@@ -58,6 +58,9 @@ _FORBIDDEN_KEYS = frozenset(
         "x_amz_credential",
         "x_amz_security_token",
         "x_amz_signature",
+        "x_goog_credential",
+        "x_goog_security_token",
+        "x_goog_signature",
     }
 )
 _FORBIDDEN_KEY_CANONICAL = frozenset(
@@ -829,9 +832,10 @@ class StackMCPApplication:
         return {
             "source": state(subject.source.evidence),
             "package": state(subject.package.evidence),
-            "deploy": cls._read_deploy_state(
+            "deploy": cls._read_timestamped_link_state(
                 observation,
-                subject,
+                subject.deploy.evidence,
+                subject.deploy.deployed_at,
                 now,
             ),
             "process": state(subject.process.evidence),
@@ -844,8 +848,18 @@ class StackMCPApplication:
                     [state(consumer.evidence) for consumer in subject.consumers]
                 )
             ),
-            "proof": state(subject.proof.evidence),
-            "acceptance": state(subject.acceptance.evidence),
+            "proof": cls._read_timestamped_link_state(
+                observation,
+                subject.proof.evidence,
+                subject.proof.evaluated_at,
+                now,
+            ),
+            "acceptance": cls._read_timestamped_link_state(
+                observation,
+                subject.acceptance.evidence,
+                subject.acceptance.accepted_at,
+                now,
+            ),
             "canary": state(subject.canary.evidence),
             "rollback": state(subject.rollback.evidence),
         }
@@ -864,22 +878,25 @@ class StackMCPApplication:
         )
 
     @classmethod
-    def _read_deploy_state(
+    def _read_timestamped_link_state(
         cls,
         observation: RuntimeObservation,
-        subject: RuntimeSubject,
+        link: LinkEvidence,
+        event_at: datetime | None,
         now: datetime,
     ) -> str:
         state = cls._read_link_state(
             observation,
-            subject.deploy.evidence,
+            link,
             now,
         )
+        if event_at is None:
+            return state
         latest_allowed = min(
             now + MAX_PLAN_FUTURE_SKEW,
             observation.generated_at + MAX_PLAN_FUTURE_SKEW,
         )
-        if subject.deploy.deployed_at > latest_allowed:
+        if event_at > latest_allowed:
             return cls._worst_state([state, "blocked"])
         return state
 
@@ -1008,9 +1025,10 @@ class StackMCPApplication:
                 "deploy": with_effective_evidence(
                     subject.deploy,
                     subject.deploy.evidence,
-                    effective_state=self._read_deploy_state(
+                    effective_state=self._read_timestamped_link_state(
                         observation,
-                        subject,
+                        subject.deploy.evidence,
+                        subject.deploy.deployed_at,
                         now,
                     ),
                 ),
@@ -1076,11 +1094,23 @@ class StackMCPApplication:
             return with_effective_evidence(
                 subject.proof,
                 subject.proof.evidence,
+                effective_state=self._read_timestamped_link_state(
+                    observation,
+                    subject.proof.evidence,
+                    subject.proof.evaluated_at,
+                    now,
+                ),
             )
         if view == "acceptance":
             return with_effective_evidence(
                 subject.acceptance,
                 subject.acceptance.evidence,
+                effective_state=self._read_timestamped_link_state(
+                    observation,
+                    subject.acceptance.evidence,
+                    subject.acceptance.accepted_at,
+                    now,
+                ),
             )
         if view == "canary":
             return with_effective_evidence(

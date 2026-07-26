@@ -647,6 +647,9 @@ def test_observation_store_redacts_secret_material_from_forbidden_keys(
         "aws-presign-credential",
         "aws-presign-security-token",
         "aws-presign-signature",
+        "google-presign-credential",
+        "google-presign-security-token",
+        "google-presign-signature",
         "credential-query",
         "credentials-query",
         "unparseable",
@@ -818,6 +821,15 @@ def test_observation_store_rejects_credentials_inside_references(
         }[reference_surface]
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"https://bucket.s3.amazonaws.com/object?{key}={secret_value}"
+        )
+    elif reference_surface.startswith("google-presign-"):
+        key = {
+            "google-presign-credential": "X-Goog-Credential",
+            "google-presign-security-token": "X-Goog-Security-Token",
+            "google-presign-signature": "X-Goog-Signature",
+        }[reference_surface]
+        payload["subjects"][0]["deploy"]["manifest_ref"] = (
+            f"https://storage.googleapis.com/bucket/object?{key}={secret_value}"
         )
     elif reference_surface in {"credential-query", "credentials-query"}:
         key = reference_surface.removesuffix("-query")
@@ -1108,6 +1120,48 @@ def test_inspection_blocks_deployment_that_postdates_its_snapshot(
     assert full["metadata"]["freshness_state"] == "blocked"
     assert full["owner_payload"]["observation"]["effective_link_states"][
         "deploy"
+    ] == "blocked"
+
+
+@pytest.mark.parametrize(
+    ("view", "event_field"),
+    (
+        ("proof", "evaluated_at"),
+        ("acceptance", "accepted_at"),
+    ),
+)
+def test_inspection_blocks_decisions_that_postdate_their_snapshot(
+    tmp_path: Path,
+    view: str,
+    event_field: str,
+) -> None:
+    payload = observation(subject())
+    event = payload["subjects"][0][view]
+    event[event_field] = (NOW + timedelta(seconds=31)).isoformat()
+    receipt_at = (NOW + timedelta(seconds=1)).isoformat()
+    event["evidence"]["observed_at"] = receipt_at
+    event["evidence"]["evidence_refs"][0]["observed_at"] = receipt_at
+    if view == "proof":
+        payload["subjects"][0]["acceptance"]["accepted"] = False
+    app = application(tmp_path, payload=payload)
+
+    catalog = app.catalog(organ_id="aoa-kag")
+    inspected = app.inspect("aoa-kag", "read", view=view)
+    full = app.inspect("aoa-kag", "read", view="full")
+
+    assert catalog["owner_payload"]["entries"][0]["link_states"][view] == (
+        "blocked"
+    )
+    assert inspected["metadata"]["freshness_state"] == "blocked"
+    assert inspected["owner_payload"]["observation"]["evidence"]["state"] == (
+        "exact"
+    )
+    assert inspected["owner_payload"]["observation"][
+        "effective_evidence_state"
+    ] == "blocked"
+    assert full["metadata"]["freshness_state"] == "blocked"
+    assert full["owner_payload"]["observation"]["effective_link_states"][
+        view
     ] == "blocked"
 
 
