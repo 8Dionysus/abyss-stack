@@ -59,6 +59,14 @@ FEDERATION_LAYERS = [
     "aoa-kag",
     "tos-source",
 ]
+SDK_CANONICAL_AUTHORITY = {
+    "archive_authorized": False,
+    "canonical_producer_switch_authorized": True,
+    "compatibility_window_started": True,
+    "live_runtime_mutation_authorized": True,
+    "predecessor_maintenance_only": True,
+    "sdk_canonical": True,
+}
 PODMAN_INSPECT_MISSING_MARKERS = (
     "no such object",
     "no such container",
@@ -186,6 +194,23 @@ def load_json_text(text: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("expected JSON object")
     return payload
+
+
+def is_git_object_id(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 40
+        and all(char in "0123456789abcdef" for char in value)
+    )
+
+
+def is_sha256_digest(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and value.startswith("sha256:")
+        and len(value) == 71
+        and all(char in "0123456789abcdef" for char in value[7:])
+    )
 
 
 def http_get_json(url: str, *, timeout_s: float = 10.0) -> dict[str, Any]:
@@ -369,6 +394,198 @@ def fetch_route_api_surface_status(requirement: dict[str, Any]) -> dict[str, Any
     )
 
 
+def routing_sdk_canonical_layer_check(
+    predecessor_sync_check: dict[str, Any],
+) -> dict[str, Any]:
+    url = f"{ROUTE_API_BASE_URL.rstrip('/')}/surface-status"
+    detail: dict[str, Any] = {
+        "accepted_via": "route_api_sdk_canonical_closure",
+        "predecessor_sync_check": predecessor_sync_check,
+        "route_api_url": url,
+    }
+    try:
+        payload = http_get_json(url)
+    except (
+        urllib.error.URLError,
+        TimeoutError,
+        json.JSONDecodeError,
+        ValueError,
+    ) as exc:
+        detail["reasons"] = ["route_api_surface_status_unavailable"]
+        detail["error"] = str(exc)
+        return make_check(
+            status="degraded",
+            summary=(
+                "aoa-routing predecessor mirror check failed and "
+                "SDK-canonical closure was unavailable"
+            ),
+            detail=detail,
+        )
+
+    switch = payload.get("routing_switch")
+    layers_status = payload.get("layers_status")
+    routing_status = (
+        layers_status.get("aoa-routing")
+        if isinstance(layers_status, dict)
+        else None
+    )
+    closure = (
+        routing_status.get("closure_status")
+        if isinstance(routing_status, dict)
+        else None
+    )
+    metadata = (
+        routing_status.get("surface_metadata")
+        if isinstance(routing_status, dict)
+        else None
+    )
+    provenance = (
+        metadata.get("mirror_provenance")
+        if isinstance(metadata, dict)
+        else None
+    )
+    receipt = (
+        switch.get("owner_switch_receipt")
+        if isinstance(switch, dict)
+        else None
+    )
+
+    detail["routing_switch"] = switch
+    detail["routing_closure"] = closure
+    detail["routing_provenance"] = (
+        {
+            key: provenance.get(key)
+            for key in (
+                "routing_producer_posture",
+                "cutover_activation_mode",
+                "operator_change_ref_present",
+                "source_git_commit",
+                "artifact_subject_digest",
+                "canonical_producer",
+                "predecessor_rollback",
+                "g5_authority",
+                "trust_verdict_available",
+            )
+        }
+        if isinstance(provenance, dict)
+        else provenance
+    )
+    reasons: list[str] = []
+    if not isinstance(switch, dict):
+        reasons.append("routing_switch_missing")
+    else:
+        expected_switch = {
+            "posture": "sdk_canonical",
+            "activation_mode": "authorized_live_cutover",
+            "canonical_posture": True,
+            "canonical_ready": True,
+            "closure_ready": True,
+            "live_cutover_active": True,
+            "compatibility_rollback_active": False,
+            "canonical_switch_authorized": True,
+        }
+        for key, expected in expected_switch.items():
+            if switch.get(key) != expected:
+                reasons.append(f"routing_switch_{key}_invalid")
+        if switch.get("canonical_reasons") != []:
+            reasons.append("routing_switch_canonical_reasons_present")
+    if not isinstance(receipt, dict):
+        reasons.append("routing_owner_switch_receipt_missing")
+    else:
+        receipt_digest = receipt.get("digest")
+        if (
+            receipt.get("schema")
+            != "aoa_sdk_routing_g5_owner_switch_receipt_v1"
+            or receipt.get("status") != "g5_switch_authorized"
+            or not is_sha256_digest(receipt_digest)
+        ):
+            reasons.append("routing_owner_switch_receipt_invalid")
+        compatibility = receipt.get("compatibility_window")
+        if (
+            not isinstance(compatibility, dict)
+            or compatibility.get("state") != "started"
+            or not isinstance(
+                compatibility.get("started_by_sdk_version"),
+                str,
+            )
+            or not isinstance(compatibility.get("started_on"), str)
+        ):
+            reasons.append(
+                "routing_owner_switch_compatibility_window_invalid"
+            )
+    if not isinstance(closure, dict):
+        reasons.append("routing_closure_missing")
+    else:
+        for key in (
+            "mirror_ready",
+            "consumer_ready",
+            "provenance_ready",
+            "closure_ready",
+            "canonical_posture",
+            "canonical_ready",
+        ):
+            if closure.get(key) is not True:
+                reasons.append(f"routing_closure_{key}_invalid")
+        if closure.get("canonical_reasons") != []:
+            reasons.append("routing_closure_canonical_reasons_present")
+        if closure.get("reasons") != []:
+            reasons.append("routing_closure_reasons_present")
+    if not isinstance(provenance, dict):
+        reasons.append("routing_provenance_missing")
+    else:
+        if provenance.get("routing_producer_posture") != "sdk_canonical":
+            reasons.append("routing_provenance_posture_invalid")
+        if (
+            provenance.get("cutover_activation_mode")
+            != "authorized_live_cutover"
+        ):
+            reasons.append("routing_provenance_activation_mode_invalid")
+        if provenance.get("operator_change_ref_present") is not True:
+            reasons.append("routing_provenance_operator_change_ref_missing")
+        if provenance.get("trust_verdict_available") is not True:
+            reasons.append("routing_provenance_trust_verdict_missing")
+        if provenance.get("g5_authority") != SDK_CANONICAL_AUTHORITY:
+            reasons.append("routing_provenance_g5_authority_invalid")
+        producer = provenance.get("canonical_producer")
+        source_ref = provenance.get("source_git_commit")
+        if (
+            not isinstance(producer, dict)
+            or producer.get("owner_repo") != "aoa-sdk"
+            or producer.get("source_ref") != source_ref
+            or not is_git_object_id(source_ref)
+        ):
+            reasons.append("routing_provenance_canonical_producer_invalid")
+        predecessor = provenance.get("predecessor_rollback")
+        if (
+            not isinstance(predecessor, dict)
+            or predecessor.get("owner_repo") != "aoa-routing"
+            or not is_git_object_id(predecessor.get("source_ref"))
+        ):
+            reasons.append("routing_provenance_predecessor_invalid")
+        subject_digest = provenance.get("artifact_subject_digest")
+        if not is_sha256_digest(subject_digest):
+            reasons.append("routing_provenance_subject_digest_invalid")
+
+    detail["reasons"] = reasons
+    if not reasons:
+        return make_check(
+            status="pass",
+            summary=(
+                "aoa-routing SDK-canonical live cutover closure passed; "
+                "predecessor sync mismatch is compatibility evidence"
+            ),
+            detail=detail,
+        )
+    return make_check(
+        status="degraded",
+        summary=(
+            "aoa-routing predecessor mirror check failed and "
+            "SDK-canonical live cutover closure did not pass"
+        ),
+        detail=detail,
+    )
+
+
 def run_federation_layer_check(layer: str) -> dict[str, Any]:
     result = run_command(
         [
@@ -400,6 +617,8 @@ def run_federation_layer_check(layer: str) -> dict[str, Any]:
             summary=f"{layer} federation mirror check passed",
             detail=detail,
         )
+    if layer == "aoa-routing":
+        return routing_sdk_canonical_layer_check(detail)
     return make_check(
         status="degraded",
         summary=f"{layer} federation mirror check failed",

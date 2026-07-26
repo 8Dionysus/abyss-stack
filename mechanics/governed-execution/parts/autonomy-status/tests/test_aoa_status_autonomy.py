@@ -61,6 +61,80 @@ def trial_check(*, status: str, trial_proven: bool, live_available: bool) -> dic
     )
 
 
+def sdk_canonical_surface_status() -> dict:
+    authority = {
+        "archive_authorized": False,
+        "canonical_producer_switch_authorized": True,
+        "compatibility_window_started": True,
+        "live_runtime_mutation_authorized": True,
+        "predecessor_maintenance_only": True,
+        "sdk_canonical": True,
+    }
+    source_ref = "a" * 40
+    predecessor_ref = "b" * 40
+    return {
+        "ok": True,
+        "routing_switch": {
+            "posture": "sdk_canonical",
+            "activation_mode": "authorized_live_cutover",
+            "canonical_posture": True,
+            "canonical_ready": True,
+            "canonical_reasons": [],
+            "closure_ready": True,
+            "live_cutover_active": True,
+            "compatibility_rollback_active": False,
+            "canonical_switch_authorized": True,
+            "owner_switch_receipt": {
+                "schema": "aoa_sdk_routing_g5_owner_switch_receipt_v1",
+                "status": "g5_switch_authorized",
+                "digest": "sha256:" + ("c" * 64),
+                "compatibility_window": {
+                    "started_by_sdk_version": "0.8.0",
+                    "started_on": "2026-07-26",
+                    "state": "started",
+                },
+            },
+        },
+        "layers_status": {
+            "aoa-routing": {
+                "closure_status": {
+                    "mirror_ready": True,
+                    "consumer_ready": True,
+                    "provenance_ready": True,
+                    "closure_ready": True,
+                    "canonical_posture": True,
+                    "canonical_ready": True,
+                    "canonical_reasons": [],
+                    "reasons": [],
+                },
+                "surface_metadata": {
+                    "mirror_provenance": {
+                        "routing_producer_posture": "sdk_canonical",
+                        "cutover_activation_mode": (
+                            "authorized_live_cutover"
+                        ),
+                        "operator_change_ref_present": True,
+                        "source_git_commit": source_ref,
+                        "artifact_subject_digest": (
+                            "sha256:" + ("d" * 64)
+                        ),
+                        "canonical_producer": {
+                            "owner_repo": "aoa-sdk",
+                            "source_ref": source_ref,
+                        },
+                        "predecessor_rollback": {
+                            "owner_repo": "aoa-routing",
+                            "source_ref": predecessor_ref,
+                        },
+                        "g5_authority": authority,
+                        "trust_verdict_available": True,
+                    }
+                },
+            }
+        },
+    }
+
+
 class AutonomyCollectorTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -299,3 +373,104 @@ class AutonomyCollectorTests(unittest.TestCase):
         self.assertTrue(requirement["required"])
         self.assertEqual(requirement["route_api_container_state"], "inspect_error")
         self.assertEqual(requirement["reason"], "route-api container state is inspect_error")
+
+    def test_routing_sdk_canonical_closure_supersedes_predecessor_sync_mismatch(
+        self,
+    ) -> None:
+        stale_result = {
+            "command": ["aoa-sync-federation-surfaces"],
+            "cwd": str(self.configs_root),
+            "exit_code": 1,
+            "stdout": (
+                '{"layer":"aoa-routing","status":"stale",'
+                '"freshness_status":"source_commit_mismatch"}'
+            ),
+            "stderr": "",
+        }
+        surface = sdk_canonical_surface_status()
+        surface["ok"] = False
+        with patch.object(self.module, "CONFIGS_ROOT", self.configs_root):
+            with patch.object(
+                self.module,
+                "run_command",
+                return_value=stale_result,
+            ):
+                with patch.object(
+                    self.module,
+                    "http_get_json",
+                    return_value=surface,
+                ):
+                    result = self.module.run_federation_layer_check(
+                        "aoa-routing"
+                    )
+
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(
+            result["detail"]["accepted_via"],
+            "route_api_sdk_canonical_closure",
+        )
+        self.assertEqual(result["detail"]["reasons"], [])
+        self.assertEqual(
+            result["detail"]["predecessor_sync_check"]["payload"]["status"],
+            "stale",
+        )
+
+    def test_routing_sdk_canonical_fallback_fails_closed_on_isolated_state(
+        self,
+    ) -> None:
+        stale_result = {
+            "command": ["aoa-sync-federation-surfaces"],
+            "cwd": str(self.configs_root),
+            "exit_code": 1,
+            "stdout": '{"layer":"aoa-routing","status":"stale"}',
+            "stderr": "",
+        }
+        surface = sdk_canonical_surface_status()
+        surface["routing_switch"]["activation_mode"] = "isolated"
+        with patch.object(self.module, "CONFIGS_ROOT", self.configs_root):
+            with patch.object(
+                self.module,
+                "run_command",
+                return_value=stale_result,
+            ):
+                with patch.object(
+                    self.module,
+                    "http_get_json",
+                    return_value=surface,
+                ):
+                    result = self.module.run_federation_layer_check(
+                        "aoa-routing"
+                    )
+
+        self.assertEqual(result["status"], "degraded")
+        self.assertIn(
+            "routing_switch_activation_mode_invalid",
+            result["detail"]["reasons"],
+        )
+
+    def test_current_predecessor_sync_does_not_query_route_api_fallback(
+        self,
+    ) -> None:
+        current_result = {
+            "command": ["aoa-sync-federation-surfaces"],
+            "cwd": str(self.configs_root),
+            "exit_code": 0,
+            "stdout": '{"layer":"aoa-routing","status":"ok"}',
+            "stderr": "",
+        }
+        with patch.object(self.module, "CONFIGS_ROOT", self.configs_root):
+            with patch.object(
+                self.module,
+                "run_command",
+                return_value=current_result,
+            ):
+                with patch.object(
+                    self.module,
+                    "http_get_json",
+                    side_effect=AssertionError("fallback should not run"),
+                ):
+                    result = self.module.run_federation_layer_check(
+                        "aoa-routing"
+                    )
+
+        self.assertEqual(result["status"], "pass")
