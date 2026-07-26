@@ -66,9 +66,10 @@ Tracking starts with the community-docs baseline for this repository.
   disable bytecode writes explicitly so isolated mode cannot mutate the
   measured runtime after provisioning.
 - Secret screening now detects bounded provider-token patterns inside
-  descriptive references, rollback restoration requires evidence bound to an
-  absent consumer's exact registration target, and runtime reuse binds the
-  bytes behind the fully resolved venv interpreter symlink chain.
+  descriptive references and passphrase-bearing exact or namespaced keys;
+  rollback restoration requires evidence bound to an absent consumer's exact
+  registration target, and runtime reuse binds the bytes behind the fully
+  resolved venv interpreter symlink chain.
 - Rollback candidate preparation now relies on the usable, typed
   last-known-good rollback proof and no longer blocks on or copies canary
   evidence from the current deployment.

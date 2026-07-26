@@ -122,8 +122,9 @@ fields, secret-like keys or values, shared credential classes, non-loopback
 HTTP endpoints, credentials embedded in URI userinfo/path/query/fragment references,
 encoded nested credential references, unparseable or excessively nested
 URI-like references, whitespace-only exact targets, and unsupported effect
-classes. Credential-key screening recognizes namespaced separator and
-camel-case token sequences rather than only exact key spellings. Concatenated
+classes. Credential-key screening includes passphrases and recognizes
+namespaced separator and camel-case token sequences rather than only exact key
+spellings. Concatenated
 matches require a recognized provider/consumer namespace or credential-value
 attribute boundary, so ordinary keys such as `tokenizer`, `passwordless`, and
 `authorizationPolicy` remain valid.

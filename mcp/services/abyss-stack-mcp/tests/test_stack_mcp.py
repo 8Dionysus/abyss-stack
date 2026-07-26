@@ -566,6 +566,10 @@ def test_observation_store_rejects_secrets_symlinks_and_oversize(
         "refresh token",
         "github_api_key",
         "backupClientSecretValue",
+        "passphrase",
+        "databasePassphrase",
+        "ssh_passphrase",
+        "private_key_passphrase",
     ),
 )
 def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
@@ -618,6 +622,7 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
         "namespaced-bare-assignment",
         "concatenated-suffixed-bare-assignment",
         "encoded-bare-assignment",
+        "passphrase-query",
         "unparseable",
     ),
 )
@@ -768,6 +773,11 @@ def test_observation_store_rejects_credentials_inside_references(
     elif reference_surface == "encoded-bare-assignment":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"github_api_key%3D{secret_value}"
+        )
+    elif reference_surface == "passphrase-query":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            "https://acceptance.invalid/receipt?"
+            f"ssh_passphrase={secret_value}"
         )
     else:
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (

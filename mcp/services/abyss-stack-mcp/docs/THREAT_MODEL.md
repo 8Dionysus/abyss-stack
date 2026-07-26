@@ -22,8 +22,8 @@
   validation or response; unparseable URI-like values fail closed, bounded
   recursive decoding covers nested parameters, and credential-key tokenization
   catches namespaced separator/camel-case forms plus concatenated recognized
-  provider/consumer and credential-attribute boundaries without treating
-  arbitrary word substrings as credentials; structurally valid compact JWT and
+  provider/consumer, passphrase, and credential-attribute boundaries without
+  treating arbitrary word substrings as credentials; structurally valid compact JWT and
   PEM private-key checks cover embedded material, Basic/Bearer checks normalize
   leading whitespace, and bounded provider-token patterns are scanned
   throughout values for the standard OpenAI, GitHub, and GitLab families;
