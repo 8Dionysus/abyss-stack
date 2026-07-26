@@ -364,7 +364,10 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
         "relative-query",
         "userinfo",
         "fragment",
+        "fragment-token",
         "secret-value",
+        "nested-value",
+        "double-key",
         "unparseable",
     ),
 )
@@ -390,9 +393,23 @@ def test_observation_store_rejects_credentials_inside_references(
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"https://acceptance.invalid/receipt#client_secret={secret_value}"
         )
+    elif reference_surface == "fragment-token":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"https://acceptance.invalid/receipt#sk-{secret_value}"
+        )
     elif reference_surface == "secret-value":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"https://acceptance.invalid/receipt?value=sk-{secret_value}"
+        )
+    elif reference_surface == "nested-value":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            "https://acceptance.invalid/receipt?"
+            "next=https%3A%2F%2Fhost.invalid%2Freport"
+            f"%3Fapi_key%3D{secret_value}"
+        )
+    elif reference_surface == "double-key":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"https://acceptance.invalid/receipt?%2561pi_key={secret_value}"
         )
     else:
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
@@ -400,7 +417,7 @@ def test_observation_store_rejects_credentials_inside_references(
         )
     path = write_observation(tmp_path / f"{reference_surface}.json", payload)
 
-    with pytest.raises(StackMCPError, match="reference") as caught:
+    with pytest.raises(StackMCPError, match="forbidden") as caught:
         ObservationStore(path).load()
 
     assert secret_value not in str(caught.value)

@@ -12,7 +12,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qsl, urlsplit
+from urllib.parse import parse_qsl, unquote_plus, urlsplit
 
 from pydantic import ValidationError
 
@@ -35,6 +35,7 @@ DEFAULT_OBSERVATION_PATH = Path(
 )
 MAX_OBSERVATION_BYTES = 2 * 1024 * 1024
 MAX_PLAN_FUTURE_SKEW = timedelta(seconds=30)
+MAX_REFERENCE_DECODE_DEPTH = 4
 _FORBIDDEN_KEYS = frozenset(
     {
         "access_token",
@@ -72,21 +73,52 @@ def sha256_digest(value: Any) -> str:
     return f"sha256:{hashlib.sha256(canonical_json_bytes(value)).hexdigest()}"
 
 
-def _reject_secret_material(value: Any, path: str = "$") -> None:
+def _decoded_reference_variants(value: str, path: str) -> tuple[str, ...]:
+    variants = [value]
+    for _ in range(MAX_REFERENCE_DECODE_DEPTH):
+        decoded = unquote_plus(variants[-1])
+        if decoded == variants[-1]:
+            return tuple(variants)
+        variants.append(decoded)
+    if unquote_plus(variants[-1]) != variants[-1]:
+        raise StackMCPError(
+            f"excessively encoded reference is forbidden at {path}"
+        )
+    return tuple(variants)
+
+
+def _reject_secret_material(
+    value: Any,
+    path: str = "$",
+    *,
+    reference_depth: int = 0,
+) -> None:
     if isinstance(value, dict):
         for key, child in value.items():
             normalized = re.sub(r"[^a-z0-9]", "", str(key).casefold())
             if normalized in _FORBIDDEN_KEY_CANONICAL:
                 raise StackMCPError(f"secret-bearing key is forbidden at {path}.{key}")
-            _reject_secret_material(child, f"{path}.{key}")
+            _reject_secret_material(
+                child,
+                f"{path}.{key}",
+                reference_depth=reference_depth,
+            )
     elif isinstance(value, list):
         for index, child in enumerate(value):
-            _reject_secret_material(child, f"{path}[{index}]")
+            _reject_secret_material(
+                child,
+                f"{path}[{index}]",
+                reference_depth=reference_depth,
+            )
     elif isinstance(value, str):
         lowered = value.lower()
         if lowered.startswith(("bearer ", "sk-", "ghp_", "github_pat_")):
             raise StackMCPError(f"secret-like value is forbidden at {path}")
         if any(marker in value for marker in ("://", "?", "#")):
+            if reference_depth >= MAX_REFERENCE_DECODE_DEPTH:
+                raise StackMCPError(
+                    f"nested reference depth is forbidden at {path}"
+                )
             try:
                 parsed = urlsplit(value)
             except ValueError:
@@ -105,18 +137,35 @@ def _reject_secret_material(value: Any, path: str = "$") -> None:
                     component,
                     keep_blank_values=True,
                 ):
-                    normalized = re.sub(r"[^a-z0-9]", "", key.casefold())
-                    if normalized in _FORBIDDEN_KEY_CANONICAL:
-                        raise StackMCPError(
-                            "secret-bearing reference key is forbidden at "
-                            f"{path}.{component_name}"
-                        )
-                    if query_value.lower().startswith(
-                        ("bearer ", "sk-", "ghp_", "github_pat_")
+                    for decoded_key in _decoded_reference_variants(
+                        key,
+                        f"{path}.{component_name}.key",
                     ):
-                        raise StackMCPError(
-                            "secret-like reference value is forbidden at "
-                            f"{path}.{component_name}"
+                        normalized = re.sub(
+                            r"[^a-z0-9]",
+                            "",
+                            decoded_key.casefold(),
+                        )
+                        if normalized in _FORBIDDEN_KEY_CANONICAL:
+                            raise StackMCPError(
+                                "secret-bearing reference key is forbidden at "
+                                f"{path}.{component_name}"
+                            )
+                        if decoded_key.lower().startswith(
+                            ("bearer ", "sk-", "ghp_", "github_pat_")
+                        ):
+                            raise StackMCPError(
+                                "secret-like reference component is forbidden at "
+                                f"{path}.{component_name}"
+                            )
+                    for decoded_value in _decoded_reference_variants(
+                        query_value,
+                        f"{path}.{component_name}.value",
+                    ):
+                        _reject_secret_material(
+                            decoded_value,
+                            f"{path}.{component_name}.value",
+                            reference_depth=reference_depth + 1,
                         )
 
 
