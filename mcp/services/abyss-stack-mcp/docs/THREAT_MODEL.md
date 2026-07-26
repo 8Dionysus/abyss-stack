@@ -18,7 +18,9 @@
 - secret-like material rejected before validation or response;
 - URI-like references reject credential-bearing userinfo and forbidden
   query/fragment keys before validation or response; unparseable URI-like
-  values fail closed, and bounded recursive decoding covers nested parameters;
+  values fail closed, bounded recursive decoding covers nested parameters, and
+  secret-prefix checks normalize leading whitespace;
+- exact targets require at least one non-whitespace character;
 - exact observation digest and short expiry for candidate plans;
 - structured allowlisted plan actions with no free-form command;
 - active processes require an observed process identity rather than a bare

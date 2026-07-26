@@ -6,6 +6,7 @@
         "evidence_ref": {
           "maxLength": 2048,
           "minLength": 1,
+          "pattern": "\\S",
           "title": "Evidence Ref",
           "type": "string"
         },
@@ -37,6 +38,7 @@
         "revision": {
           "maxLength": 2048,
           "minLength": 1,
+          "pattern": "\\S",
           "title": "Revision",
           "type": "string"
         }
@@ -63,12 +65,14 @@
         "exact_target": {
           "maxLength": 2048,
           "minLength": 1,
+          "pattern": "\\S",
           "title": "Exact Target",
           "type": "string"
         },
         "expected_effect": {
           "maxLength": 2048,
           "minLength": 1,
+          "pattern": "\\S",
           "title": "Expected Effect",
           "type": "string"
         },
@@ -118,6 +122,7 @@
     "deployed_revision": {
       "maxLength": 2048,
       "minLength": 1,
+      "pattern": "\\S",
       "title": "Deployed Revision",
       "type": "string"
     },
@@ -187,6 +192,7 @@
     "rollback_route": {
       "maxLength": 2048,
       "minLength": 1,
+      "pattern": "\\S",
       "title": "Rollback Route",
       "type": "string"
     },
@@ -199,6 +205,7 @@
     "source_revision": {
       "maxLength": 2048,
       "minLength": 1,
+      "pattern": "\\S",
       "title": "Source Revision",
       "type": "string"
     },

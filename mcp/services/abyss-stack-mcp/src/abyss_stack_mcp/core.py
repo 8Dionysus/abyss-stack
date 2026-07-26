@@ -111,7 +111,7 @@ def _reject_secret_material(
                 reference_depth=reference_depth,
             )
     elif isinstance(value, str):
-        lowered = value.lower()
+        lowered = value.lstrip().lower()
         if lowered.startswith(("bearer ", "sk-", "ghp_", "github_pat_")):
             raise StackMCPError(f"secret-like value is forbidden at {path}")
         if any(marker in value for marker in ("://", "?", "#")):
@@ -151,7 +151,7 @@ def _reject_secret_material(
                                 "secret-bearing reference key is forbidden at "
                                 f"{path}.{component_name}"
                             )
-                        if decoded_key.lower().startswith(
+                        if decoded_key.lstrip().lower().startswith(
                             ("bearer ", "sk-", "ghp_", "github_pat_")
                         ):
                             raise StackMCPError(

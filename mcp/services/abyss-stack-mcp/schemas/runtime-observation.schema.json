@@ -44,6 +44,7 @@
             {
               "maxLength": 2048,
               "minLength": 1,
+              "pattern": "\\S",
               "type": "string"
             },
             {
@@ -56,6 +57,7 @@
         "canary_route": {
           "maxLength": 2048,
           "minLength": 1,
+          "pattern": "\\S",
           "title": "Canary Route",
           "type": "string"
         },
@@ -171,6 +173,7 @@
             {
               "maxLength": 2048,
               "minLength": 1,
+              "pattern": "\\S",
               "type": "string"
             },
             {
@@ -185,6 +188,7 @@
             {
               "maxLength": 2048,
               "minLength": 1,
+              "pattern": "\\S",
               "type": "string"
             },
             {
@@ -199,6 +203,7 @@
             {
               "maxLength": 2048,
               "minLength": 1,
+              "pattern": "\\S",
               "type": "string"
             },
             {
@@ -213,6 +218,7 @@
             {
               "maxLength": 2048,
               "minLength": 1,
+              "pattern": "\\S",
               "type": "string"
             },
             {
@@ -253,6 +259,7 @@
             {
               "maxLength": 2048,
               "minLength": 1,
+              "pattern": "\\S",
               "type": "string"
             },
             {
@@ -325,6 +332,7 @@
           "items": {
             "maxLength": 2048,
             "minLength": 1,
+            "pattern": "\\S",
             "type": "string"
           },
           "title": "Observed Protocol Versions",
@@ -350,6 +358,7 @@
         "registration_ref": {
           "maxLength": 2048,
           "minLength": 1,
+          "pattern": "\\S",
           "title": "Registration Ref",
           "type": "string"
         }
@@ -377,12 +386,14 @@
         "manifest_ref": {
           "maxLength": 2048,
           "minLength": 1,
+          "pattern": "\\S",
           "title": "Manifest Ref",
           "type": "string"
         },
         "revision": {
           "maxLength": 2048,
           "minLength": 1,
+          "pattern": "\\S",
           "title": "Revision",
           "type": "string"
         },
@@ -432,6 +443,7 @@
         "endpoint_ref": {
           "maxLength": 2048,
           "minLength": 1,
+          "pattern": "\\S",
           "title": "Endpoint Ref",
           "type": "string"
         },
@@ -442,6 +454,7 @@
           "items": {
             "maxLength": 2048,
             "minLength": 1,
+            "pattern": "\\S",
             "type": "string"
           },
           "minItems": 1,
@@ -490,6 +503,7 @@
         "evidence_ref": {
           "maxLength": 2048,
           "minLength": 1,
+          "pattern": "\\S",
           "title": "Evidence Ref",
           "type": "string"
         },
@@ -521,6 +535,7 @@
         "revision": {
           "maxLength": 2048,
           "minLength": 1,
+          "pattern": "\\S",
           "title": "Revision",
           "type": "string"
         }
@@ -618,6 +633,7 @@
             {
               "maxLength": 2048,
               "minLength": 1,
+              "pattern": "\\S",
               "type": "string"
             },
             {
@@ -850,6 +866,7 @@
             {
               "maxLength": 2048,
               "minLength": 1,
+              "pattern": "\\S",
               "type": "string"
             },
             {
@@ -894,6 +911,7 @@
             {
               "maxLength": 2048,
               "minLength": 1,
+              "pattern": "\\S",
               "type": "string"
             },
             {
@@ -982,6 +1000,7 @@
         "version": {
           "maxLength": 2048,
           "minLength": 1,
+          "pattern": "\\S",
           "title": "Version",
           "type": "string"
         }
@@ -1032,6 +1051,7 @@
         "executable_ref": {
           "maxLength": 2048,
           "minLength": 1,
+          "pattern": "\\S",
           "title": "Executable Ref",
           "type": "string"
         },
@@ -1040,6 +1060,7 @@
             {
               "maxLength": 2048,
               "minLength": 1,
+              "pattern": "\\S",
               "type": "string"
             },
             {
@@ -1175,6 +1196,7 @@
             {
               "maxLength": 2048,
               "minLength": 1,
+              "pattern": "\\S",
               "type": "string"
             },
             {
@@ -1204,6 +1226,7 @@
             {
               "maxLength": 2048,
               "minLength": 1,
+              "pattern": "\\S",
               "type": "string"
             },
             {
@@ -1231,6 +1254,7 @@
             {
               "maxLength": 2048,
               "minLength": 1,
+              "pattern": "\\S",
               "type": "string"
             },
             {
@@ -1258,6 +1282,7 @@
             {
               "maxLength": 2048,
               "minLength": 1,
+              "pattern": "\\S",
               "type": "string"
             },
             {
@@ -1287,6 +1312,7 @@
             {
               "maxLength": 2048,
               "minLength": 1,
+              "pattern": "\\S",
               "type": "string"
             },
             {
@@ -1303,6 +1329,7 @@
         "rollback_route": {
           "maxLength": 2048,
           "minLength": 1,
+          "pattern": "\\S",
           "title": "Rollback Route",
           "type": "string"
         }
@@ -1531,6 +1558,7 @@
         "revision": {
           "maxLength": 2048,
           "minLength": 1,
+          "pattern": "\\S",
           "title": "Revision",
           "type": "string"
         },
@@ -1578,6 +1606,7 @@
     "provider_watermark": {
       "maxLength": 2048,
       "minLength": 1,
+      "pattern": "\\S",
       "title": "Provider Watermark",
       "type": "string"
     },

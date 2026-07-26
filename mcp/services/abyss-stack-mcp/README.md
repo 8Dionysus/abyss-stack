@@ -79,7 +79,8 @@ The loader rejects symlinks, non-files, payloads above 2 MiB, unknown contract
 fields, secret-like keys or values, shared credential classes, non-loopback
 HTTP endpoints, credentials embedded in URI userinfo/query/fragment references,
 encoded nested credential references, unparseable or excessively nested
-URI-like references, and unsupported effect classes. Expired observations
+URI-like references, whitespace-only exact targets, and unsupported effect
+classes. Secret-prefix checks ignore leading whitespace. Expired observations
 remain visible as stale read evidence but cannot produce a candidate plan.
 The generated Draft 2020-12 schema includes the conditional invariants for
 usable links and freshness, endpoint readiness, consumer registration,

@@ -15,7 +15,10 @@ Identifier = Annotated[
     str,
     Field(min_length=1, max_length=160, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$"),
 ]
-NonEmpty = Annotated[str, Field(min_length=1, max_length=2048)]
+NonEmpty = Annotated[
+    str,
+    Field(min_length=1, max_length=2048, pattern=r"\S"),
+]
 Digest = Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")]
 UnitName = Annotated[
     str,

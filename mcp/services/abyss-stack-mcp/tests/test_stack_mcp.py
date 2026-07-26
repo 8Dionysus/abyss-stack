@@ -310,6 +310,29 @@ def test_central_proof_cannot_predate_its_canary(
         RuntimeObservation.model_validate(payload)
 
 
+@pytest.mark.parametrize(
+    "field_path",
+    (
+        ("deploy", "manifest_ref"),
+        ("consumers", 0, "registration_ref"),
+        ("canary", "canary_route"),
+        ("rollback", "rollback_route"),
+        ("source", "evidence", "evidence_refs", 0, "evidence_ref"),
+    ),
+)
+def test_contract_rejects_whitespace_only_exact_targets(
+    field_path: tuple[str | int, ...],
+) -> None:
+    payload = observation(subject())
+    target = payload["subjects"][0]
+    for part in field_path[:-1]:
+        target = target[part]
+    target[field_path[-1]] = " \t\n"
+
+    with pytest.raises(ValidationError, match="pattern"):
+        RuntimeObservation.model_validate(payload)
+
+
 def test_observation_store_rejects_secrets_symlinks_and_oversize(
     tmp_path: Path,
 ) -> None:
@@ -366,6 +389,8 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
         "fragment",
         "fragment-token",
         "secret-value",
+        "leading-token",
+        "leading-direct",
         "nested-value",
         "double-key",
         "unparseable",
@@ -400,6 +425,14 @@ def test_observation_store_rejects_credentials_inside_references(
     elif reference_surface == "secret-value":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"https://acceptance.invalid/receipt?value=sk-{secret_value}"
+        )
+    elif reference_surface == "leading-token":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"https://acceptance.invalid/receipt?value=%20sk-{secret_value}"
+        )
+    elif reference_surface == "leading-direct":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f" Bearer {secret_value}"
         )
     elif reference_surface == "nested-value":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
