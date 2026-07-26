@@ -590,6 +590,23 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
     assert secret_value not in str(caught.value)
 
 
+def test_observation_store_redacts_secret_material_from_forbidden_keys(
+    tmp_path: Path,
+) -> None:
+    secret_value = "actual-secret-material"
+    secret_key = f"password={secret_value}"
+    payload = observation(subject())
+    payload["subjects"][0][secret_key] = "blocked-before-contract-validation"
+    path = write_observation(tmp_path / "secret-bearing-key.json", payload)
+
+    with pytest.raises(StackMCPError, match="secret-bearing") as caught:
+        ObservationStore(path).load()
+
+    assert secret_key not in str(caught.value)
+    assert secret_value not in str(caught.value)
+    assert "field[" in str(caught.value)
+
+
 @pytest.mark.parametrize(
     "reference_surface",
     (

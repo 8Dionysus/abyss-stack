@@ -307,12 +307,15 @@ def _reject_secret_material(
     reference_depth: int = 0,
 ) -> None:
     if isinstance(value, dict):
-        for key, child in value.items():
+        for index, (key, child) in enumerate(value.items()):
+            child_path = f"{path}.field[{index}]"
             if _is_forbidden_credential_key(key):
-                raise StackMCPError(f"secret-bearing key is forbidden at {path}.{key}")
+                raise StackMCPError(
+                    f"secret-bearing key is forbidden at {child_path}"
+                )
             _reject_secret_material(
                 child,
-                f"{path}.{key}",
+                child_path,
                 reference_depth=reference_depth,
             )
     elif isinstance(value, list):
