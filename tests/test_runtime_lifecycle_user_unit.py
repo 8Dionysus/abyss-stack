@@ -759,6 +759,11 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 str(INSTALL_SYSTEMD),
                 "--provision-abyss-stack-mcp-runtime",
             ]
+            verify_command = [
+                "bash",
+                str(INSTALL_SYSTEMD),
+                "--verify-abyss-stack-mcp-runtime",
+            ]
 
             read_unit_source = (
                 unit_source_dir / "abyss-stack-mcp-read.service"
@@ -895,6 +900,17 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertTrue(all(str(service_root) not in line for line in pip_calls))
 
+            verified = subprocess.run(
+                verify_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(verified.returncode, 0, verified.stderr)
+            self.assertEqual(verified.stdout, "")
+
             second = subprocess.run(
                 command,
                 cwd=REPO_ROOT,
@@ -910,10 +926,39 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 first_identity,
             )
 
+            source_file.write_text("VALUE = 2\n", encoding="utf-8")
+            source_drift = subprocess.run(
+                verify_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(source_drift.returncode, 0)
+            self.assertIn(
+                "runtime source-and-lock identity mismatch",
+                source_drift.stderr,
+            )
+            source_file.write_text("VALUE = 1\n", encoding="utf-8")
+
             bootstrap.write_text(
                 bootstrap.read_text(encoding="utf-8")
                 + "\n# simulated host interpreter update\n",
                 encoding="utf-8",
+            )
+            interpreter_drift = subprocess.run(
+                verify_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(interpreter_drift.returncode, 0)
+            self.assertIn(
+                "abyss-stack MCP runtime content digest mismatch",
+                interpreter_drift.stderr,
             )
             interpreter_rebuilt = subprocess.run(
                 command,
@@ -1211,6 +1256,20 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
             "link lock-aware user units in a separate transaction",
+            result.stderr,
+        )
+
+    def test_stack_mcp_runtime_verification_is_read_only_and_standalone(
+        self,
+    ) -> None:
+        result = self.run_install_systemd(
+            "--verify-abyss-stack-mcp-runtime",
+            "--restart-now",
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "runtime verification must be a standalone read-only action",
             result.stderr,
         )
 
@@ -1536,6 +1595,10 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             "ExecCondition=/usr/bin/test -x /srv/AbyssOS/abyss-stack/Services/"
             "abyss-stack-mcp/venv/bin/python"
         )
+        runtime_verifier_condition = (
+            "ExecCondition=/srv/AbyssOS/abyss-stack/Configs/scripts/"
+            "aoa-install-systemd --verify-abyss-stack-mcp-runtime"
+        )
 
         self.assertIn("Environment=ABYSS_STACK_MCP_POLICY_FAMILY=read", read_unit)
         self.assertNotIn(
@@ -1574,6 +1637,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             self.assertIn("/venv/bin/python -I -B -m abyss_stack_mcp.server", unit)
             self.assertIn(runtime_condition, unit)
             self.assertIn(runtime_exec_condition, unit)
+            self.assertIn(runtime_verifier_condition, unit)
             self.assertIn(deployed_entrypoint, unit)
             self.assertNotIn(
                 "/Configs/mcp/services/abyss-stack-mcp/scripts/"

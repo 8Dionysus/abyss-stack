@@ -14,6 +14,7 @@ link_system_units=0
 provision_mcp_http_auth=0
 provision_abyss_stack_mcp_auth=0
 provision_abyss_stack_mcp_runtime=0
+verify_abyss_stack_mcp_runtime=0
 install_mcp_http_codex_client=0
 remove_mcp_http_codex_client=0
 preset_spec=""
@@ -88,6 +89,9 @@ while (($#)); do
     --provision-abyss-stack-mcp-runtime)
       provision_abyss_stack_mcp_runtime=1
       ;;
+    --verify-abyss-stack-mcp-runtime)
+      verify_abyss_stack_mcp_runtime=1
+      ;;
     --install-mcp-http-codex-client)
       install_mcp_http_codex_client=1
       ;;
@@ -152,6 +156,13 @@ if ((install_mcp_http_codex_client && remove_mcp_http_codex_client)); then
 fi
 if ((provision_abyss_stack_mcp_runtime && link_all_user_units)); then
   aoa_die "link lock-aware user units in a separate transaction before abyss-stack MCP runtime provisioning"
+fi
+if ((verify_abyss_stack_mcp_runtime && \
+      (provision_mcp_http_auth || provision_abyss_stack_mcp_auth || \
+       provision_abyss_stack_mcp_runtime || install_mcp_http_codex_client || \
+       remove_mcp_http_codex_client || enable_now || restart_now || \
+       link_all_user_units || link_system_units || selection_set || overlay_set))); then
+  aoa_die "abyss-stack MCP runtime verification must be a standalone read-only action"
 fi
 if (((install_mcp_http_codex_client || remove_mcp_http_codex_client) && EUID == 0)); then
   aoa_die "MCP HTTP Codex client install and removal must run as the target user, not root"
@@ -453,6 +464,86 @@ aoa_digest_abyss_stack_mcp_runtime() {
   )" || return 1
   [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || return 1
   printf '%s\n' "$digest"
+}
+
+aoa_verify_abyss_stack_mcp_runtime() {
+  local marker=".abyss-stack-mcp-runtime-identity"
+  local content_marker=".abyss-stack-mcp-runtime-content-digest"
+  local lock_path="${abyss_stack_mcp_service_root}/requirements.lock"
+  local source_digest=""
+  local lock_digest=""
+  local expected_identity=""
+  local recorded_identity=""
+  local recorded_content_digest=""
+  local observed_content_digest=""
+  local source_lock_fd=""
+  local runtime_lock_fd=""
+
+  [[ -f "$abyss_stack_mcp_source_lock" && \
+     ! -L "$abyss_stack_mcp_source_lock" ]] || \
+    aoa_die "abyss-stack MCP source projection lock is unavailable"
+  [[ -f "$abyss_stack_mcp_runtime_lock" && \
+     ! -L "$abyss_stack_mcp_runtime_lock" ]] || \
+    aoa_die "abyss-stack MCP runtime lock is unavailable"
+  exec {source_lock_fd}<> "$abyss_stack_mcp_source_lock"
+  if ! /usr/bin/flock --shared --nonblock "$source_lock_fd"; then
+    aoa_die "Configs sync or runtime provisioning holds the abyss-stack MCP source projection lock"
+  fi
+  exec {runtime_lock_fd}<> "$abyss_stack_mcp_runtime_lock"
+  if ! /usr/bin/flock --shared --nonblock "$runtime_lock_fd"; then
+    aoa_die "runtime provisioning holds the abyss-stack MCP runtime lock"
+  fi
+  [[ -d "$abyss_stack_mcp_service_root" && \
+     ! -L "$abyss_stack_mcp_service_root" ]] || \
+    aoa_die "deployed abyss-stack MCP package root is unavailable"
+  [[ -f "${abyss_stack_mcp_service_root}/pyproject.toml" && \
+     ! -L "${abyss_stack_mcp_service_root}/pyproject.toml" ]] || \
+    aoa_die "deployed abyss-stack MCP package metadata is unavailable"
+  [[ -f "$lock_path" && ! -L "$lock_path" ]] || \
+    aoa_die "deployed abyss-stack MCP hash lock is unavailable"
+  if [[ -n "$(
+    find "$abyss_stack_mcp_service_root" \
+      ! -type f \
+      ! -type d \
+      -print \
+      -quit
+  )" ]]; then
+    aoa_die "deployed abyss-stack MCP package must contain only regular files and directories"
+  fi
+  [[ -d "$abyss_stack_mcp_venv" && ! -L "$abyss_stack_mcp_venv" ]] || \
+    aoa_die "provisioned abyss-stack MCP runtime is unavailable"
+  [[ -f "${abyss_stack_mcp_venv}/${marker}" && \
+     ! -L "${abyss_stack_mcp_venv}/${marker}" ]] || \
+    aoa_die "abyss-stack MCP runtime identity marker is unavailable"
+  [[ -f "${abyss_stack_mcp_venv}/${content_marker}" && \
+     ! -L "${abyss_stack_mcp_venv}/${content_marker}" ]] || \
+    aoa_die "abyss-stack MCP runtime content marker is unavailable"
+
+  source_digest="$(
+    aoa_digest_abyss_stack_mcp_package "$abyss_stack_mcp_service_root"
+  )" || aoa_die "failed to digest the deployed abyss-stack MCP package"
+  lock_digest="$(sha256sum "$lock_path" | cut -d' ' -f1)"
+  [[ "$lock_digest" =~ ^[0-9a-f]{64}$ ]] || \
+    aoa_die "failed to digest the deployed abyss-stack MCP hash lock"
+  expected_identity="${source_digest}:${lock_digest}"
+  recorded_identity="$(<"${abyss_stack_mcp_venv}/${marker}")"
+  [[ "$recorded_identity" =~ ^[0-9a-f]{64}:[0-9a-f]{64}$ ]] || \
+    aoa_die "abyss-stack MCP runtime identity marker is invalid"
+  [[ "$recorded_identity" == "$expected_identity" ]] || \
+    aoa_die "abyss-stack MCP runtime source-and-lock identity mismatch"
+
+  recorded_content_digest="$(
+    <"${abyss_stack_mcp_venv}/${content_marker}"
+  )"
+  [[ "$recorded_content_digest" =~ ^[0-9a-f]{64}$ ]] || \
+    aoa_die "abyss-stack MCP runtime content marker is invalid"
+  observed_content_digest="$(
+    aoa_digest_abyss_stack_mcp_runtime "$abyss_stack_mcp_venv"
+  )" || aoa_die "failed to digest the provisioned abyss-stack MCP runtime"
+  [[ "$observed_content_digest" == "$recorded_content_digest" ]] || \
+    aoa_die "abyss-stack MCP runtime content digest mismatch"
+  exec {runtime_lock_fd}>&-
+  exec {source_lock_fd}>&-
 }
 
 aoa_rewrite_abyss_stack_mcp_entrypoint_shebangs() {
@@ -898,13 +989,16 @@ fi
 if ((provision_abyss_stack_mcp_runtime)); then
   aoa_provision_abyss_stack_mcp_runtime
 fi
+if ((verify_abyss_stack_mcp_runtime)); then
+  aoa_verify_abyss_stack_mcp_runtime
+fi
 if ((install_mcp_http_codex_client)); then
   aoa_install_mcp_http_codex_client
 fi
 if ((remove_mcp_http_codex_client)); then
   aoa_remove_mcp_http_codex_client
 fi
-if ((provision_mcp_http_auth || provision_abyss_stack_mcp_auth || provision_abyss_stack_mcp_runtime || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
+if ((provision_mcp_http_auth || provision_abyss_stack_mcp_auth || provision_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_runtime || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
   ((!enable_now && !restart_now && !link_all_user_units && !link_system_units && !selection_set && !overlay_set)); then
   exit 0
 fi

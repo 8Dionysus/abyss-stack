@@ -66,3 +66,9 @@ Source/runtime parity now routes through
 `mechanics/runtime-lifecycle/parts/config-sync-boundary/docs/SOURCE_RUNTIME_PARITY_PACKET.md`,
 and live runtime cutover inspection routes through
 `mechanics/runtime-lifecycle/parts/start-stop/docs/LIVE_RUNTIME_CUTOVER_PACKET.md`.
+Stack MCP runtime provisioning and its read-only pre-launch integrity check
+route through
+`scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime` and
+`scripts/aoa-install-systemd --verify-abyss-stack-mcp-runtime`; provisioning
+mutates only while both planes are stopped, while verification only compares
+deployed source-and-lock and measured runtime identities.

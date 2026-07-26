@@ -51,6 +51,7 @@ _FORBIDDEN_KEYS = frozenset(
         "private_key",
         "refresh_token",
         "secret",
+        "secret_access_key",
         "token",
     }
 )
@@ -136,6 +137,14 @@ _PROVIDER_TOKEN_PATTERN = re.compile(
     )
     + r")[A-Za-z0-9_-]{8,}(?![A-Za-z0-9_-])",
     re.IGNORECASE,
+)
+_UNAMBIGUOUS_CREDENTIAL_KEY_TOKENS = frozenset(
+    {
+        "bearer",
+        "passphrase",
+        "password",
+        "secret",
+    }
 )
 _JWT_CANDIDATE = re.compile(
     r"(?<![A-Za-z0-9_-])"
@@ -225,9 +234,13 @@ def _is_forbidden_credential_key(value: Any) -> bool:
     )
     for start in range(len(tokens)):
         for stop in range(start + 1, min(len(tokens), start + 3) + 1):
-            if "".join(tokens[start:stop]) not in _FORBIDDEN_KEY_CANONICAL:
+            candidate = "".join(tokens[start:stop])
+            if candidate not in _FORBIDDEN_KEY_CANONICAL:
                 continue
-            if stop - start > 1:
+            if (
+                stop - start > 1
+                or candidate in _UNAMBIGUOUS_CREDENTIAL_KEY_TOKENS
+            ):
                 return True
             if has_recognized_boundary(
                 "".join(tokens[:start]),
@@ -1179,11 +1192,27 @@ class StackMCPApplication:
                 not in usable_states
             ):
                 blockers.append("rollback_not_proven")
-        if plan_kind == "restart" and (
-            self._effective_link_state(subject.canary.evidence, now)
-            not in usable_states
-        ):
-            blockers.append("canary_evidence_not_usable")
+        if plan_kind == "restart":
+            if (
+                not subject.canary.succeeded
+                or not subject.canary.result_grounded
+                or self._effective_link_state(subject.canary.evidence, now)
+                not in usable_states
+            ):
+                blockers.append("canary_evidence_not_usable")
+            if (
+                subject.proof.verdict != "passed"
+                or self._effective_link_state(subject.proof.evidence, now)
+                not in usable_states
+            ):
+                blockers.append("restart_canary_not_proven")
+            elif (
+                subject.proof.proved_canary_route
+                != subject.canary.canary_route
+                or subject.proof.proved_canary_ref
+                != subject.canary.canary_ref
+            ):
+                blockers.append("restart_canary_target_mismatch")
         if plan_kind == "rollback":
             if not subject.rollback.ready or self._effective_link_state(
                 subject.rollback.evidence, now
@@ -1315,7 +1344,12 @@ class StackMCPApplication:
                 )
             )
         elif plan_kind == "restart":
-            links.append(subject.canary.evidence)
+            links.extend(
+                (
+                    subject.proof.evidence,
+                    subject.canary.evidence,
+                )
+            )
         return tuple(links)
 
     @staticmethod
@@ -1365,7 +1399,12 @@ class StackMCPApplication:
                 )
             )
         elif plan_kind == "restart":
-            links.append(subject.canary.evidence)
+            links.extend(
+                (
+                    subject.proof.evidence,
+                    subject.canary.evidence,
+                )
+            )
         return tuple(links)
 
     @staticmethod
@@ -1556,6 +1595,10 @@ class StackMCPApplication:
                 ("run-grounded-canary", subject.canary.canary_route),
             ),
             "restart": (
+                (
+                    "verify-central-proof",
+                    subject.proof.proof_ref or "missing",
+                ),
                 ("snapshot-exact-process", subject.process.unit_name),
                 ("restart-exact-unit", subject.process.unit_name),
                 ("run-grounded-canary", subject.canary.canary_route),

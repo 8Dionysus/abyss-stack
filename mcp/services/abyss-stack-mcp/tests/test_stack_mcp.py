@@ -570,6 +570,7 @@ def test_observation_store_rejects_secrets_symlinks_and_oversize(
         "databasePassphrase",
         "ssh_passphrase",
         "private_key_passphrase",
+        "aws_secret_access_key",
     ),
 )
 def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
@@ -623,6 +624,7 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
         "concatenated-suffixed-bare-assignment",
         "encoded-bare-assignment",
         "passphrase-query",
+        "aws-secret-access-key",
         "unparseable",
     ),
 )
@@ -778,6 +780,11 @@ def test_observation_store_rejects_credentials_inside_references(
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             "https://acceptance.invalid/receipt?"
             f"ssh_passphrase={secret_value}"
+        )
+    elif reference_surface == "aws-secret-access-key":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            "https://acceptance.invalid/receipt?"
+            f"aws_secret_access_key={secret_value}"
         )
     else:
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
@@ -1440,7 +1447,35 @@ def test_restart_plan_requires_and_carries_fresh_canary_evidence(
         item["evidence_ref"]
         for item in result["owner_payload"]["plan"]["precondition_evidence"]
     }
+    assert "receipt://runtime/central-proof" in {
+        item["evidence_ref"]
+        for item in result["owner_payload"]["plan"]["precondition_evidence"]
+    }
+    assert result["owner_payload"]["plan"]["steps"][0] == {
+        "order": 1,
+        "action": "verify-central-proof",
+        "exact_target": "receipt://runtime/central-proof",
+        "expected_effect": (
+            "prepare verify-central-proof for operator review"
+        ),
+        "stop_on": ["unexpected-drift", "precondition-mismatch"],
+    }
 
+    payload = observation(subject())
+    payload["subjects"][0]["canary"]["canary_route"] = (
+        "runbook://canary/aoa-kag/unproved-restart-route"
+    )
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+    with pytest.raises(StackMCPError, match="restart_canary_target_mismatch"):
+        app.prepare_plan(
+            "aoa-kag",
+            "read",
+            "restart",
+            expected_observation_digest=digest,
+        )
+
+    payload = observation(subject())
     canary_evidence = payload["subjects"][0]["canary"]["evidence"]
     canary_evidence["expires_at"] = (NOW + timedelta(minutes=1)).isoformat()
     canary_evidence["evidence_refs"][0]["expires_at"] = (

@@ -22,7 +22,8 @@
   validation or response; unparseable URI-like values fail closed, bounded
   recursive decoding covers nested parameters, and credential-key tokenization
   catches namespaced separator/camel-case forms plus concatenated recognized
-  provider/consumer, passphrase, and credential-attribute boundaries without
+  provider/consumer, passphrase, and credential-attribute boundaries, including
+  unambiguous compound credentials such as `secret_access_key`, without
   treating arbitrary word substrings as credentials; structurally valid compact JWT and
   PEM private-key checks cover embedded material, Basic/Bearer checks normalize
   leading whitespace, and bounded provider-token patterns are scanned
@@ -45,6 +46,10 @@
   `ExecStart`; MCP Configs sync and runtime provisioning share an exclusive
   source-projection lock from their first mutation/read through publication,
   and deployed source is rehashed before the runtime marker/swap;
+- each managed launch independently recomputes the deployed source-and-lock
+  identity and measured runtime-content digest, including resolved interpreter
+  bytes, and remains inactive on drift rather than trusting executable
+  presence alone;
 - sync plans verify both the observed source revision and source-tree digest
   before mutation; sync/deploy plans bind an expected future deployed-tree
   digest instead of reusing the pre-action observation, and rollback denial
@@ -53,7 +58,9 @@
 - active processes require an observed process identity rather than a bare
   boolean;
 - restart candidates require an already active process, preventing restart from
-  becoming an activation-gate bypass for an inactive unit;
+  becoming an activation-gate bypass for an inactive unit; they also require
+  and carry usable central-proof and current-canary evidence, with the proof
+  bound to the exact canary route and receipt used by the plan;
 - activation requires a passed central-proof verdict issued by `proof_owner`
   and bound to the current source revision and tree digest, package, deployed
   revision and tree digest, running process identity, schema, consumer, and

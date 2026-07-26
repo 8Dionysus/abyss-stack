@@ -114,9 +114,12 @@ Provision their dependency-closed Python environment after sync with
 `scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime`. The
 source-and-lock-addressed environment lives under
 `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv`; both units refuse activation
-through `ConditionPathExists` and an executable `ExecCondition` when it is
-absent or unusable. Runtime provisioning, credential provisioning, unit
-linking, start, and client registration remain separate actions.
+through `ConditionPathExists`, an executable `ExecCondition`, and a read-only
+runtime verifier when it is absent, unusable, drifted, or no longer matches the
+deployed source and hash lock. The verifier recomputes the measured runtime,
+including resolved interpreter bytes, before every launch. Runtime
+provisioning, credential provisioning, unit linking, start, and client
+registration remain separate actions.
 Provisioning installs the exact artifact-hashed lock, binds the bytes behind
 the resolved venv interpreter into the runtime-content digest, and refuses to
 replace a changed environment while either stack MCP unit is active or its

@@ -34,7 +34,9 @@ acceptance-owner evidence bound to the exact current source revision and
 package digest and issued no earlier than central proof. Effect-policy
 activation remains blocked until the separate
 effect contracts named in the owner decision are modeled; restart cannot serve
-as an activation bypass.
+as an activation bypass. Restart also verifies and carries a usable central
+proof whose named canary route and receipt exactly match the current grounded
+canary, so changing the restart canary cannot reuse an older proof.
 The compatible consumer is selected deterministically and its registration
 reference becomes the exact activation-step target; central proof and owner
 acceptance are separate preceding verification steps. Only after those gates
@@ -93,6 +95,10 @@ whose source and lock digests match the initial deployed snapshot, then
 rechecks deployed source immediately before publishing the marker and swapping
 the environment. Unit link/reload and runtime provisioning are separate
 transactions so the loaded units cannot lag behind the locking contract.
+Before every managed launch, a read-only unit condition recomputes the deployed
+source-and-lock identity and the complete runtime-content digest, including
+the resolved interpreter bytes; source drift or runtime tampering therefore
+leaves the unit inactive until explicit reprovisioning succeeds.
 
 `rollback_required` is admissible only for the failed source/package/deploy
 links of a rollback plan, and only while the triggering link and its evidence

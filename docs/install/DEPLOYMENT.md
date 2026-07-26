@@ -461,9 +461,13 @@ and swap. Provisioning holds the same source-projection lock that an applying
 MCP Configs sync holds across its full rsync transaction, so the deployed
 source and published runtime identity cannot pass each other between recheck
 and environment replacement.
-The user units point only at this environment and use
-`ConditionPathExists` plus an executable `ExecCondition`, so a missing or
-unusable runtime leaves them inactive instead of entering a restart loop.
+The user units point only at this environment and use `ConditionPathExists`,
+an executable `ExecCondition`, and
+`--verify-abyss-stack-mcp-runtime` as a read-only second condition. Before every
+launch it recomputes the deployed source-and-lock identity and the measured
+runtime-content digest, including resolved interpreter bytes, so a missing,
+unusable, drifted, or source-mismatched runtime leaves the unit inactive
+instead of entering a restart loop.
 They clear ambient `PYTHONHOME`/`PYTHONPATH`, invoke that venv in isolated
 Python mode with explicit bytecode writes disabled, and execute its installed
 package rather than importing `Configs/src` or an inherited user-manager

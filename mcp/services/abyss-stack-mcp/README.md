@@ -65,8 +65,10 @@ rather than the current deployment's canary. Rollback planning relies on the
 usable rollback proof that binds that LKG route and receipt; it neither validates
 nor copies the current deployment's canary evidence, which may be failed,
 blocked, or expired in the recovery scenario. Restart plans also require and
-carry usable current-canary evidence and reject inactive processes, which must
-use the full activation contour instead. A plan expires at the
+carry usable current-canary and central-proof evidence, verify that the passed
+proof names the exact current canary route and receipt before the restart
+snapshot, and reject inactive processes, which must use the full activation
+contour instead. A plan expires at the
 earliest of ten minutes, its observation/freshness envelopes, every required
 link, and every copied evidence ref; it cannot outlive its proof. Candidate
 planning allows at most 30 seconds of positive clock skew and rejects
@@ -124,7 +126,9 @@ encoded nested credential references, unparseable or excessively nested
 URI-like references, whitespace-only exact targets, and unsupported effect
 classes. Credential-key screening includes passphrases and recognizes
 namespaced separator and camel-case token sequences rather than only exact key
-spellings. Concatenated
+spellings. Unambiguous credential components such as `secret_access_key` are
+rejected even without a provider namespace, including AWS-style
+`aws_secret_access_key`. Concatenated
 matches require a recognized provider/consumer namespace or credential-value
 attribute boundary, so ordinary keys such as `tokenizer`, `passwordless`, and
 `authorizationPolicy` remain valid.
@@ -192,9 +196,11 @@ guarded rebuild. A changed identity is never installed
 over a running plane: provisioning fails closed while either the read or
 candidate unit is active or their user-systemd state cannot be observed. Stop
 both units explicitly before reprovisioning, then start or canary them as a
-separate action. The units have a
-`ConditionPathExists` guard plus an executable `ExecCondition`, and remain
-inactive when this runtime is absent or unusable.
+separate action. The units have a `ConditionPathExists` guard, an executable
+`ExecCondition`, and a second read-only `ExecCondition` that recomputes the
+deployed source-and-lock identity plus measured runtime-content digest before
+every launch. They remain inactive when the runtime is absent, unusable,
+drifted, or no longer matches the deployed package.
 Each unit holds a shared runtime lock for its full process lifetime. Changed
 provisioning holds the exclusive lock, checks both unit states before the
 build and again immediately before the guarded environment swap, and aborts if
