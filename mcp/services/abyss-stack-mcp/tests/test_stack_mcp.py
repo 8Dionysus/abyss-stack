@@ -359,7 +359,14 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
 
 @pytest.mark.parametrize(
     "reference_surface",
-    ("query", "relative-query", "userinfo", "fragment", "secret-value"),
+    (
+        "query",
+        "relative-query",
+        "userinfo",
+        "fragment",
+        "secret-value",
+        "unparseable",
+    ),
 )
 def test_observation_store_rejects_credentials_inside_references(
     tmp_path: Path,
@@ -383,9 +390,13 @@ def test_observation_store_rejects_credentials_inside_references(
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"https://acceptance.invalid/receipt#client_secret={secret_value}"
         )
-    else:
+    elif reference_surface == "secret-value":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"https://acceptance.invalid/receipt?value=sk-{secret_value}"
+        )
+    else:
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"https://[bad?api_key={secret_value}"
         )
     path = write_observation(tmp_path / f"{reference_surface}.json", payload)
 
@@ -1269,6 +1280,62 @@ def test_portable_cli_exposes_governed_activation_views(
 
     result = json.loads(capsys.readouterr().out)
     assert result["owner_payload"]["view"] == view
+
+
+@pytest.mark.parametrize(
+    ("arguments", "expected_error"),
+    (
+        (
+            ["inspect", "aoa-kag", "candidate"],
+            "invalid choice",
+        ),
+        (
+            [
+                "--policy-family",
+                "candidate",
+                "inspect",
+                "aoa-kag",
+                "read",
+            ],
+            "inspect requires --policy-family read",
+        ),
+        (
+            [
+                "plan",
+                "aoa-kag",
+                "read",
+                "restart",
+                "--expected-observation-digest",
+                DIGEST_A,
+            ],
+            "plan requires --policy-family candidate",
+        ),
+    ),
+)
+def test_portable_cli_rejects_cross_contour_commands(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    arguments: list[str],
+    expected_error: str,
+) -> None:
+    path = write_observation(tmp_path / "observation.json")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "abyss-stack-mcp",
+            "--observation-path",
+            str(path),
+            *arguments,
+        ],
+    )
+
+    with pytest.raises(SystemExit) as caught:
+        cli_main()
+
+    assert caught.value.code == 2
+    assert expected_error in capsys.readouterr().err
 
 
 def test_policy_contours_use_distinct_ports_credentials_and_scopes(

@@ -78,8 +78,9 @@ Set `ABYSS_STACK_MCP_OBSERVATION_PATH` to one explicit secret-free
 The loader rejects symlinks, non-files, payloads above 2 MiB, unknown contract
 fields, secret-like keys or values, shared credential classes, non-loopback
 HTTP endpoints, credentials embedded in URI userinfo/query/fragment references,
-and unsupported effect classes. Expired observations remain visible as stale
-read evidence but cannot produce a candidate plan.
+unparseable URI-like references, and unsupported effect classes. Expired
+observations remain visible as stale read evidence but cannot produce a
+candidate plan.
 The generated Draft 2020-12 schema includes the conditional invariants for
 usable links and freshness, endpoint readiness, consumer registration,
 active-process identity, accepted-target completeness, successful canaries,
@@ -104,7 +105,8 @@ ABYSS_STACK_MCP_POLICY_FAMILY=read abyss-stack-mcp-server
 
 Stdio is the portable default. Authenticated loopback Streamable HTTP is
 selected through `AOA_MCP_TRANSPORT=streamable-http`; it requires the
-plane-specific credential.
+plane-specific credential. Portable `catalog` and `inspect` are read-contour
+commands; `plan` requires explicit `--policy-family candidate`.
 
 The managed user units do not use ambient Python. After syncing the package to
 `Configs`, provision the source-addressed runtime explicitly:

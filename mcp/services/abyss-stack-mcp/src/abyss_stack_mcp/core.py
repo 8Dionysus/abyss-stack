@@ -90,7 +90,9 @@ def _reject_secret_material(value: Any, path: str = "$") -> None:
             try:
                 parsed = urlsplit(value)
             except ValueError:
-                return
+                raise StackMCPError(
+                    f"unparseable URI-like reference is forbidden at {path}"
+                ) from None
             if parsed.username is not None or parsed.password is not None:
                 raise StackMCPError(
                     f"credential-bearing reference is forbidden at {path}"

@@ -20,7 +20,7 @@ def main() -> None:
     catalog.add_argument("--organ-id")
     catalog.add_argument(
         "--target-policy-family",
-        choices=("read", "candidate", "internal_effect", "external_effect"),
+        choices=("read",),
     )
     catalog.add_argument("--max-results", type=int, default=32)
     catalog.add_argument("--byte-budget", type=int, default=32_768)
@@ -29,7 +29,7 @@ def main() -> None:
     inspect.add_argument("organ_id")
     inspect.add_argument(
         "target_policy_family",
-        choices=("read", "candidate", "internal_effect", "external_effect"),
+        choices=("read",),
     )
     inspect.add_argument(
         "--view",
@@ -65,6 +65,11 @@ def main() -> None:
     plan.add_argument("--expected-observation-digest", required=True)
 
     args = parser.parse_args()
+    expected_contour = "candidate" if args.command == "plan" else "read"
+    if args.policy_family != expected_contour:
+        parser.error(
+            f"{args.command} requires --policy-family {expected_contour}"
+        )
     application = StackMCPApplication(
         ObservationStore(args.observation_path),
         policy_family=args.policy_family,
