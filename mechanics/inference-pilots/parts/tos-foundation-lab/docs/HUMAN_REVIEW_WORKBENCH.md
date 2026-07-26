@@ -52,7 +52,10 @@ forcing every task through blank full-page transcription:
    correction.
 2. **Candidate correction** begins from the exact frozen candidate text. The
    reviewer edits only detected errors; the untouched candidate digest remains
-   in the draft so correction effort can be measured honestly.
+   in the draft so correction effort can be measured honestly. Typography is
+   recorded separately from text: the reviewer selects a corrected-text span,
+   and the draft binds an italic annotation to both Unicode code-point offsets
+   and the exact selected quote.
 3. **Independent reference** keeps every candidate hidden and asks for a
    source-only transcription. It is deliberately rare and small because its
    purpose is to create an anchoring-independent calibration witness, not to
@@ -88,6 +91,7 @@ Machine-owned fields include:
 - unit ordering and page routing;
 - timestamps, autosave revision, and active-time observation;
 - draft filename, digest, and freeze receipt;
+- the mutable session-control projection derived from validated review state;
 - blind-lane enforcement that can be established mechanically.
 
 A reviewer is never asked to attest that a digest was checked. The packet
@@ -130,14 +134,24 @@ It provides:
 - human-readable edition and page labels while retaining technical IDs only as
   secondary provenance;
 - screenshot feedback by clipboard paste, file selection, or drag-and-drop;
+- one combined completeness result for pages that contain both omissions and
+  machine-added text;
+- stand-off italic marking with removable chips and a source-text preview;
 - explicit final review and human attestation;
 - a frozen draft plus SHA-256 receipt.
 
 Candidate review records language scope, candidate digest, criteria,
-correction, error tags, decision, and human time without exposing the method
-map. Pass 2, cross-pass blindness, adjudication, and accepted JSONL
-materialization remain later stages. The first slice must not imply that a
-submitted draft is gold, accepted German, or a general method ranking.
+correction, typography selectors, error tags, decision, and human time without
+exposing the method map. Typography syntax never enters `corrected_text`; if
+that text changes, its old spans are cleared and must be selected again.
+Pass 2, cross-pass blindness, adjudication, and accepted JSONL materialization
+remain later stages. The first slice must not imply that a submitted draft is
+gold, accepted German, or a general method ranking.
+
+Candidate protocol v2 adds the combined completeness result and stand-off
+typography. A session declares its protocol identity when it is initialized.
+Already started or frozen v1 sessions continue under v1 and must reproduce the
+same draft bytes; activation of v2 is not a migration of old human evidence.
 
 ## Exposure and storage
 
@@ -156,6 +170,9 @@ submitted draft is gold, accepted German, or a general method ranking.
 - Hold an exclusive session lock while the Workbench is running so two local
   processes cannot overwrite the same mutable pass.
 - Use atomic replacement and owner-only file modes.
+- Treat `review-session.json` as a repairable control projection. Its progress
+  and terminal status come from the validated autosave and, after freeze, the
+  matching draft and receipt; the projection cannot overrule those artifacts.
 - Keep all private source images and human drafts outside Git.
 
 ## Lifecycle
@@ -167,6 +184,28 @@ ready -> in-progress -> submitted-and-frozen
 `submitted-and-frozen` means only that one real human declared the pass
 complete and the runtime fixed the resulting draft. It does not mean
 double-checked, adjudicated, accepted, promoted, or correct.
+
+Autosave and submission refresh the mutable control projection. The explicit
+`sync-human-review-session-control` operator route can repair an older stale
+projection after re-validating the complete artifact set; it never modifies
+the autosave, draft, or receipt.
+
+## Post-reveal analysis
+
+Method identity remains sealed until the candidate draft is
+`submitted-and-frozen`. The explicit `analyze-ocr-candidate-review` route then
+re-verifies the draft, freeze receipt, immutable packet, restricted blind map,
+run receipts, and source-candidate digests before writing a separate private
+analysis and receipt under the mutable session's `post-reveal/` directory.
+Nothing is joined back into the human draft.
+
+The report keeps decisions, fidelity, completeness, structure, error types,
+runtime evidence, and human active time as separate dimensions. It does not
+order `accept-with-limits` against `corrected` or collapse them into a hidden
+winner score. It also audits which revealed method occupied display positions
+one, two, and three. When those positions are imbalanced, human-time and
+correction-cost rankings are explicitly blocked because later candidates may
+benefit from page familiarity and prior comparison.
 
 ## UX evaluation
 

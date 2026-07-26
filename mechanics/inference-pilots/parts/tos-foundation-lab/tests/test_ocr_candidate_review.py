@@ -14,6 +14,8 @@ PART_ROOT = Path(__file__).resolve().parents[1]
 if str(PART_ROOT) not in sys.path:
     sys.path.insert(0, str(PART_ROOT))
 
+import human_review_workbench as workbench
+import ocr_candidate_analysis as candidate_analysis
 import ocr_candidate_review as candidate_review
 
 
@@ -169,6 +171,9 @@ def test_materializes_blind_candidate_packet_and_private_session(
     assert session["packet"]["candidate_set_sha256"] == manifest[
         "candidate_set_sha256"
     ]
+    assert session["protocol_id"] == (
+        candidate_review.ACTIVE_WORKBENCH_PROTOCOL_ID
+    )
     assert session["status"] == "awaiting-real-human-candidate-review"
     assert stat.S_IMODE(session_dir.stat().st_mode) == 0o700
 
@@ -205,3 +210,164 @@ def test_candidate_packet_verifier_detects_candidate_drift(
         candidate_review.verify_ocr_candidate_review_manifest(
             packet_root / "ocr-candidate-review-manifest.json"
         )
+
+
+def test_post_reveal_analysis_joins_only_a_frozen_human_pass(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_path, source_manifest = _source_packet(tmp_path)
+    monkeypatch.setattr(
+        candidate_review,
+        "verify_human_gold_review_manifest",
+        lambda path: source_manifest
+        if path == source_path
+        else pytest.fail(f"unexpected source packet: {path}"),
+    )
+    manifest = candidate_review.materialize_ocr_candidate_review(
+        source_path,
+        _candidate_runs(tmp_path, source_manifest),
+        "synthetic-post-reveal",
+        languages=("ru",),
+        shared_root=tmp_path / "shared",
+        invocation=["synthetic-post-reveal-test"],
+    )
+    session_dir = candidate_review.initialize_ocr_candidate_review_session(
+        tmp_path
+        / "shared"
+        / manifest["packet_id"]
+        / "ocr-candidate-review-manifest.json",
+        "synthetic-post-reveal-session",
+        review_root=tmp_path / "human-review",
+    )
+
+    with pytest.raises(
+        candidate_analysis.OcrCandidateAnalysisError,
+        match="requires a frozen human draft",
+    ):
+        candidate_analysis.analyze_frozen_ocr_candidate_review(
+            session_dir, allowed_work_root=tmp_path / "human-review"
+        )
+
+    context = workbench.ReviewContext(
+        session_dir, allowed_work_root=tmp_path / "human-review"
+    )
+    view = context.public_session()
+    rows: list[dict[str, Any]] = []
+    for index, row in enumerate(view["state"]["rows"], start=1):
+        values = {
+            str(field["name"]): None
+            for field in view["protocol"]["fields"]
+        }
+        values.update(
+            {
+                "language_review_scope": "full",
+                "page_and_region_resolved": "yes",
+                "source_legibility": "legible",
+                "text_fidelity": "exact",
+                "completeness": "complete",
+                "structure_and_order": "correct",
+                "error_types": [],
+                "decision": "accept",
+                "corrected_text": None,
+                "typography_annotations": None,
+                "notes": None,
+            }
+        )
+        rows.append(
+            {
+                "unit_id": row["unit_id"],
+                "values": values,
+                "active_seconds": index * 10,
+            }
+        )
+    saved = context.autosave(
+        {
+            "protocol_id": context.protocol.protocol_id,
+            "revision": view["state"]["revision"],
+            "reviewer_ref": "human:synthetic-post-reveal",
+            "active_unit_index": 0,
+            "rows": rows,
+        }
+    )
+    context.submit(
+        {
+            "revision": saved["state"]["revision"],
+            "performed_by_real_human": True,
+        }
+    )
+    frozen_bytes = context.draft_path.read_bytes()
+
+    result = candidate_analysis.analyze_frozen_ocr_candidate_review(
+        session_dir, allowed_work_root=tmp_path / "human-review"
+    )
+    output_dir = Path(result["analysis_dir"])
+    analysis = json.loads(
+        (output_dir / candidate_analysis.ANALYSIS_FILENAME).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert result["changed"] is True
+    assert result["reused_existing"] is False
+    assert analysis["scope"] == {
+        "source_count": 2,
+        "unit_count": 6,
+        "variant_count": 3,
+        "variants": ["A", "B", "C"],
+        "human_pass_count": 1,
+        "independent_gold_available": False,
+    }
+    assert set(analysis["methods"]) == {"A", "B", "C"}
+    for variant in ("A", "B", "C"):
+        summary = analysis["aggregates_by_variant"][variant]
+        assert summary["unit_count"] == 2
+        assert summary["decisions"] == {"accept": 2}
+        assert summary["text_fidelity"] == {"exact": 2}
+    assert (
+        candidate_analysis.AUTHORITY_BOUNDARY
+        in (output_dir / candidate_analysis.REPORT_FILENAME).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert stat.S_IMODE(
+        (output_dir / candidate_analysis.ANALYSIS_FILENAME).stat().st_mode
+    ) == 0o600
+    assert context.draft_path.read_bytes() == frozen_bytes
+
+    reused = candidate_analysis.analyze_frozen_ocr_candidate_review(
+        session_dir, allowed_work_root=tmp_path / "human-review"
+    )
+    assert reused["reused_existing"] is True
+    assert reused["changed"] is False
+    assert context.draft_path.read_bytes() == frozen_bytes
+    control = json.loads(
+        (session_dir / "review-session.json").read_text(encoding="utf-8")
+    )
+    assert control["status"] == "pass-1-draft-frozen"
+    assert control["post_reveal_analysis"]["analysis_sha256"] == result[
+        "analysis_sha256"
+    ]
+
+
+def test_post_reveal_analysis_parses_owner_systemd_resource_summary(
+    tmp_path: Path,
+) -> None:
+    run_root = tmp_path / "run"
+    summary = run_root / "receipts" / "systemd-final-resource-summary.txt"
+    summary.parent.mkdir(parents=True)
+    summary.write_text(
+        "unit.scope: Consumed 13h 29min 29.154s CPU time over "
+        "3h 50min 652ms wall clock time, 3.7G memory peak, "
+        "809M memory swap peak.\n",
+        encoding="utf-8",
+    )
+    record = candidate_analysis._systemd_resource_summary(
+        run_root,
+        {"metric_refs": ["receipts/systemd-final-resource-summary.txt"]},
+    )
+    assert record is not None
+    assert record["status"] == "parsed-owner-summary"
+    assert record["cpu_time"] == "13h 29min 29.154s"
+    assert record["wall_clock_time"] == "3h 50min 652ms"
+    assert record["memory_peak"] == "3.7G"
+    assert record["memory_swap_peak"] == "809M"

@@ -1,6 +1,6 @@
 # Tree of Sophia Human Review Workbench Boundary
 
-- Decision ID: ABYSS-STACK-D-0086
+- Decision ID: ABYSS-STACK-D-0088
 - Status: accepted
 - Date: 2026-07-25
 - Owner surface: `mechanics/inference-pilots/parts/tos-foundation-lab/`
@@ -11,7 +11,7 @@
 - Surface classes: inference pilot, human review interface, source/runtime boundary, host storage
 - Stack lanes: inference pilots, Tree of Sophia access, human review
 - Mechanic parents: inference-pilots
-- Guard families: independent reference, method-blind candidate review, language competence, loopback exposure, draft freeze
+- Guard families: independent reference, method-blind candidate review, language competence, stand-off typography, loopback exposure, draft freeze, post-reveal evidence join, display-position audit, mutable control projection
 - Posture: accepted human-workbench boundary
 
 ## Context
@@ -91,6 +91,30 @@ run an independent second pass, adjudicate disagreement, accept source text,
 create gold, establish a general method ranking, authorize translation, or
 promote a Tree of Sophia sign, concept, graph edge, or canon entry.
 
+The candidate-review protocol evolves additively. V2 admits the combined case
+where OCR both omits source material and inserts extra text, and records italic
+typography as stand-off annotations over corrected text. Each annotation binds
+Unicode code-point positions to an exact text quote; Markdown or another
+presentation syntax never alters the diplomatic text. Editing that text
+invalidates and clears its typography spans. Sessions declare their protocol
+identity, while already started or frozen v1 sessions remain v1 and are not
+migrated or rewritten.
+
+`review-session.json` is a mutable operational projection, not human-evidence
+authority. Its progress and terminal status are synchronized from the
+validated autosave and, after freeze, the matching immutable draft and digest
+receipt. An explicit repair route may reconstruct that projection without
+changing any frozen evidence.
+
+Method reveal is a separate one-way analytical phase after freeze. The
+post-reveal route re-verifies the human draft and receipt, packet and restricted
+map, run receipts, and candidate-source digests, then writes a private
+digest-bound analysis beside the session. It preserves decision, quality,
+runtime, and human-time dimensions instead of manufacturing one winner score.
+Display-position balance is part of that analysis: an imbalanced pass may
+still provide bounded quality observations, but it cannot rank human
+correction cost.
+
 No persistent service is added for this slice. The stable
 `scripts/aoa-tos-foundation-lab human-review-workbench` command starts the
 session on demand; a server-hosted or multi-reviewer route requires a later
@@ -127,6 +151,14 @@ later calibration and adjudication gates.
   compared across later interface variants.
 - Positive: ordinary OCR comparison no longer requires full-page retyping;
   criteria-only and corrected-text records remain distinguishable.
+- Positive: combined completeness defects and italic typography can be
+  represented without overloading free-text notes or corrupting source text.
+- Positive: stale session progress can be repaired without reopening or
+  rewriting a completed human pass.
+- Positive: method reveal becomes reproducible and provenance-bound without
+  contaminating the frozen blind draft.
+- Positive: display-order learning is measured as a confound instead of being
+  mistaken for lower correction cost.
 - Positive: every language claim is bounded by reviewer-declared competence,
   so visual German review cannot masquerade as German-language verification.
 - Tradeoff: a criteria-only candidate review cannot yield exact character
@@ -135,9 +167,15 @@ later calibration and adjudication gates.
   not yet coordinate concurrent reviewers or remote access.
 - Tradeoff: browser-observed active time is a method measurement, not proof of
   attention or correctness.
+- Tradeoff: typography annotations must be reselected after corrected text
+  changes so stale offsets cannot silently survive.
+- Tradeoff: the first completed OCR pass cannot support a human-cost ranking
+  because its independently shuffled display positions are imbalanced.
 - Follow-up: add pass 2 only after its independent identity and blindness
   contract can be shown in the interface; add adjudication only as a separate
   source-visible human role.
+- Follow-up: use a predeclared block-balanced display assignment before the
+  next correction-cost comparison.
 
 ## Source surfaces
 
@@ -145,6 +183,7 @@ later calibration and adjudication gates.
 - `mechanics/inference-pilots/parts/tos-foundation-lab/README.md`
 - `mechanics/inference-pilots/parts/tos-foundation-lab/docs/HUMAN_REVIEW_WORKBENCH.md`
 - `mechanics/inference-pilots/parts/tos-foundation-lab/human_review_workbench.py`
+- `mechanics/inference-pilots/parts/tos-foundation-lab/ocr_candidate_analysis.py`
 - `mechanics/inference-pilots/parts/tos-foundation-lab/ocr_candidate_review.py`
 - `mechanics/inference-pilots/parts/tos-foundation-lab/schemas/ocr-candidate-review-manifest.schema.json`
 - `mechanics/inference-pilots/parts/tos-foundation-lab/tos_foundation_lab.py`

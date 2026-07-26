@@ -205,19 +205,19 @@ def _review_fixture(
 
     manifest_path = packet_root / protocol.manifest_filename
     _write_json(manifest_path, manifest)
-    _write_json(
-        session_dir / "review-session.json",
-        {
-            "schema_version": f"synthetic_{protocol_name}_session_v1",
-            "session_id": f"synthetic-{protocol_name}-session",
-            "private_local_only": True,
-            "packet": {
-                "packet_id": manifest["packet_id"],
-                "root": packet_root.as_posix(),
-                "manifest_sha256": _sha256(manifest_path),
-            },
+    session_payload = {
+        "schema_version": f"synthetic_{protocol_name}_session_v1",
+        "session_id": f"synthetic-{protocol_name}-session",
+        "private_local_only": True,
+        "packet": {
+            "packet_id": manifest["packet_id"],
+            "root": packet_root.as_posix(),
+            "manifest_sha256": _sha256(manifest_path),
         },
-    )
+    }
+    if protocol is workbench.OCR_CANDIDATE_PROTOCOL:
+        session_payload["protocol_id"] = protocol.protocol_id
+    _write_json(session_dir / "review-session.json", session_payload)
 
     if protocol is workbench.GOLD_PROTOCOL:
         monkeypatch.setattr(
@@ -267,7 +267,11 @@ def _autosave_payload(
             )
         elif (
             complete
-            and protocol_id == workbench.OCR_CANDIDATE_PROTOCOL.protocol_id
+            and protocol_id
+            in {
+                workbench.OCR_CANDIDATE_PROTOCOL_V1.protocol_id,
+                workbench.OCR_CANDIDATE_PROTOCOL.protocol_id,
+            }
         ):
             values.update(
                 {
@@ -357,8 +361,20 @@ def test_loads_both_supported_review_protocols(
         )
         assert view["protocol"]["review_mode"] == "candidate-review"
         assert view["protocol"]["candidate_visible"] is True
+        assert view["protocol"]["protocol_id"].endswith(".v2")
         assert view["units"][0]["candidate_text"].startswith("Synthetic OCR")
         assert view["units"][0]["candidate_label"] == "Кандидат A"
+        fields = {
+            field["name"]: field for field in view["protocol"]["fields"]
+        }
+        assert (
+            "mixed-omissions-and-additions",
+            "Есть и пропуски, и лишний текст",
+        ) in fields["completeness"]["options"]
+        assert ("typography", "Курсив или другое выделение") in fields[
+            "error_types"
+        ]["options"]
+        assert fields["typography_annotations"]["kind"] == "span-annotations"
     public_bytes = json.dumps(view, ensure_ascii=False).encode("utf-8")
     assert b"immutable-packets" not in public_bytes
     assert b"recognized_comparator" not in public_bytes
@@ -752,10 +768,31 @@ def test_candidate_correction_is_prefilled_evidence_not_required_retyping(
     )
     payload = _autosave_payload(context.public_session(), complete=True)
     first_values = payload["rows"][0]["values"]
+    corrected_text = "Synthetic OCR candidate 1 for page 1, corrected."
+    italic_start = corrected_text.index("candidate")
+    italic_end = italic_start + len("candidate")
     first_values.update(
         {
             "decision": "corrected",
-            "corrected_text": "Synthetic OCR candidate 1 for page 1, corrected.",
+            "completeness": "mixed-omissions-and-additions",
+            "error_types": ["spacing", "typography"],
+            "corrected_text": corrected_text,
+            "typography_annotations": [
+                {
+                    "kind": "italic",
+                    "selectors": [
+                        {
+                            "type": "TextPositionSelector",
+                            "start": italic_start,
+                            "end": italic_end,
+                        },
+                        {
+                            "type": "TextQuoteSelector",
+                            "exact": "candidate",
+                        },
+                    ],
+                }
+            ],
             "notes": None,
         }
     )
@@ -772,8 +809,126 @@ def test_candidate_correction_is_prefilled_evidence_not_required_retyping(
     first = draft["rows"][0]
     assert first["decision"] == "corrected"
     assert first["corrected_text"].endswith("corrected.")
+    assert first["completeness"] == "mixed-omissions-and-additions"
+    assert first["typography_annotations"][0]["selectors"][1]["exact"] == (
+        "candidate"
+    )
     assert first["candidate_sha256"] == context.units[0]["candidate_sha256"]
     assert "run_id" not in json.dumps(draft)
+
+
+def test_candidate_typography_selector_must_match_corrected_text(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    allowed_root, session_dir, _manifest = _review_fixture(
+        tmp_path, monkeypatch, "candidate"
+    )
+    context = workbench.ReviewContext(
+        session_dir, allowed_work_root=allowed_root
+    )
+    payload = _autosave_payload(context.public_session(), complete=True)
+    values = payload["rows"][0]["values"]
+    values.update(
+        {
+            "decision": "corrected",
+            "corrected_text": "alpha beta",
+            "typography_annotations": [
+                {
+                    "kind": "italic",
+                    "selectors": [
+                        {
+                            "type": "TextPositionSelector",
+                            "start": 6,
+                            "end": 10,
+                        },
+                        {
+                            "type": "TextQuoteSelector",
+                            "exact": "wrong",
+                        },
+                    ],
+                }
+            ],
+        }
+    )
+    with pytest.raises(
+        workbench.HumanReviewWorkbenchError,
+        match="no longer matches corrected_text",
+    ):
+        context.autosave(payload)
+
+
+def test_frozen_candidate_v1_remains_byte_compatible_after_v2_activation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    allowed_root, session_dir, _manifest = _review_fixture(
+        tmp_path, monkeypatch, "candidate"
+    )
+    session_path = session_dir / "review-session.json"
+    session = json.loads(session_path.read_text(encoding="utf-8"))
+    session["protocol_id"] = workbench.OCR_CANDIDATE_PROTOCOL_V1.protocol_id
+    _write_json(session_path, session)
+
+    context = workbench.ReviewContext(
+        session_dir, allowed_work_root=allowed_root
+    )
+    assert context.protocol is workbench.OCR_CANDIDATE_PROTOCOL_V1
+    saved = context.autosave(
+        _autosave_payload(context.public_session(), complete=True)
+    )
+    context.submit(
+        {
+            "revision": saved["state"]["revision"],
+            "performed_by_real_human": True,
+        }
+    )
+    draft_bytes = context.draft_path.read_bytes()
+    draft = json.loads(draft_bytes)
+    assert draft["schema_version"] == (
+        "tos_ocr_candidate_human_review_draft_v1"
+    )
+    assert "typography_annotations" not in draft["rows"][0]
+
+    stale_control = json.loads(session_path.read_text(encoding="utf-8"))
+    stale_control.pop("protocol_id")
+    stale_control.pop("review_result")
+    stale_control["status"] = "awaiting-real-human-candidate-review"
+    stale_control["progress"] = {
+        "total_units": len(context.units),
+        "completed_units": 0,
+    }
+    _write_json(session_path, stale_control)
+    repaired = workbench.synchronize_human_review_session_control(
+        session_dir, allowed_work_root=allowed_root
+    )
+    assert repaired == {
+        "session_id": "synthetic-candidate-session",
+        "protocol_id": workbench.OCR_CANDIDATE_PROTOCOL_V1.protocol_id,
+        "status": "pass-1-draft-frozen",
+        "progress": {
+            "total_units": len(context.units),
+            "completed_units": len(context.units),
+        },
+        "changed": True,
+        "authority_boundary": (
+            "mutable session-control projection synchronized from validated "
+            "autosave/draft/receipt; frozen human evidence was not changed"
+        ),
+    }
+    assert context.draft_path.read_bytes() == draft_bytes
+    assert (
+        workbench.synchronize_human_review_session_control(
+            session_dir, allowed_work_root=allowed_root
+        )["changed"]
+        is False
+    )
+
+    resumed = workbench.ReviewContext(
+        session_dir, allowed_work_root=allowed_root
+    )
+    assert resumed.protocol is workbench.OCR_CANDIDATE_PROTOCOL_V1
+    assert resumed.draft_path.read_bytes() == draft_bytes
 
 
 def test_resume_rejects_partial_freeze(
@@ -836,6 +991,17 @@ def test_complete_submission_freezes_draft_and_digest(
     assert draft["performed_by_real_human"] is True
     assert draft["reviewer_ref"] == "human:synthetic-reviewer"
     assert len(draft["rows"]) == len(context.units)
+    control = json.loads(
+        (session_dir / "review-session.json").read_text(encoding="utf-8")
+    )
+    assert control["protocol_id"] == context.protocol.protocol_id
+    assert control["status"] == "pass-1-draft-frozen"
+    assert control["progress"] == {
+        "total_units": len(context.units),
+        "completed_units": len(context.units),
+    }
+    assert control["review_result"]["draft_sha256"] == receipt["draft_sha256"]
+    assert context.synchronize_session_control() is False
 
     resumed = workbench.ReviewContext(
         session_dir, allowed_work_root=allowed_root

@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 87,
-  "edge_count": 1941,
+  "decision_count": 88,
+  "edge_count": 1977,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 775,
-    "DATED": 87,
-    "GUARDED_BY": 235,
-    "HAS_STATUS": 87,
-    "HAS_SURFACE_CLASS": 219,
-    "IN_STACK_LANE": 181,
-    "NEXT_DECISION": 86,
-    "OWNED_BY_SURFACE": 92,
-    "OWNS_DECISION": 87,
+    "CITES_SOURCE_SURFACE": 789,
+    "DATED": 88,
+    "GUARDED_BY": 244,
+    "HAS_STATUS": 88,
+    "HAS_SURFACE_CLASS": 223,
+    "IN_STACK_LANE": 184,
+    "NEXT_DECISION": 87,
+    "OWNED_BY_SURFACE": 93,
+    "OWNS_DECISION": 88,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 90
+    "UNDER_MECHANIC_PARENT": 91
   },
   "edges": [
     {
@@ -9273,6 +9273,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0087",
+      "target": "decision:ABYSS-STACK-D-0088",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
       "target": "owner_surface:mcp/",
       "type": "OWNED_BY_SURFACE"
     },
@@ -9284,6 +9289,176 @@
     {
       "source": "decision:ABYSS-STACK-D-0087",
       "target": "mechanic_parent:runtime-lifecycle",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/docs/HUMAN_REVIEW_WORKBENCH.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/human_review_workbench.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/ocr_candidate_analysis.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/ocr_candidate_review.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/schemas/ocr-candidate-review-manifest.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_human_review_workbench.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_ocr_candidate_review.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/tos_foundation_lab.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/workbench/app.css",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/workbench/app.js",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/workbench/index.html",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "source_surface:scripts/aoa-tos-foundation-lab",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "date:2026-07-25",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "guard_family:display-position%20audit",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "guard_family:draft%20freeze",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "guard_family:independent%20reference",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "guard_family:language%20competence",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "guard_family:loopback%20exposure",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "guard_family:method-blind%20candidate%20review",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "guard_family:mutable%20control%20projection",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "guard_family:post-reveal%20evidence%20join",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "guard_family:stand-off%20typography",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "surface_class:host%20storage",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "surface_class:human%20review%20interface",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "surface_class:inference%20pilot",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "surface_class:source/runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "stack_lane:Tree%20of%20Sophia%20access",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "stack_lane:human%20review",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "stack_lane:inference%20pilots",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "owner_surface:mechanics/inference-pilots/parts/tos-foundation-lab/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "mechanic_parent:inference-pilots",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -9720,21 +9895,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0087",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0088",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 857,
+  "node_count": 879,
   "node_type_counts": {
     "date": 26,
-    "decision": 87,
-    "guard_family": 107,
+    "decision": 88,
+    "guard_family": 116,
     "mechanic_parent": 10,
     "owner_surface": 46,
     "repo": 1,
-    "source_surface": 462,
-    "stack_lane": 35,
+    "source_surface": 472,
+    "stack_lane": 36,
     "status": 3,
-    "surface_class": 80
+    "surface_class": 81
   },
   "nodes": [
     {
@@ -10738,6 +10918,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-07-25",
+      "id": "decision:ABYSS-STACK-D-0088",
+      "label": "ABYSS-STACK-D-0088",
+      "path": "docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md",
+      "posture": "accepted human-workbench boundary",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -10863,8 +11053,18 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:display-position%20audit",
+      "label": "display-position audit",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:docs%20route",
       "label": "docs route",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:draft%20freeze",
+      "label": "draft freeze",
       "type": "guard_family"
     },
     {
@@ -10933,6 +11133,16 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:independent%20reference",
+      "label": "independent reference",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:language%20competence",
+      "label": "language competence",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:legacy%20boundary",
       "label": "legacy boundary",
       "type": "guard_family"
@@ -10945,6 +11155,11 @@
     {
       "id": "guard_family:legacy%20metadata%20containment",
       "label": "legacy metadata containment",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:loopback%20exposure",
+      "label": "loopback exposure",
       "type": "guard_family"
     },
     {
@@ -10968,8 +11183,18 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:method-blind%20candidate%20review",
+      "label": "method-blind candidate review",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:mirror%20hygiene",
       "label": "mirror hygiene",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:mutable%20control%20projection",
+      "label": "mutable control projection",
       "type": "guard_family"
     },
     {
@@ -11020,6 +11245,11 @@
     {
       "id": "guard_family:pilot%20route%20posture",
       "label": "pilot route posture",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:post-reveal%20evidence%20join",
+      "label": "post-reveal evidence join",
       "type": "guard_family"
     },
     {
@@ -11240,6 +11470,11 @@
     {
       "id": "guard_family:stale%20path%20hygiene",
       "label": "stale path hygiene",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:stand-off%20typography",
+      "label": "stand-off typography",
       "type": "guard_family"
     },
     {
@@ -13174,6 +13409,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/docs/HUMAN_REVIEW_WORKBENCH.md",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/docs/HUMAN_REVIEW_WORKBENCH.md",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/docs/MANUAL_REVIEW_PROTOCOL.md",
       "label": "mechanics/inference-pilots/parts/tos-foundation-lab/docs/MANUAL_REVIEW_PROTOCOL.md",
       "type": "source_surface"
@@ -13189,6 +13429,21 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/human_review_workbench.py",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/human_review_workbench.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/ocr_candidate_analysis.py",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/ocr_candidate_analysis.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/ocr_candidate_review.py",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/ocr_candidate_review.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/schemas/experiment-suite.schema.json",
       "label": "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/experiment-suite.schema.json",
       "type": "source_surface"
@@ -13199,13 +13454,43 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/schemas/ocr-candidate-review-manifest.schema.json",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/ocr-candidate-review-manifest.schema.json",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/schemas/run-receipt.schema.json",
       "label": "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/run-receipt.schema.json",
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_human_review_workbench.py",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_human_review_workbench.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_ocr_candidate_review.py",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_ocr_candidate_review.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/tos_foundation_lab.py",
       "label": "mechanics/inference-pilots/parts/tos-foundation-lab/tos_foundation_lab.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/workbench/app.css",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/workbench/app.css",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/workbench/app.js",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/workbench/app.js",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/workbench/index.html",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/workbench/index.html",
       "type": "source_surface"
     },
     {
@@ -13929,6 +14214,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:human%20review",
+      "label": "human review",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:inference%20pilots",
       "label": "inference pilots",
       "type": "stack_lane"
@@ -14231,6 +14521,11 @@
     {
       "id": "surface_class:host%20storage",
       "label": "host storage",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:human%20review%20interface",
+      "label": "human review interface",
       "type": "surface_class"
     },
     {

@@ -26,7 +26,10 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from human_gold_review import verify_human_gold_review_manifest
-from ocr_candidate_review import verify_ocr_candidate_review_manifest
+from ocr_candidate_review import (
+    ACTIVE_WORKBENCH_PROTOCOL_ID,
+    verify_ocr_candidate_review_manifest,
+)
 from translation_source_review import verify_translation_source_review_manifest
 
 
@@ -38,6 +41,8 @@ DEFAULT_HUMAN_REVIEW_ROOT = Path(
 )
 MAX_REQUEST_BYTES = 18 * 1024 * 1024
 MAX_TEXT_FIELD_CHARS = 500_000
+MAX_TYPOGRAPHY_ANNOTATIONS = 256
+MAX_TYPOGRAPHY_QUOTE_CHARS = 10_000
 MAX_FEEDBACK_ATTACHMENTS = 4
 MAX_FEEDBACK_ATTACHMENT_BYTES = 8 * 1024 * 1024
 MAX_FEEDBACK_ATTACHMENT_TOTAL_BYTES = 12 * 1024 * 1024
@@ -478,7 +483,7 @@ GERMAN_FIELDS: tuple[dict[str, Any], ...] = (
     },
 )
 
-OCR_CANDIDATE_FIELDS: tuple[dict[str, Any], ...] = (
+OCR_CANDIDATE_FIELDS_V1: tuple[dict[str, Any], ...] = (
     {
         "name": "language_review_scope",
         "kind": "choice",
@@ -633,6 +638,50 @@ OCR_CANDIDATE_FIELDS: tuple[dict[str, Any], ...] = (
 )
 
 
+def _ocr_candidate_fields_v2() -> tuple[dict[str, Any], ...]:
+    """Extend v1 without changing the field contract of frozen v1 drafts."""
+
+    fields: list[dict[str, Any]] = []
+    for original in OCR_CANDIDATE_FIELDS_V1:
+        field = copy.deepcopy(original)
+        if field["name"] == "completeness":
+            field["options"] = (
+                *field["options"][:-1],
+                ("mixed-omissions-and-additions", "Есть и пропуски, и лишний текст"),
+                field["options"][-1],
+            )
+        if field["name"] == "error_types":
+            field["options"] = (
+                *field["options"],
+                ("typography", "Курсив или другое выделение"),
+            )
+        fields.append(field)
+        if field["name"] == "corrected_text":
+            fields.append(
+                {
+                    "name": "typography_annotations",
+                    "kind": "span-annotations",
+                    "label": "Курсив в исправленном тексте",
+                    "help": (
+                        "Сначала исправьте текст, затем выделите нужные слова "
+                        "в поле выше и нажмите «Отметить курсивом». Разметка "
+                        "хранится отдельно от символов текста."
+                    ),
+                    "target_field": "corrected_text",
+                    "annotation_kind": "italic",
+                    "visible_for": ("corrected",),
+                    "hidden_when": {
+                        "field": "language_review_scope",
+                        "values": ("visual-only",),
+                    },
+                }
+            )
+    return tuple(fields)
+
+
+OCR_CANDIDATE_FIELDS = _ocr_candidate_fields_v2()
+
+
 SELECTION_INSTRUCTIONS = {
     "confirm-visible-complete-prose-unit-without-reusing-v1-text": (
         "Найдите и точно перепишите полный видимый прозаический фрагмент. "
@@ -698,12 +747,12 @@ GERMAN_PROTOCOL = ReviewProtocol(
     manifest_filename="translation-source-review-manifest.json",
 )
 
-OCR_CANDIDATE_PROTOCOL = ReviewProtocol(
+OCR_CANDIDATE_PROTOCOL_V1 = ReviewProtocol(
     protocol_id="tos.human-review.ocr-candidate-pass-1.v1",
     title="Сверка OCR: оценка и точечное исправление",
     short_title="Сверка OCR · A/B/C",
     unit_id_key="review_unit_id",
-    fields=OCR_CANDIDATE_FIELDS,
+    fields=OCR_CANDIDATE_FIELDS_V1,
     expected_unit_count=None,
     draft_filename="ocr-candidate-review-pass-1.draft.json",
     draft_schema_version="tos_ocr_candidate_human_review_draft_v1",
@@ -717,6 +766,52 @@ OCR_CANDIDATE_PROTOCOL = ReviewProtocol(
     ),
     authority_boundary=OCR_CANDIDATE_REVIEW_AUTHORITY_BOUNDARY,
 )
+
+OCR_CANDIDATE_PROTOCOL = ReviewProtocol(
+    protocol_id=ACTIVE_WORKBENCH_PROTOCOL_ID,
+    title="Сверка OCR: оценка, типографика и точечное исправление",
+    short_title="Сверка OCR · A/B/C",
+    unit_id_key="review_unit_id",
+    fields=OCR_CANDIDATE_FIELDS,
+    expected_unit_count=None,
+    draft_filename="ocr-candidate-review-pass-1.draft.json",
+    draft_schema_version="tos_ocr_candidate_human_review_draft_v2",
+    manifest_filename="ocr-candidate-review-manifest.json",
+    review_mode="candidate-review",
+    candidate_visible=True,
+    badge_label="Методы скрыты",
+    blind_notice=(
+        "Название метода скрыто, но сам результат показан: сравните его с "
+        "источником. Не перепечатывайте страницу с нуля."
+    ),
+    authority_boundary=OCR_CANDIDATE_REVIEW_AUTHORITY_BOUNDARY,
+)
+
+
+def _is_candidate_protocol(protocol: ReviewProtocol) -> bool:
+    return protocol.review_mode == "candidate-review"
+
+
+def _candidate_protocol_for_session(
+    session_dir: Path, session: dict[str, Any]
+) -> ReviewProtocol:
+    declared = session.get("protocol_id")
+    autosave_path = session_dir / "human-review-workbench.pass-1.autosave.json"
+    if autosave_path.is_symlink():
+        raise HumanReviewWorkbenchError(
+            "mutable review output is a symlink: "
+            "human-review-workbench.pass-1.autosave.json"
+        )
+    if declared is None and autosave_path.is_file():
+        autosave = _load_json(autosave_path)
+        declared = autosave.get("protocol_id")
+    if declared in {None, OCR_CANDIDATE_PROTOCOL_V1.protocol_id}:
+        return OCR_CANDIDATE_PROTOCOL_V1
+    if declared == OCR_CANDIDATE_PROTOCOL.protocol_id:
+        return OCR_CANDIDATE_PROTOCOL
+    raise HumanReviewWorkbenchError(
+        f"unsupported OCR candidate review protocol: {declared}"
+    )
 
 
 def _field_names(protocol: ReviewProtocol) -> set[str]:
@@ -734,6 +829,11 @@ def _sanitize_values(
     for field in protocol.fields:
         name = str(field["name"])
         options = field.get("options")
+        if field.get("kind") == "span-annotations":
+            sanitized[name] = _sanitize_typography_annotations(
+                values.get(name), field=name
+            )
+            continue
         if field.get("kind") == "multi-choice":
             value = values.get(name)
             if value is None:
@@ -760,7 +860,127 @@ def _sanitize_values(
                     f"{name} is not an allowed protocol value"
                 )
         sanitized[name] = value
+    if _is_candidate_protocol(protocol):
+        _validate_typography_annotations_against_text(
+            sanitized.get("typography_annotations"),
+            sanitized.get("corrected_text"),
+        )
     return sanitized
+
+
+def _sanitize_typography_annotations(
+    value: object, *, field: str
+) -> list[dict[str, Any]] | None:
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise HumanReviewWorkbenchError(f"{field} must be a list or null")
+    if len(value) > MAX_TYPOGRAPHY_ANNOTATIONS:
+        raise HumanReviewWorkbenchError(
+            f"{field} accepts at most {MAX_TYPOGRAPHY_ANNOTATIONS} spans"
+        )
+    sanitized: list[dict[str, Any]] = []
+    for index, annotation in enumerate(value):
+        if not isinstance(annotation, dict) or set(annotation) != {
+            "kind",
+            "selectors",
+        }:
+            raise HumanReviewWorkbenchError(
+                f"{field}[{index}] has an invalid annotation shape"
+            )
+        if annotation.get("kind") != "italic":
+            raise HumanReviewWorkbenchError(
+                f"{field}[{index}] has an unsupported typography kind"
+            )
+        selectors = annotation.get("selectors")
+        if not isinstance(selectors, list) or len(selectors) != 2:
+            raise HumanReviewWorkbenchError(
+                f"{field}[{index}] must carry position and quote selectors"
+            )
+        position, quote = selectors
+        if (
+            not isinstance(position, dict)
+            or set(position) != {"type", "start", "end"}
+            or position.get("type") != "TextPositionSelector"
+        ):
+            raise HumanReviewWorkbenchError(
+                f"{field}[{index}] has an invalid position selector"
+            )
+        start = position.get("start")
+        end = position.get("end")
+        if (
+            not isinstance(start, int)
+            or isinstance(start, bool)
+            or not isinstance(end, int)
+            or isinstance(end, bool)
+            or start < 0
+            or end <= start
+        ):
+            raise HumanReviewWorkbenchError(
+                f"{field}[{index}] has an invalid text range"
+            )
+        if (
+            not isinstance(quote, dict)
+            or set(quote) != {"type", "exact"}
+            or quote.get("type") != "TextQuoteSelector"
+        ):
+            raise HumanReviewWorkbenchError(
+                f"{field}[{index}] has an invalid quote selector"
+            )
+        exact = quote.get("exact")
+        if (
+            not isinstance(exact, str)
+            or not exact
+            or len(exact) > MAX_TYPOGRAPHY_QUOTE_CHARS
+        ):
+            raise HumanReviewWorkbenchError(
+                f"{field}[{index}] has an invalid exact quote"
+            )
+        sanitized.append(
+            {
+                "kind": "italic",
+                "selectors": [
+                    {
+                        "type": "TextPositionSelector",
+                        "start": start,
+                        "end": end,
+                    },
+                    {
+                        "type": "TextQuoteSelector",
+                        "exact": exact,
+                    },
+                ],
+            }
+        )
+    positions = [
+        (annotation["selectors"][0]["start"], annotation["selectors"][0]["end"])
+        for annotation in sanitized
+    ]
+    if positions != sorted(positions):
+        raise HumanReviewWorkbenchError(f"{field} spans must be sorted")
+    for previous, current in zip(positions, positions[1:]):
+        if current[0] < previous[1]:
+            raise HumanReviewWorkbenchError(f"{field} spans must not overlap")
+    return sanitized or None
+
+
+def _validate_typography_annotations_against_text(
+    annotations: object, corrected_text: object
+) -> None:
+    if annotations is None:
+        return
+    if not isinstance(corrected_text, str):
+        raise HumanReviewWorkbenchError(
+            "typography_annotations require corrected_text"
+        )
+    for index, annotation in enumerate(annotations):
+        position, quote = annotation["selectors"]
+        start = position["start"]
+        end = position["end"]
+        if end > len(corrected_text) or corrected_text[start:end] != quote["exact"]:
+            raise HumanReviewWorkbenchError(
+                f"typography_annotations[{index}] no longer matches corrected_text"
+            )
 
 
 def _sanitize_string(value: object, *, field: str) -> str | None:
@@ -794,7 +1014,7 @@ def _missing_fields(
         if required and (value is None or (isinstance(value, str) and not value.strip())):
             missing.append(name)
     if (
-        protocol is not OCR_CANDIDATE_PROTOCOL
+        not _is_candidate_protocol(protocol)
         and decision
         and decision != "accept"
     ):
@@ -803,7 +1023,7 @@ def _missing_fields(
             rationale = rationale or values.get("source_damage_or_ambiguity")
         if not isinstance(rationale, str) or not rationale.strip():
             missing.append("notes")
-    if protocol is OCR_CANDIDATE_PROTOCOL:
+    if _is_candidate_protocol(protocol):
         scope = values.get("language_review_scope")
         if scope == "visual-only" and decision not in {
             None,
@@ -854,7 +1074,9 @@ class ReviewContext:
         elif (
             self.packet_root / OCR_CANDIDATE_PROTOCOL.manifest_filename
         ).is_file():
-            self.protocol = OCR_CANDIDATE_PROTOCOL
+            self.protocol = _candidate_protocol_for_session(
+                self.session_dir, self.session
+            )
             self.manifest_path = (
                 self.packet_root / OCR_CANDIDATE_PROTOCOL.manifest_filename
             )
@@ -998,7 +1220,7 @@ class ReviewContext:
                 context = " · ".join(part for part in context_parts if part)
                 language = str(manifest_unit.get("language", "")).lower() or "ru"
                 extra: dict[str, Any] = {}
-            elif self.protocol is OCR_CANDIDATE_PROTOCOL:
+            elif _is_candidate_protocol(self.protocol):
                 source = _source_labels(manifest_unit, pages)
                 pdf_page = manifest_unit.get("pdf_page", "?")
                 title = f"{source['short']} · PDF-страница {pdf_page}"
@@ -1307,6 +1529,50 @@ class ReviewContext:
                 "authority_boundary": self.protocol.authority_boundary,
             }
 
+    def synchronize_session_control(self) -> bool:
+        """Refresh the mutable control projection from validated review state."""
+
+        with self.lock:
+            completed_units = sum(
+                not _missing_fields(self.protocol, row["values"])
+                for row in self.state["rows"]
+            )
+            control = copy.deepcopy(self.session)
+            control["protocol_id"] = self.protocol.protocol_id
+            control["progress"] = {
+                "total_units": len(self.units),
+                "completed_units": completed_units,
+            }
+            if self.state["status"] == "submitted-and-frozen":
+                receipt = _load_json(self.receipt_path)
+                control["status"] = "pass-1-draft-frozen"
+                control["next_action"] = (
+                    "Keep the frozen human draft immutable and run an explicit "
+                    "post-reveal analysis against the restricted method map."
+                )
+                control["review_result"] = {
+                    "status": receipt["status"],
+                    "submitted_at_utc": receipt["submitted_at_utc"],
+                    "reviewer_ref": receipt["reviewer_ref"],
+                    "draft_ref": receipt["draft_ref"],
+                    "draft_sha256": receipt["draft_sha256"],
+                    "receipt_ref": self.receipt_path.name,
+                }
+            elif self.state["status"] == "in-progress":
+                control["status"] = "human-review-in-progress"
+                control["next_action"] = (
+                    "Resume the loopback Workbench at the next unfinished unit."
+                )
+                control.pop("review_result", None)
+            else:
+                control.setdefault("status", "awaiting-real-human-review")
+                control.pop("review_result", None)
+            if control == self.session:
+                return False
+            _atomic_write_json(self.session_path, control)
+            self.session = control
+            return True
+
     def page_asset(self, index: int, role: str) -> Path:
         asset = self.page_assets.get((index, role))
         if asset is None:
@@ -1394,6 +1660,7 @@ class ReviewContext:
                 }
             )
             _atomic_write_json(self.autosave_path, self.state)
+            self.synchronize_session_control()
             return self.public_session()
 
     def _decode_feedback_attachments(
@@ -1594,38 +1861,41 @@ class ReviewContext:
                         "notes": _split_lines(values.get("notes")),
                     }
                 )
-            elif self.protocol is OCR_CANDIDATE_PROTOCOL:
+            elif _is_candidate_protocol(self.protocol):
                 unit = manifest_units[row["unit_id"]]
-                rows.append(
-                    {
-                        "review_unit_id": row["unit_id"],
-                        "source_sample_id": unit["source_sample_id"],
-                        "visual_sample_id": unit["visual_sample_id"],
-                        "source_anchor_ref": unit["source_anchor_ref"],
-                        "language": unit["language"],
-                        "candidate_label": unit["candidate_label"],
-                        "candidate_sha256": unit["candidate_sha256"],
-                        "source_visible": True,
-                        "source_page_digest_verified": True,
-                        "language_review_scope": values[
-                            "language_review_scope"
-                        ],
-                        "page_and_region_resolved": values[
-                            "page_and_region_resolved"
-                        ],
-                        "source_legibility": values["source_legibility"],
-                        "text_fidelity": values["text_fidelity"],
-                        "completeness": values["completeness"],
-                        "structure_and_order": values["structure_and_order"],
-                        "error_types": list(values.get("error_types") or []),
-                        "corrected_text": values["corrected_text"],
-                        "decision": values["decision"],
-                        "notes": values["notes"],
-                        "elapsed_minutes": round(
-                            float(row["active_seconds"]) / 60.0, 1
-                        ),
-                    }
-                )
+                candidate_row = {
+                    "review_unit_id": row["unit_id"],
+                    "source_sample_id": unit["source_sample_id"],
+                    "visual_sample_id": unit["visual_sample_id"],
+                    "source_anchor_ref": unit["source_anchor_ref"],
+                    "language": unit["language"],
+                    "candidate_label": unit["candidate_label"],
+                    "candidate_sha256": unit["candidate_sha256"],
+                    "source_visible": True,
+                    "source_page_digest_verified": True,
+                    "language_review_scope": values[
+                        "language_review_scope"
+                    ],
+                    "page_and_region_resolved": values[
+                        "page_and_region_resolved"
+                    ],
+                    "source_legibility": values["source_legibility"],
+                    "text_fidelity": values["text_fidelity"],
+                    "completeness": values["completeness"],
+                    "structure_and_order": values["structure_and_order"],
+                    "error_types": list(values.get("error_types") or []),
+                    "corrected_text": values["corrected_text"],
+                    "decision": values["decision"],
+                    "notes": values["notes"],
+                    "elapsed_minutes": round(
+                        float(row["active_seconds"]) / 60.0, 1
+                    ),
+                }
+                if self.protocol is OCR_CANDIDATE_PROTOCOL:
+                    candidate_row["typography_annotations"] = copy.deepcopy(
+                        values["typography_annotations"] or []
+                    )
+                rows.append(candidate_row)
             else:
                 rows.append(
                     {
@@ -1718,6 +1988,7 @@ class ReviewContext:
                 }
             )
             _atomic_write_json(self.autosave_path, self.state)
+            self.synchronize_session_control()
             return self.public_session()
 
 
@@ -1954,6 +2225,28 @@ def _handler_for(application: WorkbenchApplication) -> type[BaseHTTPRequestHandl
             self._send_json(HTTPStatus.OK, response)
 
     return WorkbenchHandler
+
+
+def synchronize_human_review_session_control(
+    session_dir: Path,
+    *,
+    allowed_work_root: Path = DEFAULT_HUMAN_REVIEW_ROOT,
+) -> dict[str, Any]:
+    """Repair one mutable control projection from validated review artifacts."""
+
+    context = ReviewContext(session_dir, allowed_work_root=allowed_work_root)
+    changed = context.synchronize_session_control()
+    return {
+        "session_id": context.session.get("session_id"),
+        "protocol_id": context.protocol.protocol_id,
+        "status": context.session.get("status"),
+        "progress": copy.deepcopy(context.session.get("progress")),
+        "changed": changed,
+        "authority_boundary": (
+            "mutable session-control projection synchronized from validated "
+            "autosave/draft/receipt; frozen human evidence was not changed"
+        ),
+    }
 
 
 def create_human_review_workbench_server(

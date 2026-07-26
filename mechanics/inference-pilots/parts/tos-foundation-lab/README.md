@@ -71,6 +71,7 @@ tos-foundation-lab/
 ├── native_structure.py
 ├── neo4j_bridge.py
 ├── neo4j_graph.py
+├── ocr_candidate_analysis.py
 ├── ocr_candidate_review.py
 ├── ocr_render.py
 ├── oxigraph_bridge.py
@@ -126,12 +127,40 @@ screenshot feedback, and draft freeze so the reviewer handles only
 source-visible judgments. Feedback screenshots can be pasted directly from the
 clipboard and remain content-addressed inside the mutable review session. The
 current bounded slice supports method-blind visible OCR candidate review,
-candidate-prefilled correction, the independent first pass of the historical
-15-page Human Gold packet, and the 30-unit language-competent German source
-packet. Its frozen output is still only one human draft: it does not perform
+candidate-prefilled correction, combined omission-plus-addition judgments, and
+stand-off italic spans bound to both Unicode positions and exact quotes. It
+also supports the independent first pass of the historical 15-page Human Gold
+packet and the 30-unit language-competent German source packet. Frozen v1
+candidate drafts remain byte-compatible; newly initialized candidate sessions
+use v2. Its frozen output is still only one human draft: it does not perform
 pass 2, adjudicate disagreement, accept German source text, create gold,
 produce a general method ranking, or promote Tree of Sophia content. See
 [`docs/HUMAN_REVIEW_WORKBENCH.md`](docs/HUMAN_REVIEW_WORKBENCH.md).
+
+If a mutable `review-session.json` projection was left stale after an
+otherwise valid freeze, repair only that projection from the validated
+autosave, draft, and receipt:
+
+```bash
+scripts/aoa-tos-foundation-lab sync-human-review-session-control \
+  --session-dir PRIVATE_PREPARED_REVIEW_SESSION
+```
+
+The repair command does not rewrite the human draft, receipt, or autosave.
+
+After a candidate pass is frozen, method identity may be joined only in a
+private post-reveal output:
+
+```bash
+scripts/aoa-tos-foundation-lab analyze-ocr-candidate-review \
+  --session-dir PRIVATE_FROZEN_CANDIDATE_SESSION
+```
+
+The analyzer re-verifies the complete human and run-evidence chain, writes a
+digest-bound JSON analysis plus human-readable report under the session's
+`post-reveal/` route, and leaves the frozen draft unchanged. It reports
+distributions rather than inventing one scalar winner and audits whether
+display position confounds human-time or correction-cost comparisons.
 
 The ordinary solo+AI OCR route materializes a separate candidate-visible
 packet. Candidate order is randomized per source page, method identity is

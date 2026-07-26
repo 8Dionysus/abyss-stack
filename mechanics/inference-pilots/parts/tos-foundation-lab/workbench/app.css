@@ -622,6 +622,88 @@ textarea {
   background: rgba(217, 184, 103, 0.08);
 }
 
+.annotation-controls {
+  display: flex;
+  margin-bottom: 9px;
+}
+
+.annotation-add {
+  min-height: 38px;
+}
+
+.annotation-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.annotation-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 6px 8px 6px 10px;
+  border: 1px solid rgba(217, 184, 103, 0.40);
+  border-radius: 999px;
+  color: var(--gold-bright);
+  background: rgba(217, 184, 103, 0.08);
+}
+
+.annotation-chip em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annotation-remove {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+}
+
+.annotation-remove:hover {
+  color: var(--text);
+  background: rgba(216, 137, 120, 0.16);
+}
+
+.annotation-preview-label {
+  display: block;
+  margin: 0 0 6px;
+  color: #818981;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.annotation-preview {
+  max-height: 240px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: #d8d7ce;
+  background: rgba(8, 11, 9, 0.42);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.83rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.annotation-preview em {
+  color: var(--gold-bright);
+}
+
 input[type="text"],
 select {
   min-height: 42px;

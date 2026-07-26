@@ -73,6 +73,12 @@ correction cost. Candidate-prefilled correction measures repair effort.
 Source-only transcription is a smaller independent calibration lane used only
 when exact reference metrics justify its cost.
 
+Post-reveal analysis must audit display position before comparing human time.
+If methods are not near-balanced across first, middle, and last display
+positions, correction-cost ranking remains blocked even when every draft row
+is complete. The next cost-bearing packet must use a predeclared balanced
+assignment rather than relying on independent per-page shuffles.
+
 Every human content claim is bounded by declared source-language competence.
 A visual-only review may contribute page, legibility, and structure evidence
 but cannot satisfy orthographic, grammatical, semantic, or translation

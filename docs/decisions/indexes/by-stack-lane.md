@@ -102,7 +102,7 @@
 - [ABYSS-STACK-D-0028 Intel Inference And Rerank Service Selection](../ABYSS-STACK-D-0028-intel-inference-and-rerank-service-selection.md) (`docs/decisions/ABYSS-STACK-D-0028-intel-inference-and-rerank-service-selection.md`)
 - [ABYSS-STACK-D-0029 BabelVox TTS Experimental Lane](../ABYSS-STACK-D-0029-babelvox-tts-experimental-lane.md) (`docs/decisions/ABYSS-STACK-D-0029-babelvox-tts-experimental-lane.md`)
 - [ABYSS-STACK-D-0083 Tree of Sophia Foundation Laboratory Boundary](../ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md) (`docs/decisions/ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md`)
-- [ABYSS-STACK-D-0086 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md`)
+- [ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md`)
 
 ## service selection
 
@@ -202,7 +202,7 @@
 - [ABYSS-STACK-D-0069 ToS Corpus MCP Access Plane](../ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0073 ToS Philosophy Graph Access Plane](../ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md`)
 - [ABYSS-STACK-D-0083 Tree of Sophia Foundation Laboratory Boundary](../ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md) (`docs/decisions/ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md`)
-- [ABYSS-STACK-D-0086 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md`)
+- [ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md`)
 
 ## agent surface
 
@@ -224,7 +224,7 @@
 
 ## human review
 
-- [ABYSS-STACK-D-0086 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md`)
+- [ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md`)
 
 ## observability
 

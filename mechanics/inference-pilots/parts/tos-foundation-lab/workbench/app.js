@@ -317,6 +317,7 @@ function markFieldChanged(fieldName, value) {
         row.values.completeness = null;
         row.values.error_types = null;
         row.values.corrected_text = null;
+        row.values.typography_annotations = null;
         if (
           row.values.decision &&
           !["language-not-assessed", "uncertain", "reject"].includes(
@@ -361,9 +362,148 @@ function appendCharacterTools(wrapper, input, characters) {
   wrapper.append(toolbar);
 }
 
+function typographyPosition(annotation) {
+  return (annotation.selectors || []).find(
+    (selector) => selector.type === "TextPositionSelector",
+  );
+}
+
+function typographyQuote(annotation) {
+  return (annotation.selectors || []).find(
+    (selector) => selector.type === "TextQuoteSelector",
+  );
+}
+
+function codePointOffset(text, utf16Offset) {
+  return Array.from(text.slice(0, utf16Offset)).length;
+}
+
+function renderTypographyPreview(container, text, annotations) {
+  const heading = document.createElement("span");
+  heading.className = "annotation-preview-label";
+  heading.textContent = "Предпросмотр";
+  const preview = document.createElement("pre");
+  preview.className = "annotation-preview";
+  const characters = Array.from(text);
+  let cursor = 0;
+  for (const annotation of annotations) {
+    const position = typographyPosition(annotation);
+    if (!position) continue;
+    preview.append(document.createTextNode(characters.slice(cursor, position.start).join("")));
+    const emphasis = document.createElement("em");
+    emphasis.textContent = characters.slice(position.start, position.end).join("");
+    preview.append(emphasis);
+    cursor = position.end;
+  }
+  preview.append(document.createTextNode(characters.slice(cursor).join("")));
+  container.append(heading, preview);
+}
+
+function buildSpanAnnotations(wrapper, field, row) {
+  const annotations = Array.isArray(row.values[field.name])
+    ? row.values[field.name]
+    : [];
+  const controls = document.createElement("span");
+  controls.className = "annotation-controls";
+  const addButton = document.createElement("button");
+  addButton.type = "button";
+  addButton.className = "button button-secondary annotation-add";
+  const italicLabel = document.createElement("em");
+  italicLabel.textContent = "Отметить курсивом";
+  addButton.append(italicLabel);
+  addButton.disabled = isFrozen();
+  addButton.addEventListener("click", () => {
+    const input = elements.reviewForm.querySelector(
+      `[name="${field.target_field}"]`,
+    );
+    if (!input) return;
+    const startUtf16 = input.selectionStart ?? 0;
+    const endUtf16 = input.selectionEnd ?? startUtf16;
+    if (endUtf16 <= startUtf16) {
+      showToast("Сначала выделите курсивный фрагмент в исправленном тексте.");
+      input.focus();
+      return;
+    }
+    const exact = input.value.slice(startUtf16, endUtf16);
+    if (!exact.trim()) {
+      showToast("Нельзя отметить курсивом только пробелы или переносы.");
+      input.focus();
+      return;
+    }
+    const start = codePointOffset(input.value, startUtf16);
+    const end = codePointOffset(input.value, endUtf16);
+    const overlaps = annotations.some((annotation) => {
+      const position = typographyPosition(annotation);
+      return position && start < position.end && end > position.start;
+    });
+    if (overlaps) {
+      showToast("Этот фрагмент пересекается с уже отмеченным курсивом.");
+      input.focus();
+      return;
+    }
+    const updated = [
+      ...annotations,
+      {
+        kind: field.annotation_kind,
+        selectors: [
+          { type: "TextPositionSelector", start, end },
+          { type: "TextQuoteSelector", exact },
+        ],
+      },
+    ].sort(
+      (left, right) =>
+        typographyPosition(left).start - typographyPosition(right).start,
+    );
+    markFieldChanged(field.name, updated);
+    renderForm();
+    window.requestAnimationFrame(() => {
+      const refreshed = elements.reviewForm.querySelector(
+        `[name="${field.target_field}"]`,
+      );
+      refreshed?.focus();
+      refreshed?.setSelectionRange(endUtf16, endUtf16);
+    });
+  });
+  controls.append(addButton);
+  wrapper.append(controls);
+
+  if (annotations.length) {
+    const list = document.createElement("span");
+    list.className = "annotation-list";
+    annotations.forEach((annotation, index) => {
+      const quote = typographyQuote(annotation);
+      const item = document.createElement("span");
+      item.className = "annotation-chip";
+      const text = document.createElement("em");
+      text.textContent = `«${quote?.exact || ""}»`;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "annotation-remove";
+      remove.textContent = "×";
+      remove.title = "Убрать отметку курсива";
+      remove.setAttribute("aria-label", `Убрать курсив: ${quote?.exact || ""}`);
+      remove.disabled = isFrozen();
+      remove.addEventListener("click", () => {
+        const updated = annotations.filter(
+          (_annotation, itemIndex) => itemIndex !== index,
+        );
+        markFieldChanged(field.name, updated);
+        renderForm();
+      });
+      item.append(text, remove);
+      list.append(item);
+    });
+    wrapper.append(list);
+    const targetText = row.values[field.target_field] || "";
+    renderTypographyPreview(wrapper, targetText, annotations);
+  }
+  return wrapper;
+}
+
 function buildField(field, row) {
   const isButtonGroup = field.kind === "choice" || field.kind === "multi-choice";
-  const wrapper = document.createElement(isButtonGroup ? "div" : "label");
+  const containsButtons = isButtonGroup || field.kind === "span-annotations";
+  const wrapper = document.createElement(containsButtons ? "div" : "label");
   wrapper.className = "field";
   wrapper.dataset.field = field.name;
   if (missingFields(row).includes(field.name)) {
@@ -381,6 +521,10 @@ function buildField(field, row) {
     help.className = "field-help";
     help.textContent = field.help;
     wrapper.append(help);
+  }
+
+  if (field.kind === "span-annotations") {
+    return buildSpanAnnotations(wrapper, field, row);
   }
 
   const value = fieldValue(row, field.name);
@@ -460,6 +604,21 @@ function buildField(field, row) {
   appendCharacterTools(wrapper, input, field.character_tools || []);
   const handleValueChange = () => {
     wrapper.classList.remove("missing");
+    let clearedTypography = false;
+    const selectionStart = input.selectionStart;
+    const selectionEnd = input.selectionEnd;
+    if (
+      field.name === "corrected_text" &&
+      Array.isArray(row.values.typography_annotations) &&
+      row.values.typography_annotations.length
+    ) {
+      row.values.typography_annotations = null;
+      clearedTypography = true;
+      showToast(
+        "После изменения текста разметка курсива очищена. Отметьте её заново.",
+        5000,
+      );
+    }
     if (
       field.name === "decision" &&
       input.value === "corrected" &&
@@ -468,6 +627,18 @@ function buildField(field, row) {
       row.values.corrected_text = currentUnit().candidate_text;
     }
     markFieldChanged(field.name, input.value);
+    if (clearedTypography) {
+      renderForm();
+      window.requestAnimationFrame(() => {
+        const refreshed = elements.reviewForm.querySelector(
+          '[name="corrected_text"]',
+        );
+        refreshed?.focus();
+        if (selectionStart !== null && selectionEnd !== null) {
+          refreshed?.setSelectionRange(selectionStart, selectionEnd);
+        }
+      });
+    }
     if (field.name === "decision") {
       renderCandidate();
       renderForm();

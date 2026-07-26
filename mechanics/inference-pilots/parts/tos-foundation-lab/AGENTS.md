@@ -55,9 +55,16 @@ semantic promotion, rights clearance, model storage, or host policy.
 - Do not make full-page retyping the default human route. Use source-visible
   criteria first, candidate-prefilled correction second, and an independent
   transcription only for a deliberately small calibration/reference lane.
+- Preserve source typography as stand-off evidence. Do not insert Markdown or
+  other presentation syntax into corrected source text; bind each typography
+  span to both Unicode code-point offsets and its exact quoted text, and reject
+  stale or overlapping selectors.
 - Human-review workbench writes must stay inside the selected mutable review
   session. The verified packet and Tree of Sophia source witnesses remain
   read-only.
+- Treat `review-session.json` as a mutable control projection, not review
+  authority. Rebuild its progress and terminal status only from a validated
+  autosave plus, after submission, the matching frozen draft and receipt.
 - Feedback screenshots are private mutable-session evidence: accept only
   bounded image allowlists, store them content-addressed with owner-only modes,
   reference them relatively from feedback JSONL, and never serve them through
@@ -65,6 +72,10 @@ semantic promotion, rights clearance, model storage, or host policy.
 - OCR candidate-review packets are immutable private inputs. Serve candidate
   text only in their declared candidate-visible protocol, bind every text to
   its digest, and never serve or serialize the restricted method-identity map.
+- Reveal method identity only after a complete draft is frozen. Post-reveal
+  analysis must re-verify the draft, receipt, packet, restricted map, run
+  receipts, and candidate digests; remain private; audit display-position
+  balance; and block human-cost rankings when position is confounded.
 - Preserve reviewer identity once a pass begins, require explicit real-human
   attestation at freeze, and label every workbench submission as a pass draft,
   never as gold, accepted source, translation, or canon.

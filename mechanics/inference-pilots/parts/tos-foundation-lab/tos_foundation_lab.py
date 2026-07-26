@@ -58,6 +58,11 @@ from ocr_candidate_review import (
 from human_review_workbench import (
     HumanReviewWorkbenchError,
     serve_human_review_workbench,
+    synchronize_human_review_session_control,
+)
+from ocr_candidate_analysis import (
+    OcrCandidateAnalysisError,
+    analyze_frozen_ocr_candidate_review,
 )
 from translation_source import (
     DEFAULT_SHARED_ROOT as DEFAULT_TRANSLATION_SOURCE_ROOT,
@@ -1201,6 +1206,23 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="ask the desktop to open the tokenized loopback URL",
     )
+    synchronize_review_control_parser = subparsers.add_parser(
+        "sync-human-review-session-control",
+        help="repair mutable review-session status from validated review artifacts",
+    )
+    synchronize_review_control_parser.add_argument(
+        "--session-dir", type=Path, required=True
+    )
+    analyze_ocr_candidate_review_parser = subparsers.add_parser(
+        "analyze-ocr-candidate-review",
+        help=(
+            "join one frozen candidate pass to its restricted A/B/C map in a "
+            "private post-reveal report"
+        ),
+    )
+    analyze_ocr_candidate_review_parser.add_argument(
+        "--session-dir", type=Path, required=True
+    )
 
     translation_source_parser = subparsers.add_parser(
         "materialize-translation-source",
@@ -1664,6 +1686,18 @@ def main(argv: list[str] | None = None) -> int:
                 port=args.port,
                 open_browser=args.open_browser,
             )
+            return 0
+
+        if args.command == "sync-human-review-session-control":
+            result = synchronize_human_review_session_control(
+                args.session_dir
+            )
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
+
+        if args.command == "analyze-ocr-candidate-review":
+            result = analyze_frozen_ocr_candidate_review(args.session_dir)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0
 
         if args.command == "materialize-translation-source":
@@ -2141,6 +2175,7 @@ def main(argv: list[str] | None = None) -> int:
         DoclingStructureError,
         PaddleVlStructureError,
         HumanReviewWorkbenchError,
+        OcrCandidateAnalysisError,
     ) as exc:
         print(f"[error] {exc}", file=sys.stderr)
         return 1

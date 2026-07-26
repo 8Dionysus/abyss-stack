@@ -27,3 +27,5 @@
   time after license, storage, and retention gates
 - preserve failed runs and manual correction cost
 - promote only runtime methods here; return content decisions to Tree of Sophia
+- replace independent per-page OCR candidate shuffles with a predeclared
+  block-balanced display assignment before the next correction-cost comparison

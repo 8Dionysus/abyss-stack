@@ -90,7 +90,10 @@ Tracking starts with the community-docs baseline for this repository.
   capture, concrete target, evidence/freshness, bounded repair-handoff, and
   stored-packet review plus nearest-route distinctions in the host-visible
   prefix.
-
+- Newly initialized Tree of Sophia OCR candidate reviews now use a
+  backward-compatible v2 workbench protocol with a combined
+  omission-plus-addition outcome and provenance-safe stand-off italic
+  annotations; existing v1 sessions and frozen drafts stay byte-compatible.
 - Thin-host service overlays now preserve service-native budgets and soft
   reclaim reservations while clearing hard cgroup CPU and memory ceilings from
   persistent owner services; explicit measured lab and disposable workloads

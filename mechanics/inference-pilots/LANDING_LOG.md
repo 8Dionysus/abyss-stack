@@ -58,3 +58,20 @@ candidate/run provenance, a mutable-session initializer, and focused packet,
 resume, correction, language-boundary, and freeze tests. Existing Human Gold
 autosaves retain their internal protocol identity and are presented as
 independent calibration drafts rather than completed gold.
+
+## 2026-07-26 - Provenance-safe typography and review projection repair
+
+Extended newly initialized OCR candidate sessions to protocol v2 with a
+combined omission-plus-addition judgment and stand-off italic annotations
+bound to Unicode positions plus exact quotes. Frozen and in-progress v1
+sessions remain on their original schema and are never rewritten.
+
+Autosave and freeze now synchronize the mutable `review-session.json` control
+projection. Added an explicit idempotent repair command for valid completed
+sessions whose control status predates the frozen human evidence.
+
+Added a private, idempotent post-reveal analyzer that joins only a frozen human
+draft to its restricted A/B/C map after re-verifying run and candidate
+provenance. The report keeps quality, runtime, and observed human time
+separate, and blocks correction-cost ranking when display positions are
+imbalanced.

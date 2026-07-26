@@ -48,6 +48,7 @@ BLIND_MAP_BOUNDARY = (
     "restricted method-identity map for post-review analysis only; never expose "
     "it through the human-review workbench"
 )
+ACTIVE_WORKBENCH_PROTOCOL_ID = "tos.human-review.ocr-candidate-pass-1.v2"
 
 
 class OcrCandidateReviewError(RuntimeError):
@@ -649,6 +650,7 @@ def initialize_ocr_candidate_review_session(
         {
             "schema_version": "tos_ocr_candidate_review_session_v1",
             "session_id": session_id,
+            "protocol_id": ACTIVE_WORKBENCH_PROTOCOL_ID,
             "created_at_utc": _utc_now(),
             "status": "awaiting-real-human-candidate-review",
             "private_local_only": True,
