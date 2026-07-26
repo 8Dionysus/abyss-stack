@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 19259699,
+  "allowed_tracked_bytes": 24707486,
+  "approved_by": "repository-owner",
+  "base_ref": "8d9d4309302d90b79fdc3d68da99bb2ace511446",
+  "changed_generated_bytes": 19259699,
+  "changed_generated_files": 287,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "fb035cdc2a209729a8a4fdfcd368b3417ee5b580dcb7a64037bac1f009d3e8c8",
+  "reason": "Admit the receipt-bound SDK routing G5 canonical intake, its isolated/live authority split, exact runtime trust validation, and reversible predecessor compatibility rollback.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 24707486,
+  "tracked_bytes_max": 24117248
+}
