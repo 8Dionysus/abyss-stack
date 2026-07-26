@@ -28,6 +28,11 @@ owner layers.
 MCP packages may expose resources, tools, prompts, smoke tests, and access
 helpers. They may not promote sibling-owned truth by themselves.
 
+For stack runtime evidence,
+`mcp/services/abyss-stack-mcp/` exposes compact source/package/deploy/process/
+endpoint/consumer observations and separately prepares non-executing runtime
+plan candidates. It does not proxy owner tools or execute plans.
+
 For memory work, `mcp/services/aoa-memo-mcp/` exposes `aoa-memo`, `.aoa`, and
 local `memo/` routes while keeping durable memory review in `aoa-memo`.
 
@@ -82,6 +87,13 @@ source policy, packet truth, token/session handling, and generated storage in
 `aoa-discord-connector`.
 
 ## Validation
+
+For `abyss-stack-mcp` changes, run:
+
+```bash
+python mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py
+python -m pytest mcp/services/abyss-stack-mcp/tests -q
+```
 
 For `aoa-memo-mcp` changes, run:
 

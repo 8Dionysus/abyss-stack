@@ -10,63 +10,159 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema"
 
 EXPECTED_ACTIVE_SCHEMA_PATHS = {
+    Path("mcp/services/abyss-stack-mcp/schemas/runtime-observation.schema.json"),
+    Path("mcp/services/abyss-stack-mcp/schemas/runtime-plan-candidate.schema.json"),
     Path("schemas/workspace_decision_repo_source_posture.schema.json"),
     Path("schemas/workspace_decision_graph.schema.json"),
     Path("schemas/workspace_decision_graph_edge.schema.json"),
     Path("schemas/workspace_decision_graph_node.schema.json"),
     Path("schemas/workspace_decision_graph_summary.schema.json"),
     Path("mechanics/agon-runtime/parts/runtime-kernels/schemas/duel-event.schema.json"),
-    Path("mechanics/agon-runtime/parts/runtime-kernels/schemas/duel-runtime-kernel-registry.schema.json"),
-    Path("mechanics/agon-runtime/parts/runtime-kernels/schemas/duel-runtime-kernel.schema.json"),
-    Path("mechanics/agon-runtime/parts/runtime-kernels/schemas/mechanical-trial-event-log.schema.json"),
-    Path("mechanics/agon-runtime/parts/runtime-kernels/schemas/mechanical-trial-run-registry.schema.json"),
-    Path("mechanics/agon-runtime/parts/runtime-kernels/schemas/mechanical-trial-run.schema.json"),
-    Path("mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnosis_companion.schema.json"),
-    Path("mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_anchor_ref.schema.json"),
-    Path("mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json"),
-    Path("mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_target.schema.json"),
-    Path("mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/repair_handoff.schema.json"),
-    Path("mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/reviewed_diagnosis_ref.schema.json"),
-    Path("mechanics/federation-seams/parts/rpg-runtime/schemas/agent_build_snapshot.schema.json"),
-    Path("mechanics/federation-seams/parts/rpg-runtime/schemas/agent_build_snapshot_collection.schema.json"),
-    Path("mechanics/federation-seams/parts/rpg-runtime/schemas/frontend_projection_bundle.schema.json"),
-    Path("mechanics/federation-seams/parts/rpg-runtime/schemas/frontend_projection_bundle_collection.schema.json"),
-    Path("mechanics/federation-seams/parts/rpg-runtime/schemas/quest_run_result.schema.json"),
-    Path("mechanics/federation-seams/parts/rpg-runtime/schemas/quest_run_result_collection.schema.json"),
-    Path("mechanics/federation-seams/parts/rpg-runtime/schemas/reputation_ledger.schema.json"),
-    Path("mechanics/federation-seams/parts/rpg-runtime/schemas/reputation_ledger_collection.schema.json"),
-    Path("mechanics/governed-execution/parts/candidate-exports/schemas/runtime-artifact-hook-candidate.schema.json"),
-    Path("mechanics/governed-execution/parts/candidate-exports/schemas/runtime-eval-evidence-selection-candidate.schema.json"),
-    Path("mechanics/governed-execution/parts/candidate-exports/schemas/runtime-memo-export-candidate.schema.json"),
-    Path("mechanics/governed-execution/parts/return-policy/schemas/runtime-return-event.schema.json"),
-    Path("mechanics/governed-execution/parts/return-policy/schemas/runtime-return-policy.schema.json"),
-    Path("mechanics/governed-execution/parts/runtime-contracts/schemas/runtime-governed-execution-canary-catalog.schema.json"),
-    Path("mechanics/governed-execution/parts/runtime-contracts/schemas/runtime-governed-execution-policy.schema.json"),
-    Path("mechanics/governed-execution/parts/runtime-contracts/schemas/runtime-governed-execution-request.schema.json"),
-    Path("mechanics/inference-pilots/parts/local-trials/schemas/runtime-benchmark.schema.json"),
-    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/experiment-suite.schema.json"),
-    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/human-gold-review-manifest.schema.json"),
-    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/human-gold-review-record.schema.json"),
-    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/manual-review-receipt.schema.json"),
-    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/ocr-render-manifest.schema.json"),
-    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/run-receipt.schema.json"),
-    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/runtime-manifest.schema.json"),
-    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/source-visible-model-inspection.schema.json"),
-    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/structure-vlm-selection.schema.json"),
-    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/translation-lab-readiness.schema.json"),
-    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/translation-source-human-review.schema.json"),
-    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/translation-source-manifest.schema.json"),
-    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/translation-source-model-inspection.schema.json"),
-    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/translation-source-review-manifest.schema.json"),
+    Path(
+        "mechanics/agon-runtime/parts/runtime-kernels/schemas/duel-runtime-kernel-registry.schema.json"
+    ),
+    Path(
+        "mechanics/agon-runtime/parts/runtime-kernels/schemas/duel-runtime-kernel.schema.json"
+    ),
+    Path(
+        "mechanics/agon-runtime/parts/runtime-kernels/schemas/mechanical-trial-event-log.schema.json"
+    ),
+    Path(
+        "mechanics/agon-runtime/parts/runtime-kernels/schemas/mechanical-trial-run-registry.schema.json"
+    ),
+    Path(
+        "mechanics/agon-runtime/parts/runtime-kernels/schemas/mechanical-trial-run.schema.json"
+    ),
+    Path(
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnosis_companion.schema.json"
+    ),
+    Path(
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_anchor_ref.schema.json"
+    ),
+    Path(
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json"
+    ),
+    Path(
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_target.schema.json"
+    ),
+    Path(
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/repair_handoff.schema.json"
+    ),
+    Path(
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/reviewed_diagnosis_ref.schema.json"
+    ),
+    Path(
+        "mechanics/federation-seams/parts/rpg-runtime/schemas/agent_build_snapshot.schema.json"
+    ),
+    Path(
+        "mechanics/federation-seams/parts/rpg-runtime/schemas/agent_build_snapshot_collection.schema.json"
+    ),
+    Path(
+        "mechanics/federation-seams/parts/rpg-runtime/schemas/frontend_projection_bundle.schema.json"
+    ),
+    Path(
+        "mechanics/federation-seams/parts/rpg-runtime/schemas/frontend_projection_bundle_collection.schema.json"
+    ),
+    Path(
+        "mechanics/federation-seams/parts/rpg-runtime/schemas/quest_run_result.schema.json"
+    ),
+    Path(
+        "mechanics/federation-seams/parts/rpg-runtime/schemas/quest_run_result_collection.schema.json"
+    ),
+    Path(
+        "mechanics/federation-seams/parts/rpg-runtime/schemas/reputation_ledger.schema.json"
+    ),
+    Path(
+        "mechanics/federation-seams/parts/rpg-runtime/schemas/reputation_ledger_collection.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/candidate-exports/schemas/runtime-artifact-hook-candidate.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/candidate-exports/schemas/runtime-eval-evidence-selection-candidate.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/candidate-exports/schemas/runtime-memo-export-candidate.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/return-policy/schemas/runtime-return-event.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/return-policy/schemas/runtime-return-policy.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/runtime-contracts/schemas/runtime-governed-execution-canary-catalog.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/runtime-contracts/schemas/runtime-governed-execution-policy.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/runtime-contracts/schemas/runtime-governed-execution-request.schema.json"
+    ),
+    Path(
+        "mechanics/inference-pilots/parts/local-trials/schemas/runtime-benchmark.schema.json"
+    ),
+    Path(
+        "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/experiment-suite.schema.json"
+    ),
+    Path(
+        "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/human-gold-review-manifest.schema.json"
+    ),
+    Path(
+        "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/human-gold-review-record.schema.json"
+    ),
+    Path(
+        "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/manual-review-receipt.schema.json"
+    ),
+    Path(
+        "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/ocr-render-manifest.schema.json"
+    ),
+    Path(
+        "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/run-receipt.schema.json"
+    ),
+    Path(
+        "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/runtime-manifest.schema.json"
+    ),
+    Path(
+        "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/source-visible-model-inspection.schema.json"
+    ),
+    Path(
+        "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/structure-vlm-selection.schema.json"
+    ),
+    Path(
+        "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/translation-lab-readiness.schema.json"
+    ),
+    Path(
+        "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/translation-source-human-review.schema.json"
+    ),
+    Path(
+        "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/translation-source-manifest.schema.json"
+    ),
+    Path(
+        "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/translation-source-model-inspection.schema.json"
+    ),
+    Path(
+        "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/translation-source-review-manifest.schema.json"
+    ),
     Path("mechanics/machine-fit/parts/fit-record/schemas/schema.v1.json"),
     Path("mechanics/machine-fit/parts/host-facts/schemas/schema.v1.json"),
     Path("mechanics/machine-fit/parts/machine-bridge/schemas/schema.v1.json"),
     Path("mechanics/machine-fit/parts/platform-adaptations/schemas/schema.v1.json"),
-    Path("mechanics/runtime-lifecycle/parts/status-readouts/schemas/runtime-gateway-cache-status.schema.json"),
-    Path("mechanics/runtime-lifecycle/parts/status-readouts/schemas/runtime-usage-snapshot.schema.json"),
-    Path("mechanics/runtime-repair/parts/a2a-return-dry-run/schemas/runtime-a2a-return-closeout-dry-run.schema.json"),
-    Path("mechanics/runtime-repair/parts/degradation-receipts/schemas/service-degradation-receipt.schema.json"),
-    Path("mechanics/runtime-repair/parts/repair-safe-closeout/schemas/repair-safe-closeout-receipt.schema.json"),
+    Path(
+        "mechanics/runtime-lifecycle/parts/status-readouts/schemas/runtime-gateway-cache-status.schema.json"
+    ),
+    Path(
+        "mechanics/runtime-lifecycle/parts/status-readouts/schemas/runtime-usage-snapshot.schema.json"
+    ),
+    Path(
+        "mechanics/runtime-repair/parts/a2a-return-dry-run/schemas/runtime-a2a-return-closeout-dry-run.schema.json"
+    ),
+    Path(
+        "mechanics/runtime-repair/parts/degradation-receipts/schemas/service-degradation-receipt.schema.json"
+    ),
+    Path(
+        "mechanics/runtime-repair/parts/repair-safe-closeout/schemas/repair-safe-closeout-receipt.schema.json"
+    ),
     Path("quests/schemas/quest.schema.json"),
     Path("quests/schemas/quest_dispatch.schema.json"),
 }
@@ -118,7 +214,9 @@ def validate_payload(
         assert isinstance(payload, list), f"{payload_path} must contain an array"
         for index, item in enumerate(payload):
             validator.validate(item)
-            assert isinstance(item, dict), f"{payload_path} item {index} must be an object"
+            assert isinstance(item, dict), (
+                f"{payload_path} item {index} must be an object"
+            )
         return
     if mode == "events-array":
         assert isinstance(payload, dict), f"{payload_path} must contain an object"
@@ -126,12 +224,19 @@ def validate_payload(
         assert isinstance(events, list), f"{payload_path} must contain events[]"
         for index, item in enumerate(events):
             validator.validate(item)
-            assert isinstance(item, dict), f"{payload_path} events[{index}] must be an object"
+            assert isinstance(item, dict), (
+                f"{payload_path} events[{index}] must be an object"
+            )
         return
     raise AssertionError(f"unknown validation mode: {mode}")
 
 
 EXAMPLE_SCHEMA_CASES: tuple[tuple[str, str, str], ...] = (
+    (
+        "mcp/services/abyss-stack-mcp/examples/runtime-observation.public.example.json",
+        "mcp/services/abyss-stack-mcp/schemas/runtime-observation.schema.json",
+        "object",
+    ),
     (
         "mechanics/agon-runtime/parts/runtime-kernels/examples/duel-runtime-kernel.example.json",
         "mechanics/agon-runtime/parts/runtime-kernels/schemas/duel-runtime-kernel.schema.json",
@@ -372,9 +477,15 @@ def test_active_schema_documents_are_valid_draft_2020_12_contracts() -> None:
         assert isinstance(payload, dict), f"{path} must contain a JSON object"
         assert payload.get("$schema") == DRAFT_2020_12, f"{path} must use Draft 2020-12"
         assert isinstance(payload.get("$id"), str), f"{path} must declare $id"
-        assert payload["$id"].startswith(("https://", "http://")), f"{path} $id must be URI-like"
-        assert isinstance(payload.get("title"), str) and payload["title"], f"{path} must declare title"
-        assert payload.get("type") == "object", f"{path} must describe a top-level object"
+        assert payload["$id"].startswith(("https://", "http://")), (
+            f"{path} $id must be URI-like"
+        )
+        assert isinstance(payload.get("title"), str) and payload["title"], (
+            f"{path} must declare title"
+        )
+        assert payload.get("type") == "object", (
+            f"{path} must describe a top-level object"
+        )
         Draft202012Validator.check_schema(payload)
 
 

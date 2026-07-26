@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "abyss-stack-mcp"
+version = "0.1.0"
+description = "Owner-bounded runtime observation and plan-candidate MCP for abyss-stack"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "mcp>=1.27.2,<2",
+  "pydantic>=2.11,<3",
+]
+
+[project.scripts]
+abyss-stack-mcp = "abyss_stack_mcp.cli:main"
+abyss-stack-mcp-server = "abyss_stack_mcp.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

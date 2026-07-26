@@ -9,6 +9,13 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Added
 
+- A standalone `abyss-stack-mcp` source candidate now exposes a compact
+  stack-owned runtime-evidence read plane and a credential-disjoint,
+  non-executing plan-candidate plane. Typed contracts keep source, package,
+  deploy, process, endpoint, registry, consumer-schema, canary, freshness, and
+  rollback evidence separate; generated public examples are fictional, and
+  source-owned user units remain unstarted until provenance, deployment
+  parity, registry, consumer, canary, proof, and acceptance gates are met.
 - A distinct, inert `aoa-routing-cutover` path now admits only a
   receipt-bound `aoa-sdk` canonical routing release with exact public-release
   runtime trust, verified subject-store bytes, explicit G5 authority, atomic

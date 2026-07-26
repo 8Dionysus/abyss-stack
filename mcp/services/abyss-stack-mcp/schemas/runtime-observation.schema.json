@@ -1,0 +1,781 @@
+{
+  "$defs": {
+    "CanaryObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "canary_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Canary Ref"
+        },
+        "canary_route": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Canary Route",
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "result_grounded": {
+          "title": "Result Grounded",
+          "type": "boolean"
+        },
+        "succeeded": {
+          "title": "Succeeded",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "succeeded",
+        "result_grounded",
+        "canary_route",
+        "evidence"
+      ],
+      "title": "CanaryObservation",
+      "type": "object"
+    },
+    "ConsumerObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "consumer_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Consumer Id",
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "observed_protocol_versions": {
+          "default": [],
+          "items": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Observed Protocol Versions",
+          "type": "array"
+        },
+        "observed_schema_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed Schema Digest"
+        },
+        "registered": {
+          "title": "Registered",
+          "type": "boolean"
+        },
+        "registration_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Registration Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "consumer_id",
+        "registration_ref",
+        "registered",
+        "evidence"
+      ],
+      "title": "ConsumerObservation",
+      "type": "object"
+    },
+    "DeployIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "deployed_at": {
+          "format": "date-time",
+          "title": "Deployed At",
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "manifest_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Manifest Ref",
+          "type": "string"
+        },
+        "revision": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Revision",
+          "type": "string"
+        },
+        "tree_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Tree Digest",
+          "type": "string"
+        }
+      },
+      "required": [
+        "revision",
+        "tree_digest",
+        "manifest_ref",
+        "deployed_at",
+        "evidence"
+      ],
+      "title": "DeployIdentity",
+      "type": "object"
+    },
+    "EndpointObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "endpoint_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Endpoint Ref",
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "protocol_versions": {
+          "items": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Protocol Versions",
+          "type": "array"
+        },
+        "ready": {
+          "title": "Ready",
+          "type": "boolean"
+        },
+        "server_schema_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Server Schema Digest"
+        },
+        "transport": {
+          "enum": [
+            "stdio",
+            "streamable-http"
+          ],
+          "title": "Transport",
+          "type": "string"
+        }
+      },
+      "required": [
+        "transport",
+        "endpoint_ref",
+        "protocol_versions",
+        "ready",
+        "evidence"
+      ],
+      "title": "EndpointObservation",
+      "type": "object"
+    },
+    "EvidenceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Evidence Ref",
+          "type": "string"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "owner": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Owner",
+          "type": "string"
+        },
+        "revision": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "evidence_ref",
+        "revision",
+        "observed_at"
+      ],
+      "title": "EvidenceRef",
+      "type": "object"
+    },
+    "FreshnessObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "provider_watermark": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider Watermark"
+        },
+        "reason_codes": {
+          "default": [],
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "state": {
+          "enum": [
+            "exact",
+            "compatible_drift",
+            "stale_readable",
+            "blocked",
+            "unknown",
+            "rollback_required"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "observed_at",
+        "expires_at",
+        "evidence_refs"
+      ],
+      "title": "FreshnessObservation",
+      "type": "object"
+    },
+    "LinkEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "reason_codes": {
+          "default": [],
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "state": {
+          "enum": [
+            "exact",
+            "compatible_drift",
+            "stale_readable",
+            "blocked",
+            "unknown",
+            "rollback_required"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "observed_at",
+        "evidence_refs"
+      ],
+      "title": "LinkEvidence",
+      "type": "object"
+    },
+    "OwnerRoles": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_owner": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Acceptance Owner",
+          "type": "string"
+        },
+        "access_owner": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Access Owner",
+          "type": "string"
+        },
+        "proof_owner": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Proof Owner",
+          "type": "string"
+        },
+        "runtime_owner": {
+          "const": "abyss-stack",
+          "default": "abyss-stack",
+          "title": "Runtime Owner",
+          "type": "string"
+        },
+        "source_owner": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Source Owner",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_owner",
+        "access_owner",
+        "proof_owner",
+        "acceptance_owner"
+      ],
+      "title": "OwnerRoles",
+      "type": "object"
+    },
+    "PackageIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Artifact Digest",
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "artifact_digest",
+        "evidence"
+      ],
+      "title": "PackageIdentity",
+      "type": "object"
+    },
+    "ProcessObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "title": "Active",
+          "type": "boolean"
+        },
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "executable_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Executable Ref",
+          "type": "string"
+        },
+        "process_identity": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Process Identity"
+        },
+        "unit_name": {
+          "maxLength": 256,
+          "minLength": 3,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]*\\.(service|socket)$",
+          "title": "Unit Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "unit_name",
+        "executable_ref",
+        "active",
+        "evidence"
+      ],
+      "title": "ProcessObservation",
+      "type": "object"
+    },
+    "RegistryObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "registry_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Registry Digest",
+          "type": "string"
+        },
+        "registry_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Registry Id",
+          "type": "string"
+        },
+        "registry_state": {
+          "enum": [
+            "declared",
+            "package_candidate",
+            "deploy_candidate",
+            "shadow",
+            "admitted",
+            "suspended",
+            "deprecated",
+            "retired"
+          ],
+          "title": "Registry State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "registry_id",
+        "registry_digest",
+        "registry_state",
+        "evidence"
+      ],
+      "title": "RegistryObservation",
+      "type": "object"
+    },
+    "RollbackObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "last_known_good_package_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Package Digest"
+        },
+        "proof_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proof Ref"
+        },
+        "ready": {
+          "title": "Ready",
+          "type": "boolean"
+        },
+        "rollback_route": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Rollback Route",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ready",
+        "rollback_route",
+        "evidence"
+      ],
+      "title": "RollbackObservation",
+      "type": "object"
+    },
+    "RuntimeSubject": {
+      "additionalProperties": false,
+      "properties": {
+        "canary": {
+          "$ref": "#/$defs/CanaryObservation"
+        },
+        "consumers": {
+          "items": {
+            "$ref": "#/$defs/ConsumerObservation"
+          },
+          "title": "Consumers",
+          "type": "array"
+        },
+        "credential_class": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Credential Class",
+          "type": "string"
+        },
+        "deploy": {
+          "$ref": "#/$defs/DeployIdentity"
+        },
+        "effect_classes": {
+          "items": {
+            "enum": [
+              "observe",
+              "derive",
+              "validate",
+              "prepare_candidate",
+              "apply_runtime",
+              "accept_source",
+              "external_emit",
+              "external_change"
+            ],
+            "type": "string"
+          },
+          "title": "Effect Classes",
+          "type": "array"
+        },
+        "endpoint": {
+          "$ref": "#/$defs/EndpointObservation"
+        },
+        "freshness": {
+          "$ref": "#/$defs/FreshnessObservation"
+        },
+        "organ_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Organ Id",
+          "type": "string"
+        },
+        "owners": {
+          "$ref": "#/$defs/OwnerRoles"
+        },
+        "package": {
+          "$ref": "#/$defs/PackageIdentity"
+        },
+        "policy_family": {
+          "enum": [
+            "read",
+            "candidate",
+            "internal_effect",
+            "external_effect"
+          ],
+          "title": "Policy Family",
+          "type": "string"
+        },
+        "process": {
+          "$ref": "#/$defs/ProcessObservation"
+        },
+        "registry": {
+          "$ref": "#/$defs/RegistryObservation"
+        },
+        "rollback": {
+          "$ref": "#/$defs/RollbackObservation"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceIdentity"
+        }
+      },
+      "required": [
+        "organ_id",
+        "policy_family",
+        "owners",
+        "credential_class",
+        "effect_classes",
+        "source",
+        "package",
+        "deploy",
+        "process",
+        "endpoint",
+        "registry",
+        "consumers",
+        "freshness",
+        "canary",
+        "rollback"
+      ],
+      "title": "RuntimeSubject",
+      "type": "object"
+    },
+    "SourceIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "revision": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Revision",
+          "type": "string"
+        },
+        "tree_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Tree Digest",
+          "type": "string"
+        }
+      },
+      "required": [
+        "revision",
+        "tree_digest",
+        "evidence"
+      ],
+      "title": "SourceIdentity",
+      "type": "object"
+    }
+  },
+  "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/runtime-observation.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "contains_secrets": {
+      "const": false,
+      "default": false,
+      "title": "Contains Secrets",
+      "type": "boolean"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "provider": {
+      "const": "abyss-stack",
+      "default": "abyss-stack",
+      "title": "Provider",
+      "type": "string"
+    },
+    "provider_watermark": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "title": "Provider Watermark",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "abyss_stack_runtime_observation_v1",
+      "default": "abyss_stack_runtime_observation_v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "subjects": {
+      "items": {
+        "$ref": "#/$defs/RuntimeSubject"
+      },
+      "title": "Subjects",
+      "type": "array"
+    }
+  },
+  "required": [
+    "provider_watermark",
+    "generated_at",
+    "expires_at",
+    "subjects"
+  ],
+  "title": "RuntimeObservation",
+  "type": "object"
+}

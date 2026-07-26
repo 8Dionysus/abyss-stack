@@ -7,6 +7,7 @@ route card, and validation path.
 
 | Service | Use for |
 |---|---|
+| [`abyss-stack-mcp`](abyss-stack-mcp/README.md) | stack-owned source/package/deploy/process/endpoint/consumer observations and non-executing runtime-plan candidates |
 | [`aoa-memo-mcp`](aoa-memo-mcp/README.md) | memory briefs, local memo port status, candidate creation and validation, session rehydration pointers |
 | [`aoa-decisions-mcp`](aoa-decisions-mcp/README.md) | fresh workspace decision graph status, search, repo slices, decision neighborhoods, and task packets |
 | [`aoa-evals-mcp`](aoa-evals-mcp/README.md) | bounded eval selection, bundle inspection, comparison readers, runtime evidence templates, candidate-only report skeletons |
@@ -55,6 +56,15 @@ access planes even when their read calls work.
 | `aoa-discord-connector` | 5428 |
 | `tos-corpus` | 5429 |
 | `aoa-stats` | 5430 |
+| `abyss-stack` read | 5431 |
+| `abyss-stack` candidate | 5432 |
+
+`abyss-stack-mcp` does not join the transitional shared owner credential. Its
+read and candidate planes select distinct credential names, scopes, client
+identities, ports, and tool catalogs. The candidate plane only prepares
+content-addressed plans and has no dispatch method. Neither plane is included
+in the existing owner bundle until package/deploy provenance, a live
+observation, consumer canary, and rollback evidence are present.
 
 `systemd/user/aoa-mcp-http@.service` owns one process per instance and launches
 the deployed workspace wrapper, not a source checkout. The

@@ -9,6 +9,9 @@ This directory stores user-unit skeletons for the deployed runtime.
 - `aoa-mcp-http@.service`, one authenticated loopback shared owner per MCP
   instance
 - `aoa-mcp-http.service`, the ten-owner local bundle
+- `abyss-stack-mcp-read.service`, the stack-owned runtime-observation plane
+- `abyss-stack-mcp-candidate.service`, the separate non-executing plan-candidate
+  plane
 - `managed-units.txt` allowlists the host-local user units that can be linked
   from the deployed Configs mirror.
 
@@ -74,6 +77,10 @@ The current allowlist covers the local working surface:
   run deployed workspace wrappers with explicit authenticated loopback
   Streamable HTTP, preserve each MCP package's tool authority, and reject
   unauthenticated callers before dispatch
+- the separate `abyss-stack-mcp-read.service` and
+  `abyss-stack-mcp-candidate.service` processes; neither belongs to the shared
+  owner bundle, and each has a disjoint tool catalog, port, scope, client
+  identity, and systemd credential
 - warm dictation and TTS services, plus the `gemma4.spark` stack endpoint
   bridge
 - TTS keep-warm timer that periodically exercises the protected warm server
@@ -96,6 +103,12 @@ advance to the next owner. The bundle is lifecycle grouping, not a gateway.
 Provision the non-committed bearer first with
 `scripts/aoa-install-systemd --provision-mcp-http-auth`; the template reads it
 through `LoadCredential` and never places the value in the unit environment.
+Provision the two non-committed stack-plane credentials separately with
+`scripts/aoa-install-systemd --provision-abyss-stack-mcp-auth`. The action is
+idempotent and never prints or replaces either value. Linking the units still
+does not start them, and the stack MCP services must not be started until the
+typed runtime observation exists and source-to-Configs parity is green. No
+Codex client registration is installed for these two contours by this action.
 
 The units intentionally consume host-owned commands such as `abyss-machine`
 instead of copying host-layer implementation into `abyss-stack`.

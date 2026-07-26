@@ -46,11 +46,13 @@ Higher-effect planes are separate processes and credentials and remain absent
 or disabled until their threat model, approval, receipt, and rollback proof
 pass.
 
-`abyss-stack-mcp` is the planned stack-owned runtime observation family. Its
+`abyss-stack-mcp` is the stack-owned runtime observation family. Its
 read plane reports source-package-deploy-process-endpoint-consumer evidence;
 its candidate plane prepares bounded sync, activation, restart, deployment,
-and rollback plans. Runtime effects, if later admitted, use a separate process
-and credential and never accept sibling source or memory truth.
+and rollback plans. The two planes are separate processes, credentials,
+scopes, ports, and tool catalogs; every candidate is non-executing. Runtime
+effects, if later admitted, use another separately proven process and
+credential and never accept sibling source or memory truth.
 
 The current shared bearer lifecycle remains transitional transport evidence.
 It does not satisfy admitted effect isolation and must not be used to raise a

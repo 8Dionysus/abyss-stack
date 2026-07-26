@@ -11,6 +11,7 @@ SHARED_ROOT = Path(__file__).resolve().parent
 SERVICES_ROOT = SHARED_ROOT.parent
 CANONICAL = SHARED_ROOT / "http_auth.py"
 TARGETS = {
+    "abyss-stack-mcp": "abyss_stack_mcp",
     "abyss-machine-mcp": "abyss_machine_mcp",
     "aoa-4pda-connector-mcp": "aoa_4pda_connector_mcp",
     "aoa-decisions-mcp": "aoa_decisions_mcp",

@@ -1,0 +1,235 @@
+{
+  "contains_secrets": false,
+  "expires_at": "2026-07-25T13:00:00Z",
+  "generated_at": "2026-07-25T12:00:00Z",
+  "provider": "abyss-stack",
+  "provider_watermark": "public-example-not-live",
+  "schema_version": "abyss_stack_runtime_observation_v1",
+  "subjects": [
+    {
+      "canary": {
+        "canary_ref": "example://canary/aoa-kag",
+        "canary_route": "example://canary-route/aoa-kag",
+        "evidence": {
+          "evidence_refs": [
+            {
+              "evidence_ref": "example://runtime/canary",
+              "expires_at": "2026-07-25T14:00:00Z",
+              "observed_at": "2026-07-25T12:00:00Z",
+              "owner": "abyss-stack",
+              "revision": "public-example-revision"
+            }
+          ],
+          "expires_at": "2026-07-25T14:00:00Z",
+          "observed_at": "2026-07-25T12:00:00Z",
+          "reason_codes": [],
+          "state": "exact"
+        },
+        "result_grounded": true,
+        "succeeded": true
+      },
+      "consumers": [
+        {
+          "consumer_id": "codex-example",
+          "evidence": {
+            "evidence_refs": [
+              {
+                "evidence_ref": "example://runtime/consumer",
+                "expires_at": "2026-07-25T14:00:00Z",
+                "observed_at": "2026-07-25T12:00:00Z",
+                "owner": "abyss-stack",
+                "revision": "public-example-revision"
+              }
+            ],
+            "expires_at": "2026-07-25T14:00:00Z",
+            "observed_at": "2026-07-25T12:00:00Z",
+            "reason_codes": [],
+            "state": "exact"
+          },
+          "observed_protocol_versions": [
+            "2025-11-25"
+          ],
+          "observed_schema_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "registered": true,
+          "registration_ref": "example://consumer/aoa-kag"
+        }
+      ],
+      "credential_class": "aoa-kag-read-example",
+      "deploy": {
+        "deployed_at": "2026-07-25T12:00:00Z",
+        "evidence": {
+          "evidence_refs": [
+            {
+              "evidence_ref": "example://runtime/deploy",
+              "expires_at": "2026-07-25T14:00:00Z",
+              "observed_at": "2026-07-25T12:00:00Z",
+              "owner": "abyss-stack",
+              "revision": "public-example-revision"
+            }
+          ],
+          "expires_at": "2026-07-25T14:00:00Z",
+          "observed_at": "2026-07-25T12:00:00Z",
+          "reason_codes": [],
+          "state": "exact"
+        },
+        "manifest_ref": "example://deploy/aoa-kag-read",
+        "revision": "deploy-example-revision",
+        "tree_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "effect_classes": [
+        "observe",
+        "derive"
+      ],
+      "endpoint": {
+        "endpoint_ref": "http://127.0.0.1:5425/mcp",
+        "evidence": {
+          "evidence_refs": [
+            {
+              "evidence_ref": "example://runtime/endpoint",
+              "expires_at": "2026-07-25T14:00:00Z",
+              "observed_at": "2026-07-25T12:00:00Z",
+              "owner": "abyss-stack",
+              "revision": "public-example-revision"
+            }
+          ],
+          "expires_at": "2026-07-25T14:00:00Z",
+          "observed_at": "2026-07-25T12:00:00Z",
+          "reason_codes": [],
+          "state": "exact"
+        },
+        "protocol_versions": [
+          "2025-11-25"
+        ],
+        "ready": true,
+        "server_schema_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "transport": "streamable-http"
+      },
+      "freshness": {
+        "evidence_refs": [
+          {
+            "evidence_ref": "example://runtime/freshness",
+            "expires_at": "2026-07-25T14:00:00Z",
+            "observed_at": "2026-07-25T12:00:00Z",
+            "owner": "abyss-stack",
+            "revision": "public-example-revision"
+          }
+        ],
+        "expires_at": "2026-07-25T13:00:00Z",
+        "observed_at": "2026-07-25T12:00:00Z",
+        "provider_watermark": "owner-example-watermark",
+        "reason_codes": [],
+        "state": "exact"
+      },
+      "organ_id": "aoa-kag",
+      "owners": {
+        "acceptance_owner": "aoa-kag",
+        "access_owner": "aoa-kag",
+        "proof_owner": "aoa-evals",
+        "runtime_owner": "abyss-stack",
+        "source_owner": "aoa-kag"
+      },
+      "package": {
+        "artifact_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "evidence": {
+          "evidence_refs": [
+            {
+              "evidence_ref": "example://runtime/package",
+              "expires_at": "2026-07-25T14:00:00Z",
+              "observed_at": "2026-07-25T12:00:00Z",
+              "owner": "abyss-stack",
+              "revision": "public-example-revision"
+            }
+          ],
+          "expires_at": "2026-07-25T14:00:00Z",
+          "observed_at": "2026-07-25T12:00:00Z",
+          "reason_codes": [],
+          "state": "exact"
+        },
+        "name": "aoa-kag-mcp",
+        "version": "0.0.0-example"
+      },
+      "policy_family": "read",
+      "process": {
+        "active": true,
+        "evidence": {
+          "evidence_refs": [
+            {
+              "evidence_ref": "example://runtime/process",
+              "expires_at": "2026-07-25T14:00:00Z",
+              "observed_at": "2026-07-25T12:00:00Z",
+              "owner": "abyss-stack",
+              "revision": "public-example-revision"
+            }
+          ],
+          "expires_at": "2026-07-25T14:00:00Z",
+          "observed_at": "2026-07-25T12:00:00Z",
+          "reason_codes": [],
+          "state": "exact"
+        },
+        "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py",
+        "process_identity": "aoa-kag-mcp/0.0.0-example",
+        "unit_name": "aoa-mcp-http@aoa-kag.service"
+      },
+      "registry": {
+        "evidence": {
+          "evidence_refs": [
+            {
+              "evidence_ref": "example://runtime/registry",
+              "expires_at": "2026-07-25T14:00:00Z",
+              "observed_at": "2026-07-25T12:00:00Z",
+              "owner": "abyss-stack",
+              "revision": "public-example-revision"
+            }
+          ],
+          "expires_at": "2026-07-25T14:00:00Z",
+          "observed_at": "2026-07-25T12:00:00Z",
+          "reason_codes": [],
+          "state": "exact"
+        },
+        "registry_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "registry_id": "abyss-private-example",
+        "registry_state": "shadow"
+      },
+      "rollback": {
+        "evidence": {
+          "evidence_refs": [
+            {
+              "evidence_ref": "example://runtime/rollback",
+              "expires_at": "2026-07-25T14:00:00Z",
+              "observed_at": "2026-07-25T12:00:00Z",
+              "owner": "abyss-stack",
+              "revision": "public-example-revision"
+            }
+          ],
+          "expires_at": "2026-07-25T14:00:00Z",
+          "observed_at": "2026-07-25T12:00:00Z",
+          "reason_codes": [],
+          "state": "exact"
+        },
+        "last_known_good_package_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "proof_ref": "example://rollback-proof/aoa-kag",
+        "ready": true,
+        "rollback_route": "example://rollback/aoa-kag"
+      },
+      "source": {
+        "evidence": {
+          "evidence_refs": [
+            {
+              "evidence_ref": "example://runtime/source",
+              "expires_at": "2026-07-25T14:00:00Z",
+              "observed_at": "2026-07-25T12:00:00Z",
+              "owner": "abyss-stack",
+              "revision": "public-example-revision"
+            }
+          ],
+          "expires_at": "2026-07-25T14:00:00Z",
+          "observed_at": "2026-07-25T12:00:00Z",
+          "reason_codes": [],
+          "state": "exact"
+        },
+        "revision": "source-example-revision",
+        "tree_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
+  ]
+}

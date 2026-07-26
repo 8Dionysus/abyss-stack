@@ -153,6 +153,7 @@ Preview the exact bounded projection before a lifecycle-sensitive rollout:
 scripts/aoa-sync-configs --dry-run --item mcp --item schemas --item systemd
 scripts/aoa-sync-configs --item mcp --item schemas --item systemd
 scripts/aoa-install-systemd --provision-mcp-http-auth
+scripts/aoa-install-systemd --provision-abyss-stack-mcp-auth
 scripts/aoa-install-systemd --install-mcp-http-codex-client
 scripts/aoa-install-systemd --all-user-units
 ```
@@ -166,6 +167,11 @@ owners. The explicit provision action creates the optional host-local MCP
 bearer under `Secrets/Configs` without printing or replacing it. Shared HTTP
 Codex entries must name `AOA_MCP_HTTP_BEARER_TOKEN` through
 `bearer_token_env_var`; the value must never be copied into `config.toml`.
+The stack MCP provision action creates distinct read and non-executing
+candidate credentials; neither credential is shared with the owner adapters or
+with the other stack contour. It does not register either service with Codex
+and does not start a unit. Start remains a later canary decision after the
+typed runtime observation, deployed parity, and consumer contract are ready.
 The Codex client install adds a removable Zsh launch function that delegates
 to the deployed launcher without replacing the managed Codex executable or
 exporting the bearer into the parent shell. It affects only new interactive
@@ -388,6 +394,14 @@ This links every unit in `systemd/user/managed-units.txt` from
 `${AOA_CONFIGS_ROOT}/systemd/user` into `~/.config/systemd/user` and runs
 `systemctl --user daemon-reload`. It intentionally does not start, stop,
 restart, enable, disable, or mask services.
+
+Use `--provision-abyss-stack-mcp-auth` before canarying the stack-owned MCP
+read or candidate process. It creates separate read and candidate bearer
+credentials under `${AOA_STACK_ROOT}/Secrets/Configs`, keeps each file at mode
+`0600`, is idempotent, and never prints or replaces a valid existing value.
+This action grants no runtime-effect authority: the candidate process only
+compiles an expiring content-addressed plan with
+`execution_authorized=false`.
 
 Use `--system-units` only through a privileged route after the Configs mirror is
 synced:

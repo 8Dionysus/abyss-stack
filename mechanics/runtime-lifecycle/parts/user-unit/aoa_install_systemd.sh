@@ -12,6 +12,7 @@ restart_now=0
 link_all_user_units=0
 link_system_units=0
 provision_mcp_http_auth=0
+provision_abyss_stack_mcp_auth=0
 install_mcp_http_codex_client=0
 remove_mcp_http_codex_client=0
 preset_spec=""
@@ -79,6 +80,9 @@ while (($#)); do
       ;;
     --provision-mcp-http-auth)
       provision_mcp_http_auth=1
+      ;;
+    --provision-abyss-stack-mcp-auth)
+      provision_abyss_stack_mcp_auth=1
       ;;
     --install-mcp-http-codex-client)
       install_mcp_http_codex_client=1
@@ -148,14 +152,18 @@ fi
 
 mcp_http_credential_name="aoa-mcp-http-bearer-token"
 mcp_http_secret_dir="${AOA_STACK_ROOT}/Secrets/Configs"
-mcp_http_credential_path="${mcp_http_secret_dir}/${mcp_http_credential_name}"
+abyss_stack_mcp_read_credential_name="abyss-stack-mcp-read-bearer-token"
+abyss_stack_mcp_candidate_credential_name="abyss-stack-mcp-candidate-bearer-token"
 mcp_http_codex_launcher="${AOA_CONFIGS_ROOT}/mcp/services/_shared/codex_http_client.sh"
 mcp_http_codex_zshrc="${ZDOTDIR:-${HOME}}/.zshrc"
 mcp_http_codex_block_start="# >>> abyss-stack MCP HTTP Codex client >>>"
 mcp_http_codex_block_end="# <<< abyss-stack MCP HTTP Codex client <<<"
 mcp_http_codex_block_present=0
 
-aoa_provision_mcp_http_auth() {
+aoa_provision_mcp_bearer() {
+  local credential_name="$1"
+  local credential_label="$2"
+  local credential_path="${mcp_http_secret_dir}/${credential_name}"
   local token=""
   local token_size=0
   local file_size=0
@@ -167,29 +175,44 @@ aoa_provision_mcp_http_auth() {
   else
     install -d -m 0700 "$mcp_http_secret_dir"
   fi
-  if [[ -e "$mcp_http_credential_path" || -L "$mcp_http_credential_path" ]]; then
-    [[ -f "$mcp_http_credential_path" && ! -L "$mcp_http_credential_path" ]] || \
-      aoa_die "existing MCP HTTP bearer credential must be a regular non-symlink file"
-    token="$(<"$mcp_http_credential_path")"
+  if [[ -e "$credential_path" || -L "$credential_path" ]]; then
+    [[ -f "$credential_path" && ! -L "$credential_path" ]] || \
+      aoa_die "existing ${credential_label} must be a regular non-symlink file"
+    token="$(<"$credential_path")"
     token_size="${#token}"
-    file_size="$(stat -c '%s' "$mcp_http_credential_path")"
+    file_size="$(stat -c '%s' "$credential_path")"
     if [[ ! "$token" =~ ^[A-Za-z0-9._~-]{43,512}$ ]] || \
       ! ((file_size == token_size || file_size == token_size + 1)); then
-      aoa_die "existing MCP HTTP bearer credential has invalid content"
+      aoa_die "existing ${credential_label} has invalid content"
     fi
-    chmod 0600 "$mcp_http_credential_path"
-    aoa_note "MCP HTTP bearer credential already provisioned under the deployed Secrets root"
+    chmod 0600 "$credential_path"
+    aoa_note "${credential_label} already provisioned under the deployed Secrets root"
     return 0
   fi
 
-  temp_path="$(mktemp "${mcp_http_secret_dir}/.${mcp_http_credential_name}.XXXXXX")"
+  temp_path="$(mktemp "${mcp_http_secret_dir}/.${credential_name}.XXXXXX")"
   if ! /usr/bin/env python3 -c 'import secrets; print(secrets.token_urlsafe(48))' > "$temp_path"; then
     rm -f -- "$temp_path"
     aoa_die "failed to generate MCP HTTP bearer credential"
   fi
   chmod 0600 "$temp_path"
-  mv -- "$temp_path" "$mcp_http_credential_path"
-  aoa_note "provisioned MCP HTTP bearer credential under the deployed Secrets root"
+  mv -- "$temp_path" "$credential_path"
+  aoa_note "provisioned ${credential_label} under the deployed Secrets root"
+}
+
+aoa_provision_mcp_http_auth() {
+  aoa_provision_mcp_bearer \
+    "$mcp_http_credential_name" \
+    "MCP HTTP bearer credential"
+}
+
+aoa_provision_abyss_stack_mcp_auth() {
+  aoa_provision_mcp_bearer \
+    "$abyss_stack_mcp_read_credential_name" \
+    "abyss-stack MCP read bearer credential"
+  aoa_provision_mcp_bearer \
+    "$abyss_stack_mcp_candidate_credential_name" \
+    "abyss-stack MCP candidate bearer credential"
 }
 
 aoa_validate_mcp_http_codex_zshrc() {
@@ -301,13 +324,16 @@ aoa_remove_mcp_http_codex_client() {
 if ((provision_mcp_http_auth || install_mcp_http_codex_client)); then
   aoa_provision_mcp_http_auth
 fi
+if ((provision_abyss_stack_mcp_auth)); then
+  aoa_provision_abyss_stack_mcp_auth
+fi
 if ((install_mcp_http_codex_client)); then
   aoa_install_mcp_http_codex_client
 fi
 if ((remove_mcp_http_codex_client)); then
   aoa_remove_mcp_http_codex_client
 fi
-if ((provision_mcp_http_auth || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
+if ((provision_mcp_http_auth || provision_abyss_stack_mcp_auth || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
   ((!enable_now && !restart_now && !link_all_user_units && !link_system_units && !selection_set && !overlay_set)); then
   exit 0
 fi

@@ -145,6 +145,7 @@
     {
       "family": "mcp-service-tests",
       "paths": [
+        "mcp/services/abyss-stack-mcp/tests/test_stack_mcp.py",
         "mcp/services/abyss-machine-mcp/tests/test_machine_mcp.py",
         "mcp/services/aoa-decisions-mcp/tests/test_decisions_mcp.py",
         "mcp/services/aoa-evals-mcp/tests/test_evals_mcp.py",

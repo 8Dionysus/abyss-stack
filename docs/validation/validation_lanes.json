@@ -156,6 +156,14 @@
     ],
     "mcp_services": [
       {
+        "label": "validate abyss stack mcp",
+        "command": ["python", "mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py"]
+      },
+      {
+        "label": "test abyss stack mcp",
+        "command": ["python", "-m", "pytest", "-q", "mcp/services/abyss-stack-mcp/tests"]
+      },
+      {
         "label": "validate aoa memo mcp",
         "command": ["python", "mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py"]
       },

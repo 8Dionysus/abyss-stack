@@ -1,0 +1,31 @@
+[Unit]
+Description=abyss-stack MCP read observation plane
+Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/README.md
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp
+Environment=ABYSS_STACK_MCP_POLICY_FAMILY=read
+Environment=ABYSS_STACK_MCP_OBSERVATION_PATH=/srv/AbyssOS/abyss-stack/Logs/mcp/organ-runtime-observation.json
+Environment=AOA_MCP_TRANSPORT=streamable-http
+Environment=AOA_MCP_HOST=127.0.0.1
+Environment=PYTHONDONTWRITEBYTECODE=1
+LoadCredential=abyss-stack-mcp-read-bearer-token:/srv/AbyssOS/abyss-stack/Secrets/Configs/abyss-stack-mcp-read-bearer-token
+ExecStart=/usr/bin/env python3 /srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/scripts/abyss_stack_mcp_server.py
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=20
+KillMode=control-group
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+UMask=0077
+
+[Install]
+WantedBy=default.target

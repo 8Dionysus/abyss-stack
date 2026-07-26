@@ -25,6 +25,13 @@ named by the service-local route card.
 
 ## Validation
 
+For `abyss-stack-mcp`, run:
+
+```bash
+python mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py
+python -m pytest mcp/services/abyss-stack-mcp/tests -q
+```
+
 For `aoa-memo-mcp`, run:
 
 ```bash

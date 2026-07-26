@@ -19,8 +19,11 @@ python mcp/services/_shared/build_http_auth_vendors.py --check
 
 The helper never owns MCP tools, resources, prompts, or sibling data. It owns
 only the common transport parse, loopback guard, credential load, and static
-bearer verification primitive. Real credentials remain outside git under the
-deployed stack `Secrets/` tree.
+bearer verification primitive. Callers may select an explicit environment
+variable, systemd credential name, scope, and client identity so owner and
+policy planes do not share an authentication contour. The legacy defaults
+remain transitional compatibility only. Real credentials remain outside git
+under the deployed stack `Secrets/` tree.
 
 `codex_http_client.sh` is the matching client-side launcher for hosts that use
 the authenticated shared owners. It validates the deployed credential, places

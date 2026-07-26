@@ -534,6 +534,7 @@
     {
       "family": "mcp-service-validators",
       "paths": [
+        "mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py",
         "mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py",
         "mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py",
         "mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py",
