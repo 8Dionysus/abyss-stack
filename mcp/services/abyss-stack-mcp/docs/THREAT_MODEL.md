@@ -21,8 +21,8 @@
   credential-bearing userinfo and forbidden path/query/fragment keys before
   validation or response; unparseable URI-like values fail closed, bounded
   recursive decoding covers nested parameters, and credential-key tokenization
-  catches namespaced separator/camel-case forms while Basic/Bearer and
-  provider-token prefix checks normalize leading whitespace;
+  catches namespaced separator/camel-case forms while PEM private-key,
+  Basic/Bearer, and provider-token checks normalize leading whitespace;
 - exact targets require at least one non-whitespace character;
 - exact observation digest and short expiry for candidate plans;
 - exact artifact-hashed runtime dependency closure, bound with deployed source
@@ -43,7 +43,7 @@
   boolean;
 - activation requires a passed central-proof verdict issued by `proof_owner`
   and bound to the current source, package, deployed revision and tree digest,
-  schema, consumer, and canary contour;
+  running process identity, schema, consumer, and canary contour;
 - activation and restart reject `internal_effect` and `external_effect`
   subjects while their distinct threat, approval, egress, compensation, and
   rollback contracts are absent;

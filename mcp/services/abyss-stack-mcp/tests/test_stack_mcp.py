@@ -141,6 +141,7 @@ def subject(
             "proved_package_digest": DIGEST_B,
             "proved_deploy_revision": "deploy-rev-1",
             "proved_deploy_tree_digest": DIGEST_C,
+            "proved_process_identity": f"{organ_id}-mcp/0.1.0",
             "proved_server_schema_digest": DIGEST_D,
             "proved_consumer_registration_ref": f"config://codex/{organ_id}",
             "proved_canary_ref": f"receipt://canary/{organ_id}",
@@ -475,6 +476,9 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
         "leading-direct",
         "basic-auth",
         "encoded-basic-auth",
+        "pem-private-key",
+        "embedded-pem-private-key",
+        "encoded-pem-private-key",
         "top-level-encoded",
         "nested-value",
         "double-key",
@@ -540,6 +544,23 @@ def test_observation_store_rejects_credentials_inside_references(
     elif reference_surface == "encoded-basic-auth":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"Basic%20{secret_value}"
+        )
+    elif reference_surface == "pem-private-key":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            "-----BEGIN PRIVATE KEY-----\n"
+            f"{secret_value}\n"
+            "-----END PRIVATE KEY-----"
+        )
+    elif reference_surface == "embedded-pem-private-key":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            "captured material:\n"
+            "-----BEGIN EC PRIVATE KEY-----\n"
+            f"{secret_value}"
+        )
+    elif reference_surface == "encoded-pem-private-key":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            "-----BEGIN%20OPENSSH%20PRIVATE%20KEY-----"
+            f"%0A{secret_value}"
         )
     elif reference_surface == "top-level-encoded":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
@@ -1113,6 +1134,7 @@ def test_activation_requires_usable_freshness_and_runtime_readiness(
     proof["proved_package_digest"] = None
     proof["proved_deploy_revision"] = None
     proof["proved_deploy_tree_digest"] = None
+    proof["proved_process_identity"] = None
     proof["proved_server_schema_digest"] = None
     proof["proved_consumer_registration_ref"] = None
     proof["proved_canary_ref"] = None
@@ -1125,6 +1147,12 @@ def test_activation_requires_usable_freshness_and_runtime_readiness(
 
     payload = observation(subject())
     payload["subjects"][0]["proof"]["proved_deploy_tree_digest"] = DIGEST_A
+    cases.append((payload, "central_proof_target_mismatch"))
+
+    payload = observation(subject())
+    payload["subjects"][0]["proof"]["proved_process_identity"] = (
+        "aoa-kag-mcp/previous-process"
+    )
     cases.append((payload, "central_proof_target_mismatch"))
 
     payload = observation(subject())

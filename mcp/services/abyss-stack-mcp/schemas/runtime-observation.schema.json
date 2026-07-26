@@ -133,6 +133,9 @@
               "proved_package_digest": {
                 "type": "string"
               },
+              "proved_process_identity": {
+                "type": "string"
+              },
               "proved_server_schema_digest": {
                 "type": "string"
               },
@@ -147,6 +150,7 @@
               "proved_package_digest",
               "proved_deploy_revision",
               "proved_deploy_tree_digest",
+              "proved_process_identity",
               "proved_server_schema_digest",
               "proved_consumer_registration_ref",
               "proved_canary_ref",
@@ -257,6 +261,21 @@
           ],
           "default": null,
           "title": "Proved Package Digest"
+        },
+        "proved_process_identity": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Process Identity"
         },
         "proved_server_schema_digest": {
           "anyOf": [

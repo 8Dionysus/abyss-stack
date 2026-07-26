@@ -485,6 +485,7 @@ class CentralProofObservation(StrictModel):
                             "proved_package_digest": {"type": "string"},
                             "proved_deploy_revision": {"type": "string"},
                             "proved_deploy_tree_digest": {"type": "string"},
+                            "proved_process_identity": {"type": "string"},
                             "proved_server_schema_digest": {"type": "string"},
                             "proved_consumer_registration_ref": {
                                 "type": "string"
@@ -506,6 +507,7 @@ class CentralProofObservation(StrictModel):
                             "proved_package_digest",
                             "proved_deploy_revision",
                             "proved_deploy_tree_digest",
+                            "proved_process_identity",
                             "proved_server_schema_digest",
                             "proved_consumer_registration_ref",
                             "proved_canary_ref",
@@ -523,6 +525,7 @@ class CentralProofObservation(StrictModel):
     proved_package_digest: Digest | None = None
     proved_deploy_revision: NonEmpty | None = None
     proved_deploy_tree_digest: Digest | None = None
+    proved_process_identity: NonEmpty | None = None
     proved_server_schema_digest: Digest | None = None
     proved_consumer_registration_ref: NonEmpty | None = None
     proved_canary_ref: NonEmpty | None = None
@@ -542,6 +545,7 @@ class CentralProofObservation(StrictModel):
             self.proved_package_digest,
             self.proved_deploy_revision,
             self.proved_deploy_tree_digest,
+            self.proved_process_identity,
             self.proved_server_schema_digest,
             self.proved_consumer_registration_ref,
             self.proved_canary_ref,

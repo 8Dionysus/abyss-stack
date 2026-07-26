@@ -29,9 +29,10 @@ Tracking starts with the community-docs baseline for this repository.
   writes publish one atomically selected value without clobbering the winner.
 - Published stack MCP schemas now encode conditional runtime invariants;
   freshness includes supporting-ref expiry, plan TTL cannot outlive any copied
-  precondition, central proof binds the exact deployed-tree digest, activation
-  steps name the exact selected compatible consumer registration, and effect
-  planes cannot be activated or restarted before their distinct contracts
+  precondition, central proof binds the exact deployed-tree digest and running
+  process identity, activation steps name the exact selected compatible
+  consumer registration, and effect planes cannot be activated or restarted
+  before their distinct contracts
   exist. Sync and deploy candidates now bind their distinct expected
   post-action tree digests, rollback denial binds the exact registry digest,
   and secret screening covers namespaced credential keys and encoded URI path

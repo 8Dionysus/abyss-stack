@@ -216,6 +216,7 @@
         "proved_deploy_revision": "deploy-example-revision",
         "proved_deploy_tree_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "proved_package_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "proved_process_identity": "aoa-kag-mcp/0.0.0-example",
         "proved_server_schema_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
         "proved_source_revision": "source-example-revision",
         "verdict": "passed"

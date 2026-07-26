@@ -28,10 +28,11 @@ Plan preparation therefore accepts only `exact` or `compatible_drift`
 freshness. Activation also requires process and endpoint readiness, an exact
 consumer/server schema match, at least one shared protocol version, grounded
 canary evidence, rollback readiness, a passed proof-owner verdict bound to the
-exact current source, package, deployed revision and tree digest, schema,
-selected consumer, and canary contour, and acceptance-owner evidence bound to
-the exact current source revision and package digest and issued no earlier than
-central proof. Effect-policy activation remains blocked until the separate
+exact current source, package, deployed revision and tree digest, running
+process identity, schema, selected consumer, and canary contour, and
+acceptance-owner evidence bound to the exact current source revision and
+package digest and issued no earlier than central proof. Effect-policy
+activation remains blocked until the separate
 effect contracts named in the owner decision are modeled; restart cannot serve
 as an activation bypass.
 The compatible consumer is selected deterministically and its registration

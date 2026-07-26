@@ -40,8 +40,9 @@ an active process with an observed process identity, a ready endpoint, a
 registered consumer with the exact server schema digest and an overlapping MCP
 protocol version, a passed central-proof verdict issued by `proof_owner` and
 bound to the current source, package, deployed revision and tree digest, schema,
-consumer, and canary contour, named acceptance-owner evidence bound to the
-current source revision and package digest, a grounded canary, and usable
+running process identity, consumer, and canary contour, named acceptance-owner
+evidence bound to the current source revision and package digest, a grounded
+canary, and usable
 rollback proof. Activation or restart of `internal_effect` and
 `external_effect` targets is rejected because this package does not model
 their separately required threat, approval, egress, compensation, or rollback

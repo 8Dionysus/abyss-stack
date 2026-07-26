@@ -67,6 +67,18 @@ class StackMCPError(ValueError):
     """Fail-closed stack MCP contract or observation error."""
 
 
+def _looks_like_secret_value(value: str) -> bool:
+    normalized = value.lstrip().lower()
+    if normalized.startswith(_SECRET_VALUE_PREFIXES):
+        return True
+    return bool(
+        re.search(
+            r"-----begin [a-z0-9 ]*private key(?: block)?-----",
+            normalized,
+        )
+    )
+
+
 def _is_forbidden_credential_key(value: Any) -> bool:
     text = str(value)
     canonical = re.sub(r"[^a-z0-9]", "", text.casefold())
@@ -152,17 +164,15 @@ def _reject_secret_material(
                 reference_depth=reference_depth,
             )
     elif isinstance(value, str):
-        lowered = value.lstrip().lower()
-        if lowered.startswith(_SECRET_VALUE_PREFIXES):
+        if _looks_like_secret_value(value):
             raise StackMCPError(f"secret-like value is forbidden at {path}")
         all_decoded_variants = _decoded_reference_variants(value, path)
         for decoded_variant in all_decoded_variants:
             _reject_credential_assignments(decoded_variant, path)
         decoded_variants = all_decoded_variants[1:]
         for decoded_variant in decoded_variants:
-            decoded_lowered = decoded_variant.lstrip().lower()
             if (
-                decoded_lowered.startswith(_SECRET_VALUE_PREFIXES)
+                _looks_like_secret_value(decoded_variant)
                 or any(
                     marker in decoded_variant
                     for marker in ("://", "//", "?", "#")
@@ -232,9 +242,7 @@ def _reject_secret_material(
                                 "secret-bearing reference key is forbidden at "
                                 f"{path}.{component_name}"
                             )
-                        if decoded_key.lstrip().lower().startswith(
-                            _SECRET_VALUE_PREFIXES
-                        ):
+                        if _looks_like_secret_value(decoded_key):
                             raise StackMCPError(
                                 "secret-like reference component is forbidden at "
                                 f"{path}.{component_name}"
@@ -780,6 +788,8 @@ class StackMCPApplication:
                 or subject.proof.proved_deploy_revision != subject.deploy.revision
                 or subject.proof.proved_deploy_tree_digest
                 != subject.deploy.tree_digest
+                or subject.proof.proved_process_identity
+                != subject.process.process_identity
                 or subject.proof.proved_server_schema_digest
                 != subject.endpoint.server_schema_digest
                 or subject.proof.proved_canary_ref != subject.canary.canary_ref
