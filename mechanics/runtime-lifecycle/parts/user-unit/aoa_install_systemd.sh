@@ -392,8 +392,21 @@ aoa_digest_abyss_stack_mcp_package() {
 aoa_digest_abyss_stack_mcp_runtime() {
   local runtime_root="$1"
   local digest=""
+  local resolved_interpreter=""
+  local interpreter_digest=""
 
   [[ -d "$runtime_root" && ! -L "$runtime_root" ]] || return 1
+  resolved_interpreter="$(
+    readlink -f -- "${runtime_root}/bin/python"
+  )" || return 1
+  [[ "$resolved_interpreter" == /* && \
+     -f "$resolved_interpreter" && \
+     ! -L "$resolved_interpreter" && \
+     -x "$resolved_interpreter" ]] || return 1
+  interpreter_digest="$(
+    sha256sum -- "$resolved_interpreter" | cut -d' ' -f1
+  )" || return 1
+  [[ "$interpreter_digest" =~ ^[0-9a-f]{64}$ ]] || return 1
   if [[ -n "$(
     find "$runtime_root" \
       ! -type f \
@@ -406,30 +419,35 @@ aoa_digest_abyss_stack_mcp_runtime() {
   fi
   digest="$(
     cd "$runtime_root"
-    while IFS= read -r -d '' entry; do
-      local entry_type="${entry%% *}"
-      local entry_path="${entry#* }"
-      local entry_digest=""
+    {
+      printf 'i\0./bin/python\0%s\0' "$interpreter_digest"
+      while IFS= read -r -d '' entry; do
+        local entry_type="${entry%% *}"
+        local entry_path="${entry#* }"
+        local entry_digest=""
 
-      if [[ "$entry_type" == "l" ]]; then
-        entry_digest="$(
-          readlink --zero -- "$entry_path" |
-            sha256sum |
-            cut -d' ' -f1
-        )" || exit 1
-      else
-        entry_digest="$(sha256sum -- "$entry_path" | cut -d' ' -f1)" || exit 1
-      fi
-      [[ "$entry_digest" =~ ^[0-9a-f]{64}$ ]] || exit 1
-      printf '%s\0%s\0%s\0' "$entry_type" "$entry_path" "$entry_digest"
-    done < <(
-      find . \
-        ! -name '.abyss-stack-mcp-runtime-identity' \
-        ! -name '.abyss-stack-mcp-runtime-content-digest' \
-        \( -type f -o -type l \) \
-        -printf '%y %p\0' |
-        LC_ALL=C sort -z
-    ) |
+        if [[ "$entry_type" == "l" ]]; then
+          entry_digest="$(
+            readlink --zero -- "$entry_path" |
+              sha256sum |
+              cut -d' ' -f1
+          )" || exit 1
+        else
+          entry_digest="$(
+            sha256sum -- "$entry_path" | cut -d' ' -f1
+          )" || exit 1
+        fi
+        [[ "$entry_digest" =~ ^[0-9a-f]{64}$ ]] || exit 1
+        printf '%s\0%s\0%s\0' "$entry_type" "$entry_path" "$entry_digest"
+      done < <(
+        find . \
+          ! -name '.abyss-stack-mcp-runtime-identity' \
+          ! -name '.abyss-stack-mcp-runtime-content-digest' \
+          \( -type f -o -type l \) \
+          -printf '%y %p\0' |
+          LC_ALL=C sort -z
+      )
+    } |
       sha256sum |
       cut -d' ' -f1
   )" || return 1

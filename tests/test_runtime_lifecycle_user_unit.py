@@ -632,8 +632,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "shift\n"
                 "if [[ \"$1\" == \"-m\" && \"$2\" == \"venv\" ]]; then\n"
                 "  mkdir -p \"$3/bin\"\n"
-                "  cp \"$0\" \"$3/bin/python\"\n"
-                "  chmod 0755 \"$3/bin/python\"\n"
+                "  ln -s \"$0\" \"$3/bin/python\"\n"
                 "  exit 0\n"
                 "fi\n"
                 "if [[ \"$1\" == \"-m\" && \"$2\" == \"pip\" ]]; then\n"
@@ -848,11 +847,19 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             first_identity = marker.read_text(encoding="utf-8").strip()
             self.assertRegex(first_identity, r"\A[0-9a-f]{64}:[0-9a-f]{64}\Z")
+            first_content_digest = content_marker.read_text(
+                encoding="utf-8"
+            ).strip()
             self.assertRegex(
-                content_marker.read_text(encoding="utf-8").strip(),
+                first_content_digest,
                 r"\A[0-9a-f]{64}\Z",
             )
             self.assertTrue((venv / "bin" / "python").is_file())
+            self.assertTrue((venv / "bin" / "python").is_symlink())
+            self.assertEqual(
+                (venv / "bin" / "python").resolve(),
+                bootstrap.resolve(),
+            )
             entrypoint = venv / "bin" / "abyss-stack-mcp"
             self.assertEqual(
                 entrypoint.read_text(encoding="utf-8").splitlines()[0],
@@ -898,6 +905,38 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertIn("already provisioned", second.stdout)
+            self.assertEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
+
+            bootstrap.write_text(
+                bootstrap.read_text(encoding="utf-8")
+                + "\n# simulated host interpreter update\n",
+                encoding="utf-8",
+            )
+            interpreter_rebuilt = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                interpreter_rebuilt.returncode,
+                0,
+                interpreter_rebuilt.stderr,
+            )
+            self.assertIn(
+                "provisioned abyss-stack MCP runtime",
+                interpreter_rebuilt.stdout,
+            )
+            self.assertNotIn("already provisioned", interpreter_rebuilt.stdout)
+            self.assertNotEqual(
+                content_marker.read_text(encoding="utf-8").strip(),
+                first_content_digest,
+            )
             self.assertEqual(
                 marker.read_text(encoding="utf-8").strip(),
                 first_identity,

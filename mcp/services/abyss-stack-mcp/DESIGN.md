@@ -80,9 +80,12 @@ Managed units execute a stack-owned, source-addressed virtual environment under
 Python or import newly synced `Configs/src` over the installed package.
 The environment is reproduced from exact direct and transitive pins with
 artifact hashes, and its identity binds both deployed source content and the
-lock file. Provisioning is explicit, refuses to replace the environment while
-either plane is active or its state cannot be observed, and does not stop,
-start, or register either plane. After the units are linked and reloaded, each
+lock file. Its runtime-content digest also binds the installed tree and the
+bytes behind the fully resolved `bin/python` symlink chain, so a host
+interpreter replacement invalidates reuse. Provisioning is explicit, refuses
+to replace the environment while either plane is active or its state cannot be
+observed, and does not stop, start, or register either plane. After the units
+are linked and reloaded, each
 process holds a shared lock for its lifetime; changed provisioning holds the
 exclusive lock and checks stopped state both before building and immediately
 before swapping the verified environment. It builds only from a private copy

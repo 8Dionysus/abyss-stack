@@ -369,12 +369,15 @@ class ConsumerObservation(StrictModel):
             raise ValueError(
                 "a registered consumer requires schema and protocol observations"
             )
-        if self.registered and not _contains_named_evidence(
-            self.evidence,
-            self.registration_ref,
+        if (
+            self.evidence.state in {"exact", "compatible_drift"}
+            and not _contains_named_evidence(
+                self.evidence,
+                self.registration_ref,
+            )
         ):
             raise ValueError(
-                "registered consumer registration_ref must match contained evidence"
+                "usable consumer registration_ref must match contained evidence"
             )
         return self
 

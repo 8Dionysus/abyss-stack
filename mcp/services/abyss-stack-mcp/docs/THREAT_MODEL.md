@@ -23,16 +23,17 @@
   recursive decoding covers nested parameters, and credential-key tokenization
   catches namespaced separator/camel-case forms plus concatenated recognized
   provider/consumer and credential-attribute boundaries without treating
-  arbitrary word substrings as credentials; structurally valid compact JWT,
-  PEM private-key, Basic/Bearer, and
-  provider-token checks normalize leading whitespace and cover the standard
-  OpenAI, GitHub, and GitLab token-prefix families;
+  arbitrary word substrings as credentials; structurally valid compact JWT and
+  PEM private-key checks cover embedded material, Basic/Bearer checks normalize
+  leading whitespace, and bounded provider-token patterns are scanned
+  throughout values for the standard OpenAI, GitHub, and GitLab families;
 - exact targets require at least one non-whitespace character;
 - exact observation digest and short expiry for candidate plans;
 - exact artifact-hashed runtime dependency closure, bound with deployed source
   into the managed-environment identity and installed only from a private
-  digest-matched source snapshot, with the installed files and symlink targets
-  rehashed against a recorded runtime-content digest before any reuse;
+  digest-matched source snapshot, with the installed files, symlink targets,
+  and fully resolved interpreter bytes rehashed against a recorded
+  runtime-content digest before any reuse;
   generated entry-point shebangs are rebound to the stable publication path
   before that digest is recorded and the staged environment is renamed;
 - fail-closed reprovisioning while either managed stack MCP plane is active,
@@ -70,9 +71,10 @@
   folds every copied plan link together with the subject freshness envelope;
 - every step-relevant named deploy, consumer-registration, proof, acceptance,
   canary, or rollback target must equal a contained evidence identity that the
-  candidate copies and expiry-bounds; the proof and acceptance identities must
-  also be issued by their respective declared owners rather than relying on a
-  separate decoy receipt from that owner;
+  candidate copies and expiry-bounds, including an absent current consumer
+  selected for registration restoration; the proof and acceptance identities
+  must also be issued by their respective declared owners rather than relying
+  on a separate decoy receipt from that owner;
 - read catalog and inspection use the earlier wall-clock/snapshot bound and
   downgrade a causally future observation envelope, link, freshness timestamp,
   or nested evidence ref to `blocked`;

@@ -95,9 +95,11 @@ _CREDENTIAL_NAMESPACE_SUFFIXES = frozenset(
         "value",
     }
 )
-_SECRET_VALUE_PREFIXES = (
+_AUTH_VALUE_PREFIXES = (
     "basic ",
     "bearer ",
+)
+_PROVIDER_TOKEN_PREFIXES = (
     "sk-",
     "ghp_",
     "github_pat_",
@@ -114,6 +116,19 @@ _SECRET_VALUE_PREFIXES = (
     "glwt-",
     "glsoat-",
     "glffct-",
+)
+_PROVIDER_TOKEN_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_-])(?:"
+    + "|".join(
+        re.escape(prefix)
+        for prefix in sorted(
+            _PROVIDER_TOKEN_PREFIXES,
+            key=len,
+            reverse=True,
+        )
+    )
+    + r")[A-Za-z0-9_-]{8,}(?![A-Za-z0-9_-])",
+    re.IGNORECASE,
 )
 _JWT_CANDIDATE = re.compile(
     r"(?<![A-Za-z0-9_-])"
@@ -154,7 +169,9 @@ def _contains_compact_jwt(value: str) -> bool:
 
 def _looks_like_secret_value(value: str) -> bool:
     normalized = value.lstrip().lower()
-    if normalized.startswith(_SECRET_VALUE_PREFIXES):
+    if normalized.startswith(_AUTH_VALUE_PREFIXES):
+        return True
+    if _PROVIDER_TOKEN_PATTERN.search(value):
         return True
     if _contains_compact_jwt(value):
         return True
@@ -1229,6 +1246,10 @@ class StackMCPApplication:
             == subject.rollback.last_known_good_consumer_registration_ref
             if cls._effective_link_state(consumer.evidence, now)
             in {"exact", "compatible_drift"}
+            if any(
+                evidence.evidence_ref == consumer.registration_ref
+                for evidence in consumer.evidence.evidence_refs
+            )
         ]
         return tuple(
             sorted(

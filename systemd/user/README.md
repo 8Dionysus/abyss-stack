@@ -117,9 +117,10 @@ source-and-lock-addressed environment lives under
 through `ConditionPathExists` and an executable `ExecCondition` when it is
 absent or unusable. Runtime provisioning, credential provisioning, unit
 linking, start, and client registration remain separate actions.
-Provisioning installs the exact artifact-hashed lock and refuses to replace a
-changed environment while either stack MCP unit is active or its state cannot
-be observed; it never stops a plane implicitly.
+Provisioning installs the exact artifact-hashed lock, binds the bytes behind
+the resolved venv interpreter into the runtime-content digest, and refuses to
+replace a changed environment while either stack MCP unit is active or its
+state cannot be observed; it never stops a plane implicitly.
 The units execute the installed venv module, not the mutable `Configs/src`
 tree, clear inherited `PYTHONHOME` and `PYTHONPATH`, invoke Python in isolated
 mode, and pass `-B` explicitly. Neither a Configs sync nor ambient user-manager

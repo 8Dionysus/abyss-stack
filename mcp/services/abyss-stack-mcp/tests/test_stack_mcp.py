@@ -393,6 +393,18 @@ def test_registered_consumer_target_must_match_contained_evidence() -> None:
         RuntimeObservation.model_validate(payload)
 
 
+def test_unregistered_rollback_consumer_target_must_match_evidence() -> None:
+    payload = observation(subject())
+    consumer = payload["subjects"][0]["consumers"][0]
+    consumer["registered"] = False
+    consumer["observed_schema_digest"] = None
+    consumer["observed_protocol_versions"] = []
+    consumer["evidence"] = evidence("unrelated-consumer-observation")
+
+    with pytest.raises(ValidationError, match="must match contained evidence"):
+        RuntimeObservation.model_validate(payload)
+
+
 @pytest.mark.parametrize(
     (
         "surface",
@@ -816,6 +828,31 @@ def test_observation_store_rejects_gitlab_tokens_as_raw_references(
     payload = observation(subject())
     payload["subjects"][0]["acceptance"]["acceptance_ref"] = secret_value
     path = write_observation(tmp_path / f"{token_prefix}reference.json", payload)
+
+    with pytest.raises(StackMCPError, match="forbidden") as caught:
+        ObservationStore(path).load()
+
+    assert secret_value not in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    "secret_value",
+    (
+        "sk-proj-reference-secret-value",
+        "ghp_reference-secret-value",
+        "github_pat_reference-secret-value",
+        "glpat-reference-secret-value",
+    ),
+)
+def test_observation_store_rejects_embedded_provider_tokens(
+    tmp_path: Path,
+    secret_value: str,
+) -> None:
+    payload = observation(subject())
+    payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+        f"runtime receipt {secret_value} captured"
+    )
+    path = write_observation(tmp_path / "embedded-provider-token.json", payload)
 
     with pytest.raises(StackMCPError, match="forbidden") as caught:
         ObservationStore(path).load()
@@ -1272,6 +1309,32 @@ def test_rollback_plan_accepts_fresh_rollback_required_deploy_links(
             "rollback",
             expected_observation_digest=digest,
         )
+
+
+def test_rollback_can_restore_a_bound_unregistered_consumer(
+    tmp_path: Path,
+) -> None:
+    payload = observation(subject())
+    consumer = payload["subjects"][0]["consumers"][0]
+    consumer["registered"] = False
+    consumer["observed_schema_digest"] = None
+    consumer["observed_protocol_versions"] = []
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+
+    result = app.prepare_plan(
+        "aoa-kag",
+        "read",
+        "rollback",
+        expected_observation_digest=digest,
+    )
+
+    restore = next(
+        step
+        for step in result["owner_payload"]["plan"]["steps"]
+        if step["action"] == "restore-consumer-registration"
+    )
+    assert restore["exact_target"] == "config://codex/aoa-kag"
 
 
 @pytest.mark.parametrize(

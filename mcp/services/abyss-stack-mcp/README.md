@@ -127,11 +127,12 @@ camel-case token sequences rather than only exact key spellings. Concatenated
 matches require a recognized provider/consumer namespace or credential-value
 attribute boundary, so ordinary keys such as `tokenizer`, `passwordless`, and
 `authorizationPolicy` remain valid.
-Secret-prefix checks ignore leading whitespace and cover the standard OpenAI,
-GitHub, and GitLab token families, including GitLab personal, deploy, runner,
-job, trigger, agent, workspace, SCIM, and feature-flag client tokens. Expired
-observations remain visible as stale read evidence but cannot produce a
-candidate plan.
+Basic/Bearer prefix checks ignore leading whitespace. Bounded provider-token
+patterns are scanned throughout direct and decoded reference values, covering
+the standard OpenAI, GitHub, and GitLab token families, including GitLab
+personal, deploy, runner, job, trigger, agent, workspace, SCIM, and feature-flag
+client tokens. Expired observations remain visible as stale read evidence but
+cannot produce a candidate plan.
 The generated Draft 2020-12 schema includes the conditional invariants for
 usable links and freshness, endpoint readiness, consumer registration,
 active-process identity, accepted-target completeness, successful canaries,
@@ -179,13 +180,14 @@ This creates or refreshes
 `requirements.lock` closure with `--require-hashes`, verifies its dependencies,
 and records a runtime identity composed from both the deployed-package digest
 and the lock digest, plus a deterministic content digest of the installed
-runtime files and symlink targets. Before that digest is recorded, generated
-entry-point shebangs are rebound from the private staging directory to the
-stable published venv path, so atomic publication does not leave launchers
-pointing at a removed directory. Repeating the command with unchanged source
-and lock rehashes the installed environment before verification and reuses it
-only when the content digest still matches; missing or changed installed bytes
-force a guarded rebuild. A changed identity is never installed
+runtime files, symlink targets, and bytes of the fully resolved
+`bin/python` interpreter. Before that digest is recorded, generated entry-point
+shebangs are rebound from the private staging directory to the stable published
+venv path, so atomic publication does not leave launchers pointing at a removed
+directory. Repeating the command with unchanged source and lock rehashes the
+installed environment before verification and reuses it only when the content
+digest still matches; missing or changed installed or interpreter bytes force a
+guarded rebuild. A changed identity is never installed
 over a running plane: provisioning fails closed while either the read or
 candidate unit is active or their user-systemd state cannot be observed. Stop
 both units explicitly before reprovisioning, then start or canary them as a
