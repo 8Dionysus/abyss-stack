@@ -222,7 +222,7 @@ def observation_example() -> dict[str, Any]:
                             "example://canary/aoa-kag/last-known-good"
                         ),
                     },
-                    "evidence": evidence("rollback"),
+                    "evidence": evidence("rollback", owner="aoa-evals"),
                 },
             }
         ],

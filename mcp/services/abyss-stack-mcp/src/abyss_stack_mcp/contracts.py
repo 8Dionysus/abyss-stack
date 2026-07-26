@@ -1010,6 +1010,14 @@ class RuntimeSubject(StrictModel):
             raise ValueError(
                 "acceptance_ref evidence must be issued by acceptance_owner"
             )
+        if self.rollback.ready and not _contains_named_evidence(
+            self.rollback.evidence,
+            self.rollback.proof_ref,
+            owner=self.owners.proof_owner,
+        ):
+            raise ValueError(
+                "rollback proof_ref evidence must be issued by proof_owner"
+            )
         if (
             self.canary.succeeded
             and min(

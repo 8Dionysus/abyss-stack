@@ -54,6 +54,8 @@ _FORBIDDEN_KEYS = frozenset(
         "refresh_token",
         "secret",
         "secret_access_key",
+        "sig",
+        "signature",
         "token",
         "x_amz_credential",
         "x_amz_security_token",

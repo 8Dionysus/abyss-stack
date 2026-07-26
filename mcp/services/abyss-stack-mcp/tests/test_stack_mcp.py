@@ -210,7 +210,7 @@ def subject(
                     f"receipt://canary/{organ_id}/last-known-good"
                 ),
             },
-            "evidence": evidence("rollback"),
+            "evidence": evidence("rollback", owner="aoa-evals"),
         },
     }
 
@@ -414,6 +414,12 @@ def test_unregistered_rollback_consumer_target_must_match_evidence() -> None:
     ),
     (
         ("proof", "proof_ref", "proof_owner", "issued by proof_owner"),
+        (
+            "rollback",
+            "proof_ref",
+            "proof_owner",
+            "issued by proof_owner",
+        ),
         (
             "acceptance",
             "acceptance_ref",
@@ -650,6 +656,8 @@ def test_observation_store_redacts_secret_material_from_forbidden_keys(
         "google-presign-credential",
         "google-presign-security-token",
         "google-presign-signature",
+        "azure-sas-signature",
+        "generic-signed-url-signature",
         "credential-query",
         "credentials-query",
         "unparseable",
@@ -830,6 +838,17 @@ def test_observation_store_rejects_credentials_inside_references(
         }[reference_surface]
         payload["subjects"][0]["deploy"]["manifest_ref"] = (
             f"https://storage.googleapis.com/bucket/object?{key}={secret_value}"
+        )
+    elif reference_surface in {
+        "azure-sas-signature",
+        "generic-signed-url-signature",
+    }:
+        key = {
+            "azure-sas-signature": "sig",
+            "generic-signed-url-signature": "Signature",
+        }[reference_surface]
+        payload["subjects"][0]["deploy"]["manifest_ref"] = (
+            f"https://storage.invalid/object?{key}={secret_value}"
         )
     elif reference_surface in {"credential-query", "credentials-query"}:
         key = reference_surface.removesuffix("-query")
