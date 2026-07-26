@@ -473,6 +473,8 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
         "secret-value",
         "leading-token",
         "leading-direct",
+        "basic-auth",
+        "encoded-basic-auth",
         "top-level-encoded",
         "nested-value",
         "double-key",
@@ -530,6 +532,14 @@ def test_observation_store_rejects_credentials_inside_references(
     elif reference_surface == "leading-direct":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f" Bearer {secret_value}"
+        )
+    elif reference_surface == "basic-auth":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"  bAsIc {secret_value}"
+        )
+    elif reference_surface == "encoded-basic-auth":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"Basic%20{secret_value}"
         )
     elif reference_surface == "top-level-encoded":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (

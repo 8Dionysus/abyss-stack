@@ -54,6 +54,13 @@ _FORBIDDEN_KEYS = frozenset(
 _FORBIDDEN_KEY_CANONICAL = frozenset(
     re.sub(r"[^a-z0-9]", "", key.casefold()) for key in _FORBIDDEN_KEYS
 )
+_SECRET_VALUE_PREFIXES = (
+    "basic ",
+    "bearer ",
+    "sk-",
+    "ghp_",
+    "github_pat_",
+)
 
 
 class StackMCPError(ValueError):
@@ -146,7 +153,7 @@ def _reject_secret_material(
             )
     elif isinstance(value, str):
         lowered = value.lstrip().lower()
-        if lowered.startswith(("bearer ", "sk-", "ghp_", "github_pat_")):
+        if lowered.startswith(_SECRET_VALUE_PREFIXES):
             raise StackMCPError(f"secret-like value is forbidden at {path}")
         all_decoded_variants = _decoded_reference_variants(value, path)
         for decoded_variant in all_decoded_variants:
@@ -155,9 +162,7 @@ def _reject_secret_material(
         for decoded_variant in decoded_variants:
             decoded_lowered = decoded_variant.lstrip().lower()
             if (
-                decoded_lowered.startswith(
-                    ("bearer ", "sk-", "ghp_", "github_pat_")
-                )
+                decoded_lowered.startswith(_SECRET_VALUE_PREFIXES)
                 or any(
                     marker in decoded_variant
                     for marker in ("://", "//", "?", "#")
@@ -228,7 +233,7 @@ def _reject_secret_material(
                                 f"{path}.{component_name}"
                             )
                         if decoded_key.lstrip().lower().startswith(
-                            ("bearer ", "sk-", "ghp_", "github_pat_")
+                            _SECRET_VALUE_PREFIXES
                         ):
                             raise StackMCPError(
                                 "secret-like reference component is forbidden at "

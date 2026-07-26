@@ -21,8 +21,8 @@
   credential-bearing userinfo and forbidden path/query/fragment keys before
   validation or response; unparseable URI-like values fail closed, bounded
   recursive decoding covers nested parameters, and credential-key tokenization
-  catches namespaced separator/camel-case forms while secret-prefix checks
-  normalize leading whitespace;
+  catches namespaced separator/camel-case forms while Basic/Bearer and
+  provider-token prefix checks normalize leading whitespace;
 - exact targets require at least one non-whitespace character;
 - exact observation digest and short expiry for candidate plans;
 - exact artifact-hashed runtime dependency closure, bound with deployed source
