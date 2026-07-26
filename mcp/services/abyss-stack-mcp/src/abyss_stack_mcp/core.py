@@ -1043,6 +1043,8 @@ class StackMCPApplication:
         if plan_kind in {"activate", "restart"}:
             if subject.policy_family in {"internal_effect", "external_effect"}:
                 blockers.append("effect_activation_contracts_absent")
+            if not subject.process.active:
+                blockers.append("process_not_active")
             if subject.registry.registry_state not in {"shadow", "admitted"}:
                 blockers.append("registry_state_blocks_runtime_plan")
             for name, link in (
@@ -1057,8 +1059,6 @@ class StackMCPApplication:
         if plan_kind == "activate":
             compatible_consumers = self._compatible_consumers(subject, now)
             proof_consumers = self._proof_consumers(subject, now)
-            if not subject.process.active:
-                blockers.append("process_not_active")
             if not subject.endpoint.ready:
                 blockers.append("endpoint_not_ready")
             if (

@@ -48,6 +48,8 @@
 - structured allowlisted plan actions with no free-form command;
 - active processes require an observed process identity rather than a bare
   boolean;
+- restart candidates require an already active process, preventing restart from
+  becoming an activation-gate bypass for an inactive unit;
 - activation requires a passed central-proof verdict issued by `proof_owner`
   and bound to the current source revision and tree digest, package, deployed
   revision and tree digest, running process identity, schema, consumer, and

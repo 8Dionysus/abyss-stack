@@ -1269,6 +1269,18 @@ def test_restart_plan_requires_and_carries_fresh_canary_evidence(
             expected_observation_digest=digest,
         )
 
+    payload = observation(subject())
+    payload["subjects"][0]["process"]["active"] = False
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+    with pytest.raises(StackMCPError, match="process_not_active"):
+        app.prepare_plan(
+            "aoa-kag",
+            "read",
+            "restart",
+            expected_observation_digest=digest,
+        )
+
 
 def test_activation_requires_usable_freshness_and_runtime_readiness(
     tmp_path: Path,

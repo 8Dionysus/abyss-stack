@@ -65,7 +65,8 @@ rather than the current deployment's canary. Rollback planning relies on the
 usable rollback proof that binds that LKG route and receipt; it neither validates
 nor copies the current deployment's canary evidence, which may be failed,
 blocked, or expired in the recovery scenario. Restart plans also require and
-carry usable current-canary evidence. A plan expires at the
+carry usable current-canary evidence and reject inactive processes, which must
+use the full activation contour instead. A plan expires at the
 earliest of ten minutes, its observation/freshness envelopes, every required
 link, and every copied evidence ref; it cannot outlive its proof. Candidate
 planning allows at most 30 seconds of positive clock skew and rejects

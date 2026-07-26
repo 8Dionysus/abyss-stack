@@ -54,6 +54,8 @@ Tracking starts with the community-docs baseline for this repository.
 - Rollback candidate preparation now relies on the usable, typed
   last-known-good rollback proof and no longer blocks on or copies canary
   evidence from the current deployment.
+- Restart candidates now reject inactive processes instead of allowing the
+  restart step to act as an ungated start path.
 - Rollback plans now admit fresh `rollback_required` failed-link evidence
   without weakening other blockers, while managed units execute only the
   digest-matched package installed in their provisioned venv.
