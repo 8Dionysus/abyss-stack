@@ -7,16 +7,16 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
-SCRIPT = REPO_ROOT / "scripts" / "aoa-routing-canary"
-SDK_REF = "b" * 40
+SCRIPT = REPO_ROOT / "scripts" / "aoa-routing-cutover"
+SDK_REF = "d" * 40
 PREDECESSOR_REF = "a" * 40
-G5_AUTHORITY = {
+AUTHORITY = {
     "archive_authorized": False,
-    "canonical_producer_switch_authorized": False,
-    "compatibility_window_started": False,
-    "live_runtime_mutation_authorized": False,
-    "predecessor_maintenance_only": False,
-    "sdk_canonical": False,
+    "canonical_producer_switch_authorized": True,
+    "compatibility_window_started": True,
+    "live_runtime_mutation_authorized": True,
+    "predecessor_maintenance_only": True,
+    "sdk_canonical": True,
 }
 
 
@@ -38,7 +38,7 @@ def stable_digest(payload: object) -> str:
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
-def run_canary(arguments: list[str]) -> subprocess.CompletedProcess[str]:
+def run_cutover(arguments: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [str(SCRIPT), *arguments],
         cwd=REPO_ROOT,
@@ -46,6 +46,44 @@ def run_canary(arguments: list[str]) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         check=False,
     )
+
+
+def owner_switch_receipt() -> dict[str, object]:
+    return {
+        "schema": "aoa_sdk_routing_g5_owner_switch_receipt_v1",
+        "status": "g5_switch_authorized",
+        "transition": {
+            "from_state": "predecessor_canonical",
+            "to_state": "sdk_canonical",
+            "canonical_owner_before": "aoa-routing",
+            "canonical_owner_after": "aoa-sdk",
+        },
+        "sdk": {
+            "owner_repo": "aoa-sdk",
+            "source_ref": SDK_REF,
+            "version": "0.8.0",
+            "abi_epoch": "aoa_routing_thin_router_v1",
+        },
+        "predecessor": {
+            "owner_repo": "aoa-routing",
+            "source_ref": PREDECESSOR_REF,
+            "rollback_posture": "retained",
+        },
+        "public_release": {
+            "release_ref": "https://example.invalid/aoa-sdk/v0.8.0",
+            "asset_digest": "sha256:" + ("e" * 64),
+        },
+        "compatibility_window": {
+            "state": "started",
+            "started_on": "2026-07-25",
+            "started_by_sdk_version": "0.8.0",
+        },
+        "g5_authority": dict(AUTHORITY),
+        "archive_stop_line": (
+            "Repository archival remains forbidden without consumer-zero, "
+            "compatibility exit, and separate exact operator approval."
+        ),
+    }
 
 
 def make_fixture(tmp_path: Path) -> dict[str, str]:
@@ -66,9 +104,8 @@ def make_fixture(tmp_path: Path) -> dict[str, str]:
         ),
         encoding="utf-8",
     )
-
-    subject_store = tmp_path / "subject-store"
-    payloads = {
+    store = tmp_path / "subject-store"
+    payloads: dict[str, object] = {
         "generated/aoa_router.min.json": {
             "router_version": 1,
             "artifact_identity": {
@@ -77,60 +114,75 @@ def make_fixture(tmp_path: Path) -> dict[str, str]:
                 "abi_epoch": "aoa_routing_thin_router_v1",
             },
         },
-        "generated/task_to_surface_hints.json": {"version": "1", "hints": []},
+        "generated/task_to_surface_hints.json": {
+            "version": "1",
+            "hints": [],
+        },
+        "succession/routing-g5-owner-switch.json": owner_switch_receipt(),
     }
-    files = []
+    files: list[dict[str, object]] = []
     for relative, payload in payloads.items():
-        path = subject_store / relative
+        path = store / relative
         write_json(path, payload)
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         files.append(
             {
                 "bytes": path.stat().st_size,
                 "path": relative,
-                "role": "routing_readmodel",
+                "role": (
+                    "owner_switch_receipt"
+                    if relative.startswith("succession/")
+                    else "routing_readmodel"
+                ),
                 "sha256": f"sha256:{digest}",
                 "sha256_hex": digest,
             }
         )
-    files.sort(key=lambda item: item["path"])
+    files.sort(key=lambda item: str(item["path"]))
     subject_digest = stable_digest(files)
     write_json(
-        subject_store / "subject-store.json",
+        store / "subject-store.json",
         {
             "schema": "abyss_machine_artifact_subject_store_v1",
             "artifact_class": "thin_routing_readmodel_bundle",
             "owner_repo": "aoa-sdk",
             "aggregate_digest": subject_digest,
-            "consumer_intent": "runtime_canary",
+            "consumer_intent": "runtime",
             "files": files,
         },
     )
-
-    record_id = "sha256:" + ("c" * 64)
-    producer_admission = {
+    receipt = owner_switch_receipt()
+    receipt_summary = {
+        "schema": "aoa_sdk_routing_g5_owner_switch_receipt_v1",
+        "status": "g5_switch_authorized",
+        "digest": stable_digest(receipt),
+    }
+    admission = {
         "schema": "abyss_machine_artifact_producer_admission_v1",
-        "status": "candidate_admitted",
+        "status": "canonical_producer",
+        "profile_id": "aoa-sdk-g5-canonical",
         "owner_repo": "aoa-sdk",
         "source_ref": SDK_REF,
-        "canonical_owner_repo": "aoa-routing",
+        "canonical_owner_repo": "aoa-sdk",
         "canonical_predecessor_source_ref": PREDECESSOR_REF,
         "runtime_consumer": "abyss-stack",
         "stronger_owner": "abyss-machine",
-        "provenance_state": "sdk_g5_candidate",
-        "publication_posture": "non_publishing_canary",
+        "provenance_state": "sdk_canonical",
+        "publication_posture": "public_release_canonical",
         "single_canonical_owner": True,
-        "canonical_switch_authorized": False,
-        "allowed_consumer_intents": ["agent", "runtime_canary"],
+        "canonical_switch_authorized": True,
+        "allowed_consumer_intents": ["release_consumer", "runtime"],
         "required_controls": ["abi_signature", "sbom", "slsa_in_toto"],
-        "g5_authority": dict(G5_AUTHORITY),
+        "g5_authority": dict(AUTHORITY),
+        "owner_switch_receipt": receipt_summary,
     }
-    trust_verdict = {
+    record_id = "sha256:" + ("c" * 64)
+    trust = {
         "schema": "abyss_machine_artifact_trust_gate_v1",
         "ok": True,
         "verdict": "allow",
         "artifact_class": "thin_routing_readmodel_bundle",
-        "consumer_intent": "runtime_canary",
+        "consumer_intent": "runtime",
         "subject_digest": subject_digest,
         "record_id": record_id,
         "require_latest": True,
@@ -140,7 +192,7 @@ def make_fixture(tmp_path: Path) -> dict[str, str]:
         "decision": {
             "model": "fail_closed_consumer_admission",
             "allow": True,
-            "consumer_intent": "runtime_canary",
+            "consumer_intent": "runtime",
         },
         "inspected_claims": {
             "subject_identity": {
@@ -157,7 +209,7 @@ def make_fixture(tmp_path: Path) -> dict[str, str]:
                 "source_ref_actual": SDK_REF,
             },
             "trust_root": {
-                "trust_root_mode_actual": "host_managed",
+                "trust_root_mode_actual": "public_release",
                 "trust_root_mode_matched": True,
             },
             "artifact_subject_store": {
@@ -165,6 +217,7 @@ def make_fixture(tmp_path: Path) -> dict[str, str]:
                 "ok": True,
                 "aggregate_digest": subject_digest,
             },
+            "producer_admission": admission,
         },
         "record": {
             "record_id": record_id,
@@ -172,11 +225,12 @@ def make_fixture(tmp_path: Path) -> dict[str, str]:
             "source_repo": "aoa-sdk",
             "source_ref": SDK_REF,
             "artifact_subjects_digest": subject_digest,
-            "lifecycle_state": "manually-verified",
+            "lifecycle_state": "release-ready",
             "latest_eligible": True,
             "terminal_state": False,
             "verification_ok": True,
-            "consumer_refs": ["abyss-stack:routing-canary"],
+            "trust_root_mode": "public_release",
+            "consumer_refs": ["abyss-stack:routing-canonical"],
             "required_controls": ["abi_signature", "sbom", "slsa_in_toto"],
             "verified_controls": ["abi_signature", "sbom", "slsa_in_toto"],
             "artifact_subject_store": {
@@ -184,14 +238,15 @@ def make_fixture(tmp_path: Path) -> dict[str, str]:
                 "ok": True,
                 "aggregate_digest": subject_digest,
             },
-            "producer_admission": producer_admission,
+            "producer_admission": admission,
         },
     }
     trust_path = tmp_path / "trust-verdict.json"
-    write_json(trust_path, trust_verdict)
+    write_json(trust_path, trust)
     return {
         "config": str(config),
-        "subject_store": str(subject_store),
+        "subject_store": str(store),
+        "receipt": str(store / "succession/routing-g5-owner-switch.json"),
         "subject_digest": subject_digest,
         "trust_verdict": str(trust_path),
     }
@@ -203,6 +258,8 @@ def exact_args(fixture: dict[str, str], target: Path) -> list[str]:
         fixture["subject_store"],
         "--trust-verdict",
         fixture["trust_verdict"],
+        "--owner-switch-receipt",
+        fixture["receipt"],
         "--target-root",
         str(target),
         "--sdk-source-ref",
@@ -216,115 +273,103 @@ def exact_args(fixture: dict[str, str], target: Path) -> list[str]:
     ]
 
 
-def test_isolated_canary_materializes_and_checks_exact_candidate(tmp_path: Path) -> None:
+def test_isolated_canonical_materialization_is_receipt_bound(
+    tmp_path: Path,
+) -> None:
     fixture = make_fixture(tmp_path)
     target = tmp_path / "isolated" / "aoa-routing"
 
-    materialized = run_canary(["materialize", *exact_args(fixture, target), "--isolated"])
+    materialized = run_cutover(
+        ["materialize", *exact_args(fixture, target), "--isolated"]
+    )
     assert materialized.returncode == 0, materialized.stderr + materialized.stdout
-    payload = json.loads(materialized.stdout)
-    assert payload["ok"] is True
-    assert payload["activation_mode"] == "isolated"
-    assert payload["closure_authorized"] is False
-    assert all(value is False for value in payload["g5_authority"].values())
+    result = json.loads(materialized.stdout)
+    assert result["posture"] == "sdk_canonical"
+    assert result["canonical_switch_authorized"] is True
+    assert result["closure_authorized"] is True
+    assert result["g5_authority"] == AUTHORITY
 
-    checked = run_canary(["check", *exact_args(fixture, target)])
+    checked = run_cutover(["check", *exact_args(fixture, target)])
     assert checked.returncode == 0, checked.stderr + checked.stdout
-    assert json.loads(checked.stdout)["posture"] == "sdk_g5_candidate_canary"
-
     manifest = json.loads(
-        (target / "manifest" / "federation_mirror_manifest.json").read_text(
+        (target / "manifest/federation_mirror_manifest.json").read_text(
             encoding="utf-8"
         )
     )
-    assert manifest["candidate_producer"]["owner_repo"] == "aoa-sdk"
-    assert manifest["canonical_producer"]["owner_repo"] == "aoa-routing"
+    assert manifest["canonical_producer"]["owner_repo"] == "aoa-sdk"
+    assert manifest["predecessor_rollback"]["owner_repo"] == "aoa-routing"
     assert manifest["mirror_is_authority"] is False
 
-    router_path = target / "generated" / "aoa_router.min.json"
-    router_path.write_text('{"tampered":true}\n', encoding="utf-8")
-    manifest["file_sha256"][
-        "generated/aoa_router.min.json"
-    ] = hashlib.sha256(router_path.read_bytes()).hexdigest()
-    write_json(
-        target / "manifest" / "federation_mirror_manifest.json",
-        manifest,
-    )
-    rebound = run_canary(["check", *exact_args(fixture, target)])
-    assert rebound.returncode == 1
-    assert "subject-store ledger" in json.loads(rebound.stdout)["error"]
 
-
-def test_isolated_canary_rejects_live_target_shape(tmp_path: Path) -> None:
+def test_isolated_cutover_rejects_live_target_shape(tmp_path: Path) -> None:
     fixture = make_fixture(tmp_path)
     target = tmp_path / "runtime/Knowledge/federation/aoa-routing"
 
-    result = run_canary(
+    result = run_cutover(
         ["materialize", *exact_args(fixture, target), "--isolated"]
     )
 
     assert result.returncode == 1
-    assert "requires --authorized-live-canary" in json.loads(result.stdout)[
+    assert "requires --authorized-live-cutover" in json.loads(result.stdout)[
         "error"
     ]
     assert not target.exists()
 
 
-def test_canary_rejects_any_asserted_g5_authority(tmp_path: Path) -> None:
+def test_canonical_cutover_rejects_receipt_or_admission_authority_drift(
+    tmp_path: Path,
+) -> None:
     fixture = make_fixture(tmp_path)
-    trust_path = Path(fixture["trust_verdict"])
-    trust = json.loads(trust_path.read_text(encoding="utf-8"))
-    trust["record"]["producer_admission"]["g5_authority"]["sdk_canonical"] = True
-    write_json(trust_path, trust)
+    receipt_path = Path(fixture["receipt"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["g5_authority"]["archive_authorized"] = True
+    write_json(receipt_path, receipt)
 
-    result = run_canary(
+    result = run_cutover(
         [
             "materialize",
             *exact_args(fixture, tmp_path / "isolated" / "aoa-routing"),
             "--isolated",
         ]
     )
-
     assert result.returncode == 1
-    assert "asserts forbidden authority" in json.loads(result.stdout)["error"]
+    assert "subject-store file digest drifted" in json.loads(result.stdout)[
+        "error"
+    ]
 
 
-def test_live_canary_activation_and_rollback_preserve_both_trees(tmp_path: Path) -> None:
+def test_live_cutover_and_runtime_rollback_preserve_source_owner_state(
+    tmp_path: Path,
+) -> None:
     fixture = make_fixture(tmp_path)
-    target = tmp_path / "runtime" / "Knowledge" / "federation" / "aoa-routing"
+    target = tmp_path / "runtime/Knowledge/federation/aoa-routing"
     target.mkdir(parents=True)
-    (target / "canonical.txt").write_text("predecessor\n", encoding="utf-8")
-    rollback_root = target.parent / "aoa-routing.pre-canary"
-
-    activated = run_canary(
+    (target / "predecessor.txt").write_text("rollback\n", encoding="utf-8")
+    rollback_root = target.parent / "aoa-routing.pre-g5"
+    activated = run_cutover(
         [
             "materialize",
             *exact_args(fixture, target),
-            "--authorized-live-canary",
+            "--authorized-live-cutover",
             "--rollback-root",
             str(rollback_root),
             "--operator-change-ref",
-            "test-change-record",
+            "test-g5-change",
         ]
     )
     assert activated.returncode == 0, activated.stderr + activated.stdout
-    assert rollback_root.joinpath("canonical.txt").read_text() == "predecessor\n"
-    assert not target.joinpath("canonical.txt").exists()
+    assert rollback_root.joinpath("predecessor.txt").is_file()
 
-    Path(fixture["trust_verdict"]).unlink()
-    (
-        target / "manifest" / "federation_mirror_manifest.json"
-    ).write_text("{corrupted canary manifest\n", encoding="utf-8")
-    retained = target.parent / "aoa-routing.sdk-canary-retained"
-    restored = run_canary(
+    retained = target.parent / "aoa-routing.sdk-canonical-retained"
+    restored = run_cutover(
         [
             "rollback",
-            "--authorized-live-canary",
+            "--authorized-live-cutover",
             "--target-root",
             str(target),
             "--rollback-root",
             str(rollback_root),
-            "--candidate-retain-root",
+            "--canonical-retain-root",
             str(retained),
             "--sdk-source-ref",
             SDK_REF,
@@ -333,13 +378,12 @@ def test_live_canary_activation_and_rollback_preserve_both_trees(tmp_path: Path)
             "--subject-digest",
             fixture["subject_digest"],
             "--operator-change-ref",
-            "test-change-record",
+            "test-g5-change",
         ]
     )
     assert restored.returncode == 0, restored.stderr + restored.stdout
-    restored_payload = json.loads(restored.stdout)
-    assert restored_payload["candidate_identity_inspection"]["verified"] is False
-    assert target.joinpath("canonical.txt").read_text(encoding="utf-8") == "predecessor\n"
-    assert retained.joinpath(
-        "manifest/federation_mirror_manifest.json"
-    ).is_file()
+    result = json.loads(restored.stdout)
+    assert result["runtime_owner_state"] == "compatibility_rollback_active"
+    assert result["source_owner_state"] == "sdk_canonical_unchanged"
+    assert result["archive_authorized"] is False
+    assert target.joinpath("predecessor.txt").is_file()

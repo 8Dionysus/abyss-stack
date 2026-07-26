@@ -208,6 +208,10 @@
 - [ABYSS-STACK-D-0075 AoA KAG MCP Access Plane](../ABYSS-STACK-D-0075-aoa-kag-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0075-aoa-kag-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0080 Diagnostic Skill Owner Home](../ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md) (`docs/decisions/ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md`)
 
+## compatibility rollback
+
+- [ABYSS-STACK-D-0086 Receipt-Bound SDK Routing Cutover](../ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md) (`docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md`)
+
 ## federation seam
 
 - [ABYSS-STACK-D-0076 Repo-Self KAG Runtime Projections](../ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md) (`docs/decisions/ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md`)
@@ -229,6 +233,7 @@
 ## operator cutover
 
 - [ABYSS-STACK-D-0085 SDK Routing Canary Intake](../ABYSS-STACK-D-0085-sdk-routing-canary-intake.md) (`docs/decisions/ABYSS-STACK-D-0085-sdk-routing-canary-intake.md`)
+- [ABYSS-STACK-D-0086 Receipt-Bound SDK Routing Cutover](../ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md) (`docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md`)
 
 ## release/tooling
 
@@ -264,6 +269,7 @@
 - [ABYSS-STACK-D-0064 Federation Effective Runtime Inputs](../ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md) (`docs/decisions/ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md`)
 - [ABYSS-STACK-D-0084 Routing Mirror Provenance Readiness](../ABYSS-STACK-D-0084-routing-mirror-provenance-readiness.md) (`docs/decisions/ABYSS-STACK-D-0084-routing-mirror-provenance-readiness.md`)
 - [ABYSS-STACK-D-0085 SDK Routing Canary Intake](../ABYSS-STACK-D-0085-sdk-routing-canary-intake.md) (`docs/decisions/ABYSS-STACK-D-0085-sdk-routing-canary-intake.md`)
+- [ABYSS-STACK-D-0086 Receipt-Bound SDK Routing Cutover](../ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md) (`docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md`)
 
 ## source validation
 

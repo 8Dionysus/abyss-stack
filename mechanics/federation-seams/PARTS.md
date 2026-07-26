@@ -2,7 +2,7 @@
 
 | Part | Route | Current source surfaces |
 |---|---|---|
-| Sync wrapper | `parts/sync-wrapper/` | `scripts/aoa-sync-federation-surfaces`, `parts/sync-wrapper/aoa_sync_federation_surfaces.sh`, and the exact-trust `scripts/aoa-routing-canary` / `aoa_routing_canary.py` adapter; validates source freshness, subject-store bytes, reversible activation, and non-canonical canary posture |
+| Sync wrapper | `parts/sync-wrapper/` | `scripts/aoa-sync-federation-surfaces`, the exact-trust non-canonical `aoa-routing-canary`, and the receipt-bound canonical `aoa-routing-cutover`; validates source freshness, subject-store bytes, public-release/runtime admission, reversible activation, and explicit producer posture |
 | Federation checks | `parts/federation-checks/` | `scripts/aoa-federated-check`, `parts/federation-checks/aoa_federated_check.py`, route-api routing ABI/provenance/trust closure, active compatibility bridge at `parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md`, active detailed inventory at `parts/federation-checks/docs/UPSTREAM_COMPATIBILITY_DETAIL.md`; archived harvest worker docs now route through `mechanics/experience-runtime/PROVENANCE.md` |
 | Memo seam | `parts/memo-seam/` | `mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md` |
 | Eval seam | `parts/eval-seam/` | `mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md` |

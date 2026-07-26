@@ -268,7 +268,7 @@ scripts/aoa-routing-canary materialize \
   --isolated \
   --subject-store /absolute/subject-store/root \
   --trust-verdict /absolute/durable/trust-gate.json \
-  --target-root /absolute/isolated/Knowledge/federation/aoa-routing \
+  --target-root /absolute/isolated/aoa-routing-canary \
   --sdk-source-ref SDK_GIT_OBJECT_ID \
   --predecessor-source-ref AOA_ROUTING_GIT_OBJECT_ID \
   --subject-digest sha256:SUBJECT_DIGEST
@@ -300,6 +300,55 @@ It records whether the displaced candidate identity was still inspectable.
 The command never starts route-api, never declares G5, and never turns
 `canary_ready` into ordinary `closure_ready`. Live activation and service
 restart remain separate operator-reviewed actions.
+
+### `scripts/aoa-routing-cutover`
+
+This is the distinct, receipt-bound G5 route. Merging or deploying the script
+does not change producer authority. Use it only after the SDK has published an
+exact canonical artifact whose materialized subject store contains
+`succession/routing-g5-owner-switch.json`, and `abyss-machine` has admitted
+that exact receipt and artifact for `runtime`.
+
+Rehearse the exact cutover inputs into an isolated target:
+
+```bash
+scripts/aoa-routing-cutover materialize \
+  --isolated \
+  --subject-store /absolute/canonical-subject-store/root \
+  --trust-verdict /absolute/durable/runtime-trust-gate.json \
+  --owner-switch-receipt /absolute/canonical-subject-store/root/succession/routing-g5-owner-switch.json \
+  --target-root /absolute/isolated/aoa-routing-g5 \
+  --sdk-source-ref SDK_GIT_OBJECT_ID \
+  --predecessor-source-ref AOA_ROUTING_GIT_OBJECT_ID \
+  --subject-digest sha256:CANONICAL_SUBJECT_DIGEST
+```
+
+Run `check` with the same exact-input flags. The separately reviewed live
+mutation replaces `--isolated` with `--authorized-live-cutover` and requires
+both a disjoint sibling `--rollback-root` and a named
+`--operator-change-ref`. It is valid only for the deployed target ending in
+`Knowledge/federation/aoa-routing`.
+
+Rollback is explicit:
+
+```bash
+scripts/aoa-routing-cutover rollback \
+  --authorized-live-cutover \
+  --target-root /srv/AbyssOS/abyss-stack/Knowledge/federation/aoa-routing \
+  --rollback-root /srv/AbyssOS/abyss-stack/Knowledge/federation/aoa-routing.pre-sdk-g5 \
+  --canonical-retain-root /srv/AbyssOS/abyss-stack/Knowledge/federation/aoa-routing.sdk-canonical-retained \
+  --sdk-source-ref SDK_GIT_OBJECT_ID \
+  --predecessor-source-ref AOA_ROUTING_GIT_OBJECT_ID \
+  --subject-digest sha256:CANONICAL_SUBJECT_DIGEST \
+  --operator-change-ref OWNER_CHANGE_RECORD_ID
+```
+
+Runtime rollback restores predecessor bytes as a compatibility posture; it
+does not reverse SDK source ownership and does not authorize repository
+archival. Route-api may report normal closure only for an
+`authorized_live_cutover` while the exact `sdk_canonical` receipt,
+public-release record, subject bytes, and mirror hashes agree. An isolated
+rehearsal remains non-closing.
 
 ### `scripts/aoa-install-systemd`
 

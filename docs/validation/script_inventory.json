@@ -91,6 +91,7 @@
         "scripts/aoa-sync-configs",
         "scripts/aoa-sync-federation-surfaces",
         "scripts/aoa-routing-canary",
+        "scripts/aoa-routing-cutover",
         "scripts/aoa-tos-graph",
         "scripts/aoa-up",
         "scripts/aoa-wait",
@@ -144,6 +145,33 @@
       "validation_lane": "mechanics-part-local/tests/release",
       "ci_inclusion": "default mechanics and release pytest lanes exercise isolated activation, live guard, and rollback",
       "test_target": "mechanics/federation-seams/parts/sync-wrapper/tests/test_routing_canary.py",
+      "disposition": "keep"
+    },
+    {
+      "family": "routing-g5-canonical-cutover-adapter",
+      "paths": [
+        "mechanics/federation-seams/parts/sync-wrapper/aoa_routing_cutover.py"
+      ],
+      "organ_lane": "runtime federation canonical consumer admission",
+      "owner_surface": "mechanics/federation-seams/parts/sync-wrapper/README.md",
+      "source_truth": [
+        "config-templates/Configs/federation/aoa-routing.yaml",
+        "aoa-sdk routing G5 owner-switch receipt and canonical subject store",
+        "abyss-machine exact public-release runtime trust verdict"
+      ],
+      "reads": [
+        "exact canonical artifact subject store",
+        "exact abyss-machine runtime trust verdict",
+        "receipt subject and routing required-file config"
+      ],
+      "writes": [
+        "explicit isolated target",
+        "operator-authorized live routing mirror with sibling rollback root"
+      ],
+      "side_effects": "checks are read-only; materialize and rollback require explicit authority modes, reject isolated use of the live target shape, and preserve displaced trees",
+      "validation_lane": "mechanics-part-local/tests/release",
+      "ci_inclusion": "default mechanics and release pytest lanes exercise receipt binding, isolated/live separation, exact activation, and compatibility rollback",
+      "test_target": "mechanics/federation-seams/parts/sync-wrapper/tests/test_routing_cutover.py",
       "disposition": "keep"
     },
     {

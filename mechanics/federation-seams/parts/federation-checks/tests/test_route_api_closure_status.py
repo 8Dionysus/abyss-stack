@@ -585,6 +585,128 @@ datasources:
         }
         return store
 
+    def make_sdk_canonical_store(self):
+        store = self.make_sdk_canary_store()
+        manifest = store.routing.payloads["mirror_manifest"]
+        sdk_source_ref = manifest["source_git_commit"]
+        predecessor_ref = manifest["canonical_producer"]["source_ref"]
+        subject_digest = manifest["artifact_subject_digest"]
+        authority = {
+            "archive_authorized": False,
+            "canonical_producer_switch_authorized": True,
+            "compatibility_window_started": True,
+            "live_runtime_mutation_authorized": True,
+            "predecessor_maintenance_only": True,
+            "sdk_canonical": True,
+        }
+        receipt = {
+            "schema": "aoa_sdk_routing_g5_owner_switch_receipt_v1",
+            "status": "g5_switch_authorized",
+            "transition": {
+                "from_state": "predecessor_canonical",
+                "to_state": "sdk_canonical",
+                "canonical_owner_before": "aoa-routing",
+                "canonical_owner_after": "aoa-sdk",
+            },
+            "sdk": {
+                "owner_repo": "aoa-sdk",
+                "source_ref": sdk_source_ref,
+                "version": "0.8.0",
+                "abi_epoch": "aoa_routing_thin_router_v1",
+            },
+            "predecessor": {
+                "owner_repo": "aoa-routing",
+                "source_ref": predecessor_ref,
+                "rollback_posture": "retained",
+            },
+            "public_release": {
+                "release_ref": "https://example.invalid/aoa-sdk/v0.8.0",
+                "asset_digest": "sha256:" + ("e" * 64),
+            },
+            "compatibility_window": {
+                "state": "started",
+                "started_on": "2026-07-25",
+                "started_by_sdk_version": "0.8.0",
+            },
+            "g5_authority": authority,
+            "archive_stop_line": (
+                "Repository archival remains forbidden without consumer-zero, "
+                "compatibility exit, and separate exact operator approval."
+            ),
+        }
+        receipt_digest = self.module.routing_receipt_digest(receipt)
+        admission = {
+            "schema": "abyss_machine_artifact_producer_admission_v1",
+            "status": "canonical_producer",
+            "profile_id": "aoa-sdk-g5-canonical",
+            "owner_repo": "aoa-sdk",
+            "source_ref": sdk_source_ref,
+            "canonical_owner_repo": "aoa-sdk",
+            "canonical_predecessor_source_ref": predecessor_ref,
+            "runtime_consumer": "abyss-stack",
+            "stronger_owner": "abyss-machine",
+            "provenance_state": "sdk_canonical",
+            "publication_posture": "public_release_canonical",
+            "single_canonical_owner": True,
+            "canonical_switch_authorized": True,
+            "allowed_consumer_intents": ["release_consumer", "runtime"],
+            "required_controls": ["abi_signature", "sbom", "slsa_in_toto"],
+            "g5_authority": authority,
+            "owner_switch_receipt": {
+                "schema": receipt["schema"],
+                "status": receipt["status"],
+                "digest": receipt_digest,
+            },
+        }
+        trust = manifest["trust_verdict"]
+        trust.update(
+            {
+                "consumer_intent": "runtime",
+                "decision": {
+                    "model": "fail_closed_consumer_admission",
+                    "allow": True,
+                    "consumer_intent": "runtime",
+                },
+            }
+        )
+        trust["inspected_claims"]["trust_root"] = {
+            "trust_root_mode_actual": "public_release",
+            "trust_root_mode_matched": True,
+        }
+        trust["inspected_claims"]["producer_admission"] = admission
+        trust["record"].update(
+            {
+                "lifecycle_state": "release-ready",
+                "trust_root_mode": "public_release",
+                "consumer_refs": ["abyss-stack:routing-canonical"],
+                "producer_admission": admission,
+            }
+        )
+        manifest.update(
+            {
+                "routing_producer_posture": "sdk_canonical",
+                "cutover_activation_mode": "authorized_live_cutover",
+                "canary_activation_mode": None,
+                "operator_change_ref": "test-g5-live-cutover",
+                "canonical_producer": {
+                    "owner_repo": "aoa-sdk",
+                    "source_ref": sdk_source_ref,
+                },
+                "candidate_producer": None,
+                "predecessor_rollback": {
+                    "owner_repo": "aoa-routing",
+                    "source_ref": predecessor_ref,
+                    "posture": (
+                        "compatibility_security_rollback_deprecation_only"
+                    ),
+                },
+                "g5_authority": authority,
+                "owner_switch_receipt": receipt,
+                "owner_switch_receipt_digest": receipt_digest,
+            }
+        )
+        return store
+
     def test_health_reports_closure_summary_when_all_layers_are_ready(self) -> None:
         self.module.STORE = self.make_store()
 
@@ -649,6 +771,73 @@ datasources:
         self.assertIn(
             "routing SDK canary asserts forbidden G5 authority: sdk_canonical",
             closure["canary_reasons"],
+        )
+
+    def test_sdk_canonical_receipt_can_satisfy_runtime_closure(self) -> None:
+        store = self.make_sdk_canonical_store()
+        self.module.STORE = store
+
+        health = self.module.health()
+        surface = self.module.surface_status()
+        closure = surface["layers_status"]["aoa-routing"]["closure_status"]
+
+        self.assertTrue(health["ok"])
+        self.assertTrue(health["routing_switch"]["canonical_posture"])
+        self.assertTrue(health["routing_switch"]["canonical_ready"])
+        self.assertTrue(health["routing_switch"]["live_cutover_active"])
+        self.assertTrue(
+            health["routing_switch"]["canonical_switch_authorized"]
+        )
+        self.assertFalse(
+            health["routing_switch"]["owner_switch_receipt"][
+                "compatibility_window"
+            ]
+            is None
+        )
+        self.assertTrue(closure["closure_ready"])
+        self.assertTrue(closure["canonical_ready"])
+        self.assertEqual(closure["canonical_reasons"], [])
+
+    def test_sdk_isolated_canonical_rehearsal_cannot_close_live_runtime(
+        self,
+    ) -> None:
+        store = self.make_sdk_canonical_store()
+        manifest = store.routing.payloads["mirror_manifest"]
+        manifest["cutover_activation_mode"] = "isolated"
+        manifest["operator_change_ref"] = None
+        self.module.STORE = store
+
+        health = self.module.health()
+        closure = self.module.layer_status(store.routing)["closure_status"]
+
+        self.assertTrue(closure["canonical_ready"])
+        self.assertFalse(closure["closure_ready"])
+        self.assertFalse(health["routing_switch"]["live_cutover_active"])
+        self.assertIn(
+            "routing SDK isolated canonical rehearsal cannot satisfy "
+            "live runtime closure",
+            closure["provenance_reasons"],
+        )
+
+    def test_sdk_canonical_receipt_fails_closed_on_archive_authority(
+        self,
+    ) -> None:
+        store = self.make_sdk_canonical_store()
+        store.routing.payloads["mirror_manifest"]["g5_authority"][
+            "archive_authorized"
+        ] = True
+        self.module.STORE = store
+
+        health = self.module.health()
+        closure = self.module.layer_status(store.routing)["closure_status"]
+
+        self.assertFalse(closure["canonical_ready"])
+        self.assertFalse(
+            health["routing_switch"]["canonical_switch_authorized"]
+        )
+        self.assertIn(
+            "routing SDK canonical G5 authority posture is invalid",
+            closure["canonical_reasons"],
         )
 
     def test_sdk_live_canary_requires_named_operator_change(self) -> None:
