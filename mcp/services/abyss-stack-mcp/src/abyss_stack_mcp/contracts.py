@@ -226,6 +226,12 @@ class EndpointObservation(StrictModel):
                 raise ValueError("HTTP endpoint_ref must be an absolute URL")
             if parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
                 raise ValueError("stack MCP observations are loopback-only")
+            try:
+                port = parsed.port
+            except ValueError as exc:
+                raise ValueError("HTTP endpoint_ref has an invalid port") from exc
+            if port is not None and not 1 <= port <= 65_535:
+                raise ValueError("HTTP endpoint_ref has an invalid port")
             if parsed.username is not None or parsed.password is not None:
                 raise ValueError("HTTP endpoint_ref cannot contain user information")
             if parsed.query or parsed.fragment:

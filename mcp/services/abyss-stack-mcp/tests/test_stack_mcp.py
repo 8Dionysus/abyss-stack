@@ -236,6 +236,22 @@ def test_observation_store_rejects_fifo_without_blocking(tmp_path: Path) -> None
         ObservationStore(fifo).load()
 
 
+@pytest.mark.parametrize(
+    "endpoint_ref",
+    (
+        "http://localhost:abc/mcp",
+        "http://localhost:0/mcp",
+        "http://localhost:65536/mcp",
+    ),
+)
+def test_contract_rejects_invalid_http_endpoint_ports(endpoint_ref: str) -> None:
+    payload = observation(subject())
+    payload["subjects"][0]["endpoint"]["endpoint_ref"] = endpoint_ref
+
+    with pytest.raises(ValidationError, match="invalid port"):
+        RuntimeObservation.model_validate(payload)
+
+
 def test_catalog_is_compact_and_does_not_flatten_health(tmp_path: Path) -> None:
     app = application(tmp_path)
     result = app.catalog()
@@ -401,9 +417,18 @@ def test_rollback_plan_accepts_fresh_rollback_required_deploy_links(
     )
     plan = result["owner_payload"]["plan"]
     assert plan["plan_kind"] == "rollback"
-    assert "receipt://runtime/source" in {
+    assert plan["steps"][0]["exact_target"] == "abyss-private"
+    assert plan["steps"][2]["exact_target"] == "config://codex/aoa-kag"
+    evidence_refs = {
         item["evidence_ref"] for item in plan["precondition_evidence"]
     }
+    assert {
+        "receipt://runtime/source",
+        "receipt://runtime/registry",
+        "receipt://runtime/consumer",
+        "receipt://runtime/canary",
+        "receipt://runtime/rollback",
+    } <= evidence_refs
 
     payload = observation(subject())
     payload["subjects"][0]["source"]["evidence"] = evidence(
@@ -413,6 +438,42 @@ def test_rollback_plan_accepts_fresh_rollback_required_deploy_links(
     app = application(tmp_path, policy_family="candidate", payload=payload)
     _, digest = app.store.load()
     with pytest.raises(StackMCPError, match="source_identity_not_usable"):
+        app.prepare_plan(
+            "aoa-kag",
+            "read",
+            "rollback",
+            expected_observation_digest=digest,
+        )
+
+
+@pytest.mark.parametrize(
+    ("evidence_path", "expected_blocker"),
+    (
+        (("registry", "evidence"), "registry_evidence_not_usable"),
+        (
+            ("consumers", 0, "evidence"),
+            "rollback_consumer_evidence_not_usable",
+        ),
+        (("canary", "evidence"), "canary_evidence_not_usable"),
+    ),
+)
+def test_rollback_plan_requires_fresh_evidence_for_every_step(
+    tmp_path: Path,
+    evidence_path: tuple[str | int, ...],
+    expected_blocker: str,
+) -> None:
+    payload = observation(subject())
+    target = payload["subjects"][0]
+    for part in evidence_path:
+        target = target[part]
+    target["expires_at"] = (NOW + timedelta(minutes=1)).isoformat()
+    target["evidence_refs"][0]["expires_at"] = (
+        NOW + timedelta(minutes=1)
+    ).isoformat()
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+
+    with pytest.raises(StackMCPError, match=expected_blocker):
         app.prepare_plan(
             "aoa-kag",
             "read",
@@ -606,6 +667,60 @@ def test_plan_expires_with_its_earliest_precondition(
         result["owner_payload"]["plan"]["expires_at"].replace("Z", "+00:00")
     )
     assert plan_expiry == expected_expiry
+
+
+@pytest.mark.parametrize(
+    "future_surface",
+    ("observation", "deploy", "freshness", "link", "evidence"),
+)
+def test_plan_rejects_timestamps_beyond_bounded_future_skew(
+    tmp_path: Path,
+    future_surface: str,
+) -> None:
+    payload = observation(subject())
+    future = (NOW + timedelta(minutes=5, seconds=31)).isoformat()
+    if future_surface == "observation":
+        payload["generated_at"] = future
+    elif future_surface == "deploy":
+        payload["subjects"][0]["deploy"]["deployed_at"] = future
+    elif future_surface == "freshness":
+        payload["subjects"][0]["freshness"]["observed_at"] = future
+    elif future_surface == "link":
+        payload["subjects"][0]["source"]["evidence"]["observed_at"] = future
+    else:
+        payload["subjects"][0]["source"]["evidence"]["evidence_refs"][0][
+            "observed_at"
+        ] = future
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+
+    with pytest.raises(StackMCPError, match="future-dated"):
+        app.prepare_plan(
+            "aoa-kag",
+            "read",
+            "activate",
+            expected_observation_digest=digest,
+        )
+
+
+def test_plan_allows_observation_within_bounded_future_skew(
+    tmp_path: Path,
+) -> None:
+    payload = observation(subject())
+    payload["generated_at"] = (
+        NOW + timedelta(minutes=5, seconds=30)
+    ).isoformat()
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+
+    result = app.prepare_plan(
+        "aoa-kag",
+        "read",
+        "activate",
+        expected_observation_digest=digest,
+    )
+
+    assert result["owner_payload"]["plan"]["plan_kind"] == "activate"
 
 
 def test_plan_deduplication_retains_earliest_evidence_expiry(

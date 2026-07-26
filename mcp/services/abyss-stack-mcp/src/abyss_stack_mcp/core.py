@@ -32,6 +32,7 @@ DEFAULT_OBSERVATION_PATH = Path(
     "/srv/AbyssOS/abyss-stack/Logs/mcp/organ-runtime-observation.json"
 )
 MAX_OBSERVATION_BYTES = 2 * 1024 * 1024
+MAX_PLAN_FUTURE_SKEW = timedelta(seconds=30)
 _FORBIDDEN_KEYS = frozenset(
     {
         "access_token",
@@ -261,6 +262,10 @@ class StackMCPApplication:
             raise StackMCPError("observation digest drift blocks plan preparation")
         if observation.expires_at <= now:
             raise StackMCPError("expired runtime observation blocks plan preparation")
+        if observation.generated_at > now + MAX_PLAN_FUTURE_SKEW:
+            raise StackMCPError(
+                "future-dated runtime observation blocks plan preparation"
+            )
         subject = self._find_subject(
             observation,
             organ_id,
@@ -271,17 +276,28 @@ class StackMCPApplication:
             raise StackMCPError(
                 "plan preconditions are not satisfied: " + ", ".join(blockers)
             )
-        activation_consumer = (
-            self._compatible_consumers(subject, now)[0]
-            if plan_kind == "activate"
-            else None
-        )
+        plan_consumer: ConsumerObservation | None = None
+        if plan_kind == "activate":
+            plan_consumer = self._compatible_consumers(subject, now)[0]
+        elif plan_kind == "rollback":
+            plan_consumer = self._rollback_consumers(subject, now)[0]
         plan_links = self._plan_links(
             subject,
             plan_kind,
-            activation_consumer=activation_consumer,
+            plan_consumer=plan_consumer,
         )
         precondition_evidence = self._plan_evidence(subject, plan_links)
+        future_evidence = self._future_plan_evidence(
+            subject,
+            plan_links,
+            precondition_evidence,
+            now,
+        )
+        if future_evidence:
+            raise StackMCPError(
+                "future-dated plan evidence blocks plan preparation: "
+                + ", ".join(future_evidence)
+            )
         unsigned = {
             "schema_version": "abyss_stack_runtime_plan_candidate_v1",
             "plan_kind": plan_kind,
@@ -305,7 +321,7 @@ class StackMCPApplication:
                 for step in self._steps(
                     subject,
                     plan_kind,
-                    activation_consumer=activation_consumer,
+                    plan_consumer=plan_consumer,
                 )
             ],
             "rollback_route": subject.rollback.rollback_route,
@@ -569,6 +585,18 @@ class StackMCPApplication:
                 subject.rollback.evidence, now
             ) not in usable_states:
                 blockers.append("rollback_not_proven")
+            if (
+                self._effective_link_state(subject.registry.evidence, now)
+                not in usable_states
+            ):
+                blockers.append("registry_evidence_not_usable")
+            if not self._rollback_consumers(subject, now):
+                blockers.append("rollback_consumer_evidence_not_usable")
+            if (
+                self._effective_link_state(subject.canary.evidence, now)
+                not in usable_states
+            ):
+                blockers.append("canary_evidence_not_usable")
         return blockers
 
     @classmethod
@@ -600,12 +628,34 @@ class StackMCPApplication:
             )
         )
 
+    @classmethod
+    def _rollback_consumers(
+        cls,
+        subject: RuntimeSubject,
+        now: datetime,
+    ) -> tuple[ConsumerObservation, ...]:
+        usable = [
+            consumer
+            for consumer in subject.consumers
+            if cls._effective_link_state(consumer.evidence, now)
+            in {"exact", "compatible_drift"}
+        ]
+        return tuple(
+            sorted(
+                usable,
+                key=lambda consumer: (
+                    consumer.consumer_id,
+                    consumer.registration_ref,
+                ),
+            )
+        )
+
     @staticmethod
     def _plan_links(
         subject: RuntimeSubject,
         plan_kind: PlanKind,
         *,
-        activation_consumer: ConsumerObservation | None,
+        plan_consumer: ConsumerObservation | None,
     ) -> tuple[LinkEvidence, ...]:
         links = [
             subject.source.evidence,
@@ -621,19 +671,30 @@ class StackMCPApplication:
                 )
             )
         if plan_kind == "activate":
-            if activation_consumer is None:
+            if plan_consumer is None:
                 raise StackMCPError(
                     "activation plan requires one exact compatible consumer"
                 )
             links.extend(
                 (
-                    activation_consumer.evidence,
+                    plan_consumer.evidence,
                     subject.canary.evidence,
                     subject.rollback.evidence,
                 )
             )
         elif plan_kind == "rollback":
-            links.append(subject.rollback.evidence)
+            if plan_consumer is None:
+                raise StackMCPError(
+                    "rollback plan requires one usable consumer observation"
+                )
+            links.extend(
+                (
+                    subject.registry.evidence,
+                    plan_consumer.evidence,
+                    subject.canary.evidence,
+                    subject.rollback.evidence,
+                )
+            )
         return tuple(links)
 
     @staticmethod
@@ -690,14 +751,38 @@ class StackMCPApplication:
         return min(expiries)
 
     @staticmethod
+    def _future_plan_evidence(
+        subject: RuntimeSubject,
+        links: tuple[LinkEvidence, ...],
+        precondition_evidence: tuple[EvidenceRef, ...],
+        now: datetime,
+    ) -> tuple[str, ...]:
+        latest_allowed = now + MAX_PLAN_FUTURE_SKEW
+        future: set[str] = set()
+        if subject.deploy.deployed_at > latest_allowed:
+            future.add("deploy.deployed_at")
+        if subject.freshness.observed_at > latest_allowed:
+            future.add("freshness.observed_at")
+        if any(link.observed_at > latest_allowed for link in links):
+            future.add("required_link.observed_at")
+        if any(
+            evidence.observed_at > latest_allowed
+            for evidence in precondition_evidence
+        ):
+            future.add("evidence_ref.observed_at")
+        return tuple(sorted(future))
+
+    @staticmethod
     def _steps(
         subject: RuntimeSubject,
         plan_kind: PlanKind,
         *,
-        activation_consumer: ConsumerObservation | None,
+        plan_consumer: ConsumerObservation | None,
     ) -> tuple[PlanStep, ...]:
-        if plan_kind == "activate" and activation_consumer is None:
+        if plan_kind == "activate" and plan_consumer is None:
             raise StackMCPError("activation plan requires a compatible consumer")
+        if plan_kind == "rollback" and plan_consumer is None:
+            raise StackMCPError("rollback plan requires a usable consumer")
         actions = {
             "sync": (
                 ("verify-source-revision", subject.source.revision),
@@ -714,8 +799,8 @@ class StackMCPApplication:
                 (
                     "verify-consumer-registration",
                     (
-                        activation_consumer.registration_ref
-                        if activation_consumer is not None
+                        plan_consumer.registration_ref
+                        if plan_consumer is not None
                         else "missing-compatible-consumer"
                     ),
                 ),
@@ -727,12 +812,19 @@ class StackMCPApplication:
                 ("run-grounded-canary", subject.canary.canary_route),
             ),
             "rollback": (
-                ("deny-discovery", subject.organ_id),
+                ("deny-discovery", subject.registry.registry_id),
                 (
                     "restore-last-known-good",
                     subject.rollback.last_known_good_package_digest or "missing",
                 ),
-                ("restore-consumer-registration", subject.organ_id),
+                (
+                    "restore-consumer-registration",
+                    (
+                        plan_consumer.registration_ref
+                        if plan_consumer is not None
+                        else "missing-rollback-consumer"
+                    ),
+                ),
                 ("run-grounded-canary", subject.canary.canary_route),
             ),
         }[plan_kind]
