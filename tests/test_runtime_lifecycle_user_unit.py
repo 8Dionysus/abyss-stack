@@ -1366,7 +1366,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             "/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/"
             ".runtime-provision.lock /usr/bin/env "
             "/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python "
-            "-m abyss_stack_mcp.server"
+            "-I -m abyss_stack_mcp.server"
         )
         runtime_condition = (
             "ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/"
@@ -1409,6 +1409,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertNotIn("read-bearer-token", candidate_unit)
         for unit in (read_unit, candidate_unit):
             self.assertIn("Environment=AOA_MCP_HOST=127.0.0.1", unit)
+            self.assertIn("Environment=PYTHONHOME=", unit)
+            self.assertIn("Environment=PYTHONPATH=", unit)
+            self.assertIn("/venv/bin/python -I -m abyss_stack_mcp.server", unit)
             self.assertIn(runtime_condition, unit)
             self.assertIn(runtime_exec_condition, unit)
             self.assertIn(deployed_entrypoint, unit)

@@ -507,6 +507,27 @@ class StackMCPApplication:
             organ_id,
             target_policy_family,
         )
+        causal_links = self._subject_links(subject)
+        causal_evidence = (
+            *subject.freshness.evidence_refs,
+            *(
+                evidence
+                for link in causal_links
+                for evidence in link.evidence_refs
+            ),
+        )
+        future_evidence = self._future_plan_evidence(
+            observation,
+            subject,
+            causal_links,
+            causal_evidence,
+            now,
+        )
+        if future_evidence:
+            raise StackMCPError(
+                "future-dated subject evidence blocks plan preparation: "
+                + ", ".join(future_evidence)
+            )
         blockers = self._plan_blockers(subject, plan_kind, now)
         if blockers:
             raise StackMCPError(
@@ -618,6 +639,12 @@ class StackMCPApplication:
             "rollback_required",
         }:
             return link.state
+        latest_allowed = now + MAX_PLAN_FUTURE_SKEW
+        if link.observed_at > latest_allowed or any(
+            evidence.observed_at > latest_allowed
+            for evidence in link.evidence_refs
+        ):
+            return "blocked"
         link_expired = link.expires_at is not None and link.expires_at <= now
         evidence_expired = any(
             evidence.expires_at is not None and evidence.expires_at <= now
@@ -678,6 +705,12 @@ class StackMCPApplication:
     ) -> str:
         if subject.freshness.state not in {"exact", "compatible_drift"}:
             return subject.freshness.state
+        latest_allowed = now + MAX_PLAN_FUTURE_SKEW
+        if subject.freshness.observed_at > latest_allowed or any(
+            evidence.observed_at > latest_allowed
+            for evidence in subject.freshness.evidence_refs
+        ):
+            return "blocked"
         evidence_expired = any(
             evidence.expires_at is not None and evidence.expires_at <= now
             for evidence in subject.freshness.evidence_refs
@@ -963,6 +996,22 @@ class StackMCPApplication:
                     consumer.registration_ref,
                 ),
             )
+        )
+
+    @staticmethod
+    def _subject_links(subject: RuntimeSubject) -> tuple[LinkEvidence, ...]:
+        return (
+            subject.source.evidence,
+            subject.package.evidence,
+            subject.deploy.evidence,
+            subject.process.evidence,
+            subject.endpoint.evidence,
+            subject.registry.evidence,
+            *(consumer.evidence for consumer in subject.consumers),
+            subject.proof.evidence,
+            subject.acceptance.evidence,
+            subject.canary.evidence,
+            subject.rollback.evidence,
         )
 
     @staticmethod

@@ -1401,6 +1401,50 @@ def test_freshness_reference_expiry_is_stale_and_blocks_plans(
 
 
 @pytest.mark.parametrize(
+    ("future_surface", "state_surface"),
+    (
+        ("link", "link_states"),
+        ("evidence", "link_states"),
+        ("freshness", "freshness_state"),
+        ("freshness_evidence", "freshness_state"),
+    ),
+)
+def test_read_paths_block_causally_future_evidence(
+    tmp_path: Path,
+    future_surface: str,
+    state_surface: str,
+) -> None:
+    payload = observation(subject())
+    future = (NOW + timedelta(minutes=5, seconds=31)).isoformat()
+    subject_payload = payload["subjects"][0]
+    if future_surface == "link":
+        subject_payload["source"]["evidence"]["observed_at"] = future
+    elif future_surface == "evidence":
+        subject_payload["source"]["evidence"]["evidence_refs"][0][
+            "observed_at"
+        ] = future
+    elif future_surface == "freshness":
+        subject_payload["freshness"]["observed_at"] = future
+    else:
+        subject_payload["freshness"]["evidence_refs"][0]["observed_at"] = future
+
+    app = application(tmp_path, payload=payload)
+    entry = app.catalog()["owner_payload"]["entries"][0]
+    if state_surface == "link_states":
+        assert entry[state_surface]["source"] == "blocked"
+        drift = app.inspect("aoa-kag", "read", view="drift")
+        assert drift["owner_payload"]["observation"]["states"]["source"] == (
+            "blocked"
+        )
+    else:
+        assert entry[state_surface] == "blocked"
+        freshness = app.inspect("aoa-kag", "read", view="freshness")
+        assert freshness["owner_payload"]["observation"]["effective_state"] == (
+            "blocked"
+        )
+
+
+@pytest.mark.parametrize(
     ("expiry_surface", "expected_expiry"),
     [
         ("link", NOW + timedelta(minutes=7)),

@@ -72,6 +72,9 @@ seconds after their enclosing observation snapshot, so an older snapshot
 cannot carry causally newer proof. Central proof cannot predate the canary link
 or evidence refs it names. Duplicate evidence identities with conflicting
 `observed_at` values are rejected before expiry deduplication.
+Catalog and inspection apply the same 30-second future-skew bound to link,
+freshness, and nested evidence timestamps; causally future usable evidence is
+reported as `blocked`, never as current, before candidate planning is involved.
 `rollback_required` is accepted only while its own link and evidence refs are
 unexpired; a bare or expired rollback signal is a controlled precondition
 failure.
@@ -171,6 +174,9 @@ rsync transaction. A sync and provision transaction therefore cannot cross
 each other's publication boundary or publish mixed or mislabelled runtime
 bytes.
 They execute the package installed inside that venv, not `Configs/src`.
+Both units clear ambient `PYTHONHOME`/`PYTHONPATH` and invoke the venv with
+Python isolated mode, so a user-manager import override cannot precede the
+measured site-packages.
 Consequently, a later Configs sync cannot mix new code with an older dependency
 closure; the synced package becomes eligible for a later start only after this
 explicit reprovision step succeeds.

@@ -463,9 +463,10 @@ and environment replacement.
 The user units point only at this environment and use
 `ConditionPathExists` plus an executable `ExecCondition`, so a missing or
 unusable runtime leaves them inactive instead of entering a restart loop.
-They execute the package installed in that venv rather than importing
-`Configs/src`; after a later Configs sync, rerun this provision action before
-starting or restarting either plane.
+They clear ambient `PYTHONHOME`/`PYTHONPATH`, invoke that venv in isolated
+Python mode, and execute its installed package rather than importing
+`Configs/src` or an inherited user-manager module. After a later Configs sync,
+rerun this provision action before starting or restarting either plane.
 
 Use `--system-units` only through a privileged route after the Configs mirror is
 synced:
