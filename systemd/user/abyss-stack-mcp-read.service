@@ -18,7 +18,7 @@ Environment=PYTHONHOME=
 Environment=PYTHONPATH=
 LoadCredential=abyss-stack-mcp-read-bearer-token:/srv/AbyssOS/abyss-stack/Secrets/Configs/abyss-stack-mcp-read-bearer-token
 ExecCondition=/usr/bin/test -x /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
-ExecStart=/usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock /usr/bin/env /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -I -m abyss_stack_mcp.server
+ExecStart=/usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock /usr/bin/env /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -I -B -m abyss_stack_mcp.server
 Restart=on-failure
 RestartSec=2
 TimeoutStopSec=20

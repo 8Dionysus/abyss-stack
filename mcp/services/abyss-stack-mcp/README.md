@@ -78,10 +78,12 @@ only the exact proof-selected or last-known-good consumer; unrelated consumer
 observations cannot veto a candidate and are not copied into it. Candidate
 result freshness is the worst effective state across subject freshness and
 every exact link the plan copies, so a drift-backed plan cannot claim `exact`.
-Every usable deploy manifest, passed central proof, accepted owner decision,
-successful canary, and ready rollback proof also binds its named receipt to one
-contained `EvidenceRef`; the candidate copies and expiry-bounds that exact
-identity before any step can name it.
+Every usable deploy manifest, registered consumer, passed central proof,
+accepted owner decision, successful canary, and ready rollback proof also binds
+its named receipt or registration target to one contained `EvidenceRef`; for
+proof and acceptance, that same ref must be issued by the declared owner. The
+candidate copies and expiry-bounds that exact identity before any step can name
+it.
 Central proof cannot predate the canary link or evidence refs it names.
 Duplicate evidence identities with conflicting `observed_at` values are
 rejected before expiry deduplication.
@@ -207,9 +209,11 @@ Every provisioner Python call clears inherited `PYTHONHOME`/`PYTHONPATH` and
 uses isolated interpreter mode, including venv creation, pip installation,
 dependency checks, and import verification.
 They execute the package installed inside that venv, not `Configs/src`.
-Both units clear ambient `PYTHONHOME`/`PYTHONPATH` and invoke the venv with
-Python isolated mode, so a user-manager import override cannot precede the
-measured site-packages.
+Both units clear ambient `PYTHONHOME`/`PYTHONPATH`, invoke the venv with Python
+isolated mode, and pass `-B` explicitly so service imports cannot add bytecode
+to the measured environment. A user-manager import override therefore cannot
+precede the measured site-packages, and a normal launch cannot invalidate the
+recorded runtime-content digest.
 Consequently, a later Configs sync cannot mix new code with an older dependency
 closure; the synced package becomes eligible for a later start only after this
 explicit reprovision step succeeds.

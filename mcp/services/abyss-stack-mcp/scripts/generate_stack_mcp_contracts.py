@@ -34,10 +34,15 @@ DIGESTS = {
 }
 
 
-def evidence(name: str, *, owner: str = "abyss-stack") -> dict[str, Any]:
+def evidence(
+    name: str,
+    *,
+    owner: str = "abyss-stack",
+    evidence_ref: str | None = None,
+) -> dict[str, Any]:
     ref = {
         "owner": owner,
-        "evidence_ref": f"example://runtime/{name}",
+        "evidence_ref": evidence_ref or f"example://runtime/{name}",
         "revision": "public-example-revision",
         "observed_at": NOW.isoformat(),
         "expires_at": (NOW + timedelta(hours=2)).isoformat(),
@@ -120,7 +125,10 @@ def observation_example() -> dict[str, Any]:
                         "registered": True,
                         "observed_schema_digest": DIGESTS["schema"],
                         "observed_protocol_versions": ["2025-11-25"],
-                        "evidence": evidence("consumer"),
+                        "evidence": evidence(
+                            "consumer",
+                            evidence_ref="example://consumer/aoa-kag",
+                        ),
                     }
                 ],
                 "freshness": {

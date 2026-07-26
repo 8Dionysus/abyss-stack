@@ -289,7 +289,7 @@ aoa_require_abyss_stack_mcp_units_stopped() {
   for unit in abyss-stack-mcp-read.service abyss-stack-mcp-candidate.service; do
     expected_unit_source="${AOA_CONFIGS_ROOT}/systemd/user/${unit}"
     expected_unit_target="${XDG_CONFIG_HOME:-${HOME}/.config}/systemd/user/${unit}"
-    expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} /usr/bin/env ${abyss_stack_mcp_venv}/bin/python -I -m abyss_stack_mcp.server"
+    expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} /usr/bin/env ${abyss_stack_mcp_venv}/bin/python -I -B -m abyss_stack_mcp.server"
     if [[ ! -f "$expected_unit_source" || -L "$expected_unit_source" ]]; then
       abyss_stack_mcp_units_error="lock-aware source unit is unavailable for ${unit}; link and reload managed user units before provisioning"
       return 1

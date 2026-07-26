@@ -121,10 +121,11 @@ Provisioning installs the exact artifact-hashed lock and refuses to replace a
 changed environment while either stack MCP unit is active or its state cannot
 be observed; it never stops a plane implicitly.
 The units execute the installed venv module, not the mutable `Configs/src`
-tree, clear inherited `PYTHONHOME` and `PYTHONPATH`, and invoke Python in
-isolated mode, so neither a Configs sync nor ambient user-manager imports can
-replace the measured module closure. Rerun runtime provisioning before a later
-restart.
+tree, clear inherited `PYTHONHOME` and `PYTHONPATH`, invoke Python in isolated
+mode, and pass `-B` explicitly. Neither a Configs sync nor ambient user-manager
+imports can replace the measured module closure, and service imports cannot
+write bytecode that invalidates its recorded digest. Rerun runtime provisioning
+before a later restart.
 
 The units intentionally consume host-owned commands such as `abyss-machine`
 instead of copying host-layer implementation into `abyss-stack`.

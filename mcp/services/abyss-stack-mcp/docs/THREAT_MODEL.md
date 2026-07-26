@@ -68,9 +68,11 @@
 - candidate causality and evidence expansion use only the exact
   proof-selected or last-known-good consumer, while candidate result freshness
   folds every copied plan link together with the subject freshness envelope;
-- every step-relevant named deploy, proof, acceptance, canary, or rollback
-  receipt must equal a contained evidence identity that the candidate copies
-  and expiry-bounds;
+- every step-relevant named deploy, consumer-registration, proof, acceptance,
+  canary, or rollback target must equal a contained evidence identity that the
+  candidate copies and expiry-bounds; the proof and acceptance identities must
+  also be issued by their respective declared owners rather than relying on a
+  separate decoy receipt from that owner;
 - read catalog and inspection use the earlier wall-clock/snapshot bound and
   downgrade a causally future observation envelope, link, freshness timestamp,
   or nested evidence ref to `blocked`;
@@ -93,7 +95,9 @@
 - server-side policy checks independent of MCP annotations or model behavior;
 - the provisioner and managed units clear ambient Python import roots and use
   isolated interpreter mode, preventing inherited shell or user-manager
-  `PYTHONPATH`/`PYTHONHOME` from shadowing the measured venv closure.
+  `PYTHONPATH`/`PYTHONHOME` from shadowing the measured venv closure; managed
+  launches also pass `-B` explicitly so isolated-mode environment filtering
+  cannot re-enable bytecode writes into that measured closure.
 
 ## Confused deputy
 

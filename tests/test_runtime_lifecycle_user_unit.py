@@ -703,7 +703,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/"
                 ".runtime-provision.lock /usr/bin/env "
                 "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv/bin/python "
-                "-I -m abyss_stack_mcp.server\"\n"
+                "-I -B -m abyss_stack_mcp.server\"\n"
                 "if [[ \"${ABYSS_STACK_MCP_TEST_UNLOADED_UNIT:-}\" == "
                 "\"$unit\" ]]; then\n"
                 "  load_state=not-found\n"
@@ -716,7 +716,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "  exec_path=/usr/bin/env\n"
                 "  exec_start=\"/usr/bin/env "
                 "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv/bin/python "
-                "-I -m abyss_stack_mcp.server\"\n"
+                "-I -B -m abyss_stack_mcp.server\"\n"
                 "fi\n"
                 "if [[ \"${ABYSS_STACK_MCP_TEST_ACTIVE_UNIT:-}\" == "
                 "\"$unit\" ]]; then\n"
@@ -1487,7 +1487,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             "/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/"
             ".runtime-provision.lock /usr/bin/env "
             "/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python "
-            "-I -m abyss_stack_mcp.server"
+            "-I -B -m abyss_stack_mcp.server"
         )
         runtime_condition = (
             "ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/"
@@ -1532,7 +1532,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             self.assertIn("Environment=AOA_MCP_HOST=127.0.0.1", unit)
             self.assertIn("Environment=PYTHONHOME=", unit)
             self.assertIn("Environment=PYTHONPATH=", unit)
-            self.assertIn("/venv/bin/python -I -m abyss_stack_mcp.server", unit)
+            self.assertIn("/venv/bin/python -I -B -m abyss_stack_mcp.server", unit)
             self.assertIn(runtime_condition, unit)
             self.assertIn(runtime_exec_condition, unit)
             self.assertIn(deployed_entrypoint, unit)

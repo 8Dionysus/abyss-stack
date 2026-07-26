@@ -56,7 +56,7 @@
           "evidence": {
             "evidence_refs": [
               {
-                "evidence_ref": "example://runtime/consumer",
+                "evidence_ref": "example://consumer/aoa-kag",
                 "expires_at": "2026-07-25T14:00:00Z",
                 "observed_at": "2026-07-25T12:00:00Z",
                 "owner": "abyss-stack",

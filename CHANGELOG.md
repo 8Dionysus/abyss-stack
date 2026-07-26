@@ -59,9 +59,12 @@ Tracking starts with the community-docs baseline for this repository.
 - Candidate result freshness now folds every copied plan link, and activation
   or rollback causality checks ignore unrelated consumers in favor of the
   exact proof-selected or last-known-good registration.
-- Step-relevant deploy, proof, acceptance, canary, and rollback receipt names
-  now have to match evidence identities copied into and expiry-bounded by the
-  candidate.
+- Step-relevant deploy, consumer-registration, proof, acceptance, canary, and
+  rollback targets now have to match evidence identities copied into and
+  expiry-bounded by the candidate; proof and acceptance bind the named ref and
+  declared owner in the same evidence item. Managed stack MCP launches also
+  disable bytecode writes explicitly so isolated mode cannot mutate the
+  measured runtime after provisioning.
 - Rollback candidate preparation now relies on the usable, typed
   last-known-good rollback proof and no longer blocks on or copies canary
   evidence from the current deployment.

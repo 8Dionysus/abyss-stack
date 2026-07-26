@@ -164,9 +164,12 @@ class LinkEvidence(StrictModel):
 def _contains_named_evidence(
     link: LinkEvidence,
     named_ref: str | None,
+    *,
+    owner: str | None = None,
 ) -> bool:
     return named_ref is not None and any(
         evidence.evidence_ref == named_ref
+        and (owner is None or evidence.owner == owner)
         for evidence in link.evidence_refs
     )
 
@@ -365,6 +368,13 @@ class ConsumerObservation(StrictModel):
         ):
             raise ValueError(
                 "a registered consumer requires schema and protocol observations"
+            )
+        if self.registered and not _contains_named_evidence(
+            self.evidence,
+            self.registration_ref,
+        ):
+            raise ValueError(
+                "registered consumer registration_ref must match contained evidence"
             )
         return self
 
@@ -981,17 +991,21 @@ class RuntimeSubject(StrictModel):
             raise ValueError(
                 "consumer registration refs must be unique within a runtime subject"
             )
-        if self.proof.verdict == "passed" and not any(
-            evidence.owner == self.owners.proof_owner
-            for evidence in self.proof.evidence.evidence_refs
-        ):
-            raise ValueError("central proof evidence must be issued by proof_owner")
-        if self.acceptance.accepted and not any(
-            evidence.owner == self.owners.acceptance_owner
-            for evidence in self.acceptance.evidence.evidence_refs
+        if self.proof.verdict == "passed" and not _contains_named_evidence(
+            self.proof.evidence,
+            self.proof.proof_ref,
+            owner=self.owners.proof_owner,
         ):
             raise ValueError(
-                "owner acceptance evidence must be issued by acceptance_owner"
+                "central proof_ref evidence must be issued by proof_owner"
+            )
+        if self.acceptance.accepted and not _contains_named_evidence(
+            self.acceptance.evidence,
+            self.acceptance.acceptance_ref,
+            owner=self.owners.acceptance_owner,
+        ):
+            raise ValueError(
+                "acceptance_ref evidence must be issued by acceptance_owner"
             )
         if (
             self.canary.succeeded

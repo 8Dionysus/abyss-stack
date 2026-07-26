@@ -34,10 +34,11 @@ def evidence(
     *,
     state: str = "exact",
     owner: str = "abyss-stack",
+    evidence_ref: str | None = None,
 ) -> dict:
     ref = {
         "owner": owner,
-        "evidence_ref": f"receipt://runtime/{name}",
+        "evidence_ref": evidence_ref or f"receipt://runtime/{name}",
         "revision": "stack-rev-1",
         "observed_at": NOW.isoformat(),
         "expires_at": (NOW + timedelta(hours=2)).isoformat(),
@@ -119,11 +120,14 @@ def subject(
         "consumers": [
             {
                 "consumer_id": "codex-main",
-                "registration_ref": "config://codex/aoa-kag",
+                "registration_ref": f"config://codex/{organ_id}",
                 "registered": True,
                 "observed_schema_digest": DIGEST_D,
                 "observed_protocol_versions": ["2025-11-25"],
-                "evidence": evidence("consumer"),
+                "evidence": evidence(
+                    "consumer",
+                    evidence_ref=f"config://codex/{organ_id}",
+                ),
             }
         ],
         "freshness": {
@@ -376,6 +380,56 @@ def test_usable_named_receipts_must_match_contained_evidence(
     )
 
     with pytest.raises(ValidationError, match="must match contained evidence"):
+        RuntimeObservation.model_validate(payload)
+
+
+def test_registered_consumer_target_must_match_contained_evidence() -> None:
+    payload = observation(subject())
+    payload["subjects"][0]["consumers"][0]["registration_ref"] = (
+        "config://codex/unbound"
+    )
+
+    with pytest.raises(ValidationError, match="must match contained evidence"):
+        RuntimeObservation.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    (
+        "surface",
+        "named_field",
+        "owner_field",
+        "expected_error",
+    ),
+    (
+        ("proof", "proof_ref", "proof_owner", "issued by proof_owner"),
+        (
+            "acceptance",
+            "acceptance_ref",
+            "acceptance_owner",
+            "issued by acceptance_owner",
+        ),
+    ),
+)
+def test_named_receipt_must_be_issued_by_declared_owner(
+    surface: str,
+    named_field: str,
+    owner_field: str,
+    expected_error: str,
+) -> None:
+    payload = observation(subject())
+    runtime_subject = payload["subjects"][0]
+    event = runtime_subject[surface]
+    named_ref = event[named_field]
+    declared_owner = runtime_subject["owners"][owner_field]
+    event["evidence"]["evidence_refs"][0]["owner"] = "unrelated-owner"
+    decoy = evidence(
+        f"{surface}-owner-decoy",
+        owner=declared_owner,
+    )["evidence_refs"][0]
+    assert decoy["evidence_ref"] != named_ref
+    event["evidence"]["evidence_refs"].append(decoy)
+
+    with pytest.raises(ValidationError, match=expected_error):
         RuntimeObservation.model_validate(payload)
 
 
@@ -978,7 +1032,7 @@ def test_candidate_plan_is_content_addressed_and_never_authorized(
     evidence_refs = {
         item["evidence_ref"] for item in plan["precondition_evidence"]
     }
-    assert "receipt://runtime/consumer" in evidence_refs
+    assert "config://codex/aoa-kag" in evidence_refs
     assert "receipt://runtime/freshness" in evidence_refs
     assert "receipt://runtime/central-proof" in evidence_refs
     assert "receipt://runtime/acceptance" in evidence_refs
@@ -1181,7 +1235,7 @@ def test_rollback_plan_accepts_fresh_rollback_required_deploy_links(
     assert {
         "receipt://runtime/source",
         "receipt://runtime/registry",
-        "receipt://runtime/consumer",
+        "config://codex/aoa-kag",
         "receipt://runtime/rollback",
     } <= evidence_refs
     assert "receipt://runtime/canary" not in evidence_refs
@@ -1578,14 +1632,20 @@ def test_activation_targets_only_the_selected_compatible_consumer(
     good = payload["subjects"][0]["consumers"][0]
     good["consumer_id"] = "z-compatible"
     good["registration_ref"] = "config://codex/compatible"
-    good["evidence"] = evidence("consumer-good")
+    good["evidence"] = evidence(
+        "consumer-good",
+        evidence_ref="config://codex/compatible",
+    )
     payload["subjects"][0]["proof"]["proved_consumer_registration_ref"] = (
         "config://codex/compatible"
     )
     unselected = json.loads(json.dumps(good))
     unselected["consumer_id"] = "a-compatible-unselected"
     unselected["registration_ref"] = "config://codex/compatible-unselected"
-    unselected["evidence"] = evidence("consumer-unselected")
+    unselected["evidence"] = evidence(
+        "consumer-unselected",
+        evidence_ref="config://codex/compatible-unselected",
+    )
     future = (NOW + timedelta(seconds=31)).isoformat()
     unselected["evidence"]["observed_at"] = future
     unselected["evidence"]["evidence_refs"][0]["observed_at"] = future
@@ -1604,8 +1664,8 @@ def test_activation_targets_only_the_selected_compatible_consumer(
     evidence_refs = {
         item["evidence_ref"] for item in plan["precondition_evidence"]
     }
-    assert "receipt://runtime/consumer-good" in evidence_refs
-    assert "receipt://runtime/consumer-unselected" not in evidence_refs
+    assert "config://codex/compatible" in evidence_refs
+    assert "config://codex/compatible-unselected" not in evidence_refs
 
 
 def test_freshness_reference_expiry_is_stale_and_blocks_plans(
