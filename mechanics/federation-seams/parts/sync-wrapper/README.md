@@ -77,15 +77,16 @@ reuse canary authority. It requires:
 - an explicit rollback root and operator change record for live activation.
 
 The mirror posture is `sdk_canonical`. Route-api permits ordinary closure only
-for `authorized_live_cutover` when the receipt, producer admission,
-public-release record, subject bytes, and mirror hashes agree. An isolated
-rehearsal may be canonical-ready but cannot close the live runtime. Runtime
-rollback first verifies the predecessor manifest, exact source ref, stable
-ABI, and all configured file hashes. It then persists
+for `authorized_live_cutover` when the receipt, producer admission with its
+exact trust controls, public-release record, subject bytes, and mirror hashes
+agree. An isolated rehearsal may be canonical-ready but cannot close the live
+runtime. Runtime rollback first verifies the predecessor manifest, exact
+source ref, stable ABI, and all configured file hashes. It then persists
 `manifest/routing_g5_compatibility_rollback.json` in the restored tree.
 Route-api consumes that marker after restart and keeps ordinary closure red:
 the runtime serves compatibility bytes while SDK source ownership remains
-canonical.
+canonical. If an atomic swap step fails, the exact staged marker is removed
+from the rollback root so that the verified predecessor remains retryable.
 The isolated mode rejects the live target shape; only
 `--authorized-live-cutover` may address
 `Knowledge/federation/aoa-routing`.

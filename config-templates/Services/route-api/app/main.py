@@ -1664,6 +1664,13 @@ def routing_sdk_canonical_provenance_reasons(
             reasons.append(
                 "routing SDK canonical producer admission lacks runtime"
             )
+        if (
+            set(admission.get("required_controls", []))
+            != ROUTING_REQUIRED_TRUST_CONTROLS
+        ):
+            reasons.append(
+                "routing SDK canonical producer admission controls drifted"
+            )
         receipt_summary = admission.get("owner_switch_receipt")
         if (
             not isinstance(receipt_summary, dict)

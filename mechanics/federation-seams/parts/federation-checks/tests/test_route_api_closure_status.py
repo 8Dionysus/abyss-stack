@@ -873,6 +873,32 @@ datasources:
             closure["canonical_reasons"],
         )
 
+    def test_sdk_canonical_requires_exact_producer_admission_controls(
+        self,
+    ) -> None:
+        store = self.make_sdk_canonical_store()
+        admission = store.routing.payloads["mirror_manifest"][
+            "trust_verdict"
+        ]["record"]["producer_admission"]
+        admission["required_controls"] = ["abi_signature", "sbom"]
+        store.routing.payloads["mirror_manifest"]["trust_verdict"][
+            "inspected_claims"
+        ]["producer_admission"] = admission
+        self.module.STORE = store
+
+        health = self.module.health()
+        closure = self.module.layer_status(store.routing)["closure_status"]
+
+        self.assertFalse(closure["canonical_ready"])
+        self.assertFalse(closure["closure_ready"])
+        self.assertFalse(
+            health["routing_switch"]["canonical_switch_authorized"]
+        )
+        self.assertIn(
+            "routing SDK canonical producer admission controls drifted",
+            closure["canonical_reasons"],
+        )
+
     def test_compatibility_rollback_marker_persists_degraded_owner_state(
         self,
     ) -> None:

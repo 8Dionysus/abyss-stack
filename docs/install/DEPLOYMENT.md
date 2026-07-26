@@ -350,10 +350,12 @@ exact predecessor ref, stable ABI identity, and every configured file hash.
 It persists
 `manifest/routing_g5_compatibility_rollback.json` in the restored tree, so
 route-api keeps reporting `compatibility_rollback_active` and non-closing
-posture after restart. Route-api may report normal closure only for an
-`authorized_live_cutover` while the exact `sdk_canonical` receipt,
-public-release record, subject bytes, and mirror hashes agree. An isolated
-rehearsal remains non-closing.
+posture after restart. If either atomic swap step fails, the exact staged
+marker is removed from the rollback root so that the already-verified
+predecessor remains retryable. Route-api may report normal closure only for
+an `authorized_live_cutover` while the exact `sdk_canonical` receipt,
+producer-admission trust controls, public-release record, subject bytes, and
+mirror hashes agree. An isolated rehearsal remains non-closing.
 
 ### `scripts/aoa-install-systemd`
 

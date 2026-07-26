@@ -58,8 +58,9 @@ Live materialization additionally requires:
 - atomic activation.
 
 Route-api recognizes `routing_producer_posture: sdk_canonical` only when the
-receipt, producer admission, subject bytes, public-release trust record, and
-mirror hashes agree. Only the separately recorded
+receipt, producer admission including the exact required trust controls,
+subject bytes, public-release trust record, and mirror hashes agree. Only the
+separately recorded
 `authorized_live_cutover` posture may satisfy normal runtime closure; an
 isolated rehearsal remains non-closing.
 
@@ -93,6 +94,8 @@ only compatibility and rollback.
   reversible.
 - Positive: rollback refuses an unverified predecessor tree and persists a
   compatibility marker that survives route-api restart.
+- Positive: an aborted rollback swap removes only the exact marker it staged,
+  keeping the verified predecessor tree retryable without manual mutation.
 - Positive: route-api exposes only allowlisted receipt and trust summaries.
 - Tradeoff: G5 requires a new canonical registry record and subject store; the
   earlier candidate record cannot be silently promoted.

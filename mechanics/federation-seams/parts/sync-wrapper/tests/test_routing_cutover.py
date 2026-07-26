@@ -1,13 +1,30 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
+import os
 import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 SCRIPT = REPO_ROOT / "scripts" / "aoa-routing-cutover"
+BACKEND = (
+    REPO_ROOT
+    / "mechanics/federation-seams/parts/sync-wrapper/aoa_routing_cutover.py"
+)
+sys.path.insert(0, str(BACKEND.parent))
+BACKEND_SPEC = importlib.util.spec_from_file_location(
+    "aoa_routing_cutover_under_test",
+    BACKEND,
+)
+assert BACKEND_SPEC is not None and BACKEND_SPEC.loader is not None
+CUTOVER_BACKEND = importlib.util.module_from_spec(BACKEND_SPEC)
+BACKEND_SPEC.loader.exec_module(CUTOVER_BACKEND)
 SDK_REF = "d" * 40
 PREDECESSOR_REF = "a" * 40
 AUTHORITY = {
@@ -503,3 +520,67 @@ def test_rollback_rejects_corrupt_predecessor_before_restore(
     ).is_file()
     assert rollback_root.is_dir()
     assert not retained.exists()
+
+
+@pytest.mark.parametrize("failing_replace_call", [1, 2])
+def test_failed_rollback_swap_removes_marker_and_preserves_retryable_tree(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failing_replace_call: int,
+) -> None:
+    fixture = make_fixture(tmp_path)
+    target = tmp_path / "runtime/Knowledge/federation/aoa-routing"
+    make_predecessor_root(target, fixture)
+    rollback_root = target.parent / "aoa-routing.pre-g5"
+    activated = run_cutover(
+        [
+            "materialize",
+            *exact_args(fixture, target),
+            "--authorized-live-cutover",
+            "--rollback-root",
+            str(rollback_root),
+            "--operator-change-ref",
+            "test-g5-change",
+        ]
+    )
+    assert activated.returncode == 0, activated.stderr + activated.stdout
+
+    retained = target.parent / "aoa-routing.sdk-canonical-retained"
+    parsed = CUTOVER_BACKEND.build_parser().parse_args(
+        rollback_args(
+            fixture,
+            target=target,
+            rollback_root=rollback_root,
+            retain_root=retained,
+        )
+    )
+    replace_calls = 0
+    real_replace = os.replace
+
+    def fail_selected_replace(source: Path, destination: Path) -> None:
+        nonlocal replace_calls
+        replace_calls += 1
+        if replace_calls == failing_replace_call:
+            raise PermissionError("injected rollback swap failure")
+        real_replace(source, destination)
+
+    monkeypatch.setattr(
+        CUTOVER_BACKEND.os,
+        "replace",
+        fail_selected_replace,
+    )
+
+    with pytest.raises(
+        PermissionError,
+        match="injected rollback swap failure",
+    ):
+        CUTOVER_BACKEND.rollback(parsed)
+
+    assert target.joinpath(
+        "manifest/federation_mirror_manifest.json"
+    ).is_file()
+    assert rollback_root.is_dir()
+    assert not retained.exists()
+    assert not rollback_root.joinpath(
+        "manifest/routing_g5_compatibility_rollback.json"
+    ).exists()

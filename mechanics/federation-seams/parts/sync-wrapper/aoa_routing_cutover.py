@@ -916,6 +916,26 @@ def inspect_active_canonical(
     return {"verified": not reasons, "reasons": reasons}
 
 
+def remove_exact_compatibility_marker(
+    rollback_root: Path,
+    *,
+    expected_marker: dict[str, Any],
+) -> None:
+    marker_path = rollback_root / COMPATIBILITY_ROLLBACK_REL
+    if not marker_path.exists():
+        return
+    persisted = read_json(
+        marker_path,
+        "failed compatibility rollback marker",
+    )
+    if stable_digest(persisted) != stable_digest(expected_marker):
+        raise CutoverError(
+            "failed rollback marker changed before cleanup; refusing "
+            "to remove unverified state"
+        )
+    marker_path.unlink()
+
+
 def rollback(args: argparse.Namespace) -> dict[str, Any]:
     sdk_ref = require_git_object_id(args.sdk_source_ref, "SDK source ref")
     predecessor_ref = require_git_object_id(
@@ -981,11 +1001,18 @@ def rollback(args: argparse.Namespace) -> dict[str, Any]:
         operator_change_ref=operator_change,
         predecessor_inspection=predecessor_inspection,
     )
-    os.replace(target, retain_root)
     try:
-        os.replace(rollback_root, target)
+        os.replace(target, retain_root)
+        try:
+            os.replace(rollback_root, target)
+        except Exception:
+            os.replace(retain_root, target)
+            raise
     except Exception:
-        os.replace(retain_root, target)
+        remove_exact_compatibility_marker(
+            rollback_root,
+            expected_marker=persisted_marker,
+        )
         raise
     return {
         "ok": True,
