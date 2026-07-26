@@ -25,6 +25,8 @@ DIGEST_A = "sha256:" + "a" * 64
 DIGEST_B = "sha256:" + "b" * 64
 DIGEST_C = "sha256:" + "c" * 64
 DIGEST_D = "sha256:" + "d" * 64
+DIGEST_E = "sha256:" + "e" * 64
+DIGEST_F = "sha256:" + "f" * 64
 
 
 def evidence(
@@ -76,12 +78,14 @@ def subject(
         "source": {
             "revision": "source-rev-1",
             "tree_digest": DIGEST_A,
+            "expected_sync_tree_digest": DIGEST_E,
             "evidence": evidence("source"),
         },
         "package": {
             "name": f"{organ_id}-mcp",
             "version": "0.1.0",
             "artifact_digest": DIGEST_B,
+            "expected_deploy_tree_digest": DIGEST_F,
             "evidence": evidence("package"),
         },
         "deploy": {
@@ -464,6 +468,9 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
         "top-level-encoded",
         "nested-value",
         "double-key",
+        "path",
+        "encoded-path",
+        "path-token",
         "unparseable",
     ),
 )
@@ -519,6 +526,18 @@ def test_observation_store_rejects_credentials_inside_references(
     elif reference_surface == "double-key":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"https://acceptance.invalid/receipt?%2561pi_key={secret_value}"
+        )
+    elif reference_surface == "path":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"https://acceptance.invalid/report/api_key/{secret_value}"
+        )
+    elif reference_surface == "encoded-path":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"https://acceptance.invalid/report/%2561pi_key/{secret_value}"
+        )
+    elif reference_surface == "path-token":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"https://acceptance.invalid/report/sk-{secret_value}"
         )
     else:
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
@@ -727,7 +746,7 @@ def test_activation_verifies_an_already_admitted_registry(tmp_path: Path) -> Non
                 ("verify-source-revision", "source-rev-1"),
                 ("preview-config-sync", "receipt://deploy/aoa-kag"),
                 ("apply-exact-config-sync", "receipt://deploy/aoa-kag"),
-                ("compare-deployed-digest", DIGEST_C),
+                ("compare-deployed-digest", DIGEST_E),
             ),
         ),
         (
@@ -736,7 +755,7 @@ def test_activation_verifies_an_already_admitted_registry(tmp_path: Path) -> Non
                 ("verify-package-digest", DIGEST_B),
                 ("stage-exact-package", f"aoa-kag-mcp@{DIGEST_B}"),
                 ("deploy-staged-package", f"aoa-kag-mcp@{DIGEST_B}"),
-                ("compare-deployed-digest", DIGEST_C),
+                ("compare-deployed-digest", DIGEST_F),
             ),
         ),
     ),
@@ -758,6 +777,10 @@ def test_sync_and_deploy_plans_include_exact_transition_steps(
 
     plan = result["owner_payload"]["plan"]
     assert plan["execution_authorized"] is False
+    assert plan["postcondition_deploy_tree_digest"] == {
+        "sync": DIGEST_E,
+        "deploy": DIGEST_F,
+    }[plan_kind]
     assert tuple(
         (step["action"], step["exact_target"]) for step in plan["steps"]
     ) == expected_steps
@@ -863,7 +886,7 @@ def test_rollback_plan_accepts_fresh_rollback_required_deploy_links(
     assert [
         (step["action"], step["exact_target"]) for step in plan["steps"]
     ] == [
-        ("deny-discovery", "abyss-private"),
+        ("deny-discovery", f"abyss-private@{DIGEST_A}"),
         ("deny-activation", "aoa-kag/read"),
         ("verify-rollback-proof", "receipt://rollback/aoa-kag"),
         ("restore-exact-package", DIGEST_B),

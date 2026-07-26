@@ -70,6 +70,10 @@ The managed units use the explicitly provisioned
 `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv` runtime rather than ambient
 Python. `scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime`
 creates or refreshes it from the deployed package and does not start a unit.
+Link and reload the managed user units first: each stack plane holds a shared
+runtime lock for its full lifetime, while changed provisioning holds the
+exclusive lock and rechecks stopped state immediately before the environment
+swap.
 
 `systemd/user/aoa-mcp-http@.service` owns one process per instance and launches
 the deployed workspace wrapper, not a source checkout. The

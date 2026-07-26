@@ -167,6 +167,7 @@
           "reason_codes": [],
           "state": "exact"
         },
+        "expected_deploy_tree_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
         "name": "aoa-kag-mcp",
         "version": "0.0.0-example"
       },
@@ -283,6 +284,7 @@
           "reason_codes": [],
           "state": "exact"
         },
+        "expected_sync_tree_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "revision": "source-example-revision",
         "tree_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       }

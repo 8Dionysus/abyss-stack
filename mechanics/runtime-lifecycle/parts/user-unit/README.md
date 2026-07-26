@@ -64,7 +64,11 @@ is a separate explicit action:
 artifact-hashed dependency lock, binds deployed source and lock digests into
 the runtime identity, and refuses to replace a changed environment while
 either plane is active or its user-systemd state cannot be observed. It never
-stops or starts those units implicitly.
+stops or starts those units implicitly. Run `--all-user-units` first so the
+loaded unit definitions participate in the runtime lock. Each plane then holds
+a shared lock for its full process lifetime; changed provisioning takes the
+exclusive lock and repeats the stopped-state check immediately before the
+environment swap, closing starts that race the build.
 
 Use `pkexec .../aoa-install-systemd --system-units` for the small privileged
 support-unit allowlist under `systemd/system/`. That mode installs root-owned

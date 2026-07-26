@@ -1007,6 +1007,11 @@
         "evidence": {
           "$ref": "#/$defs/LinkEvidence"
         },
+        "expected_deploy_tree_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Expected Deploy Tree Digest",
+          "type": "string"
+        },
         "name": {
           "maxLength": 160,
           "minLength": 1,
@@ -1026,6 +1031,7 @@
         "name",
         "version",
         "artifact_digest",
+        "expected_deploy_tree_digest",
         "evidence"
       ],
       "title": "PackageIdentity",
@@ -1572,6 +1578,11 @@
         "evidence": {
           "$ref": "#/$defs/LinkEvidence"
         },
+        "expected_sync_tree_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Expected Sync Tree Digest",
+          "type": "string"
+        },
         "revision": {
           "maxLength": 2048,
           "minLength": 1,
@@ -1588,6 +1599,7 @@
       "required": [
         "revision",
         "tree_digest",
+        "expected_sync_tree_digest",
         "evidence"
       ],
       "title": "SourceIdentity",

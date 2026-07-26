@@ -40,7 +40,11 @@ acceptance are separate preceding verification steps. Only after those gates
 does a shadow registry receive an admission action addressed to its immutable
 ID-and-digest pair; an already admitted entry is verified against the same pair.
 Sync and deploy candidates include the exact transition action between preview
-or staging and their postcondition check, but remain non-executing and require
+or staging and their postcondition check. The source identity supplies the
+expected post-sync tree, the package identity supplies the expected
+post-deploy tree, and the candidate binds that future digest independently of
+the currently observed deploy tree. Rollback denial addresses the immutable
+registry ID-and-digest pair. Candidates remain non-executing and require
 separate operator approval. Candidate expiry is capped by every link and
 evidence ref actually copied into the plan, including freshness, central-proof,
 and acceptance evidence. Required evidence timestamps must also be causally
@@ -74,7 +78,10 @@ The environment is reproduced from exact direct and transitive pins with
 artifact hashes, and its identity binds both deployed source content and the
 lock file. Provisioning is explicit, refuses to replace the environment while
 either plane is active or its state cannot be observed, and does not stop,
-start, or register either plane.
+start, or register either plane. After the units are linked and reloaded, each
+process holds a shared lock for its lifetime; changed provisioning holds the
+exclusive lock and checks stopped state both before building and immediately
+before swapping the verified environment.
 
 `rollback_required` is admissible only for the failed source/package/deploy
 links of a rollback plan, and only while the triggering link and its evidence

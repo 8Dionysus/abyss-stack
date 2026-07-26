@@ -18,8 +18,9 @@ Tracking starts with the community-docs baseline for this repository.
   parity, registry, consumer, canary, proof, and acceptance gates are met.
 - The stack MCP candidate contour now avoids PostgreSQL on port `5432`, uses
   explicit port `5433`, provisions a source-and-lock-addressed Python runtime
-  from exact artifact hashes before unit activation, refuses to replace that
-  runtime while either plane is active, and fails activation-plan preparation
+  from exact artifact hashes before unit activation, coordinates each
+  plane's lifetime shared lock against exclusive provisioning, rechecks unit
+  state immediately before replacement, and fails activation-plan preparation
   on unusable freshness, endpoint/process unreadiness, incompatible consumers,
   ungrounded canaries, or missing rollback proof. Concurrent first credential
   writes publish one atomically selected value without clobbering the winner.
@@ -28,7 +29,10 @@ Tracking starts with the community-docs baseline for this repository.
   precondition, central proof binds the exact deployed-tree digest, activation
   steps name the exact selected compatible consumer registration, and effect
   planes cannot be activated or restarted before their distinct contracts
-  exist.
+  exist. Sync and deploy candidates now bind their distinct expected
+  post-action tree digests, rollback denial binds the exact registry digest,
+  and secret screening covers encoded URI path segments as well as
+  userinfo/query/fragment surfaces.
 - Rollback plans now admit fresh `rollback_required` failed-link evidence
   without weakening other blockers, while managed units execute only the
   digest-matched package installed in their provisioned venv.

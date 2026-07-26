@@ -69,6 +69,13 @@ or evidence refs it names. Duplicate evidence identities with conflicting
 `rollback_required` is accepted only while its own link and evidence refs are
 unexpired; a bare or expired rollback signal is a controlled precondition
 failure.
+Every plan also names one exact deployed-tree postcondition. Sync takes that
+target from the reviewed source identity, deploy takes it from the exact
+package identity, activate and restart preserve the observed deployed tree,
+and rollback restores the last-known-good tree. The ordered sync/deploy
+comparison step uses this future target rather than the pre-action deployed
+digest. Rollback denies discovery for the exact registry ID and registry digest
+observed by the candidate, not for a mutable registry name alone.
 
 ## Observation input
 
@@ -81,7 +88,7 @@ Set `ABYSS_STACK_MCP_OBSERVATION_PATH` to one explicit secret-free
 
 The loader rejects symlinks, non-files, payloads above 2 MiB, unknown contract
 fields, secret-like keys or values, shared credential classes, non-loopback
-HTTP endpoints, credentials embedded in URI userinfo/query/fragment references,
+HTTP endpoints, credentials embedded in URI userinfo/path/query/fragment references,
 encoded nested credential references, unparseable or excessively nested
 URI-like references, whitespace-only exact targets, and unsupported effect
 classes. Secret-prefix checks ignore leading whitespace. Expired observations
@@ -114,9 +121,11 @@ plane-specific credential. Portable `catalog` and `inspect` are read-contour
 commands; `plan` requires explicit `--policy-family candidate`.
 
 The managed user units do not use ambient Python. After syncing the package to
-`Configs`, provision the source-addressed runtime explicitly:
+`Configs`, first link and reload the lock-aware units, then provision the
+source-addressed runtime explicitly:
 
 ```bash
+scripts/aoa-install-systemd --all-user-units
 scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime
 ```
 
@@ -132,6 +141,11 @@ both units explicitly before reprovisioning, then start or canary them as a
 separate action. The units have a
 `ConditionPathExists` guard plus an executable `ExecCondition`, and remain
 inactive when this runtime is absent or unusable.
+Each unit holds a shared runtime lock for its full process lifetime. Changed
+provisioning holds the exclusive lock, checks both unit states before the
+build and again immediately before the guarded environment swap, and aborts if
+a start races the build. Linking and reloading the committed units before
+provisioning is therefore a required rollout precondition.
 They execute the package installed inside that venv, not `Configs/src`.
 Consequently, a later Configs sync cannot mix new code with an older dependency
 closure; the synced package becomes eligible for a later start only after this

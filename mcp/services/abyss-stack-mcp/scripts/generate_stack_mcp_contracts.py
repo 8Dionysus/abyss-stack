@@ -28,6 +28,8 @@ DIGESTS = {
         ("deploy", "c"),
         ("schema", "d"),
         ("registry", "e"),
+        ("sync_target", "f"),
+        ("deploy_target", "0"),
     )
 }
 
@@ -73,12 +75,14 @@ def observation_example() -> dict[str, Any]:
                 "source": {
                     "revision": "source-example-revision",
                     "tree_digest": DIGESTS["source"],
+                    "expected_sync_tree_digest": DIGESTS["sync_target"],
                     "evidence": evidence("source"),
                 },
                 "package": {
                     "name": "aoa-kag-mcp",
                     "version": "0.0.0-example",
                     "artifact_digest": DIGESTS["package"],
+                    "expected_deploy_tree_digest": DIGESTS["deploy_target"],
                     "evidence": evidence("package"),
                 },
                 "deploy": {

@@ -152,11 +152,11 @@ Preview the exact bounded projection before a lifecycle-sensitive rollout:
 ```bash
 scripts/aoa-sync-configs --dry-run --item mcp --item schemas --item systemd
 scripts/aoa-sync-configs --item mcp --item schemas --item systemd
+scripts/aoa-install-systemd --all-user-units
 scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime
 scripts/aoa-install-systemd --provision-mcp-http-auth
 scripts/aoa-install-systemd --provision-abyss-stack-mcp-auth
 scripts/aoa-install-systemd --install-mcp-http-codex-client
-scripts/aoa-install-systemd --all-user-units
 ```
 
 `--item` is repeatable and accepts only the public-safe managed allowlist;
@@ -181,7 +181,11 @@ It does not link, stop, start, or register a service. Repeating it against the
 same deployed package and lock verifies and reuses the environment. A changed
 runtime identity fails closed while either stack MCP unit is active or its
 user-systemd state cannot be observed; stop both planes explicitly before
-reprovisioning.
+reprovisioning. Each plane holds a shared runtime lock for its full lifetime;
+changed provisioning takes the exclusive lock and repeats the stopped-state
+check immediately before swapping the environment. The preceding
+`--all-user-units` link-and-reload step is required so every later start
+participates in that lock.
 The Codex client install adds a removable Zsh launch function that delegates
 to the deployed launcher without replacing the managed Codex executable or
 exporting the bearer into the parent shell. It affects only new interactive
@@ -414,6 +418,7 @@ compiles an expiring content-addressed plan with
 `execution_authorized=false`.
 
 Use `--provision-abyss-stack-mcp-runtime` after syncing the MCP package and
+after `--all-user-units` has linked and reloaded the lock-aware units, but
 before canarying either stack-owned plane. It must run as the target user,
 installs the deployed package and the exact `requirements.lock` closure with
 artifact-hash enforcement into
@@ -423,7 +428,10 @@ deployed-package digest and lock digest. If that identity changes while either
 `abyss-stack-mcp-read.service` or `abyss-stack-mcp-candidate.service` is
 active, or when their user-systemd state cannot be observed, the action refuses
 to mutate the environment; stopping and later starting those units remain
-explicit operator actions.
+explicit operator actions. The units hold a shared lock for their whole
+process lifetime. Provisioning takes the exclusive form of that lock and
+rechecks both unit states after the build, immediately before the environment
+swap, so a concurrent start cannot cross the replacement boundary.
 The user units point only at this environment and use
 `ConditionPathExists` plus an executable `ExecCondition`, so a missing or
 unusable runtime leaves them inactive instead of entering a restart loop.

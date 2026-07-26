@@ -172,6 +172,7 @@ class OwnerRoles(StrictModel):
 class SourceIdentity(StrictModel):
     revision: NonEmpty
     tree_digest: Digest
+    expected_sync_tree_digest: Digest
     evidence: LinkEvidence
 
 
@@ -179,6 +180,7 @@ class PackageIdentity(StrictModel):
     name: Identifier
     version: NonEmpty
     artifact_digest: Digest
+    expected_deploy_tree_digest: Digest
     evidence: LinkEvidence
 
 
@@ -964,6 +966,7 @@ class RuntimePlanCandidate(StrictModel):
     source_revision: NonEmpty
     package_digest: Digest
     deployed_revision: NonEmpty
+    postcondition_deploy_tree_digest: Digest
     exact_unit_name: UnitName
     precondition_evidence: tuple[EvidenceRef, ...]
     steps: Annotated[tuple[PlanStep, ...], Field(min_length=1)]

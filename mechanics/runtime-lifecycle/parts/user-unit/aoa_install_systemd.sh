@@ -167,7 +167,9 @@ abyss_stack_mcp_candidate_credential_name="abyss-stack-mcp-candidate-bearer-toke
 abyss_stack_mcp_service_root="${AOA_CONFIGS_ROOT}/mcp/services/abyss-stack-mcp"
 abyss_stack_mcp_runtime_root="${AOA_STACK_ROOT}/Services/abyss-stack-mcp"
 abyss_stack_mcp_venv="${abyss_stack_mcp_runtime_root}/venv"
+abyss_stack_mcp_runtime_lock="${abyss_stack_mcp_runtime_root}/.runtime-provision.lock"
 abyss_stack_mcp_bootstrap_python="${ABYSS_STACK_MCP_BOOTSTRAP_PYTHON:-/usr/bin/python3}"
+abyss_stack_mcp_units_error=""
 mcp_http_codex_launcher="${AOA_CONFIGS_ROOT}/mcp/services/_shared/codex_http_client.sh"
 mcp_http_codex_zshrc="${ZDOTDIR:-${HOME}}/.zshrc"
 mcp_http_codex_block_start="# >>> abyss-stack MCP HTTP Codex client >>>"
@@ -245,6 +247,41 @@ aoa_provision_abyss_stack_mcp_auth() {
     "abyss-stack MCP candidate bearer credential"
 }
 
+aoa_require_abyss_stack_mcp_units_stopped() {
+  local unit=""
+  local unit_state=""
+
+  abyss_stack_mcp_units_error=""
+  for unit in abyss-stack-mcp-read.service abyss-stack-mcp-candidate.service; do
+    if ! unit_state="$(
+      systemctl --user list-units \
+        --all \
+        --full \
+        --plain \
+        --no-legend \
+        "$unit" |
+        awk -v expected="$unit" '$1 == expected {print $3}'
+    )"; then
+      abyss_stack_mcp_units_error="cannot determine whether ${unit} is active; refusing runtime replacement"
+      return 1
+    fi
+    case "$unit_state" in
+      "")
+        ;;
+      inactive|failed)
+        ;;
+      active|activating|reloading|deactivating)
+        abyss_stack_mcp_units_error="refusing to replace abyss-stack MCP runtime while ${unit} is ${unit_state}"
+        return 1
+        ;;
+      *)
+        abyss_stack_mcp_units_error="unexpected ${unit} active state ${unit_state}; refusing runtime replacement"
+        return 1
+        ;;
+    esac
+  done
+}
+
 aoa_provision_abyss_stack_mcp_runtime() {
   local source_digest=""
   local lock_digest=""
@@ -255,8 +292,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
   local temp_venv=""
   local backup_venv=""
   local resolved_bootstrap_python=""
-  local unit=""
-  local unit_state=""
+  local runtime_lock_fd=""
 
   [[ "$abyss_stack_mcp_bootstrap_python" == /* ]] || \
     aoa_die "ABYSS_STACK_MCP_BOOTSTRAP_PYTHON must be an absolute path"
@@ -300,6 +336,31 @@ aoa_provision_abyss_stack_mcp_runtime() {
     aoa_die "failed to digest the deployed abyss-stack MCP hash lock"
   runtime_identity="${source_digest}:${lock_digest}"
 
+  if [[ -e "$abyss_stack_mcp_runtime_root" || \
+        -L "$abyss_stack_mcp_runtime_root" ]]; then
+    [[ -d "$abyss_stack_mcp_runtime_root" && \
+       ! -L "$abyss_stack_mcp_runtime_root" ]] || \
+      aoa_die "abyss-stack MCP runtime root must be a non-symlink directory"
+  else
+    install -d -m 0750 "$abyss_stack_mcp_runtime_root"
+  fi
+  if [[ -e "$abyss_stack_mcp_runtime_lock" || \
+        -L "$abyss_stack_mcp_runtime_lock" ]]; then
+    [[ -f "$abyss_stack_mcp_runtime_lock" && \
+       ! -L "$abyss_stack_mcp_runtime_lock" ]] || \
+      aoa_die "abyss-stack MCP runtime lock must be a regular non-symlink file"
+  else
+    (
+      umask 077
+      set -o noclobber
+      : > "$abyss_stack_mcp_runtime_lock"
+    ) 2>/dev/null || true
+    [[ -f "$abyss_stack_mcp_runtime_lock" && \
+       ! -L "$abyss_stack_mcp_runtime_lock" ]] || \
+      aoa_die "failed to create the abyss-stack MCP runtime lock"
+  fi
+  chmod 0600 "$abyss_stack_mcp_runtime_lock"
+
   if [[ -e "$abyss_stack_mcp_venv" || -L "$abyss_stack_mcp_venv" ]]; then
     [[ -d "$abyss_stack_mcp_venv" && ! -L "$abyss_stack_mcp_venv" ]] || \
       aoa_die "existing abyss-stack MCP runtime must be a non-symlink directory"
@@ -316,33 +377,14 @@ aoa_provision_abyss_stack_mcp_runtime() {
     fi
   fi
 
-  for unit in abyss-stack-mcp-read.service abyss-stack-mcp-candidate.service; do
-    if ! unit_state="$(
-      systemctl --user list-units \
-        --all \
-        --full \
-        --plain \
-        --no-legend \
-        "$unit" |
-        awk -v expected="$unit" '$1 == expected {print $3}'
-    )"; then
-      aoa_die "cannot determine whether ${unit} is active; refusing runtime replacement"
-    fi
-    case "$unit_state" in
-      "")
-        ;;
-      inactive|failed)
-        ;;
-      active|activating|reloading|deactivating)
-        aoa_die "refusing to replace abyss-stack MCP runtime while ${unit} is ${unit_state}"
-        ;;
-      *)
-        aoa_die "unexpected ${unit} active state ${unit_state}; refusing runtime replacement"
-        ;;
-    esac
-  done
+  exec {runtime_lock_fd}<> "$abyss_stack_mcp_runtime_lock"
+  if ! /usr/bin/flock --exclusive --nonblock "$runtime_lock_fd"; then
+    aoa_die "another provisioner or a managed abyss-stack MCP plane holds the runtime lock"
+  fi
+  if ! aoa_require_abyss_stack_mcp_units_stopped; then
+    aoa_die "$abyss_stack_mcp_units_error"
+  fi
 
-  install -d -m 0750 "$abyss_stack_mcp_runtime_root"
   temp_venv="$(mktemp -d "${abyss_stack_mcp_runtime_root}/.venv.XXXXXX")"
   if ! "$abyss_stack_mcp_bootstrap_python" -m venv "$temp_venv"; then
     rm -rf -- "$temp_venv"
@@ -374,6 +416,10 @@ aoa_provision_abyss_stack_mcp_runtime() {
   printf '%s\n' "$runtime_identity" > "${temp_venv}/${marker}"
   chmod 0644 "${temp_venv}/${marker}"
 
+  if ! aoa_require_abyss_stack_mcp_units_stopped; then
+    rm -rf -- "$temp_venv"
+    aoa_die "$abyss_stack_mcp_units_error"
+  fi
   if [[ -d "$abyss_stack_mcp_venv" ]]; then
     backup_venv="$(mktemp -d "${abyss_stack_mcp_runtime_root}/.venv.previous.XXXXXX")"
     rmdir -- "$backup_venv"
@@ -389,6 +435,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
   if [[ -n "$backup_venv" && -d "$backup_venv" ]]; then
     rm -rf -- "$backup_venv"
   fi
+  exec {runtime_lock_fd}>&-
   aoa_note "provisioned abyss-stack MCP runtime for deployed source ${source_digest} and lock ${lock_digest}"
 }
 

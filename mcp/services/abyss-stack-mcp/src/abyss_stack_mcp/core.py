@@ -150,6 +150,34 @@ def _reject_secret_material(
                 raise StackMCPError(
                     f"credential-bearing reference is forbidden at {path}"
                 )
+            for index, segment in enumerate(parsed.path.split("/")):
+                if not segment:
+                    continue
+                segment_path = f"{path}.path[{index}]"
+                for decoded_segment in _decoded_reference_variants(
+                    segment,
+                    segment_path,
+                ):
+                    key_candidate = re.split(
+                        r"[=:;,]",
+                        decoded_segment,
+                        maxsplit=1,
+                    )[0]
+                    normalized_key = re.sub(
+                        r"[^a-z0-9]",
+                        "",
+                        key_candidate.casefold(),
+                    )
+                    if normalized_key in _FORBIDDEN_KEY_CANONICAL:
+                        raise StackMCPError(
+                            "secret-bearing reference path is forbidden at "
+                            f"{segment_path}"
+                        )
+                    _reject_secret_material(
+                        decoded_segment,
+                        segment_path,
+                        reference_depth=reference_depth + 1,
+                    )
             for component_name, component in (
                 ("query", parsed.query),
                 ("fragment", parsed.fragment),
@@ -440,6 +468,9 @@ class StackMCPApplication:
             "source_revision": subject.source.revision,
             "package_digest": subject.package.artifact_digest,
             "deployed_revision": subject.deploy.revision,
+            "postcondition_deploy_tree_digest": (
+                self._postcondition_deploy_tree_digest(subject, plan_kind)
+            ),
             "exact_unit_name": subject.process.unit_name,
             "precondition_evidence": [
                 evidence.model_dump(mode="json")
@@ -1000,6 +1031,24 @@ class StackMCPApplication:
         return tuple(sorted(future))
 
     @staticmethod
+    def _postcondition_deploy_tree_digest(
+        subject: RuntimeSubject,
+        plan_kind: PlanKind,
+    ) -> str:
+        if plan_kind == "sync":
+            return subject.source.expected_sync_tree_digest
+        if plan_kind == "deploy":
+            return subject.package.expected_deploy_tree_digest
+        if plan_kind == "rollback":
+            target = subject.rollback.last_known_good_deploy_tree_digest
+            if target is None:
+                raise StackMCPError(
+                    "rollback plan requires a last-known-good deploy tree digest"
+                )
+            return target
+        return subject.deploy.tree_digest
+
+    @staticmethod
     def _steps(
         subject: RuntimeSubject,
         plan_kind: PlanKind,
@@ -1015,7 +1064,10 @@ class StackMCPApplication:
                 ("verify-source-revision", subject.source.revision),
                 ("preview-config-sync", subject.deploy.manifest_ref),
                 ("apply-exact-config-sync", subject.deploy.manifest_ref),
-                ("compare-deployed-digest", subject.deploy.tree_digest),
+                (
+                    "compare-deployed-digest",
+                    subject.source.expected_sync_tree_digest,
+                ),
             ),
             "deploy": (
                 ("verify-package-digest", subject.package.artifact_digest),
@@ -1027,7 +1079,10 @@ class StackMCPApplication:
                     "deploy-staged-package",
                     f"{subject.package.name}@{subject.package.artifact_digest}",
                 ),
-                ("compare-deployed-digest", subject.deploy.tree_digest),
+                (
+                    "compare-deployed-digest",
+                    subject.package.expected_deploy_tree_digest,
+                ),
             ),
             "activate": (
                 (
@@ -1069,7 +1124,13 @@ class StackMCPApplication:
                 ("run-grounded-canary", subject.canary.canary_route),
             ),
             "rollback": (
-                ("deny-discovery", subject.registry.registry_id),
+                (
+                    "deny-discovery",
+                    (
+                        f"{subject.registry.registry_id}"
+                        f"@{subject.registry.registry_digest}"
+                    ),
+                ),
                 (
                     "deny-activation",
                     f"{subject.organ_id}/{subject.policy_family}",

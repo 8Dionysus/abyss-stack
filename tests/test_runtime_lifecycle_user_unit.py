@@ -593,6 +593,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "fi\n"
                 "if [[ \"$1\" == \"-m\" && \"$2\" == \"pip\" ]]; then\n"
                 "  printf '%s\\n' \"$*\" >> \"$ABYSS_STACK_MCP_TEST_PIP_LOG\"\n"
+                "  if [[ -n \"${ABYSS_STACK_MCP_TEST_ACTIVATE_DURING_BUILD:-}\" ]]; then\n"
+                "    : > \"$ABYSS_STACK_MCP_TEST_ACTIVATE_DURING_BUILD\"\n"
+                "  fi\n"
                 "  exit 0\n"
                 "fi\n"
                 "if [[ \"$1\" == \"-c\" ]]; then\n"
@@ -617,6 +620,10 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "fi\n"
                 "if [[ \"${ABYSS_STACK_MCP_TEST_ACTIVE_UNIT:-}\" == "
                 "\"$unit\" ]]; then\n"
+                "  printf '%s loaded active running test\\n' \"$unit\"\n"
+                "elif [[ \"$unit\" == \"abyss-stack-mcp-read.service\" && "
+                "-f \"${ABYSS_STACK_MCP_TEST_ACTIVATE_DURING_BUILD:-"
+                "/nonexistent}\" ]]; then\n"
                 "  printf '%s loaded active running test\\n' \"$unit\"\n"
                 "fi\n"
                 "exit 0\n",
@@ -652,9 +659,17 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             self.assertEqual(first.returncode, 0, first.stderr)
             venv = stack_root / "Services" / "abyss-stack-mcp" / "venv"
             marker = venv / ".abyss-stack-mcp-runtime-identity"
+            runtime_lock = (
+                stack_root
+                / "Services"
+                / "abyss-stack-mcp"
+                / ".runtime-provision.lock"
+            )
             first_identity = marker.read_text(encoding="utf-8").strip()
             self.assertRegex(first_identity, r"\A[0-9a-f]{64}:[0-9a-f]{64}\Z")
             self.assertTrue((venv / "bin" / "python").is_file())
+            self.assertTrue(runtime_lock.is_file())
+            self.assertEqual(runtime_lock.stat().st_mode & 0o777, 0o600)
             self.assertIn("provisioned abyss-stack MCP runtime", first.stdout)
             self.assertNotIn("unit linked", first.stdout)
             pip_calls = pip_log.read_text(encoding="utf-8").splitlines()
@@ -688,6 +703,50 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
 
             source_file.write_text("VALUE = 2\n", encoding="utf-8")
             pip_log_before_block = pip_log.read_text(encoding="utf-8")
+            lock_holder = subprocess.Popen(
+                [
+                    "/usr/bin/flock",
+                    "--shared",
+                    str(runtime_lock),
+                    sys.executable,
+                    "-c",
+                    (
+                        "import sys; "
+                        "print('locked', flush=True); "
+                        "sys.stdin.buffer.read()"
+                    ),
+                ],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            self.assertIsNotNone(lock_holder.stdout)
+            self.assertEqual(lock_holder.stdout.readline().strip(), "locked")
+            locked = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(locked.returncode, 0)
+            self.assertIn("holds the runtime lock", locked.stderr)
+            self.assertEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
+            self.assertEqual(
+                pip_log.read_text(encoding="utf-8"),
+                pip_log_before_block,
+            )
+            self.assertIsNotNone(lock_holder.stdin)
+            lock_holder.stdin.close()
+            self.assertEqual(lock_holder.wait(timeout=5), 0)
+            lock_holder.stdout.close()
+            lock_holder.stderr.close()
+
             for active_unit in (
                 "abyss-stack-mcp-read.service",
                 "abyss-stack-mcp-candidate.service",
@@ -742,6 +801,35 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 pip_log.read_text(encoding="utf-8"),
                 pip_log_before_block,
             )
+
+            activation_signal = root / "activate-during-build"
+            raced = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_ACTIVATE_DURING_BUILD": str(
+                        activation_signal
+                    ),
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(raced.returncode, 0)
+            self.assertIn(
+                "while abyss-stack-mcp-read.service is active",
+                raced.stderr,
+            )
+            self.assertEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
+            self.assertNotEqual(
+                pip_log.read_text(encoding="utf-8"),
+                pip_log_before_block,
+            )
+            activation_signal.unlink()
 
             third = subprocess.run(
                 command,
@@ -1066,8 +1154,11 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             "/srv/AbyssOS/abyss-stack/Logs/mcp/organ-runtime-observation.json"
         )
         deployed_entrypoint = (
-            "ExecStart=/usr/bin/env /srv/AbyssOS/abyss-stack/Services/"
-            "abyss-stack-mcp/venv/bin/python -m abyss_stack_mcp.server"
+            "ExecStart=/usr/bin/flock --shared --no-fork "
+            "/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/"
+            ".runtime-provision.lock /usr/bin/env "
+            "/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python "
+            "-m abyss_stack_mcp.server"
         )
         runtime_condition = (
             "ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/"

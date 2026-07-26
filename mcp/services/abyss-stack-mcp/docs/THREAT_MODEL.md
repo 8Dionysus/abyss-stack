@@ -17,14 +17,19 @@
 - strict input and output models with unknown fields denied;
 - secret-like material rejected before validation or response;
 - URI-like references reject credential-bearing userinfo and forbidden
-  query/fragment keys before validation or response; unparseable URI-like
+  path/query/fragment keys before validation or response; unparseable URI-like
   values fail closed, bounded recursive decoding covers nested parameters, and
   secret-prefix checks normalize leading whitespace;
 - exact targets require at least one non-whitespace character;
 - exact observation digest and short expiry for candidate plans;
 - exact artifact-hashed runtime dependency closure, bound with deployed source
   into the managed-environment identity;
-- fail-closed reprovisioning while either managed stack MCP plane is active;
+- fail-closed reprovisioning while either managed stack MCP plane is active,
+  with a lifetime shared service lock, exclusive provision lock, and final
+  stopped-state check before environment replacement;
+- sync/deploy plans bind an expected future deployed-tree digest instead of
+  reusing the pre-action observation; rollback denial binds registry ID and
+  digest together;
 - structured allowlisted plan actions with no free-form command;
 - active processes require an observed process identity rather than a bare
   boolean;
