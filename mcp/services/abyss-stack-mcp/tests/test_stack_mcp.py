@@ -225,6 +225,15 @@ def test_contract_is_strict_and_policy_effects_are_bounded() -> None:
         RuntimeObservation.model_validate(payload)
 
     payload = observation(subject())
+    duplicate_consumer = json.loads(
+        json.dumps(payload["subjects"][0]["consumers"][0])
+    )
+    duplicate_consumer["consumer_id"] = "duplicate-registration"
+    payload["subjects"][0]["consumers"].append(duplicate_consumer)
+    with pytest.raises(ValidationError, match="registration refs must be unique"):
+        RuntimeObservation.model_validate(payload)
+
+    payload = observation(subject())
     payload["subjects"][0]["source"]["evidence"] = evidence(
         "source",
         state="compatible_drift",
@@ -307,6 +316,25 @@ def test_central_proof_cannot_predate_its_canary(
         ).isoformat()
 
     with pytest.raises(ValidationError, match="cannot precede canary evidence"):
+        RuntimeObservation.model_validate(payload)
+
+
+@pytest.mark.parametrize("canary_time_surface", ("link", "evidence"))
+def test_successful_canary_cannot_predate_deployment(
+    canary_time_surface: str,
+) -> None:
+    payload = observation(subject())
+    canary_evidence = payload["subjects"][0]["canary"]["evidence"]
+    if canary_time_surface == "link":
+        canary_evidence["observed_at"] = (
+            NOW - timedelta(seconds=1)
+        ).isoformat()
+    else:
+        canary_evidence["evidence_refs"][0]["observed_at"] = (
+            NOW - timedelta(seconds=1)
+        ).isoformat()
+
+    with pytest.raises(ValidationError, match="cannot precede deployment"):
         RuntimeObservation.model_validate(payload)
 
 
@@ -1018,12 +1046,11 @@ def test_activation_targets_only_the_selected_compatible_consumer(
     payload["subjects"][0]["proof"]["proved_consumer_registration_ref"] = (
         "config://codex/compatible"
     )
-    incompatible = json.loads(json.dumps(good))
-    incompatible["consumer_id"] = "a-incompatible"
-    incompatible["registration_ref"] = "config://codex/incompatible"
-    incompatible["observed_schema_digest"] = DIGEST_A
-    incompatible["evidence"] = evidence("consumer-bad")
-    payload["subjects"][0]["consumers"] = [incompatible, good]
+    unselected = json.loads(json.dumps(good))
+    unselected["consumer_id"] = "a-compatible-unselected"
+    unselected["registration_ref"] = "config://codex/compatible-unselected"
+    unselected["evidence"] = evidence("consumer-unselected")
+    payload["subjects"][0]["consumers"] = [unselected, good]
 
     app = application(tmp_path, policy_family="candidate", payload=payload)
     _, digest = app.store.load()
@@ -1039,7 +1066,7 @@ def test_activation_targets_only_the_selected_compatible_consumer(
         item["evidence_ref"] for item in plan["precondition_evidence"]
     }
     assert "receipt://runtime/consumer-good" in evidence_refs
-    assert "receipt://runtime/consumer-bad" not in evidence_refs
+    assert "receipt://runtime/consumer-unselected" not in evidence_refs
 
 
 def test_freshness_reference_expiry_is_stale_and_blocks_plans(
@@ -1134,6 +1161,11 @@ def test_plan_rejects_timestamps_beyond_bounded_future_skew(
         payload["generated_at"] = future
     elif future_surface == "deploy":
         payload["subjects"][0]["deploy"]["deployed_at"] = future
+        canary_evidence = payload["subjects"][0]["canary"]["evidence"]
+        canary_evidence["observed_at"] = future
+        canary_evidence["evidence_refs"][0]["observed_at"] = future
+        payload["subjects"][0]["proof"]["evaluated_at"] = future
+        payload["subjects"][0]["acceptance"]["accepted_at"] = future
     elif future_surface == "freshness":
         payload["subjects"][0]["freshness"]["observed_at"] = future
     elif future_surface == "proof":
@@ -1171,6 +1203,11 @@ def test_plan_rejects_evidence_that_postdates_its_snapshot(
     post_snapshot = (NOW + timedelta(seconds=31)).isoformat()
     if post_snapshot_surface == "deploy":
         payload["subjects"][0]["deploy"]["deployed_at"] = post_snapshot
+        canary_evidence = payload["subjects"][0]["canary"]["evidence"]
+        canary_evidence["observed_at"] = post_snapshot
+        canary_evidence["evidence_refs"][0]["observed_at"] = post_snapshot
+        payload["subjects"][0]["proof"]["evaluated_at"] = post_snapshot
+        payload["subjects"][0]["acceptance"]["accepted_at"] = post_snapshot
     elif post_snapshot_surface == "freshness":
         payload["subjects"][0]["freshness"]["observed_at"] = post_snapshot
     elif post_snapshot_surface == "proof":

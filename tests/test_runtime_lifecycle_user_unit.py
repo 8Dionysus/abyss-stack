@@ -521,12 +521,14 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 encoding="utf-8",
             )
             bootstrap.chmod(0o755)
+            bootstrap_link = root / "fake-python-link"
+            bootstrap_link.symlink_to(bootstrap)
             env = os.environ.copy()
             env.update(
                 {
                     "AOA_STACK_ROOT": str(stack_root),
                     "AOA_CONFIGS_ROOT": str(stack_root / "Configs"),
-                    "ABYSS_STACK_MCP_BOOTSTRAP_PYTHON": str(bootstrap),
+                    "ABYSS_STACK_MCP_BOOTSTRAP_PYTHON": str(bootstrap_link),
                     "HOME": str(root / "home"),
                     "XDG_CONFIG_HOME": str(root / "xdg-config"),
                 }

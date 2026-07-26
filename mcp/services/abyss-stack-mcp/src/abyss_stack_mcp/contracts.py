@@ -818,6 +818,15 @@ class RuntimeSubject(StrictModel):
         consumer_ids = [consumer.consumer_id for consumer in self.consumers]
         if len(consumer_ids) != len(set(consumer_ids)):
             raise ValueError("consumer ids must be unique within a runtime subject")
+        consumer_registration_refs = [
+            consumer.registration_ref for consumer in self.consumers
+        ]
+        if len(consumer_registration_refs) != len(
+            set(consumer_registration_refs)
+        ):
+            raise ValueError(
+                "consumer registration refs must be unique within a runtime subject"
+            )
         if self.proof.verdict == "passed" and not any(
             evidence.owner == self.owners.proof_owner
             for evidence in self.proof.evidence.evidence_refs
@@ -830,6 +839,18 @@ class RuntimeSubject(StrictModel):
             raise ValueError(
                 "owner acceptance evidence must be issued by acceptance_owner"
             )
+        if (
+            self.canary.succeeded
+            and min(
+                self.canary.evidence.observed_at,
+                *(
+                    evidence.observed_at
+                    for evidence in self.canary.evidence.evidence_refs
+                ),
+            )
+            < self.deploy.deployed_at
+        ):
+            raise ValueError("successful canary cannot precede deployment")
         if (
             self.proof.verdict == "passed"
             and self.canary.succeeded

@@ -385,7 +385,7 @@ class StackMCPApplication:
             )
         plan_consumer: ConsumerObservation | None = None
         if plan_kind == "activate":
-            plan_consumer = self._compatible_consumers(subject, now)[0]
+            plan_consumer = self._proof_consumers(subject, now)[0]
         elif plan_kind == "rollback":
             plan_consumer = self._rollback_consumers(subject, now)[0]
         plan_links = self._plan_links(
@@ -676,6 +676,7 @@ class StackMCPApplication:
                 blockers.append("server_schema_unobserved")
         if plan_kind == "activate":
             compatible_consumers = self._compatible_consumers(subject, now)
+            proof_consumers = self._proof_consumers(subject, now)
             if not subject.process.active:
                 blockers.append("process_not_active")
             if not subject.endpoint.ready:
@@ -694,11 +695,7 @@ class StackMCPApplication:
                 or subject.proof.proved_server_schema_digest
                 != subject.endpoint.server_schema_digest
                 or subject.proof.proved_canary_ref != subject.canary.canary_ref
-                or (
-                    bool(compatible_consumers)
-                    and subject.proof.proved_consumer_registration_ref
-                    != compatible_consumers[0].registration_ref
-                )
+                or (bool(compatible_consumers) and not proof_consumers)
             ):
                 blockers.append("central_proof_target_mismatch")
             if (
@@ -789,6 +786,19 @@ class StackMCPApplication:
                     consumer.registration_ref,
                 ),
             )
+        )
+
+    @classmethod
+    def _proof_consumers(
+        cls,
+        subject: RuntimeSubject,
+        now: datetime,
+    ) -> tuple[ConsumerObservation, ...]:
+        return tuple(
+            consumer
+            for consumer in cls._compatible_consumers(subject, now)
+            if consumer.registration_ref
+            == subject.proof.proved_consumer_registration_ref
         )
 
     @classmethod

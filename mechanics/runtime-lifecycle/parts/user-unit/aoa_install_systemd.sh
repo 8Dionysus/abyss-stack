@@ -235,13 +235,19 @@ aoa_provision_abyss_stack_mcp_runtime() {
   local marker=".abyss-stack-mcp-source-digest"
   local temp_venv=""
   local backup_venv=""
+  local resolved_bootstrap_python=""
 
   [[ "$abyss_stack_mcp_bootstrap_python" == /* ]] || \
     aoa_die "ABYSS_STACK_MCP_BOOTSTRAP_PYTHON must be an absolute path"
-  [[ -f "$abyss_stack_mcp_bootstrap_python" && \
-     ! -L "$abyss_stack_mcp_bootstrap_python" && \
-     -x "$abyss_stack_mcp_bootstrap_python" ]] || \
+  resolved_bootstrap_python="$(
+    readlink -f -- "$abyss_stack_mcp_bootstrap_python"
+  )" || aoa_die "failed to resolve abyss-stack MCP bootstrap Python"
+  [[ "$resolved_bootstrap_python" == /* && \
+     -f "$resolved_bootstrap_python" && \
+     ! -L "$resolved_bootstrap_python" && \
+     -x "$resolved_bootstrap_python" ]] || \
     aoa_die "abyss-stack MCP bootstrap Python is not an executable regular file"
+  abyss_stack_mcp_bootstrap_python="$resolved_bootstrap_python"
   [[ -d "$abyss_stack_mcp_service_root" && \
      ! -L "$abyss_stack_mcp_service_root" ]] || \
     aoa_die "deployed abyss-stack MCP package root is unavailable"
