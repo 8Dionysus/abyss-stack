@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 17703997,
+  "allowed_tracked_bytes": 25232431,
+  "approved_by": "repository-owner",
+  "base_ref": "e3f35444e4b527f26eeb9118f4bfeffff6c695d6",
+  "changed_generated_bytes": 17703997,
+  "changed_generated_files": 276,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "e0fc9bd094c27df2859e58ffc3658a5cf0d465ae75fd2f2c5309e4b50bd6c000",
+  "reason": "Refresh the KAG family for proof-owner activation evidence and observation-snapshot causality without raising the standing budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 25232431,
+  "tracked_bytes_max": 24117248
+}
