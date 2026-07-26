@@ -559,9 +559,14 @@ def test_failed_rollback_swap_removes_marker_and_preserves_retryable_tree(
 
     def fail_selected_replace(source: Path, destination: Path) -> None:
         nonlocal replace_calls
-        replace_calls += 1
-        if replace_calls == failing_replace_call:
-            raise PermissionError("injected rollback swap failure")
+        swap_pair = (Path(source), Path(destination))
+        if swap_pair in {
+            (target, retained),
+            (rollback_root, target),
+        }:
+            replace_calls += 1
+            if replace_calls == failing_replace_call:
+                raise PermissionError("injected rollback swap failure")
         real_replace(source, destination)
 
     monkeypatch.setattr(
@@ -584,3 +589,107 @@ def test_failed_rollback_swap_removes_marker_and_preserves_retryable_tree(
     assert not rollback_root.joinpath(
         "manifest/routing_g5_compatibility_rollback.json"
     ).exists()
+
+
+@pytest.mark.parametrize(
+    "termination_point",
+    ["before_first_swap", "between_swaps", "after_second_swap"],
+)
+def test_retry_recovers_each_process_termination_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    termination_point: str,
+) -> None:
+    fixture = make_fixture(tmp_path)
+    target = tmp_path / "runtime/Knowledge/federation/aoa-routing"
+    make_predecessor_root(target, fixture)
+    rollback_root = target.parent / "aoa-routing.pre-g5"
+    activated = run_cutover(
+        [
+            "materialize",
+            *exact_args(fixture, target),
+            "--authorized-live-cutover",
+            "--rollback-root",
+            str(rollback_root),
+            "--operator-change-ref",
+            "test-g5-change",
+        ]
+    )
+    assert activated.returncode == 0, activated.stderr + activated.stdout
+
+    retained = target.parent / "aoa-routing.sdk-canonical-retained"
+    parsed = CUTOVER_BACKEND.build_parser().parse_args(
+        rollback_args(
+            fixture,
+            target=target,
+            rollback_root=rollback_root,
+            retain_root=retained,
+        )
+    )
+    real_replace = os.replace
+
+    def terminate_at_selected_boundary(
+        source: Path,
+        destination: Path,
+    ) -> None:
+        pair = (Path(source), Path(destination))
+        if (
+            termination_point == "before_first_swap"
+            and pair == (target, retained)
+        ):
+            raise KeyboardInterrupt("injected process termination")
+        real_replace(source, destination)
+        if (
+            termination_point == "between_swaps"
+            and pair == (target, retained)
+        ):
+            raise KeyboardInterrupt("injected process termination")
+        if (
+            termination_point == "after_second_swap"
+            and pair == (rollback_root, target)
+        ):
+            raise KeyboardInterrupt("injected process termination")
+
+    monkeypatch.setattr(
+        CUTOVER_BACKEND.os,
+        "replace",
+        terminate_at_selected_boundary,
+    )
+    with pytest.raises(
+        KeyboardInterrupt,
+        match="injected process termination",
+    ):
+        CUTOVER_BACKEND.rollback(parsed)
+
+    if termination_point == "before_first_swap":
+        assert target.is_dir()
+        assert rollback_root.is_dir()
+        assert not retained.exists()
+    elif termination_point == "between_swaps":
+        assert not target.exists()
+        assert rollback_root.is_dir()
+        assert retained.is_dir()
+    else:
+        assert target.is_dir()
+        assert not rollback_root.exists()
+        assert retained.is_dir()
+
+    monkeypatch.setattr(CUTOVER_BACKEND.os, "replace", real_replace)
+    recovered = CUTOVER_BACKEND.rollback(parsed)
+
+    assert recovered["restored"] is True
+    assert recovered["retry_state"] in {
+        "fresh_restore",
+        "continued_after_first_swap",
+        "already_restored",
+    }
+    assert recovered["idempotent_retry"] is (
+        termination_point == "after_second_swap"
+    )
+    assert target.joinpath("predecessor.txt").is_file()
+    assert target.joinpath(
+        "manifest/routing_g5_compatibility_rollback.json"
+    ).is_file()
+    assert retained.joinpath(
+        "manifest/federation_mirror_manifest.json"
+    ).is_file()

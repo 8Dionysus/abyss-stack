@@ -899,6 +899,33 @@ datasources:
             closure["canonical_reasons"],
         )
 
+    def test_sdk_canonical_null_controls_fail_closed_without_health_error(
+        self,
+    ) -> None:
+        store = self.make_sdk_canonical_store()
+        trust = store.routing.payloads["mirror_manifest"]["trust_verdict"]
+        admission = trust["record"]["producer_admission"]
+        admission["required_controls"] = None
+        trust["inspected_claims"]["producer_admission"] = admission
+        self.module.STORE = store
+
+        health = self.module.health()
+        surface = self.module.surface_status()
+        closure = self.module.layer_status(store.routing)["closure_status"]
+
+        self.assertFalse(health["ok"])
+        self.assertFalse(closure["canonical_ready"])
+        self.assertFalse(closure["closure_ready"])
+        self.assertFalse(
+            surface["layers_status"]["aoa-routing"]["closure_status"][
+                "closure_ready"
+            ]
+        )
+        self.assertIn(
+            "routing SDK canonical producer admission controls drifted",
+            closure["canonical_reasons"],
+        )
+
     def test_compatibility_rollback_marker_persists_degraded_owner_state(
         self,
     ) -> None:

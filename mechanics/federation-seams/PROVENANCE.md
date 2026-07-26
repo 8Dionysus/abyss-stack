@@ -20,7 +20,8 @@ The refactor pattern is:
   `runtime` verdict and materialized owner-switch receipt; runtime rollback
   first verifies the exact predecessor manifest, ref, stable ABI, and hashes,
   then persists a compatibility-rollback marker while source ownership stays
-  singular and archive authority stays false
+  singular and archive authority stays false; exact marker and tree evidence
+  also recovers termination before, between, or after the swap boundaries
 - expose only an allowlisted trust summary through health; keep full durable
   registry records and deploy-local evidence refs behind their owner boundary
 

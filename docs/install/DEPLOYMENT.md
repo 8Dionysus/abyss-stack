@@ -352,10 +352,14 @@ It persists
 route-api keeps reporting `compatibility_rollback_active` and non-closing
 posture after restart. If either atomic swap step fails, the exact staged
 marker is removed from the rollback root so that the already-verified
-predecessor remains retryable. Route-api may report normal closure only for
-an `authorized_live_cutover` while the exact `sdk_canonical` receipt,
-producer-admission trust controls, public-release record, subject bytes, and
-mirror hashes agree. An isolated rehearsal remains non-closing.
+predecessor remains retryable. If the process terminates instead, a repeated
+command validates and recovers the exact marker-before-swap, between-swap, or
+already-restored state; the last case returns idempotent success. Route-api
+may report normal closure only for an `authorized_live_cutover` while the
+exact `sdk_canonical` receipt, typed producer-admission trust controls,
+public-release record, subject bytes, and mirror hashes agree. Malformed
+control collections remain non-ready instead of raising a health error. An
+isolated rehearsal remains non-closing.
 
 ### `scripts/aoa-install-systemd`
 

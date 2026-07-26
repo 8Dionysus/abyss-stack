@@ -96,6 +96,11 @@ only compatibility and rollback.
   compatibility marker that survives route-api restart.
 - Positive: an aborted rollback swap removes only the exact marker it staged,
   keeping the verified predecessor tree retryable without manual mutation.
+- Positive: a retry recognizes exact pre-swap, between-swap, and
+  already-restored filesystem states, validates the bound marker and trees,
+  and either continues or returns an idempotent success.
+- Positive: malformed trust-control collections degrade canonical readiness
+  instead of crashing route-api health.
 - Positive: route-api exposes only allowlisted receipt and trust summaries.
 - Tradeoff: G5 requires a new canonical registry record and subject store; the
   earlier candidate record cannot be silently promoted.

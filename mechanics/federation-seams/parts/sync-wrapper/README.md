@@ -87,6 +87,11 @@ Route-api consumes that marker after restart and keeps ordinary closure red:
 the runtime serves compatibility bytes while SDK source ownership remains
 canonical. If an atomic swap step fails, the exact staged marker is removed
 from the rollback root so that the verified predecessor remains retryable.
+If the process terminates, retry validates the exact pre-swap, between-swap,
+or already-restored state and safely continues or returns idempotent success.
+Trust controls and consumer-intent collections are type-checked before set or
+membership operations, so corrupt JSON stays fail-closed without crashing
+route-api health or the cutover command.
 The isolated mode rejects the live target shape; only
 `--authorized-live-cutover` may address
 `Knowledge/federation/aoa-routing`.

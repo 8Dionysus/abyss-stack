@@ -94,6 +94,29 @@ def owner_switch_receipt_digest(receipt: dict[str, Any]) -> str:
     return stable_digest(receipt)
 
 
+def require_exact_controls(value: Any, label: str) -> None:
+    if (
+        not isinstance(value, list)
+        or any(not isinstance(item, str) for item in value)
+        or len(value) != len(EXPECTED_CONTROLS)
+        or set(value) != EXPECTED_CONTROLS
+    ):
+        raise CutoverError(f"{label} drifted")
+
+
+def require_string_list_contains(
+    value: Any,
+    expected: str,
+    label: str,
+) -> None:
+    if (
+        not isinstance(value, list)
+        or any(not isinstance(item, str) for item in value)
+        or expected not in value
+    ):
+        raise CutoverError(f"{label} lacks {expected}")
+
+
 def resolved_tree_file(root: Path, relative: str, label: str) -> Path:
     normalized = safe_relative_path(relative, label)
     resolved_root = root.resolve(strict=True)
@@ -117,8 +140,12 @@ def validate_predecessor_root(
     *,
     required_files: list[str],
     predecessor_source_ref: str,
+    allow_compatibility_marker: bool = False,
 ) -> dict[str, Any]:
-    if (root / COMPATIBILITY_ROLLBACK_REL).exists():
+    if (
+        (root / COMPATIBILITY_ROLLBACK_REL).exists()
+        and not allow_compatibility_marker
+    ):
         raise CutoverError(
             "predecessor rollback tree already carries a compatibility "
             "rollback marker"
@@ -414,12 +441,19 @@ def validate_canonical_trust_verdict(
             raise CutoverError(f"canonical trust record field drifted: {key}")
     if record.get("lifecycle_state") not in {"release-ready", "published"}:
         raise CutoverError("canonical trust record lifecycle is not release-ready")
-    if "abyss-stack:routing-canonical" not in record.get("consumer_refs", []):
-        raise CutoverError("canonical trust record lacks runtime consumer admission")
-    if set(record.get("required_controls", [])) != EXPECTED_CONTROLS:
-        raise CutoverError("canonical trust record required controls drifted")
-    if set(record.get("verified_controls", [])) != EXPECTED_CONTROLS:
-        raise CutoverError("canonical trust record verified controls drifted")
+    require_string_list_contains(
+        record.get("consumer_refs"),
+        "abyss-stack:routing-canonical",
+        "canonical trust record consumer admission",
+    )
+    require_exact_controls(
+        record.get("required_controls"),
+        "canonical trust record required controls",
+    )
+    require_exact_controls(
+        record.get("verified_controls"),
+        "canonical trust record verified controls",
+    )
     store = record.get("artifact_subject_store")
     if (
         not isinstance(store, dict)
@@ -450,10 +484,15 @@ def validate_canonical_trust_verdict(
     for key, value in expected_admission.items():
         if admission.get(key) != value:
             raise CutoverError(f"canonical producer admission field drifted: {key}")
-    if "runtime" not in admission.get("allowed_consumer_intents", []):
-        raise CutoverError("canonical producer admission does not allow runtime")
-    if set(admission.get("required_controls", [])) != EXPECTED_CONTROLS:
-        raise CutoverError("canonical producer admission controls drifted")
+    require_string_list_contains(
+        admission.get("allowed_consumer_intents"),
+        "runtime",
+        "canonical producer admission consumer intent",
+    )
+    require_exact_controls(
+        admission.get("required_controls"),
+        "canonical producer admission controls",
+    )
     authority = require_canonical_authority(
         admission.get("g5_authority"),
         "canonical producer admission g5_authority",
@@ -936,6 +975,122 @@ def remove_exact_compatibility_marker(
     marker_path.unlink()
 
 
+def load_staged_compatibility_marker(
+    rollback_root: Path,
+) -> dict[str, Any] | None:
+    marker_path = rollback_root / COMPATIBILITY_ROLLBACK_REL
+    if marker_path.is_symlink():
+        raise CutoverError(
+            "staged compatibility rollback marker must not be a symlink"
+        )
+    if not marker_path.exists():
+        return None
+    return read_json(
+        marker_path,
+        "staged compatibility rollback marker",
+    )
+
+
+def write_compatibility_marker_atomic(
+    rollback_root: Path,
+    marker: dict[str, Any],
+) -> dict[str, Any]:
+    marker_path = rollback_root / COMPATIBILITY_ROLLBACK_REL
+    marker_path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{marker_path.name}.stage-",
+        dir=marker_path.parent,
+    )
+    os.close(descriptor)
+    temporary_path = Path(temporary_name)
+    try:
+        write_json(temporary_path, marker)
+        staged = read_json(
+            temporary_path,
+            "staged compatibility rollback marker",
+        )
+        if stable_digest(staged) != stable_digest(marker):
+            raise CutoverError(
+                "staged compatibility rollback marker digest drifted"
+            )
+        os.replace(temporary_path, marker_path)
+    finally:
+        if temporary_path.exists():
+            temporary_path.unlink()
+    persisted = read_json(
+        marker_path,
+        "compatibility rollback marker",
+    )
+    if stable_digest(persisted) != stable_digest(marker):
+        raise CutoverError(
+            "persisted compatibility rollback marker digest drifted"
+        )
+    return persisted
+
+
+def validate_marked_predecessor(
+    root: Path,
+    *,
+    marker: dict[str, Any],
+    required_files: list[str],
+    sdk_source_ref: str,
+    predecessor_source_ref: str,
+    subject_digest: str,
+    operator_change_ref: str,
+) -> dict[str, Any]:
+    inspection = validate_predecessor_root(
+        root,
+        required_files=required_files,
+        predecessor_source_ref=predecessor_source_ref,
+        allow_compatibility_marker=True,
+    )
+    validate_compatibility_rollback_marker(
+        marker,
+        sdk_source_ref=sdk_source_ref,
+        predecessor_source_ref=predecessor_source_ref,
+        subject_digest=subject_digest,
+        operator_change_ref=operator_change_ref,
+        predecessor_inspection=inspection,
+    )
+    return inspection
+
+
+def rollback_result(
+    *,
+    sdk_source_ref: str,
+    subject_digest: str,
+    operator_change_ref: str,
+    target: Path,
+    retain_root: Path,
+    canonical_inspection: dict[str, Any],
+    predecessor_inspection: dict[str, Any],
+    persisted_marker: dict[str, Any],
+    retry_state: str,
+) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "schema": "abyss_stack_routing_g5_cutover_rollback_v1",
+        "operation": "rollback",
+        "restored": True,
+        "idempotent_retry": retry_state == "already_restored",
+        "retry_state": retry_state,
+        "runtime_owner_state": "compatibility_rollback_active",
+        "source_owner_state": "sdk_canonical_unchanged",
+        "sdk_source_ref": sdk_source_ref,
+        "target_root": str(target),
+        "canonical_retain_root": str(retain_root),
+        "artifact_subject_digest": subject_digest,
+        "operator_change_ref": operator_change_ref,
+        "canonical_identity_inspection": canonical_inspection,
+        "predecessor_identity_inspection": predecessor_inspection,
+        "compatibility_rollback_marker": COMPATIBILITY_ROLLBACK_REL,
+        "compatibility_rollback_marker_digest": stable_digest(
+            persisted_marker
+        ),
+        "archive_authorized": False,
+    }
+
+
 def rollback(args: argparse.Namespace) -> dict[str, Any]:
     sdk_ref = require_git_object_id(args.sdk_source_ref, "SDK source ref")
     predecessor_ref = require_git_object_id(
@@ -963,12 +1118,116 @@ def rollback(args: argparse.Namespace) -> dict[str, Any]:
         raise CutoverError(
             "target, rollback, and canonical-retain roots must be disjoint"
         )
-    if not target.is_dir() or not rollback_root.is_dir():
-        raise CutoverError("rollback requires active canonical and rollback roots")
-    if retain_root.exists():
-        raise CutoverError(f"canonical retain root already exists: {retain_root}")
     if not (target.parent == rollback_root.parent == retain_root.parent):
         raise CutoverError("rollback roots must share one parent for atomic restore")
+
+    initial_state = (
+        target.is_dir()
+        and rollback_root.is_dir()
+        and not retain_root.exists()
+    )
+    interrupted_between_swaps = (
+        not target.exists()
+        and rollback_root.is_dir()
+        and retain_root.is_dir()
+    )
+    already_restored = (
+        target.is_dir()
+        and not rollback_root.exists()
+        and retain_root.is_dir()
+    )
+    if not (
+        initial_state
+        or interrupted_between_swaps
+        or already_restored
+    ):
+        raise CutoverError(
+            "rollback roots do not match an initial, interrupted, or "
+            "already-restored transaction state"
+        )
+
+    if already_restored:
+        completed_marker = load_staged_compatibility_marker(target)
+        if completed_marker is None:
+            raise CutoverError(
+                "already-restored target lacks its compatibility marker"
+            )
+        predecessor_inspection = validate_marked_predecessor(
+            target,
+            marker=completed_marker,
+            required_files=required,
+            sdk_source_ref=sdk_ref,
+            predecessor_source_ref=predecessor_ref,
+            subject_digest=digest,
+            operator_change_ref=operator_change,
+        )
+        canonical_inspection = inspect_active_canonical(
+            retain_root,
+            sdk_source_ref=sdk_ref,
+            predecessor_source_ref=predecessor_ref,
+            subject_digest=digest,
+        )
+        return rollback_result(
+            sdk_source_ref=sdk_ref,
+            subject_digest=digest,
+            operator_change_ref=operator_change,
+            target=target,
+            retain_root=retain_root,
+            canonical_inspection=canonical_inspection,
+            predecessor_inspection=predecessor_inspection,
+            persisted_marker=completed_marker,
+            retry_state="already_restored",
+        )
+
+    staged_marker = load_staged_compatibility_marker(rollback_root)
+    if interrupted_between_swaps:
+        if staged_marker is None:
+            raise CutoverError(
+                "interrupted rollback tree lacks its exact staged marker"
+            )
+        predecessor_inspection = validate_marked_predecessor(
+            rollback_root,
+            marker=staged_marker,
+            required_files=required,
+            sdk_source_ref=sdk_ref,
+            predecessor_source_ref=predecessor_ref,
+            subject_digest=digest,
+            operator_change_ref=operator_change,
+        )
+        canonical_inspection = inspect_active_canonical(
+            retain_root,
+            sdk_source_ref=sdk_ref,
+            predecessor_source_ref=predecessor_ref,
+            subject_digest=digest,
+        )
+        try:
+            os.replace(rollback_root, target)
+        except Exception:
+            os.replace(retain_root, target)
+            remove_exact_compatibility_marker(
+                rollback_root,
+                expected_marker=staged_marker,
+            )
+            raise
+        return rollback_result(
+            sdk_source_ref=sdk_ref,
+            subject_digest=digest,
+            operator_change_ref=operator_change,
+            target=target,
+            retain_root=retain_root,
+            canonical_inspection=canonical_inspection,
+            predecessor_inspection=predecessor_inspection,
+            persisted_marker=staged_marker,
+            retry_state="continued_after_first_swap",
+        )
+
+    if (
+        (target / COMPATIBILITY_ROLLBACK_REL).exists()
+        or (target / COMPATIBILITY_ROLLBACK_REL).is_symlink()
+    ):
+        raise CutoverError(
+            "initial live target already carries a compatibility marker"
+        )
     inspection = inspect_active_canonical(
         target,
         sdk_source_ref=sdk_ref,
@@ -979,7 +1238,22 @@ def rollback(args: argparse.Namespace) -> dict[str, Any]:
         rollback_root,
         required_files=required,
         predecessor_source_ref=predecessor_ref,
+        allow_compatibility_marker=staged_marker is not None,
     )
+    if staged_marker is not None:
+        predecessor_inspection = validate_marked_predecessor(
+            rollback_root,
+            marker=staged_marker,
+            required_files=required,
+            sdk_source_ref=sdk_ref,
+            predecessor_source_ref=predecessor_ref,
+            subject_digest=digest,
+            operator_change_ref=operator_change,
+        )
+        remove_exact_compatibility_marker(
+            rollback_root,
+            expected_marker=staged_marker,
+        )
     marker = compatibility_rollback_marker(
         sdk_source_ref=sdk_ref,
         predecessor_source_ref=predecessor_ref,
@@ -988,10 +1262,9 @@ def rollback(args: argparse.Namespace) -> dict[str, Any]:
         predecessor_inspection=predecessor_inspection,
         rolled_back_at=datetime.now(timezone.utc).isoformat(),
     )
-    write_json(rollback_root / COMPATIBILITY_ROLLBACK_REL, marker)
-    persisted_marker = read_json(
-        rollback_root / COMPATIBILITY_ROLLBACK_REL,
-        "compatibility rollback marker",
+    persisted_marker = write_compatibility_marker_atomic(
+        rollback_root,
+        marker,
     )
     validate_compatibility_rollback_marker(
         persisted_marker,
@@ -1014,25 +1287,17 @@ def rollback(args: argparse.Namespace) -> dict[str, Any]:
             expected_marker=persisted_marker,
         )
         raise
-    return {
-        "ok": True,
-        "schema": "abyss_stack_routing_g5_cutover_rollback_v1",
-        "operation": "rollback",
-        "restored": True,
-        "runtime_owner_state": "compatibility_rollback_active",
-        "source_owner_state": "sdk_canonical_unchanged",
-        "target_root": str(target),
-        "canonical_retain_root": str(retain_root),
-        "artifact_subject_digest": digest,
-        "operator_change_ref": operator_change,
-        "canonical_identity_inspection": inspection,
-        "predecessor_identity_inspection": predecessor_inspection,
-        "compatibility_rollback_marker": COMPATIBILITY_ROLLBACK_REL,
-        "compatibility_rollback_marker_digest": stable_digest(
-            persisted_marker
-        ),
-        "archive_authorized": False,
-    }
+    return rollback_result(
+        sdk_source_ref=sdk_ref,
+        subject_digest=digest,
+        operator_change_ref=operator_change,
+        target=target,
+        retain_root=retain_root,
+        canonical_inspection=inspection,
+        predecessor_inspection=predecessor_inspection,
+        persisted_marker=persisted_marker,
+        retry_state="fresh_restore",
+    )
 
 
 def add_exact_input_args(parser: argparse.ArgumentParser) -> None:

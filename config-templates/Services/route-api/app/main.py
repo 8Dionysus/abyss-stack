@@ -57,6 +57,23 @@ ROUTING_REQUIRED_TRUST_CONTROLS = {
 }
 
 
+def exact_routing_trust_controls(value: Any) -> bool:
+    return (
+        isinstance(value, list)
+        and all(isinstance(item, str) for item in value)
+        and len(value) == len(ROUTING_REQUIRED_TRUST_CONTROLS)
+        and set(value) == ROUTING_REQUIRED_TRUST_CONTROLS
+    )
+
+
+def string_list_contains(value: Any, expected: str) -> bool:
+    return (
+        isinstance(value, list)
+        and all(isinstance(item, str) for item in value)
+        and expected in value
+    )
+
+
 @dataclass(frozen=True)
 class LayerStore:
     layer: str
@@ -1170,11 +1187,18 @@ def routing_sdk_canary_provenance_reasons(layer: LayerStore) -> list[str]:
         for key, expected in expected_record_fields.items():
             if record.get(key) != expected:
                 reasons.append(f"routing SDK canary trust record field drifted: {key}")
-        if "abyss-stack:routing-canary" not in record.get("consumer_refs", []):
+        if not string_list_contains(
+            record.get("consumer_refs"),
+            "abyss-stack:routing-canary",
+        ):
             reasons.append("routing SDK canary trust record lacks consumer admission")
-        if set(record.get("required_controls", [])) != ROUTING_REQUIRED_TRUST_CONTROLS:
+        if not exact_routing_trust_controls(
+            record.get("required_controls")
+        ):
             reasons.append("routing SDK canary trust record required controls drifted")
-        if set(record.get("verified_controls", [])) != ROUTING_REQUIRED_TRUST_CONTROLS:
+        if not exact_routing_trust_controls(
+            record.get("verified_controls")
+        ):
             reasons.append("routing SDK canary trust record verified controls drifted")
         subject_store = record.get("artifact_subject_store")
         if (
@@ -1208,9 +1232,14 @@ def routing_sdk_canary_provenance_reasons(layer: LayerStore) -> list[str]:
                 reasons.append(
                     f"routing SDK canary producer admission field drifted: {key}"
                 )
-        if "runtime_canary" not in admission.get("allowed_consumer_intents", []):
+        if not string_list_contains(
+            admission.get("allowed_consumer_intents"),
+            "runtime_canary",
+        ):
             reasons.append("routing SDK canary producer admission lacks runtime_canary")
-        if set(admission.get("required_controls", [])) != ROUTING_REQUIRED_TRUST_CONTROLS:
+        if not exact_routing_trust_controls(
+            admission.get("required_controls")
+        ):
             reasons.append("routing SDK canary producer admission controls drifted")
         admission_authority = admission.get("g5_authority")
         if not isinstance(admission_authority, dict) or any(
@@ -1593,18 +1622,20 @@ def routing_sdk_canonical_provenance_reasons(
             reasons.append("routing SDK canonical trust lifecycle is invalid")
         if record.get("trust_root_mode") != "public_release":
             reasons.append("routing SDK canonical trust root is not public release")
-        if "abyss-stack:routing-canonical" not in record.get(
-            "consumer_refs",
-            [],
+        if not string_list_contains(
+            record.get("consumer_refs"),
+            "abyss-stack:routing-canonical",
         ):
             reasons.append(
                 "routing SDK canonical trust record lacks consumer admission"
             )
         if (
-            set(record.get("required_controls", []))
-            != ROUTING_REQUIRED_TRUST_CONTROLS
-            or set(record.get("verified_controls", []))
-            != ROUTING_REQUIRED_TRUST_CONTROLS
+            not exact_routing_trust_controls(
+                record.get("required_controls")
+            )
+            or not exact_routing_trust_controls(
+                record.get("verified_controls")
+            )
         ):
             reasons.append("routing SDK canonical trust controls drifted")
         subject_store = record.get("artifact_subject_store")
@@ -1660,13 +1691,15 @@ def routing_sdk_canonical_provenance_reasons(
                     "routing SDK canonical producer admission field drifted: "
                     + key
                 )
-        if "runtime" not in admission.get("allowed_consumer_intents", []):
+        if not string_list_contains(
+            admission.get("allowed_consumer_intents"),
+            "runtime",
+        ):
             reasons.append(
                 "routing SDK canonical producer admission lacks runtime"
             )
-        if (
-            set(admission.get("required_controls", []))
-            != ROUTING_REQUIRED_TRUST_CONTROLS
+        if not exact_routing_trust_controls(
+            admission.get("required_controls")
         ):
             reasons.append(
                 "routing SDK canonical producer admission controls drifted"
