@@ -709,6 +709,39 @@ def test_observation_store_allows_noncredential_substrings_in_reference_keys(
     )
 
 
+@pytest.mark.parametrize(
+    "token_prefix",
+    (
+        "glpat-",
+        "gloas-",
+        "gldt-",
+        "glrt-",
+        "glrtr-",
+        "glcbt-",
+        "glptt-",
+        "glft-",
+        "glimt-",
+        "glagent-",
+        "glwt-",
+        "glsoat-",
+        "glffct-",
+    ),
+)
+def test_observation_store_rejects_gitlab_tokens_as_raw_references(
+    tmp_path: Path,
+    token_prefix: str,
+) -> None:
+    secret_value = f"{token_prefix}reference-secret-value"
+    payload = observation(subject())
+    payload["subjects"][0]["acceptance"]["acceptance_ref"] = secret_value
+    path = write_observation(tmp_path / f"{token_prefix}reference.json", payload)
+
+    with pytest.raises(StackMCPError, match="forbidden") as caught:
+        ObservationStore(path).load()
+
+    assert secret_value not in str(caught.value)
+
+
 def test_observation_store_redacts_contract_validation_input_values(
     tmp_path: Path,
 ) -> None:
@@ -1606,6 +1639,33 @@ def test_read_paths_block_future_dated_observation_envelope(
     drift = app.inspect("aoa-kag", "read", view="drift")
     assert drift["metadata"]["freshness_state"] == "blocked"
     assert drift["owner_payload"]["observation"]["freshness_state"] == "blocked"
+
+
+def test_read_paths_downgrade_expired_observation_envelope(
+    tmp_path: Path,
+) -> None:
+    payload = observation(subject())
+    payload["expires_at"] = (NOW + timedelta(minutes=1)).isoformat()
+    app = application(tmp_path, payload=payload)
+
+    catalog = app.catalog()
+    assert catalog["metadata"]["freshness_state"] == "stale_readable"
+    assert catalog["metadata"]["warnings"] == ["runtime-observation-expired"]
+    assert catalog["owner_payload"]["entries"][0]["freshness_state"] == (
+        "stale_readable"
+    )
+
+    freshness = app.inspect("aoa-kag", "read", view="freshness")
+    assert freshness["metadata"]["freshness_state"] == "stale_readable"
+    assert freshness["owner_payload"]["observation"]["effective_state"] == (
+        "stale_readable"
+    )
+
+    drift = app.inspect("aoa-kag", "read", view="drift")
+    assert drift["metadata"]["freshness_state"] == "stale_readable"
+    assert drift["owner_payload"]["observation"]["freshness_state"] == (
+        "stale_readable"
+    )
 
 
 @pytest.mark.parametrize(

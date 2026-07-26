@@ -81,6 +81,9 @@ observation envelope, links, freshness, and nested evidence timestamps, using
 the earlier of wall-clock time and the enclosing observation snapshot;
 causally future usable evidence is reported as `blocked`, never as current,
 before candidate planning is involved.
+An expired observation envelope likewise downgrades both result metadata and
+the derived catalog/freshness/drift fields to at least `stale_readable`, even
+when the enclosed subject freshness expires later.
 Inspection also folds the effective state of the selected evidence view into
 result freshness metadata and exposes it beside the immutable raw owner state.
 `rollback_required` is accepted only while its own link and evidence refs are
@@ -113,8 +116,11 @@ camel-case token sequences rather than only exact key spellings. Concatenated
 matches require a recognized provider/consumer namespace or credential-value
 attribute boundary, so ordinary keys such as `tokenizer`, `passwordless`, and
 `authorizationPolicy` remain valid.
-Secret-prefix checks ignore leading whitespace. Expired observations
-remain visible as stale read evidence but cannot produce a candidate plan.
+Secret-prefix checks ignore leading whitespace and cover the standard OpenAI,
+GitHub, and GitLab token families, including GitLab personal, deploy, runner,
+job, trigger, agent, workspace, SCIM, and feature-flag client tokens. Expired
+observations remain visible as stale read evidence but cannot produce a
+candidate plan.
 The generated Draft 2020-12 schema includes the conditional invariants for
 usable links and freshness, endpoint readiness, consumer registration,
 active-process identity, accepted-target completeness, successful canaries,
@@ -152,7 +158,11 @@ scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime
 ```
 
 These are intentionally separate transactions; combining both flags is
-rejected so provisioning cannot run before the link-and-reload phase.
+rejected so provisioning cannot run before the link-and-reload phase. The
+standalone provision step verifies that both units are loaded from the
+expected managed fragments and that user systemd's effective `ExecStart`
+contains the exact shared runtime lock; absent, stale, or unexpectedly sourced
+unit definitions fail closed and require another `daemon-reload`.
 This creates or refreshes
 `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv`, installs the exact
 `requirements.lock` closure with `--require-hashes`, verifies its dependencies,

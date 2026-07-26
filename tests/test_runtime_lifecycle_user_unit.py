@@ -669,6 +669,23 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             bootstrap_link.symlink_to(bootstrap)
             fake_bin = root / "bin"
             fake_bin.mkdir()
+            unit_source_dir = stack_root / "Configs" / "systemd" / "user"
+            unit_source_dir.mkdir(parents=True)
+            unit_target_dir = root / "xdg-config" / "systemd" / "user"
+            unit_target_dir.mkdir(parents=True)
+            for source_unit in (
+                STACK_MCP_READ_UNIT,
+                STACK_MCP_CANDIDATE_UNIT,
+            ):
+                source_path = unit_source_dir / source_unit.name
+                source_path.write_text(
+                    source_unit.read_text(encoding="utf-8").replace(
+                        "/srv/AbyssOS/abyss-stack",
+                        str(stack_root),
+                    ),
+                    encoding="utf-8",
+                )
+                (unit_target_dir / source_unit.name).symlink_to(source_path)
             systemctl = fake_bin / "systemctl"
             systemctl.write_text(
                 "#!/usr/bin/env bash\n"
@@ -678,13 +695,47 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "then\n"
                 "  exit 1\n"
                 "fi\n"
+                "load_state=loaded\n"
+                "active_state=inactive\n"
+                "fragment_path=\"${XDG_CONFIG_HOME}/systemd/user/${unit}\"\n"
+                "exec_path=/usr/bin/flock\n"
+                "exec_start=\"/usr/bin/flock --shared --no-fork "
+                "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/"
+                ".runtime-provision.lock /usr/bin/env "
+                "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv/bin/python "
+                "-I -m abyss_stack_mcp.server\"\n"
+                "if [[ \"${ABYSS_STACK_MCP_TEST_UNLOADED_UNIT:-}\" == "
+                "\"$unit\" ]]; then\n"
+                "  load_state=not-found\n"
+                "  fragment_path=\n"
+                "  exec_path=\n"
+                "  exec_start=\n"
+                "fi\n"
+                "if [[ \"${ABYSS_STACK_MCP_TEST_STALE_UNIT:-}\" == "
+                "\"$unit\" ]]; then\n"
+                "  exec_path=/usr/bin/env\n"
+                "  exec_start=\"/usr/bin/env "
+                "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv/bin/python "
+                "-I -m abyss_stack_mcp.server\"\n"
+                "fi\n"
                 "if [[ \"${ABYSS_STACK_MCP_TEST_ACTIVE_UNIT:-}\" == "
                 "\"$unit\" ]]; then\n"
-                "  printf '%s loaded active running test\\n' \"$unit\"\n"
+                "  active_state=active\n"
                 "elif [[ \"$unit\" == \"abyss-stack-mcp-read.service\" && "
                 "-f \"${ABYSS_STACK_MCP_TEST_ACTIVATE_DURING_BUILD:-"
                 "/nonexistent}\" ]]; then\n"
-                "  printf '%s loaded active running test\\n' \"$unit\"\n"
+                "  active_state=active\n"
+                "fi\n"
+                "printf 'LoadState=%s\\n' \"$load_state\"\n"
+                "printf 'ActiveState=%s\\n' \"$active_state\"\n"
+                "printf 'FragmentPath=%s\\n' \"$fragment_path\"\n"
+                "if [[ -n \"$exec_start\" ]]; then\n"
+                "  printf 'ExecStart={ path=%s ; argv[]=%s ; "
+                "ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; "
+                "pid=0 ; code=(null) ; status=0/0 }\\n' "
+                "\"$exec_path\" \"$exec_start\"\n"
+                "else\n"
+                "  printf 'ExecStart=\\n'\n"
                 "fi\n"
                 "exit 0\n",
                 encoding="utf-8",
@@ -709,6 +760,65 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 str(INSTALL_SYSTEMD),
                 "--provision-abyss-stack-mcp-runtime",
             ]
+
+            read_unit_source = (
+                unit_source_dir / "abyss-stack-mcp-read.service"
+            )
+            lock_aware_source = read_unit_source.read_text(encoding="utf-8")
+            read_unit_source.write_text(
+                lock_aware_source.replace(
+                    "ExecStart=/usr/bin/flock --shared --no-fork ",
+                    "ExecStart=/usr/bin/env ",
+                ),
+                encoding="utf-8",
+            )
+            stale_source = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(stale_source.returncode, 0)
+            self.assertIn(
+                "managed source unit is not lock-aware",
+                stale_source.stderr,
+            )
+            self.assertFalse(pip_log.exists())
+            read_unit_source.write_text(
+                lock_aware_source,
+                encoding="utf-8",
+            )
+
+            for environment_key, expected_error in (
+                (
+                    "ABYSS_STACK_MCP_TEST_UNLOADED_UNIT",
+                    "is not loaded; link and reload managed user units",
+                ),
+                (
+                    "ABYSS_STACK_MCP_TEST_STALE_UNIT",
+                    "is not loaded with the lock-aware ExecStart",
+                ),
+            ):
+                with self.subTest(environment_key=environment_key):
+                    missing_prerequisite = subprocess.run(
+                        command,
+                        cwd=REPO_ROOT,
+                        env={
+                            **env,
+                            environment_key: "abyss-stack-mcp-read.service",
+                        },
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(missing_prerequisite.returncode, 0)
+                    self.assertIn(
+                        expected_error,
+                        missing_prerequisite.stderr,
+                    )
+                    self.assertFalse(pip_log.exists())
 
             first = subprocess.run(
                 command,
@@ -965,7 +1075,8 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertNotEqual(unobservable.returncode, 0)
             self.assertIn(
-                "cannot determine whether abyss-stack-mcp-read.service is active",
+                "cannot inspect the loaded definition for "
+                "abyss-stack-mcp-read.service",
                 unobservable.stderr,
             )
             self.assertEqual(

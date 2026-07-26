@@ -51,6 +51,11 @@ Tracking starts with the community-docs baseline for this repository.
   inspection also folds its selected effective link state into response
   freshness while preserving the raw owner claim. Existing equal
   read/candidate bearer values fail closed instead of collapsing the contours.
+- Read payloads now propagate an expired observation envelope into their
+  derived catalog/freshness/drift states, raw references reject the standard
+  GitLab token-prefix families, and standalone runtime provisioning verifies
+  that user systemd has loaded both expected fragments with the exact
+  lock-aware `ExecStart` before it can replace the venv.
 - Rollback candidate preparation now relies on the usable, typed
   last-known-good rollback proof and no longer blocks on or copies canary
   evidence from the current deployment.

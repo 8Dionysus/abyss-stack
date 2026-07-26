@@ -101,6 +101,19 @@ _SECRET_VALUE_PREFIXES = (
     "sk-",
     "ghp_",
     "github_pat_",
+    "glpat-",
+    "gloas-",
+    "gldt-",
+    "glrt-",
+    "glrtr-",
+    "glcbt-",
+    "glptt-",
+    "glft-",
+    "glimt-",
+    "glagent-",
+    "glwt-",
+    "glsoat-",
+    "glffct-",
 )
 _JWT_CANDIDATE = re.compile(
     r"(?<![A-Za-z0-9_-])"
@@ -856,11 +869,14 @@ class StackMCPApplication:
     ) -> str:
         if observation.generated_at > now + MAX_PLAN_FUTURE_SKEW:
             return "blocked"
-        return self._effective_freshness(
+        effective = self._effective_freshness(
             subject,
             now,
             snapshot_at=observation.generated_at,
         )
+        if observation.expires_at <= now:
+            effective = self._worst_state([effective, "stale_readable"])
+        return effective
 
     def _view(
         self,

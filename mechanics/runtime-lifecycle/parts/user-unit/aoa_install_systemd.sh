@@ -274,25 +274,87 @@ aoa_provision_abyss_stack_mcp_auth() {
 
 aoa_require_abyss_stack_mcp_units_stopped() {
   local unit=""
+  local unit_properties=""
+  local unit_load_state=""
   local unit_state=""
+  local unit_fragment_path=""
+  local unit_exec_start=""
+  local expected_unit_source=""
+  local expected_unit_target=""
+  local resolved_unit_source=""
+  local resolved_unit_fragment=""
+  local expected_exec_start=""
 
   abyss_stack_mcp_units_error=""
   for unit in abyss-stack-mcp-read.service abyss-stack-mcp-candidate.service; do
-    if ! unit_state="$(
-      systemctl --user list-units \
-        --all \
-        --full \
-        --plain \
-        --no-legend \
-        "$unit" |
-        awk -v expected="$unit" '$1 == expected {print $3}'
+    expected_unit_source="${AOA_CONFIGS_ROOT}/systemd/user/${unit}"
+    expected_unit_target="${XDG_CONFIG_HOME:-${HOME}/.config}/systemd/user/${unit}"
+    expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} /usr/bin/env ${abyss_stack_mcp_venv}/bin/python -I -m abyss_stack_mcp.server"
+    if [[ ! -f "$expected_unit_source" || -L "$expected_unit_source" ]]; then
+      abyss_stack_mcp_units_error="lock-aware source unit is unavailable for ${unit}; link and reload managed user units before provisioning"
+      return 1
+    fi
+    if ! grep -Fqx -- "ExecStart=${expected_exec_start}" \
+        "$expected_unit_source"; then
+      abyss_stack_mcp_units_error="managed source unit is not lock-aware for ${unit}; refusing runtime replacement"
+      return 1
+    fi
+    if [[ ! -L "$expected_unit_target" || \
+          "$(readlink -- "$expected_unit_target" 2>/dev/null)" != \
+            "$expected_unit_source" ]]; then
+      abyss_stack_mcp_units_error="managed lock-aware unit is not linked for ${unit}; link and reload managed user units before provisioning"
+      return 1
+    fi
+    if ! unit_properties="$(
+      systemctl --user show \
+        --no-pager \
+        --property=LoadState \
+        --property=ActiveState \
+        --property=FragmentPath \
+        --property=ExecStart \
+        "$unit"
     )"; then
-      abyss_stack_mcp_units_error="cannot determine whether ${unit} is active; refusing runtime replacement"
+      abyss_stack_mcp_units_error="cannot inspect the loaded definition for ${unit}; refusing runtime replacement"
+      return 1
+    fi
+    unit_load_state="$(
+      awk -F= '$1 == "LoadState" {print substr($0, index($0, "=") + 1)}' \
+        <<< "$unit_properties"
+    )"
+    unit_state="$(
+      awk -F= '$1 == "ActiveState" {print substr($0, index($0, "=") + 1)}' \
+        <<< "$unit_properties"
+    )"
+    unit_fragment_path="$(
+      awk -F= '$1 == "FragmentPath" {print substr($0, index($0, "=") + 1)}' \
+        <<< "$unit_properties"
+    )"
+    unit_exec_start="$(
+      awk -F= '$1 == "ExecStart" {print substr($0, index($0, "=") + 1)}' \
+        <<< "$unit_properties"
+    )"
+    if [[ "$unit_load_state" != "loaded" || -z "$unit_fragment_path" ]]; then
+      abyss_stack_mcp_units_error="${unit} is not loaded; link and reload managed user units before provisioning"
+      return 1
+    fi
+    resolved_unit_source="$(readlink -f -- "$expected_unit_source")" || {
+      abyss_stack_mcp_units_error="cannot resolve the lock-aware source for ${unit}; refusing runtime replacement"
+      return 1
+    }
+    resolved_unit_fragment="$(readlink -f -- "$unit_fragment_path")" || {
+      abyss_stack_mcp_units_error="cannot resolve the loaded fragment for ${unit}; refusing runtime replacement"
+      return 1
+    }
+    if [[ "$resolved_unit_fragment" != "$resolved_unit_source" ]]; then
+      abyss_stack_mcp_units_error="${unit} is loaded from an unexpected fragment; link and reload managed user units before provisioning"
+      return 1
+    fi
+    if [[ "$unit_exec_start" != \
+          "{ path=/usr/bin/flock ; argv[]=${expected_exec_start} ;"* ]]; then
+      abyss_stack_mcp_units_error="${unit} is not loaded with the lock-aware ExecStart; run daemon-reload before provisioning"
       return 1
     fi
     case "$unit_state" in
-      "")
-        ;;
       inactive|failed)
         ;;
       active|activating|reloading|deactivating)

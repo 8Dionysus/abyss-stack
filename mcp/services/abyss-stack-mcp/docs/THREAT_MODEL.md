@@ -25,7 +25,8 @@
   provider/consumer and credential-attribute boundaries without treating
   arbitrary word substrings as credentials; structurally valid compact JWT,
   PEM private-key, Basic/Bearer, and
-  provider-token checks normalize leading whitespace;
+  provider-token checks normalize leading whitespace and cover the standard
+  OpenAI, GitHub, and GitLab token-prefix families;
 - exact targets require at least one non-whitespace character;
 - exact observation digest and short expiry for candidate plans;
 - exact artifact-hashed runtime dependency closure, bound with deployed source
@@ -38,7 +39,9 @@
   with a lifetime shared service lock, exclusive provision lock, and final
   stopped-state check before environment replacement;
 - unit link/reload and runtime provisioning cannot be combined in one
-  invocation; MCP Configs sync and runtime provisioning share an exclusive
+  invocation; the standalone provisioner requires both units to be loaded from
+  their expected managed fragments with user systemd's effective lock-aware
+  `ExecStart`; MCP Configs sync and runtime provisioning share an exclusive
   source-projection lock from their first mutation/read through publication,
   and deployed source is rehashed before the runtime marker/swap;
 - sync plans verify both the observed source revision and source-tree digest
@@ -65,6 +68,8 @@
 - read catalog and inspection use the earlier wall-clock/snapshot bound and
   downgrade a causally future observation envelope, link, freshness timestamp,
   or nested evidence ref to `blocked`;
+- an expired observation envelope downgrades result metadata and each derived
+  catalog/freshness/drift state to at least `stale_readable`;
 - inspection preserves the raw owner link state while exposing its derived
   effective state and folding the selected view's link state into result
   freshness metadata;
