@@ -42,8 +42,9 @@ acceptance-owner evidence bound to the current source revision and package
 digest, a grounded canary, and usable rollback proof. The central-proof and
 acceptance receipts plus the selected compatible consumer's exact
 `registration_ref` are embedded in ordered activation steps, preceded by exact
-process-identity verification, and copied into the expiring precondition
-evidence. Rollback requires
+process-identity verification. A shadow registry receives an exact admission
+action after those gates; an already admitted registry receives verification.
+All receipts are copied into the expiring precondition evidence. Rollback requires
 usable registry, selected consumer-registration, canary-route, and rollback
 evidence, embeds the selected registration target, and carries every one of
 those proofs into the candidate. A ready rollback proof must identify the
@@ -74,8 +75,9 @@ Set `ABYSS_STACK_MCP_OBSERVATION_PATH` to one explicit secret-free
 
 The loader rejects symlinks, non-files, payloads above 2 MiB, unknown contract
 fields, secret-like keys or values, shared credential classes, non-loopback
-HTTP endpoints, and unsupported effect classes. Expired observations remain
-visible as stale read evidence but cannot produce a candidate plan.
+HTTP endpoints, credentials embedded in URI userinfo/query/fragment references,
+and unsupported effect classes. Expired observations remain visible as stale
+read evidence but cannot produce a candidate plan.
 The generated Draft 2020-12 schema includes the conditional invariants for
 usable links and freshness, endpoint readiness, consumer registration,
 active-process identity, accepted-target completeness, successful canaries,

@@ -12,6 +12,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl, urlsplit
 
 from pydantic import ValidationError
 
@@ -85,6 +86,26 @@ def _reject_secret_material(value: Any, path: str = "$") -> None:
         lowered = value.lower()
         if lowered.startswith(("bearer ", "sk-", "ghp_", "github_pat_")):
             raise StackMCPError(f"secret-like value is forbidden at {path}")
+        if "://" in value:
+            try:
+                parsed = urlsplit(value)
+            except ValueError:
+                return
+            if parsed.username is not None or parsed.password is not None:
+                raise StackMCPError(
+                    f"credential-bearing reference is forbidden at {path}"
+                )
+            for component_name, component in (
+                ("query", parsed.query),
+                ("fragment", parsed.fragment),
+            ):
+                for key, _ in parse_qsl(component, keep_blank_values=True):
+                    normalized = re.sub(r"[^a-z0-9]", "", key.casefold())
+                    if normalized in _FORBIDDEN_KEY_CANONICAL:
+                        raise StackMCPError(
+                            "secret-bearing reference key is forbidden at "
+                            f"{path}.{component_name}"
+                        )
 
 
 class ObservationStore:
@@ -910,7 +931,14 @@ class StackMCPApplication:
                     "verify-owner-acceptance",
                     subject.acceptance.acceptance_ref or "missing",
                 ),
-                ("verify-registry-admission", subject.registry.registry_id),
+                (
+                    (
+                        "admit-registry-entry"
+                        if subject.registry.registry_state == "shadow"
+                        else "verify-registry-admission"
+                    ),
+                    subject.registry.registry_id,
+                ),
                 (
                     "verify-consumer-registration",
                     (

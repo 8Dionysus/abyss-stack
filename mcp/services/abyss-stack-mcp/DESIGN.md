@@ -33,10 +33,12 @@ and acceptance-owner evidence bound to the exact current source revision and
 package digest and issued no earlier than central proof.
 The compatible consumer is selected deterministically and its registration
 reference becomes the exact activation-step target; central proof and owner
-acceptance are separate preceding verification steps. Candidate expiry is
-capped by every link and evidence ref actually copied into the plan, including
-freshness, central-proof, and acceptance evidence. Required evidence timestamps
-must also be causally consistent with the enclosing observation snapshot.
+acceptance are separate preceding verification steps. Only after those gates
+does a shadow registry receive an admission action; an already admitted entry
+is verified instead. Candidate expiry is capped by every link and evidence ref
+actually copied into the plan, including freshness, central-proof, and
+acceptance evidence. Required evidence timestamps must also be causally
+consistent with the enclosing observation snapshot.
 
 ## Progressive surface
 

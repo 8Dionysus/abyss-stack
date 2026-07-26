@@ -340,6 +340,36 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
     assert secret_value not in str(caught.value)
 
 
+@pytest.mark.parametrize(
+    "reference_surface",
+    ("query", "userinfo", "fragment"),
+)
+def test_observation_store_rejects_credentials_inside_references(
+    tmp_path: Path,
+    reference_surface: str,
+) -> None:
+    secret_value = "reference-secret-value"
+    payload = observation(subject())
+    if reference_surface == "query":
+        payload["subjects"][0]["source"]["evidence"]["evidence_refs"][0][
+            "evidence_ref"
+        ] = f"https://evidence.invalid/report?api_key={secret_value}"
+    elif reference_surface == "userinfo":
+        payload["subjects"][0]["deploy"]["manifest_ref"] = (
+            f"https://operator:{secret_value}@deploy.invalid/manifest"
+        )
+    else:
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"https://acceptance.invalid/receipt#client_secret={secret_value}"
+        )
+    path = write_observation(tmp_path / f"{reference_surface}.json", payload)
+
+    with pytest.raises(StackMCPError, match="reference") as caught:
+        ObservationStore(path).load()
+
+    assert secret_value not in str(caught.value)
+
+
 def test_observation_store_redacts_contract_validation_input_values(
     tmp_path: Path,
 ) -> None:
@@ -493,6 +523,7 @@ def test_candidate_plan_is_content_addressed_and_never_authorized(
     assert plan["steps"][0]["exact_target"] == "aoa-kag-mcp/0.1.0"
     assert plan["steps"][1]["exact_target"] == "receipt://central-proof/aoa-kag"
     assert plan["steps"][2]["exact_target"] == "receipt://acceptance/aoa-kag"
+    assert plan["steps"][3]["action"] == "admit-registry-entry"
     assert plan["steps"][4]["exact_target"] == "config://codex/aoa-kag"
     evidence_refs = {
         item["evidence_ref"] for item in plan["precondition_evidence"]
@@ -501,6 +532,24 @@ def test_candidate_plan_is_content_addressed_and_never_authorized(
     assert "receipt://runtime/freshness" in evidence_refs
     assert "receipt://runtime/central-proof" in evidence_refs
     assert "receipt://runtime/acceptance" in evidence_refs
+
+
+def test_activation_verifies_an_already_admitted_registry(tmp_path: Path) -> None:
+    payload = observation(subject())
+    payload["subjects"][0]["registry"]["registry_state"] = "admitted"
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+
+    result = app.prepare_plan(
+        "aoa-kag",
+        "read",
+        "activate",
+        expected_observation_digest=digest,
+    )
+
+    assert result["owner_payload"]["plan"]["steps"][3]["action"] == (
+        "verify-registry-admission"
+    )
 
 
 def test_candidate_plan_denies_drift_expiry_and_unproven_rollback(
