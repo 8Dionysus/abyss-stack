@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import subprocess
 import sys
@@ -88,6 +89,7 @@ def main() -> int:
         answer = state.answer("vendor_boot bootloop warning")
         graph = state.query_graph("vendor_boot bootloop warning")
         server = build_server(state)
+        tools = asyncio.run(server.list_tools())
     checks = {
         "source_route": route["service_name"] == "aoa-telegram-connector-mcp" and route["read_only"],
         "status": status["schema"] == "aoa_telegram_connector_mcp_status_v1" and status["status"] == "ok",
@@ -97,6 +99,13 @@ def main() -> int:
         "graph": graph["schema"] == "aoa_telegram_connector_mcp_query_graph_v1" and graph["status"] == "ok",
         "permission_modes": route["permission_modes"] == ["bot_api", "tdlib_user_session", "takeout_export"],
         "server": server is not None,
+        "tool_annotations": len(tools) == 4
+        and all(
+            tool.annotations.readOnlyHint is True
+            and tool.annotations.destructiveHint is False
+            and tool.annotations.openWorldHint is False
+            for tool in tools
+        ),
     }
     ok = all(checks.values())
     print(json.dumps({"status": "pass" if ok else "fail", "checks": checks}, indent=2, sort_keys=True))

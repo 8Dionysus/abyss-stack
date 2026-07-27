@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 
 from aoa_telegram_connector_mcp._http_auth import http_auth_kwargs as _http_auth_kwargs
 from aoa_telegram_connector_mcp._http_auth import transport_settings as _transport_settings
@@ -13,11 +14,25 @@ from aoa_telegram_connector_mcp.core import AoATelegramConnectorMCPState
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_HTTP_PORT = 5427
+READ_TOKEN_ENV = "AOA_TELEGRAM_CONNECTOR_MCP_READ_BEARER_TOKEN"
+READ_CREDENTIAL = "aoa-telegram-connector-mcp-read-bearer-token"
+READ_SCOPE = "mcp:aoa-telegram-connector:read"
+READ_CLIENT_ID = "aoa-loopback-codex:aoa-telegram-connector:read"
+
+
+def _read_http_auth_kwargs() -> dict[str, Any]:
+    return _http_auth_kwargs(
+        DEFAULT_HTTP_PORT,
+        token_env_var=READ_TOKEN_ENV,
+        credential_name=READ_CREDENTIAL,
+        auth_scope=READ_SCOPE,
+        client_id=READ_CLIENT_ID,
+    )
 
 
 def _run_server(server: Any) -> None:
     settings = _transport_settings(DEFAULT_HTTP_PORT)
-    _http_auth_kwargs(DEFAULT_HTTP_PORT)
+    _read_http_auth_kwargs()
     if settings.transport == "stdio":
         server.run(transport="stdio")
         return
@@ -33,28 +48,36 @@ def build_server(state: AoATelegramConnectorMCPState | None = None) -> FastMCP:
     mcp = FastMCP(
         "aoa-telegram-connector-mcp",
         json_response=True,
-        **_http_auth_kwargs(DEFAULT_HTTP_PORT),
+        **_read_http_auth_kwargs(),
+    )
+    read_only_tool = mcp.tool(
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        )
     )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_telegram_connector_status() -> dict[str, Any]:
         """Return local Telegram connector doctor, storage, and policy status."""
 
         return service_state.status()
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_telegram_connector_source_route() -> dict[str, Any]:
         """Return MCP/source ownership and read-only boundary information."""
 
         return service_state.source_route()
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_telegram_connector_answer(query: str, run: str = "latest", limit: int = 5) -> dict[str, Any]:
         """Answer from already-built local Telegram connector evidence."""
 
         return service_state.answer(query, run=run, limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_telegram_connector_query_graph(query: str, run: str = "latest", limit: int = 5) -> dict[str, Any]:
         """Query the already-built local Telegram graph/index evidence."""
 

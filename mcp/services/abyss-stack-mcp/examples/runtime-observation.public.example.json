@@ -193,7 +193,7 @@
         },
         "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py",
         "process_identity": "aoa-kag-mcp/0.0.0-example",
-        "unit_name": "aoa-mcp-http@aoa-kag.service"
+        "unit_name": "aoa-organ-mcp-read@aoa-kag.service"
       },
       "proof": {
         "evaluated_at": "2026-07-25T12:00:00Z",
@@ -273,7 +273,7 @@
         "last_known_good_executable_ref": "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py",
         "last_known_good_package_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "last_known_good_process_identity": "aoa-kag-mcp/0.0.0-example",
-        "last_known_good_unit_name": "aoa-mcp-http@aoa-kag.service",
+        "last_known_good_unit_name": "aoa-organ-mcp-read@aoa-kag.service",
         "proof_ref": "example://runtime/rollback",
         "proved_target": {
           "canary_ref": "example://canary/aoa-kag/last-known-good",
@@ -287,7 +287,7 @@
           "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py",
           "package_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "process_identity": "aoa-kag-mcp/0.0.0-example",
-          "unit_name": "aoa-mcp-http@aoa-kag.service"
+          "unit_name": "aoa-organ-mcp-read@aoa-kag.service"
         },
         "ready": true,
         "rollback_route": "example://rollback/aoa-kag"

@@ -21,7 +21,10 @@ Generated readers own deterministic read models.
 Runtime-candidate readers own candidate evidence shapes.
 Stack runtime exports own private candidate records under
 `Logs/eval-exports/`.
-`aoa-evals-mcp` owns just-in-time access, selection helpers, and route prompts.
+`aoa-evals-mcp` owns just-in-time access, selection helpers, route prompts, and
+narrow local-port authoring convenience. It does not combine them in one
+authority: read and candidate run as different processes with disjoint tool
+catalogs, ports, credentials, scopes, and client identities.
 `abyss-stack` owns the runnable MCP service package.
 
 ## Operation
@@ -103,6 +106,11 @@ When the stack federation sync wrapper refreshes the mirror, it writes
 required files, and compact counts. MCP treats the manifest as freshness
 evidence, not proof authority.
 
+The read process exposes catalog, inspection, validation, Forge, candidate
+read-model, and local-port planning surfaces. The candidate process exposes
+only the three AOA-EV-D-0241 writers. Core guards independently deny writes
+under the read policy and outside the configured candidate roots.
+
 ## Local Port Inventory
 
 Repo-local `evals/` ports are exposed as a read-only workspace inventory before
@@ -132,6 +140,17 @@ pinned interpreter, dependency runtime, verdict, score, regression, or proof
 acceptance. V1, unknown, invalid-authority, and degraded fallback inputs map
 suite execution to `absent`, so historical suite-note counts cannot become a
 runnable inference.
+
+## Managed Candidate Isolation
+
+Managed read uses port `5424` and a filesystem-read-only owner unit. Managed
+candidate uses port `5435`, a distinct bearer, an explicit application root
+allowlist, and exact OS write paths for `intake/`, `suites/`, `reports/`, and
+the first-pressure `PORT.yaml` transition.
+
+The runtime inventory may discover future ports for read routing, but discovery
+does not grant write authority. A new candidate port requires an explicit
+source update to both allowlists and owner review.
 
 ## Readiness
 

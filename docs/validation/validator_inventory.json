@@ -545,6 +545,9 @@
         "mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py",
         "mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py",
         "mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py",
+        "mcp/services/aoa-course-connector-mcp/scripts/validate_course_connector_mcp.py",
+        "mcp/services/aoa-stackoverflow-connector-mcp/scripts/validate_stackoverflow_connector_mcp.py",
+        "mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py",
         "mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py",
         "mcp/services/aoa-memo-mcp/scripts/release_check.py",
         "mcp/services/aoa-decisions-mcp/scripts/release_check.py",
@@ -562,6 +565,23 @@
         "scripts/ci_gate.py --mode mcp-services"
       ],
       "failure_route": "Fix the service-local package route and owner-boundary docs.",
+      "status": "active"
+    },
+    {
+      "family": "mcp-protocol-lab-validator",
+      "paths": [
+        "mcp/protocol-lab/scripts/validate_protocol_lab.py"
+      ],
+      "protects": "exact stable and next pins, pre-final migration block, pair evidence, read-only pilot isolation, dual support, and rollback gates",
+      "owner_surface": "mcp/protocol-lab/AGENTS.md",
+      "layer": "MCP protocol compatibility",
+      "lane": "mcp-services/release",
+      "mode": "blocking-fail-closed",
+      "callers": [
+        "mcp/AGENTS.md",
+        "docs/validation/validation_lanes.json"
+      ],
+      "failure_route": "Refresh exact protocol evidence or fix the protocol-lab contract; do not bypass the migration block.",
       "status": "active"
     }
   ]

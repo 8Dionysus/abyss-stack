@@ -14,14 +14,17 @@ TARGETS = {
     "abyss-stack-mcp": "abyss_stack_mcp",
     "abyss-machine-mcp": "abyss_machine_mcp",
     "aoa-4pda-connector-mcp": "aoa_4pda_connector_mcp",
+    "aoa-course-connector-mcp": "aoa_course_connector_mcp",
     "aoa-decisions-mcp": "aoa_decisions_mcp",
     "aoa-discord-connector-mcp": "aoa_discord_connector_mcp",
     "aoa-evals-mcp": "aoa_evals_mcp",
     "aoa-kag-mcp": "aoa_kag_mcp",
     "aoa-memo-mcp": "aoa_memo_mcp",
     "aoa-session-memory-mcp": "aoa_session_memory_mcp",
+    "aoa-stackoverflow-connector-mcp": "aoa_stackoverflow_connector_mcp",
     "aoa-stats-mcp": "aoa_stats_mcp",
     "aoa-telegram-connector-mcp": "aoa_telegram_connector_mcp",
+    "aoa-xda-connector-mcp": "aoa_xda_connector_mcp",
     "tos-corpus-mcp": "tos_corpus_mcp",
 }
 GENERATED_HEADER = (

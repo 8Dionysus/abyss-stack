@@ -8,7 +8,8 @@
 - stale memory beats current repository evidence;
 - session archive summaries are treated as raw evidence;
 - MCP tool metadata or tool results are trusted beyond their owner layer;
-- a local process invokes candidate-write tools through anonymous loopback HTTP.
+- a read bearer invokes candidate-write tools through the same endpoint;
+- a discovered or symlinked memo port silently expands candidate write scope.
 
 ## Controls
 
@@ -22,8 +23,15 @@
 - MCP resources expose pointers and compact route data, not full raw archives.
 - Local ports default to `write_candidate_only`.
 - Durable memory promotion remains outside this MCP server.
-- Stdio remains the portable default; optional loopback HTTP requires the
-  source-owned bearer credential before any MCP dispatch.
+- Stdio defaults to the read contour. Managed loopback HTTP uses separate
+  read/candidate ports, bearer credentials, authorization scopes, and client
+  identities.
+- Tool catalogs are disjoint and carry explicit read/candidate annotations.
+- Core write guards deny read-policy calls and require every candidate target
+  under `AOA_MEMO_MCP_CANDIDATE_ROOTS`.
+- The candidate systemd unit keeps `ProtectSystem=strict` and grants writes
+  only to enumerated candidate/export/receipt/index paths; durable
+  `aoa-memo/memo/objects/` is not in the allowlist.
 
 ## Guardrail Rule
 

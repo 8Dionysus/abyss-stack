@@ -1080,29 +1080,59 @@ def test_review_intake_returns_rejection_for_unknown_export_repo(tmp_path: Path,
 
 def test_mcp_surface_contracts(tmp_path: Path) -> None:
     seed_workspace(tmp_path)
-    server = build_server(tmp_path)
+    read_server = build_server(tmp_path, policy_family="read")
+    candidate_server = build_server(tmp_path, policy_family="candidate")
 
-    async def inspect() -> tuple[set[str], set[str], set[str]]:
+    async def inspect(server) -> tuple[dict[str, object], set[str], set[str]]:
+        tool_records = {
+            tool.name: tool.annotations
+            for tool in await server.list_tools()
+        }
         tools = {tool.name for tool in await server.list_tools()}
         prompts = {prompt.name for prompt in await server.list_prompts()}
         templates = {template.uriTemplate for template in await server.list_resource_templates()}
-        return tools, prompts, templates
+        assert tools == set(tool_records)
+        return tool_records, prompts, templates
 
-    tools, prompts, templates = asyncio.run(inspect())
-    assert tools == {
+    read_tools, read_prompts, read_templates = asyncio.run(
+        inspect(read_server)
+    )
+    candidate_tools, candidate_prompts, candidate_templates = asyncio.run(
+        inspect(candidate_server)
+    )
+    assert set(read_tools) == {
         "aoa_memo_build_port_index",
         "aoa_memo_brief",
         "aoa_memo_search",
-        "aoa_memo_create_candidate",
         "aoa_memo_landing_plan",
         "aoa_memo_pending_exports",
-        "aoa_memo_prepare_intake_packet",
-        "aoa_memo_review_intake",
         "aoa_memo_validate_candidate",
         "aoa_memo_validate_port",
     }
-    assert prompts == {"memo-brief", "memo-intake", "memo-landing-plan", "memo-review", "session-rehydrate"}
-    assert templates == {
+    assert set(candidate_tools) == {
+        "aoa_memo_create_candidate",
+        "aoa_memo_prepare_intake_packet",
+        "aoa_memo_review_intake",
+        "aoa_memo_write_port_index",
+    }
+    assert set(read_tools).isdisjoint(candidate_tools)
+    for tool_annotations in read_tools.values():
+        assert tool_annotations.readOnlyHint is True
+        assert tool_annotations.destructiveHint is False
+        assert tool_annotations.idempotentHint is True
+        assert tool_annotations.openWorldHint is False
+    for tool_annotations in candidate_tools.values():
+        assert tool_annotations.readOnlyHint is False
+        assert tool_annotations.destructiveHint is True
+        assert tool_annotations.idempotentHint is False
+        assert tool_annotations.openWorldHint is False
+    assert read_prompts == {
+        "memo-brief",
+        "memo-landing-plan",
+        "session-rehydrate",
+    }
+    assert candidate_prompts == {"memo-intake", "memo-review"}
+    assert read_templates == {
         "aoa-memo://brief/repo/{repo}",
         "aoa-memo://memory/object/{object_id}",
         "aoa-memo://session/{session_id}/rehydrate",
@@ -1113,3 +1143,42 @@ def test_mcp_surface_contracts(tmp_path: Path) -> None:
         "aoa-memo://repo/{repo}/memo-vocabulary",
         "aoa-memo://intake/{packet_id}/review",
     }
+    assert candidate_templates == set()
+
+
+def test_mcp_policy_family_and_candidate_root_gate_writes(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    seed_workspace(tmp_path)
+    monkeypatch.setenv(
+        "AOA_ABYSS_STACK_ROOT",
+        str(tmp_path / "stack-source"),
+    )
+    state = AoAMemoMCPState.discover(tmp_path)
+    args = (
+        "abyss-stack",
+        ["mcp/services/aoa-memo-mcp/DESIGN.md"],
+        "Policy isolation must deny memo writes from the read contour",
+    )
+
+    monkeypatch.setenv("AOA_MCP_POLICY_FAMILY", "read")
+    with pytest.raises(PermissionError, match="read contour"):
+        state.create_candidate(*args)
+
+    monkeypatch.setenv("AOA_MCP_POLICY_FAMILY", "candidate")
+    monkeypatch.delenv("AOA_MEMO_MCP_CANDIDATE_ROOTS", raising=False)
+    with pytest.raises(
+        PermissionError,
+        match="AOA_MEMO_MCP_CANDIDATE_ROOTS",
+    ):
+        state.create_candidate(*args)
+
+    allowed_root = tmp_path / "stack-source" / "memo"
+    monkeypatch.setenv(
+        "AOA_MEMO_MCP_CANDIDATE_ROOTS",
+        str(allowed_root),
+    )
+    result = state.create_candidate(*args)
+    assert Path(result["path"]).is_file()
+    assert Path(result["path"]).is_relative_to(allowed_root)

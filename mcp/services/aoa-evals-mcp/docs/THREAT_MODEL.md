@@ -11,6 +11,7 @@
 | proposal context is mistaken for source authoring approval | find-or-propose returns read-only `eval_need_v1` context and repo-local scaffold route only |
 | stack absorbs sibling proof meaning | local docs route proof meaning back to `aoa-evals` |
 | loopback HTTP widens the caller surface beyond stdio | stdio remains the portable default; optional HTTP rejects non-loopback binds and requires the source-owned bearer credential under `ABYSS-STACK-D-0077` |
+| a read credential reaches local-port writers | read and candidate are separate processes with disjoint catalogs, ports, bearer credentials, scopes, and client identities |
 | evidence laundering | candidate validation reports shape only and requires human review posture |
 | private runtime candidate leakage | export listing omits nested private payloads by default and stays on local-process or authenticated loopback transport |
 | stale mirror use | runtime status reports missing manifests and refresh route |
@@ -19,6 +20,7 @@
 | workspace scan leaks runtime-heavy/private state | local-port discovery scans Git roots with ignored worktree, model, log, service, and bundle paths |
 | legacy or injected inventory claims a runnable suite | only valid v2 owner inventory may carry suite posture; v1, unknown, and invalid-authority input maps to `absent`, while conflicting paths, owners, authority flags, or runner grammar map to `invalid` |
 | a readable suite command becomes executable MCP authority | MCP marks execution and sidecar writes forbidden, never invokes `runner.argv`, and keeps `evals/suites/*.suite.json` outside all write globs |
+| discovery silently widens candidate writes | core requires an explicit `AOA_EVALS_MCP_CANDIDATE_ROOTS` match and systemd grants only enumerated intake/suite/report/PORT paths |
 
 ## Trust Boundary
 
@@ -38,6 +40,10 @@ directories under the selected repo's `evals/` port. Explicit slugs are not path
 fragments: absolute paths, separators, null bytes, `.` and `..` are rejected.
 Existing target files are not overwritten unless the caller explicitly sets
 `replace_existing=true`.
+
+The read core rejects `apply=true` even if a future registration mistake
+exposes a writer. The candidate core rejects missing, relative, symlink-root,
+or non-matching root configuration before mutation.
 
 ## Review Trigger
 

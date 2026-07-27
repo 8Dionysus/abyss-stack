@@ -117,7 +117,7 @@ def observation_example() -> dict[str, Any]:
                     ),
                 },
                 "process": {
-                    "unit_name": "aoa-mcp-http@aoa-kag.service",
+                    "unit_name": "aoa-organ-mcp-read@aoa-kag.service",
                     "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py",
                     "process_identity": "aoa-kag-mcp/0.0.0-example",
                     "active": True,
@@ -210,7 +210,7 @@ def observation_example() -> dict[str, Any]:
                         DIGESTS["rollback_manifest"]
                     ),
                     "last_known_good_unit_name": (
-                        "aoa-mcp-http@aoa-kag.service"
+                        "aoa-organ-mcp-read@aoa-kag.service"
                     ),
                     "last_known_good_credential_class": (
                         "aoa-kag-read-example"
@@ -239,7 +239,7 @@ def observation_example() -> dict[str, Any]:
                             DIGESTS["rollback_manifest"]
                         ),
                         "deploy_manifest_digest": DIGESTS["rollback_manifest"],
-                        "unit_name": "aoa-mcp-http@aoa-kag.service",
+                        "unit_name": "aoa-organ-mcp-read@aoa-kag.service",
                         "credential_class": "aoa-kag-read-example",
                         "executable_ref": (
                             "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py"

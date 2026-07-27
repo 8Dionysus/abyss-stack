@@ -151,6 +151,24 @@ That mode links the allowlisted unit files from
 restart, enable, disable, or mask anything. Existing drop-ins remain host-local
 and continue to carry per-machine memory or runtime-selection overrides.
 
+Organ read instances use exact owner credentials; Memo and Evals additionally
+use dedicated candidate units. Provision the fourteen read bearers with
+`--provision-organ-mcp-read-auth` and the two contour-distinct candidate
+bearers with `--provision-organ-mcp-candidate-auth`. These actions do not
+start, restart, enable, deploy, or register a consumer. Canary each owner and
+policy contour separately; a green read endpoint says nothing about candidate
+denial, local-port write confinement, owner acceptance, or another connector.
+
+The stack-owned MCP read and candidate planes require an explicitly
+provisioned, source-addressed Python runtime and two persistent policy audit
+journals. After linking/reloading their units and while both planes are
+stopped, run
+`scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime`. It creates
+the journal root and empty files only when absent, never truncates existing
+records, and leaves start/restart explicit. Each plane writes only its own
+bounded hash chain. Stop the affected plane before a reviewed archival
+continuity handoff; no live or automatic rotation is part of this lifecycle.
+
 The privileged support allowlist under `systemd/system/managed-units.txt` is
 installed separately:
 

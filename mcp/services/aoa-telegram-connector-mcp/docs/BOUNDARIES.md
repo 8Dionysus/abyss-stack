@@ -9,3 +9,5 @@
   account/session state are runtime artifacts and must stay out of this repo.
 - MCP tools are read-only and must not initiate network collection or source
   mutation.
+- The managed HTTP process receives only the Telegram read credential and has
+  no persistent write path or non-loopback network route.

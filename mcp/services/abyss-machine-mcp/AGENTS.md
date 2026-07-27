@@ -46,7 +46,7 @@ It does not own:
 | MCP resource, tool, or prompt shape | `src/abyss_machine_mcp/server.py` |
 | compact machine brief | `src/abyss_machine_mcp/core.py` `machine_brief()` |
 | owner and evidence map | `evidence_map()` and `authority_boundary()` |
-| machine RAG trace | `machine_rag_trace()` and `abyss-machine rag trace --query TEXT --json` |
+| existing machine RAG trace | `surface("rag-latest")`; trace creation stays on the owner CLI effect route |
 | safe launch/mutation posture | `machine_route()` and `abyss-machine changes preflight` refs |
 | live host truth | `abyss-machine` source contracts and validators |
 | durable host rationale | `/etc/abyss-machine/decisions/` |
@@ -56,6 +56,8 @@ It does not own:
 
 - MCP exposes access; it does not become host authority.
 - Use only allowlisted `abyss-machine ... --json` read-model commands.
+- Classify the actual owner CLI behavior. A status, trace, recall, coverage, or
+  validator that writes generated/latest state is not a read route.
 - Do not add arbitrary shell, privileged commands, service restarts, process
   mutation, source mutation, or private raw capture reads.
 - Treat generated/latest JSON as evidence and route accelerators; source
@@ -86,7 +88,8 @@ PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli br
 PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli evidence-map
 PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli maps --axis by-freshness --query semantic --limit 8
 PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli context-packet --axis by-eval-packet --reader-profile proof-context --limit 4
-PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli rag-trace --query "machine RAG trace loop" --limit 4 --evidence-limit 6
+PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli surface rag-latest
+PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli surfaces
 PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli surface memory-pressure
 PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli surface artifact-trust-gate --artifact-class public_source_seed --consumer-intent agent
 PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli route --intent "start bounded local AI work" --class heavy --kind ai

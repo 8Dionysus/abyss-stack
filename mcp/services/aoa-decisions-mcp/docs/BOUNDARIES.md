@@ -6,10 +6,15 @@ It may:
 
 - check graph freshness;
 - report local checkout posture against already available local tracking refs;
-- rebuild the ignored local graph cache;
 - return compact graph packets, repo slices, decision slices, and search
   results;
 - point agents back to source decision records.
+
+The separate internal-effect contour may:
+
+- rebuild the ignored local graph cache;
+- report cache posture;
+- write only beneath `Logs/decision-graph/latest/`.
 
 It may not:
 
@@ -20,6 +25,10 @@ It may not:
 - fetch remotes or mutate source checkout state;
 - decide proof, memory, routing, skill, KAG, playbook, stats, or source
   doctrine for another repo.
+
+The read contour may not create its output directory, acquire a refresh lock,
+or repair missing or stale cache output. It fails closed until an owner
+operator or separately credentialed internal-effect process prepares the cache.
 
 When graph output and a source decision record disagree, the source record wins.
 When a decision record and current source code disagree, inspect the current

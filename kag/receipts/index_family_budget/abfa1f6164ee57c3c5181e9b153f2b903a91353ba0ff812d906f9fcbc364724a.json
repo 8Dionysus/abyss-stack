@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 23529294,
+  "allowed_tracked_bytes": 26541161,
+  "approved_by": "repository-owner",
+  "base_ref": "0c930170c474eaaee1dc71d56ef4e00cc3b7e7e8",
+  "changed_generated_bytes": 23529294,
+  "changed_generated_files": 438,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "abfa1f6164ee57c3c5181e9b153f2b903a91353ba0ff812d906f9fcbc364724a",
+  "reason": "Integrated owner-bounded MCP organ fabric adds reviewed services, contracts, security tests, protocol lab, and consumer handoff.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 26541161,
+  "tracked_bytes_max": 24117248
+}

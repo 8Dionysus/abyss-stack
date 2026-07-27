@@ -9,8 +9,8 @@ surfaces. It lets agents select, inspect, expand, compare, check runtime
   freshness, find-or-propose eval-need routes, validate candidate evidence packet
 shape, expose the Eval Forge front door, read stack-owned runtime candidate
 exports, and prepare candidate evidence/report skeletons without turning MCP
-into proof authority. It also federates sibling repository `evals/` ports and
-can perform explicitly gated repo-local port writes.
+into proof authority. A separately authenticated candidate process exposes
+only the explicitly gated repo-local port writers.
 
 ## Owner Lane
 
@@ -103,7 +103,12 @@ For source-local service execution from the `abyss-stack` repo root, run:
 
 ```bash
 python mcp/services/aoa-evals-mcp/scripts/aoa_evals_mcp_server.py
+AOA_MCP_POLICY_FAMILY=candidate python mcp/services/aoa-evals-mcp/scripts/aoa_evals_mcp_server.py
 ```
+
+The first command defaults to the read contour. Candidate writes additionally
+require `AOA_EVALS_MCP_CANDIDATE_ROOTS`; managed lifecycle supplies the exact
+root and systemd write allowlists.
 
 If the package is installed, the server entry point is:
 

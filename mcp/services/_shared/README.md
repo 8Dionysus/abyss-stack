@@ -26,7 +26,12 @@ remain transitional compatibility only. Real credentials remain outside git
 under the deployed stack `Secrets/` tree.
 
 `codex_http_client.sh` is the matching client-side launcher for hosts that use
-the authenticated shared owners. It validates the deployed credential, places
-the bearer only in the launched Codex process environment, and then execs the
-currently installed Codex binary. It does not replace that binary, persist the
-bearer in shell configuration, or merge MCP owner boundaries.
+authenticated loopback owners. It validates the compatibility credential and
+the owner-distinct Decisions, Memo, Evals, KAG, Session Memory, Stats, Abyss
+Machine, staged ToS corpus, 4PDA, Telegram, Discord, Course, StackOverflow, and
+XDA read credentials, plus the distinct Memo and Evals candidate credentials.
+It places each bearer only in its named variable in the launched Codex process
+environment and then execs the installed Codex binary. It does not replace
+that binary, persist bearer values in shell configuration, merge MCP
+owner/contour boundaries, or imply that the ToS wrapper/canary admission
+already exists.

@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 abyss-stack-mcp = "abyss_stack_mcp.cli:main"
+abyss-stack-mcp-audit = "abyss_stack_mcp.audit:main"
 abyss-stack-mcp-server = "abyss_stack_mcp.server:main"
 
 [tool.setuptools.packages.find]

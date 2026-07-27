@@ -320,6 +320,12 @@
         "mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py",
         "mcp/services/aoa-discord-connector-mcp/scripts/aoa_discord_connector_mcp_server.py",
         "mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py",
+        "mcp/services/aoa-course-connector-mcp/scripts/aoa_course_connector_mcp_server.py",
+        "mcp/services/aoa-course-connector-mcp/scripts/validate_course_connector_mcp.py",
+        "mcp/services/aoa-stackoverflow-connector-mcp/scripts/aoa_stackoverflow_connector_mcp_server.py",
+        "mcp/services/aoa-stackoverflow-connector-mcp/scripts/validate_stackoverflow_connector_mcp.py",
+        "mcp/services/aoa-xda-connector-mcp/scripts/aoa_xda_connector_mcp_server.py",
+        "mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py",
         "mcp/services/tos-corpus-mcp/scripts/tos_corpus_mcp_server.py",
         "mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py"
       ],
@@ -339,6 +345,31 @@
       "validation_lane": "mcp-services/release",
       "ci_inclusion": "mcp-services lane and default pytest collection",
       "test_target": "mcp/services/*/tests",
+      "disposition": "keep"
+    },
+    {
+      "family": "mcp-protocol-lab-scripts",
+      "paths": [
+        "mcp/protocol-lab/scripts/build_protocol_lab_status.py",
+        "mcp/protocol-lab/scripts/validate_protocol_lab.py"
+      ],
+      "organ_lane": "MCP protocol compatibility gate",
+      "owner_surface": "mcp/protocol-lab/AGENTS.md",
+      "source_truth": [
+        "mcp/protocol-lab/protocol-compatibility-matrix.v1.json",
+        "mcp/protocol-lab/fixtures/current-pair-observation.json"
+      ],
+      "reads": [
+        "protocol lab source contracts",
+        "stack MCP package constraints and exact lock"
+      ],
+      "writes": [
+        "deterministic generated protocol-lab status when the builder runs without --check"
+      ],
+      "side_effects": "source-local generation and validation only; no registration, process, credential, or runtime mutation",
+      "validation_lane": "mcp-services/release",
+      "ci_inclusion": "mcp-services lane and default pytest collection",
+      "test_target": "mcp/protocol-lab/tests/test_protocol_lab.py",
       "disposition": "keep"
     },
     {

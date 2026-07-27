@@ -12,11 +12,21 @@ from .core import AbyssMachineMCPState, CommandRunner
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_HTTP_PORT = 5423
+READ_AUTH = {
+    "token_env_var": "ABYSS_MACHINE_MCP_READ_BEARER_TOKEN",
+    "credential_name": "abyss-machine-mcp-read-bearer-token",
+    "auth_scope": "mcp:abyss-machine:read",
+    "client_id": "aoa-loopback-codex:abyss-machine:read",
+}
+
+
+def _read_http_auth_kwargs() -> dict[str, Any]:
+    return _http_auth_kwargs(DEFAULT_HTTP_PORT, **READ_AUTH)
 
 
 def _run_server(server: Any) -> None:
     settings = _transport_settings(DEFAULT_HTTP_PORT)
-    _http_auth_kwargs(DEFAULT_HTTP_PORT)
+    _read_http_auth_kwargs()
     if settings.transport == "stdio":
         server.run(transport="stdio")
         return
@@ -38,7 +48,11 @@ def build_server(
     except ImportError as exc:
         raise SystemExit("Missing dependency 'mcp'. Install with: python -m pip install -e .") from exc
 
-    mcp = FastMCP("abyss-machine-mcp", json_response=True, **_http_auth_kwargs(DEFAULT_HTTP_PORT))
+    mcp = FastMCP(
+        "abyss-machine-mcp-read",
+        json_response=True,
+        **_read_http_auth_kwargs(),
+    )
 
     def current_state() -> AbyssMachineMCPState:
         return AbyssMachineMCPState.discover(
@@ -91,6 +105,11 @@ def build_server(
         )
 
     @mcp.tool()
+    def abyss_machine_surfaces() -> dict[str, Any]:
+        """List the finite read contour and the effectful routes it withdraws."""
+        return current_state().available_surfaces()
+
+    @mcp.tool()
     def abyss_machine_evidence_map(layer: str | None = None, limit: int = 40) -> dict[str, Any]:
         """Return compact evidence refs from the stack bridge."""
         return current_state().evidence_map(layer=layer, limit=limit)
@@ -99,11 +118,6 @@ def build_server(
     def abyss_machine_route(intent: str, work_class: str = "heavy", kind: str = "ai") -> dict[str, Any]:
         """Plan a non-mutating owner-aware route before starting work."""
         return current_state().machine_route(intent=intent, work_class=work_class, kind=kind)
-
-    @mcp.tool()
-    def abyss_machine_recall(query: str, mode: str = "hybrid") -> dict[str, Any]:
-        """Run focused nervous recall as evidence, not operator intent."""
-        return current_state().recall(query=query, mode=mode)
 
     @mcp.tool()
     def abyss_machine_maps(axis: str = "", query: str = "", limit: int = 40) -> dict[str, Any]:
@@ -120,23 +134,6 @@ def build_server(
         """Return a bounded machine atlas context packet for a reader profile."""
         return current_state().machine_context_packet(axis=axis or None, query=query, reader_profile=reader_profile, limit=limit)
 
-    @mcp.tool()
-    def abyss_machine_rag_trace(
-        query: str,
-        axis: str = "by-rag-run",
-        reader_profile: str = "retrieval-context",
-        limit: int = 8,
-        evidence_limit: int = 12,
-    ) -> dict[str, Any]:
-        """Run a read-only maps-to-evidence machine RAG trace with local trace eval."""
-        return current_state().machine_rag_trace(
-            query=query,
-            axis=axis or None,
-            reader_profile=reader_profile,
-            limit=limit,
-            evidence_limit=evidence_limit,
-        )
-
     @mcp.resource("abyss-machine://brief")
     def brief_resource() -> str:
         return json.dumps(current_state().machine_brief(), ensure_ascii=False, indent=2)
@@ -152,10 +149,6 @@ def build_server(
     @mcp.resource("abyss-machine://stack-bridge")
     def stack_bridge_resource() -> str:
         return json.dumps(current_state().surface("stack-bridge"), ensure_ascii=False, indent=2)
-
-    @mcp.resource("abyss-machine://resource-status")
-    def resource_status_resource() -> str:
-        return json.dumps(current_state().surface("resource-status"), ensure_ascii=False, indent=2)
 
     @mcp.resource("abyss-machine://memory-pressure")
     def memory_pressure_resource() -> str:
@@ -181,9 +174,17 @@ def build_server(
     def rag_resource() -> str:
         return json.dumps(current_state().surface("rag-latest"), ensure_ascii=False, indent=2)
 
-    @mcp.resource("abyss-machine://rag-validate")
-    def rag_validate_resource() -> str:
-        return json.dumps(current_state().surface("rag-validate"), ensure_ascii=False, indent=2)
+    @mcp.resource("abyss-machine://surfaces")
+    def surfaces_resource() -> str:
+        return json.dumps(current_state().available_surfaces(), ensure_ascii=False, indent=2)
+
+    @mcp.resource("abyss-machine://processes-latest")
+    def processes_latest_resource() -> str:
+        return json.dumps(current_state().surface("processes-latest"), ensure_ascii=False, indent=2)
+
+    @mcp.resource("abyss-machine://changes-latest")
+    def changes_latest_resource() -> str:
+        return json.dumps(current_state().surface("changes-latest"), ensure_ascii=False, indent=2)
 
     @mcp.resource("abyss-machine://surface/{name}")
     def surface_resource(name: str) -> str:
@@ -215,14 +216,6 @@ def build_server(
             "Do not request raw private captures unless the operator explicitly authorizes it."
         )
 
-    @mcp.prompt(name="nervous-recall")
-    def nervous_recall(query: str) -> str:
-        """Prompt route for focused host recall."""
-        return (
-            f"Use abyss_machine_recall(query={query!r}, mode='hybrid'). "
-            "Treat returned items as evidence and verify source refs before making claims."
-        )
-
     @mcp.prompt(name="machine-atlas")
     def machine_atlas(intent: str) -> str:
         """Prompt route for using machine atlas maps."""
@@ -233,33 +226,24 @@ def build_server(
             "Treat entries and packets as route signals, not destinations, source truth, or permission to act."
         )
 
-    @mcp.prompt(name="machine-rag-trace")
-    def machine_rag_trace(query: str) -> str:
-        """Prompt route for read-only machine RAG traces."""
-        return (
-            f"Use abyss_machine_rag_trace(query={query!r}, axis='by-rag-run', reader_profile='retrieval-context'). "
-            "Treat the result as a generated evidence trace with local trace eval. It is not proof, reviewed memory, "
-            "KAG truth, action approval, or delivery into an AoA organ."
-        )
-
     @mcp.prompt(name="artifact-trust-read")
     def artifact_trust_read(artifact_class: str) -> str:
         """Prompt route for read-only artifact trust orientation."""
         return (
-            "Use abyss_machine_surface(name='artifact-trust-requirements', "
-            f"artifact_class={artifact_class!r}), then read artifact-trust-producer-profiles, "
-            "artifact-trust-affected, and artifact-trust-gate for the same class. "
-            "When checking a dirty or explicit source ref, pass source_root to artifact-trust-coverage. "
-            "Treat MCP output as read-only evidence from abyss-machine; build, sign, promote, "
-            "or repair only through the owning CLI and owner repository route."
+            "Use abyss_machine_surface(name='artifact-trust-registry-latest', "
+            f"artifact_class={artifact_class!r}), then read artifact-trust-gate for the same class. "
+            "The read contour does not refresh requirements, affected, coverage, scenario, or validation artifacts. "
+            "Run those effectful diagnostics only through the owning abyss-machine CLI route. Treat MCP output as "
+            "read-only evidence; build, sign, promote, or repair only through the owner."
         )
 
     @mcp.prompt(name="host-incident-triage")
     def host_incident_triage(symptom: str) -> str:
         """Prompt route for host incident orientation."""
         return (
-            f"Use abyss_machine_brief(profile='live') for symptom {symptom!r}, then read the targeted "
-            "surface named by the failing subsystem. Use abyss-machine validators outside MCP for confirmation."
+            f"Use abyss_machine_brief(profile='live') for symptom {symptom!r}, then inspect "
+            "abyss_machine_surfaces() before selecting a targeted read surface. Run refreshes and "
+            "validators outside MCP through abyss-machine."
         )
 
     LOGGER.info("Abyss Machine MCP server ready")

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 import tempfile
@@ -360,6 +361,23 @@ def main() -> None:
         server = build_server(tos_root=state.tos_root, index_path=state.index_path)
         if server is None:
             raise SystemExit("MCP server did not build")
+        tools = asyncio.run(server.list_tools())
+        if not tools:
+            raise SystemExit("MCP server published no tools")
+        unsafe_tools = [
+            tool.name
+            for tool in tools
+            if tool.annotations is None
+            or tool.annotations.readOnlyHint is not True
+            or tool.annotations.destructiveHint is not False
+            or tool.annotations.idempotentHint is not True
+            or tool.annotations.openWorldHint is not False
+        ]
+        if unsafe_tools:
+            raise SystemExit(
+                "MCP tools lost the closed-world read-only contract: "
+                + ", ".join(sorted(unsafe_tools))
+            )
 
         print(
             json.dumps(
@@ -372,6 +390,8 @@ def main() -> None:
                     "philosophy_views": len(philosophy_status["views"]),
                     "philosophy_clusters": philosophy_status["counts"].get("clusters"),
                     "philosophy_review_packets": philosophy_status["counts"].get("review_packets"),
+                    "tool_count": len(tools),
+                    "policy_family": "read",
                     "validation_source": validation_source,
                 },
                 indent=2,

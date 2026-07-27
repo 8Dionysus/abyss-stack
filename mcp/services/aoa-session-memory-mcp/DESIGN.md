@@ -30,6 +30,14 @@ packets, freshness checks, route prompts, and MCP service packaging.
 topology: portable stdio by default and the optional authenticated loopback
 shared HTTP owner defined by `ABYSS-STACK-D-0077`.
 
+The HTTP read contour is owner-specific:
+`AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN`,
+`aoa-session-memory-mcp-read-bearer-token`,
+`mcp:aoa-session-memory:read`, and
+`aoa-loopback-codex:aoa-session-memory:read`. It runs through
+`aoa-organ-mcp-read@aoa-session-memory.service`; the generic shared bearer
+cannot authenticate it.
+
 `aoa-memo` owns durable reviewed memory and writeback review. This MCP may
 prepare evidence refs for that route, but it does not write memory.
 
@@ -109,6 +117,10 @@ queries and expansion commands use shard-aware archive routes when available,
 while queryless scoped packets may stay on the MCP-local SQLite shortcut and
 report their cost/profile explicitly. The MCP does not run expansion if it
 would turn an agent health probe into a bulk scan.
+All MCP-local SQLite fast paths open the generated database through
+`mode=ro` and enable `PRAGMA query_only`. This keeps their behavior compatible
+with the filesystem-read-only owner unit even when the database itself was
+created in WAL mode.
 
 Session review and continuation use compact packets:
 

@@ -16,6 +16,11 @@ from typing import Annotated, Any, Literal
 from pydantic import Field
 
 from ._http_auth import http_auth_kwargs, transport_settings
+from .audit import (
+    DEFAULT_MAX_BYTES,
+    PolicyAuditError,
+    PolicyAuditJournal,
+)
 from .core import ObservationStore, StackMCPApplication
 from .policy import PolicyIdentity, StackPolicySeam, ToolPolicy
 
@@ -195,6 +200,53 @@ def _policy_identity(policy_family: PolicyMode) -> PolicyIdentity:
     )
 
 
+def _configured_audit_journal(
+    policy_family: PolicyMode,
+) -> PolicyAuditJournal | None:
+    required = os.environ.get(
+        "ABYSS_STACK_MCP_REQUIRE_AUDIT_JOURNAL",
+        "",
+    ).strip()
+    if required not in {"", "1"}:
+        raise SystemExit(
+            "ABYSS_STACK_MCP_REQUIRE_AUDIT_JOURNAL must be 1 when configured"
+        )
+    path = os.environ.get(
+        "ABYSS_STACK_MCP_AUDIT_JOURNAL_PATH",
+        "",
+    ).strip()
+    max_bytes_text = os.environ.get(
+        "ABYSS_STACK_MCP_AUDIT_MAX_BYTES",
+        "",
+    ).strip()
+    if not path:
+        if required:
+            raise SystemExit(
+                "managed startup requires ABYSS_STACK_MCP_AUDIT_JOURNAL_PATH"
+            )
+        if max_bytes_text:
+            raise SystemExit(
+                "ABYSS_STACK_MCP_AUDIT_MAX_BYTES requires an audit journal path"
+            )
+        return None
+    max_bytes = DEFAULT_MAX_BYTES
+    if max_bytes_text:
+        if not max_bytes_text.isascii() or not max_bytes_text.isdecimal():
+            raise SystemExit(
+                "ABYSS_STACK_MCP_AUDIT_MAX_BYTES must be a decimal integer"
+            )
+        max_bytes = int(max_bytes_text)
+    try:
+        return PolicyAuditJournal(
+            path,
+            owner="abyss-stack",
+            policy_family=policy_family,
+            max_bytes=max_bytes,
+        )
+    except PolicyAuditError as exc:
+        raise SystemExit(f"policy audit startup failed: {exc}") from None
+
+
 def _build_policy_seam(policy_family: PolicyMode) -> StackPolicySeam:
     _, _, _, scope = _contour(policy_family)
     if policy_family == "read":
@@ -247,6 +299,7 @@ def _build_policy_seam(policy_family: PolicyMode) -> StackPolicySeam:
         max_in_flight=max_in_flight,
         rate_limit=rate_limit,
         rate_window_seconds=60.0,
+        audit_journal=_configured_audit_journal(policy_family),
     )
 
 
@@ -278,6 +331,7 @@ def build_server(
         ) from exc
 
     mode = policy_family or configured_policy_family()
+    auth_kwargs = _auth_kwargs(mode)
     application = StackMCPApplication(
         ObservationStore(observation_path),
         policy_family=mode,
@@ -303,7 +357,7 @@ def build_server(
             "does not proxy owner tools and never executes a plan."
         ),
         json_response=True,
-        **_auth_kwargs(mode),
+        **auth_kwargs,
     )
     _bind_server_info_version(mcp)
 

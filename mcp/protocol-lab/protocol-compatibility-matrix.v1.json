@@ -1,0 +1,325 @@
+{
+  "capability_matrix": [
+    {
+      "capability": "connection_lifecycle",
+      "notes": "Stable uses initialize plus session state; next removes the handshake and protocol session.",
+      "production_use": "stable_only",
+      "stable": "supported",
+      "next": "rc_defined"
+    },
+    {
+      "capability": "server_discover",
+      "notes": "Next capability discovery is a new method and has not been observed in the Codex pair.",
+      "production_use": "forbidden",
+      "stable": "not_applicable",
+      "next": "rc_defined"
+    },
+    {
+      "capability": "explicit_state_handles",
+      "notes": "Next replaces implicit protocol session state with explicit application handles.",
+      "production_use": "forbidden",
+      "stable": "not_applicable",
+      "next": "rc_defined"
+    },
+    {
+      "capability": "stateless_http",
+      "notes": "Next requests are self-describing; application state may still exist behind explicit handles.",
+      "production_use": "forbidden",
+      "stable": "not_applicable",
+      "next": "rc_defined"
+    },
+    {
+      "capability": "trace_context",
+      "notes": "Trace metadata needs pair-level preservation tests and must not become owner authority.",
+      "production_use": "separate_gate",
+      "stable": "unknown",
+      "next": "rc_defined"
+    },
+    {
+      "capability": "list_cache_ttl",
+      "notes": "Next list responses may carry cache metadata; revocation and stale-catalog behavior need Abyss tests.",
+      "production_use": "forbidden",
+      "stable": "not_applicable",
+      "next": "rc_defined"
+    },
+    {
+      "capability": "tasks",
+      "notes": "Tasks is a separate extension and cannot be inferred from core protocol support.",
+      "production_use": "separate_gate",
+      "stable": "supported",
+      "next": "extension"
+    },
+    {
+      "capability": "roots_sampling_logging",
+      "notes": "Next marks the legacy core features deprecated; removal is not implied.",
+      "production_use": "stable_only",
+      "stable": "supported",
+      "next": "deprecated"
+    },
+    {
+      "capability": "json_schema_2020_12",
+      "notes": "Next widens tool schemas and output values; depth, external refs, and validator budgets need pair tests.",
+      "production_use": "forbidden",
+      "stable": "supported",
+      "next": "rc_defined"
+    }
+  ],
+  "claim_limits": [
+    "Protocol literals in a binary do not prove negotiated wire support.",
+    "A stable SDK release does not prove Codex pair support.",
+    "Official conformance does not prove Abyss owner, freshness, effect, or rollback behavior.",
+    "A read canary does not admit candidate or effect organs.",
+    "A registered alias does not prove schema observation or a grounded call.",
+    "RC compatibility never authorizes production migration."
+  ],
+  "consumer_pairs": [
+    {
+      "capability_posture": "unknown",
+      "consumer_id": "codex-cli",
+      "evidence": [
+        "local command: codex --version -> codex-cli 0.145.0",
+        "local binary contains 2026-07-28 and Tasks type literals",
+        "local binary also contains initialize, Mcp-Session-Id, and session lifecycle paths",
+        "no observed server/discover exchange or 2026-07-28 read canary"
+      ],
+      "next_protocol_literal_present": true,
+      "next_wire_pair_observed": false,
+      "server_discover_observed": false,
+      "stable_pair_observed": true,
+      "tasks_wire_pair_observed": false,
+      "version": "0.145.0"
+    }
+  ],
+  "dual_support": {
+    "mass_migration_allowed": false,
+    "next_registration_separate": true,
+    "rollback_without_stable_mutation": true,
+    "shared_credential_forbidden": true,
+    "stable_registration_retained": true
+  },
+  "expires_at": "2026-07-28T12:00:00Z",
+  "migration_gates": [
+    {
+      "evidence_refs": [
+        "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28-RC"
+      ],
+      "gate_id": "P1-01",
+      "reason": "Only the release-candidate tag exists; final publication is scheduled for 2026-07-28.",
+      "requirement": "Pin an exact final specification.",
+      "status": "blocked"
+    },
+    {
+      "evidence_refs": [
+        "https://github.com/modelcontextprotocol/python-sdk/tree/v2.0.0b2",
+        "https://github.com/modelcontextprotocol/typescript-sdk/tree/main"
+      ],
+      "gate_id": "P1-02",
+      "reason": "Python v2.0.0b2 and TypeScript v2 beta.5 remain prerelease lines.",
+      "requirement": "Observe a stable next-protocol SDK release.",
+      "status": "blocked"
+    },
+    {
+      "evidence_refs": [
+        "local://codex-cli/0.145.0"
+      ],
+      "gate_id": "P1-03",
+      "reason": "Modern literals exist, but an actual next-era Codex wire pair is unobserved.",
+      "requirement": "Prove Codex next-protocol capabilities.",
+      "status": "blocked"
+    },
+    {
+      "evidence_refs": [
+        "https://github.com/modelcontextprotocol/conformance/releases/tag/v0.1.15"
+      ],
+      "gate_id": "P1-04",
+      "reason": "The next-protocol suite is intentionally not run before the final and stable pair exist.",
+      "requirement": "Run official conformance against the exact pair.",
+      "status": "pending"
+    },
+    {
+      "evidence_refs": [
+        "mcp/protocol-lab/"
+      ],
+      "gate_id": "P1-05",
+      "reason": "The fail-closed Abyss harness exists; a next pair receipt does not.",
+      "requirement": "Run Abyss pair-conformance.",
+      "status": "pending"
+    },
+    {
+      "evidence_refs": [
+        "mcp/protocol-lab/protocol-compatibility-matrix.v1.json"
+      ],
+      "gate_id": "P1-06",
+      "reason": "The source-authored stable/next capability comparison is present and validated.",
+      "requirement": "Compare stable and next adapters.",
+      "status": "passed"
+    },
+    {
+      "evidence_refs": [],
+      "gate_id": "P1-07",
+      "reason": "No next-era pair has demonstrated request independence and bounded application state.",
+      "requirement": "Verify stateless behavior.",
+      "status": "pending"
+    },
+    {
+      "evidence_refs": [],
+      "gate_id": "P1-08",
+      "reason": "No next-era pair has demonstrated explicit handle isolation, expiry, replay, and revocation.",
+      "requirement": "Verify explicit handles.",
+      "status": "pending"
+    },
+    {
+      "evidence_refs": [],
+      "gate_id": "P1-09",
+      "reason": "No Codex exchange has observed server/discover request and response bytes.",
+      "requirement": "Verify server/discover.",
+      "status": "pending"
+    },
+    {
+      "evidence_refs": [],
+      "gate_id": "P1-10",
+      "reason": "Trace propagation, TTL, cache invalidation, and revocation are unobserved for the pair.",
+      "requirement": "Verify trace and cache metadata.",
+      "status": "pending"
+    },
+    {
+      "evidence_refs": [],
+      "gate_id": "P1-11",
+      "reason": "Tasks remains a separately gated extension and has no Abyss pair receipt.",
+      "requirement": "Verify the Tasks extension separately.",
+      "status": "pending"
+    },
+    {
+      "evidence_refs": [
+        "mcp/protocol-lab/protocol-compatibility-matrix.v1.json"
+      ],
+      "gate_id": "P1-12",
+      "reason": "The stable registration is retained and the disabled next lab name is non-replacing.",
+      "requirement": "Define compatibility aliases.",
+      "status": "passed"
+    },
+    {
+      "evidence_refs": [],
+      "gate_id": "P1-13",
+      "reason": "The read-only pilot cannot run until final, SDK, consumer, and conformance gates pass.",
+      "requirement": "Run one compact read-only canary.",
+      "status": "blocked"
+    },
+    {
+      "evidence_refs": [
+        "mcp/protocol-lab/protocol-compatibility-matrix.v1.json"
+      ],
+      "gate_id": "P1-14",
+      "reason": "Dual registration and stable-preserving rollback law are source-defined; runtime proof is pending.",
+      "requirement": "Retain dual support and rollback.",
+      "status": "pending"
+    }
+  ],
+  "next_spec": {
+    "commit": "9d700ed62dcf86cb77475c9b81930611a9182f46",
+    "final_published": false,
+    "production_allowed": false,
+    "release_label": "2026-07-28-RC",
+    "release_status": "release_candidate",
+    "source": "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28-RC",
+    "tag": "2026-07-28-RC",
+    "wire_version": "2026-07-28"
+  },
+  "observed_at": "2026-07-26T23:41:49Z",
+  "official_conformance": {
+    "commit": "a2855b03582a6c0b31065ad4d9af248316ce61a3",
+    "next_suite_executed": false,
+    "receipt_refs": [],
+    "repository": "https://github.com/modelcontextprotocol/conformance",
+    "version": "v0.1.15"
+  },
+  "pilot": {
+    "effectful": false,
+    "next_lab_registration": "aoa_kag_next_lab",
+    "next_lab_registration_enabled": false,
+    "organ_id": "aoa-kag",
+    "policy_family": "read",
+    "rollback": [
+      "Stop and remove only the next lab registration.",
+      "Verify the stable aoa_kag registration was never changed.",
+      "Re-run the stable read canary and compare its schema digest."
+    ],
+    "stable_registration": "aoa_kag",
+    "state": "blocked"
+  },
+  "production_protocol": "2025-11-25",
+  "refresh_triggers": [
+    "The final 2026-07-28 specification tag appears.",
+    "Python or TypeScript v2 reaches stable.",
+    "Codex changes version or documents next-era client support.",
+    "The official conformance suite changes version or scenarios.",
+    "Any server SDK pin, schema, transport, auth, or registration changes.",
+    "The matrix reaches expires_at."
+  ],
+  "schema_version": "abyss_mcp_protocol_compatibility_matrix_v1",
+  "sdk_lines": [
+    {
+      "commit": "777b8d06710c140e3606b0d4598e2aa48546c266",
+      "ecosystem": "python",
+      "production_allowed": true,
+      "protocol_versions": [
+        "2024-11-05",
+        "2025-03-26",
+        "2025-06-18",
+        "2025-11-25"
+      ],
+      "release_status": "stable",
+      "sdk_id": "python-stable",
+      "stack_pin": "1.27.2",
+      "stack_pin_status": "compatible_maintenance_drift",
+      "version": "1.28.1"
+    },
+    {
+      "commit": "2713b53b127afc094dc97d6067df9f69b647661c",
+      "ecosystem": "python",
+      "production_allowed": false,
+      "protocol_versions": [
+        "2025-11-25",
+        "2026-07-28"
+      ],
+      "release_status": "beta",
+      "sdk_id": "python-next",
+      "stack_pin": null,
+      "stack_pin_status": "not_used",
+      "version": "2.0.0b2"
+    },
+    {
+      "commit": "1e1392e3f91583884fe82a0b4b91335875c3fba6",
+      "ecosystem": "typescript",
+      "production_allowed": false,
+      "protocol_versions": [
+        "2025-11-25",
+        "2026-07-28"
+      ],
+      "release_status": "beta",
+      "sdk_id": "typescript-next",
+      "stack_pin": null,
+      "stack_pin_status": "not_used",
+      "version": "2.0.0-beta.5"
+    }
+  ],
+  "sources": [
+    "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2025-11-25",
+    "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28-RC",
+    "https://blog.modelcontextprotocol.io/posts/2026-07-28-release-candidate/",
+    "https://github.com/modelcontextprotocol/python-sdk/tree/v2.0.0b2",
+    "https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/migration/support-2026-07-28.md",
+    "https://github.com/modelcontextprotocol/conformance",
+    "https://github.com/openai/codex"
+  ],
+  "stable_spec": {
+    "commit": "38c84e9f93ad191d9eb26d92b945d17bd0efcaf3",
+    "final_published": true,
+    "production_allowed": true,
+    "release_label": "2025-11-25",
+    "release_status": "final",
+    "source": "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2025-11-25",
+    "tag": "2025-11-25",
+    "wire_version": "2025-11-25"
+  }
+}

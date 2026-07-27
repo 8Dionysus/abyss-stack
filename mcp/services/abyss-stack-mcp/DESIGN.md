@@ -67,6 +67,14 @@ receipts containing only identities, decisions, policy facts, and content
 digests. Read results and candidate payloads are always untrusted data with no
 instruction authority. The seam has no runtime-effect dispatch path; future
 MCP interceptor support may call it but cannot replace it.
+An optional persistent sink appends each receipt to one owner/policy-specific
+canonical JSONL chain before the in-memory receipt ring is updated. Record IDs
+bind the previous ID, sequence, timestamp, contour, and complete validated
+receipt. A process restart replays the bounded file and reconstructs only a
+public-safe aggregate read model. Raw values are never journalled: only the
+same validated identities, policy facts, reason codes, and input/output
+digests already present in the receipt. Journal continuity is stack-local
+operational evidence, not central proof or owner acceptance.
 
 ## Progressive surface
 
@@ -88,6 +96,12 @@ The named acceptance owner accepts durable source or memory changes.
 The MCP stable production line remains `2025-11-25`. These contracts are
 protocol-independent so a future adapter can coexist without changing runtime
 authority.
+
+Codex integration consumes this observation through the owner-composed handoff
+in `docs/CODEX_CONSUMER_HANDOFF.md`. The stack may issue canary and runtime
+rollback-target evidence and carry foreign receipt refs. It never edits the
+Codex consumer projection, infers consumer admission, or performs consumer
+reload/removal.
 
 Managed units execute a stack-owned, source-addressed virtual environment under
 `Services/abyss-stack-mcp`; they never inherit dependencies from ambient
@@ -116,6 +130,12 @@ locks, and `exec`s the server without releasing either lock. Source sync,
 runtime replacement, and process launch are therefore serialized for the full
 service lifetime; source drift or runtime tampering leaves the unit inactive
 until explicit stop, sync, and reprovisioning succeed.
+Runtime provisioning also establishes two persistent journal files without
+truncating existing bytes. Managed units require their existence, give each
+process an exact-file write exception under an otherwise read-only system
+view, and hide the opposite contour's file. A fixed capacity fails closed;
+automatic rollover is deliberately absent until an archive-continuity contract
+is reviewed.
 
 `rollback_required` is admissible only for the failed source/package/deploy
 links of a rollback plan, and only while the triggering link and its evidence

@@ -9,6 +9,11 @@ It is not a gateway, does not proxy owner tools, does not flatten nested state
 into `healthy`, and does not own proof, memory, source truth, or owner
 acceptance.
 
+For the exact boundary between stack runtime receipts and the source-owned
+Codex organ-fabric projection, read
+[`docs/CODEX_CONSUMER_HANDOFF.md`](docs/CODEX_CONSUMER_HANDOFF.md). Service
+presence cannot register, reload, or remove a Codex consumer.
+
 ## Process contours
 
 The read process exposes only:
@@ -41,6 +46,15 @@ secret-free allow/deny/cancel receipt containing digests rather than values.
 All returned owner/runtime text is marked `content_trust=untrusted_data` and
 `instruction_authority=none`. The candidate primitive remains
 `prepare_candidate`; its policy receipt never authorizes a runtime effect.
+When `ABYSS_STACK_MCP_AUDIT_JOURNAL_PATH` is set, every receipt is appended
+before it enters the bounded in-memory read model to one contour-specific,
+mode-`0600`, canonical-JSONL hash chain. Startup replays the complete bounded
+chain and fails closed on a partial record, digest or sequence drift, a foreign
+owner/policy contour, a symlink, broad file permissions, or external size
+change. The public-safe `abyss-stack-mcp-audit` summary exposes counts and
+continuity metadata, not request/result values. It proves only local journal
+shape and hash-chain continuity; it does not prove caller intent, grounding,
+admission, owner acceptance, or a runtime effect.
 Provisioning validates the two existing or newly created bearer values
 together and fails closed if they are identical. It also atomically publishes
 a non-secret digest manifest. Each managed startup receives only its own
@@ -188,6 +202,8 @@ abyss-stack-mcp --observation-path /path/to/observation.json catalog
 abyss-stack-mcp --observation-path /path/to/observation.json \
   inspect aoa-kag read --view proof
 ABYSS_STACK_MCP_POLICY_FAMILY=read abyss-stack-mcp-server
+abyss-stack-mcp-audit --journal /absolute/policy-read.jsonl \
+  --policy-family read
 ```
 
 Stdio is the portable default. Authenticated loopback Streamable HTTP is
@@ -261,6 +277,14 @@ Consequently, a later Configs sync cannot cross a running plane or mix new code
 with an older dependency closure; after explicitly stopping both planes, the
 synced package becomes eligible for a later start only after this explicit
 reprovision step succeeds.
+The same explicit provision action creates, but never truncates, the
+contour-specific audit journals at
+`${AOA_STACK_ROOT}/Logs/mcp/audit/policy-read.jsonl` and
+`policy-candidate.jsonl`. The directory is mode `0700`, each file is mode
+`0600`, and the read-only runtime verifier requires both safe paths. Each unit
+can write only its own journal under `ProtectSystem=strict` and makes the other
+contour's journal inaccessible. Managed startup requires the configured
+journal and validates its complete chain before listening.
 
 Runtime dependencies and the build backend are exact pins in
 `requirements.constraints`; the committed `requirements.lock` carries the
@@ -274,6 +298,12 @@ pip-compile --generate-hashes --resolver=backtracking --strip-extras \
   --output-file mcp/services/abyss-stack-mcp/requirements.lock \
   mcp/services/abyss-stack-mcp/pyproject.toml
 ```
+
+The managed journal limit is 32 MiB per contour. Capacity exhaustion rejects
+the next policy decision instead of dropping or overwriting evidence.
+Automatic rotation is intentionally not admitted yet: stop the affected plane
+and use a reviewed archival/continuity handoff before replacing a journal. Do
+not rotate, truncate, or edit it while the plane is active.
 
 ## Validation
 

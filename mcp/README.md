@@ -10,10 +10,16 @@ read models into every prompt.
 
 | District | Use for |
 |---|---|
+| [`protocol-lab/`](protocol-lab/README.md) | fail-closed stable/next protocol compatibility, pair evidence, read-only canary, and rollback gates |
 | [`services/`](services/README.md) | runnable MCP service packages with package-local source, tests, and route cards |
 
 MCP packages are access planes. Their outputs help agents move, but authority
 stays with the source owner named by the package.
+
+The protocol lab is not another server. It retains the stable production pair
+and derives whether one separately named next-protocol read pilot is eligible.
+It cannot admit a candidate or effect organ, and it treats Tasks as a separate
+extension gate.
 
 ## Owner-bounded access fabric
 
@@ -54,9 +60,13 @@ scopes, ports, and tool catalogs; every candidate is non-executing. Runtime
 effects, if later admitted, use another separately proven process and
 credential and never accept sibling source or memory truth.
 
-The current shared bearer lifecycle remains transitional transport evidence.
-It does not satisfy admitted effect isolation and must not be used to raise a
-route above shadow without the new policy proof.
+The legacy shared bearer lifecycle remains compatibility-only transport
+evidence. Current organ packages use exact owner-and-policy credentials, but
+that source isolation still must not raise a route above shadow without
+package, deploy, endpoint, consumer, result, acceptance, and rollback proof.
+The cross-owner Codex handoff is documented by
+`mcp/services/abyss-stack-mcp/docs/CODEX_CONSUMER_HANDOFF.md`; stack runtime
+evidence is an input to that handoff, not consumer-configuration authority.
 
 `aoa-decisions-mcp` is the access plane for the local workspace decision graph:
 it auto-refreshes the ignored graph cache before returning search results,

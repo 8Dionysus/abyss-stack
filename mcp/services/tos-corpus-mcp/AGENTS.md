@@ -34,6 +34,12 @@ ToS meaning into `abyss-stack`.
 - MCP packets are navigation aids, not source truth.
 - Do not add writeback here. A future write route must be ToS-validator-gated
   and separately reviewed.
+- Keep HTTP authentication owner-specific:
+  `TOS_CORPUS_MCP_READ_BEARER_TOKEN`,
+  `tos-corpus-mcp-read-bearer-token`, `mcp:tos-corpus:read`, and
+  `aoa-loopback-codex:tos-corpus:read`.
+- Do not add `tos-corpus` to the default owner bundle until the deployed
+  workspace wrapper and grounded live canary exist.
 
 ## Validation
 

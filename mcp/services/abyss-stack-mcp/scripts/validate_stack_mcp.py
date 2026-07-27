@@ -13,6 +13,7 @@ SERVICE_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = SERVICE_ROOT / "src"
 sys.path.insert(0, str(SRC_ROOT))
 
+from abyss_stack_mcp.audit import PolicyAuditJournal  # noqa: E402
 from abyss_stack_mcp.contracts import RuntimeObservation  # noqa: E402
 from abyss_stack_mcp.policy import StackPolicySeam  # noqa: E402
 
@@ -131,7 +132,28 @@ def main() -> int:
     RuntimeObservation.model_validate(json.loads(example.read_text(encoding="utf-8")))
     if StackPolicySeam.__module__ != "abyss_stack_mcp.policy":
         raise SystemExit("protocol-independent stack policy seam is unavailable")
+    if PolicyAuditJournal.__module__ != "abyss_stack_mcp.audit":
+        raise SystemExit("persistent stack policy audit journal is unavailable")
     validate_runtime_lock()
+    pyproject = tomllib.loads(
+        (SERVICE_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    if (
+        pyproject["project"]["scripts"].get("abyss-stack-mcp-audit")
+        != "abyss_stack_mcp.audit:main"
+    ):
+        raise SystemExit("policy audit summary entry point is unavailable")
+    audit_schema = json.loads(
+        (
+            SERVICE_ROOT / "schemas" / "policy-audit-summary.schema.json"
+        ).read_text(encoding="utf-8")
+    )
+    if (
+        audit_schema.get("$schema")
+        != "https://json-schema.org/draft/2020-12/schema"
+        or "claim_limit" not in audit_schema.get("properties", {})
+    ):
+        raise SystemExit("policy audit summary schema is unavailable")
 
     required = {
         "README.md": (
@@ -140,6 +162,7 @@ def main() -> int:
             "candidate process",
             "execution_authorized=false",
             "policy seam",
+            "hash chain",
         ),
         "DESIGN.md": (
             "source",
@@ -148,17 +171,27 @@ def main() -> int:
             "process",
             "endpoint",
             "consumer",
+            "journal continuity",
         ),
         "docs/BOUNDARIES.md": (
             "does not own",
             "aoa-evals",
             "owner acceptance",
+            "audit summary",
+        ),
+        "docs/CODEX_CONSUMER_HANDOFF.md": (
+            "consumer-schema evidence",
+            "consumer-zero",
+            "fresh Codex process",
+            "execution_authorized=false",
+            "must not",
         ),
         "docs/THREAT_MODEL.md": (
             "confused deputy",
             "separate credential",
             "symlink",
             "untrusted data",
+            "tamper-evident",
         ),
     }
     for relative, needles in required.items():

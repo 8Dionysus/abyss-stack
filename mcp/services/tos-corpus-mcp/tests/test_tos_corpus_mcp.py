@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -333,6 +334,23 @@ def test_resources_and_server_build(tmp_path: Path) -> None:
     assert json.loads(state.render_resource("tos-corpus://status"))["counts"]["nodes"] == 1
     assert state.read_resource("tos-corpus://graph-view/corpus-topology")["item_count"] == 1
     assert build_server(tos_root=tmp_path) is not None
+
+
+def test_published_tools_advertise_closed_world_read_only_contract(
+    tmp_path: Path,
+) -> None:
+    write_index(tmp_path)
+    server = build_server(tos_root=tmp_path)
+
+    tools = asyncio.run(server.list_tools())
+
+    assert tools
+    for tool in tools:
+        assert tool.annotations is not None, tool.name
+        assert tool.annotations.readOnlyHint is True, tool.name
+        assert tool.annotations.destructiveHint is False, tool.name
+        assert tool.annotations.idempotentHint is True, tool.name
+        assert tool.annotations.openWorldHint is False, tool.name
 
 
 def test_philosophy_graph_packets_and_resources(tmp_path: Path) -> None:

@@ -166,3 +166,15 @@
 - [ABYSS-STACK-D-0085 SDK Routing Canary Intake](../ABYSS-STACK-D-0085-sdk-routing-canary-intake.md) (`docs/decisions/ABYSS-STACK-D-0085-sdk-routing-canary-intake.md`)
 - [ABYSS-STACK-D-0086 Receipt-Bound SDK Routing Cutover](../ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md) (`docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md`)
 - [ABYSS-STACK-D-0087 Owner-Bounded MCP Access Fabric](../ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md) (`docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md`)
+
+## 2026-07-26
+
+- [ABYSS-STACK-D-0088 Decision Cache Effect Isolation](../ABYSS-STACK-D-0088-decision-cache-effect-isolation.md) (`docs/decisions/ABYSS-STACK-D-0088-decision-cache-effect-isolation.md`)
+- [ABYSS-STACK-D-0089 Machine Diagnostic Effect Isolation](../ABYSS-STACK-D-0089-machine-diagnostic-effect-isolation.md) (`docs/decisions/ABYSS-STACK-D-0089-machine-diagnostic-effect-isolation.md`)
+- [ABYSS-STACK-D-0090 Session Memory and ToS Read Contour Isolation](../ABYSS-STACK-D-0090-session-and-tos-read-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0090-session-and-tos-read-contour-isolation.md`)
+- [ABYSS-STACK-D-0091 Memo and Evals Candidate Contour Isolation](../ABYSS-STACK-D-0091-memo-and-evals-candidate-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0091-memo-and-evals-candidate-contour-isolation.md`)
+- [ABYSS-STACK-D-0092 Connector Read Contour Isolation](../ABYSS-STACK-D-0092-connector-read-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0092-connector-read-contour-isolation.md`)
+- [ABYSS-STACK-D-0093 Wave 6 Access-Form and Retirement Classification](../ABYSS-STACK-D-0093-wave6-access-form-and-retirement-classification.md) (`docs/decisions/ABYSS-STACK-D-0093-wave6-access-form-and-retirement-classification.md`)
+- [ABYSS-STACK-D-0094 Cross-Organ Orchestration Host Boundary](../ABYSS-STACK-D-0094-cross-organ-orchestration-host-boundary.md) (`docs/decisions/ABYSS-STACK-D-0094-cross-organ-orchestration-host-boundary.md`)
+- [ABYSS-STACK-D-0095 Fail-Closed MCP Protocol Migration Lab](../ABYSS-STACK-D-0095-fail-closed-mcp-protocol-migration-lab.md) (`docs/decisions/ABYSS-STACK-D-0095-fail-closed-mcp-protocol-migration-lab.md`)
+- [ABYSS-STACK-D-0096 Codex Consumer Handoff Remains Owner-Composed](../ABYSS-STACK-D-0096-codex-consumer-handoff-remains-owner-composed.md) (`docs/decisions/ABYSS-STACK-D-0096-codex-consumer-handoff-remains-owner-composed.md`)

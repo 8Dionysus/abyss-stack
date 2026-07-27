@@ -12,11 +12,25 @@ from .core import AoA4PDAConnectorMCPState
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_HTTP_PORT = 5426
+READ_TOKEN_ENV = "AOA_4PDA_CONNECTOR_MCP_READ_BEARER_TOKEN"
+READ_CREDENTIAL = "aoa-4pda-connector-mcp-read-bearer-token"
+READ_SCOPE = "mcp:aoa-4pda-connector:read"
+READ_CLIENT_ID = "aoa-loopback-codex:aoa-4pda-connector:read"
+
+
+def _read_http_auth_kwargs() -> dict[str, Any]:
+    return _http_auth_kwargs(
+        DEFAULT_HTTP_PORT,
+        token_env_var=READ_TOKEN_ENV,
+        credential_name=READ_CREDENTIAL,
+        auth_scope=READ_SCOPE,
+        client_id=READ_CLIENT_ID,
+    )
 
 
 def _run_server(server: Any) -> None:
     settings = _transport_settings(DEFAULT_HTTP_PORT)
-    _http_auth_kwargs(DEFAULT_HTTP_PORT)
+    _read_http_auth_kwargs()
     if settings.transport == "stdio":
         server.run(transport="stdio")
         return
@@ -37,10 +51,23 @@ def build_server(
 ) -> Any:
     try:
         from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
+        from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
         raise SystemExit("Missing dependency 'mcp'. Install with: python -m pip install -e .") from exc
 
-    mcp = FastMCP("aoa-4pda-connector-mcp", json_response=True, **_http_auth_kwargs(DEFAULT_HTTP_PORT))
+    mcp = FastMCP(
+        "aoa-4pda-connector-mcp",
+        json_response=True,
+        **_read_http_auth_kwargs(),
+    )
+    read_only_tool = mcp.tool(
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        )
+    )
 
     def current_state() -> AoA4PDAConnectorMCPState:
         return AoA4PDAConnectorMCPState.discover(
@@ -52,27 +79,27 @@ def build_server(
             default_run=default_run,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_4pda_connector_status(run: str = "latest") -> dict[str, Any]:
         """Return connector CLI, storage, readiness, and source-route status."""
         return current_state().status(run=run)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_4pda_connector_source_route() -> dict[str, Any]:
         """Return owner boundaries, env vars, wrapped commands, and stop lines."""
         return current_state().source_route()
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_4pda_connector_answer(query: str, run: str = "latest", limit: int = 5) -> dict[str, Any]:
         """Return a compact local answer packet preserving source evidence fields."""
         return current_state().answer(query=query, run=run, limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_4pda_connector_query_graph(query: str, run: str = "latest", limit: int = 5) -> dict[str, Any]:
         """Return a local graph-aware query packet from the connector CLI."""
         return current_state().query_graph(query=query, run=run, limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_4pda_connector_query_hybrid(query: str, run: str = "latest", limit: int = 5) -> dict[str, Any]:
         """Return a local hybrid query packet from the connector CLI."""
         return current_state().query_hybrid(query=query, run=run, limit=limit)

@@ -23,7 +23,8 @@ the canonical fallback.
   tool metadata.
 - Page size, traversal depth, full-text expansion, trace retention, SQLite
   execution, and backend HTTP calls are bounded.
-- Loopback HTTP requires a source-owned bearer and validates Host and Origin.
+- Loopback HTTP requires the owner-specific `aoa-kag` read bearer and scope,
+  and validates Host and Origin.
 - Responses expose projection freshness, the adapters actually used, and every
   degradation step.
 - Logs carry service and transport state without query bodies, source text, or

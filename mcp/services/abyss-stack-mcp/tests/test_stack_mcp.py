@@ -8,16 +8,23 @@ import sys
 import threading
 import time
 import tomllib
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from pydantic import ValidationError
 
 from abyss_stack_mcp.contracts import RuntimeObservation
 from abyss_stack_mcp.cli import main as cli_main
+from abyss_stack_mcp.audit import (
+    MIN_MAX_BYTES,
+    PolicyAuditError,
+    PolicyAuditJournal,
+)
 from abyss_stack_mcp.core import (
     ObservationStore,
     StackMCPApplication,
@@ -26,6 +33,7 @@ from abyss_stack_mcp.core import (
 from abyss_stack_mcp.server import (
     SOURCE_FALLBACK_VERSION,
     _auth_kwargs,
+    _configured_audit_journal,
     _contour,
     _policy_identity,
     build_server,
@@ -315,6 +323,7 @@ def policy_seam(
     rate_limit: int = 10,
     timeout_seconds: float = 1.0,
     max_output_bytes: int = 4096,
+    audit_journal: PolicyAuditJournal | None = None,
 ) -> StackPolicySeam:
     return StackPolicySeam(
         owner="abyss-stack",
@@ -336,6 +345,7 @@ def policy_seam(
         rate_limit=rate_limit,
         rate_window_seconds=60,
         clock=lambda: NOW,
+        audit_journal=audit_journal,
     )
 
 
@@ -436,6 +446,53 @@ def test_policy_identity_binds_bearer_scope_resource_and_issuer(
     )
     monkeypatch.setattr(auth_context, "get_access_token", lambda: drifted)
     assert _policy_identity("read").scope == "invalid"
+
+
+def test_configured_audit_journal_is_explicit_bounded_and_contour_specific(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ABYSS_STACK_MCP_REQUIRE_AUDIT_JOURNAL", "1")
+    with pytest.raises(SystemExit, match="requires.*JOURNAL_PATH"):
+        _configured_audit_journal("read")
+
+    path = tmp_path / "policy-read.jsonl"
+    monkeypatch.setenv("ABYSS_STACK_MCP_AUDIT_JOURNAL_PATH", str(path))
+    monkeypatch.setenv(
+        "ABYSS_STACK_MCP_AUDIT_MAX_BYTES",
+        str(MIN_MAX_BYTES),
+    )
+    journal = _configured_audit_journal("read")
+    assert journal is not None
+    assert journal.summary()["policy_family"] == "read"
+    assert journal.summary()["max_bytes"] == MIN_MAX_BYTES
+
+    monkeypatch.setenv("ABYSS_STACK_MCP_AUDIT_MAX_BYTES", "unbounded")
+    with pytest.raises(SystemExit, match="decimal integer"):
+        _configured_audit_journal("read")
+
+
+def test_managed_auth_fails_before_audit_journal_creation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    credentials = tmp_path / "credentials"
+    credentials.mkdir()
+    journal_path = tmp_path / "policy-read.jsonl"
+    monkeypatch.setenv("AOA_MCP_TRANSPORT", "streamable-http")
+    monkeypatch.setenv("AOA_MCP_HOST", "127.0.0.1")
+    monkeypatch.setenv("AOA_MCP_PORT", "5431")
+    monkeypatch.setenv("CREDENTIALS_DIRECTORY", str(credentials))
+    monkeypatch.setenv("ABYSS_STACK_MCP_REQUIRE_AUTH_MANIFEST", "1")
+    monkeypatch.setenv("ABYSS_STACK_MCP_REQUIRE_AUDIT_JOURNAL", "1")
+    monkeypatch.setenv(
+        "ABYSS_STACK_MCP_AUDIT_JOURNAL_PATH",
+        str(journal_path),
+    )
+
+    with pytest.raises(SystemExit, match="read bearer credential"):
+        build_server(policy_family="read")
+    assert not journal_path.exists()
 
 
 @pytest.mark.parametrize(
@@ -630,6 +687,248 @@ def test_policy_seam_propagates_cancellation_and_records_it() -> None:
         assert receipt["reason_codes"] == ["caller_cancelled"]
 
     asyncio.run(cancellation_scenario())
+
+
+def test_policy_audit_journal_persists_secret_free_receipts_across_restart(
+    tmp_path: Path,
+) -> None:
+    journal_path = tmp_path / "policy-read.jsonl"
+    journal = PolicyAuditJournal(
+        journal_path,
+        owner="abyss-stack",
+        policy_family="read",
+        clock=lambda: NOW,
+    )
+    seam = policy_seam(audit_journal=journal)
+
+    allowed = asyncio.run(
+        seam.invoke(
+            request_id="request-journal-allowed",
+            identity=policy_identity(),
+            tool_id="stack_runtime_catalog",
+            arguments={"organ_id": "aoa-kag"},
+            dispatch=lambda: {"owner_payload": {"entries": []}},
+        )
+    )
+    secret_value = "sk-proj-" + "b" * 48
+    with pytest.raises(PolicyDeniedError, match="secret_material_rejected"):
+        asyncio.run(
+            seam.invoke(
+                request_id="request-journal-denied",
+                identity=policy_identity(),
+                tool_id="stack_runtime_catalog",
+                arguments={"query": secret_value},
+                dispatch=lambda: {},
+            )
+        )
+
+    async def cancel() -> None:
+        started = threading.Event()
+        release = threading.Event()
+
+        def dispatch() -> dict:
+            started.set()
+            release.wait(timeout=2)
+            return {"owner_payload": {}}
+
+        task = asyncio.create_task(
+            seam.invoke(
+                request_id="request-journal-cancelled",
+                identity=policy_identity(),
+                tool_id="stack_runtime_catalog",
+                arguments={},
+                dispatch=dispatch,
+            )
+        )
+        assert await asyncio.to_thread(started.wait, 1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        release.set()
+
+    asyncio.run(cancel())
+    rendered = journal_path.read_text(encoding="utf-8")
+    assert secret_value not in rendered
+    assert "aoa-kag" not in rendered
+    assert allowed["owner_payload"] == {"entries": []}
+    assert journal_path.stat().st_mode & 0o777 == 0o600
+
+    restarted = PolicyAuditJournal(
+        journal_path,
+        owner="abyss-stack",
+        policy_family="read",
+    )
+    summary = restarted.summary()
+    assert summary["continuity_state"] == "exact"
+    assert summary["records"] == 3
+    assert summary["decision_counts"] == {
+        "allowed": 1,
+        "cancelled": 1,
+        "denied": 1,
+    }
+    assert summary["reason_counts"] == {
+        "caller_cancelled": 1,
+        "secret_material_rejected": 1,
+    }
+    assert summary["contains_secrets"] is False
+    assert "grounding" in summary["claim_limit"]
+    schema = json.loads(
+        (
+            Path(__file__).resolve().parents[1]
+            / "schemas"
+            / "policy-audit-summary.schema.json"
+        ).read_text(encoding="utf-8")
+    )
+    Draft202012Validator(schema).validate(summary)
+
+
+def test_policy_audit_journal_rejects_tamper_partial_records_and_wrong_contour(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "policy-read.jsonl"
+    journal = PolicyAuditJournal(
+        path,
+        owner="abyss-stack",
+        policy_family="read",
+        clock=lambda: NOW,
+    )
+    seam = policy_seam(audit_journal=journal)
+    asyncio.run(
+        seam.invoke(
+            request_id="request-audit-tamper",
+            identity=policy_identity(),
+            tool_id="stack_runtime_catalog",
+            arguments={},
+            dispatch=lambda: {"owner_payload": {}},
+        )
+    )
+    original = path.read_bytes()
+
+    record = json.loads(original)
+    record["policy_receipt"]["identity_id"] = "tampered-consumer"
+    path.write_text(
+        json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(PolicyAuditError, match="receipt digest"):
+        PolicyAuditJournal(
+            path,
+            owner="abyss-stack",
+            policy_family="read",
+        )
+
+    path.write_bytes(original[:-1])
+    with pytest.raises(PolicyAuditError, match="partial record"):
+        PolicyAuditJournal(
+            path,
+            owner="abyss-stack",
+            policy_family="read",
+        )
+
+    path.write_bytes(original)
+    with pytest.raises(PolicyAuditError, match="continuity"):
+        PolicyAuditJournal(
+            path,
+            owner="abyss-stack",
+            policy_family="candidate",
+        )
+
+
+def test_policy_audit_journal_rejects_unsafe_paths_permissions_and_live_drift(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "target.jsonl"
+    target.touch(mode=0o600)
+    symlink = tmp_path / "policy-read.jsonl"
+    symlink.symlink_to(target)
+    with pytest.raises(PolicyAuditError, match="symlink"):
+        PolicyAuditJournal(
+            symlink,
+            owner="abyss-stack",
+            policy_family="read",
+        )
+
+    target.chmod(0o640)
+    with pytest.raises(PolicyAuditError, match="permissions"):
+        PolicyAuditJournal(
+            target,
+            owner="abyss-stack",
+            policy_family="read",
+        )
+
+    target.chmod(0o600)
+    journal = PolicyAuditJournal(
+        target,
+        owner="abyss-stack",
+        policy_family="read",
+    )
+    with target.open("ab") as handle:
+        handle.write(b"{}\n")
+    with pytest.raises(PolicyAuditError, match="outside this process"):
+        journal.summary()
+
+    replacement_path = tmp_path / "replacement.jsonl"
+    replacement_path.touch(mode=0o600)
+    replacement = PolicyAuditJournal(
+        replacement_path,
+        owner="abyss-stack",
+        policy_family="read",
+    )
+    staged = tmp_path / "staged.jsonl"
+    staged.touch(mode=0o600)
+    staged.replace(replacement_path)
+    with pytest.raises(PolicyAuditError, match="identity changed"):
+        replacement.summary()
+
+
+def test_policy_audit_journal_is_thread_safe_and_fails_closed_at_capacity(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "policy-read.jsonl"
+    journal = PolicyAuditJournal(
+        path,
+        owner="abyss-stack",
+        policy_family="read",
+        max_bytes=MIN_MAX_BYTES,
+        clock=lambda: NOW,
+    )
+    seam = policy_seam(audit_journal=journal)
+    allowed = asyncio.run(
+        seam.invoke(
+            request_id="request-audit-template",
+            identity=policy_identity(),
+            tool_id="stack_runtime_catalog",
+            arguments={},
+            dispatch=lambda: {"owner_payload": {}},
+        )
+    )["metadata"]["policy_receipt"]
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        record_ids = tuple(pool.map(journal.append, [allowed] * 24))
+    assert len(set(record_ids)) == 24
+    restarted = PolicyAuditJournal(
+        path,
+        owner="abyss-stack",
+        policy_family="read",
+        max_bytes=MIN_MAX_BYTES,
+    )
+    assert restarted.summary()["records"] == 25
+
+    while True:
+        before_append = path.read_bytes()
+        try:
+            restarted.append(allowed)
+        except PolicyAuditError as exc:
+            assert "capacity is exhausted" in str(exc)
+            assert path.read_bytes() == before_append
+            break
+    final = PolicyAuditJournal(
+        path,
+        owner="abyss-stack",
+        policy_family="read",
+        max_bytes=MIN_MAX_BYTES,
+    )
+    assert final.summary()["remaining_bytes"] >= 0
 
 
 def test_contract_is_strict_and_policy_effects_are_bounded() -> None:

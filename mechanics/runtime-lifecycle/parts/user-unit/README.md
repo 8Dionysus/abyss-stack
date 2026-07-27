@@ -33,25 +33,41 @@ unit from the deployed Configs mirror into `~/.config/systemd/user`. This is a
 link-and-reload operation only; it preserves enable state, running processes,
 host-local drop-ins, and existing `/dev/null` masks.
 
-The allowlist includes `aoa-mcp-http@.service` and its bundle. The template
+The allowlist includes the transitional `aoa-mcp-http@.service`, the
+owner-specific `aoa-organ-mcp-read@.service`, the dedicated Memo/Evals
+candidate services, and their bundle. Each read template
 launches one deployed workspace MCP wrapper with
 `AOA_MCP_TRANSPORT=streamable-http` and `AOA_MCP_HOST=127.0.0.1`; package code
-still defaults to stdio outside that explicit lifecycle. It also loads the
-non-committed `aoa-mcp-http-bearer-token` systemd credential; package startup
-fails before bind if the credential is missing or invalid. Provision it only
-through the explicit `aoa-install-systemd --provision-mcp-http-auth` action,
-which never prints or replaces an existing valid value. A missing secret root
-is created with mode `0700`; an existing root keeps its current permissions,
-and symlinked roots or credential files fail closed. Install never starts or
-restarts an owner. Canary and restart each instance separately after
-source/deployed parity so one failed owner cannot hide behind bundle state.
+still defaults to stdio outside that explicit lifecycle. The transitional
+template loads `aoa-mcp-http-bearer-token`; the read template loads only
+`%i-mcp-read-bearer-token` and denies persistent filesystem writes. Provision
+the former with `--provision-mcp-http-auth` and the owner-distinct Decisions,
+Memo, Evals, KAG, Session Memory, Stats, Abyss Machine, and staged ToS corpus
+read credentials, plus the exact 4PDA, Telegram, Discord, Course,
+StackOverflow, and XDA connector read credentials, with
+`--provision-organ-mcp-read-auth`.
+Provision the Memo/Evals candidate credentials with
+`--provision-organ-mcp-candidate-auth`; it verifies that all fourteen read and
+two candidate values are distinct.
+Provisioning never prints or replaces an existing valid value, rejects
+owner-equal read tokens, and writes only a secret-local digest manifest. A
+missing secret root is created with mode `0700`; symlinked roots or credential
+files fail closed. Install never starts or restarts an owner. Canary and
+restart each instance separately after source/deployed parity so one failed
+owner cannot hide behind bundle state.
 
 Use `aoa-install-systemd --install-mcp-http-codex-client` once for the target
 user after the MCP package has been projected into deployed `Configs`. The
-action validates or provisions the same credential and adds one managed Zsh
-function that delegates new interactive Codex launches to the deployed
-client-side launcher. The bearer is inherited only by Codex, the managed Codex
-binary symlink is unchanged, and running shells and sessions are untouched.
+action validates or provisions the legacy credential plus the fourteen
+source-isolated owner-read and two candidate credentials and adds one managed Zsh function that
+delegates new
+interactive Codex launches to the deployed client-side launcher. The named
+bearers are inherited only by Codex, the managed Codex binary symlink is
+unchanged, and running shells and sessions are untouched. The ToS bearer is
+staged only; this route does not create its workspace wrapper, start it, or add
+it to the owner bundle.
+The candidate values remain separate named variables for separate Memo/Evals
+candidate registrations; inheriting them does not merge endpoint authority.
 `--remove-mcp-http-codex-client` removes only that managed Zsh block.
 
 The stack-owned read and non-executing candidate planes have separate
@@ -89,6 +105,14 @@ source-projection lock is held from before the first deployed-source read
 through the environment swap; an MCP Configs sync takes the same lock around
 its full rsync transaction, so neither publication can cross the other's
 commit boundary.
+The same runtime provision action creates two persistent, non-truncated policy
+audit journals under `${AOA_STACK_ROOT}/Logs/mcp/audit`: `policy-read.jsonl`
+and `policy-candidate.jsonl`. The root is mode `0700` and files are mode
+`0600`; symlinks, non-regular files, broad modes, or files beyond the managed
+32 MiB bound fail closed. Verification does not create or repair these paths.
+Each managed unit can write only its own exact journal path and hides the
+opposite contour. Stop a plane before any reviewed archive handoff; no
+automatic journal rotation is installed.
 
 Use `pkexec .../aoa-install-systemd --system-units` for the small privileged
 support-unit allowlist under `systemd/system/`. That mode installs root-owned

@@ -7,7 +7,8 @@
 | `aoa-evals` | bounded proof bundles, verdict logic, generated reader contracts, runtime-candidate posture | runtime service execution |
 | generated readers | deterministic catalog, capsule, section, comparison, and report read models | proof interpretation stronger than source bundles |
 | runtime-candidate readers | candidate evidence and artifact hook templates | accepted proof or verdicts |
-| `aoa-evals-mcp` | read access, selection, find-or-propose routing, inspection, expansion, comparison, template lookup, runtime status, Eval Forge front-door access packets, candidate packet validation, runtime candidate export read-model, report skeletons, and gated sibling repo-local eval-port writes | eval running, verdict computation, receipt publication, bundle promotion, central `aoa-evals` source mutation, proposal approval, evidence acceptance, worksheet acceptance, arbitrary sibling path mutation |
+| `aoa-evals-mcp` read contour | selection, inspection, generated/candidate readers, validation, Forge access, report skeletons, local-port inventory and planning | persistent writes or proof authority |
+| `aoa-evals-mcp` candidate contour | three AOA-EV-D-0241 local-port writers under explicit application and OS allowlists | central mutation, arbitrary sibling writes, suite sidecars, execution, verdicts, acceptance, promotion |
 | `abyss-stack` | runnable MCP package and local transport topology | proof meaning |
 
 ## Interface
@@ -65,6 +66,11 @@ state, target confinement, validation, activation, side effects, and forbidden
 proof/promotion/verdict/scoring/central-mutation effects.
 Execution sidecars under `evals/suites/*.suite.json` are deliberately outside
 this write allowlist.
+
+Read and candidate tools never share an endpoint or bearer. A port appearing
+in the read inventory does not make it writable: managed candidate writes
+require both an `AOA_EVALS_MCP_CANDIDATE_ROOTS` match and an exact systemd
+`ReadWritePaths` lane.
 
 ## Stop Lines
 

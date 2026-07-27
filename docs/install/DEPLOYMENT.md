@@ -155,6 +155,8 @@ scripts/aoa-sync-configs --item mcp --item schemas --item systemd
 scripts/aoa-install-systemd --all-user-units
 scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime
 scripts/aoa-install-systemd --provision-mcp-http-auth
+scripts/aoa-install-systemd --provision-organ-mcp-read-auth
+scripts/aoa-install-systemd --provision-organ-mcp-candidate-auth
 scripts/aoa-install-systemd --provision-abyss-stack-mcp-auth
 # Later standalone rotation, only with both stack MCP planes stopped:
 scripts/aoa-install-systemd --rotate-abyss-stack-mcp-auth
@@ -166,10 +168,34 @@ unknown items and `Secrets` fail closed. `--dry-run` requires an existing
 target and never mutates it. Source-control, bytecode, and test/tool caches are
 excluded from deployment. The systemd installer links and reloads only,
 preserves existing masks, and does not start or restart the newly linked MCP
-owners. The explicit provision action creates the optional host-local MCP
-bearer under `Secrets/Configs` without printing or replacing it. Shared HTTP
-Codex entries must name `AOA_MCP_HTTP_BEARER_TOKEN` through
-`bearer_token_env_var`; the value must never be copied into `config.toml`.
+owners. The legacy provision action creates the transitional shared bearer
+under `Secrets/Configs` without printing or replacing it. The organ read
+provision action creates owner-distinct read credentials for `aoa-decisions`,
+`aoa-memo`, `aoa-evals`, `aoa-kag`, `aoa-session-memory`, `aoa-stats`,
+`abyss-machine`, `tos-corpus`, `aoa-4pda-connector`,
+`aoa-telegram-connector`, `aoa-discord-connector`,
+`aoa-course-connector`, `aoa-stackoverflow-connector`, and
+`aoa-xda-connector`, rejects equal values, and publishes only their digests in
+a secret-local manifest. The candidate provision action also creates distinct
+`aoa-memo` and `aoa-evals` candidate credentials and verifies that all sixteen
+owner/contour values differ. Codex entries use matching named variables:
+`AOA_DECISIONS_MCP_READ_BEARER_TOKEN`,
+`AOA_MEMO_MCP_READ_BEARER_TOKEN`, `AOA_EVALS_MCP_READ_BEARER_TOKEN`,
+`AOA_KAG_MCP_READ_BEARER_TOKEN`,
+`AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN`,
+`AOA_STATS_MCP_READ_BEARER_TOKEN`, `ABYSS_MACHINE_MCP_READ_BEARER_TOKEN`, or
+`TOS_CORPUS_MCP_READ_BEARER_TOKEN`, with exact connector-specific variables
+for all six connector packages. The ToS credential is staged for a later
+wrapper/canary admission; it does not add that owner to the bundle. The legacy
+compatibility template continues to name `AOA_MCP_HTTP_BEARER_TOKEN`. No value
+may be copied into `config.toml`.
+
+Memo and Evals candidate services use ports `5434` and `5435`, distinct
+candidate variables, disjoint tool catalogs, and source-enumerated application
+plus systemd write allowlists. Provisioning, linking, package deployment,
+starting, and client registration remain separate actions.
+Course, StackOverflow, and XDA use `5436`, `5437`, and `5438`, preserving the
+stack MCP ports `5431`/`5433` and PostgreSQL reservation `5432`.
 
 An applying sync that includes `mcp` additionally requires a clean exact Git
 revision. After rsync it compares the complete source and deployed MCP service
@@ -467,6 +493,11 @@ artifact-hash enforcement into
 runtime imports, and records a runtime identity containing both the exact
 deployed-package digest and lock digest, plus a deterministic digest over the
 installed runtime files, symlink targets, and fully resolved interpreter bytes.
+It also creates, without truncation, separate read and candidate policy audit
+journals under `${AOA_STACK_ROOT}/Logs/mcp/audit`, enforces directory mode
+`0700`, file mode `0600`, regular non-symlink files, and the managed 32 MiB
+per-contour capacity. The read-only verifier requires this safe path shape; the
+server validates the complete receipt hash chain before bind.
 Generated console-script shebangs are rebound to the stable published venv
 before that digest and the atomic rename, so no launcher retains the removed
 staging path. Reuse requires the observed runtime digest to match that recorded
@@ -506,6 +537,10 @@ Python mode with explicit bytecode writes disabled, and execute its installed
 package rather than importing `Configs/src` or an inherited user-manager
 module. After a later stopped-plane Configs sync, rerun this provision action
 before starting or restarting either plane.
+Each unit can write only its own exact journal path and cannot access the
+opposite contour journal. Capacity exhaustion fails closed. Automatic
+rotation is not installed; stop the affected plane and use a reviewed archive
+continuity handoff rather than truncating or replacing a live journal.
 
 Use `--system-units` only through a privileged route after the Configs mirror is
 synced:

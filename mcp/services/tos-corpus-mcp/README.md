@@ -19,12 +19,29 @@ It returns:
   edges, neighborhoods, paths, review packets, snapshot fingerprints,
   post-planting audit packets, and compact packets
 
+Every tool is a closed-world read:
+`readOnlyHint=true`, `destructiveHint=false`, `idempotentHint=true`, and
+`openWorldHint=false`. The annotations mirror the implementation contract;
+package tests and the validator inspect the published inventory.
+
 ## Boundary
 
 Tree of Sophia owns the corpus and philosophy graph resources. `abyss-stack`
 owns this MCP access plane, runtime projection, and visualization support. MCP
 packets help agents review and navigate the corpus and projected philosophy
 graph; they do not become ToS source truth.
+
+Portable stdio remains the default. Optional loopback HTTP uses only:
+
+- `TOS_CORPUS_MCP_READ_BEARER_TOKEN`;
+- `tos-corpus-mcp-read-bearer-token`;
+- `mcp:tos-corpus:read`;
+- `aoa-loopback-codex:tos-corpus:read`.
+
+This source contour is ready for a filesystem-read-only
+`aoa-organ-mcp-read@tos-corpus.service`, but it remains outside the default
+bundle until the deployed workspace wrapper and live canary required by
+`ABYSS-STACK-D-0077` exist. A provisioned credential is not admission.
 
 ## Local Checks
 

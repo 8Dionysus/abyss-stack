@@ -4,6 +4,7 @@ Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-m
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.source-projection.lock
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/audit/policy-candidate.jsonl
 StartLimitIntervalSec=60
 StartLimitBurst=3
 
@@ -16,6 +17,8 @@ Environment=AOA_MCP_TRANSPORT=streamable-http
 Environment=AOA_MCP_HOST=127.0.0.1
 Environment=AOA_MCP_PORT=5433
 Environment=ABYSS_STACK_MCP_REQUIRE_AUTH_MANIFEST=1
+Environment=ABYSS_STACK_MCP_AUDIT_JOURNAL_PATH=/srv/AbyssOS/abyss-stack/Logs/mcp/audit/policy-candidate.jsonl
+Environment=ABYSS_STACK_MCP_REQUIRE_AUDIT_JOURNAL=1
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PYTHONHOME=
 Environment=PYTHONPATH=
@@ -31,6 +34,8 @@ KillMode=control-group
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=read-only
+ReadWritePaths=/srv/AbyssOS/abyss-stack/Logs/mcp/audit/policy-candidate.jsonl
+InaccessiblePaths=/srv/AbyssOS/abyss-stack/Logs/mcp/audit/policy-read.jsonl
 PrivateTmp=yes
 RestrictSUIDSGID=yes
 LockPersonality=yes

@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aoa-course-connector-mcp"
+version = "0.1.0"
+description = "Filtered read-only OS access to the owner aoa-course MCP API"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "mcp>=1.27.2,<2",
+]
+
+[project.scripts]
+aoa-course-connector-mcp = "aoa_course_connector_mcp.cli:main"
+aoa-course-connector-mcp-server = "aoa_course_connector_mcp.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

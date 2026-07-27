@@ -14,24 +14,16 @@ from urllib.parse import unquote, urlparse
 
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
 DEFAULT_ABYSS_MACHINE_BIN = "abyss-machine"
-DEFAULT_ARTIFACT_BUNDLE_REGISTRY = "/var/lib/abyss-machine/artifacts/bundle-registry"
 DEFAULT_TIMEOUT_SECONDS = 12.0
 SURFACE_TIMEOUT_SECONDS = {
     # Aggregating read models can legitimately scan large local state while
     # still remaining non-mutating and bounded.
     "typing-status": 45.0,
-    "artifact-trust-requirements": 45.0,
-    "artifact-trust-producer-profiles": 45.0,
-    "artifact-trust-affected": 45.0,
-    "artifact-trust-coverage": 45.0,
     "artifact-trust-gate": 45.0,
     "artifact-trust-registry-latest": 45.0,
-    "artifact-trust-scenarios": 45.0,
-    "artifact-trust-validate": 60.0,
 }
 
 TOKEN_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
-SOURCE_REF_RE = re.compile(r"^[A-Za-z0-9_./:+-]{1,240}$")
 
 STOP_LINES = [
     "Do not execute arbitrary shell commands.",
@@ -83,26 +75,21 @@ OWNER_LAYERS = [
     },
 ]
 
-SURFACE_META: dict[str, dict[str, str]] = {
+READ_SURFACE_META: dict[str, dict[str, str]] = {
     "stack-bridge": {
         "owner": "abyss-machine",
-        "truth_level": "bridge_contract",
-        "description": "stack-facing owner-aware bridge and evidence map",
+        "truth_level": "generated_latest_bridge",
+        "description": "existing stack-facing bridge latest; this contour never refreshes it",
     },
     "bridge": {
         "owner": "abyss-machine",
         "truth_level": "host_bridge_contract",
         "description": "host command and integration contract",
     },
-    "resource-status": {
-        "owner": "abyss-machine",
-        "truth_level": "latest_resource_state",
-        "description": "current resource orchestration posture",
-    },
     "resource-plan": {
         "owner": "abyss-machine",
         "truth_level": "launch_preflight",
-        "description": "non-mutating launch route plan for a work class and kind",
+        "description": "live launch route plan forced through the owner CLI no-write mode",
     },
     "memory-status": {
         "owner": "abyss-machine",
@@ -119,45 +106,20 @@ SURFACE_META: dict[str, dict[str, str]] = {
         "truth_level": "memory_launch_gate",
         "description": "non-mutating memory gate for new work",
     },
-    "storage-pressure": {
+    "processes-latest": {
         "owner": "abyss-machine",
-        "truth_level": "latest_storage_pressure",
-        "description": "current storage pressure and routing posture",
-    },
-    "processes-game-guard": {
-        "owner": "abyss-machine",
-        "truth_level": "protective_process_read_model",
-        "description": "non-mutating game/workload guard posture",
+        "truth_level": "generated_latest_process_state",
+        "description": "existing process snapshot latest; this contour never refreshes it",
     },
     "typing-status": {
         "owner": "abyss-machine",
         "truth_level": "typing_intake_status",
         "description": "safe typed-text intake status",
     },
-    "typing-coverage": {
-        "owner": "abyss-machine",
-        "truth_level": "typing_intake_coverage",
-        "description": "typed-text source coverage read model",
-    },
     "typing-causal-context": {
         "owner": "abyss-machine",
         "truth_level": "typing_causal_read_model",
         "description": "causal context around recent typed-text intake",
-    },
-    "nervous-status": {
-        "owner": "abyss-machine",
-        "truth_level": "nervous_status",
-        "description": "nervous capture/index/retrieval status",
-    },
-    "nervous-brief": {
-        "owner": "abyss-machine",
-        "truth_level": "nervous_brief",
-        "description": "compact nervous brief for a scope",
-    },
-    "nervous-recall": {
-        "owner": "abyss-machine",
-        "truth_level": "evidence_pack",
-        "description": "focused nervous recall evidence pack",
     },
     "maps-paths": {
         "owner": "abyss-machine",
@@ -179,11 +141,6 @@ SURFACE_META: dict[str, dict[str, str]] = {
         "truth_level": "machine_atlas_context_packet",
         "description": "bounded reader-profile context packet over machine atlas route entries",
     },
-    "maps-validate": {
-        "owner": "abyss-machine",
-        "truth_level": "machine_atlas_validation",
-        "description": "validator result for generated machine atlas maps and refresh route",
-    },
     "rag-paths": {
         "owner": "abyss-machine",
         "truth_level": "machine_rag_paths",
@@ -194,75 +151,15 @@ SURFACE_META: dict[str, dict[str, str]] = {
         "truth_level": "machine_rag_policy",
         "description": "read-only machine RAG trace policy derived from maps source law",
     },
-    "rag-trace": {
-        "owner": "abyss-machine",
-        "truth_level": "machine_rag_trace",
-        "description": "read-only maps-to-evidence trace with local trace eval",
-    },
     "rag-latest": {
         "owner": "abyss-machine",
         "truth_level": "machine_rag_trace_latest",
-        "description": "latest generated machine RAG trace",
+        "description": "existing generated machine RAG trace latest; this contour never refreshes it",
     },
-    "rag-eval": {
+    "changes-latest": {
         "owner": "abyss-machine",
-        "truth_level": "machine_rag_trace_eval",
-        "description": "latest/local machine RAG trace quality eval",
-    },
-    "rag-validate": {
-        "owner": "abyss-machine",
-        "truth_level": "machine_rag_validation",
-        "description": "validator result for the machine RAG trace loop",
-    },
-    "ai-llm-registry": {
-        "owner": "abyss-machine",
-        "truth_level": "llm_registry",
-        "description": "local LLM profile registry",
-    },
-    "ai-llm-resident-status": {
-        "owner": "abyss-machine",
-        "truth_level": "resident_llm_runtime_state",
-        "description": "resident local LLM runtime status",
-    },
-    "heartbeats-pulse": {
-        "owner": "abyss-machine",
-        "truth_level": "heartbeat_read_model",
-        "description": "OS Abyss heartbeat pulse read model",
-    },
-    "changes-status": {
-        "owner": "abyss-machine",
-        "truth_level": "change_ledger_status",
-        "description": "host change-ledger status",
-    },
-    "changes-index": {
-        "owner": "abyss-machine",
-        "truth_level": "change_ledger_index",
-        "description": "host change-ledger index",
-    },
-    "stack-bridge-validate": {
-        "owner": "abyss-machine",
-        "truth_level": "bridge_validation",
-        "description": "stack bridge validator result",
-    },
-    "artifact-trust-requirements": {
-        "owner": "abyss-machine",
-        "truth_level": "artifact_trust_requirements_read_model",
-        "description": "artifact class required controls, owner route, and consumer loop commands",
-    },
-    "artifact-trust-producer-profiles": {
-        "owner": "abyss-machine",
-        "truth_level": "artifact_trust_producer_profile_read_model",
-        "description": "owner-local producer profiles with command-resolution checks",
-    },
-    "artifact-trust-affected": {
-        "owner": "abyss-machine",
-        "truth_level": "artifact_trust_drift_read_model",
-        "description": "artifact trust drift, freshness, stale ABI, and sibling lag posture",
-    },
-    "artifact-trust-coverage": {
-        "owner": "abyss-machine",
-        "truth_level": "artifact_trust_coverage_read_model",
-        "description": "durable registry coverage and OS-internal artifact trust readiness",
+        "truth_level": "generated_latest_change_ledger",
+        "description": "existing change-ledger latest; this contour never rebuilds its index",
     },
     "artifact-trust-gate": {
         "owner": "abyss-machine",
@@ -274,17 +171,39 @@ SURFACE_META: dict[str, dict[str, str]] = {
         "truth_level": "artifact_trust_registry_latest",
         "description": "latest durable registry record selected through consumer gate rules",
     },
-    "artifact-trust-scenarios": {
-        "owner": "abyss-machine",
-        "truth_level": "artifact_trust_scenario_read_model",
-        "description": "representative OS Abyss artifact trust E2E scenarios",
-    },
-    "artifact-trust-validate": {
-        "owner": "abyss-machine",
-        "truth_level": "artifact_trust_validation",
-        "description": "artifact trust subsystem validator result",
-    },
 }
+
+# These historical names remain explicit so callers receive a stable denial
+# instead of accidentally falling through to a newly-added owner CLI command.
+# Each owner command currently refreshes or persists generated state. It may
+# return only after a separate effect contour and credential are designed.
+WITHDRAWN_EFFECTFUL_SURFACES = frozenset(
+    {
+        "resource-status",
+        "storage-pressure",
+        "processes-game-guard",
+        "typing-coverage",
+        "nervous-status",
+        "nervous-brief",
+        "nervous-recall",
+        "maps-validate",
+        "rag-trace",
+        "rag-eval",
+        "rag-validate",
+        "ai-llm-registry",
+        "ai-llm-resident-status",
+        "heartbeats-pulse",
+        "changes-status",
+        "changes-index",
+        "stack-bridge-validate",
+        "artifact-trust-requirements",
+        "artifact-trust-producer-profiles",
+        "artifact-trust-affected",
+        "artifact-trust-coverage",
+        "artifact-trust-scenarios",
+        "artifact-trust-validate",
+    }
+)
 
 
 @dataclass(slots=True)
@@ -342,40 +261,6 @@ def _safe_token(value: str, label: str) -> str:
     if not TOKEN_RE.fullmatch(value):
         raise ValueError(f"{label} must be a short token, got: {value!r}")
     return value
-
-
-def _safe_source_ref(value: str, label: str) -> str:
-    if not SOURCE_REF_RE.fullmatch(value):
-        raise ValueError(f"{label} must be a bounded source ref token, got: {value!r}")
-    return value
-
-
-def _path_is_relative_to(path: Path, parent: Path) -> bool:
-    try:
-        path.relative_to(parent)
-    except ValueError:
-        return False
-    return True
-
-
-def _safe_source_root(value: str, *, workspace_root: Path) -> str:
-    if not value:
-        return ""
-    raw = Path(value).expanduser()
-    if not raw.is_absolute():
-        raise ValueError("source_root must be an absolute abyss-machine source root")
-    resolved = raw.resolve(strict=False)
-    if resolved.name != "abyss-machine":
-        raise ValueError("source_root must point at an abyss-machine source root")
-    allowed_prefixes = [
-        workspace_root.resolve(strict=False),
-        workspace_root.parent.resolve(strict=False),
-        (Path.home() / "src").resolve(strict=False),
-        Path("/usr/local/share").resolve(strict=False),
-    ]
-    if not any(resolved == prefix or _path_is_relative_to(resolved, prefix) for prefix in allowed_prefixes):
-        raise ValueError("source_root is outside the bounded abyss-machine source-root allowlist")
-    return resolved.as_posix()
 
 
 def _safe_query(value: str) -> str:
@@ -480,8 +365,6 @@ def _surface_read_ok(surface: str, payload: Any, returncode: int) -> bool:
     if not isinstance(payload, dict):
         return False
     schema = str(payload.get("schema") or "")
-    if surface == "artifact-trust-validate":
-        return returncode == 0 and schema == "abyss_machine_artifacts_validate_v1" and payload.get("ok") is True
     if returncode == 0 and payload.get("ok") is not False:
         return True
     if surface.startswith("artifact-trust-"):
@@ -489,16 +372,6 @@ def _surface_read_ok(surface: str, payload: Any, returncode: int) -> bool:
     if surface == "memory-pressure":
         return schema == "abyss_machine_memory_pressure_v1"
     return False
-
-
-def _coverage_source_context_unsupported(run: dict[str, Any]) -> bool:
-    if run.get("surface") != "artifact-trust-coverage":
-        return False
-    stderr = str(run.get("stderr") or "")
-    if "unrecognized arguments" not in stderr:
-        return False
-    argv = [str(item) for item in run.get("argv", [])]
-    return "--source-root" in argv or "--source-repo" in argv or "--source-ref" in argv
 
 
 def _collect_paths(value: Any, *, limit: int = 16) -> list[str]:
@@ -619,11 +492,23 @@ class AbyssMachineMCPState:
     def available_surfaces(self) -> dict[str, Any]:
         return {
             "schema": "abyss_machine_mcp_surface_catalog_v1",
-            "count": len(SURFACE_META),
+            "policy_family": "read",
+            "count": len(READ_SURFACE_META),
             "surfaces": [
-                {"name": name, **meta, "mutates": False}
-                for name, meta in sorted(SURFACE_META.items())
+                {
+                    "name": name,
+                    **meta,
+                    "effect": "read",
+                    "persistent_writes": False,
+                }
+                for name, meta in sorted(READ_SURFACE_META.items())
             ],
+            "withdrawn_effectful_surface_count": len(WITHDRAWN_EFFECTFUL_SURFACES),
+            "withdrawn_effectful_surfaces": sorted(WITHDRAWN_EFFECTFUL_SURFACES),
+            "withdrawn_reason": (
+                "owner CLI route persists or refreshes generated state; unavailable "
+                "from the read contour until a separately authorized effect contour exists"
+            ),
             "authority_boundary": self.authority_boundary(),
         }
 
@@ -647,11 +532,9 @@ class AbyssMachineMCPState:
         source_root: str = "",
     ) -> list[str]:
         if name == "stack-bridge":
-            return ["stack-bridge", "--json"]
+            return ["stack-bridge", "latest", "--json"]
         if name == "bridge":
             return ["bridge", "--json"]
-        if name == "resource-status":
-            return ["resource", "status", "--json"]
         if name == "resource-plan":
             return [
                 "resource",
@@ -660,6 +543,7 @@ class AbyssMachineMCPState:
                 _safe_token(work_class, "work_class"),
                 "--kind",
                 _safe_token(kind, "kind"),
+                "--no-write",
                 "--json",
             ]
         if name == "memory-status":
@@ -668,30 +552,12 @@ class AbyssMachineMCPState:
             return ["memory", "pressure", "--json"]
         if name == "memory-plan":
             return ["memory", "plan", "--json"]
-        if name == "storage-pressure":
-            return ["storage", "pressure", "--json"]
-        if name == "processes-game-guard":
-            return ["processes", "game-guard", "--json"]
+        if name == "processes-latest":
+            return ["processes", "latest", "--json"]
         if name == "typing-status":
             return ["typing", "status", "--json"]
-        if name == "typing-coverage":
-            return ["typing", "coverage", "--json"]
         if name == "typing-causal-context":
             return ["typing", "causal-context", "--json"]
-        if name == "nervous-status":
-            return ["nervous", "status", "--json"]
-        if name == "nervous-brief":
-            return ["nervous", "brief", "--scope", _safe_token(scope, "scope"), "--json"]
-        if name == "nervous-recall":
-            return [
-                "nervous",
-                "recall",
-                "--mode",
-                _safe_token(mode, "mode"),
-                "--query",
-                _safe_query(query),
-                "--json",
-            ]
         if name == "maps-paths":
             return ["maps", "paths", "--json"]
         if name == "maps-policy":
@@ -718,76 +584,14 @@ class AbyssMachineMCPState:
                 "--json",
             ])
             return args
-        if name == "maps-validate":
-            return ["maps", "validate", "--json"]
         if name == "rag-paths":
             return ["rag", "paths", "--json"]
         if name == "rag-policy":
             return ["rag", "policy", "--json"]
-        if name == "rag-trace":
-            args = ["rag", "trace", "--query", _safe_query(query or "machine RAG trace")]
-            if axis:
-                args.extend(["--axis", _safe_token(axis, "axis")])
-            if reader_profile:
-                args.extend(["--reader-profile", _safe_token(reader_profile, "reader_profile")])
-            args.extend([
-                "--limit",
-                str(_bounded_limit(limit, default=8, maximum=50)),
-                "--evidence-limit",
-                str(_bounded_limit(evidence_limit, default=12, maximum=40)),
-                "--json",
-            ])
-            return args
         if name == "rag-latest":
             return ["rag", "latest", "--json"]
-        if name == "rag-eval":
-            return ["rag", "eval", "--json"]
-        if name == "rag-validate":
-            return ["rag", "validate", "--json"]
-        if name == "ai-llm-registry":
-            return ["ai", "llm", "registry", "--json"]
-        if name == "ai-llm-resident-status":
-            return ["ai", "llm", "resident", "status", "--json"]
-        if name == "heartbeats-pulse":
-            return ["heartbeats", "pulse", "--json"]
-        if name == "changes-status":
-            return ["changes", "status", "--json"]
-        if name == "changes-index":
-            return ["changes", "index", "--json"]
-        if name == "stack-bridge-validate":
-            return ["stack-bridge", "validate", "--json"]
-        if name == "artifact-trust-requirements":
-            args = ["artifacts", "requirements"]
-            if artifact_class:
-                args.extend(["--artifact-class", _safe_token(artifact_class, "artifact_class")])
-            args.append("--json")
-            return args
-        if name == "artifact-trust-producer-profiles":
-            args = ["artifacts", "producer-profiles", "--require-command-resolution"]
-            if artifact_class:
-                args.extend(["--artifact-class", _safe_token(artifact_class, "artifact_class")])
-            args.append("--json")
-            return args
-        if name == "artifact-trust-affected":
-            args = ["artifacts", "affected"]
-            if artifact_class:
-                args.extend(["--artifact-class", _safe_token(artifact_class, "artifact_class")])
-            if source_repo:
-                args.extend(["--source-repo", _safe_token(source_repo, "source_repo")])
-            if source_ref:
-                args.extend(["--source-ref", _safe_source_ref(source_ref, "source_ref")])
-            args.append("--json")
-            return args
-        if name == "artifact-trust-coverage":
-            args = ["artifacts", "trust-coverage"]
-            if source_root:
-                args.extend(["--source-root", _safe_source_root(source_root, workspace_root=self.workspace_root)])
-            if source_repo:
-                args.extend(["--source-repo", _safe_token(source_repo, "source_repo")])
-            if source_ref:
-                args.extend(["--source-ref", _safe_source_ref(source_ref, "source_ref")])
-            args.append("--json")
-            return args
+        if name == "changes-latest":
+            return ["changes", "latest", "--json"]
         if name == "artifact-trust-gate":
             if not artifact_class:
                 raise ValueError("artifact_class is required for artifact-trust-gate")
@@ -812,16 +616,6 @@ class AbyssMachineMCPState:
                 _safe_token(consumer_intent, "consumer_intent"),
                 "--json",
             ]
-        if name == "artifact-trust-scenarios":
-            return [
-                "artifacts",
-                "scenarios",
-                "--registry-dir",
-                DEFAULT_ARTIFACT_BUNDLE_REGISTRY,
-                "--json",
-            ]
-        if name == "artifact-trust-validate":
-            return ["artifacts", "validate", "--json"]
         raise ValueError(f"unknown or disallowed abyss-machine surface: {name}")
 
     def _run_json(self, surface: str, args: list[str], timeout: float | None = None) -> dict[str, Any]:
@@ -844,14 +638,15 @@ class AbyssMachineMCPState:
     def _public_command_result(self, run: dict[str, Any], *, include_payload: bool = False) -> dict[str, Any]:
         surface = str(run["surface"])
         payload = run.get("payload")
-        meta = SURFACE_META.get(surface, {})
+        meta = READ_SURFACE_META.get(surface, {})
         result: dict[str, Any] = {
             "schema": "abyss_machine_mcp_surface_result_v1",
             "surface": surface,
             "owner": meta.get("owner", "abyss-machine"),
             "truth_level": meta.get("truth_level", "host_read_model"),
             "description": meta.get("description", ""),
-            "mutates": False,
+            "effect": "read",
+            "persistent_writes": False,
             "command": run["argv"],
             "ok": run["ok"],
             "returncode": run["returncode"],
@@ -891,7 +686,12 @@ class AbyssMachineMCPState:
         include_payload: bool = True,
         timeout: float | None = None,
     ) -> dict[str, Any]:
-        if name not in SURFACE_META:
+        if name in WITHDRAWN_EFFECTFUL_SURFACES:
+            raise ValueError(
+                f"abyss-machine surface {name!r} is effectful and unavailable "
+                "from the read contour"
+            )
+        if name not in READ_SURFACE_META:
             raise ValueError(f"unknown or disallowed abyss-machine surface: {name}")
         args = self._surface_args(
             name,
@@ -911,24 +711,6 @@ class AbyssMachineMCPState:
             source_root=source_root,
         )
         run = self._run_json(name, args, timeout=timeout)
-        if name == "artifact-trust-coverage" and (source_root or source_repo or source_ref) and _coverage_source_context_unsupported(run):
-            fallback_args = self._surface_args(name)
-            fallback_run = self._run_json(name, fallback_args, timeout=timeout)
-            result = self._public_command_result(fallback_run, include_payload=include_payload)
-            result["warnings"] = [
-                *([str(item) for item in result.get("warnings", [])] if isinstance(result.get("warnings"), list) else []),
-                "artifact_trust_coverage_source_context_unsupported_by_cli",
-            ]
-            result["source_context_request"] = {
-                "requested_source_root": source_root or None,
-                "requested_source_repo": source_repo or None,
-                "requested_source_ref": source_ref or None,
-                "status": "fallback_without_source_context",
-                "reason": "installed abyss-machine trust-coverage does not yet support --source-root/--source-repo/--source-ref",
-            }
-            result["requested_command"] = run["argv"]
-            result["requested_stderr"] = run["stderr"] or None
-            return result
         return self._public_command_result(run, include_payload=include_payload)
 
     def _stack_bridge_payload(self) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -985,12 +767,11 @@ class AbyssMachineMCPState:
         live_surfaces: dict[str, Any] = {}
         if profile in {"live", "full"}:
             for surface_name in (
-                "resource-status",
+                "memory-status",
                 "memory-pressure",
-                "storage-pressure",
-                "processes-game-guard",
+                "processes-latest",
                 "typing-status",
-                "heartbeats-pulse",
+                "changes-latest",
             ):
                 live_surfaces[surface_name] = self.surface(surface_name, include_payload=(profile == "full"))
         return {
@@ -1038,7 +819,6 @@ class AbyssMachineMCPState:
             raise ValueError("intent is too long; keep route requests focused")
         resource = self.surface("resource-plan", work_class=work_class, kind=kind, include_payload=True)
         memory = self.surface("memory-plan", include_payload=True)
-        game_guard = self.surface("processes-game-guard", include_payload=True)
         brief = self.machine_brief(profile="fast")
         return {
             "schema": "abyss_machine_mcp_route_v1",
@@ -1050,7 +830,6 @@ class AbyssMachineMCPState:
             "surface_results": {
                 "resource_plan": resource,
                 "memory_plan": memory,
-                "game_guard": game_guard,
             },
             "constraints": brief["constraints"],
             "safe_next_route": brief["safe_next_route"],
@@ -1059,7 +838,10 @@ class AbyssMachineMCPState:
         }
 
     def recall(self, query: str, mode: str = "hybrid") -> dict[str, Any]:
-        return self.surface("nervous-recall", query=query, mode=mode, include_payload=True)
+        raise ValueError(
+            "nervous recall persists an evidence pack and is unavailable from "
+            "the abyss-machine MCP read contour"
+        )
 
     def machine_maps(self, axis: str | None = None, query: str = "", limit: int = 40) -> dict[str, Any]:
         limit = _bounded_limit(limit, default=40, maximum=100)
@@ -1119,39 +901,10 @@ class AbyssMachineMCPState:
         limit: int = 8,
         evidence_limit: int = 12,
     ) -> dict[str, Any]:
-        query = query.strip()
-        if not query:
-            query = "machine RAG trace"
-        limit = _bounded_limit(limit, default=8, maximum=50)
-        evidence_limit = _bounded_limit(evidence_limit, default=12, maximum=40)
-        args = self._surface_args(
-            "rag-trace",
-            query=query,
-            axis=axis or "",
-            reader_profile=reader_profile,
-            limit=limit,
-            evidence_limit=evidence_limit,
+        raise ValueError(
+            "machine RAG trace persists generated trace/eval state and is "
+            "unavailable from the abyss-machine MCP read contour; use rag-latest"
         )
-        run = self._run_json("rag-trace", args, timeout=max(self.timeout_seconds, 20.0))
-        trace = run.get("payload") if isinstance(run.get("payload"), dict) else {}
-        return {
-            "schema": "abyss_machine_mcp_rag_trace_v1",
-            "ok": run["ok"],
-            "query": query,
-            "axis": axis,
-            "reader_profile": reader_profile,
-            "limit": limit,
-            "evidence_limit": evidence_limit,
-            "surface": self._public_command_result(run, include_payload=False),
-            "trace_schema": trace.get("schema"),
-            "trace_id": trace.get("trace_id"),
-            "trace_truth_status": trace.get("truth_status"),
-            "summary": _compact(trace.get("summary"), max_depth=3, max_items=12),
-            "answer": _compact(trace.get("answer"), max_depth=4, max_items=12),
-            "eval": _compact(trace.get("eval"), max_depth=4, max_items=12),
-            "evidence_snapshots": _compact(trace.get("evidence_snapshots", []), max_depth=4, max_items=16),
-            "authority_boundary": self.authority_boundary(),
-        }
 
     def read_resource(self, uri: str) -> dict[str, Any]:
         parsed = urlparse(uri)
@@ -1171,24 +924,20 @@ class AbyssMachineMCPState:
             return self.machine_context_packet(reader_profile=path or "agent", limit=20)
         if name == "rag" and not path:
             return self.surface("rag-latest")
-        if name == "rag-validate" and not path:
-            return self.surface("rag-validate")
         if name == "surface" and path:
             return self.surface(path)
         resource_surface = {
             "stack-bridge": "stack-bridge",
-            "resource-status": "resource-status",
             "memory-pressure": "memory-pressure",
             "typing-status": "typing-status",
             "maps-paths": "maps-paths",
             "maps-policy": "maps-policy",
             "maps-packet": "maps-packet",
-            "maps-validate": "maps-validate",
             "rag-paths": "rag-paths",
             "rag-policy": "rag-policy",
             "rag-latest": "rag-latest",
-            "rag-eval": "rag-eval",
-            "rag-validate": "rag-validate",
+            "changes-latest": "changes-latest",
+            "processes-latest": "processes-latest",
         }.get(name)
         if resource_surface and not path:
             return self.surface(resource_surface)

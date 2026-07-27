@@ -20,18 +20,27 @@ owner layers.
 2. `DESIGN.md`
 3. `BOUNDARIES.md`
 4. This card
-5. `mcp/services/AGENTS.md` for service packages
-6. The package-local `AGENTS.md`, `README.md`, and design docs
+5. `mcp/protocol-lab/AGENTS.md` for protocol compatibility work
+6. `mcp/services/AGENTS.md` for service packages
+7. The package-local `AGENTS.md`, `README.md`, and design docs
 
 ## Boundaries
 
 MCP packages may expose resources, tools, prompts, smoke tests, and access
 helpers. They may not promote sibling-owned truth by themselves.
 
+For MCP protocol migration, `mcp/protocol-lab/` pins the exact stable and next
+pairs, retains the stable registration, and blocks migration until pair-level
+conformance, read canary, and rollback receipts exist. It is a compatibility
+gate, not a server, and it never admits effectful migration.
+
 For stack runtime evidence,
 `mcp/services/abyss-stack-mcp/` exposes compact source/package/deploy/process/
 endpoint/consumer observations and separately prepares non-executing runtime
 plan candidates. It does not proxy owner tools or execute plans.
+Its Codex handoff reports exact runtime and foreign receipt refs but never
+edits consumer config, reads credentials, reloads Codex, removes registrations,
+or infers consumer-zero.
 
 For memory work, `mcp/services/aoa-memo-mcp/` exposes `aoa-memo`, `.aoa`, and
 local `memo/` routes while keeping durable memory review in `aoa-memo`.
@@ -86,7 +95,33 @@ source-route, graph query, and answer packets while keeping
 source policy, packet truth, token/session handling, and generated storage in
 `aoa-discord-connector`.
 
+For course connector evidence work,
+`mcp/services/aoa-course-connector-mcp/` filters the owner MCP dispatcher to
+nine local read tools. It excludes connected execution, live/network, plan,
+auth, browser, refresh, fixture-execution, and raw source-ref surfaces while
+keeping course meaning and evidence in `aoa-course-connector`.
+
+For StackOverflow connector evidence work,
+`mcp/services/aoa-stackoverflow-connector-mcp/` exposes local status,
+source-route, graph query, and answer packets while keeping score and
+accepted-answer signals as context rather than truth. It must not advertise
+the documented hybrid route until the owner CLI implements it.
+
+For XDA connector evidence work,
+`mcp/services/aoa-xda-connector-mcp/` exposes local status, source-route,
+graph query, and answer packets while keeping source policy, packet truth, and
+generated storage in `aoa-xda-connector`. It must not invent a hybrid command
+that is absent from the owner CLI.
+
 ## Validation
+
+For protocol compatibility changes, run:
+
+```bash
+python mcp/protocol-lab/scripts/build_protocol_lab_status.py --check
+python mcp/protocol-lab/scripts/validate_protocol_lab.py
+python -m pytest mcp/protocol-lab/tests -q
+```
 
 For `abyss-stack-mcp` changes, run:
 
@@ -165,6 +200,27 @@ For `aoa-discord-connector-mcp` changes, run:
 ```bash
 python mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py
 python -m pytest mcp/services/aoa-discord-connector-mcp/tests -q
+```
+
+For `aoa-course-connector-mcp` changes, run:
+
+```bash
+python mcp/services/aoa-course-connector-mcp/scripts/validate_course_connector_mcp.py
+python -m pytest mcp/services/aoa-course-connector-mcp/tests -q
+```
+
+For `aoa-stackoverflow-connector-mcp` changes, run:
+
+```bash
+python mcp/services/aoa-stackoverflow-connector-mcp/scripts/validate_stackoverflow_connector_mcp.py
+python -m pytest mcp/services/aoa-stackoverflow-connector-mcp/tests -q
+```
+
+For `aoa-xda-connector-mcp` changes, run:
+
+```bash
+python mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py
+python -m pytest mcp/services/aoa-xda-connector-mcp/tests -q
 ```
 
 For release-facing stack changes, also run:

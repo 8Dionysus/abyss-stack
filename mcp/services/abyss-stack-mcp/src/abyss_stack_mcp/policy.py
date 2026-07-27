@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from time import monotonic
 from typing import Any, Literal
 
+from .audit import PolicyAuditJournal
 from .core import (
     StackMCPError,
     _reject_secret_material,
@@ -74,6 +75,7 @@ class StackPolicySeam:
         rate_window_seconds: float,
         clock: Callable[[], datetime] | None = None,
         monotonic_clock: Callable[[], float] | None = None,
+        audit_journal: PolicyAuditJournal | None = None,
     ) -> None:
         if max_in_flight < 1:
             raise ValueError("max_in_flight must be positive")
@@ -91,6 +93,7 @@ class StackPolicySeam:
         self._rate_window_seconds = rate_window_seconds
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._monotonic = monotonic_clock or monotonic
+        self._audit_journal = audit_journal
         self._state_lock = asyncio.Lock()
         self._in_flight = 0
         self._recent_starts: deque[float] = deque()
@@ -153,6 +156,8 @@ class StackPolicySeam:
         }
 
     def _record(self, receipt: dict[str, Any]) -> None:
+        if self._audit_journal is not None:
+            self._audit_journal.append(receipt)
         self._audit.append(dict(receipt))
 
     def _release_background_worker(self, task: asyncio.Task[Any]) -> None:

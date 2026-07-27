@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 from pathlib import Path
@@ -203,9 +204,33 @@ def main() -> None:
             raise SystemExit("runtime candidate export read leaked payload by default")
         if not isinstance(export_read.get("validation"), dict):
             raise SystemExit("runtime candidate export read lost validation summary")
-    server = build_server()
-    if server is None:
-        raise SystemExit("MCP server did not build")
+    read_server = build_server(policy_family="read")
+    candidate_server = build_server(policy_family="candidate")
+
+    async def tool_inventory(server):
+        return {
+            tool.name: tool.annotations
+            for tool in await server.list_tools()
+        }
+
+    read_tools = asyncio.run(tool_inventory(read_server))
+    candidate_tools = asyncio.run(tool_inventory(candidate_server))
+    if set(read_tools) & set(candidate_tools):
+        raise SystemExit("evals read and candidate tool catalogs overlap")
+    if not read_tools or not candidate_tools:
+        raise SystemExit("evals MCP contour tool catalog is empty")
+    if any(
+        annotations.readOnlyHint is not True
+        or annotations.destructiveHint is not False
+        for annotations in read_tools.values()
+    ):
+        raise SystemExit("evals read tool annotations drifted")
+    if any(
+        annotations.readOnlyHint is not False
+        or annotations.destructiveHint is not True
+        for annotations in candidate_tools.values()
+    ):
+        raise SystemExit("evals candidate tool annotations drifted")
 
     print(
         json.dumps(
@@ -214,6 +239,8 @@ def main() -> None:
                 "schema": catalog["schema"],
                 "evals_root": catalog["evals_root"],
                 "catalog_count": catalog["count"],
+                "read_tool_count": len(read_tools),
+                "candidate_tool_count": len(candidate_tools),
                 "freshness_status": status["freshness"]["status"],
                 "forge_access_packet": True,
                 "forge_front_door_valid": forge_front_door.get("surface_status", {}).get("valid"),

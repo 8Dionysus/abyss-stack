@@ -10,16 +10,26 @@ source remains each repo's `docs/decisions/` lane.
 
 ## Operation
 
-Every resource and tool calls `ensure_fresh()` before reading graph outputs.
-Cache freshness is based on a deterministic fingerprint of discovered
+Every read resource and tool calls `require_fresh()` before reading graph
+outputs. Cache freshness is based on a deterministic fingerprint of discovered
 workspace decision lanes plus local Git source posture. If decision content,
 HEAD, the available local tracking ref, ahead/behind relation, or clean/dirty
-posture changes, the MCP rebuilds the ignored local graph cache before
-responding.
+posture changes, the read contour fails closed without creating or rewriting
+output.
 
 ```text
-repo-local docs/decisions -> build_workspace_decision_graph.py -> Logs/decision-graph/latest -> MCP packets
+repo-local docs/decisions
+  -> owner CLI or internal-effect refresh contour
+  -> Logs/decision-graph/latest
+  -> read contour parity check
+  -> MCP packets
 ```
+
+The default `read` contour exposes navigation reads and a non-writing cache
+posture tool. The `internal_effect` contour is a separate process surface that
+exposes only cache posture and explicit refresh. The two contours must use
+different credentials when deployed. The owner-local CLI can prepare the same
+cache without exposing an effectful MCP route.
 
 The graph builder also owns a decision-surface registry. Every fingerprinted
 file under `docs/decisions/` must either become a known graph node type or be
@@ -46,7 +56,10 @@ not merged with a second copy.
 - The graph is a navigation read model.
 - Repo-local decision records own rationale.
 - Repo-local validators and generated indexes own local decision-lane health.
-- MCP writes only ignored cache files under `Logs/decision-graph/latest/`.
+- The read MCP contour never writes cache files, lock directories, or source.
+- The internal-effect contour writes only ignored cache files under
+  `Logs/decision-graph/latest/`.
+- A read credential cannot enumerate or invoke refresh.
 - MCP does not fetch, switch, reset, clean, or otherwise mutate source repos.
 - Cache freshness does not claim owner-source or remote freshness.
 - Unknown decision-lane surface types require graph-registry work before agents

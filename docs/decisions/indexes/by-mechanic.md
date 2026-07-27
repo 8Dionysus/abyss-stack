@@ -89,6 +89,7 @@
 - [ABYSS-STACK-D-0036 Abyss Machine MCP Access Plane](../ABYSS-STACK-D-0036-abyss-machine-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0036-abyss-machine-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0052 Machine Fit Validator Module](../ABYSS-STACK-D-0052-machine-fit-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0052-machine-fit-validator-module.md`)
 - [ABYSS-STACK-D-0083 Tree of Sophia Foundation Laboratory Boundary](../ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md) (`docs/decisions/ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md`)
+- [ABYSS-STACK-D-0089 Machine Diagnostic Effect Isolation](../ABYSS-STACK-D-0089-machine-diagnostic-effect-isolation.md) (`docs/decisions/ABYSS-STACK-D-0089-machine-diagnostic-effect-isolation.md`)
 
 ## runtime-lifecycle
 
@@ -103,6 +104,15 @@
 - [ABYSS-STACK-D-0077 Loopback MCP Owner Lifecycle](../ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md`)
 - [ABYSS-STACK-D-0082 Observability Bind State and Launcher Cgroup Boundary](../ABYSS-STACK-D-0082-observability-bind-state-and-launcher-cgroup-boundary.md) (`docs/decisions/ABYSS-STACK-D-0082-observability-bind-state-and-launcher-cgroup-boundary.md`)
 - [ABYSS-STACK-D-0087 Owner-Bounded MCP Access Fabric](../ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md) (`docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md`)
+- [ABYSS-STACK-D-0088 Decision Cache Effect Isolation](../ABYSS-STACK-D-0088-decision-cache-effect-isolation.md) (`docs/decisions/ABYSS-STACK-D-0088-decision-cache-effect-isolation.md`)
+- [ABYSS-STACK-D-0089 Machine Diagnostic Effect Isolation](../ABYSS-STACK-D-0089-machine-diagnostic-effect-isolation.md) (`docs/decisions/ABYSS-STACK-D-0089-machine-diagnostic-effect-isolation.md`)
+- [ABYSS-STACK-D-0090 Session Memory and ToS Read Contour Isolation](../ABYSS-STACK-D-0090-session-and-tos-read-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0090-session-and-tos-read-contour-isolation.md`)
+- [ABYSS-STACK-D-0091 Memo and Evals Candidate Contour Isolation](../ABYSS-STACK-D-0091-memo-and-evals-candidate-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0091-memo-and-evals-candidate-contour-isolation.md`)
+- [ABYSS-STACK-D-0092 Connector Read Contour Isolation](../ABYSS-STACK-D-0092-connector-read-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0092-connector-read-contour-isolation.md`)
+- [ABYSS-STACK-D-0093 Wave 6 Access-Form and Retirement Classification](../ABYSS-STACK-D-0093-wave6-access-form-and-retirement-classification.md) (`docs/decisions/ABYSS-STACK-D-0093-wave6-access-form-and-retirement-classification.md`)
+- [ABYSS-STACK-D-0094 Cross-Organ Orchestration Host Boundary](../ABYSS-STACK-D-0094-cross-organ-orchestration-host-boundary.md) (`docs/decisions/ABYSS-STACK-D-0094-cross-organ-orchestration-host-boundary.md`)
+- [ABYSS-STACK-D-0095 Fail-Closed MCP Protocol Migration Lab](../ABYSS-STACK-D-0095-fail-closed-mcp-protocol-migration-lab.md) (`docs/decisions/ABYSS-STACK-D-0095-fail-closed-mcp-protocol-migration-lab.md`)
+- [ABYSS-STACK-D-0096 Codex Consumer Handoff Remains Owner-Composed](../ABYSS-STACK-D-0096-codex-consumer-handoff-remains-owner-composed.md) (`docs/decisions/ABYSS-STACK-D-0096-codex-consumer-handoff-remains-owner-composed.md`)
 
 ## cross-mechanic
 

@@ -30,6 +30,12 @@
 - policy receipts contain input/output digests rather than values, mark all
   returned content as untrusted data with no instruction authority, and never
   authorize runtime effects;
+- managed receipts are synchronously appended to distinct read/candidate
+  mode-`0600` canonical-JSONL hash chains before a decision is returned;
+  startup validates the full bounded chain, sequence, owner/policy contour,
+  receipt and record digests, secret screening, file type, permissions, and
+  partial-tail state; each hardened unit receives an exact write path only for
+  its own journal and cannot access the other contour's file;
 - explicit regular observation file with symlink rejection and a 2 MiB limit;
 - strict input and output models with unknown fields denied;
 - secret-like material rejected before validation or response;
@@ -148,3 +154,9 @@ Deadline cancellation cannot terminate an already-running Python worker
 thread. Current dispatches are bounded, local, and non-effecting; an effect
 plane must use cooperatively cancellable or process-isolated handlers before
 admission.
+The journal hash chain is tamper-evident, not externally notarized. A same-UID
+actor can still rewrite the file and recompute a replacement chain while the
+service is stopped. External anchoring belongs to a later proof/evidence
+handoff. The 32 MiB per-contour bound fails closed at capacity; no automatic
+rotation or deletion policy exists yet, so archival requires a stopped-plane,
+reviewed continuity handoff.

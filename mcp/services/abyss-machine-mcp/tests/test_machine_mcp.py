@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -76,7 +77,7 @@ STACK_BRIDGE = {
 }
 
 PAYLOADS: dict[tuple[str, ...], dict[str, Any]] = {
-    ("stack-bridge", "--json"): STACK_BRIDGE,
+    ("stack-bridge", "latest", "--json"): STACK_BRIDGE,
     ("memory", "pressure", "--json"): {
         "schema": "abyss_machine_memory_pressure_v1",
         "ok": True,
@@ -89,7 +90,7 @@ PAYLOADS: dict[tuple[str, ...], dict[str, Any]] = {
         "generated_at": "2026-05-25T00:00:02Z",
         "summary": {"sources": 3, "status": "ready"},
     },
-    ("resource", "plan", "--class", "heavy", "--kind", "ai", "--json"): {
+    ("resource", "plan", "--class", "heavy", "--kind", "ai", "--no-write", "--json"): {
         "schema": "abyss_machine_resource_plan_v1",
         "ok": True,
         "summary": {"decision": "allow_with_observation", "class": "heavy", "kind": "ai"},
@@ -532,7 +533,7 @@ def test_fast_brief_returns_owner_constraints_and_evidence() -> None:
         if layer["layer"] == "abyss-stack"
         for item in layer["owns"]
     )
-    assert runner.calls.count(("stack-bridge", "--json")) == 1
+    assert runner.calls.count(("stack-bridge", "latest", "--json")) == 1
 
 
 def test_surface_allowlist_rejects_arbitrary_command() -> None:
@@ -552,21 +553,31 @@ def test_route_is_preflight_only_and_uses_allowlisted_surfaces() -> None:
 
     assert route["mutates"] is False
     assert route["route_posture"] == "preflight_only"
-    assert ("resource", "plan", "--class", "heavy", "--kind", "ai", "--json") in runner.calls
+    assert (
+        "resource",
+        "plan",
+        "--class",
+        "heavy",
+        "--kind",
+        "ai",
+        "--no-write",
+        "--json",
+    ) in runner.calls
     assert ("memory", "plan", "--json") in runner.calls
-    assert ("processes", "game-guard", "--json") in runner.calls
+    assert ("processes", "game-guard", "--json") not in runner.calls
 
 
-def test_read_resource_and_recall() -> None:
-    state = state_with_fake()
+def test_read_resource_and_effectful_recall_denial() -> None:
+    runner = FakeRunner()
+    state = state_with_fake(runner)
 
     resource = state.read_resource("abyss-machine://surface/memory-pressure")
     assert resource["surface"] == "memory-pressure"
     assert resource["ok"] is True
 
-    recall = state.recall("swap pressure")
-    assert recall["surface"] == "nervous-recall"
-    assert recall["payload_schema"] == "abyss_machine_nervous_retrieval_pack_v1"
+    with pytest.raises(ValueError, match="persists an evidence pack"):
+        state.recall("swap pressure")
+    assert not any(call[:2] == ("nervous", "recall") for call in runner.calls)
 
 
 def test_surface_fails_closed_when_json_payload_is_unparsable() -> None:
@@ -592,28 +603,21 @@ def test_memory_pressure_watch_is_a_readable_surface_not_transport_failure() -> 
     assert result["payload_summary"]["class"] == "watch"
 
 
-def test_artifact_trust_manual_review_remains_readable_typed_surface() -> None:
-    state = state_with_fake(ArtifactManualReviewRunner())
+def test_effectful_artifact_diagnostics_are_denied_before_dispatch() -> None:
+    runner = ArtifactManualReviewRunner()
+    state = state_with_fake(runner)
 
-    result = state.surface("artifact-trust-coverage")
-
-    assert result["returncode"] == 1
-    assert result["payload_parse_ok"] is True
-    assert result["payload_ok"] is False
-    assert result["ok"] is True
-    assert result["payload_summary"]["deferred_with_real_blocker"] == 3
-
-
-def test_artifact_trust_validate_failure_fails_surface() -> None:
-    state = state_with_fake(ArtifactValidateFailureRunner())
-
-    result = state.surface("artifact-trust-validate")
-
-    assert result["returncode"] == 1
-    assert result["payload_parse_ok"] is True
-    assert result["payload_ok"] is False
-    assert result["ok"] is False
-    assert result["payload_summary"]["fails"] == 1
+    for surface in (
+        "artifact-trust-coverage",
+        "artifact-trust-validate",
+        "artifact-trust-requirements",
+        "artifact-trust-producer-profiles",
+        "artifact-trust-affected",
+        "artifact-trust-scenarios",
+    ):
+        with pytest.raises(ValueError, match="effectful and unavailable"):
+            state.surface(surface)
+    assert runner.calls == []
 
 
 def test_maps_tool_queries_axis_as_route_signals() -> None:
@@ -639,8 +643,8 @@ def test_maps_resource_and_surfaces_are_allowlisted() -> None:
     policy = state.surface("maps-policy")
     assert policy["payload_schema"] == "abyss_machine_maps_policy_v1"
 
-    validate = state.surface("maps-validate")
-    assert validate["payload_summary"]["status"] == "ok"
+    with pytest.raises(ValueError, match="effectful and unavailable"):
+        state.surface("maps-validate")
 
     resource = state.read_resource("abyss-machine://maps/by-eval-packet")
     assert resource["axis"] == "by-eval-packet"
@@ -651,41 +655,6 @@ def test_artifact_trust_surfaces_are_allowlisted_and_typed() -> None:
     runner = FakeRunner()
     state = state_with_fake(runner)
 
-    requirements = state.surface("artifact-trust-requirements", artifact_class="public_source_seed")
-    assert requirements["payload_schema"] == "abyss_machine_artifact_requirements_v1"
-    assert requirements["mutates"] is False
-    assert requirements["truth_level"] == "artifact_trust_requirements_read_model"
-
-    profiles = state.surface("artifact-trust-producer-profiles", artifact_class="public_source_seed")
-    assert profiles["payload_summary"]["command_resolution_checked"] is True
-
-    affected = state.surface("artifact-trust-affected", artifact_class="public_source_seed")
-    assert affected["payload_summary"]["affected"] == 0
-
-    affected_with_source_ref = state.surface(
-        "artifact-trust-affected",
-        artifact_class="public_source_seed",
-        source_repo="abyss-machine",
-        source_ref="source-refresh:main-abc123+dirty-deadbeef",
-    )
-    assert affected_with_source_ref["payload_summary"]["affected"] == 0
-
-    coverage = state.surface("artifact-trust-coverage")
-    assert coverage["payload_summary"]["deferred_with_real_blocker"] == 1
-    coverage_with_source_ref = state.surface(
-        "artifact-trust-coverage",
-        source_repo="abyss-machine",
-        source_ref="source-refresh:main-abc123+dirty-deadbeef",
-    )
-    assert coverage_with_source_ref["payload_summary"]["deferred_with_real_blocker"] == 1
-    coverage_with_source_root = state.surface(
-        "artifact-trust-coverage",
-        source_root="/tmp/abyss/abyss-machine",
-        source_repo="abyss-machine",
-        source_ref="source-refresh:main-abc123+dirty-deadbeef",
-    )
-    assert coverage_with_source_root["payload_summary"]["deferred_with_real_blocker"] == 1
-
     gate = state.surface(
         "artifact-trust-gate",
         artifact_class="public_media_export",
@@ -693,25 +662,12 @@ def test_artifact_trust_surfaces_are_allowlisted_and_typed() -> None:
     )
     assert gate["payload_schema"] == "abyss_machine_artifact_trust_gate_v1"
     assert gate["payload_summary"]["verdict"] == "warn"
+    assert gate["effect"] == "read"
+    assert gate["persistent_writes"] is False
 
     latest = state.surface("artifact-trust-registry-latest", artifact_class="public_source_seed")
     assert latest["payload_schema"] == "abyss_machine_artifact_registry_latest_v1"
 
-    scenarios = state.surface("artifact-trust-scenarios")
-    assert scenarios["payload_summary"]["scenarios"] == 8
-
-    validate = state.surface("artifact-trust-validate")
-    assert validate["payload_summary"]["fails"] == 0
-    assert validate["timeout_seconds"] == 60.0
-
-    assert (
-        "artifacts",
-        "producer-profiles",
-        "--require-command-resolution",
-        "--artifact-class",
-        "public_source_seed",
-        "--json",
-    ) in runner.calls
     assert (
         "artifacts",
         "trust-gate",
@@ -733,79 +689,6 @@ def test_artifact_trust_surfaces_are_allowlisted_and_typed() -> None:
         ),
         45.0,
     ) in runner.timeouts
-    assert (
-        "artifacts",
-        "scenarios",
-        "--registry-dir",
-        "/var/lib/abyss-machine/artifacts/bundle-registry",
-        "--json",
-    ) in runner.calls
-    assert (
-        "artifacts",
-        "affected",
-        "--artifact-class",
-        "public_source_seed",
-        "--source-repo",
-        "abyss-machine",
-        "--source-ref",
-        "source-refresh:main-abc123+dirty-deadbeef",
-        "--json",
-    ) in runner.calls
-    assert (
-        "artifacts",
-        "trust-coverage",
-        "--source-repo",
-        "abyss-machine",
-        "--source-ref",
-        "source-refresh:main-abc123+dirty-deadbeef",
-        "--json",
-    ) in runner.calls
-    assert (
-        "artifacts",
-        "trust-coverage",
-        "--source-root",
-        "/tmp/abyss/abyss-machine",
-        "--source-repo",
-        "abyss-machine",
-        "--source-ref",
-        "source-refresh:main-abc123+dirty-deadbeef",
-        "--json",
-    ) in runner.calls
-    assert (
-        (
-            "artifacts",
-            "validate",
-            "--json",
-        ),
-        60.0,
-    ) in runner.timeouts
-
-
-def test_artifact_trust_coverage_source_context_falls_back_for_old_cli() -> None:
-    runner = CoverageSourceContextUnsupportedRunner()
-    state = state_with_fake(runner)
-
-    coverage = state.surface(
-        "artifact-trust-coverage",
-        source_repo="abyss-machine",
-        source_ref="source-refresh:main-abc123+dirty-deadbeef",
-    )
-
-    assert coverage["ok"] is True
-    assert coverage["payload_summary"]["deferred_with_real_blocker"] == 1
-    assert coverage["warnings"] == ["artifact_trust_coverage_source_context_unsupported_by_cli"]
-    assert coverage["source_context_request"]["status"] == "fallback_without_source_context"
-    assert coverage["command"] == ["abyss-machine", "artifacts", "trust-coverage", "--json"]
-    assert coverage["requested_command"] == [
-        "abyss-machine",
-        "artifacts",
-        "trust-coverage",
-        "--source-repo",
-        "abyss-machine",
-        "--source-ref",
-        "source-refresh:main-abc123+dirty-deadbeef",
-        "--json",
-    ]
 
 
 def test_artifact_trust_surfaces_reject_unsafe_or_incomplete_parameters() -> None:
@@ -817,13 +700,13 @@ def test_artifact_trust_surfaces_reject_unsafe_or_incomplete_parameters() -> Non
     with pytest.raises(ValueError):
         state.surface("artifact-trust-registry-latest")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="effectful and unavailable"):
         state.surface("artifact-trust-requirements", artifact_class="../private")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="effectful and unavailable"):
         state.surface("artifact-trust-affected", source_ref="source-refresh:main;rm -rf /")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="effectful and unavailable"):
         state.surface("artifact-trust-coverage", source_root="/etc")
 
 
@@ -841,24 +724,36 @@ def test_context_packet_wraps_host_owned_packet() -> None:
     assert ("maps", "packet", "--axis", "by-eval-packet", "--reader-profile", "proof-context", "--limit", "4", "--json") in runner.calls
 
 
-def test_rag_trace_wraps_host_owned_trace_loop() -> None:
+def test_rag_latest_is_readable_but_trace_and_validate_are_denied() -> None:
     runner = FakeRunner()
     state = state_with_fake(runner)
-    trace = state.machine_rag_trace("machine RAG trace loop", limit=4, evidence_limit=6)
-
-    assert trace["schema"] == "abyss_machine_mcp_rag_trace_v1"
-    assert trace["ok"] is True
-    assert trace["trace_schema"] == "abyss_machine_rag_trace_v1"
-    assert trace["trace_truth_status"] == "generated_trace_not_source_truth"
-    assert trace["summary"]["packet_entries"] == 2
-    assert trace["eval"]["ok"] is True
-    assert ("rag", "trace", "--query", "machine RAG trace loop", "--axis", "by-rag-run", "--reader-profile", "retrieval-context", "--limit", "4", "--evidence-limit", "6", "--json") in runner.calls
 
     resource = state.read_resource("abyss-machine://rag")
     assert resource["payload_schema"] == "abyss_machine_rag_trace_v1"
 
-    validate = state.surface("rag-validate")
-    assert validate["payload_summary"]["status"] == "ok"
+    with pytest.raises(ValueError, match="persists generated trace"):
+        state.machine_rag_trace("machine RAG trace loop", limit=4, evidence_limit=6)
+    with pytest.raises(ValueError, match="effectful and unavailable"):
+        state.surface("rag-validate")
+    assert not any(call[:2] == ("rag", "trace") for call in runner.calls)
+
+
+def test_surface_catalog_and_server_expose_only_read_routes() -> None:
+    state = state_with_fake()
+    catalog = state.available_surfaces()
+
+    assert catalog["policy_family"] == "read"
+    assert catalog["count"] == len(catalog["surfaces"])
+    assert all(item["effect"] == "read" for item in catalog["surfaces"])
+    assert all(item["persistent_writes"] is False for item in catalog["surfaces"])
+    assert "nervous-recall" in catalog["withdrawn_effectful_surfaces"]
+    assert "artifact-trust-coverage" in catalog["withdrawn_effectful_surfaces"]
+
+    server = build_server(workspace_root="/tmp/abyss", command_runner=FakeRunner())
+    tools = {tool.name for tool in asyncio.run(server.list_tools())}
+    assert "abyss_machine_surfaces" in tools
+    assert "abyss_machine_recall" not in tools
+    assert "abyss_machine_rag_trace" not in tools
 
 
 def test_server_builds_with_fake_runner() -> None:

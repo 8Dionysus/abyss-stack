@@ -39,7 +39,7 @@ Resources:
 
 Tools:
 
-- `aoa_decisions_status(force_refresh)`
+- `aoa_decisions_status()`
 - `aoa_decisions_summary()`
 - `aoa_decisions_search(query, repo, limit)`
 - `aoa_decisions_packet(query, repo, decision_id, path, limit)`
@@ -50,10 +50,19 @@ Tools:
 - `aoa_decisions_changed_path(path, repo, limit)`
 - `aoa_decisions_repo_symmetry(repo)`
 - `aoa_decisions_issues(repo, limit)`
+
+The default read contour exposes no refresh tool. All read tools require an
+existing cache that matches current local inputs. Missing or stale output fails
+closed without creating the output directory or a refresh lock.
+
+The separate `internal_effect` contour exposes only:
+
+- `aoa_decisions_status()`
 - `aoa_decisions_refresh(force)`
 
-All read tools auto-refresh the ignored local graph cache before returning.
-Refresh writes only under `Logs/decision-graph/latest/`.
+Refresh writes only under `Logs/decision-graph/latest/`. It must run as a
+separate process with a credential that the read process does not accept.
+The owner-local CLI can prepare the cache without enabling the effect contour.
 If a new file appears under `docs/decisions/` without a graph-registry entry,
 the refreshed summary reports an issue instead of silently hiding that surface.
 

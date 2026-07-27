@@ -5,9 +5,11 @@ Local route card for `mcp/services/aoa-memo-mcp/`.
 ## Purpose
 
 `aoa-memo-mcp` is the thin MCP access plane for OS Abyss memory.
-It lets agents read memory briefs, inspect local memo ports, create local
-memory candidates, validate candidates, and route session rehydration without
-turning MCP into memory authority.
+Its read contour lets agents read memory briefs, inspect local memo ports,
+validate candidates, and route session rehydration. Its separately
+authenticated candidate contour creates only allowlisted local candidates,
+indexes, exports, and forwarding receipts. Neither contour turns MCP into
+memory authority.
 
 ## Owner Lane
 
@@ -73,7 +75,12 @@ For source-local service execution from the `abyss-stack` repo root, run:
 
 ```bash
 python mcp/services/aoa-memo-mcp/scripts/aoa_memo_mcp_server.py
+AOA_MCP_POLICY_FAMILY=candidate python mcp/services/aoa-memo-mcp/scripts/aoa_memo_mcp_server.py
 ```
+
+The first command defaults to the read contour. Candidate writes additionally
+require `AOA_MEMO_MCP_CANDIDATE_ROOTS`; managed lifecycle supplies that exact
+allowlist and the distinct candidate bearer.
 
 If the package is installed, the server entry point is:
 

@@ -1,0 +1,68 @@
+{
+  "abyss_pair_conformance": {
+    "reason": "The harness is source-complete but no final next-era server and Codex pair exists.",
+    "receipt_refs": [],
+    "status": "not_run"
+  },
+  "authority_move_combined": false,
+  "compatibility_aliases": {
+    "reason": "Stable and disabled next-lab names are distinct in the source matrix.",
+    "receipt_refs": [
+      "mcp/protocol-lab/protocol-compatibility-matrix.v1.json"
+    ],
+    "status": "passed"
+  },
+  "consumer_next_pair_observed": false,
+  "dual_support": {
+    "reason": "Dual-support law exists but has not been exercised in runtime.",
+    "receipt_refs": [
+      "mcp/protocol-lab/protocol-compatibility-matrix.v1.json"
+    ],
+    "status": "not_run"
+  },
+  "effectful_organs_migrated": false,
+  "explicit_handles_observed": false,
+  "matrix_version": "abyss_mcp_protocol_compatibility_matrix_v1",
+  "observation_id": "p1-pre-final-20260726",
+  "observed_at": "2026-07-26T23:41:49Z",
+  "official_conformance": {
+    "reason": "Final spec and stable next SDK/client pair are prerequisites.",
+    "receipt_refs": [],
+    "status": "blocked"
+  },
+  "read_only_canary": {
+    "reason": "The next-protocol read-only pilot is gated by final, SDK, client, and conformance evidence.",
+    "receipt_refs": [],
+    "status": "blocked"
+  },
+  "reason_codes": [
+    "next_spec_not_final",
+    "next_sdks_prerelease",
+    "codex_next_pair_unobserved",
+    "official_conformance_not_run",
+    "read_canary_not_run"
+  ],
+  "receipt_refs": [
+    "local://codex-cli/0.145.0",
+    "local://python-mcp/1.27.2"
+  ],
+  "rollback": {
+    "reason": "Rollback shape is defined but has not been exercised against a next adapter.",
+    "receipt_refs": [
+      "mcp/protocol-lab/protocol-compatibility-matrix.v1.json"
+    ],
+    "status": "not_run"
+  },
+  "schema_version": "abyss_mcp_protocol_pair_observation_v1",
+  "server_discover_observed": false,
+  "spec_final_observed": false,
+  "stable_sdk_release_observed": false,
+  "stateless_behavior_observed": false,
+  "tasks_extension": {
+    "reason": "Tasks is separately gated and binary type presence is not wire-pair evidence.",
+    "receipt_refs": [],
+    "status": "not_run"
+  },
+  "trace_cache_metadata_observed": false,
+  "verdict": "blocked"
+}

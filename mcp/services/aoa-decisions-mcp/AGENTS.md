@@ -17,8 +17,10 @@ This stack-owned MCP surface owns:
 
 - MCP resources, tools, prompts, CLI, smoke tests, and service-local docs for
   decision graph access.
-- Mandatory lazy freshness over the ignored local graph cache under
+- An effect-isolated refresh contour for the ignored local graph cache under
   `Logs/decision-graph/latest/`.
+- A read contour that checks cache parity but cannot create, lock, or refresh
+  graph outputs.
 - Honest local source-posture reporting without remote fetch or checkout
   mutation.
 - Decision-surface coverage reporting for every fingerprinted
@@ -59,9 +61,12 @@ It does not own:
 
 - MCP exposes access; it does not promote generated graph packets to source
   truth.
-- Every read route must call `ensure_fresh()` before reading graph outputs.
+- Every read route must call `require_fresh()` before reading graph outputs.
+- `AOA_DECISIONS_MCP_CONTOUR=read` is the default and cannot write cache
+  output; `internal_effect` exposes only cache posture and explicit refresh.
 - Keep `cache_status`, source posture, and remote freshness as distinct claims.
-- Refresh may write only the ignored local graph cache under `Logs/`.
+- The internal-effect refresh contour may write only the ignored local graph
+  cache under `Logs/`.
 - Do not hide unmodeled decision-lane files; add a graph-registry entry or
   report a summary issue.
 - Do not install hooks, timers, or daemons from this package.
@@ -72,6 +77,21 @@ For source-local service execution from the `abyss-stack` repo root, run:
 
 ```bash
 python mcp/services/aoa-decisions-mcp/scripts/aoa_decisions_mcp_server.py
+```
+
+This starts the read contour. An internal-effect server must be a separate
+process and credential:
+
+```bash
+AOA_DECISIONS_MCP_CONTOUR=internal_effect \
+  python mcp/services/aoa-decisions-mcp/scripts/aoa_decisions_mcp_server.py
+```
+
+The owner-local CLI remains the non-MCP cache preparation route:
+
+```bash
+PYTHONPATH=mcp/services/aoa-decisions-mcp/src \
+  python -m aoa_decisions_mcp.cli refresh
 ```
 
 If the package is installed, the server entry point is:
@@ -106,6 +126,6 @@ python scripts/validate_nested_agents.py
 
 ## Report
 
-State which MCP surface changed, whether mandatory freshness behavior changed,
-what validation ran, and whether the change affected portable stdio, loopback
-shared HTTP, or any wider runtime exposure.
+State which MCP contour changed, whether cache parity behavior changed, what
+validation ran, and whether the change affected portable stdio, loopback HTTP,
+or any wider runtime exposure.

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 import aoa_decisions_mcp.core as core
-from aoa_decisions_mcp.core import AoADecisionsMCPState
+from aoa_decisions_mcp.core import AoADecisionsMCPState, DecisionGraphCacheUnavailable
 from aoa_decisions_mcp.server import build_server
 
 
@@ -20,7 +23,15 @@ def test_default_stack_root_is_current_checkout() -> None:
 
 
 def test_installed_entrypoint_discovers_checkout_from_cwd(tmp_path: Path) -> None:
-    installed_core = tmp_path / "venv" / "lib" / "python3.12" / "site-packages" / "aoa_decisions_mcp" / "core.py"
+    installed_core = (
+        tmp_path
+        / "venv"
+        / "lib"
+        / "python3.12"
+        / "site-packages"
+        / "aoa_decisions_mcp"
+        / "core.py"
+    )
     installed_core.parent.mkdir(parents=True)
     installed_core.write_text("# installed package file\n", encoding="utf-8")
     checkout = tmp_path / "checkout" / "abyss-stack"
@@ -30,7 +41,10 @@ def test_installed_entrypoint_discovers_checkout_from_cwd(tmp_path: Path) -> Non
     cwd = checkout / "mcp" / "services"
     cwd.mkdir(parents=True)
 
-    assert core.discover_stack_root(package_file=installed_core, cwd=cwd) == checkout.resolve()
+    assert (
+        core.discover_stack_root(package_file=installed_core, cwd=cwd)
+        == checkout.resolve()
+    )
 
 
 def write_decision(
@@ -89,19 +103,38 @@ def initialize_tracked_git_repo(repo_root: Path) -> None:
     git(repo_root, "init", "--initial-branch=main")
     git(repo_root, "config", "user.name", "AoA Test")
     git(repo_root, "config", "user.email", "aoa-test@example.invalid")
-    git(repo_root, "remote", "add", "origin", f"https://github.com/example/{repo_root.name}.git")
+    git(
+        repo_root,
+        "remote",
+        "add",
+        "origin",
+        f"https://github.com/example/{repo_root.name}.git",
+    )
     git(repo_root, "add", ".")
     git(repo_root, "commit", "-m", "seed")
     git(repo_root, "update-ref", "refs/remotes/origin/main", "HEAD")
-    git(repo_root, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+    git(
+        repo_root,
+        "symbolic-ref",
+        "refs/remotes/origin/HEAD",
+        "refs/remotes/origin/main",
+    )
 
 
 def seed_workspace(root: Path) -> None:
     repo = root / "repo-a"
     repo.mkdir(parents=True)
     (repo / "docs" / "decisions" / "indexes").mkdir(parents=True)
-    (repo / "docs" / "decisions" / "indexes" / "README.md").write_text("# Index\n", encoding="utf-8")
-    write_decision(repo, "AAA-D-0001", "First Decision", "docs/source.md", route_anchor="config/app.toml")
+    (repo / "docs" / "decisions" / "indexes" / "README.md").write_text(
+        "# Index\n", encoding="utf-8"
+    )
+    write_decision(
+        repo,
+        "AAA-D-0001",
+        "First Decision",
+        "docs/source.md",
+        route_anchor="config/app.toml",
+    )
     initialize_tracked_git_repo(repo)
 
 
@@ -111,6 +144,16 @@ def state_for(root: Path) -> AoADecisionsMCPState:
         stack_root=STACK_ROOT,
         output_dir=root / "graph",
         include_stack_repo=False,
+    )
+
+
+def read_state_for(root: Path) -> AoADecisionsMCPState:
+    return AoADecisionsMCPState.discover(
+        workspace_root=root,
+        stack_root=STACK_ROOT,
+        output_dir=root / "graph",
+        include_stack_repo=False,
+        cache_write_allowed=False,
     )
 
 
@@ -133,7 +176,92 @@ def test_status_auto_refreshes_graph_cache(tmp_path: Path) -> None:
     assert (tmp_path / "graph" / "edges.jsonl").is_file()
 
 
-def test_status_downgrades_when_local_tracking_ref_is_ahead_of_checkout(tmp_path: Path) -> None:
+def test_read_contour_denies_missing_cache_without_creating_output(
+    tmp_path: Path,
+) -> None:
+    seed_workspace(tmp_path)
+    state = read_state_for(tmp_path)
+
+    posture = state.cache_posture()
+
+    assert posture["status"] == "missing"
+    assert posture["cache_write_allowed"] is False
+    assert not state.output_dir.exists()
+    with pytest.raises(
+        DecisionGraphCacheUnavailable, match="read contour cannot refresh"
+    ):
+        state.summary()
+    assert not state.output_dir.exists()
+
+
+def test_read_contour_denies_stale_cache_without_rewriting_it(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    writer = state_for(tmp_path)
+    writer.ensure_fresh()
+    graph_before = writer.graph_path.read_bytes()
+    summary_before = writer.summary_path.read_bytes()
+    write_decision(
+        tmp_path / "repo-a", "AAA-D-0002", "Second Decision", "docs/other.md"
+    )
+    reader = read_state_for(tmp_path)
+
+    assert reader.cache_posture()["status"] == "stale"
+    with pytest.raises(DecisionGraphCacheUnavailable, match="cache is stale"):
+        reader.packet(query="First")
+
+    assert writer.graph_path.read_bytes() == graph_before
+    assert writer.summary_path.read_bytes() == summary_before
+    assert not (writer.output_dir / core.LOCK_NAME).exists()
+
+
+def test_read_and_internal_effect_servers_have_disjoint_tools(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    read = build_server(
+        workspace_root=tmp_path,
+        stack_root=STACK_ROOT,
+        output_dir=tmp_path / "graph",
+        contour="read",
+    )
+    internal_effect = build_server(
+        workspace_root=tmp_path,
+        stack_root=STACK_ROOT,
+        output_dir=tmp_path / "graph",
+        contour="internal_effect",
+    )
+
+    read_tools = {tool.name: tool for tool in asyncio.run(read.list_tools())}
+    effect_tools = {
+        tool.name: tool for tool in asyncio.run(internal_effect.list_tools())
+    }
+
+    assert "aoa_decisions_refresh" not in read_tools
+    assert (
+        "force_refresh"
+        not in read_tools["aoa_decisions_status"].inputSchema["properties"]
+    )
+    assert set(effect_tools) == {"aoa_decisions_status", "aoa_decisions_refresh"}
+
+
+def test_read_server_status_never_materializes_cache(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    output_dir = tmp_path / "graph"
+    server = build_server(
+        workspace_root=tmp_path,
+        stack_root=STACK_ROOT,
+        output_dir=output_dir,
+        contour="read",
+    )
+
+    _, result = asyncio.run(server.call_tool("aoa_decisions_status", {}))
+
+    assert result["status"] == "missing"
+    assert result["cache_write_allowed"] is False
+    assert not output_dir.exists()
+
+
+def test_status_downgrades_when_local_tracking_ref_is_ahead_of_checkout(
+    tmp_path: Path,
+) -> None:
     seed_workspace(tmp_path)
     repo = tmp_path / "repo-a"
     state = state_for(tmp_path)
@@ -182,7 +310,9 @@ def test_status_rebuilds_when_decision_lane_changes(tmp_path: Path) -> None:
     seed_workspace(tmp_path)
     state = state_for(tmp_path)
     first = state.summary()
-    write_decision(tmp_path / "repo-a", "AAA-D-0002", "Second Decision", "docs/other.md")
+    write_decision(
+        tmp_path / "repo-a", "AAA-D-0002", "Second Decision", "docs/other.md"
+    )
 
     second = state.summary()
 
@@ -241,7 +371,10 @@ def test_impact_packets_return_surface_and_issue_context(tmp_path: Path) -> None
     assert changed_packet["decision_count"] == 1
     assert symmetry_packet["schema"] == "aoa_decisions_repo_symmetry_packet_v1"
     assert symmetry_packet["repos"][0]["repo"] == "repo-a"
-    assert symmetry_packet["repos"][0]["symmetry_note"] == "compare coverage posture; do not force identical repo structure"
+    assert (
+        symmetry_packet["repos"][0]["symmetry_note"]
+        == "compare coverage posture; do not force identical repo structure"
+    )
     assert issues_packet["schema"] == "aoa_decisions_issues_packet_v1"
     assert issues_packet["issue_count"] == 0
 
@@ -255,7 +388,10 @@ def test_path_packets_include_route_anchor_impacts(tmp_path: Path) -> None:
 
     assert changed_packet["decision_count"] == 1
     assert changed_packet["decisions"][0]["label"] == "AAA-D-0001"
-    assert any(surface.get("facet_key") == "Route anchors" for surface in changed_packet["surfaces"])
+    assert any(
+        surface.get("facet_key") == "Route anchors"
+        for surface in changed_packet["surfaces"]
+    )
     assert any(edge["type"] == "HAS_DECISION_FACET" for edge in changed_packet["edges"])
     assert packet["decision_count"] == 1
     assert packet["decisions"][0]["label"] == "AAA-D-0001"
@@ -267,8 +403,16 @@ def test_route_anchor_path_packets_respect_repo_scope(tmp_path: Path) -> None:
     repo_b = tmp_path / "repo-b"
     (repo_b / ".git").mkdir(parents=True)
     (repo_b / "docs" / "decisions" / "indexes").mkdir(parents=True)
-    (repo_b / "docs" / "decisions" / "indexes" / "README.md").write_text("# Index\n", encoding="utf-8")
-    write_decision(repo_b, "BBB-D-0001", "Foreign Decision", "docs/foreign.md", route_anchor="config/foreign.toml")
+    (repo_b / "docs" / "decisions" / "indexes" / "README.md").write_text(
+        "# Index\n", encoding="utf-8"
+    )
+    write_decision(
+        repo_b,
+        "BBB-D-0001",
+        "Foreign Decision",
+        "docs/foreign.md",
+        route_anchor="config/foreign.toml",
+    )
     state = state_for(tmp_path)
 
     changed_packet = state.changed_path("config/foreign.toml", repo="repo-a")
@@ -293,5 +437,15 @@ def test_resources_and_server_build(tmp_path: Path) -> None:
     assert summary["decision_count"] == 1
     assert decision["matches"][0]["label"] == "AAA-D-0001"
     assert issues["issue_count"] == 0
-    assert json.loads(state.render_resource("aoa-decisions://status"))["decision_count"] == 1
-    assert build_server(workspace_root=tmp_path, stack_root=STACK_ROOT, output_dir=tmp_path / "graph") is not None
+    assert (
+        json.loads(state.render_resource("aoa-decisions://status"))["decision_count"]
+        == 1
+    )
+    assert (
+        build_server(
+            workspace_root=tmp_path,
+            stack_root=STACK_ROOT,
+            output_dir=tmp_path / "graph",
+        )
+        is not None
+    )

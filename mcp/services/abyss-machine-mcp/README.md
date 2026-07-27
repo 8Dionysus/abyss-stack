@@ -1,29 +1,23 @@
 # abyss-machine-mcp
 
-`abyss-machine-mcp` exposes compact local host-machine context through a small
-MCP access plane.
+`abyss-machine-mcp` is the owner-bounded read contour for host-machine
+context. It exposes a finite set of `abyss-machine ... --json` routes that
+either read existing state or explicitly select the owner CLI no-write mode.
 
 It does not replace `abyss-machine`, host source contracts, generated facts,
-change ledgers, validators, reviewed memory, or proof authority. It gives
-agents one repeatable route to ask:
+validators, reviewed memory, or proof authority. MCP owns access only.
 
-- what is true about the machine now;
-- what constrains action;
-- what is safe to do next;
-- where the evidence lives;
-- which layer owns the truth.
-
-## Source Hierarchy
+## Source hierarchy
 
 | Layer | Role |
 | --- | --- |
 | `/etc/abyss-machine` | host source contracts, policies, route law |
-| `/var/lib/abyss-machine` | generated latest facts, indexes, validation output, histories |
-| `abyss-machine` CLI | owner command surface and validators |
+| `/var/lib/abyss-machine` | generated latest facts, indexes, and histories |
+| `abyss-machine` CLI | owner command and effect boundary |
 | `abyss-stack` | runnable MCP package and local transport topology |
-| `abyss-machine-mcp` | read-only access plane over host read models |
+| `abyss-machine-mcp` | bounded read access over owner routes |
 
-## MCP Surface
+## Read contour
 
 Resources:
 
@@ -31,70 +25,68 @@ Resources:
 - `abyss-machine://authority`
 - `abyss-machine://evidence-map`
 - `abyss-machine://stack-bridge`
-- `abyss-machine://resource-status`
 - `abyss-machine://memory-pressure`
 - `abyss-machine://typing-status`
 - `abyss-machine://maps`
 - `abyss-machine://maps/{axis}`
 - `abyss-machine://context-packet/{reader_profile}`
 - `abyss-machine://rag`
-- `abyss-machine://rag-validate`
+- `abyss-machine://surfaces`
+- `abyss-machine://processes-latest`
+- `abyss-machine://changes-latest`
 - `abyss-machine://surface/{name}`
 
 Tools:
 
 - `abyss_machine_brief(profile, evidence_limit)`
-- `abyss_machine_surface(name, query, work_class, kind, scope, mode, axis, reader_profile, limit, evidence_limit)`
+- `abyss_machine_surface(...)`
+- `abyss_machine_surfaces()`
 - `abyss_machine_evidence_map(layer, limit)`
 - `abyss_machine_route(intent, work_class, kind)`
-- `abyss_machine_recall(query, mode)`
 - `abyss_machine_maps(axis, query, limit)`
 - `abyss_machine_context_packet(axis, query, reader_profile, limit)`
-- `abyss_machine_rag_trace(query, axis, reader_profile, limit, evidence_limit)`
 
 Prompts:
 
 - `machine-brief`
 - `before-heavy-work`
 - `typing-context`
-- `nervous-recall`
 - `machine-atlas`
-- `machine-rag-trace`
 - `artifact-trust-read`
 - `host-incident-triage`
 
-Every response carries an authority boundary and keeps source refs visible.
-`abyss_machine_brief` defaults to a small evidence window so agents get a fast
-entry map first; use `abyss_machine_evidence_map(limit=N)` to expand refs when
-the task needs deeper proof. Outputs are compacted by default so agents do not
-flood the prompt with whole bridge archives.
+`abyss_machine_surfaces()` is the machine-readable contract. Every admitted
+entry has `effect: read` and `persistent_writes: false`. Historical names
+whose owner CLI route refreshes or persists state remain in an explicit
+withdrawn list and fail before command dispatch.
 
-Artifact trust surfaces are available through the same
-`abyss_machine_surface` tool, not through a separate MCP server:
+Important command bindings include:
 
-- `artifact-trust-requirements`
-- `artifact-trust-producer-profiles`
-- `artifact-trust-affected`
-- `artifact-trust-coverage`
-- `artifact-trust-gate`
-- `artifact-trust-registry-latest`
-- `artifact-trust-scenarios`
-- `artifact-trust-validate`
+- `stack-bridge` -> `abyss-machine stack-bridge latest --json`;
+- `resource-plan` -> `abyss-machine resource plan ... --no-write --json`;
+- memory status, pressure, and plan -> owner CLI paths that pass
+  `write_latest=False`;
+- maps query/packet and RAG latest -> reads of existing owner state;
+- artifact trust gate and registry latest -> registry reads without refresh.
 
-These surfaces wrap allowlisted read-only `abyss-machine artifacts ... --json`
-commands. They do not build sidecars, sign, promote evidence, write the
-registry, repair state, or approve consumption beyond the returned
-`abyss-machine` read model. `artifact-trust-affected` and
-`artifact-trust-coverage` accepts optional `source_root`, `source_repo`, and
-`source_ref` parameters so agents can inspect explicit dirty source-ref
-freshness against a bounded abyss-machine source root instead of relying on the
-MCP process working directory. If
-the installed `abyss-machine` CLI does not yet support source-context flags for
-coverage, the MCP falls back to plain coverage and returns an explicit
-`artifact_trust_coverage_source_context_unsupported_by_cli` warning.
+Nervous recall, RAG trace/eval/validate, generated validators, resource status,
+coverage builders, heartbeat pulse, change index, and similar diagnostics are
+not read merely because their result is JSON. They currently persist
+generated/latest state and are unavailable from this contour. No
+`internal_effect` machine MCP is admitted yet.
 
-## Agent Route
+## Transport and authentication
+
+Stdio remains the portable default. Streamable HTTP is loopback-only and uses
+the owner/effect-specific tuple:
+
+- environment: `ABYSS_MACHINE_MCP_READ_BEARER_TOKEN`;
+- systemd credential: `abyss-machine-mcp-read-bearer-token`;
+- scope: `mcp:abyss-machine:read`;
+- client identity: `aoa-loopback-codex:abyss-machine:read`.
+
+The managed runtime uses `aoa-organ-mcp-read@abyss-machine.service`, whose
+filesystem is read-only and which has no `ReadWritePaths`.
 
 Executable run, smoke, and validation commands live in
-[`AGENTS.md`](AGENTS.md#run). This README describes the service surface;
-`AGENTS.md` owns the operational route for agents.
+[`AGENTS.md`](AGENTS.md#run).
