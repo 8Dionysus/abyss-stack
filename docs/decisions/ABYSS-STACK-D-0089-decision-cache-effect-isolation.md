@@ -1,6 +1,6 @@
 # Decision Cache Effect Isolation
 
-- Decision ID: ABYSS-STACK-D-0088
+- Decision ID: ABYSS-STACK-D-0089
 - Status: accepted
 - Date: 2026-07-26
 - Owner surface: `mcp/services/aoa-decisions-mcp/`

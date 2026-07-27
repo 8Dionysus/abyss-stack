@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="tos-review-token" content="__WORKBENCH_TOKEN__">
+  <title>Tree of Sophia · Human Review</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div id="app" class="app-shell" aria-busy="true">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">ϟ</span>
+        <div>
+          <p class="eyebrow">Tree of Sophia</p>
+          <h1 id="protocol-title">Human Review Workbench</h1>
+        </div>
+      </div>
+      <div class="topbar-status">
+        <span id="blind-badge" class="badge badge-blind">Независимый проход</span>
+        <span id="save-status" class="save-status" role="status">Загрузка…</span>
+        <button id="feedback-open" class="button button-quiet" type="button">
+          Сообщить о проблеме
+        </button>
+      </div>
+    </header>
+
+    <aside class="queue-panel" aria-label="Единицы ревью">
+      <div class="queue-summary">
+        <div class="progress-copy">
+          <span id="progress-label">0 / 0</span>
+          <span id="reviewer-chip" class="reviewer-chip">Рецензент не указан</span>
+        </div>
+        <div class="progress-track" aria-hidden="true">
+          <span id="progress-bar"></span>
+        </div>
+      </div>
+      <nav id="unit-list" class="unit-list" aria-label="Переход между единицами"></nav>
+      <button id="submit-review" class="button button-primary submit-review" type="button">
+        Завершить проход
+      </button>
+      <p id="queue-boundary" class="queue-boundary">
+        Завершение фиксирует только первый человеческий черновик.
+      </p>
+    </aside>
+
+    <main class="review-main">
+      <section id="source-panel" class="source-panel" aria-labelledby="unit-heading">
+        <div class="unit-heading-row">
+          <div>
+            <p id="unit-context" class="eyebrow"></p>
+            <h2 id="unit-heading">Источник</h2>
+          </div>
+          <div class="viewer-tools" aria-label="Масштаб изображения">
+            <button id="zoom-out" class="icon-button" type="button" title="Уменьшить">−</button>
+            <span id="zoom-label">100%</span>
+            <button id="zoom-in" class="icon-button" type="button" title="Увеличить">+</button>
+            <button id="zoom-fit" class="button button-quiet" type="button">Вписать</button>
+            <button id="viewer-fullscreen" class="button button-quiet" type="button">На весь экран</button>
+          </div>
+        </div>
+
+        <div id="page-tabs" class="page-tabs" role="tablist" aria-label="Страницы контекста">
+          <button type="button" data-role="previous" role="tab">Предыдущая</button>
+          <button type="button" data-role="current" role="tab" aria-selected="true">Текущая</button>
+          <button type="button" data-role="next" role="tab">Следующая</button>
+        </div>
+
+        <div id="page-viewer" class="page-viewer">
+          <div id="page-canvas" class="page-canvas">
+            <img id="source-page" alt="Страница источника">
+          </div>
+          <div class="page-caption">
+            <span id="page-label"></span>
+            <span id="source-caption-note">Источник проверен машиной; содержимое оценивает человек.</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="judgment-panel" class="judgment-panel" aria-label="Поля человеческого решения">
+        <div class="task-card">
+          <p class="eyebrow">Текущая задача</p>
+          <p id="unit-instruction"></p>
+          <p id="blind-notice" class="blind-notice"></p>
+        </div>
+        <article id="candidate-card" class="candidate-card" hidden>
+          <div class="candidate-card-heading">
+            <div>
+              <p class="eyebrow">Результат для проверки</p>
+              <h2 id="candidate-label">Кандидат</h2>
+            </div>
+            <button
+              id="candidate-correct"
+              class="button button-secondary"
+              type="button"
+            >
+              Исправить только ошибки
+            </button>
+          </div>
+          <pre id="candidate-text" class="candidate-text"></pre>
+        </article>
+        <form id="review-form" novalidate></form>
+      </section>
+    </main>
+
+    <footer class="review-footer">
+      <button id="previous-unit" class="button button-secondary" type="button">← Назад</button>
+      <p id="unit-position">Единица 1 из 1</p>
+      <button id="next-unit" class="button button-primary" type="button">Далее →</button>
+    </footer>
+  </div>
+
+  <div id="start-layer" class="modal-layer" hidden>
+    <section class="modal start-modal" role="dialog" aria-modal="true" aria-labelledby="start-title">
+      <p class="eyebrow">Tree of Sophia · человеческое ревью</p>
+      <h2 id="start-title">Всё готово к человеческой работе</h2>
+      <p id="start-description"></p>
+      <ul class="start-promises">
+        <li>Одна задача за раз</li>
+        <li>Автосохранение и точное продолжение</li>
+        <li>Никаких путей, JSON и ручных экспортов</li>
+      </ul>
+      <label class="field">
+        <span class="field-label">Как подписать эту работу?</span>
+        <span class="field-help">Например, Dionysus. Можно использовать устойчивый псевдоним; не вводите секреты.</span>
+        <input id="reviewer-ref-input" type="text" maxlength="200" autocomplete="off">
+      </label>
+      <p id="start-error" class="form-error" role="alert"></p>
+      <button id="start-review" class="button button-primary button-large" type="button">
+        Начать ревью
+      </button>
+    </section>
+  </div>
+
+  <div id="feedback-layer" class="modal-layer" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="feedback-title">
+      <button class="modal-close" type="button" data-close="feedback" aria-label="Закрыть">×</button>
+      <p class="eyebrow">Обратная связь</p>
+      <h2 id="feedback-title">Что мешает выполнить работу?</h2>
+      <label class="field">
+        <span class="field-label">Категория</span>
+        <select id="feedback-category">
+          <option value="unclear-task">Непонятно, что требуется</option>
+          <option value="wrong-source">Похоже, выбран неверный источник</option>
+          <option value="interface-friction">Интерфейс мешает или утомляет</option>
+          <option value="technical-problem">Техническая проблема</option>
+          <option value="other">Другое</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field-label">Комментарий</span>
+        <span class="field-help">
+          Можно оставить пустым, если проблема полностью видна на скриншоте.
+        </span>
+        <textarea
+          id="feedback-note"
+          rows="5"
+          placeholder="Коротко опишите, что произошло или чего не хватает"
+        ></textarea>
+      </label>
+      <div
+        id="feedback-dropzone"
+        class="feedback-dropzone"
+        role="button"
+        tabindex="0"
+        aria-label="Приложить скриншот"
+      >
+        <strong>Вставьте скриншот через Ctrl+V</strong>
+        <span>или нажмите сюда / перетащите PNG, JPEG или WebP</span>
+        <input
+          id="feedback-file-input"
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          multiple
+          hidden
+        >
+      </div>
+      <div
+        id="feedback-attachment-list"
+        class="feedback-attachment-list"
+        aria-live="polite"
+      ></div>
+      <p id="feedback-error" class="form-error" role="alert"></p>
+      <button id="feedback-send" class="button button-primary" type="button">
+        Сохранить обратную связь
+      </button>
+    </section>
+  </div>
+
+  <div id="submit-layer" class="modal-layer" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="submit-title">
+      <button class="modal-close" type="button" data-close="submit" aria-label="Закрыть">×</button>
+      <p class="eyebrow">Фиксация прохода</p>
+      <h2 id="submit-title">Проверьте перед завершением</h2>
+      <div id="submit-summary" class="submit-summary"></div>
+      <label class="attestation">
+        <input id="human-attestation" type="checkbox">
+        <span>Я подтверждаю, что являюсь реальным человеком и выполнил этот проход, глядя на показанные страницы источника.</span>
+      </label>
+      <p class="boundary-note">
+        Это зафиксирует только pass 1. Результат ещё не станет gold, принятым немецким текстом или каноном.
+      </p>
+      <p id="submit-error" class="form-error" role="alert"></p>
+      <button id="submit-confirm" class="button button-primary button-large" type="button">
+        Зафиксировать человеческий черновик
+      </button>
+    </section>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # Fail-Closed MCP Protocol Migration Lab
 
-- Decision ID: ABYSS-STACK-D-0095
+- Decision ID: ABYSS-STACK-D-0096
 - Status: accepted
 - Date: 2026-07-26
 - Owner surface: `mcp/protocol-lab/`
@@ -93,7 +93,7 @@ consumer registration, live canary, benefit, or rollback.
 - `mcp/protocol-lab/`
 - `mcp/services/aoa-kag-mcp/`
 - `docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md`
-- `docs/decisions/ABYSS-STACK-D-0093-wave6-access-form-and-retirement-classification.md`
+- `docs/decisions/ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md`
 
 ## Follow-up route
 

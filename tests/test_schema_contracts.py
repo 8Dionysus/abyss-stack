@@ -123,6 +123,9 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
         "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/manual-review-receipt.schema.json"
     ),
     Path(
+        "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/ocr-candidate-review-manifest.schema.json"
+    ),
+    Path(
         "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/ocr-render-manifest.schema.json"
     ),
     Path(

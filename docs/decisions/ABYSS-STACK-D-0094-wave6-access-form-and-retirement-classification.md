@@ -1,6 +1,6 @@
 # Wave 6 Access-Form and Retirement Classification
 
-- Decision ID: ABYSS-STACK-D-0093
+- Decision ID: ABYSS-STACK-D-0094
 - Status: accepted
 - Date: 2026-07-26
 - Owner surface: `mcp/` and OS Abyss organ-access portfolio

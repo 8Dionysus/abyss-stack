@@ -1,6 +1,6 @@
 # Session Memory and ToS Read Contour Isolation
 
-- Decision ID: ABYSS-STACK-D-0090
+- Decision ID: ABYSS-STACK-D-0091
 - Status: accepted
 - Date: 2026-07-26
 - Owner surface: `mcp/services/aoa-session-memory-mcp/` and
@@ -100,8 +100,8 @@ missing runtime link into admission.
   `ABYSS-STACK-D-0069`.
 - Preserves the wrapper/canary gate from `ABYSS-STACK-D-0077`.
 - Applies the owner/effect separation law from `ABYSS-STACK-D-0087`.
-- Follows the behavior-first effect audits in `ABYSS-STACK-D-0088` and
-  `ABYSS-STACK-D-0089`.
+- Follows the behavior-first effect audits in `ABYSS-STACK-D-0089` and
+  `ABYSS-STACK-D-0090`.
 
 ## Source surfaces
 

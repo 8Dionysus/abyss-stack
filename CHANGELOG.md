@@ -105,6 +105,14 @@ Tracking starts with the community-docs baseline for this repository.
   reversible isolated or operator-authorized live-canary activation; route-api
   exposes `canary_ready` without turning the non-canonical mirror into ordinary
   runtime closure.
+- The Tree of Sophia foundation laboratory now provides a loopback-only human
+  review workbench for independent calibration, German source, and
+  method-blind OCR candidate packets, with verified source-page routing,
+  criteria-first review, candidate-prefilled correction, reviewer-declared
+  language scope, atomic autosave and resume, human-readable edition/page
+  routing, paste-ready private screenshot feedback, explicit human
+  attestation, and a digest-bound frozen draft that cannot claim gold, source
+  acceptance, or a general method ranking.
 - Tiered KAG runtime materialization now admits exact-commit owner-family
   releases and 24-owner compositions through the `abyss-machine` trust gate,
   verifies direct or packed objects into a local content-addressed cache,
@@ -160,7 +168,10 @@ Tracking starts with the community-docs baseline for this repository.
   capture, concrete target, evidence/freshness, bounded repair-handoff, and
   stored-packet review plus nearest-route distinctions in the host-visible
   prefix.
-
+- Newly initialized Tree of Sophia OCR candidate reviews now use a
+  backward-compatible v2 workbench protocol with a combined
+  omission-plus-addition outcome and provenance-safe stand-off italic
+  annotations; existing v1 sessions and frozen drafts stay byte-compatible.
 - Thin-host service overlays now preserve service-native budgets and soft
   reclaim reservations while clearing hard cgroup CPU and memory ceilings from
   persistent owner services; explicit measured lab and disposable workloads

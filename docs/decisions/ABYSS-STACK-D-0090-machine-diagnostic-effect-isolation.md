@@ -1,6 +1,6 @@
 # Machine Diagnostic Effect Isolation
 
-- Decision ID: ABYSS-STACK-D-0089
+- Decision ID: ABYSS-STACK-D-0090
 - Status: accepted
 - Date: 2026-07-26
 - Owner surface: `docs/decisions/`
@@ -94,7 +94,7 @@ owner-controlled effect contours.
   the access-plane ownership split.
 - Uses the authenticated loopback lifecycle from `ABYSS-STACK-D-0077`.
 - Applies the owner/effect separation law from `ABYSS-STACK-D-0087`.
-- Mirrors the cache-effect isolation principle in `ABYSS-STACK-D-0088`.
+- Mirrors the cache-effect isolation principle in `ABYSS-STACK-D-0089`.
 
 ## Source surfaces
 

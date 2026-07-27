@@ -1,6 +1,6 @@
 # Connector Read Contour Isolation
 
-- Decision ID: ABYSS-STACK-D-0092
+- Decision ID: ABYSS-STACK-D-0093
 - Status: accepted
 - Date: 2026-07-26
 - Owner surface: `mcp/services/aoa-*-connector-mcp/`
@@ -121,7 +121,7 @@ to the actual organ rather than to a shared connector bucket.
 
 - Applies the owner/policy-plane law from `ABYSS-STACK-D-0087`.
 - Extends the behavior-first isolation sequence from
-  `ABYSS-STACK-D-0088` through `ABYSS-STACK-D-0091`.
+  `ABYSS-STACK-D-0089` through `ABYSS-STACK-D-0092`.
 - Keeps source meaning and acceptance in each connector owner; MCP remains an
   access plane.
 

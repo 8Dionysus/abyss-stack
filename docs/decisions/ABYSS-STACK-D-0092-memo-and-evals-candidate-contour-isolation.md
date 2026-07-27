@@ -1,6 +1,6 @@
 # Memo and Evals Candidate Contour Isolation
 
-- Decision ID: ABYSS-STACK-D-0091
+- Decision ID: ABYSS-STACK-D-0092
 - Status: accepted
 - Date: 2026-07-26
 - Owner surface: `mcp/services/aoa-memo-mcp/` and
@@ -103,7 +103,7 @@ reviewable, testable, and rollbackable.
 
 - Applies the owner/effect separation law from `ABYSS-STACK-D-0087`.
 - Extends the behavior-first isolation sequence from
-  `ABYSS-STACK-D-0088` through `ABYSS-STACK-D-0090`.
+  `ABYSS-STACK-D-0089` through `ABYSS-STACK-D-0091`.
 - Preserves `aoa-memo` decision `AOA-MEM-D-0064`: durable reviewed intake is
   owner source work, not MCP acceptance.
 - Preserves `aoa-evals` decision `AOA-EV-D-0241`: only the narrow sibling-local

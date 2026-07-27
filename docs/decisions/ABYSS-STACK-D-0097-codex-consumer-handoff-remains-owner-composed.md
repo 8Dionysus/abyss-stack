@@ -1,6 +1,6 @@
 # Codex Consumer Handoff Remains Owner-Composed
 
-- Decision ID: ABYSS-STACK-D-0096
+- Decision ID: ABYSS-STACK-D-0097
 - Status: accepted
 - Date: 2026-07-26
 - Owner surface: `mcp/services/abyss-stack-mcp/`

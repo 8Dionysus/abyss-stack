@@ -117,6 +117,8 @@
         "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_review_packets.py",
         "mechanics/inference-pilots/parts/llamacpp-pilot/tests/test_aoa_llamacpp_pilot.py",
         "mechanics/inference-pilots/parts/local-trials/tests/test_aoa_local_ai_trials.py",
+        "mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_human_review_workbench.py",
+        "mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_ocr_candidate_review.py",
         "mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_tos_foundation_lab.py",
         "mechanics/inference-pilots/parts/qwen-routes/tests/test_aoa_qwen_check.py",
         "mechanics/machine-fit/parts/fit-record/tests/test_aoa_machine_fit.py",

@@ -1,6 +1,6 @@
 # Cross-Organ Orchestration Host Boundary
 
-- Decision ID: ABYSS-STACK-D-0094
+- Decision ID: ABYSS-STACK-D-0095
 - Status: accepted
 - Date: 2026-07-26
 - Owner surface: `abyss-stack` host integration and `abyss-stack-mcp`
@@ -119,7 +119,7 @@ benefit, replay recovery, or rollback.
 - `mcp/services/abyss-stack-mcp/DESIGN.md`
 - `mcp/services/abyss-stack-mcp/docs/BOUNDARIES.md`
 - `docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md`
-- `docs/decisions/ABYSS-STACK-D-0093-wave6-access-form-and-retirement-classification.md`
+- `docs/decisions/ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md`
 - `aoa-sdk` source candidate `AOA-SDK-D-0080`
 - current `aoa-kag`, `aoa-memo`, and `aoa-evals` owner contracts cited by
   `AOA-SDK-D-0080`

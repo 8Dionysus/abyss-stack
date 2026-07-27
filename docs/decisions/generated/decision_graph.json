@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 96,
-  "edge_count": 2151,
+  "decision_count": 97,
+  "edge_count": 2187,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 842,
-    "DATED": 96,
-    "GUARDED_BY": 268,
-    "HAS_STATUS": 96,
-    "HAS_SURFACE_CLASS": 246,
-    "IN_STACK_LANE": 208,
-    "NEXT_DECISION": 95,
-    "OWNED_BY_SURFACE": 102,
-    "OWNS_DECISION": 96,
+    "CITES_SOURCE_SURFACE": 856,
+    "DATED": 97,
+    "GUARDED_BY": 277,
+    "HAS_STATUS": 97,
+    "HAS_SURFACE_CLASS": 250,
+    "IN_STACK_LANE": 211,
+    "NEXT_DECISION": 96,
+    "OWNED_BY_SURFACE": 103,
+    "OWNS_DECISION": 97,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 100
+    "UNDER_MECHANIC_PARENT": 101
   },
   "edges": [
     {
@@ -9293,72 +9293,122 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "source_surface:mcp/services/aoa-decisions-mcp/AGENTS.md",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/AGENTS.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "source_surface:mcp/services/aoa-decisions-mcp/DESIGN.md",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/README.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "source_surface:mcp/services/aoa-decisions-mcp/README.md",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/docs/HUMAN_REVIEW_WORKBENCH.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "source_surface:mcp/services/aoa-decisions-mcp/docs/BOUNDARIES.md",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/human_review_workbench.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "source_surface:mcp/services/aoa-decisions-mcp/docs/THREAT_MODEL.md",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/ocr_candidate_analysis.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "source_surface:mcp/services/aoa-decisions-mcp/src/aoa_decisions_mcp/core.py",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/ocr_candidate_review.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "source_surface:mcp/services/aoa-decisions-mcp/src/aoa_decisions_mcp/server.py",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/schemas/ocr-candidate-review-manifest.schema.json",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "source_surface:mcp/services/aoa-decisions-mcp/tests/test_decisions_mcp.py",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_human_review_workbench.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "source_surface:mechanics/runtime-lifecycle/parts/user-unit/aoa_install_systemd.sh",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_ocr_candidate_review.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "source_surface:systemd/user/aoa-organ-mcp-read%40.service",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/tos_foundation_lab.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "date:2026-07-26",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/workbench/app.css",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/workbench/app.js",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/workbench/index.html",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "source_surface:scripts/aoa-tos-foundation-lab",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "date:2026-07-25",
       "type": "DATED"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "guard_family:effect%20isolation",
+      "target": "guard_family:display-position%20audit",
       "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "guard_family:fail-closed%20freshness",
+      "target": "guard_family:draft%20freeze",
       "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "guard_family:owner%20cache",
+      "target": "guard_family:independent%20reference",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "guard_family:language%20competence",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "guard_family:loopback%20exposure",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "guard_family:method-blind%20candidate%20review",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "guard_family:mutable%20control%20projection",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "guard_family:post-reveal%20evidence%20join",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "guard_family:stand-off%20typography",
       "type": "GUARDED_BY"
     },
     {
@@ -9368,32 +9418,37 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "surface_class:MCP%20access%20plane",
+      "target": "surface_class:host%20storage",
       "type": "HAS_SURFACE_CLASS"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "surface_class:decision%20graph",
+      "target": "surface_class:human%20review%20interface",
       "type": "HAS_SURFACE_CLASS"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "surface_class:runtime%20policy",
+      "target": "surface_class:inference%20pilot",
       "type": "HAS_SURFACE_CLASS"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "stack_lane:MCP%20services",
+      "target": "surface_class:source/runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0088",
+      "target": "stack_lane:Tree%20of%20Sophia%20access",
       "type": "IN_STACK_LANE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "stack_lane:decision%20lane",
+      "target": "stack_lane:human%20review",
       "type": "IN_STACK_LANE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "stack_lane:organ%20access%20fabric",
+      "target": "stack_lane:inference%20pilots",
       "type": "IN_STACK_LANE"
     },
     {
@@ -9403,32 +9458,52 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "owner_surface:mcp/services/aoa-decisions-mcp/",
+      "target": "owner_surface:mechanics/inference-pilots/parts/tos-foundation-lab/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-      "target": "mechanic_parent:runtime-lifecycle",
+      "target": "mechanic_parent:inference-pilots",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
       "source": "decision:ABYSS-STACK-D-0089",
-      "target": "source_surface:/srv/AbyssOS/abyss-machine/src/abyss_machine/cli.py",
+      "target": "source_surface:mcp/services/aoa-decisions-mcp/AGENTS.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0089",
-      "target": "source_surface:mcp/services/abyss-machine-mcp/src/abyss_machine_mcp/core.py",
+      "target": "source_surface:mcp/services/aoa-decisions-mcp/DESIGN.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0089",
-      "target": "source_surface:mcp/services/abyss-machine-mcp/src/abyss_machine_mcp/server.py",
+      "target": "source_surface:mcp/services/aoa-decisions-mcp/README.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0089",
-      "target": "source_surface:mcp/services/abyss-machine-mcp/tests/test_machine_mcp.py",
+      "target": "source_surface:mcp/services/aoa-decisions-mcp/docs/BOUNDARIES.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0089",
+      "target": "source_surface:mcp/services/aoa-decisions-mcp/docs/THREAT_MODEL.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0089",
+      "target": "source_surface:mcp/services/aoa-decisions-mcp/src/aoa_decisions_mcp/core.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0089",
+      "target": "source_surface:mcp/services/aoa-decisions-mcp/src/aoa_decisions_mcp/server.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0089",
+      "target": "source_surface:mcp/services/aoa-decisions-mcp/tests/test_decisions_mcp.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
@@ -9453,12 +9528,12 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0089",
-      "target": "guard_family:filesystem%20read-only",
+      "target": "guard_family:fail-closed%20freshness",
       "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0089",
-      "target": "guard_family:owner%20credential",
+      "target": "guard_family:owner%20cache",
       "type": "GUARDED_BY"
     },
     {
@@ -9473,12 +9548,12 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0089",
-      "target": "surface_class:host%20bridge",
+      "target": "surface_class:decision%20graph",
       "type": "HAS_SURFACE_CLASS"
     },
     {
       "source": "decision:ABYSS-STACK-D-0089",
-      "target": "surface_class:machine%20diagnostics",
+      "target": "surface_class:runtime%20policy",
       "type": "HAS_SURFACE_CLASS"
     },
     {
@@ -9488,12 +9563,12 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0089",
-      "target": "stack_lane:machine%20fit",
+      "target": "stack_lane:decision%20lane",
       "type": "IN_STACK_LANE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0089",
-      "target": "stack_lane:runtime%20lifecycle",
+      "target": "stack_lane:organ%20access%20fabric",
       "type": "IN_STACK_LANE"
     },
     {
@@ -9503,13 +9578,8 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0089",
-      "target": "owner_surface:docs/decisions/",
+      "target": "owner_surface:mcp/services/aoa-decisions-mcp/",
       "type": "OWNED_BY_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0089",
-      "target": "mechanic_parent:machine-fit",
-      "type": "UNDER_MECHANIC_PARENT"
     },
     {
       "source": "decision:ABYSS-STACK-D-0089",
@@ -9518,42 +9588,27 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0090",
-      "target": "source_surface:mcp/services/_shared/codex_http_client.sh",
+      "target": "source_surface:/srv/AbyssOS/abyss-machine/src/abyss_machine/cli.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0090",
-      "target": "source_surface:mcp/services/aoa-session-memory-mcp/src/aoa_session_memory_mcp/core.py",
+      "target": "source_surface:mcp/services/abyss-machine-mcp/src/abyss_machine_mcp/core.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0090",
-      "target": "source_surface:mcp/services/aoa-session-memory-mcp/src/aoa_session_memory_mcp/server.py",
+      "target": "source_surface:mcp/services/abyss-machine-mcp/src/abyss_machine_mcp/server.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0090",
-      "target": "source_surface:mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0090",
-      "target": "source_surface:mcp/services/tos-corpus-mcp/src/tos_corpus_mcp/server.py",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0090",
-      "target": "source_surface:mcp/services/tos-corpus-mcp/tests/test_tos_corpus_mcp.py",
+      "target": "source_surface:mcp/services/abyss-machine-mcp/tests/test_machine_mcp.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0090",
       "target": "source_surface:mechanics/runtime-lifecycle/parts/user-unit/aoa_install_systemd.sh",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0090",
-      "target": "source_surface:systemd/user/aoa-mcp-http.service",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
@@ -9593,12 +9648,12 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0090",
-      "target": "surface_class:ToS%20corpus",
+      "target": "surface_class:host%20bridge",
       "type": "HAS_SURFACE_CLASS"
     },
     {
       "source": "decision:ABYSS-STACK-D-0090",
-      "target": "surface_class:session%20evidence",
+      "target": "surface_class:machine%20diagnostics",
       "type": "HAS_SURFACE_CLASS"
     },
     {
@@ -9608,7 +9663,7 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0090",
-      "target": "stack_lane:organ%20access%20fabric",
+      "target": "stack_lane:machine%20fit",
       "type": "IN_STACK_LANE"
     },
     {
@@ -9623,8 +9678,13 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0090",
-      "target": "owner_surface:mcp/services/aoa-session-memory-mcp/",
+      "target": "owner_surface:docs/decisions/",
       "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0090",
+      "target": "mechanic_parent:machine-fit",
+      "type": "UNDER_MECHANIC_PARENT"
     },
     {
       "source": "decision:ABYSS-STACK-D-0090",
@@ -9638,22 +9698,27 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0091",
-      "target": "source_surface:mcp/services/aoa-evals-mcp/src/aoa_evals_mcp/core.py",
+      "target": "source_surface:mcp/services/aoa-session-memory-mcp/src/aoa_session_memory_mcp/core.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0091",
-      "target": "source_surface:mcp/services/aoa-evals-mcp/src/aoa_evals_mcp/server.py",
+      "target": "source_surface:mcp/services/aoa-session-memory-mcp/src/aoa_session_memory_mcp/server.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0091",
-      "target": "source_surface:mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/core.py",
+      "target": "source_surface:mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0091",
-      "target": "source_surface:mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/server.py",
+      "target": "source_surface:mcp/services/tos-corpus-mcp/src/tos_corpus_mcp/server.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0091",
+      "target": "source_surface:mcp/services/tos-corpus-mcp/tests/test_tos_corpus_mcp.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
@@ -9663,17 +9728,7 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0091",
-      "target": "source_surface:systemd/user/aoa-evals-mcp-candidate.service",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0091",
       "target": "source_surface:systemd/user/aoa-mcp-http.service",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0091",
-      "target": "source_surface:systemd/user/aoa-memo-mcp-candidate.service",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
@@ -9693,7 +9748,7 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0091",
-      "target": "guard_family:filesystem%20write%20allowlist",
+      "target": "guard_family:filesystem%20read-only",
       "type": "GUARDED_BY"
     },
     {
@@ -9713,12 +9768,12 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0091",
-      "target": "surface_class:eval%20candidate",
+      "target": "surface_class:ToS%20corpus",
       "type": "HAS_SURFACE_CLASS"
     },
     {
       "source": "decision:ABYSS-STACK-D-0091",
-      "target": "surface_class:memory%20candidate",
+      "target": "surface_class:session%20evidence",
       "type": "HAS_SURFACE_CLASS"
     },
     {
@@ -9743,7 +9798,7 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0091",
-      "target": "owner_surface:mcp/services/aoa-memo-mcp/",
+      "target": "owner_surface:mcp/services/aoa-session-memory-mcp/",
       "type": "OWNED_BY_SURFACE"
     },
     {
@@ -9753,42 +9808,27 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0092",
-      "target": "source_surface:mcp/services/_shared/build_http_auth_vendors.py",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0092",
       "target": "source_surface:mcp/services/_shared/codex_http_client.sh",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0092",
-      "target": "source_surface:mcp/services/aoa-4pda-connector-mcp/",
+      "target": "source_surface:mcp/services/aoa-evals-mcp/src/aoa_evals_mcp/core.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0092",
-      "target": "source_surface:mcp/services/aoa-course-connector-mcp/",
+      "target": "source_surface:mcp/services/aoa-evals-mcp/src/aoa_evals_mcp/server.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0092",
-      "target": "source_surface:mcp/services/aoa-discord-connector-mcp/",
+      "target": "source_surface:mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/core.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0092",
-      "target": "source_surface:mcp/services/aoa-stackoverflow-connector-mcp/",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0092",
-      "target": "source_surface:mcp/services/aoa-telegram-connector-mcp/",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0092",
-      "target": "source_surface:mcp/services/aoa-xda-connector-mcp/",
+      "target": "source_surface:mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/server.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
@@ -9798,7 +9838,17 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0092",
+      "target": "source_surface:systemd/user/aoa-evals-mcp-candidate.service",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0092",
       "target": "source_surface:systemd/user/aoa-mcp-http.service",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0092",
+      "target": "source_surface:systemd/user/aoa-memo-mcp-candidate.service",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
@@ -9818,17 +9868,12 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0092",
-      "target": "guard_family:network%20denial",
+      "target": "guard_family:filesystem%20write%20allowlist",
       "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0092",
       "target": "guard_family:owner%20credential",
-      "type": "GUARDED_BY"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0092",
-      "target": "guard_family:tool%20allowlist",
       "type": "GUARDED_BY"
     },
     {
@@ -9843,12 +9888,12 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0092",
-      "target": "surface_class:connector%20adapter",
+      "target": "surface_class:eval%20candidate",
       "type": "HAS_SURFACE_CLASS"
     },
     {
       "source": "decision:ABYSS-STACK-D-0092",
-      "target": "surface_class:local%20evidence",
+      "target": "surface_class:memory%20candidate",
       "type": "HAS_SURFACE_CLASS"
     },
     {
@@ -9873,7 +9918,7 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0092",
-      "target": "owner_surface:mcp/services/aoa-%2A-connector-mcp/",
+      "target": "owner_surface:mcp/services/aoa-memo-mcp/",
       "type": "OWNED_BY_SURFACE"
     },
     {
@@ -9883,22 +9928,57 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0093",
-      "target": "source_surface:docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md",
+      "target": "source_surface:mcp/services/_shared/build_http_auth_vendors.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0093",
-      "target": "source_surface:mcp/",
+      "target": "source_surface:mcp/services/_shared/codex_http_client.sh",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0093",
-      "target": "source_surface:the%20O1%20portfolio%20under",
+      "target": "source_surface:mcp/services/aoa-4pda-connector-mcp/",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0093",
-      "target": "source_surface:the%20cited%20remote%20owner%20contracts",
+      "target": "source_surface:mcp/services/aoa-course-connector-mcp/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0093",
+      "target": "source_surface:mcp/services/aoa-discord-connector-mcp/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0093",
+      "target": "source_surface:mcp/services/aoa-stackoverflow-connector-mcp/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0093",
+      "target": "source_surface:mcp/services/aoa-telegram-connector-mcp/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0093",
+      "target": "source_surface:mcp/services/aoa-xda-connector-mcp/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0093",
+      "target": "source_surface:mechanics/runtime-lifecycle/parts/user-unit/aoa_install_systemd.sh",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0093",
+      "target": "source_surface:systemd/user/aoa-mcp-http.service",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0093",
+      "target": "source_surface:systemd/user/aoa-organ-mcp-read%40.service",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
@@ -9908,22 +9988,22 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0093",
-      "target": "guard_family:consumer-zero",
+      "target": "guard_family:effect%20isolation",
       "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0093",
-      "target": "guard_family:narrowest%20access%20form",
+      "target": "guard_family:network%20denial",
       "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0093",
-      "target": "guard_family:owner%20boundary",
+      "target": "guard_family:owner%20credential",
       "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0093",
-      "target": "guard_family:rollback",
+      "target": "guard_family:tool%20allowlist",
       "type": "GUARDED_BY"
     },
     {
@@ -9938,12 +10018,12 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0093",
-      "target": "surface_class:compatibility%20retirement",
+      "target": "surface_class:connector%20adapter",
       "type": "HAS_SURFACE_CLASS"
     },
     {
       "source": "decision:ABYSS-STACK-D-0093",
-      "target": "surface_class:organ%20portfolio",
+      "target": "surface_class:local%20evidence",
       "type": "HAS_SURFACE_CLASS"
     },
     {
@@ -9968,7 +10048,7 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0093",
-      "target": "owner_surface:mcp/",
+      "target": "owner_surface:mcp/services/aoa-%2A-connector-mcp/",
       "type": "OWNED_BY_SURFACE"
     },
     {
@@ -9978,47 +10058,22 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0094",
-      "target": "source_surface:AOA-SDK-D-0080",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0094",
-      "target": "source_surface:aoa-evals",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0094",
-      "target": "source_surface:aoa-kag",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0094",
-      "target": "source_surface:aoa-memo",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0094",
-      "target": "source_surface:aoa-sdk",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0094",
       "target": "source_surface:docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0094",
-      "target": "source_surface:docs/decisions/ABYSS-STACK-D-0093-wave6-access-form-and-retirement-classification.md",
+      "target": "source_surface:mcp/",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0094",
-      "target": "source_surface:mcp/services/abyss-stack-mcp/DESIGN.md",
+      "target": "source_surface:the%20O1%20portfolio%20under",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0094",
-      "target": "source_surface:mcp/services/abyss-stack-mcp/docs/BOUNDARIES.md",
+      "target": "source_surface:the%20cited%20remote%20owner%20contracts",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
@@ -10028,12 +10083,12 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0094",
-      "target": "guard_family:host-visible%20receipt",
+      "target": "guard_family:consumer-zero",
       "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0094",
-      "target": "guard_family:no%20semantic%20proxy",
+      "target": "guard_family:narrowest%20access%20form",
       "type": "GUARDED_BY"
     },
     {
@@ -10058,12 +10113,12 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0094",
-      "target": "surface_class:cross-organ%20orchestration",
+      "target": "surface_class:compatibility%20retirement",
       "type": "HAS_SURFACE_CLASS"
     },
     {
       "source": "decision:ABYSS-STACK-D-0094",
-      "target": "surface_class:host%20receipt%20chain",
+      "target": "surface_class:organ%20portfolio",
       "type": "HAS_SURFACE_CLASS"
     },
     {
@@ -10088,12 +10143,7 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0094",
-      "target": "owner_surface:abyss-stack",
-      "type": "OWNED_BY_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0094",
-      "target": "owner_surface:abyss-stack-mcp",
+      "target": "owner_surface:mcp/",
       "type": "OWNED_BY_SURFACE"
     },
     {
@@ -10103,22 +10153,47 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0095",
+      "target": "source_surface:AOA-SDK-D-0080",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0095",
+      "target": "source_surface:aoa-evals",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0095",
+      "target": "source_surface:aoa-kag",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0095",
+      "target": "source_surface:aoa-memo",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0095",
+      "target": "source_surface:aoa-sdk",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0095",
       "target": "source_surface:docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0095",
-      "target": "source_surface:docs/decisions/ABYSS-STACK-D-0093-wave6-access-form-and-retirement-classification.md",
+      "target": "source_surface:docs/decisions/ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0095",
-      "target": "source_surface:mcp/protocol-lab/",
+      "target": "source_surface:mcp/services/abyss-stack-mcp/DESIGN.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0095",
-      "target": "source_surface:mcp/services/aoa-kag-mcp/",
+      "target": "source_surface:mcp/services/abyss-stack-mcp/docs/BOUNDARIES.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
@@ -10128,22 +10203,17 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0095",
-      "target": "guard_family:dual%20support",
+      "target": "guard_family:host-visible%20receipt",
       "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0095",
-      "target": "guard_family:exact%20pin",
+      "target": "guard_family:no%20semantic%20proxy",
       "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0095",
-      "target": "guard_family:fail%20closed",
-      "type": "GUARDED_BY"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0095",
-      "target": "guard_family:read-only%20canary",
+      "target": "guard_family:owner%20boundary",
       "type": "GUARDED_BY"
     },
     {
@@ -10158,17 +10228,17 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0095",
-      "target": "surface_class:MCP%20protocol",
+      "target": "surface_class:MCP%20access%20plane",
       "type": "HAS_SURFACE_CLASS"
     },
     {
       "source": "decision:ABYSS-STACK-D-0095",
-      "target": "surface_class:compatibility%20lab",
+      "target": "surface_class:cross-organ%20orchestration",
       "type": "HAS_SURFACE_CLASS"
     },
     {
       "source": "decision:ABYSS-STACK-D-0095",
-      "target": "surface_class:consumer%20admission",
+      "target": "surface_class:host%20receipt%20chain",
       "type": "HAS_SURFACE_CLASS"
     },
     {
@@ -10183,7 +10253,7 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0095",
-      "target": "stack_lane:validation",
+      "target": "stack_lane:runtime%20lifecycle",
       "type": "IN_STACK_LANE"
     },
     {
@@ -10193,7 +10263,12 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0095",
-      "target": "owner_surface:mcp/protocol-lab/",
+      "target": "owner_surface:abyss-stack",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0095",
+      "target": "owner_surface:abyss-stack-mcp",
       "type": "OWNED_BY_SURFACE"
     },
     {
@@ -10203,22 +10278,22 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0096",
-      "target": "source_surface:mcp/services/abyss-stack-mcp/docs/CODEX_CONSUMER_HANDOFF.md",
+      "target": "source_surface:docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0096",
-      "target": "source_surface:mcp/services/abyss-stack-mcp/examples/runtime-observation.public.example.json",
+      "target": "source_surface:docs/decisions/ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0096",
-      "target": "source_surface:mcp/services/abyss-stack-mcp/schemas/runtime-observation.schema.json",
+      "target": "source_surface:mcp/protocol-lab/",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0096",
-      "target": "source_surface:mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py",
+      "target": "source_surface:mcp/services/aoa-kag-mcp/",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
@@ -10228,22 +10303,27 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0096",
-      "target": "guard_family:consumer%20zero",
+      "target": "guard_family:dual%20support",
       "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0096",
-      "target": "guard_family:deny%20by%20default",
+      "target": "guard_family:exact%20pin",
       "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0096",
-      "target": "guard_family:owner%20boundary",
+      "target": "guard_family:fail%20closed",
       "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0096",
-      "target": "guard_family:receipt%20binding",
+      "target": "guard_family:read-only%20canary",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0096",
+      "target": "guard_family:rollback",
       "type": "GUARDED_BY"
     },
     {
@@ -10253,17 +10333,17 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0096",
-      "target": "surface_class:Codex%20plane",
+      "target": "surface_class:MCP%20protocol",
       "type": "HAS_SURFACE_CLASS"
     },
     {
       "source": "decision:ABYSS-STACK-D-0096",
-      "target": "surface_class:MCP%20consumer%20integration",
+      "target": "surface_class:compatibility%20lab",
       "type": "HAS_SURFACE_CLASS"
     },
     {
       "source": "decision:ABYSS-STACK-D-0096",
-      "target": "surface_class:runtime%20evidence",
+      "target": "surface_class:consumer%20admission",
       "type": "HAS_SURFACE_CLASS"
     },
     {
@@ -10278,16 +10358,111 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0096",
-      "target": "stack_lane:runtime%20lifecycle",
+      "target": "stack_lane:validation",
       "type": "IN_STACK_LANE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0096",
-      "target": "owner_surface:mcp/services/abyss-stack-mcp/",
+      "target": "decision:ABYSS-STACK-D-0097",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0096",
+      "target": "owner_surface:mcp/protocol-lab/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0096",
+      "target": "mechanic_parent:runtime-lifecycle",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
+      "target": "source_surface:mcp/services/abyss-stack-mcp/docs/CODEX_CONSUMER_HANDOFF.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
+      "target": "source_surface:mcp/services/abyss-stack-mcp/examples/runtime-observation.public.example.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
+      "target": "source_surface:mcp/services/abyss-stack-mcp/schemas/runtime-observation.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
+      "target": "source_surface:mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
+      "target": "date:2026-07-26",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
+      "target": "guard_family:consumer%20zero",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
+      "target": "guard_family:deny%20by%20default",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
+      "target": "guard_family:owner%20boundary",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
+      "target": "guard_family:receipt%20binding",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
+      "target": "surface_class:Codex%20plane",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
+      "target": "surface_class:MCP%20consumer%20integration",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
+      "target": "surface_class:runtime%20evidence",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
+      "target": "stack_lane:MCP%20services",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
+      "target": "stack_lane:organ%20access%20fabric",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
+      "target": "stack_lane:runtime%20lifecycle",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
+      "target": "owner_surface:mcp/services/abyss-stack-mcp/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
       "target": "mechanic_parent:runtime-lifecycle",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -10770,21 +10945,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0096",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0097",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 947,
+  "node_count": 969,
   "node_type_counts": {
     "date": 27,
-    "decision": 96,
-    "guard_family": 126,
+    "decision": 97,
+    "guard_family": 135,
     "mechanic_parent": 10,
     "owner_surface": 53,
     "repo": 1,
-    "source_surface": 496,
-    "stack_lane": 37,
+    "source_surface": 506,
+    "stack_lane": 38,
     "status": 3,
-    "surface_class": 98
+    "surface_class": 99
   },
   "nodes": [
     {
@@ -11793,93 +11973,103 @@
       "type": "decision"
     },
     {
-      "date": "2026-07-26",
+      "date": "2026-07-25",
       "id": "decision:ABYSS-STACK-D-0088",
       "label": "ABYSS-STACK-D-0088",
-      "path": "docs/decisions/ABYSS-STACK-D-0088-decision-cache-effect-isolation.md",
-      "posture": "accepted effect-isolated cache rationale",
+      "path": "docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md",
+      "posture": "accepted human-workbench boundary",
       "status": "accepted",
-      "title": "ABYSS-STACK-D-0088 Decision Cache Effect Isolation",
+      "title": "ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary",
       "type": "decision"
     },
     {
       "date": "2026-07-26",
       "id": "decision:ABYSS-STACK-D-0089",
       "label": "ABYSS-STACK-D-0089",
-      "path": "docs/decisions/ABYSS-STACK-D-0089-machine-diagnostic-effect-isolation.md",
-      "posture": "accepted machine read-contour correction",
+      "path": "docs/decisions/ABYSS-STACK-D-0089-decision-cache-effect-isolation.md",
+      "posture": "accepted effect-isolated cache rationale",
       "status": "accepted",
-      "title": "ABYSS-STACK-D-0089 Machine Diagnostic Effect Isolation",
+      "title": "ABYSS-STACK-D-0089 Decision Cache Effect Isolation",
       "type": "decision"
     },
     {
       "date": "2026-07-26",
       "id": "decision:ABYSS-STACK-D-0090",
       "label": "ABYSS-STACK-D-0090",
-      "path": "docs/decisions/ABYSS-STACK-D-0090-session-and-tos-read-contour-isolation.md",
-      "posture": "accepted source read-contour isolation",
+      "path": "docs/decisions/ABYSS-STACK-D-0090-machine-diagnostic-effect-isolation.md",
+      "posture": "accepted machine read-contour correction",
       "status": "accepted",
-      "title": "ABYSS-STACK-D-0090 Session Memory and ToS Read Contour Isolation",
+      "title": "ABYSS-STACK-D-0090 Machine Diagnostic Effect Isolation",
       "type": "decision"
     },
     {
       "date": "2026-07-26",
       "id": "decision:ABYSS-STACK-D-0091",
       "label": "ABYSS-STACK-D-0091",
-      "path": "docs/decisions/ABYSS-STACK-D-0091-memo-and-evals-candidate-contour-isolation.md",
-      "posture": "accepted source candidate-contour isolation",
+      "path": "docs/decisions/ABYSS-STACK-D-0091-session-and-tos-read-contour-isolation.md",
+      "posture": "accepted source read-contour isolation",
       "status": "accepted",
-      "title": "ABYSS-STACK-D-0091 Memo and Evals Candidate Contour Isolation",
+      "title": "ABYSS-STACK-D-0091 Session Memory and ToS Read Contour Isolation",
       "type": "decision"
     },
     {
       "date": "2026-07-26",
       "id": "decision:ABYSS-STACK-D-0092",
       "label": "ABYSS-STACK-D-0092",
-      "path": "docs/decisions/ABYSS-STACK-D-0092-connector-read-contour-isolation.md",
-      "posture": "accepted source connector-read isolation",
+      "path": "docs/decisions/ABYSS-STACK-D-0092-memo-and-evals-candidate-contour-isolation.md",
+      "posture": "accepted source candidate-contour isolation",
       "status": "accepted",
-      "title": "ABYSS-STACK-D-0092 Connector Read Contour Isolation",
+      "title": "ABYSS-STACK-D-0092 Memo and Evals Candidate Contour Isolation",
       "type": "decision"
     },
     {
       "date": "2026-07-26",
       "id": "decision:ABYSS-STACK-D-0093",
       "label": "ABYSS-STACK-D-0093",
-      "path": "docs/decisions/ABYSS-STACK-D-0093-wave6-access-form-and-retirement-classification.md",
-      "posture": "accepted runtime access-form classification",
+      "path": "docs/decisions/ABYSS-STACK-D-0093-connector-read-contour-isolation.md",
+      "posture": "accepted source connector-read isolation",
       "status": "accepted",
-      "title": "ABYSS-STACK-D-0093 Wave 6 Access-Form and Retirement Classification",
+      "title": "ABYSS-STACK-D-0093 Connector Read Contour Isolation",
       "type": "decision"
     },
     {
       "date": "2026-07-26",
       "id": "decision:ABYSS-STACK-D-0094",
       "label": "ABYSS-STACK-D-0094",
-      "path": "docs/decisions/ABYSS-STACK-D-0094-cross-organ-orchestration-host-boundary.md",
-      "posture": "accepted host-integration target",
+      "path": "docs/decisions/ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md",
+      "posture": "accepted runtime access-form classification",
       "status": "accepted",
-      "title": "ABYSS-STACK-D-0094 Cross-Organ Orchestration Host Boundary",
+      "title": "ABYSS-STACK-D-0094 Wave 6 Access-Form and Retirement Classification",
       "type": "decision"
     },
     {
       "date": "2026-07-26",
       "id": "decision:ABYSS-STACK-D-0095",
       "label": "ABYSS-STACK-D-0095",
-      "path": "docs/decisions/ABYSS-STACK-D-0095-fail-closed-mcp-protocol-migration-lab.md",
-      "posture": "accepted pre-final migration block",
+      "path": "docs/decisions/ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md",
+      "posture": "accepted host-integration target",
       "status": "accepted",
-      "title": "ABYSS-STACK-D-0095 Fail-Closed MCP Protocol Migration Lab",
+      "title": "ABYSS-STACK-D-0095 Cross-Organ Orchestration Host Boundary",
       "type": "decision"
     },
     {
       "date": "2026-07-26",
       "id": "decision:ABYSS-STACK-D-0096",
       "label": "ABYSS-STACK-D-0096",
-      "path": "docs/decisions/ABYSS-STACK-D-0096-codex-consumer-handoff-remains-owner-composed.md",
+      "path": "docs/decisions/ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md",
+      "posture": "accepted pre-final migration block",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0096 Fail-Closed MCP Protocol Migration Lab",
+      "type": "decision"
+    },
+    {
+      "date": "2026-07-26",
+      "id": "decision:ABYSS-STACK-D-0097",
+      "label": "ABYSS-STACK-D-0097",
+      "path": "docs/decisions/ABYSS-STACK-D-0097-codex-consumer-handoff-remains-owner-composed.md",
       "posture": "accepted pre-final consumer handoff",
       "status": "accepted",
-      "title": "ABYSS-STACK-D-0096 Codex Consumer Handoff Remains Owner-Composed",
+      "title": "ABYSS-STACK-D-0097 Codex Consumer Handoff Remains Owner-Composed",
       "type": "decision"
     },
     {
@@ -12023,8 +12213,18 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:display-position%20audit",
+      "label": "display-position audit",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:docs%20route",
       "label": "docs route",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:draft%20freeze",
+      "label": "draft freeze",
       "type": "guard_family"
     },
     {
@@ -12128,6 +12328,16 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:independent%20reference",
+      "label": "independent reference",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:language%20competence",
+      "label": "language competence",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:legacy%20boundary",
       "label": "legacy boundary",
       "type": "guard_family"
@@ -12140,6 +12350,11 @@
     {
       "id": "guard_family:legacy%20metadata%20containment",
       "label": "legacy metadata containment",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:loopback%20exposure",
+      "label": "loopback exposure",
       "type": "guard_family"
     },
     {
@@ -12163,8 +12378,18 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:method-blind%20candidate%20review",
+      "label": "method-blind candidate review",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:mirror%20hygiene",
       "label": "mirror hygiene",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:mutable%20control%20projection",
+      "label": "mutable control projection",
       "type": "guard_family"
     },
     {
@@ -12245,6 +12470,11 @@
     {
       "id": "guard_family:pilot%20route%20posture",
       "label": "pilot route posture",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:post-reveal%20evidence%20join",
+      "label": "post-reveal evidence join",
       "type": "guard_family"
     },
     {
@@ -12475,6 +12705,11 @@
     {
       "id": "guard_family:stale%20path%20hygiene",
       "label": "stale path hygiene",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:stand-off%20typography",
+      "label": "stand-off typography",
       "type": "guard_family"
     },
     {
@@ -13439,8 +13674,8 @@
       "type": "source_surface"
     },
     {
-      "id": "source_surface:docs/decisions/ABYSS-STACK-D-0093-wave6-access-form-and-retirement-classification.md",
-      "label": "docs/decisions/ABYSS-STACK-D-0093-wave6-access-form-and-retirement-classification.md",
+      "id": "source_surface:docs/decisions/ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md",
+      "label": "docs/decisions/ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md",
       "type": "source_surface"
     },
     {
@@ -14594,6 +14829,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/docs/HUMAN_REVIEW_WORKBENCH.md",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/docs/HUMAN_REVIEW_WORKBENCH.md",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/docs/MANUAL_REVIEW_PROTOCOL.md",
       "label": "mechanics/inference-pilots/parts/tos-foundation-lab/docs/MANUAL_REVIEW_PROTOCOL.md",
       "type": "source_surface"
@@ -14609,6 +14849,21 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/human_review_workbench.py",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/human_review_workbench.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/ocr_candidate_analysis.py",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/ocr_candidate_analysis.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/ocr_candidate_review.py",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/ocr_candidate_review.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/schemas/experiment-suite.schema.json",
       "label": "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/experiment-suite.schema.json",
       "type": "source_surface"
@@ -14619,13 +14874,43 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/schemas/ocr-candidate-review-manifest.schema.json",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/ocr-candidate-review-manifest.schema.json",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/schemas/run-receipt.schema.json",
       "label": "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/run-receipt.schema.json",
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_human_review_workbench.py",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_human_review_workbench.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_ocr_candidate_review.py",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_ocr_candidate_review.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/tos_foundation_lab.py",
       "label": "mechanics/inference-pilots/parts/tos-foundation-lab/tos_foundation_lab.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/workbench/app.css",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/workbench/app.css",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/workbench/app.js",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/workbench/app.js",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/workbench/index.html",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/workbench/index.html",
       "type": "source_surface"
     },
     {
@@ -15374,6 +15659,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:human%20review",
+      "label": "human review",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:inference%20pilots",
       "label": "inference pilots",
       "type": "stack_lane"
@@ -15741,6 +16031,11 @@
     {
       "id": "surface_class:host%20storage",
       "label": "host storage",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:human%20review%20interface",
+      "label": "human review interface",
       "type": "surface_class"
     },
     {
