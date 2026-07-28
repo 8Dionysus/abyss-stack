@@ -15,6 +15,11 @@ Compilation-ready profiles retain the selected lane's exact runtime approval
 projection. The bridge compares descriptor, profile, and plan instead of
 accepting approvals inserted after compilation.
 
+Every mutating dispatch refreshes and validates the pinned source/ABI
+observation before backend execution. Approval decisions are admitted only
+for the single current request and only before that request has a durable
+decision, so an old rejection cannot rewrite an advanced or completed run.
+
 The Python bridge must be paired with an explicit installed-SDK interpreter
 and isolated mode; the executable shebang is an operator convenience, not the
 package-binding contract.

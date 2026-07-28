@@ -212,6 +212,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Agent OS start/resume/recovery dispatch now compares its refreshed
+  source/ABI observation with the immutable `RunPlan` before backend
+  execution. Approval decisions must target the single current undecided
+  request before any governed approval, event, status, or outcome mutation, so
+  stale or second decisions cannot cancel an advanced or completed run.
 - Federation routing health now accepts the stable current routing version
   fields, verifies exact mirror-manifest hashes, and reports source,
   artifact-identity, and subject-bound durable trust readiness instead of

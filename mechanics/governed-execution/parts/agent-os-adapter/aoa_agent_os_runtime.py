@@ -28,6 +28,7 @@ from aoa_sdk.contracts.control_plane import (  # type: ignore[import-untyped]
     CloseoutBundleRef,
     CommandReceipt,
     ContentRef,
+    ControlPlaneContractError,
     EvidenceBundleRef,
     ExecutionEvent,
     ObservedABIRef,
@@ -47,6 +48,7 @@ from aoa_sdk.contracts.control_plane import (  # type: ignore[import-untyped]
     assert_approval_decision_matches_request,
     assert_approvals_satisfied,
     assert_closeout_bundle_scope,
+    assert_runtime_snapshot_observation,
     assert_run_plan_digest,
     canonical_digest,
     command_digest,
@@ -1028,7 +1030,7 @@ class AgentOSRuntimeBridge:
                 rejection,
             )
         if isinstance(command, (StartCommand, ResumeCommand, RecoverCommand)):
-            self._observe_snapshot(
+            observation = self._observe_snapshot(
                 plan,
                 session,
                 profile,
@@ -1037,6 +1039,19 @@ class AgentOSRuntimeBridge:
                     state["status"]
                 ).updated_at,
             )
+            try:
+                assert_runtime_snapshot_observation(
+                    plan,
+                    session,
+                    observation,
+                )
+            except ControlPlaneContractError as exc:
+                raise AgentOSBridgeError(
+                    "runtime_snapshot_drift",
+                    "refreshed runtime snapshot differs from the exact plan: "
+                    f"{exc}",
+                ) from exc
+            state["last_observation"] = observation.model_dump(mode="json")
 
         first_event = len(state["events"])
         if isinstance(command, StartCommand):
@@ -1677,7 +1692,45 @@ class AgentOSRuntimeBridge:
                 "approval_request_missing",
                 "approval decision has no current runtime request",
             )
+        current_request = (
+            ApprovalRequest.model_validate(state["approval_requests"][-1])
+            if state["approval_requests"]
+            else None
+        )
+        if current_request is None or current_request.request_id != decision.request_id:
+            raise AgentOSBridgeError(
+                "approval_request_stale",
+                "approval decision does not target the currently pending request",
+            )
+        if any(
+            item["request_id"] == decision.request_id
+            for item in state["approval_decisions"]
+        ):
+            raise AgentOSBridgeError(
+                "approval_request_already_decided",
+                "current approval request already has a durable decision",
+            )
         assert_approval_decision_matches_request(requirement, request, decision)
+        milestone = self._milestone_for_operation(
+            compatibility,
+            requirement.operation,
+        )
+        status = RunStatus.model_validate(state["status"])
+        if milestone == "landing":
+            if status.state != "paused" or state["outcome"] is not None:
+                raise AgentOSBridgeError(
+                    "approval_state_invalid",
+                    "landing approval requires a current paused runtime",
+                )
+        elif (
+            status.state != "awaiting_approval"
+            or requirement.requirement_id not in status.pending_approval_ids
+        ):
+            raise AgentOSBridgeError(
+                "approval_state_invalid",
+                "plan-freeze approval requires the current pending requirement",
+            )
+
         state["approval_decisions"].append(decision.model_dump(mode="json"))
         self._emit(
             state,
@@ -1686,17 +1739,12 @@ class AgentOSRuntimeBridge:
             at=decision.decided_at,
             approval_decision_ref=_approval_decision_ref(decision),
         )
-        milestone = self._milestone_for_operation(
-            compatibility,
-            requirement.operation,
-        )
         self._write_governed_approval(
             state,
             milestone=milestone,
             status=("approved" if decision.verdict == "approved" else "rejected"),
             notes=decision.reason,
         )
-        status = RunStatus.model_validate(state["status"])
         if decision.verdict == "rejected":
             self._transition(
                 state,
@@ -1726,17 +1774,7 @@ class AgentOSRuntimeBridge:
                 )
             return RunStatus.model_validate(state["status"])
         if milestone == "landing":
-            if status.state != "paused":
-                raise AgentOSBridgeError(
-                    "approval_state_invalid",
-                    "landing approval requires a paused runtime",
-                )
             return status
-        if status.state != "awaiting_approval":
-            raise AgentOSBridgeError(
-                "approval_state_invalid",
-                "plan-freeze approval requires awaiting_approval",
-            )
         self._transition(
             state,
             profile,

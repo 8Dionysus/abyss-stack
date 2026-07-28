@@ -74,6 +74,16 @@ both authorities and removes post-compilation fixture mutation.
 - Stop line: runtime approval projection is neither operator consent nor
   permission to execute.
 
+## Currentness Review (2026-07-28)
+
+Projection into the immutable plan is necessary but not sufficient for
+decision admission. The runtime now accepts a decision only for the single
+current request at its exact `plan_freeze` or `landing` lifecycle boundary,
+and only when that request has no prior durable decision. The check happens
+before the governed approval artifact, event stream, runtime status, or
+outcome can change. Exact replay by decision ID remains effect-free; a second
+decision with another ID is stale rather than new authority.
+
 ## Source surfaces
 
 - `mechanics/governed-execution/parts/agent-os-adapter/runtime-profile.v1.json`

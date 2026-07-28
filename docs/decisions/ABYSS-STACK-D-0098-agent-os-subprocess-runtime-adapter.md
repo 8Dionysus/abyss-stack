@@ -98,6 +98,19 @@ artifact identity.
 - Follow-up: C5 must compose external eval and memory refs without mutating
   the runtime-owned outcome.
 
+## Currentness Review (2026-07-28)
+
+The bridge now closes two lifecycle races within the accepted adapter shape.
+It refreshes and validates the exact source/ABI observation after command
+admission and immediately before start, resume, or recovery reaches the
+backend. It also requires an approval decision to target the single current
+request, the correct lifecycle boundary, and a request without a prior durable
+decision before writing any approval, event, state, or outcome mutation.
+
+These checks do not widen runtime authority or change the public lifecycle.
+They make the original exact-snapshot and approval-boundary claims true at the
+last runtime-owned mutation boundary.
+
 ## Source surfaces
 
 - `mechanics/governed-execution/parts/agent-os-adapter/`

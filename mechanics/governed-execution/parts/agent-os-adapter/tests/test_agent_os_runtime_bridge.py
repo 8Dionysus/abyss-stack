@@ -1433,6 +1433,39 @@ def test_runner_drives_real_governed_execution_and_restores_exactly(
         ).state
         == "paused"
     )
+    decisions_after_landing = tuple(adapter.approval_decisions(session))
+    second_landing_decision = _decision(
+        landing_request,
+        decision_id="decision:landing:second",
+    ).model_copy(
+        update={
+            "verdict": "rejected",
+            "reason": "prove one request cannot mutate state twice",
+        }
+    )
+    bridge = BRIDGE.AgentOSRuntimeBridge(
+        harness.state_root,
+        backend=harness.backend,
+        clock=lambda: NOW,
+    )
+    with pytest.raises(
+        BRIDGE.AgentOSBridgeError,
+        match="already has a durable decision",
+    ) as repeated:
+        bridge.invoke(
+            "apply_approval",
+            {
+                "operation": "apply_approval",
+                "profile": harness.plan.runtime_profile.model_dump(mode="json"),
+                "binding": harness.binding.model_dump(mode="json"),
+                "plan": harness.plan.model_dump(mode="json"),
+                "session": session.model_dump(mode="json"),
+                "approval": second_landing_decision.model_dump(mode="json"),
+            },
+        )
+    assert repeated.value.code == "approval_request_already_decided"
+    assert tuple(adapter.approval_decisions(session)) == decisions_after_landing
+    assert adapter.status(session).state == "paused"
     paused = runner.status(session)
     resume = ResumeCommand(
         command_id="command:resume",
@@ -1454,6 +1487,37 @@ def test_runner_drives_real_governed_execution_and_restores_exactly(
     assert outcome is not None
     assert outcome.execution_status == "succeeded"
     assert len(outcome.evidence_bundle_refs) == 1
+    assert harness.backend.prepare_calls == 1
+    assert harness.backend.resume_calls == 2
+    decisions_before_stale = tuple(adapter.approval_decisions(session))
+    stale_rejection = _decision(
+        freeze_request,
+        decision_id="decision:plan-freeze:stale-rejection",
+    ).model_copy(
+        update={
+            "verdict": "rejected",
+            "reason": "prove a completed run cannot be cancelled retroactively",
+        }
+    )
+    with pytest.raises(
+        BRIDGE.AgentOSBridgeError,
+        match="currently pending request",
+    ) as stale:
+        bridge.invoke(
+            "apply_approval",
+            {
+                "operation": "apply_approval",
+                "profile": harness.plan.runtime_profile.model_dump(mode="json"),
+                "binding": harness.binding.model_dump(mode="json"),
+                "plan": harness.plan.model_dump(mode="json"),
+                "session": session.model_dump(mode="json"),
+                "approval": stale_rejection.model_dump(mode="json"),
+            },
+        )
+    assert stale.value.code == "approval_request_stale"
+    assert adapter.status(session).state == "completed"
+    assert adapter.outcome(session) == outcome
+    assert tuple(adapter.approval_decisions(session)) == decisions_before_stale
     assert harness.backend.prepare_calls == 1
     assert harness.backend.resume_calls == 2
 
@@ -1869,6 +1933,57 @@ def test_snapshot_drift_blocks_before_governed_execution(
 
     with pytest.raises(Exception, match="stale or spoofed source artifact"):
         runner.start(session, adapter, command)
+    assert harness.backend.prepare_calls == 0
+    assert harness.backend.resume_calls == 0
+
+
+def test_snapshot_drift_between_observation_and_dispatch_fails_closed(
+    harness: Harness,
+) -> None:
+    adapter = harness.adapter()
+    runner = AoARunner(clock=lambda: NOW, id_factory=lambda: "dispatch-drift-run")
+    session = runner.prepare(harness.plan)
+    adapter.observe_snapshot(harness.plan, session)
+    bridge = BRIDGE.AgentOSRuntimeBridge(
+        harness.state_root,
+        backend=harness.backend,
+        clock=lambda: NOW,
+    )
+    drift_key = next(key for key in harness.source_paths if key[0] == "aoa-agents")
+    harness.source_paths[drift_key].write_text(
+        '{"drift":"after-observation"}\n',
+        encoding="utf-8",
+    )
+    command = StartCommand(
+        command_id="command:start-dispatch-drift",
+        idempotency_key="idempotency:start-dispatch-drift",
+        session_id=session.session_id,
+        correlation_id=session.correlation_id,
+        plan_digest=harness.plan.plan_digest,
+        expected_revision=0,
+        issued_at=NOW + timedelta(seconds=1),
+        issued_by=session.prepared_by,
+        reason="prove the runtime rechecks the pinned snapshot at dispatch",
+    )
+
+    with pytest.raises(
+        BRIDGE.AgentOSBridgeError,
+        match="refreshed runtime snapshot differs from the exact plan",
+    ) as caught:
+        bridge.invoke(
+            "dispatch",
+            {
+                "operation": "dispatch",
+                "profile": harness.plan.runtime_profile.model_dump(mode="json"),
+                "binding": harness.binding.model_dump(mode="json"),
+                "plan": harness.plan.model_dump(mode="json"),
+                "session": session.model_dump(mode="json"),
+                "command": command.model_dump(mode="json"),
+            },
+        )
+
+    assert caught.value.code == "runtime_snapshot_drift"
+    assert adapter.status(session).state == "prepared"
     assert harness.backend.prepare_calls == 0
     assert harness.backend.resume_calls == 0
 

@@ -40,6 +40,9 @@ Before execution the bridge verifies:
 - exact plan, session, and binding;
 - request provenance and raw file digest;
 - raw file digest for every source and ABI location in the plan snapshot;
+- a refreshed source/ABI observation immediately before every start, resume,
+  or recovery dispatch, compared to the exact immutable plan before the
+  backend can run;
 - exact admitted scenario, playbook, contour ABI, active step set, and effect
   classes from `runtime-profile.v1.json`;
 - exact typed scenario inputs and their original producer provenance;
@@ -50,6 +53,9 @@ Before execution the bridge verifies:
   two governed `plan_freeze` and `landing` approvals; the admitted read-only
   lanes require none. The descriptor, profile projection, and compiled plan
   must agree in typed form;
+- each decision targets the single current approval request and may be
+  recorded only once. Stale or second decisions fail before durable approval,
+  governed-runner, status, or outcome state changes;
 - governed policy supplied through the profile constraint ref.
 
 The bridge never derives a request from a goal or playbook ID and never
