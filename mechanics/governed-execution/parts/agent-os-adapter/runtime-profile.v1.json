@@ -34,10 +34,10 @@
       "required_input_artifact_kinds": [],
       "owner_contour": {
         "owner_repo": "aoa-playbooks",
-        "source_ref": "056cac249a353ae94abedbd4048e6730f70c064d",
+        "source_ref": "f9e638395e86be8556e3579ab4ad5bf358e9499e",
         "abi_id": "aoa_playbook_plan_contour_v1",
         "abi_version": "aoa_playbook_plan_contour_v1",
-        "artifact_digest": "sha256:1effef6739136e3634f787572526926eb5731b978c03e15d6c21c8a047bdd7eb"
+        "artifact_digest": "sha256:58145fb4fe85aaba0168904550722e188055539b10963013966293f430e5be25"
       },
       "accepted_step_sets": [
         [
@@ -155,10 +155,10 @@
       ],
       "owner_contour": {
         "owner_repo": "aoa-playbooks",
-        "source_ref": "056cac249a353ae94abedbd4048e6730f70c064d",
+        "source_ref": "f9e638395e86be8556e3579ab4ad5bf358e9499e",
         "abi_id": "aoa_playbook_plan_contour_v1",
         "abi_version": "aoa_playbook_plan_contour_v1",
-        "artifact_digest": "sha256:1effef6739136e3634f787572526926eb5731b978c03e15d6c21c8a047bdd7eb"
+        "artifact_digest": "sha256:58145fb4fe85aaba0168904550722e188055539b10963013966293f430e5be25"
       },
       "accepted_step_sets": [
         [
@@ -271,10 +271,10 @@
       ],
       "owner_contour": {
         "owner_repo": "aoa-playbooks",
-        "source_ref": "056cac249a353ae94abedbd4048e6730f70c064d",
+        "source_ref": "f9e638395e86be8556e3579ab4ad5bf358e9499e",
         "abi_id": "aoa_playbook_plan_contour_v1",
         "abi_version": "aoa_playbook_plan_contour_v1",
-        "artifact_digest": "sha256:1effef6739136e3634f787572526926eb5731b978c03e15d6c21c8a047bdd7eb"
+        "artifact_digest": "sha256:58145fb4fe85aaba0168904550722e188055539b10963013966293f430e5be25"
       },
       "accepted_step_sets": [
         [
