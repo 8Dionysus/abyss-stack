@@ -131,6 +131,32 @@ class SourceTopologyValidatorModulesTests(unittest.TestCase):
         self.assertIn(owner_index, paths)
         self.assertIn(authored_doc, paths)
 
+    def test_ci_dependency_checkouts_are_outside_authored_text_surface(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            dependency_evidence = (
+                repo_root
+                / ".deps"
+                / "aoa-sdk"
+                / "mechanics"
+                / "boundary-bridge"
+                / "evidence"
+                / "routing-succession.json"
+            )
+            authored_doc = repo_root / "docs" / "ROUTE.md"
+            dependency_evidence.parent.mkdir(parents=True)
+            authored_doc.parent.mkdir(parents=True)
+            dependency_evidence.write_text(
+                "Preserved owner evidence: AOA_ROUTING_ROOT=/srv/AbyssOS/aoa-routing\n",
+                encoding="utf-8",
+            )
+            authored_doc.write_text("Current stack-owned route\n", encoding="utf-8")
+
+            paths = self.iter_text_files(repo_root)
+
+        self.assertNotIn(dependency_evidence, paths)
+        self.assertIn(authored_doc, paths)
+
     def test_required_operator_scripts_have_backend_routes(self) -> None:
         self.assertEqual(
             script_surface.REQUIRED_SCRIPTS,
