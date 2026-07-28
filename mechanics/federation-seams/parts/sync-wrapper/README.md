@@ -75,9 +75,12 @@ reuse canary authority. It requires:
 - an explicit rollback root and operator change record for live activation.
 
 Its `inspect-materialized` operation is narrower and read-only: it verifies
-the current mirror bytes, hashes, SDK identity, receipt, G5 authority, and
-embedded trust provenance without reopening release admission or reading a
-source checkout. Exact-input `check` remains the stronger admission proof.
+the current mirror bytes against the exact subject ledger retained from
+external admission, recomputes that ledger's aggregate digest, and verifies
+SDK identity, receipt, G5 authority, and embedded trust provenance without
+reopening release admission or reading a source checkout. Updating a mirror
+file and its manifest hash together cannot replace the retained subject
+ledger. Exact-input `check` remains the stronger admission proof.
 
 The mirror posture is `sdk_canonical`. Route-api permits ordinary closure only
 for `authorized_live_cutover` when the receipt, producer admission with its

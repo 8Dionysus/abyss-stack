@@ -118,6 +118,77 @@ def require_string_list_contains(
         raise CutoverError(f"{label} lacks {expected}")
 
 
+def exact_subject_ledger(
+    entries: dict[str, dict[str, Any]],
+    *,
+    subject_digest: str,
+) -> list[dict[str, Any]]:
+    ledger = sorted(
+        (dict(entry) for entry in entries.values()),
+        key=lambda entry: str(entry.get("path") or ""),
+    )
+    if stable_digest(ledger) != subject_digest:
+        raise CutoverError(
+            "canonical routing subject ledger does not match its admitted digest"
+        )
+    return ledger
+
+
+def validate_embedded_subject_ledger(
+    value: Any,
+    *,
+    subject_digest: str,
+) -> dict[str, dict[str, Any]]:
+    if not isinstance(value, list) or not value:
+        raise CutoverError(
+            "canonical routing embedded subject ledger is missing"
+        )
+    if stable_digest(value) != subject_digest:
+        raise CutoverError(
+            "canonical routing embedded subject ledger aggregate drifted"
+        )
+    entries: dict[str, dict[str, Any]] = {}
+    for index, raw_entry in enumerate(value):
+        if not isinstance(raw_entry, dict):
+            raise CutoverError(
+                "canonical routing embedded subject ledger entry must be an "
+                f"object: {index}"
+            )
+        relative = safe_relative_path(
+            raw_entry.get("path"),
+            f"canonical routing embedded subject ledger[{index}].path",
+        )
+        if relative in entries:
+            raise CutoverError(
+                "canonical routing embedded subject ledger has a duplicate "
+                f"entry: {relative}"
+            )
+        sha256_hex = str(raw_entry.get("sha256_hex") or "")
+        sha256 = require_sha256_digest(
+            str(raw_entry.get("sha256") or ""),
+            f"canonical routing embedded subject ledger digest for {relative}",
+        )
+        if sha256 != f"sha256:{sha256_hex}":
+            raise CutoverError(
+                "canonical routing embedded subject ledger digest forms "
+                f"disagree: {relative}"
+            )
+        if (
+            len(sha256_hex) != 64
+            or any(ch not in "0123456789abcdef" for ch in sha256_hex)
+            or not isinstance(raw_entry.get("bytes"), int)
+            or raw_entry["bytes"] < 0
+            or not isinstance(raw_entry.get("role"), str)
+            or not raw_entry["role"]
+        ):
+            raise CutoverError(
+                "canonical routing embedded subject ledger entry is invalid: "
+                f"{relative}"
+            )
+        entries[relative] = raw_entry
+    return entries
+
+
 def fsync_file(path: Path) -> None:
     with path.open("rb") as handle:
         os.fsync(handle.fileno())
@@ -651,6 +722,7 @@ def canonical_manifest(
     *,
     target_root: Path,
     required_files: list[str],
+    subject_entries: dict[str, dict[str, Any]],
     trust_verdict: dict[str, Any],
     receipt: dict[str, Any],
     sdk_source_ref: str,
@@ -679,6 +751,10 @@ def canonical_manifest(
             for relative in required_files
         },
         "artifact_subject_digest": subject_digest,
+        "artifact_subject_ledger": exact_subject_ledger(
+            subject_entries,
+            subject_digest=subject_digest,
+        ),
         "mirror_is_authority": False,
         "canonical_producer": {
             "owner_repo": "aoa-sdk",
@@ -755,6 +831,15 @@ def validate_canonical_root(
         receipt
     ):
         raise CutoverError("canonical routing owner-switch receipt digest drifted")
+    embedded_entries = validate_embedded_subject_ledger(
+        manifest.get("artifact_subject_ledger"),
+        subject_digest=subject_digest,
+    )
+    if embedded_entries != subject_entries:
+        raise CutoverError(
+            "canonical routing embedded subject ledger differs from the "
+            "admitted subject-store ledger"
+        )
     validate_canonical_trust_verdict(
         manifest.get("trust_verdict")
         if isinstance(manifest.get("trust_verdict"), dict)
@@ -913,6 +998,7 @@ def prepare_canonical_stage(
         manifest = canonical_manifest(
             target_root=build,
             required_files=required_files,
+            subject_entries=entries,
             trust_verdict=verdict,
             receipt=receipt,
             sdk_source_ref=sdk_source_ref,
@@ -1258,18 +1344,10 @@ def inspect_materialized(args: argparse.Namespace) -> dict[str, Any]:
         sdk_source_ref=sdk_source_ref,
         predecessor_source_ref=predecessor_source_ref,
     )
-    subject_entries = {
-        relative: {
-            "sha256_hex": file_digest_hex(
-                resolved_tree_file(
-                    target,
-                    relative,
-                    "materialized routing file",
-                )
-            )
-        }
-        for relative in required
-    }
+    subject_entries = validate_embedded_subject_ledger(
+        manifest.get("artifact_subject_ledger"),
+        subject_digest=subject_digest,
+    )
     result = validate_canonical_root(
         target,
         required_files=required,

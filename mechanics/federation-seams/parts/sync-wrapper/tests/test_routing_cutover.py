@@ -443,6 +443,39 @@ def test_materialized_inspection_needs_no_source_checkout_or_external_inputs(
     assert "digest drifted" in json.loads(rejected.stdout)["error"]
 
 
+def test_materialized_inspection_rejects_file_and_manifest_hash_tampering(
+    tmp_path: Path,
+) -> None:
+    fixture = make_fixture(tmp_path)
+    target = tmp_path / "isolated" / "aoa-routing"
+    materialized = run_cutover(
+        ["materialize", *exact_args(fixture, target), "--isolated"]
+    )
+    assert materialized.returncode == 0, materialized.stderr + materialized.stdout
+
+    relative = "generated/aoa_router.min.json"
+    materialized_path = target / relative
+    materialized_path.write_text('{"tampered":true}\n', encoding="utf-8")
+    manifest_path = target / "manifest/federation_mirror_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["file_sha256"][relative] = hashlib.sha256(
+        materialized_path.read_bytes()
+    ).hexdigest()
+    write_json(manifest_path, manifest)
+
+    rejected = run_cutover(
+        [
+            "inspect-materialized",
+            "--target-root",
+            str(target),
+            "--routing-config",
+            fixture["config"],
+        ]
+    )
+    assert rejected.returncode == 1
+    assert "subject-store ledger" in json.loads(rejected.stdout)["error"]
+
+
 def test_isolated_cutover_rejects_live_target_shape(tmp_path: Path) -> None:
     fixture = make_fixture(tmp_path)
     target = tmp_path / "runtime/Knowledge/federation/aoa-routing"

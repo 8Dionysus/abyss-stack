@@ -375,6 +375,23 @@ def _materialize_plan_source_paths(
     return paths
 
 
+def _bound_summon_decision(
+    summon_request: dict[str, Any],
+    decision: dict[str, Any],
+) -> dict[str, Any]:
+    nested_request = summon_request.get("summon_request")
+    if not isinstance(nested_request, dict):
+        raise AssertionError("summon request fixture lacks its nested request")
+    parent_task_id = nested_request.get("parent_task_id")
+    if not isinstance(parent_task_id, str) or not parent_task_id:
+        raise AssertionError("summon request fixture lacks a parent task identity")
+    return {
+        **decision,
+        "parent_task_id": parent_task_id,
+        "summon_request_digest": BRIDGE.canonical_json_digest(summon_request),
+    }
+
+
 def _live_input_payloads(
     scenario_id: str,
     repo_root: Path,
@@ -398,9 +415,16 @@ def _live_input_payloads(
             / "summon_return_checkpoint_e2e.fixture.json"
         )
         fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+        summon_request = fixture["summon_request"]
         return {
-            "summon_request": ("aoa-summon", fixture["summon_request"]),
-            "summon_decision": ("aoa-summon", fixture["summon_decision"]),
+            "summon_request": ("aoa-summon", summon_request),
+            "summon_decision": (
+                "aoa-summon",
+                _bound_summon_decision(
+                    summon_request,
+                    fixture["summon_decision"],
+                ),
+            ),
             "child_task_result": ("aoa-summon", fixture["child_task_result"]),
         }
     receipt_path = (
@@ -878,10 +902,17 @@ def _build_read_only_harness(
     scenario_id: str,
     complete_return: bool = True,
     conflicting_return: bool = False,
+    conflicting_decision: bool = False,
 ) -> Harness:
-    if not complete_return and conflicting_return:
+    if sum(
+        (
+            not complete_return,
+            conflicting_return,
+            conflicting_decision,
+        )
+    ) > 1:
         raise AssertionError(
-            "an A2A return trial must select incomplete or conflicting input"
+            "an A2A return trial must select one conflicting input"
         )
     sdk_root = _sdk_source_root()
     policy_path = root / "policy.yaml"
@@ -928,6 +959,17 @@ def _build_read_only_harness(
             / "summon_return_checkpoint_e2e.fixture.json"
         )
         fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+        summon_request = fixture["summon_request"]
+        decision_request = summon_request
+        if conflicting_decision:
+            decision_request = json.loads(json.dumps(summon_request))
+            decision_request["summon_request"]["parent_task_id"] = (
+                "parent:unrelated-a2a-return"
+            )
+        summon_decision = _bound_summon_decision(
+            decision_request,
+            fixture["summon_decision"],
+        )
         child_result = dict(fixture["child_task_result"])
         child_result["remote_task"] = dict(child_result["remote_task"])
         if not complete_return:
@@ -939,8 +981,8 @@ def _build_read_only_harness(
                 "parent:conflicting-a2a-return"
             )
         for artifact_kind, artifact_payload in (
-            ("summon_request", fixture["summon_request"]),
-            ("summon_decision", fixture["summon_decision"]),
+            ("summon_request", summon_request),
+            ("summon_decision", summon_decision),
             ("child_task_result", child_result),
         ):
             old_ref = next(
@@ -1797,6 +1839,43 @@ def test_a2a_return_lane_rejects_a_conflicting_review_chain(
         clock=lambda: NOW,
     )
     runner = AoARunner(clock=lambda: NOW, id_factory=lambda: "a2a-conflict")
+    session = runner.prepare(harness.plan)
+
+    with pytest.raises(
+        BRIDGE.AgentOSBridgeError,
+        match="do not form one reviewed parent/decision/return chain",
+    ):
+        bridge.invoke(
+            "observe_snapshot",
+            {
+                "operation": "observe_snapshot",
+                "profile": harness.plan.runtime_profile.model_dump(mode="json"),
+                "binding": harness.binding.model_dump(mode="json"),
+                "plan": harness.plan.model_dump(mode="json"),
+                "session": session.model_dump(mode="json"),
+            },
+        )
+    assert harness.backend.prepare_calls == 0
+    assert harness.backend.resume_calls == 0
+
+
+def test_a2a_return_lane_rejects_a_decision_for_another_request(
+    tmp_path: Path,
+) -> None:
+    harness = _build_read_only_harness(
+        tmp_path,
+        scenario_id="a2a_summon_return_checkpoint",
+        conflicting_decision=True,
+    )
+    bridge = BRIDGE.AgentOSRuntimeBridge(
+        harness.state_root,
+        backend=harness.backend,
+        clock=lambda: NOW,
+    )
+    runner = AoARunner(
+        clock=lambda: NOW,
+        id_factory=lambda: "a2a-decision-conflict",
+    )
     session = runner.prepare(harness.plan)
 
     with pytest.raises(

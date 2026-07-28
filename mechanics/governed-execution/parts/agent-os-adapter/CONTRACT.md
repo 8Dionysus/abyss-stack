@@ -46,6 +46,9 @@ Before execution the bridge verifies:
 - exact admitted scenario, playbook, contour ABI, active step set, and effect
   classes from `runtime-profile.v1.json`;
 - exact typed scenario inputs and their original producer provenance;
+- an A2A summon decision bound to the exact canonical summon-request digest
+  and parent task identity, so a decision from another request cannot be mixed
+  into an otherwise shape-compatible reviewed return;
 - exact scenario-scoped runtime approval projection in `RuntimeProfile`;
 - exact input and stack-owned output evidence requirements; caller-added or
   altered requirements are rejected rather than claimed by a generic bundle;

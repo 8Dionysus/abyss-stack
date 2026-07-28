@@ -792,6 +792,10 @@ class AgentOSRuntimeBridge:
             or not isinstance(decision.get("allowed"), bool)
             or not isinstance(decision.get("expected_outputs"), list)
             or decision.get("expected_outputs") != expected_outputs
+            or decision.get("parent_task_id")
+            != summon_request["parent_task_id"]
+            or decision.get("summon_request_digest")
+            != canonical_json_digest(request)
             or result.get("reviewed") is not True
             or result.get("review_status") != "reviewed"
             or not isinstance(remote_task, dict)
