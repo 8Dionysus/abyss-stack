@@ -19,6 +19,8 @@ rotate_abyss_stack_mcp_auth=0
 provision_abyss_stack_mcp_runtime=0
 verify_abyss_stack_mcp_runtime=0
 launch_verified_abyss_stack_mcp=0
+verify_abyss_stack_mcp_runtime_contour="all"
+launch_verified_abyss_stack_mcp_contour=""
 install_mcp_http_codex_client=0
 remove_mcp_http_codex_client=0
 preset_spec=""
@@ -105,8 +107,16 @@ while (($#)); do
     --verify-abyss-stack-mcp-runtime)
       verify_abyss_stack_mcp_runtime=1
       ;;
+    --verify-abyss-stack-mcp-runtime=*)
+      verify_abyss_stack_mcp_runtime=1
+      verify_abyss_stack_mcp_runtime_contour="${1#*=}"
+      ;;
     --launch-verified-abyss-stack-mcp)
       launch_verified_abyss_stack_mcp=1
+      ;;
+    --launch-verified-abyss-stack-mcp=*)
+      launch_verified_abyss_stack_mcp=1
+      launch_verified_abyss_stack_mcp_contour="${1#*=}"
       ;;
     --install-mcp-http-codex-client)
       install_mcp_http_codex_client=1
@@ -202,6 +212,29 @@ if ((launch_verified_abyss_stack_mcp && \
        enable_now || restart_now || link_all_user_units || link_system_units || \
        selection_set || overlay_set))); then
   aoa_die "verified abyss-stack MCP launch must be a standalone unit action"
+fi
+if ((verify_abyss_stack_mcp_runtime)); then
+  case "$verify_abyss_stack_mcp_runtime_contour" in
+    all|read|candidate)
+      ;;
+    *)
+      aoa_die "abyss-stack MCP runtime verification contour must be all, read, or candidate"
+      ;;
+  esac
+fi
+if ((launch_verified_abyss_stack_mcp)); then
+  if [[ -z "$launch_verified_abyss_stack_mcp_contour" ]]; then
+    launch_verified_abyss_stack_mcp_contour="$(
+      printf '%s' "${ABYSS_STACK_MCP_POLICY_FAMILY:-}"
+    )"
+  fi
+  case "$launch_verified_abyss_stack_mcp_contour" in
+    read|candidate)
+      ;;
+    *)
+      aoa_die "verified abyss-stack MCP launch contour must be read or candidate"
+      ;;
+  esac
 fi
 if (((install_mcp_http_codex_client || remove_mcp_http_codex_client) && EUID == 0)); then
   aoa_die "MCP HTTP Codex client install and removal must run as the target user, not root"
@@ -690,17 +723,36 @@ aoa_validate_abyss_stack_mcp_audit_journal() {
 }
 
 aoa_verify_abyss_stack_mcp_audit_journals() {
+  local contour="${1:-all}"
+
   [[ -d "$abyss_stack_mcp_audit_root" && \
      ! -L "$abyss_stack_mcp_audit_root" ]] || \
     aoa_die "abyss-stack MCP audit root must be a non-symlink directory"
   [[ "$(stat -c '%a' "$abyss_stack_mcp_audit_root")" == "700" ]] || \
     aoa_die "abyss-stack MCP audit root must have mode 0700"
-  aoa_validate_abyss_stack_mcp_audit_journal \
-    "$abyss_stack_mcp_read_audit_journal" \
-    "abyss-stack MCP read audit journal"
-  aoa_validate_abyss_stack_mcp_audit_journal \
-    "$abyss_stack_mcp_candidate_audit_journal" \
-    "abyss-stack MCP candidate audit journal"
+  case "$contour" in
+    all)
+      aoa_validate_abyss_stack_mcp_audit_journal \
+        "$abyss_stack_mcp_read_audit_journal" \
+        "abyss-stack MCP read audit journal"
+      aoa_validate_abyss_stack_mcp_audit_journal \
+        "$abyss_stack_mcp_candidate_audit_journal" \
+        "abyss-stack MCP candidate audit journal"
+      ;;
+    read)
+      aoa_validate_abyss_stack_mcp_audit_journal \
+        "$abyss_stack_mcp_read_audit_journal" \
+        "abyss-stack MCP read audit journal"
+      ;;
+    candidate)
+      aoa_validate_abyss_stack_mcp_audit_journal \
+        "$abyss_stack_mcp_candidate_audit_journal" \
+        "abyss-stack MCP candidate audit journal"
+      ;;
+    *)
+      aoa_die "unknown abyss-stack MCP audit contour: ${contour}"
+      ;;
+  esac
 }
 
 aoa_provision_abyss_stack_mcp_audit_journals() {
@@ -858,12 +910,15 @@ aoa_require_abyss_stack_mcp_units_stopped() {
   local resolved_unit_source=""
   local resolved_unit_fragment=""
   local expected_exec_start=""
+  local unit_contour=""
 
   abyss_stack_mcp_units_error=""
   for unit in abyss-stack-mcp-read.service abyss-stack-mcp-candidate.service; do
+    unit_contour="${unit#abyss-stack-mcp-}"
+    unit_contour="${unit_contour%.service}"
     expected_unit_source="${AOA_CONFIGS_ROOT}/systemd/user/${unit}"
     expected_unit_target="${XDG_CONFIG_HOME:-${HOME}/.config}/systemd/user/${unit}"
-    expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_source_lock} /usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} /usr/bin/env ${AOA_CONFIGS_ROOT}/scripts/aoa-install-systemd --launch-verified-abyss-stack-mcp"
+    expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_source_lock} /usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} /usr/bin/env ${AOA_CONFIGS_ROOT}/scripts/aoa-install-systemd --launch-verified-abyss-stack-mcp=${unit_contour}"
     if [[ ! -f "$expected_unit_source" || -L "$expected_unit_source" ]]; then
       abyss_stack_mcp_units_error="lock-aware source unit is unavailable for ${unit}; link and reload managed user units before provisioning"
       return 1
@@ -1030,6 +1085,7 @@ aoa_digest_abyss_stack_mcp_runtime() {
 }
 
 aoa_verify_abyss_stack_mcp_runtime() {
+  local contour="${1:-all}"
   local marker=".abyss-stack-mcp-runtime-identity"
   local content_marker=".abyss-stack-mcp-runtime-content-digest"
   local lock_path="${abyss_stack_mcp_service_root}/requirements.lock"
@@ -1042,7 +1098,7 @@ aoa_verify_abyss_stack_mcp_runtime() {
   local source_lock_fd=""
   local runtime_lock_fd=""
 
-  aoa_verify_abyss_stack_mcp_audit_journals
+  aoa_verify_abyss_stack_mcp_audit_journals "$contour"
   [[ -f "$abyss_stack_mcp_source_lock" && \
      ! -L "$abyss_stack_mcp_source_lock" ]] || \
     aoa_die "abyss-stack MCP source projection lock is unavailable"
@@ -1111,7 +1167,11 @@ aoa_verify_abyss_stack_mcp_runtime() {
 }
 
 aoa_launch_verified_abyss_stack_mcp() {
-  aoa_verify_abyss_stack_mcp_runtime
+  local contour="$1"
+
+  [[ "${ABYSS_STACK_MCP_POLICY_FAMILY:-}" == "$contour" ]] || \
+    aoa_die "verified abyss-stack MCP launch contour does not match the policy family"
+  aoa_verify_abyss_stack_mcp_runtime "$contour"
   exec /usr/bin/env -u PYTHONHOME -u PYTHONPATH \
     "$abyss_stack_mcp_venv/bin/python" \
     -I -B -m abyss_stack_mcp.server
@@ -1570,10 +1630,12 @@ if ((provision_abyss_stack_mcp_runtime)); then
   aoa_provision_abyss_stack_mcp_runtime
 fi
 if ((verify_abyss_stack_mcp_runtime)); then
-  aoa_verify_abyss_stack_mcp_runtime
+  aoa_verify_abyss_stack_mcp_runtime \
+    "$verify_abyss_stack_mcp_runtime_contour"
 fi
 if ((launch_verified_abyss_stack_mcp)); then
-  aoa_launch_verified_abyss_stack_mcp
+  aoa_launch_verified_abyss_stack_mcp \
+    "$launch_verified_abyss_stack_mcp_contour"
 fi
 if ((install_mcp_http_codex_client)); then
   aoa_install_mcp_http_codex_client

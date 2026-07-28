@@ -74,7 +74,10 @@ mutates only while both planes are stopped, while verification only compares
 deployed source-and-lock and measured runtime identities.
 Provisioning also creates the separate read/candidate policy audit journals
 when absent and never truncates them. Verification checks their regular-file,
-non-symlink, private-mode, and bounded-size shape without repairing it.
+non-symlink, private-mode, and bounded-size shape without repairing it. Manual
+verification and provisioning check both journals; each sandboxed unit checks
+only its explicitly named contour because the opposite journal is intentionally
+inaccessible.
 Managed launch acquires shared source-projection and runtime locks, repeats the
 verification under both, and retains them across `exec`; an applying MCP
 Configs sync or runtime replacement therefore requires both stack MCP planes

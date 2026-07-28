@@ -111,8 +111,11 @@ and `policy-candidate.jsonl`. The root is mode `0700` and files are mode
 `0600`; symlinks, non-regular files, broad modes, or files beyond the managed
 32 MiB bound fail closed. Verification does not create or repair these paths.
 Each managed unit can write only its own exact journal path and hides the
-opposite contour. Stop a plane before any reviewed archive handoff; no
-automatic journal rotation is installed.
+opposite contour. Its pre-launch and launch verifier therefore names and checks
+only that unit's contour, while the unsuffixed manual verifier and provisioning
+continue to check both journals. The launch contour must match
+`ABYSS_STACK_MCP_POLICY_FAMILY`. Stop a plane before any reviewed archive
+handoff; no automatic journal rotation is installed.
 
 Use `pkexec .../aoa-install-systemd --system-units` for the small privileged
 support-unit allowlist under `systemd/system/`. That mode installs root-owned
