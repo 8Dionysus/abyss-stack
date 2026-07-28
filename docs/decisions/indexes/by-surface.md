@@ -284,6 +284,10 @@
 
 - [ABYSS-STACK-D-0096 Fail-Closed MCP Protocol Migration Lab](../ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md) (`docs/decisions/ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md`)
 
+## consumer retirement
+
+- [ABYSS-STACK-D-0101 Retire Routing Predecessor Checkout Consumers](../ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md) (`docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md`)
+
 ## cross-organ orchestration
 
 - [ABYSS-STACK-D-0095 Cross-Organ Orchestration Host Boundary](../ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md) (`docs/decisions/ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md`)
@@ -429,6 +433,7 @@
 ## owner succession
 
 - [ABYSS-STACK-D-0086 Receipt-Bound SDK Routing Cutover](../ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md) (`docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md`)
+- [ABYSS-STACK-D-0101 Retire Routing Predecessor Checkout Consumers](../ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md) (`docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md`)
 
 ## owner-local stats ports
 
@@ -508,6 +513,7 @@
 - [ABYSS-STACK-D-0084 Routing Mirror Provenance Readiness](../ABYSS-STACK-D-0084-routing-mirror-provenance-readiness.md) (`docs/decisions/ABYSS-STACK-D-0084-routing-mirror-provenance-readiness.md`)
 - [ABYSS-STACK-D-0085 SDK Routing Canary Intake](../ABYSS-STACK-D-0085-sdk-routing-canary-intake.md) (`docs/decisions/ABYSS-STACK-D-0085-sdk-routing-canary-intake.md`)
 - [ABYSS-STACK-D-0086 Receipt-Bound SDK Routing Cutover](../ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md) (`docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md`)
+- [ABYSS-STACK-D-0101 Retire Routing Predecessor Checkout Consumers](../ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md) (`docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md`)
 
 ## runtime routes
 

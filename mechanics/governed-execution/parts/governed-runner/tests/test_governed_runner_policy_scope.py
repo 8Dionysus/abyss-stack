@@ -33,18 +33,17 @@ class GovernedRunnerPolicyScopeTests(GovernedRunnerTestCase):
             self.root / "materialized-canaries",
             catalog_path=self.canary_catalog_path,
         )
-        self.assertEqual(materialized["request_count"], 3)
+        self.assertEqual(materialized["request_count"], 1)
         request_file = Path(materialized["requests"][0]["request_file"])
         self.assertTrue(request_file.exists())
         self.assertEqual(materialized["requests"][0]["target_id"], "abyss-stack")
 
-    def test_request_from_canary_rejects_wrong_repo_override_for_target(self) -> None:
-        with self.assertRaisesRegex(RuntimeError, "repo_root does not match governed target aoa-routing"):
-            self.module.request_from_canary(
-                "routing-boundary-wording-alignment",
-                catalog_path=self.canary_catalog_path,
-                repo_root=self.repo_root,
-            )
+    def test_retired_routing_mutation_target_is_unsupported(self) -> None:
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "unsupported governed target_id: aoa-routing",
+        ):
+            self.module.target_checkout_detector("aoa-routing")
 
     def test_fail_closed_gate_mapping(self) -> None:
         policy, _ = self.module.load_policy(self.policy_path)
@@ -157,16 +156,20 @@ class GovernedRunnerPolicyScopeTests(GovernedRunnerTestCase):
         self.assertEqual(normalized["target_file"], "README.md")
 
     def test_enumerate_allowed_candidates_respects_root_anchored_patterns(self) -> None:
-        fixture_readme = self.routing_repo_root / "tests" / "fixtures" / "nested" / "README.md"
+        (self.repo_root / "README.md").write_text("root\n", encoding="utf-8")
+        generated = self.repo_root / "generated" / "aoa_router.min.json"
+        generated.parent.mkdir(parents=True, exist_ok=True)
+        generated.write_text('{"ok":true}\n', encoding="utf-8")
+        fixture_readme = self.repo_root / "tests" / "fixtures" / "nested" / "README.md"
         fixture_generated = (
-            self.routing_repo_root / "tests" / "fixtures" / "nested" / "generated" / "router.min.json"
+            self.repo_root / "tests" / "fixtures" / "nested" / "generated" / "router.min.json"
         )
         fixture_generated.parent.mkdir(parents=True, exist_ok=True)
         fixture_readme.write_text("fixture\n", encoding="utf-8")
         fixture_generated.write_text("{\"fixture\": true}\n", encoding="utf-8")
 
         candidates = self.module.enumerate_allowed_candidates(
-            self.routing_repo_root,
+            self.repo_root,
             ["README.md", "generated/*.json"],
         )
         self.assertIn("README.md", candidates)
@@ -187,145 +190,7 @@ class GovernedRunnerPolicyScopeTests(GovernedRunnerTestCase):
         )
         self.assertEqual(result["status"], "fail")
         self.assertEqual(result["failure_class"], "policy_denied")
-        self.assertIn("repo_root does not match governed target aoa-routing", " ".join(result["reasons"]))
-
-    def test_external_target_run_succeeds_against_routing_checkout(self) -> None:
-        request_path = self.root / "routing.request.json"
-        write_json(request_path, governed_request(self.routing_repo_root, target_id="aoa-routing"))
-        result = self.module.prepare_run(
-            request_path,
-            policy_path=self.policy_path,
-            log_root=self.logs_root,
-            gate_provider=lambda: self.gate_payload(),
-            advisory_provider=self.advisory_provider,
-            proposal_provider=self.proposal_provider,
+        self.assertIn(
+            "target aoa-routing is not present in governed execution policy",
+            " ".join(result["reasons"]),
         )
-        self.assertEqual(result["status"], "paused")
-        self.assertEqual(result["current_milestone"], "plan_freeze")
-        run_dir = self.logs_root / result["run_id"]
-        state = json.loads((run_dir / "run.state.json").read_text(encoding="utf-8"))
-        self.assertEqual(state["target_id"], "aoa-routing")
-        self.assertEqual(state["repo_root"], str(self.routing_repo_root))
-
-    def test_external_generated_surface_run_keeps_semantically_unchanged_outputs_git_stable(self) -> None:
-        request_path = self.root / "routing-generated.request.json"
-        write_json(
-            request_path,
-            {
-                "goal": (
-                    "Update only `scripts/build_router.py` so its main write loop preserves the existing "
-                    "on-disk JSON or JSONL text when the parsed file payload already equals the freshly "
-                    "built payload. This must stop no-op `python scripts/build_router.py` from dirtying "
-                    "semantically unchanged `generated/two_stage_*` and "
-                    "`generated/two_stage_skill_entrypoints.json`, without changing thin-router meaning "
-                    "or editing generated files directly."
-                ),
-                "target_id": "aoa-routing",
-                "playbook_id": "AOA-P-0011",
-                "task_class": "generated_surface",
-                "profile_class": "workhorse",
-                "repo_root": str(self.routing_repo_root),
-                "memo": None,
-                "break_glass_reason": None,
-            },
-        )
-        build_router_path = self.routing_repo_root / "scripts" / "build_router.py"
-        build_router_text = build_router_path.read_text(encoding="utf-8")
-        write_loop = self.module.extract_build_router_write_loop_block(build_router_text)
-        assert write_loop is not None
-
-        def generated_surface_provider(context: dict) -> dict:
-            spec = {
-                "mode": "exact_replace",
-                "target_file": "scripts/build_router.py",
-                "old_text": write_loop,
-                "new_text": (
-                    "    for filename, payload in outputs.items():\n"
-                    "        path = GENERATED_DIR / filename\n"
-                    "        rendered_text = render_output_text(filename, payload)\n"
-                    "        if path.exists():\n"
-                    "            try:\n"
-                    "                actual_text = path.read_text(encoding=\"utf-8\")\n"
-                    "                if filename.endswith(\".jsonl\"):\n"
-                    "                    actual_payload = [\n"
-                    "                        json.loads(line)\n"
-                    "                        for line in actual_text.splitlines()\n"
-                    "                        if line.strip()\n"
-                    "                    ]\n"
-                    "                else:\n"
-                    "                    actual_payload = json.loads(actual_text)\n"
-                    "                if actual_payload == payload:\n"
-                    "                    continue\n"
-                    "            except json.JSONDecodeError:\n"
-                    "                pass\n"
-                    "        path.write_text(rendered_text, encoding=\"utf-8\", newline=\"\\n\")\n"
-                    "        print(f\"[ok] wrote {relative_posix(path)}\")"
-                ),
-            }
-            return {
-                "provider": "fixture",
-                "selected_target_file": "scripts/build_router.py",
-                "spec": spec,
-                "candidate_files": ["scripts/build_router.py"],
-                "target_prompt": "",
-                "edit_prompt": "",
-                "target_answer": "{\"target_file\":\"scripts/build_router.py\"}",
-                "edit_answer": json.dumps(spec, ensure_ascii=True),
-                "notes": [],
-            }
-
-        first = self.module.prepare_run(
-            request_path,
-            policy_path=self.policy_path,
-            log_root=self.logs_root,
-            gate_provider=lambda: self.gate_payload(),
-            advisory_provider=self.advisory_provider,
-            proposal_provider=generated_surface_provider,
-        )
-        self.assertEqual(first["status"], "paused")
-        self.assertEqual(first["current_milestone"], "plan_freeze")
-        run_id = first["run_id"]
-        run_dir = self.logs_root / run_id
-        approval_path = run_dir / "approval.status.json"
-        approval = json.loads(approval_path.read_text(encoding="utf-8"))
-        approval["current_milestone"] = "plan_freeze"
-        approval["status"] = "approved"
-        approval["approved"] = True
-        approval["milestones"]["plan_freeze"]["status"] = "approved"
-        approval["milestones"]["plan_freeze"]["approved"] = True
-        write_json(approval_path, approval)
-
-        second = self.module.resume_run(
-            run_id,
-            log_root=self.logs_root,
-            advisory_provider=self.advisory_provider,
-            proposal_provider=generated_surface_provider,
-        )
-        self.assertEqual(second["status"], "paused")
-        self.assertEqual(second["current_milestone"], "landing")
-
-        approval = json.loads(approval_path.read_text(encoding="utf-8"))
-        approval["current_milestone"] = "landing"
-        approval["status"] = "approved"
-        approval["approved"] = True
-        approval["milestones"]["landing"]["status"] = "approved"
-        approval["milestones"]["landing"]["approved"] = True
-        write_json(approval_path, approval)
-
-        third = self.module.resume_run(run_id, log_root=self.logs_root)
-        self.assertEqual(third["status"], "pass")
-        subprocess.run(
-            ["python", "scripts/build_router.py"],
-            cwd=self.routing_repo_root,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        generated_diff = subprocess.run(
-            ["git", "diff", "--name-only", "--", "generated"],
-            cwd=self.routing_repo_root,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        self.assertEqual(generated_diff.stdout.strip(), "")

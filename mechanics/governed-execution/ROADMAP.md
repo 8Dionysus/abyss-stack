@@ -24,4 +24,6 @@
 - do not treat exported candidates as accepted owner truth
 - do not treat local-worker execution as permission to mutate sibling repos
   without the owning workflow
+- do not restore the retired `aoa-routing` predecessor as a governed mutation
+  target
 - do not treat runtime completion as eval, memory, or final closeout authority

@@ -103,7 +103,6 @@ W3_UNSAFE_CASE_IDS = {
 
 W4_DOC_CASE_IDS = {
     "aoa-skills-doc-wording-alignment",
-    "aoa-routing-doc-boundary-alignment",
     "aoa-evals-contract-wording-alignment",
     "aoa-techniques-doc-index-alignment",
     "agents-of-abyss-role-clarity-docs",
@@ -111,7 +110,6 @@ W4_DOC_CASE_IDS = {
 }
 
 W4_GENERATED_CASE_IDS = {
-    "aoa-routing-generated-surface-refresh",
     "aoa-evals-generated-catalog-refresh",
 }
 
@@ -135,7 +133,7 @@ W4_WORKTREE_NEIGHBOR_REPOS = [
     "aoa-kag",
     "aoa-memo",
     "aoa-playbooks",
-    "aoa-routing",
+    "aoa-sdk",
     "aoa-skills",
     "aoa-techniques",
 ]
@@ -144,7 +142,6 @@ W4_DOC_PREPARE_ORDER = [
     "8dionysus-profile-routing-clarity",
     "agents-of-abyss-role-clarity-docs",
     "aoa-evals-contract-wording-alignment",
-    "aoa-routing-doc-boundary-alignment",
     "aoa-techniques-doc-index-alignment",
     "aoa-skills-doc-wording-alignment",
 ]
@@ -153,13 +150,11 @@ W4_DOC_TARGET_FALLBACKS = {
     "8dionysus-profile-routing-clarity": "README.md",
     "agents-of-abyss-role-clarity-docs": "docs/LAYERS.md",
     "aoa-evals-contract-wording-alignment": "runners/reportable_proof_contract.md",
-    "aoa-routing-doc-boundary-alignment": "docs/RECURRENCE_NAVIGATION_BOUNDARY.md",
     "aoa-techniques-doc-index-alignment": "README.md",
     "aoa-skills-doc-wording-alignment": "docs/PUBLIC_SURFACE.md",
 }
 
 W4_GENERATED_PREPARE_ORDER = [
-    "aoa-routing-generated-surface-refresh",
     "aoa-evals-generated-catalog-refresh",
 ]
 
@@ -1454,7 +1449,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
             wave_id="W0",
             case_id="warm-repo-routing",
             title="Warm Repo Routing Through Langchain Run Path",
-            repo_scope=["abyss-stack", "aoa-routing"],
+            repo_scope=["abyss-stack", "aoa-sdk"],
             task_family="runtime-qualification",
             source_refs=[
                 configs_path("scripts/aoa-qwen-check"),
@@ -1501,7 +1496,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
             wave_id="W0",
             case_id="federation-smoke",
             title="Federation Smoke",
-            repo_scope=["abyss-stack", "aoa-routing", "aoa-memo", "aoa-evals", "aoa-playbooks", "aoa-kag"],
+            repo_scope=["abyss-stack", "aoa-sdk", "aoa-memo", "aoa-evals", "aoa-playbooks", "aoa-kag"],
             task_family="runtime-qualification",
             source_refs=[
                 configs_path("scripts/aoa-up"),
@@ -1630,8 +1625,14 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
             "repo-owner-aoa-routing-navigation",
             "Owning Repo For Navigation And Dispatch",
             "Which single repo owns thin navigation, typing, dispatch, and federation-entry orientation surfaces?",
-            "aoa-routing",
-            [repo_path("aoa-routing", "README.md"), repo_path("aoa-routing", "docs/FEDERATION_ENTRY_ABI.md")],
+            "aoa-sdk",
+            [
+                repo_path("aoa-sdk", "README.md"),
+                repo_path(
+                    "aoa-sdk",
+                    "mechanics/boundary-bridge/parts/consumed-surface-posture-gate/docs/routing-consumer-contract.md",
+                ),
+            ],
             ["aoa-memo", "Agents-of-Abyss"],
         ),
         ownership_case(
@@ -1640,7 +1641,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
             "Which single repo owns memory objects, recall contracts, and memory temperature posture?",
             "aoa-memo",
             [repo_path("aoa-memo", "README.md"), repo_path("aoa-memo", "docs/MEMORY_MODEL.md")],
-            ["aoa-routing", "aoa-kag"],
+            ["aoa-sdk", "aoa-kag"],
         ),
         ownership_case(
             "repo-owner-aoa-agents-role-layer",
@@ -1656,7 +1657,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
             "Which single repo owns scenario-shaped operating recipes that compose skills, agents, memory posture, and fallback paths?",
             "aoa-playbooks",
             [repo_path("aoa-playbooks", "README.md")],
-            ["aoa-skills", "aoa-routing"],
+            ["aoa-skills", "aoa-sdk"],
         ),
         ownership_case(
             "repo-owner-aoa-kag-derived-knowledge",
@@ -1672,7 +1673,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
             "Which single repo is the constitutional and ecosystem-center repository for the AoA federation?",
             "Agents-of-Abyss",
             [repo_path("Agents-of-Abyss", "README.md"), repo_path("Agents-of-Abyss", "CHARTER.md"), repo_path("Agents-of-Abyss", "docs/REPO_ROLES.md")],
-            ["aoa-agents", "aoa-routing"],
+            ["aoa-agents", "aoa-sdk"],
         ),
         ownership_case(
             "repo-owner-tree-of-sophia-source-first",
@@ -1696,7 +1697,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
             "Which single repo owns runtime, deployment, storage, lifecycle, and infrastructure glue for the local system body?",
             "abyss-stack",
             [repo_path("abyss-stack", "Configs/README.md"), repo_path("abyss-stack", "Configs/docs/PATHS.md")],
-            ["aoa-evals", "aoa-routing"],
+            ["aoa-evals", "aoa-sdk"],
         ),
         ownership_case(
             "repo-owner-8dionysus-public-entry",
@@ -1710,8 +1711,14 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
             "repo-owner-aoa-routing-federation-entrypoints",
             "Owning Repo For Federation Entrypoints",
             "Which single repo owns federation-entry orientation and lightweight next-hop entrypoints?",
-            "aoa-routing",
-            [repo_path("aoa-routing", "generated/federation_entrypoints.min.json"), repo_path("aoa-routing", "README.md")],
+            "aoa-sdk",
+            [
+                repo_path(
+                    "aoa-sdk",
+                    "src/aoa_sdk/control_plane/routing/runtime_compatibility/FEDERATION_ENTRY_ABI.md",
+                ),
+                repo_path("aoa-sdk", "README.md"),
+            ],
             ["aoa-playbooks", "aoa-memo"],
         ),
         ownership_case(
@@ -1736,7 +1743,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
             "Which single repo owns derived ToS retrieval-axis packs and bounded chunk-level retrieval helpers without replacing Tree-of-Sophia meaning?",
             "aoa-kag",
             [repo_path("aoa-kag", "README.md"), repo_path("aoa-kag", "docs/TOS_RETRIEVAL_AXIS_PACK.md")],
-            ["Tree-of-Sophia", "aoa-routing"],
+            ["Tree-of-Sophia", "aoa-sdk"],
         ),
         ownership_case(
             "repo-owner-aoa-playbooks-automation-seeds",
@@ -1744,7 +1751,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
             "Which single repo owns automation seeds and scenario composition manifests rather than raw runtime automation code?",
             "aoa-playbooks",
             [repo_path("aoa-playbooks", "README.md"), repo_path("aoa-playbooks", "docs/AUTOMATION_SEEDS.md")],
-            ["abyss-stack", "aoa-routing"],
+            ["abyss-stack", "aoa-sdk"],
         ),
         ownership_case(
             "repo-owner-aoa-agents-model-tiers",
@@ -1752,7 +1759,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
             "Which single repo owns model tiers such as router, planner, executor, and verifier?",
             "aoa-agents",
             [repo_path("aoa-agents", "README.md"), repo_path("aoa-agents", "docs/MODEL_TIER_MODEL.md")],
-            ["aoa-routing", "Agents-of-Abyss"],
+            ["aoa-sdk", "Agents-of-Abyss"],
         ),
         ownership_case(
             "repo-owner-abyss-stack-platform-adaptations",
@@ -1766,13 +1773,13 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
             wave_id="W1",
             case_id="boundary-routing-vs-memo",
             title="Boundary Confusion Routing Versus Memo",
-            repo_scope=["aoa-routing", "aoa-memo"],
+            repo_scope=["aoa-sdk", "aoa-memo"],
             task_family="routing-ownership",
-            source_refs=[repo_path("aoa-routing", "README.md"), repo_path("aoa-memo", "README.md")],
-            expected_result={"type": "owner-vs-confusion", "owner": "aoa-routing", "disallowed_confusion": "aoa-memo"},
-            goal="Check that navigation authority stays in aoa-routing and memory does not get upgraded into routing authority.",
+            source_refs=[repo_path("aoa-sdk", "README.md"), repo_path("aoa-memo", "README.md")],
+            expected_result={"type": "owner-vs-confusion", "owner": "aoa-sdk", "disallowed_confusion": "aoa-memo"},
+            goal="Check that navigation authority stays in aoa-sdk and memory does not get upgraded into routing authority.",
             inputs=["Which repo owns navigation and dispatch surfaces here, and which repo must stay memory-only instead of becoming navigation authority?", "Reply as compact JSON with keys `owner` and `disallowed_confusion`."],
-            expected_report_lines=["The owner is `aoa-routing`.", "The disallowed confusion is `aoa-memo`."],
+            expected_report_lines=["The owner is `aoa-sdk`.", "The disallowed confusion is `aoa-memo`."],
             allowed_tools=["langchain-api:/run", "local-files:read-only"],
             scoring={"exact_match": True, "critical_boundary_inversion": True},
         ),
@@ -1893,17 +1900,23 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
         ),
         read_only_case(
             "routing-validate-and-explain",
-            "Run aoa-routing Validator And Explain Boundary",
-            ["aoa-routing"],
-            [repo_path("aoa-routing", "scripts/validate_router.py"), repo_path("aoa-routing", "README.md")],
-            ["Run `python scripts/validate_router.py` in `/srv/AbyssOS/aoa-routing`.", "Explain what the validator protects and what routing does not author."],
+            "Run aoa-sdk Release Validator And Explain Routing Boundary",
+            ["aoa-sdk"],
+            [
+                repo_path("aoa-sdk", "scripts/release_check.py"),
+                repo_path(
+                    "aoa-sdk",
+                    "mechanics/boundary-bridge/parts/consumed-surface-posture-gate/docs/routing-consumer-contract.md",
+                ),
+            ],
+            ["Run `python scripts/release_check.py` in `/srv/AbyssOS/aoa-sdk`.", "Explain what the validator protects and what routing does not author."],
             ["The validator outcome is restated exactly, including any non-zero exit if it happens.", "The explanation preserves the rule that source repos own meaning and routing owns navigation."],
             observed_actions=[
                 command_action(
                     "routing_validator",
-                    ["python3", "scripts/validate_router.py"],
-                    absolute(Path("/srv/AbyssOS/aoa-routing")),
-                    120,
+                    ["python3", "scripts/release_check.py"],
+                    absolute(AOA_SDK_ROOT),
+                    300,
                 )
             ],
         ),
@@ -1958,7 +1971,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
         read_only_case(
             "playbook-activation-lookup",
             "Look Up Playbook Activation Surface",
-            ["aoa-playbooks", "aoa-routing"],
+            ["aoa-playbooks", "aoa-sdk"],
             [repo_path("aoa-playbooks", "README.md"), route_endpoint("/playbooks/activation")],
             ["Read the playbook activation surface and explain when a playbook should be consulted before execution.", "Name one activation surface that is relevant to long-horizon or cross-repo work."],
             ["The answer cites the activation surface.", "The explanation names a relevant playbook without inventing one."],
@@ -1967,7 +1980,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
         read_only_case(
             "memo-checkpoint-contract-lookup",
             "Look Up Memo Checkpoint Contract",
-            ["aoa-memo", "aoa-routing"],
+            ["aoa-memo", "aoa-sdk"],
             [repo_path("aoa-memo", "docs/LIFECYCLE.md"), route_endpoint("/memo/checkpoint-contract")],
             ["Read the memo checkpoint contract surface and explain what it is for.", "State whether this pilot wave allows writeback."],
             ["The answer cites the memo checkpoint surface.", "The explanation correctly says writeback is excluded from this pilot wave."],
@@ -1976,7 +1989,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
         read_only_case(
             "route-api-surface-status-read",
             "Read Route API Surface Status",
-            ["aoa-routing", "abyss-stack"],
+            ["aoa-sdk", "abyss-stack"],
             [route_endpoint("/surface-status"), repo_path("abyss-stack", "Services/route-api/app/main.py")],
             ["Fetch `GET /surface-status` from route-api and summarize which surfaces are live.", "Do not infer more than the endpoint actually returns."],
             ["The answer matches the endpoint output.", "The summary stays runtime-local and does not overclaim."],
@@ -1985,8 +1998,14 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
         read_only_case(
             "route-api-federation-entrypoints-read",
             "Read Route API Federation Entrypoints",
-            ["aoa-routing"],
-            [route_endpoint("/routing/federation-entrypoints"), repo_path("aoa-routing", "generated/federation_entrypoints.min.json")],
+            ["aoa-sdk"],
+            [
+                route_endpoint("/routing/federation-entrypoints"),
+                repo_path(
+                    "aoa-sdk",
+                    "src/aoa_sdk/control_plane/routing/runtime_compatibility/FEDERATION_ENTRY_ABI.md",
+                ),
+            ],
             ["Fetch `GET /routing/federation-entrypoints` and summarize what kind of next-hop help it gives.", "Name the correct source repo for the underlying meanings."],
             ["The answer cites the federation-entrypoints surface.", "The summary keeps routing as navigation-only."],
             observed_actions=[http_get_action("route_federation_entrypoints", route_endpoint("/routing/federation-entrypoints"))],
@@ -1994,7 +2013,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
         read_only_case(
             "route-api-evals-catalog-read",
             "Read Route API Evals Catalog",
-            ["aoa-evals", "aoa-routing"],
+            ["aoa-evals", "aoa-sdk"],
             [route_endpoint("/evals/catalog"), repo_path("aoa-evals", "generated/eval_catalog.json")],
             ["Fetch `GET /evals/catalog` and summarize one relevant bounded eval for scope discipline.", "Keep proof ownership in aoa-evals."],
             ["The answer cites the evals catalog.", "The chosen eval actually exists in the catalog."],
@@ -2003,7 +2022,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
         read_only_case(
             "route-api-playbooks-activation-read",
             "Read Route API Playbooks Activation",
-            ["aoa-playbooks", "aoa-routing"],
+            ["aoa-playbooks", "aoa-sdk"],
             [route_endpoint("/playbooks/activation"), repo_path("aoa-playbooks", "README.md")],
             ["Fetch `GET /playbooks/activation` and summarize one activation surface relevant to long-horizon or cross-repo work.", "Do not invent a playbook id or field."],
             ["The answer cites the activation endpoint.", "The summary matches an actual playbook activation item."],
@@ -2030,7 +2049,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
         read_only_case(
             "runtime-inspect-route-api-health",
             "Inspect Route API Health",
-            ["abyss-stack", "aoa-routing"],
+            ["abyss-stack", "aoa-sdk"],
             [route_endpoint("/health"), repo_path("abyss-stack", "Services/route-api/app/main.py")],
             ["Fetch `GET /health` from route-api and summarize what service is alive.", "Do not treat health as proof of deeper quality."],
             ["The answer cites the route-api health endpoint.", "The summary stays at runtime-health scope."],
@@ -2092,7 +2111,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
             wave_id="W3",
             case_id=case_id,
             title=title,
-            repo_scope=["aoa-routing", "aoa-agents", "aoa-playbooks", "aoa-evals"],
+            repo_scope=["aoa-sdk", "aoa-agents", "aoa-playbooks", "aoa-evals"],
             task_family=task_family,
             source_refs=refs,
             expected_result=expected_result,
@@ -2257,17 +2276,6 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
             lane="docs",
         ),
         edit_case(
-            "aoa-routing-doc-boundary-alignment",
-            "aoa-routing Boundary Doc Alignment",
-            ["aoa-routing"],
-            [repo_path("aoa-routing", "README.md"), repo_path("aoa-routing", "docs/FEDERATION_ENTRY_ABI.md"), repo_path("aoa-routing", "docs/RECURRENCE_NAVIGATION_BOUNDARY.md")],
-            [repo_path("aoa-routing", "README.md"), repo_path("aoa-routing", "docs/FEDERATION_ENTRY_ABI.md"), repo_path("aoa-routing", "docs/RECURRENCE_NAVIGATION_BOUNDARY.md")],
-            ["python scripts/validate_router.py", "pytest -q"],
-            ["Align wording so routing stays clearly navigation-only across the public entry docs.", "Do not alter schemas or generated router payloads in this case."],
-            execution_mode="qwen_patch",
-            lane="docs",
-        ),
-        edit_case(
             "aoa-evals-contract-wording-alignment",
             "aoa-evals Contract Wording Alignment",
             ["aoa-evals"],
@@ -2310,25 +2318,6 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
             ["Keep the profile concise and navigation-first while clarifying where specialized truth lives.", "Do not add new roadmap or maturity claims."],
             execution_mode="qwen_patch",
             lane="docs",
-        ),
-        edit_case(
-            "aoa-routing-generated-surface-refresh",
-            "aoa-routing Generated Surface Refresh",
-            ["aoa-routing"],
-            [repo_path("aoa-routing", "config/two_stage_router_policy.json"), repo_path("aoa-routing", "scripts/build_two_stage_skill_router.py"), repo_path("aoa-routing", "generated/two_stage_router_manifest.json")],
-            [
-                repo_path("aoa-routing", "generated/two_stage_skill_entrypoints.json"),
-                repo_path("aoa-routing", "generated/two_stage_router_prompt_blocks.json"),
-                repo_path("aoa-routing", "generated/two_stage_router_tool_schemas.json"),
-                repo_path("aoa-routing", "generated/two_stage_router_examples.json"),
-                repo_path("aoa-routing", "generated/two_stage_router_manifest.json"),
-                repo_path("aoa-routing", "generated/two_stage_router_eval_cases.jsonl"),
-            ],
-            ["python scripts/validate_two_stage_skill_router.py", "pytest -q"],
-            ["Refresh generated two-stage router surfaces from existing source policy and scripts.", "Do not broaden the edit to unrelated routing artifacts."],
-            execution_mode="script_refresh",
-            lane="generated",
-            builder_command=["python", "scripts/build_two_stage_skill_router.py"],
         ),
         edit_case(
             "aoa-evals-generated-catalog-refresh",

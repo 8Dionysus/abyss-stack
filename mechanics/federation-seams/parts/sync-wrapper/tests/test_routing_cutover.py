@@ -103,11 +103,16 @@ def owner_switch_receipt() -> dict[str, object]:
     }
 
 
-def make_fixture(tmp_path: Path) -> dict[str, str]:
-    required_files = [
-        "generated/aoa_router.min.json",
-        "generated/task_to_surface_hints.json",
-    ]
+def make_fixture(
+    tmp_path: Path,
+    *,
+    required_files: list[str] | None = None,
+) -> dict[str, str]:
+    if required_files is None:
+        required_files = [
+            "generated/aoa_router.min.json",
+            "generated/task_to_surface_hints.json",
+        ]
     config = tmp_path / "aoa-routing.yaml"
     config.write_text(
         "\n".join(
@@ -123,20 +128,20 @@ def make_fixture(tmp_path: Path) -> dict[str, str]:
     )
     store = tmp_path / "subject-store"
     payloads: dict[str, object] = {
-        "generated/aoa_router.min.json": {
+        relative: {"fixture_path": relative}
+        for relative in required_files
+    }
+    payloads["generated/aoa_router.min.json"] = {
             "router_version": 1,
             "artifact_identity": {
                 "owner_repo": "aoa-sdk",
                 "artifact_class": "thin_routing_readmodel_bundle",
                 "abi_epoch": "aoa_routing_thin_router_v1",
             },
-        },
-        "generated/task_to_surface_hints.json": {
-            "version": "1",
-            "hints": [],
-        },
-        "succession/routing-g5-owner-switch.json": owner_switch_receipt(),
     }
+    payloads["succession/routing-g5-owner-switch.json"] = (
+        owner_switch_receipt()
+    )
     files: list[dict[str, object]] = []
     for relative, payload in payloads.items():
         path = store / relative
@@ -389,6 +394,53 @@ def test_isolated_canonical_materialization_is_receipt_bound(
     assert manifest["canonical_producer"]["owner_repo"] == "aoa-sdk"
     assert manifest["predecessor_rollback"]["owner_repo"] == "aoa-routing"
     assert manifest["mirror_is_authority"] is False
+
+
+def test_materialized_inspection_needs_no_source_checkout_or_external_inputs(
+    tmp_path: Path,
+) -> None:
+    fixture = make_fixture(tmp_path)
+    target = tmp_path / "isolated" / "aoa-routing"
+    materialized = run_cutover(
+        ["materialize", *exact_args(fixture, target), "--isolated"]
+    )
+    assert materialized.returncode == 0, materialized.stderr + materialized.stdout
+
+    inspected = run_cutover(
+        [
+            "inspect-materialized",
+            "--target-root",
+            str(target),
+            "--routing-config",
+            fixture["config"],
+        ]
+    )
+
+    assert inspected.returncode == 0, inspected.stderr + inspected.stdout
+    payload = json.loads(inspected.stdout)
+    assert payload["operation"] == "inspect-materialized"
+    assert payload["posture"] == "sdk_canonical"
+    assert payload["sdk_source_ref"] == SDK_REF
+    assert payload["external_release_admission_rechecked"] is False
+    assert payload["verification_scope"] == (
+        "current_materialized_integrity_and_embedded_provenance"
+    )
+
+    (target / "generated/aoa_router.min.json").write_text(
+        '{"tampered":true}\n',
+        encoding="utf-8",
+    )
+    rejected = run_cutover(
+        [
+            "inspect-materialized",
+            "--target-root",
+            str(target),
+            "--routing-config",
+            fixture["config"],
+        ]
+    )
+    assert rejected.returncode == 1
+    assert "digest drifted" in json.loads(rejected.stdout)["error"]
 
 
 def test_isolated_cutover_rejects_live_target_shape(tmp_path: Path) -> None:

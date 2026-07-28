@@ -15,6 +15,8 @@ Current posture:
 - keep Agent OS plan admission exact, runtime-owned, durable, and limited to
   explicitly mapped execution lanes; repository mutation alone delegates to
   the governed runner
+- keep governed mutation owner-bound to `abyss-stack`; the routing predecessor
+  is retained for compatibility rollback, not as a mutable external target
 
 Near direction:
 

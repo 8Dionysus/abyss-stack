@@ -2,7 +2,7 @@
   "surface_type": "runtime_governed_execution_policy",
   "schema_version": "v1",
   "policy_id": "agentic-governed-execution-v1",
-  "description": "Fail-closed governed mutation policy for abyss-stack and the first explicit external target; playbook meaning stays generic while runtime permissions become target-aware.",
+  "description": "Fail-closed governed mutation policy for abyss-stack; playbook meaning stays generic while runtime permissions remain owner-bound.",
   "enabled": true,
   "global_rules": {
     "gate_mode": "fail_closed",
@@ -120,51 +120,6 @@
           "repo_scope": "abyss-stack",
           "trust_state": "experimental",
           "task_class": "validation_tightening",
-          "allowed_files": [],
-          "acceptance_commands": [],
-          "break_glass_allowed": false,
-          "repair_allowed": false
-        }
-      }
-    },
-    "aoa-routing": {
-      "repo_scope": "aoa-routing",
-      "description": "First external governed target for bounded thin-router wording and generated-surface refreshes only.",
-      "default_repo_root": "/srv/AbyssOS/aoa-routing",
-      "playbooks": {
-        "AOA-P-0011": {
-          "enabled": true,
-          "execution_kind": "mutation",
-          "repo_scope": "aoa-routing",
-          "trust_state": "canary_proven",
-          "task_class": "docs_only",
-          "evidence_since_run_id": "20260331t185701z-090d1817",
-          "allowed_files": [
-            "README.md",
-            "ROADMAP.md",
-            "docs/*.md",
-            "docs/**/*.md",
-            "generated/*.json",
-            "generated/*.jsonl",
-            "scripts/build_router.py",
-            "scripts/validate_router.py",
-            "tests/test_build_router.py",
-            "tests/test_validate_router.py"
-          ],
-          "acceptance_commands": [
-            "python scripts/validate_router.py --techniques-root /srv/AbyssOS/aoa-techniques --skills-root /srv/AbyssOS/aoa-skills --evals-root /srv/AbyssOS/aoa-evals --memo-root /srv/AbyssOS/aoa-memo --agents-root /srv/AbyssOS/aoa-agents --aoa-root /srv/AbyssOS/Agents-of-Abyss --playbooks-root /srv/AbyssOS/aoa-playbooks --kag-root /srv/AbyssOS/aoa-kag --tos-root /srv/AbyssOS/Tree-of-Sophia",
-            "python scripts/build_router.py --check --techniques-root /srv/AbyssOS/aoa-techniques --skills-root /srv/AbyssOS/aoa-skills --evals-root /srv/AbyssOS/aoa-evals --memo-root /srv/AbyssOS/aoa-memo --agents-root /srv/AbyssOS/aoa-agents --aoa-root /srv/AbyssOS/Agents-of-Abyss --playbooks-root /srv/AbyssOS/aoa-playbooks --kag-root /srv/AbyssOS/aoa-kag --tos-root /srv/AbyssOS/Tree-of-Sophia",
-            "pytest"
-          ],
-          "break_glass_allowed": false,
-          "repair_allowed": true
-        },
-        "AOA-P-0018": {
-          "enabled": false,
-          "execution_kind": "mutation",
-          "repo_scope": "aoa-routing",
-          "trust_state": "experimental",
-          "task_class": "governed_lane",
           "allowed_files": [],
           "acceptance_commands": [],
           "break_glass_allowed": false,

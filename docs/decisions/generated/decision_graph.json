@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 100,
-  "edge_count": 2249,
+  "decision_count": 101,
+  "edge_count": 2281,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 870,
-    "DATED": 100,
-    "GUARDED_BY": 289,
-    "HAS_STATUS": 100,
-    "HAS_SURFACE_CLASS": 259,
-    "IN_STACK_LANE": 220,
-    "NEXT_DECISION": 99,
-    "OWNED_BY_SURFACE": 106,
-    "OWNS_DECISION": 100,
+    "CITES_SOURCE_SURFACE": 884,
+    "DATED": 101,
+    "GUARDED_BY": 293,
+    "HAS_STATUS": 101,
+    "HAS_SURFACE_CLASS": 262,
+    "IN_STACK_LANE": 223,
+    "NEXT_DECISION": 100,
+    "OWNED_BY_SURFACE": 107,
+    "OWNS_DECISION": 101,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 104
+    "UNDER_MECHANIC_PARENT": 107
   },
   "edges": [
     {
@@ -10753,12 +10753,167 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0100",
+      "target": "decision:ABYSS-STACK-D-0101",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
       "target": "owner_surface:mechanics/governed-execution/parts/agent-os-adapter/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0100",
       "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "source_surface:config-templates/Configs/agent-api/governed-canary-catalog.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "source_surface:config-templates/Configs/agent-api/governed-execution-policy.yaml",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "source_surface:docs/install/DEPLOYMENT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "source_surface:docs/profiles/PROFILE_RECIPES.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "source_surface:docs/runtime/PATHS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "source_surface:mechanics/federation-seams/parts/sync-wrapper/aoa_routing_cutover.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "source_surface:mechanics/federation-seams/parts/sync-wrapper/aoa_sync_federation_surfaces.sh",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "source_surface:mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "source_surface:mechanics/inference-pilots/parts/langgraph-pilot/aoa_langgraph_pilot.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "source_surface:mechanics/inference-pilots/parts/local-trials/compatibility-runners/aoa-local-ai-trials",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "source_surface:mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w5-pilot",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "source_surface:mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w6-pilot",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "source_surface:scripts/validators/runtime_route_contracts.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "source_surface:systemd/user/aoa-evals-mcp-candidate.service",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "date:2026-07-27",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "guard_family:artifact%20trust",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "guard_family:consumer%20zero",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "guard_family:rollback",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "guard_family:routing%20G5",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "surface_class:consumer%20retirement",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "surface_class:owner%20succession",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "surface_class:runtime%20route%20contract",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "stack_lane:compatibility%20trials",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "stack_lane:governed%20execution",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "stack_lane:runtime%20mirror",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "owner_surface:mechanics/federation-seams/parts/sync-wrapper/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "mechanic_parent:federation-seams",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
+      "target": "mechanic_parent:inference-pilots",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -11260,21 +11415,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0100",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0101",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 994,
+  "node_count": 1002,
   "node_type_counts": {
-    "date": 27,
-    "decision": 100,
+    "date": 28,
+    "decision": 101,
     "guard_family": 142,
     "mechanic_parent": 10,
     "owner_surface": 54,
     "repo": 1,
-    "source_surface": 518,
-    "stack_lane": 38,
+    "source_surface": 522,
+    "stack_lane": 39,
     "status": 3,
-    "surface_class": 101
+    "surface_class": 102
   },
   "nodes": [
     {
@@ -11410,6 +11570,11 @@
     {
       "id": "date:2026-07-26",
       "label": "2026-07-26",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-07-27",
+      "label": "2026-07-27",
       "type": "date"
     },
     {
@@ -12410,6 +12575,16 @@
       "posture": "accepted rationale",
       "status": "accepted",
       "title": "ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans",
+      "type": "decision"
+    },
+    {
+      "date": "2026-07-27",
+      "id": "decision:ABYSS-STACK-D-0101",
+      "label": "ABYSS-STACK-D-0101",
+      "path": "docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md",
+      "posture": "accepted SDK-canonical consumer cut",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0101 Retire Routing Predecessor Checkout Consumers",
       "type": "decision"
     },
     {
@@ -15144,6 +15319,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
+      "label": "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/governed-execution/parts/return-policy/",
       "label": "mechanics/governed-execution/parts/return-policy/",
       "type": "source_surface"
@@ -15209,6 +15389,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/inference-pilots/parts/local-trials/compatibility-runners/aoa-local-ai-trials",
+      "label": "mechanics/inference-pilots/parts/local-trials/compatibility-runners/aoa-local-ai-trials",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/inference-pilots/parts/local-trials/docs/LOCAL_AI_TRIALS.md",
       "label": "mechanics/inference-pilots/parts/local-trials/docs/LOCAL_AI_TRIALS.md",
       "type": "source_surface"
@@ -15221,6 +15406,16 @@
     {
       "id": "source_surface:mechanics/inference-pilots/parts/local-trials/trial_compatibility_bridge.py",
       "label": "mechanics/inference-pilots/parts/local-trials/trial_compatibility_bridge.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w5-pilot",
+      "label": "mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w5-pilot",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w6-pilot",
+      "label": "mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w6-pilot",
       "type": "source_surface"
     },
     {
@@ -16064,6 +16259,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:compatibility%20trials",
+      "label": "compatibility trials",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:config%20projection",
       "label": "config projection",
       "type": "stack_lane"
@@ -16361,6 +16561,11 @@
     {
       "id": "surface_class:consumer%20admission",
       "label": "consumer admission",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:consumer%20retirement",
+      "label": "consumer retirement",
       "type": "surface_class"
     },
     {

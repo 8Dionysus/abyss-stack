@@ -70,7 +70,7 @@ import sys
 
 layer = sys.argv[1]
 status = sys.argv[2]
-source_root = str(Path(sys.argv[3]))
+source_root = str(Path(sys.argv[3])) if sys.argv[3] else None
 mirror_target = str(Path(sys.argv[4]))
 source_commit = sys.argv[5] or None
 mirror_commit = sys.argv[6] or None
@@ -234,37 +234,91 @@ print(upstream_rel_path)
 PY
 }
 
+check_canonical_routing_layer() {
+  local synced="${1:-false}"
+  local emit="${2:-true}"
+  local target_root manifest_path config_dir config_path inspection
+  local source_commit mirror_generated_at_utc refresh_command status freshness_status
+  local -a routing_fields=() routing_manifest_fields=()
+  target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing"
+  manifest_path="${target_root}/manifest/federation_mirror_manifest.json"
+  config_dir="$(resolve_federation_config_dir)"
+  config_path="${config_dir}/aoa-routing.yaml"
+  refresh_command="scripts/aoa-routing-cutover materialize --explicit-exact-inputs"
+  source_commit=""
+  mirror_generated_at_utc=""
+  status="ok"
+  freshness_status="sdk_canonical_materialized"
+
+  if inspection="$(
+    "${REPO_ROOT}/scripts/aoa-routing-cutover" inspect-materialized \
+      --target-root "${target_root}" \
+      --routing-config "${config_path}"
+  )"; then
+    mapfile -t routing_fields < <(
+      python3 - "${inspection}" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+print(payload.get("sdk_source_ref") or "")
+PY
+    )
+    source_commit="${routing_fields[0]:-}"
+    if [[ -f "${manifest_path}" ]]; then
+      mapfile -t routing_manifest_fields < <(
+        python3 - "${manifest_path}" <<'PY'
+from pathlib import Path
+import json
+import sys
+
+payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+print(payload.get("generated_at_utc") or "")
+print(payload.get("refresh_command") or "")
+PY
+      )
+      mirror_generated_at_utc="${routing_manifest_fields[0]:-}"
+      refresh_command="${routing_manifest_fields[1]:-${refresh_command}}"
+    fi
+  else
+    status="invalid_canonical_materialization"
+    freshness_status="cutover_rematerialization_required"
+    if [[ ! -d "${target_root}" ]]; then
+      status="missing_canonical_materialization"
+      freshness_status="cutover_materialization_required"
+    fi
+    if (( ! json_mode )) && [[ "${emit}" == "true" ]]; then
+      printf 'warning: SDK-canonical routing mirror is not valid: %s\n' \
+        "${target_root}" >&2
+      printf '  refresh only through receipt-bound scripts/aoa-routing-cutover materialize\n' >&2
+    fi
+  fi
+
+  if (( json_mode )) && [[ "${emit}" == "true" ]]; then
+    emit_check_json \
+      "aoa-routing" \
+      "${status}" \
+      "" \
+      "${target_root}" \
+      "${source_commit}" \
+      "${source_commit}" \
+      "${mirror_generated_at_utc}" \
+      "${refresh_command}" \
+      "false" \
+      "${synced}" \
+      "${freshness_status}" \
+      "${manifest_path}"
+  elif (( ! json_mode )) && [[ "${emit}" == "true" ]] && [[ "${status}" == "ok" ]]; then
+    aoa_note "SDK-canonical routing materialization check complete"
+    aoa_note "mirror target: ${target_root}"
+  fi
+
+  [[ "${status}" == "ok" ]]
+}
+
 resolve_layer_source_rel() {
   local layer="$1"
   local rel_path="$2"
-  if [[ "$layer" == "aoa-routing" ]]; then
-    case "$rel_path" in
-      docs/FEDERATION_ENTRY_ABI.md)
-        printf '%s\n' "mechanics/boundary-bridge/parts/federation-entry/docs/federation-entry-abi.md"
-        return 0
-        ;;
-      docs/RECURRENCE_NAVIGATION_BOUNDARY.md)
-        printf '%s\n' "mechanics/recurrence/parts/return-navigation/docs/recurrence-navigation-boundary.md"
-        return 0
-        ;;
-      schemas/kag-source-lift-relation-hints.schema.json)
-        printf '%s\n' "mechanics/boundary-bridge/parts/tos-kag-boundary/schemas/kag-source-lift-relation-hints.schema.json"
-        return 0
-        ;;
-      schemas/federation-entrypoints.schema.json)
-        printf '%s\n' "mechanics/boundary-bridge/parts/federation-entry/schemas/federation-entrypoints.schema.json"
-        return 0
-        ;;
-      schemas/return-navigation-hints.schema.json)
-        printf '%s\n' "mechanics/recurrence/parts/return-navigation/schemas/return-navigation-hints.schema.json"
-        return 0
-        ;;
-      schemas/*.json)
-        printf '%s\n' "routing/core/schemas/${rel_path#schemas/}"
-        return 0
-        ;;
-    esac
-  fi
   if [[ "$layer" == "aoa-evals" ]]; then
     case "$rel_path" in
       docs/TRACE_EVAL_BRIDGE.md)
@@ -425,8 +479,7 @@ sync_layer() {
       target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents"
       ;;
     aoa-routing)
-      source_root="${AOA_ROUTING_ROOT}"
-      target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing"
+      aoa_die "aoa-routing is materialized only by receipt-bound scripts/aoa-routing-cutover"
       ;;
     aoa-memo)
       source_root="${AOA_MEMO_ROOT}"
@@ -518,14 +571,15 @@ check_layer() {
   local -a missing_paths=()
   local -a manifest_fields=()
 
+  if [[ "${layer}" == "aoa-routing" ]]; then
+    check_canonical_routing_layer "${synced}" "${emit}"
+    return
+  fi
+
   case "$layer" in
     aoa-agents)
       source_root="${AOA_AGENTS_ROOT}"
       target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents"
-      ;;
-    aoa-routing)
-      source_root="${AOA_ROUTING_ROOT}"
-      target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing"
       ;;
     aoa-memo)
       source_root="${AOA_MEMO_ROOT}"
@@ -672,6 +726,9 @@ check_layer() {
 
 overall_status=0
 for layer in "${layers[@]}"; do
+  if [[ "${layer}" == "aoa-routing" ]] && (( sync_if_stale )); then
+    aoa_die "aoa-routing cannot be repaired by federation sync; use receipt-bound scripts/aoa-routing-cutover materialize"
+  fi
   if (( check_mode )); then
     if (( sync_if_stale )); then
       if check_layer "$layer" false false; then

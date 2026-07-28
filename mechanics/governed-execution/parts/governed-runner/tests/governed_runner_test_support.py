@@ -52,208 +52,6 @@ def init_minimal_repo(root: Path) -> None:
     subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True, capture_output=True, text=True)
 
 
-def init_minimal_routing_repo(root: Path) -> None:
-    (root / "docs").mkdir(parents=True, exist_ok=True)
-    (root / "scripts").mkdir(parents=True, exist_ok=True)
-    (root / "tests").mkdir(parents=True, exist_ok=True)
-    (root / "generated").mkdir(parents=True, exist_ok=True)
-    (root / "README.md").write_text("# aoa-routing\n", encoding="utf-8")
-    (root / "CONTRIBUTING.md").write_text("contrib\n", encoding="utf-8")
-    (root / "ROADMAP.md").write_text("roadmap\n", encoding="utf-8")
-    (root / "docs" / "FEDERATION_ENTRY_ABI.md").write_text("thin router only\n", encoding="utf-8")
-    (root / "docs" / "target.md").write_text("alpha\nbeta\n", encoding="utf-8")
-    router_payload = {
-        "router_id": "two-stage",
-        "entries": [
-            {"id": "alpha", "path": "docs/target.md"},
-            {"id": "beta", "path": "docs/FEDERATION_ENTRY_ABI.md"},
-        ],
-    }
-    skill_entrypoints_payload = [
-        {"id": "alpha", "entry": "docs/target.md"},
-        {"id": "beta", "entry": "docs/FEDERATION_ENTRY_ABI.md"},
-    ]
-    router_events_payload = [
-        {"event": "router-built", "count": 2},
-        {"event": "entrypoints", "count": 2},
-    ]
-    (root / "generated" / "aoa_router.min.json").write_text("{\"ok\": true}\n", encoding="utf-8")
-    (root / "generated" / "two_stage_router.min.json").write_text(
-        json.dumps(router_payload, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-    (root / "generated" / "two_stage_skill_entrypoints.json").write_text(
-        json.dumps(skill_entrypoints_payload, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-    (root / "generated" / "two_stage_router_events.jsonl").write_text(
-        "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in router_events_payload),
-        encoding="utf-8",
-    )
-    (root / "scripts" / "build_router.py").write_text(
-        textwrap.dedent(
-            """\
-            #!/usr/bin/env python3
-            from __future__ import annotations
-
-            import argparse
-            import json
-            from pathlib import Path
-            from typing import Any
-
-            REPO_ROOT = Path(__file__).resolve().parents[1]
-            GENERATED_DIR = REPO_ROOT / "generated"
-
-
-            def parse_args() -> argparse.Namespace:
-                parser = argparse.ArgumentParser(description="Build minimal routing generated surfaces.")
-                parser.add_argument("--check", action="store_true", help="Verify semantic parity only.")
-                return parser.parse_args()
-
-
-            def build_outputs() -> dict[str, Any]:
-                return {
-                    "two_stage_router.min.json": {
-                        "router_id": "two-stage",
-                        "entries": [
-                            {"id": "alpha", "path": "docs/target.md"},
-                            {"id": "beta", "path": "docs/FEDERATION_ENTRY_ABI.md"},
-                        ],
-                    },
-                    "two_stage_skill_entrypoints.json": [
-                        {"id": "alpha", "entry": "docs/target.md"},
-                        {"id": "beta", "entry": "docs/FEDERATION_ENTRY_ABI.md"},
-                    ],
-                    "two_stage_router_events.jsonl": [
-                        {"event": "router-built", "count": 2},
-                        {"event": "entrypoints", "count": 2},
-                    ],
-                }
-
-
-            def render_output_text(filename: str, payload: Any) -> str:
-                if filename.endswith(".jsonl"):
-                    return "".join(
-                        json.dumps(item, ensure_ascii=False, separators=(",", ":"), sort_keys=False) + "\\n"
-                        for item in payload
-                    )
-                return json.dumps(
-                    payload,
-                    ensure_ascii=False,
-                    indent=None,
-                    separators=(",", ":"),
-                    sort_keys=False,
-                ) + "\\n"
-
-
-            def relative_posix(path: Path) -> str:
-                return path.relative_to(REPO_ROOT).as_posix()
-
-
-            def validate_generated_dir_matches_outputs(outputs: dict[str, Any]) -> list[str]:
-                mismatches: list[str] = []
-                for filename, payload in outputs.items():
-                    path = GENERATED_DIR / filename
-                    if not path.exists():
-                        mismatches.append(relative_posix(path))
-                        continue
-                    actual_text = path.read_text(encoding="utf-8")
-                    try:
-                        if filename.endswith(".jsonl"):
-                            actual_payload = [
-                                json.loads(line)
-                                for line in actual_text.splitlines()
-                                if line.strip()
-                            ]
-                        else:
-                            actual_payload = json.loads(actual_text)
-                    except json.JSONDecodeError:
-                        mismatches.append(relative_posix(path))
-                        continue
-                    if actual_payload != payload:
-                        mismatches.append(relative_posix(path))
-                return mismatches
-
-
-            def main() -> int:
-                args = parse_args()
-                GENERATED_DIR.mkdir(parents=True, exist_ok=True)
-                outputs = build_outputs()
-                if args.check:
-                    mismatches = validate_generated_dir_matches_outputs(outputs)
-                    if mismatches:
-                        raise SystemExit("; ".join(mismatches))
-                    return 0
-                for filename, payload in outputs.items():
-                    path = GENERATED_DIR / filename
-                    path.write_text(render_output_text(filename, payload), encoding="utf-8", newline="\\n")
-                    print(f"[ok] wrote {relative_posix(path)}")
-                return 0
-
-
-            if __name__ == "__main__":
-                raise SystemExit(main())
-            """
-        ),
-        encoding="utf-8",
-    )
-    (root / "scripts" / "validate_router.py").write_text(
-        textwrap.dedent(
-            """\
-            #!/usr/bin/env python3
-            from __future__ import annotations
-
-            import subprocess
-            import sys
-            from pathlib import Path
-
-            REPO_ROOT = Path(__file__).resolve().parents[1]
-
-
-            def main() -> int:
-                subprocess.run(
-                    [sys.executable, str(REPO_ROOT / "scripts" / "build_router.py"), "--check"],
-                    cwd=REPO_ROOT,
-                    check=True,
-                )
-                print("ok")
-                return 0
-
-
-            if __name__ == "__main__":
-                raise SystemExit(main())
-            """
-        ),
-        encoding="utf-8",
-    )
-    (root / "tests" / "test_build_router.py").write_text(
-        textwrap.dedent(
-            """\
-            from __future__ import annotations
-
-            import subprocess
-            import sys
-            from pathlib import Path
-
-
-            def test_build_router_check_passes() -> None:
-                repo_root = Path(__file__).resolve().parents[1]
-                subprocess.run(
-                    [sys.executable, str(repo_root / "scripts" / "build_router.py"), "--check"],
-                    cwd=repo_root,
-                    check=True,
-                )
-            """
-        ),
-        encoding="utf-8",
-    )
-    subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
-    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True, capture_output=True, text=True)
-    subprocess.run(["git", "config", "user.name", "Test User"], cwd=root, check=True, capture_output=True, text=True)
-    subprocess.run(["git", "add", "."], cwd=root, check=True, capture_output=True, text=True)
-    subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True, capture_output=True, text=True)
-
-
 def governed_request(repo_root: Path, *, target_id: str = "abyss-stack") -> dict:
     return {
         "goal": "Change beta to gamma in the target doc.",
@@ -343,37 +141,6 @@ def make_policy(enabled_break_glass: bool = False) -> dict:
                         "repair_allowed": True
                     }
                 }
-            },
-            "aoa-routing": {
-                "repo_scope": "aoa-routing",
-                "default_repo_root": "/tmp/aoa-routing",
-                "playbooks": {
-                    "AOA-P-0011": {
-                        "enabled": True,
-                        "execution_kind": "mutation",
-                        "repo_scope": "aoa-routing",
-                        "trust_state": "experimental",
-                        "task_class": "docs_only",
-                        "allowed_files": [
-                            "README.md",
-                            "ROADMAP.md",
-                            "docs/*.md",
-                            "docs/**/*.md",
-                            "generated/*.json",
-                            "generated/*.jsonl",
-                            "scripts/build_router.py",
-                            "scripts/validate_router.py",
-                            "tests/test_build_router.py",
-                        ],
-                        "acceptance_commands": [
-                            "python scripts/validate_router.py",
-                            "python scripts/build_router.py --check",
-                            "pytest"
-                        ],
-                        "break_glass_allowed": False,
-                        "repair_allowed": True
-                    }
-                }
             }
         },
         "boundaries": {
@@ -402,33 +169,6 @@ def make_canary_catalog() -> dict:
                 "task_class": "docs_only",
                 "profile_class": "workhorse",
                 "memo": None,
-            },
-            {
-                "canary_id": "routing-boundary-wording-alignment",
-                "target_id": "aoa-routing",
-                "title": "Routing boundary wording alignment",
-                "goal": "Tighten docs wording inside aoa-routing.",
-                "playbook_id": "AOA-P-0011",
-                "task_class": "docs_only",
-                "profile_class": "workhorse",
-                "memo": None,
-            },
-            {
-                "canary_id": "routing-generated-surface-refresh",
-                "target_id": "aoa-routing",
-                "title": "Routing generated surface refresh",
-                "goal": (
-                    "Update only `scripts/build_router.py` so its main write loop preserves the existing "
-                    "on-disk JSON or JSONL text when the parsed file payload already equals the freshly "
-                    "built payload. This must stop no-op `python scripts/build_router.py` from dirtying "
-                    "semantically unchanged `generated/two_stage_*` and "
-                    "`generated/two_stage_skill_entrypoints.json`, without changing thin-router meaning "
-                    "or editing generated files directly."
-                ),
-                "playbook_id": "AOA-P-0011",
-                "task_class": "generated_surface",
-                "profile_class": "workhorse",
-                "memo": None,
             }
         ],
     }
@@ -445,13 +185,10 @@ class GovernedRunnerTestCase(unittest.TestCase):
         self.root = Path(self.temp_dir.name)
         self.repo_root = self.root / "repo"
         init_minimal_repo(self.repo_root)
-        self.routing_repo_root = self.root / "aoa-routing"
-        init_minimal_routing_repo(self.routing_repo_root)
         self.logs_root = self.root / "logs"
         self.policy_path = self.root / "policy.yaml"
         policy = make_policy()
         policy["targets"]["abyss-stack"]["default_repo_root"] = str(self.repo_root)
-        policy["targets"]["aoa-routing"]["default_repo_root"] = str(self.routing_repo_root)
         write_json(self.policy_path, policy)
         self.canary_catalog_path = self.root / "canaries.json"
         write_json(self.canary_catalog_path, make_canary_catalog())
@@ -796,5 +533,4 @@ class GovernedRunnerTestCase(unittest.TestCase):
             },
         )
         return stack_root
-
 

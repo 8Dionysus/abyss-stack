@@ -892,12 +892,12 @@ class GovernedRunnerReviewPacketTests(GovernedRunnerTestCase):
 
     def test_promotion_summary_respects_evidence_since_run_id(self) -> None:
         policy = make_policy()
-        policy["targets"]["aoa-routing"]["playbooks"]["AOA-P-0011"]["evidence_since_run_id"] = "r-pass-1"
+        policy["targets"]["abyss-stack"]["playbooks"]["AOA-P-0011"]["evidence_since_run_id"] = "r-pass-1"
 
         records = [
             {
                 "run_id": "r-fail-old",
-                "target_id": "aoa-routing",
+                "target_id": "abyss-stack",
                 "playbook_id": "AOA-P-0011",
                 "task_class": "generated_surface",
                 "status": "fail",
@@ -906,7 +906,7 @@ class GovernedRunnerReviewPacketTests(GovernedRunnerTestCase):
             },
             {
                 "run_id": "r-pass-1",
-                "target_id": "aoa-routing",
+                "target_id": "abyss-stack",
                 "playbook_id": "AOA-P-0011",
                 "task_class": "generated_surface",
                 "status": "pass",
@@ -915,7 +915,7 @@ class GovernedRunnerReviewPacketTests(GovernedRunnerTestCase):
             },
             {
                 "run_id": "r-pass-2",
-                "target_id": "aoa-routing",
+                "target_id": "abyss-stack",
                 "playbook_id": "AOA-P-0011",
                 "task_class": "docs_only",
                 "status": "pass",
@@ -925,8 +925,8 @@ class GovernedRunnerReviewPacketTests(GovernedRunnerTestCase):
         ]
 
         summary = self.module.promotion_summary(records, policy)
-        routing_playbook = summary["targets"]["aoa-routing"]["playbooks"]["AOA-P-0011"]
-        self.assertEqual(routing_playbook["evidence_since_run_id"], "r-pass-1")
-        self.assertEqual(routing_playbook["aggregate"]["pass_count"], 2)
-        self.assertEqual(routing_playbook["aggregate"]["post_change_validation_failure_count"], 0)
-        self.assertEqual(routing_playbook["observed_trust_state"], "canary_proven")
+        stack_playbook = summary["targets"]["abyss-stack"]["playbooks"]["AOA-P-0011"]
+        self.assertEqual(stack_playbook["evidence_since_run_id"], "r-pass-1")
+        self.assertEqual(stack_playbook["aggregate"]["pass_count"], 2)
+        self.assertEqual(stack_playbook["aggregate"]["post_change_validation_failure_count"], 0)
+        self.assertEqual(stack_playbook["observed_trust_state"], "canary_proven")

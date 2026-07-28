@@ -193,6 +193,7 @@
 
 - [ABYSS-STACK-D-0034 AoA Memo MCP Landing Plan Boundary](../ABYSS-STACK-D-0034-aoa-memo-mcp-landing-plan-boundary.md) (`docs/decisions/ABYSS-STACK-D-0034-aoa-memo-mcp-landing-plan-boundary.md`)
 - [ABYSS-STACK-D-0071 AoA Evals Local Port Write-Side MCP](../ABYSS-STACK-D-0071-aoa-evals-local-port-write-side-mcp.md) (`docs/decisions/ABYSS-STACK-D-0071-aoa-evals-local-port-write-side-mcp.md`)
+- [ABYSS-STACK-D-0101 Retire Routing Predecessor Checkout Consumers](../ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md) (`docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md`)
 
 ## diagnostics
 
@@ -237,6 +238,10 @@
 ## compatibility rollback
 
 - [ABYSS-STACK-D-0086 Receipt-Bound SDK Routing Cutover](../ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md) (`docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md`)
+
+## compatibility trials
+
+- [ABYSS-STACK-D-0101 Retire Routing Predecessor Checkout Consumers](../ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md) (`docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md`)
 
 ## federation seam
 
@@ -317,6 +322,7 @@
 - [ABYSS-STACK-D-0084 Routing Mirror Provenance Readiness](../ABYSS-STACK-D-0084-routing-mirror-provenance-readiness.md) (`docs/decisions/ABYSS-STACK-D-0084-routing-mirror-provenance-readiness.md`)
 - [ABYSS-STACK-D-0085 SDK Routing Canary Intake](../ABYSS-STACK-D-0085-sdk-routing-canary-intake.md) (`docs/decisions/ABYSS-STACK-D-0085-sdk-routing-canary-intake.md`)
 - [ABYSS-STACK-D-0086 Receipt-Bound SDK Routing Cutover](../ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md) (`docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md`)
+- [ABYSS-STACK-D-0101 Retire Routing Predecessor Checkout Consumers](../ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md) (`docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md`)
 
 ## source validation
 

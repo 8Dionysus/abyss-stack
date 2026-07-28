@@ -278,7 +278,7 @@ This profile is metadata-only for reads and does not change `langchain-api`, but
 
 ```bash
 scripts/aoa-sync-federation-surfaces --layer aoa-agents
-scripts/aoa-sync-federation-surfaces --layer aoa-routing
+scripts/aoa-sync-federation-surfaces --check --layer aoa-routing
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
 scripts/aoa-sync-federation-surfaces --layer aoa-evals
 scripts/aoa-sync-federation-surfaces --layer aoa-playbooks
@@ -504,7 +504,7 @@ Try:
 
 ```bash
 scripts/aoa-sync-federation-surfaces --layer aoa-agents
-scripts/aoa-sync-federation-surfaces --layer aoa-routing
+scripts/aoa-sync-federation-surfaces --check --layer aoa-routing
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
 scripts/aoa-sync-federation-surfaces --layer aoa-evals
 scripts/aoa-sync-federation-surfaces --layer aoa-playbooks
@@ -517,6 +517,11 @@ scripts/aoa-up --profile substrate --profile local-worker --profile federation
 scripts/aoa-smoke --profile substrate --profile local-worker --profile federation
 scripts/aoa-federated-check
 ```
+
+The `aoa-routing` command above only checks the already admitted
+SDK-canonical runtime mirror. Materialize or restore that mirror only through
+the receipt-bound `scripts/aoa-routing-cutover` workflow; profile setup never
+reads an `aoa-routing` source checkout.
 
 Preset form:
 
@@ -552,7 +557,7 @@ Try:
 
 ```bash
 scripts/aoa-sync-federation-surfaces --layer aoa-agents
-scripts/aoa-sync-federation-surfaces --layer aoa-routing
+scripts/aoa-sync-federation-surfaces --check --layer aoa-routing
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
 scripts/aoa-sync-federation-surfaces --layer aoa-evals
 scripts/aoa-sync-federation-surfaces --layer aoa-playbooks

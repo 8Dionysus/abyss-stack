@@ -176,6 +176,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Changed
 
+- Routing federation health is now check-only over the admitted SDK-canonical
+  materialization: ordinary sync cannot produce or repair routing bytes,
+  governed execution no longer exposes a predecessor mutation target, and the
+  active compatibility trial corpus routes current owner checks to `aoa-sdk`
+  while retaining old case IDs only for log compatibility.
 - Compact the diagnostic skill's global routing description while retaining
   capture, concrete target, evidence/freshness, bounded repair-handoff, and
   stored-packet review plus nearest-route distinctions in the host-visible

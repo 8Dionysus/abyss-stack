@@ -1207,6 +1207,90 @@ def check(args: argparse.Namespace) -> dict[str, Any]:
     return result
 
 
+def inspect_materialized(args: argparse.Namespace) -> dict[str, Any]:
+    """Verify current SDK-canonical bytes without reopening release admission.
+
+    The exact-input ``check`` operation remains the authority for proving that
+    a materialization matches its external subject store and trust inputs.
+    This operation verifies only the integrity and embedded provenance of the
+    already admitted runtime mirror so ordinary stack health checks never need
+    an SDK or predecessor source checkout.
+    """
+
+    target = absolute_existing_directory(
+        args.target_root,
+        "materialized routing target root",
+    )
+    required = routing_required_files(
+        absolute_existing_file(
+            args.routing_config,
+            "routing federation config",
+        )
+    )
+    manifest = read_json(
+        target / "manifest" / "federation_mirror_manifest.json",
+        "materialized routing manifest",
+    )
+    sdk_source_ref = require_git_object_id(
+        str(manifest.get("source_git_commit") or ""),
+        "materialized routing SDK source ref",
+    )
+    subject_digest = require_sha256_digest(
+        str(manifest.get("artifact_subject_digest") or ""),
+        "materialized routing subject digest",
+    )
+    predecessor = manifest.get("predecessor_rollback")
+    predecessor_source_ref = require_git_object_id(
+        str(
+            predecessor.get("source_ref")
+            if isinstance(predecessor, dict)
+            else ""
+        ),
+        "materialized routing predecessor source ref",
+    )
+    receipt = manifest.get("owner_switch_receipt")
+    if not isinstance(receipt, dict):
+        raise CutoverError(
+            "materialized routing owner-switch receipt is missing"
+        )
+    validate_owner_switch_receipt(
+        receipt,
+        sdk_source_ref=sdk_source_ref,
+        predecessor_source_ref=predecessor_source_ref,
+    )
+    subject_entries = {
+        relative: {
+            "sha256_hex": file_digest_hex(
+                resolved_tree_file(
+                    target,
+                    relative,
+                    "materialized routing file",
+                )
+            )
+        }
+        for relative in required
+    }
+    result = validate_canonical_root(
+        target,
+        required_files=required,
+        sdk_source_ref=sdk_source_ref,
+        predecessor_source_ref=predecessor_source_ref,
+        subject_digest=subject_digest,
+        subject_entries=subject_entries,
+        receipt=receipt,
+    )
+    result.update(
+        {
+            "operation": "inspect-materialized",
+            "verification_scope": (
+                "current_materialized_integrity_and_embedded_provenance"
+            ),
+            "external_release_admission_rechecked": False,
+        }
+    )
+    return result
+
+
 def inspect_active_canonical(
     target: Path,
     *,
@@ -1643,6 +1727,14 @@ def build_parser() -> argparse.ArgumentParser:
     check_parser = subparsers.add_parser("check")
     add_exact_input_args(check_parser)
     check_parser.set_defaults(handler=check)
+
+    inspect_parser = subparsers.add_parser("inspect-materialized")
+    inspect_parser.add_argument("--target-root", required=True)
+    inspect_parser.add_argument(
+        "--routing-config",
+        default=str(DEFAULT_ROUTING_CONFIG),
+    )
+    inspect_parser.set_defaults(handler=inspect_materialized)
 
     rollback_parser = subparsers.add_parser("rollback")
     rollback_parser.add_argument(
