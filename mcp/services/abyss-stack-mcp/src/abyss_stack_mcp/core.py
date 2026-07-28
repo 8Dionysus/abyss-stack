@@ -1,0 +1,1896 @@
+"""Read-only observation and candidate-plan application for abyss-stack MCP."""
+
+from __future__ import annotations
+
+import base64
+import binascii
+import errno
+import hashlib
+import json
+import os
+import re
+import stat
+from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
+from urllib.parse import parse_qsl, unquote_plus, urlsplit
+
+from pydantic import ValidationError
+
+from .contracts import (
+    ConsumerObservation,
+    EvidenceRef,
+    LinkEvidence,
+    ObservationView,
+    PlanKind,
+    PlanStep,
+    PolicyFamily,
+    RuntimeObservation,
+    RuntimePlanCandidate,
+    RuntimeSubject,
+)
+
+
+DEFAULT_OBSERVATION_PATH = Path(
+    "/srv/AbyssOS/abyss-stack/Logs/mcp/organ-runtime-observation.json"
+)
+MAX_OBSERVATION_BYTES = 2 * 1024 * 1024
+MAX_PLAN_FUTURE_SKEW = timedelta(seconds=30)
+MAX_REFERENCE_DECODE_DEPTH = 4
+_FORBIDDEN_KEYS = frozenset(
+    {
+        "access_token",
+        "api_key",
+        "authorization",
+        "bearer",
+        "client_secret",
+        "credential",
+        "credential_material",
+        "credentials",
+        "passphrase",
+        "password",
+        "private_key",
+        "refresh_token",
+        "secret",
+        "secret_access_key",
+        "sig",
+        "signature",
+        "token",
+        "x_amz_credential",
+        "x_amz_security_token",
+        "x_amz_signature",
+        "x_goog_credential",
+        "x_goog_security_token",
+        "x_goog_signature",
+    }
+)
+_FORBIDDEN_KEY_CANONICAL = frozenset(
+    re.sub(r"[^a-z0-9]", "", key.casefold()) for key in _FORBIDDEN_KEYS
+)
+_CREDENTIAL_NAMESPACE_PREFIXES = frozenset(
+    {
+        "aoa",
+        "aws",
+        "azure",
+        "client",
+        "codex",
+        "database",
+        "db",
+        "gcp",
+        "github",
+        "gitlab",
+        "google",
+        "http",
+        "key",
+        "keystore",
+        "mcp",
+        "openai",
+        "pgp",
+        "privatekey",
+        "server",
+        "service",
+        "ssh",
+        "tls",
+        "user",
+    }
+)
+_CREDENTIAL_NAMESPACE_SUFFIXES = frozenset(
+    {
+        "backup",
+        "credential",
+        "credentials",
+        "data",
+        "field",
+        "header",
+        "material",
+        "param",
+        "parameter",
+        "ref",
+        "reference",
+        "string",
+        "text",
+        "value",
+    }
+)
+_AUTH_VALUE_PREFIXES = (
+    "basic ",
+    "bearer ",
+)
+_PROVIDER_TOKEN_PREFIXES = (
+    "sk-",
+    "ghp_",
+    "gho_",
+    "ghu_",
+    "ghs_",
+    "ghr_",
+    "github_pat_",
+    "glpat-",
+    "gloas-",
+    "gldt-",
+    "glrt-",
+    "glrtr-",
+    "glcbt-",
+    "glptt-",
+    "glft-",
+    "glimt-",
+    "glagent-",
+    "glwt-",
+    "glsoat-",
+    "glffct-",
+)
+_PROVIDER_TOKEN_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_-])(?:"
+    + "|".join(
+        re.escape(prefix)
+        for prefix in sorted(
+            _PROVIDER_TOKEN_PREFIXES,
+            key=len,
+            reverse=True,
+        )
+    )
+    + r")[A-Za-z0-9_-]{8,}(?![A-Za-z0-9_-])",
+    re.IGNORECASE,
+)
+_UNAMBIGUOUS_CREDENTIAL_KEY_TOKENS = frozenset(
+    {
+        "bearer",
+        "passphrase",
+        "password",
+        "secret",
+    }
+)
+_JWT_CANDIDATE = re.compile(
+    r"(?<![A-Za-z0-9_-])"
+    r"(?P<header>[A-Za-z0-9_-]{2,})\."
+    r"(?P<payload>[A-Za-z0-9_-]{2,})\."
+    r"(?P<signature>[A-Za-z0-9_-]{2,})"
+    r"(?![A-Za-z0-9_-])"
+)
+
+
+class StackMCPError(ValueError):
+    """Fail-closed stack MCP contract or observation error."""
+
+
+def _contains_compact_jwt(value: str) -> bool:
+    for match in _JWT_CANDIDATE.finditer(value):
+        decoded_parts: list[Any] = []
+        for part_name in ("header", "payload"):
+            encoded = match.group(part_name)
+            try:
+                decoded = base64.urlsafe_b64decode(
+                    encoded + ("=" * (-len(encoded) % 4))
+                )
+                decoded_parts.append(json.loads(decoded.decode("utf-8")))
+            except (binascii.Error, UnicodeDecodeError, ValueError):
+                break
+        else:
+            header, payload = decoded_parts
+            if (
+                isinstance(header, dict)
+                and isinstance(payload, dict)
+                and isinstance(header.get("alg"), str)
+                and bool(header["alg"])
+            ):
+                return True
+    return False
+
+
+def _looks_like_secret_value(value: str) -> bool:
+    normalized = value.lstrip().lower()
+    if normalized.startswith(_AUTH_VALUE_PREFIXES):
+        return True
+    if _PROVIDER_TOKEN_PATTERN.search(value):
+        return True
+    if _contains_compact_jwt(value):
+        return True
+    return bool(
+        re.search(
+            r"-----begin [a-z0-9 ]*private key(?: block)?-----",
+            normalized,
+        )
+    )
+
+
+def _is_forbidden_credential_key(value: Any) -> bool:
+    text = str(value)
+    canonical = re.sub(r"[^a-z0-9]", "", text.casefold())
+    if canonical in _FORBIDDEN_KEY_CANONICAL:
+        return True
+
+    def has_recognized_boundary(prefix: str, suffix: str) -> bool:
+        if prefix and suffix:
+            return (
+                prefix in _CREDENTIAL_NAMESPACE_PREFIXES
+                and suffix in _CREDENTIAL_NAMESPACE_SUFFIXES
+            )
+        if prefix:
+            return prefix in _CREDENTIAL_NAMESPACE_PREFIXES
+        return suffix in _CREDENTIAL_NAMESPACE_SUFFIXES
+
+    for forbidden in _FORBIDDEN_KEY_CANONICAL:
+        start = canonical.find(forbidden)
+        while start >= 0:
+            stop = start + len(forbidden)
+            if has_recognized_boundary(canonical[:start], canonical[stop:]):
+                return True
+            start = canonical.find(forbidden, start + 1)
+
+    camel_separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", text)
+    tokens = tuple(
+        token
+        for token in (
+            re.sub(r"[^a-z0-9]", "", part.casefold())
+            for part in re.split(r"[^A-Za-z0-9]+", camel_separated)
+        )
+        if token
+    )
+    for start in range(len(tokens)):
+        for stop in range(start + 1, min(len(tokens), start + 3) + 1):
+            candidate = "".join(tokens[start:stop])
+            if candidate not in _FORBIDDEN_KEY_CANONICAL:
+                continue
+            if (
+                stop - start > 1
+                or candidate in _UNAMBIGUOUS_CREDENTIAL_KEY_TOKENS
+            ):
+                return True
+            if has_recognized_boundary(
+                "".join(tokens[:start]),
+                "".join(tokens[stop:]),
+            ):
+                return True
+    return False
+
+
+def canonical_json_bytes(value: Any) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def sha256_digest(value: Any) -> str:
+    return f"sha256:{hashlib.sha256(canonical_json_bytes(value)).hexdigest()}"
+
+
+def _decoded_reference_variants(value: str, path: str) -> tuple[str, ...]:
+    variants = [value]
+    for _ in range(MAX_REFERENCE_DECODE_DEPTH):
+        decoded = unquote_plus(variants[-1])
+        if decoded == variants[-1]:
+            return tuple(variants)
+        variants.append(decoded)
+    if unquote_plus(variants[-1]) != variants[-1]:
+        raise StackMCPError(
+            f"excessively encoded reference is forbidden at {path}"
+        )
+    return tuple(variants)
+
+
+def _reject_credential_assignments(value: str, path: str) -> None:
+    assignment_pattern = re.compile(
+        r"(?<![A-Za-z0-9_.-])"
+        r"(?P<key>[A-Za-z][A-Za-z0-9_.-]*"
+        r"(?:\s+[A-Za-z][A-Za-z0-9_.-]*){0,2})"
+        r"\s*[=:]"
+    )
+    for match in assignment_pattern.finditer(value):
+        if _is_forbidden_credential_key(match.group("key")):
+            raise StackMCPError(
+                f"secret-bearing reference assignment is forbidden at {path}"
+            )
+
+
+def _reject_reference_path_segments(
+    value: str,
+    path: str,
+    *,
+    reference_depth: int,
+) -> None:
+    if reference_depth >= MAX_REFERENCE_DECODE_DEPTH:
+        raise StackMCPError(f"nested reference depth is forbidden at {path}")
+    for index, segment in enumerate(value.split("/")):
+        if not segment:
+            continue
+        segment_path = f"{path}.path[{index}]"
+        for decoded_segment in _decoded_reference_variants(
+            segment,
+            segment_path,
+        ):
+            key_candidate = re.split(
+                r"[=:;,]",
+                decoded_segment,
+                maxsplit=1,
+            )[0]
+            if _is_forbidden_credential_key(key_candidate):
+                raise StackMCPError(
+                    "secret-bearing reference path is forbidden at "
+                    f"{segment_path}"
+                )
+            _reject_secret_material(
+                decoded_segment,
+                segment_path,
+                reference_depth=reference_depth + 1,
+            )
+
+
+def _reject_secret_material(
+    value: Any,
+    path: str = "$",
+    *,
+    reference_depth: int = 0,
+) -> None:
+    if isinstance(value, dict):
+        for index, (key, child) in enumerate(value.items()):
+            child_path = f"{path}.field[{index}]"
+            if _is_forbidden_credential_key(key):
+                raise StackMCPError(
+                    f"secret-bearing key is forbidden at {child_path}"
+                )
+            _reject_secret_material(
+                child,
+                child_path,
+                reference_depth=reference_depth,
+            )
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            _reject_secret_material(
+                child,
+                f"{path}[{index}]",
+                reference_depth=reference_depth,
+            )
+    elif isinstance(value, str):
+        if _looks_like_secret_value(value):
+            raise StackMCPError(f"secret-like value is forbidden at {path}")
+        all_decoded_variants = _decoded_reference_variants(value, path)
+        for decoded_variant in all_decoded_variants:
+            _reject_credential_assignments(decoded_variant, path)
+        decoded_variants = all_decoded_variants[1:]
+        for decoded_variant in decoded_variants:
+            if (
+                _looks_like_secret_value(decoded_variant)
+                or any(
+                    marker in decoded_variant
+                    for marker in ("://", "//", "/", "?", "#")
+                )
+            ):
+                if reference_depth >= MAX_REFERENCE_DECODE_DEPTH:
+                    raise StackMCPError(
+                        f"nested reference depth is forbidden at {path}"
+                    )
+                _reject_secret_material(
+                    decoded_variant,
+                    path,
+                    reference_depth=reference_depth + 1,
+                )
+        if "/" in value and not any(
+            marker in value for marker in ("://", "//", "?", "#")
+        ):
+            _reject_reference_path_segments(
+                value,
+                path,
+                reference_depth=reference_depth,
+            )
+        if any(marker in value for marker in ("://", "//", "?", "#")):
+            if reference_depth >= MAX_REFERENCE_DECODE_DEPTH:
+                raise StackMCPError(
+                    f"nested reference depth is forbidden at {path}"
+                )
+            try:
+                parsed = urlsplit(value)
+            except ValueError:
+                raise StackMCPError(
+                    f"unparseable URI-like reference is forbidden at {path}"
+                ) from None
+            if parsed.username is not None or parsed.password is not None:
+                raise StackMCPError(
+                    f"credential-bearing reference is forbidden at {path}"
+                )
+            _reject_reference_path_segments(
+                parsed.path,
+                path,
+                reference_depth=reference_depth,
+            )
+            for component_name, component in (
+                ("query", parsed.query),
+                ("fragment", parsed.fragment),
+            ):
+                for key, query_value in parse_qsl(
+                    component,
+                    keep_blank_values=True,
+                ):
+                    for decoded_key in _decoded_reference_variants(
+                        key,
+                        f"{path}.{component_name}.key",
+                    ):
+                        if _is_forbidden_credential_key(decoded_key):
+                            raise StackMCPError(
+                                "secret-bearing reference key is forbidden at "
+                                f"{path}.{component_name}"
+                            )
+                        if _looks_like_secret_value(decoded_key):
+                            raise StackMCPError(
+                                "secret-like reference component is forbidden at "
+                                f"{path}.{component_name}"
+                            )
+                    for decoded_value in _decoded_reference_variants(
+                        query_value,
+                        f"{path}.{component_name}.value",
+                    ):
+                        _reject_secret_material(
+                            decoded_value,
+                            f"{path}.{component_name}.value",
+                            reference_depth=reference_depth + 1,
+                        )
+
+
+class ObservationStore:
+    def __init__(self, path: str | Path | None = None) -> None:
+        configured = path or os.environ.get("ABYSS_STACK_MCP_OBSERVATION_PATH")
+        self.path = Path(configured or DEFAULT_OBSERVATION_PATH).expanduser()
+
+    def load(self) -> tuple[RuntimeObservation, str]:
+        path = self.path
+        try:
+            descriptor = os.open(
+                path,
+                os.O_RDONLY
+                | os.O_CLOEXEC
+                | os.O_NOFOLLOW
+                | getattr(os, "O_NONBLOCK", 0),
+            )
+            try:
+                file_stat = os.fstat(descriptor)
+                if not stat.S_ISREG(file_stat.st_mode):
+                    raise StackMCPError(
+                        f"runtime observation must be an explicit regular file: {path}"
+                    )
+                if file_stat.st_size > MAX_OBSERVATION_BYTES:
+                    raise StackMCPError("runtime observation exceeds the 2 MiB limit")
+                chunks: list[bytes] = []
+                remaining = MAX_OBSERVATION_BYTES + 1
+                while remaining:
+                    chunk = os.read(descriptor, min(65_536, remaining))
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                    remaining -= len(chunk)
+                raw = b"".join(chunks)
+            finally:
+                os.close(descriptor)
+            if len(raw) > MAX_OBSERVATION_BYTES:
+                raise StackMCPError("runtime observation exceeds the 2 MiB limit")
+            payload = json.loads(raw.decode("utf-8"))
+            _reject_secret_material(payload)
+            observation = RuntimeObservation.model_validate(payload)
+        except OSError as exc:
+            if exc.errno == errno.ELOOP:
+                raise StackMCPError(
+                    f"runtime observation must be an explicit regular file: {path}"
+                ) from exc
+            raise StackMCPError(f"invalid runtime observation {path}: {exc}") from exc
+        except (UnicodeError, json.JSONDecodeError):
+            raise StackMCPError(
+                f"invalid runtime observation {path}: malformed JSON"
+            ) from None
+        except ValidationError:
+            raise StackMCPError(
+                f"invalid runtime observation {path}: contract validation failed"
+            ) from None
+        digest = sha256_digest(observation.model_dump(mode="json"))
+        return observation, digest
+
+
+class StackMCPApplication:
+    def __init__(
+        self,
+        store: ObservationStore,
+        *,
+        policy_family: str = "read",
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
+        if policy_family not in {"read", "candidate"}:
+            raise StackMCPError(
+                "abyss-stack-mcp exposes only separate read or candidate processes"
+            )
+        self.store = store
+        self.policy_family = policy_family
+        self._clock = clock or (lambda: datetime.now(timezone.utc))
+
+    def catalog(
+        self,
+        *,
+        organ_id: str | None = None,
+        policy_family: PolicyFamily | None = None,
+        max_results: int = 32,
+        byte_budget: int = 32_768,
+    ) -> dict[str, Any]:
+        if self.policy_family != "read":
+            raise StackMCPError("runtime discovery is absent from this process")
+        if policy_family not in {None, "read"}:
+            raise StackMCPError(
+                "the read process exposes only read-policy observations"
+            )
+        if max_results < 1 or byte_budget < 512:
+            raise StackMCPError("catalog bounds must be positive and explicit")
+        observation, digest = self.store.load()
+        now = self._now()
+        candidates = [
+            {
+                "organ_id": subject.organ_id,
+                "policy_family": subject.policy_family,
+                "source_owner": subject.owners.source_owner,
+                "access_owner": subject.owners.access_owner,
+                "runtime_owner": subject.owners.runtime_owner,
+                "registry_state": subject.registry.registry_state,
+                "link_states": self._link_states(
+                    observation,
+                    subject,
+                    now,
+                ),
+                "freshness_state": self._observation_freshness(
+                    observation,
+                    subject,
+                    now,
+                ),
+                "views": [
+                    "identity",
+                    "parity",
+                    "process",
+                    "endpoint",
+                    "registry",
+                    "consumer",
+                    "schema",
+                    "freshness",
+                    "proof",
+                    "acceptance",
+                    "canary",
+                    "rollback",
+                    "drift",
+                ],
+            }
+            for subject in observation.subjects
+            if subject.policy_family == "read"
+            if (organ_id is None or subject.organ_id == organ_id)
+            and (policy_family is None or subject.policy_family == policy_family)
+        ]
+        selected: list[dict[str, Any]] = []
+        truncated = False
+        for candidate in candidates:
+            if len(selected) >= max_results:
+                truncated = True
+                break
+            trial = [*selected, candidate]
+            if len(canonical_json_bytes(trial)) > byte_budget:
+                truncated = True
+                break
+            selected.append(candidate)
+        return self._result(
+            observation,
+            digest,
+            primitive_id="runtime-catalog",
+            effect_class="observe",
+            payload={
+                "entries": selected,
+                "result_bytes": len(canonical_json_bytes(selected)),
+                "schema_bytes_loaded": 0,
+                "truncated": truncated,
+            },
+            now=now,
+            freshness_state=self._worst_state(
+                [entry["freshness_state"] for entry in selected] or ["exact"]
+            ),
+            freshness_scope="selected-subjects",
+        )
+
+    def inspect(
+        self,
+        organ_id: str,
+        policy_family: PolicyFamily,
+        *,
+        view: ObservationView = "identity",
+    ) -> dict[str, Any]:
+        if self.policy_family != "read":
+            raise StackMCPError("runtime inspection is absent from this process")
+        if policy_family != "read":
+            raise StackMCPError(
+                "the read process exposes only read-policy observations"
+            )
+        observation, digest = self.store.load()
+        now = self._now()
+        subject = self._find_subject(observation, organ_id, policy_family)
+        payload = self._view(observation, subject, view, now)
+        freshness_states = [
+            self._observation_freshness(observation, subject, now),
+            *self._view_link_states(
+                observation,
+                subject,
+                view,
+                now,
+            ),
+        ]
+        return self._result(
+            observation,
+            digest,
+            primitive_id="runtime-inspect",
+            effect_class="observe",
+            payload={
+                "organ_id": organ_id,
+                "policy_family": policy_family,
+                "view": view,
+                "observation": payload,
+            },
+            now=now,
+            freshness_state=self._worst_state(freshness_states),
+            freshness_scope=f"{organ_id}/{policy_family}",
+        )
+
+    def prepare_plan(
+        self,
+        organ_id: str,
+        target_policy_family: PolicyFamily,
+        plan_kind: PlanKind,
+        *,
+        expected_observation_digest: str,
+    ) -> dict[str, Any]:
+        if self.policy_family != "candidate":
+            raise StackMCPError("plan preparation is absent from the read process")
+        observation, digest = self.store.load()
+        now = self._now()
+        if digest != expected_observation_digest:
+            raise StackMCPError("observation digest drift blocks plan preparation")
+        if observation.expires_at <= now:
+            raise StackMCPError("expired runtime observation blocks plan preparation")
+        if observation.generated_at > now + MAX_PLAN_FUTURE_SKEW:
+            raise StackMCPError(
+                "future-dated runtime observation blocks plan preparation"
+            )
+        subject = self._find_subject(
+            observation,
+            organ_id,
+            target_policy_family,
+        )
+        plan_consumer: ConsumerObservation | None = None
+        if plan_kind in {"activate", "restart"}:
+            proof_consumers = self._proof_consumers(subject, now)
+            if proof_consumers:
+                plan_consumer = proof_consumers[0]
+        elif plan_kind == "rollback":
+            rollback_consumers = self._rollback_consumers(subject, now)
+            if rollback_consumers:
+                plan_consumer = rollback_consumers[0]
+        causal_links = self._subject_links(
+            subject,
+            plan_kind,
+            plan_consumer=plan_consumer,
+        )
+        causal_evidence = (
+            *subject.freshness.evidence_refs,
+            *(
+                evidence
+                for link in causal_links
+                for evidence in link.evidence_refs
+            ),
+        )
+        future_evidence = self._future_plan_evidence(
+            observation,
+            subject,
+            causal_links,
+            causal_evidence,
+            now,
+        )
+        if future_evidence:
+            raise StackMCPError(
+                "future-dated subject evidence blocks plan preparation: "
+                + ", ".join(future_evidence)
+            )
+        blockers = self._plan_blockers(subject, plan_kind, now)
+        if blockers:
+            raise StackMCPError(
+                "plan preconditions are not satisfied: " + ", ".join(blockers)
+            )
+        plan_links = self._plan_links(
+            subject,
+            plan_kind,
+            plan_consumer=plan_consumer,
+        )
+        precondition_evidence = self._plan_evidence(subject, plan_links)
+        future_evidence = self._future_plan_evidence(
+            observation,
+            subject,
+            plan_links,
+            precondition_evidence,
+            now,
+        )
+        if future_evidence:
+            raise StackMCPError(
+                "future-dated plan evidence blocks plan preparation: "
+                + ", ".join(future_evidence)
+            )
+        unsigned = {
+            "schema_version": "abyss_stack_runtime_plan_candidate_v1",
+            "plan_kind": plan_kind,
+            "policy_family": "candidate",
+            "effect_class": "prepare_candidate",
+            "execution_authorized": False,
+            "approval_required_before_execution": True,
+            "target_organ_id": subject.organ_id,
+            "target_policy_family": subject.policy_family,
+            "expected_observation_digest": digest,
+            "source_revision": subject.source.revision,
+            "package_digest": subject.package.artifact_digest,
+            "deployed_revision": subject.deploy.revision,
+            "postcondition_deploy_tree_digest": (
+                self._postcondition_deploy_tree_digest(subject, plan_kind)
+            ),
+            "exact_unit_name": subject.process.unit_name,
+            "precondition_evidence": [
+                evidence.model_dump(mode="json")
+                for evidence in precondition_evidence
+            ],
+            "steps": [
+                step.model_dump(mode="json")
+                for step in self._steps(
+                    subject,
+                    plan_kind,
+                    plan_consumer=plan_consumer,
+                )
+            ],
+            "rollback_route": subject.rollback.rollback_route,
+            "created_at": now.isoformat().replace("+00:00", "Z"),
+            "expires_at": self._plan_expiry(
+                observation,
+                subject,
+                plan_links,
+                precondition_evidence,
+                now,
+            )
+            .isoformat()
+            .replace("+00:00", "Z"),
+        }
+        plan = RuntimePlanCandidate.model_validate(
+            {"plan_id": sha256_digest(unsigned), **unsigned}
+        )
+        return self._result(
+            observation,
+            digest,
+            primitive_id="prepare-runtime-plan",
+            effect_class="prepare_candidate",
+            payload={"plan": plan.model_dump(mode="json")},
+            now=now,
+            freshness_state=self._worst_state(
+                [
+                    self._effective_freshness(subject, now),
+                    *(
+                        self._effective_link_state(link, now)
+                        for link in plan_links
+                    ),
+                ]
+            ),
+            freshness_scope=f"{organ_id}/{target_policy_family}",
+        )
+
+    def _now(self) -> datetime:
+        now = self._clock()
+        if now.tzinfo is None or now.utcoffset() is None:
+            raise StackMCPError("application clock must be timezone-aware")
+        return now.astimezone(timezone.utc)
+
+    @staticmethod
+    def _find_subject(
+        observation: RuntimeObservation,
+        organ_id: str,
+        policy_family: PolicyFamily,
+    ) -> RuntimeSubject:
+        for subject in observation.subjects:
+            if subject.organ_id == organ_id and subject.policy_family == policy_family:
+                return subject
+        raise StackMCPError(f"unknown runtime subject {organ_id!r}/{policy_family!r}")
+
+    @staticmethod
+    def _effective_link_state(
+        link: LinkEvidence,
+        now: datetime,
+        *,
+        snapshot_at: datetime | None = None,
+    ) -> str:
+        if link.state not in {
+            "exact",
+            "compatible_drift",
+            "rollback_required",
+        }:
+            return link.state
+        latest_allowed = now + MAX_PLAN_FUTURE_SKEW
+        if snapshot_at is not None:
+            latest_allowed = min(
+                latest_allowed,
+                snapshot_at + MAX_PLAN_FUTURE_SKEW,
+            )
+        if link.observed_at > latest_allowed or any(
+            evidence.observed_at > latest_allowed
+            for evidence in link.evidence_refs
+        ):
+            return "blocked"
+        link_expired = link.expires_at is not None and link.expires_at <= now
+        evidence_expired = any(
+            evidence.expires_at is not None and evidence.expires_at <= now
+            for evidence in link.evidence_refs
+        )
+        if link_expired or evidence_expired:
+            return "stale_readable"
+        return link.state
+
+    @classmethod
+    def _link_states(
+        cls,
+        observation: RuntimeObservation,
+        subject: RuntimeSubject,
+        now: datetime,
+    ) -> dict[str, str]:
+        def state(link: LinkEvidence) -> str:
+            return cls._read_link_state(observation, link, now)
+
+        return {
+            "source": state(subject.source.evidence),
+            "package": state(subject.package.evidence),
+            "deploy": cls._read_timestamped_link_state(
+                observation,
+                subject.deploy.evidence,
+                subject.deploy.deployed_at,
+                now,
+            ),
+            "process": state(subject.process.evidence),
+            "endpoint": state(subject.endpoint.evidence),
+            "registry": state(subject.registry.evidence),
+            "consumer": (
+                "unknown"
+                if not subject.consumers
+                else cls._worst_state(
+                    [state(consumer.evidence) for consumer in subject.consumers]
+                )
+            ),
+            "proof": cls._read_timestamped_link_state(
+                observation,
+                subject.proof.evidence,
+                subject.proof.evaluated_at,
+                now,
+            ),
+            "acceptance": cls._read_timestamped_link_state(
+                observation,
+                subject.acceptance.evidence,
+                subject.acceptance.accepted_at,
+                now,
+            ),
+            "canary": state(subject.canary.evidence),
+            "rollback": state(subject.rollback.evidence),
+        }
+
+    @classmethod
+    def _read_link_state(
+        cls,
+        observation: RuntimeObservation,
+        link: LinkEvidence,
+        now: datetime,
+    ) -> str:
+        return cls._effective_link_state(
+            link,
+            now,
+            snapshot_at=observation.generated_at,
+        )
+
+    @classmethod
+    def _read_timestamped_link_state(
+        cls,
+        observation: RuntimeObservation,
+        link: LinkEvidence,
+        event_at: datetime | None,
+        now: datetime,
+    ) -> str:
+        state = cls._read_link_state(
+            observation,
+            link,
+            now,
+        )
+        if event_at is None:
+            return state
+        latest_allowed = min(
+            now + MAX_PLAN_FUTURE_SKEW,
+            observation.generated_at + MAX_PLAN_FUTURE_SKEW,
+        )
+        if event_at > latest_allowed:
+            return cls._worst_state([state, "blocked"])
+        return state
+
+    @classmethod
+    def _view_link_states(
+        cls,
+        observation: RuntimeObservation,
+        subject: RuntimeSubject,
+        view: ObservationView,
+        now: datetime,
+    ) -> tuple[str, ...]:
+        states = cls._link_states(observation, subject, now)
+        selected_names = {
+            "identity": ("source", "package", "deploy"),
+            "parity": ("source", "package", "deploy"),
+            "process": ("process",),
+            "endpoint": ("endpoint",),
+            "registry": ("registry",),
+            "consumer": ("consumer",),
+            "schema": ("endpoint", "consumer"),
+            "freshness": (),
+            "proof": ("proof",),
+            "acceptance": ("acceptance",),
+            "canary": ("canary",),
+            "rollback": ("rollback",),
+            "drift": tuple(states),
+            "full": tuple(states),
+        }[view]
+        return tuple(states[name] for name in selected_names)
+
+    @staticmethod
+    def _worst_state(states: list[str]) -> str:
+        order = (
+            "exact",
+            "compatible_drift",
+            "stale_readable",
+            "unknown",
+            "blocked",
+            "rollback_required",
+        )
+        return max(states, key=order.index)
+
+    @staticmethod
+    def _effective_freshness(
+        subject: RuntimeSubject,
+        now: datetime,
+        *,
+        snapshot_at: datetime | None = None,
+    ) -> str:
+        if subject.freshness.state not in {"exact", "compatible_drift"}:
+            return subject.freshness.state
+        latest_allowed = now + MAX_PLAN_FUTURE_SKEW
+        if snapshot_at is not None:
+            latest_allowed = min(
+                latest_allowed,
+                snapshot_at + MAX_PLAN_FUTURE_SKEW,
+            )
+        if subject.freshness.observed_at > latest_allowed or any(
+            evidence.observed_at > latest_allowed
+            for evidence in subject.freshness.evidence_refs
+        ):
+            return "blocked"
+        evidence_expired = any(
+            evidence.expires_at is not None and evidence.expires_at <= now
+            for evidence in subject.freshness.evidence_refs
+        )
+        if subject.freshness.expires_at <= now or evidence_expired:
+            return "stale_readable"
+        return subject.freshness.state
+
+    def _observation_freshness(
+        self,
+        observation: RuntimeObservation,
+        subject: RuntimeSubject,
+        now: datetime,
+    ) -> str:
+        if observation.generated_at > now + MAX_PLAN_FUTURE_SKEW:
+            return "blocked"
+        effective = self._effective_freshness(
+            subject,
+            now,
+            snapshot_at=observation.generated_at,
+        )
+        if observation.expires_at <= now:
+            effective = self._worst_state([effective, "stale_readable"])
+        return effective
+
+    def _view(
+        self,
+        observation: RuntimeObservation,
+        subject: RuntimeSubject,
+        view: ObservationView,
+        now: datetime,
+    ) -> Any:
+        def with_effective_evidence(
+            value: Any,
+            link: LinkEvidence,
+            *,
+            effective_state: str | None = None,
+        ) -> Any:
+            payload = value.model_dump(mode="json")
+            payload["effective_evidence_state"] = (
+                effective_state
+                if effective_state is not None
+                else self._read_link_state(
+                    observation,
+                    link,
+                    now,
+                )
+            )
+            return payload
+
+        if view == "identity":
+            return {
+                "owners": subject.owners.model_dump(mode="json"),
+                "credential_class": subject.credential_class,
+                "effect_classes": list(subject.effect_classes),
+                "source": with_effective_evidence(
+                    subject.source,
+                    subject.source.evidence,
+                ),
+                "package": with_effective_evidence(
+                    subject.package,
+                    subject.package.evidence,
+                ),
+                "deploy": with_effective_evidence(
+                    subject.deploy,
+                    subject.deploy.evidence,
+                    effective_state=self._read_timestamped_link_state(
+                        observation,
+                        subject.deploy.evidence,
+                        subject.deploy.deployed_at,
+                        now,
+                    ),
+                ),
+            }
+        if view == "parity":
+            return {
+                "source_revision": subject.source.revision,
+                "package_source_revision": subject.package.source_revision,
+                "package_digest": subject.package.artifact_digest,
+                "deployed_revision": subject.deploy.revision,
+                "deployed_digest": subject.deploy.tree_digest,
+                "deployment_manifest_ref": subject.deploy.manifest_ref,
+                "deployment_manifest_digest": subject.deploy.manifest_digest,
+                "link_states": self._link_states(
+                    observation,
+                    subject,
+                    now,
+                ),
+            }
+        if view == "process":
+            return with_effective_evidence(
+                subject.process,
+                subject.process.evidence,
+            )
+        if view == "endpoint":
+            return with_effective_evidence(
+                subject.endpoint,
+                subject.endpoint.evidence,
+            )
+        if view == "registry":
+            return with_effective_evidence(
+                subject.registry,
+                subject.registry.evidence,
+            )
+        if view == "consumer":
+            return [
+                with_effective_evidence(consumer, consumer.evidence)
+                for consumer in subject.consumers
+            ]
+        if view == "schema":
+            link_states = self._link_states(observation, subject, now)
+            return {
+                "server_schema_digest": subject.endpoint.server_schema_digest,
+                "effective_link_states": {
+                    "endpoint": link_states["endpoint"],
+                    "consumer": link_states["consumer"],
+                },
+                "consumer_observations": [
+                    {
+                        "consumer_id": consumer.consumer_id,
+                        "observed_schema_digest": consumer.observed_schema_digest,
+                        "protocol_versions": list(consumer.observed_protocol_versions),
+                    }
+                    for consumer in subject.consumers
+                ],
+            }
+        if view == "freshness":
+            payload = subject.freshness.model_dump(mode="json")
+            payload["effective_state"] = self._observation_freshness(
+                observation,
+                subject,
+                now,
+            )
+            return payload
+        if view == "proof":
+            return with_effective_evidence(
+                subject.proof,
+                subject.proof.evidence,
+                effective_state=self._read_timestamped_link_state(
+                    observation,
+                    subject.proof.evidence,
+                    subject.proof.evaluated_at,
+                    now,
+                ),
+            )
+        if view == "acceptance":
+            return with_effective_evidence(
+                subject.acceptance,
+                subject.acceptance.evidence,
+                effective_state=self._read_timestamped_link_state(
+                    observation,
+                    subject.acceptance.evidence,
+                    subject.acceptance.accepted_at,
+                    now,
+                ),
+            )
+        if view == "canary":
+            return with_effective_evidence(
+                subject.canary,
+                subject.canary.evidence,
+            )
+        if view == "rollback":
+            return with_effective_evidence(
+                subject.rollback,
+                subject.rollback.evidence,
+            )
+        if view == "drift":
+            return {
+                "states": self._link_states(
+                    observation,
+                    subject,
+                    now,
+                ),
+                "freshness_state": self._observation_freshness(
+                    observation,
+                    subject,
+                    now,
+                ),
+                "reason_codes": sorted(
+                    {
+                        reason
+                        for link in (
+                            subject.source.evidence,
+                            subject.package.evidence,
+                            subject.deploy.evidence,
+                            subject.process.evidence,
+                            subject.endpoint.evidence,
+                            subject.registry.evidence,
+                            *(consumer.evidence for consumer in subject.consumers),
+                            subject.proof.evidence,
+                            subject.acceptance.evidence,
+                            subject.canary.evidence,
+                            subject.rollback.evidence,
+                        )
+                        for reason in link.reason_codes
+                    }
+                ),
+            }
+        payload = subject.model_dump(mode="json")
+        payload["effective_link_states"] = self._link_states(
+            observation,
+            subject,
+            now,
+        )
+        return payload
+
+    def _plan_blockers(
+        self,
+        subject: RuntimeSubject,
+        plan_kind: PlanKind,
+        now: datetime,
+    ) -> list[str]:
+        blockers: list[str] = []
+        usable_states = {"exact", "compatible_drift"}
+        effective_freshness = self._effective_freshness(subject, now)
+        if subject.freshness.expires_at <= now:
+            blockers.append("subject_freshness_expired")
+        elif effective_freshness not in usable_states:
+            blockers.append("subject_freshness_not_usable")
+        required_links = {
+            "source_identity": subject.source.evidence,
+            "package_identity": subject.package.evidence,
+            "deploy_identity": subject.deploy.evidence,
+        }
+        for name, link in required_links.items():
+            effective_state = self._effective_link_state(link, now)
+            if (
+                plan_kind == "rollback"
+                and effective_state == "rollback_required"
+            ):
+                continue
+            if effective_state not in usable_states:
+                blockers.append(f"{name}_not_usable")
+        if (
+            plan_kind in {"deploy", "activate", "restart"}
+            and subject.package.source_revision != subject.source.revision
+        ):
+            blockers.append("package_source_revision_mismatch")
+        if plan_kind in {"activate", "restart"}:
+            if subject.policy_family in {"internal_effect", "external_effect"}:
+                blockers.append("effect_activation_contracts_absent")
+            if not subject.process.active:
+                blockers.append("process_not_active")
+            if subject.registry.registry_state not in {"shadow", "admitted"}:
+                blockers.append("registry_state_blocks_runtime_plan")
+            for name, link in (
+                ("process", subject.process.evidence),
+                ("endpoint", subject.endpoint.evidence),
+                ("registry", subject.registry.evidence),
+            ):
+                if self._effective_link_state(link, now) not in usable_states:
+                    blockers.append(f"{name}_evidence_not_usable")
+            if subject.endpoint.server_schema_digest is None:
+                blockers.append("server_schema_unobserved")
+        if plan_kind == "activate":
+            compatible_consumers = self._compatible_consumers(subject, now)
+            if not subject.endpoint.ready:
+                blockers.append("endpoint_not_ready")
+            if (
+                subject.proof.verdict != "passed"
+                or self._effective_link_state(subject.proof.evidence, now)
+                not in usable_states
+            ):
+                blockers.append("central_proof_not_proven")
+            elif not self._central_proof_matches_subject(subject, now):
+                blockers.append("central_proof_target_mismatch")
+            if (
+                not subject.acceptance.accepted
+                or self._effective_link_state(subject.acceptance.evidence, now)
+                not in usable_states
+            ):
+                blockers.append("owner_acceptance_not_proven")
+            elif (
+                subject.acceptance.accepted_source_revision
+                != subject.source.revision
+                or subject.acceptance.accepted_package_digest
+                != subject.package.artifact_digest
+            ):
+                blockers.append("owner_acceptance_target_mismatch")
+            usable_consumers = [
+                consumer
+                for consumer in subject.consumers
+                if consumer.registered
+                and self._effective_link_state(consumer.evidence, now)
+                in usable_states
+            ]
+            if not usable_consumers:
+                blockers.append("no_registered_consumer")
+            elif not compatible_consumers:
+                blockers.append("no_compatible_registered_consumer")
+            if (
+                not subject.canary.succeeded
+                or not subject.canary.result_grounded
+                or self._effective_link_state(subject.canary.evidence, now)
+                not in usable_states
+            ):
+                blockers.append("canary_not_proven")
+            if (
+                not subject.rollback.ready
+                or self._effective_link_state(subject.rollback.evidence, now)
+                not in usable_states
+            ):
+                blockers.append("rollback_not_proven")
+        if plan_kind == "restart":
+            if (
+                not subject.canary.succeeded
+                or not subject.canary.result_grounded
+                or self._effective_link_state(subject.canary.evidence, now)
+                not in usable_states
+            ):
+                blockers.append("canary_evidence_not_usable")
+            if (
+                subject.proof.verdict != "passed"
+                or self._effective_link_state(subject.proof.evidence, now)
+                not in usable_states
+            ):
+                blockers.append("restart_canary_not_proven")
+            elif not self._central_proof_matches_subject(subject, now):
+                blockers.append("restart_proof_target_mismatch")
+        if plan_kind == "rollback":
+            if not subject.rollback.ready or self._effective_link_state(
+                subject.rollback.evidence, now
+            ) not in usable_states:
+                blockers.append("rollback_not_proven")
+            if (
+                self._effective_link_state(subject.registry.evidence, now)
+                not in usable_states
+            ):
+                blockers.append("registry_evidence_not_usable")
+            if not self._rollback_consumers(subject, now):
+                blockers.append("rollback_consumer_evidence_not_usable")
+        return blockers
+
+    @classmethod
+    def _compatible_consumers(
+        cls,
+        subject: RuntimeSubject,
+        now: datetime,
+    ) -> tuple[ConsumerObservation, ...]:
+        compatible = [
+            consumer
+            for consumer in subject.consumers
+            if consumer.registered
+            and cls._effective_link_state(consumer.evidence, now)
+            in {"exact", "compatible_drift"}
+            and consumer.observed_schema_digest
+            == subject.endpoint.server_schema_digest
+            and bool(
+                set(consumer.observed_protocol_versions)
+                & set(subject.endpoint.protocol_versions)
+            )
+        ]
+        return tuple(
+            sorted(
+                compatible,
+                key=lambda consumer: (
+                    consumer.consumer_id,
+                    consumer.registration_ref,
+                ),
+            )
+        )
+
+    @classmethod
+    def _proof_consumers(
+        cls,
+        subject: RuntimeSubject,
+        now: datetime,
+    ) -> tuple[ConsumerObservation, ...]:
+        return tuple(
+            consumer
+            for consumer in cls._compatible_consumers(subject, now)
+            if consumer.registration_ref
+            == subject.proof.proved_consumer_registration_ref
+        )
+
+    @classmethod
+    def _central_proof_matches_subject(
+        cls,
+        subject: RuntimeSubject,
+        now: datetime,
+    ) -> bool:
+        return bool(cls._proof_consumers(subject, now)) and (
+            subject.proof.proved_source_revision == subject.source.revision
+            and subject.package.source_revision == subject.source.revision
+            and subject.proof.proved_source_tree_digest
+            == subject.source.tree_digest
+            and subject.proof.proved_package_digest
+            == subject.package.artifact_digest
+            and subject.proof.proved_deploy_revision == subject.deploy.revision
+            and subject.proof.proved_deploy_tree_digest
+            == subject.deploy.tree_digest
+            and subject.proof.proved_deploy_manifest_digest
+            == subject.deploy.manifest_digest
+            and subject.proof.proved_process_identity
+            == subject.process.process_identity
+            and subject.proof.proved_server_schema_digest
+            == subject.endpoint.server_schema_digest
+            and subject.proof.proved_canary_route == subject.canary.canary_route
+            and subject.proof.proved_canary_ref == subject.canary.canary_ref
+        )
+
+    @classmethod
+    def _rollback_consumers(
+        cls,
+        subject: RuntimeSubject,
+        now: datetime,
+    ) -> tuple[ConsumerObservation, ...]:
+        usable = [
+            consumer
+            for consumer in subject.consumers
+            if consumer.registration_ref
+            == subject.rollback.last_known_good_consumer_registration_ref
+            if cls._effective_link_state(consumer.evidence, now)
+            in {"exact", "compatible_drift"}
+            if any(
+                evidence.evidence_ref == consumer.registration_ref
+                for evidence in consumer.evidence.evidence_refs
+            )
+        ]
+        return tuple(
+            sorted(
+                usable,
+                key=lambda consumer: (
+                    consumer.consumer_id,
+                    consumer.registration_ref,
+                ),
+            )
+        )
+
+    @staticmethod
+    def _subject_links(
+        subject: RuntimeSubject,
+        plan_kind: PlanKind,
+        *,
+        plan_consumer: ConsumerObservation | None,
+    ) -> tuple[LinkEvidence, ...]:
+        links = [
+            subject.source.evidence,
+            subject.package.evidence,
+            subject.deploy.evidence,
+        ]
+        if plan_kind in {"activate", "restart"}:
+            links.extend(
+                (
+                    subject.process.evidence,
+                    subject.endpoint.evidence,
+                    subject.registry.evidence,
+                )
+            )
+        if plan_kind == "activate":
+            links.extend(
+                (
+                    subject.proof.evidence,
+                    subject.acceptance.evidence,
+                    *(
+                        (plan_consumer.evidence,)
+                        if plan_consumer is not None
+                        else ()
+                    ),
+                    subject.canary.evidence,
+                    subject.rollback.evidence,
+                )
+            )
+        elif plan_kind == "rollback":
+            links.extend(
+                (
+                    subject.registry.evidence,
+                    *(
+                        (plan_consumer.evidence,)
+                        if plan_consumer is not None
+                        else ()
+                    ),
+                    subject.rollback.evidence,
+                )
+            )
+        elif plan_kind == "restart":
+            links.extend(
+                (
+                    subject.proof.evidence,
+                    *(
+                        (plan_consumer.evidence,)
+                        if plan_consumer is not None
+                        else ()
+                    ),
+                    subject.canary.evidence,
+                )
+            )
+        return tuple(links)
+
+    @staticmethod
+    def _plan_links(
+        subject: RuntimeSubject,
+        plan_kind: PlanKind,
+        *,
+        plan_consumer: ConsumerObservation | None,
+    ) -> tuple[LinkEvidence, ...]:
+        links = [
+            subject.source.evidence,
+            subject.package.evidence,
+            subject.deploy.evidence,
+        ]
+        if plan_kind in {"activate", "restart"}:
+            links.extend(
+                (
+                    subject.process.evidence,
+                    subject.endpoint.evidence,
+                    subject.registry.evidence,
+                )
+            )
+        if plan_kind == "activate":
+            if plan_consumer is None:
+                raise StackMCPError(
+                    "activation plan requires one exact compatible consumer"
+                )
+            links.extend(
+                (
+                    subject.proof.evidence,
+                    subject.acceptance.evidence,
+                    plan_consumer.evidence,
+                    subject.canary.evidence,
+                    subject.rollback.evidence,
+                )
+            )
+        elif plan_kind == "rollback":
+            if plan_consumer is None:
+                raise StackMCPError(
+                    "rollback plan requires one usable consumer observation"
+                )
+            links.extend(
+                (
+                    subject.registry.evidence,
+                    plan_consumer.evidence,
+                    subject.rollback.evidence,
+                )
+            )
+        elif plan_kind == "restart":
+            if plan_consumer is None:
+                raise StackMCPError(
+                    "restart plan requires the proof-selected compatible consumer"
+                )
+            links.extend(
+                (
+                    subject.proof.evidence,
+                    plan_consumer.evidence,
+                    subject.canary.evidence,
+                )
+            )
+        return tuple(links)
+
+    @staticmethod
+    def _plan_evidence(
+        subject: RuntimeSubject,
+        links: tuple[LinkEvidence, ...],
+    ) -> tuple[EvidenceRef, ...]:
+        unique: dict[tuple[str, str, str], EvidenceRef] = {}
+
+        def retain_earliest_expiry(evidence: EvidenceRef) -> None:
+            key = (
+                evidence.owner,
+                evidence.evidence_ref,
+                evidence.revision,
+            )
+            retained = unique.get(key)
+            if (
+                retained is not None
+                and evidence.observed_at != retained.observed_at
+            ):
+                raise StackMCPError(
+                    "conflicting timestamps for duplicate plan evidence"
+                )
+            if retained is None or (
+                evidence.expires_at is not None
+                and (
+                    retained.expires_at is None
+                    or evidence.expires_at < retained.expires_at
+                )
+            ):
+                unique[key] = evidence
+
+        for link in links:
+            for evidence in link.evidence_refs:
+                retain_earliest_expiry(evidence)
+        for evidence in subject.freshness.evidence_refs:
+            retain_earliest_expiry(evidence)
+        return tuple(unique[key] for key in sorted(unique))
+
+    @staticmethod
+    def _plan_expiry(
+        observation: RuntimeObservation,
+        subject: RuntimeSubject,
+        links: tuple[LinkEvidence, ...],
+        precondition_evidence: tuple[EvidenceRef, ...],
+        now: datetime,
+    ) -> datetime:
+        expiries = [
+            now + timedelta(minutes=10),
+            observation.expires_at,
+            subject.freshness.expires_at,
+        ]
+        expiries.extend(
+            link.expires_at for link in links if link.expires_at is not None
+        )
+        expiries.extend(
+            evidence.expires_at
+            for evidence in precondition_evidence
+            if evidence.expires_at is not None
+        )
+        return min(expiries)
+
+    @staticmethod
+    def _future_plan_evidence(
+        observation: RuntimeObservation,
+        subject: RuntimeSubject,
+        links: tuple[LinkEvidence, ...],
+        precondition_evidence: tuple[EvidenceRef, ...],
+        now: datetime,
+    ) -> tuple[str, ...]:
+        latest_allowed = min(
+            now + MAX_PLAN_FUTURE_SKEW,
+            observation.generated_at + MAX_PLAN_FUTURE_SKEW,
+        )
+        future: set[str] = set()
+        if subject.deploy.deployed_at > latest_allowed:
+            future.add("deploy.deployed_at")
+        if subject.freshness.observed_at > latest_allowed:
+            future.add("freshness.observed_at")
+        if (
+            any(link is subject.proof.evidence for link in links)
+            and subject.proof.evaluated_at is not None
+            and subject.proof.evaluated_at > latest_allowed
+        ):
+            future.add("proof.evaluated_at")
+        if (
+            any(link is subject.acceptance.evidence for link in links)
+            and subject.acceptance.accepted_at is not None
+            and subject.acceptance.accepted_at > latest_allowed
+        ):
+            future.add("acceptance.accepted_at")
+        if any(link.observed_at > latest_allowed for link in links):
+            future.add("required_link.observed_at")
+        if any(
+            evidence.observed_at > latest_allowed
+            for evidence in precondition_evidence
+        ):
+            future.add("evidence_ref.observed_at")
+        return tuple(sorted(future))
+
+    @staticmethod
+    def _postcondition_deploy_tree_digest(
+        subject: RuntimeSubject,
+        plan_kind: PlanKind,
+    ) -> str:
+        if plan_kind == "sync":
+            return subject.source.expected_sync_tree_digest
+        if plan_kind == "deploy":
+            return subject.package.expected_deploy_tree_digest
+        if plan_kind == "rollback":
+            target = subject.rollback.last_known_good_deploy_tree_digest
+            if target is None:
+                raise StackMCPError(
+                    "rollback plan requires a last-known-good deploy tree digest"
+                )
+            return target
+        return subject.deploy.tree_digest
+
+    @staticmethod
+    def _steps(
+        subject: RuntimeSubject,
+        plan_kind: PlanKind,
+        *,
+        plan_consumer: ConsumerObservation | None,
+    ) -> tuple[PlanStep, ...]:
+        if plan_kind == "activate" and plan_consumer is None:
+            raise StackMCPError("activation plan requires a compatible consumer")
+        if plan_kind == "restart" and plan_consumer is None:
+            raise StackMCPError(
+                "restart plan requires the proof-selected compatible consumer"
+            )
+        if plan_kind == "rollback" and plan_consumer is None:
+            raise StackMCPError("rollback plan requires a usable consumer")
+        actions = {
+            "sync": (
+                ("verify-source-revision", subject.source.revision),
+                ("verify-source-tree-digest", subject.source.tree_digest),
+                ("preview-config-sync", subject.deploy.manifest_ref),
+                ("apply-exact-config-sync", subject.deploy.manifest_ref),
+                (
+                    "compare-deployed-digest",
+                    subject.source.expected_sync_tree_digest,
+                ),
+            ),
+            "deploy": (
+                (
+                    "verify-package-source-revision",
+                    subject.package.source_revision,
+                ),
+                ("verify-package-digest", subject.package.artifact_digest),
+                (
+                    "stage-exact-package",
+                    f"{subject.package.name}@{subject.package.artifact_digest}",
+                ),
+                (
+                    "deploy-staged-package",
+                    f"{subject.package.name}@{subject.package.artifact_digest}",
+                ),
+                (
+                    "compare-deployed-digest",
+                    subject.package.expected_deploy_tree_digest,
+                ),
+            ),
+            "activate": (
+                (
+                    "verify-process-identity",
+                    subject.process.process_identity or "missing",
+                ),
+                (
+                    "verify-central-proof",
+                    subject.proof.proof_ref or "missing",
+                ),
+                (
+                    "verify-owner-acceptance",
+                    subject.acceptance.acceptance_ref or "missing",
+                ),
+                (
+                    (
+                        "admit-registry-entry"
+                        if subject.registry.registry_state == "shadow"
+                        else "verify-registry-admission"
+                    ),
+                    (
+                        f"{subject.registry.registry_id}"
+                        f"@{subject.registry.registry_digest}"
+                    ),
+                ),
+                (
+                    "verify-consumer-registration",
+                    (
+                        plan_consumer.registration_ref
+                        if plan_consumer is not None
+                        else "missing-compatible-consumer"
+                    ),
+                ),
+                ("run-grounded-canary", subject.canary.canary_route),
+            ),
+            "restart": (
+                (
+                    "verify-central-proof",
+                    subject.proof.proof_ref or "missing",
+                ),
+                (
+                    "verify-consumer-registration",
+                    (
+                        plan_consumer.registration_ref
+                        if plan_consumer is not None
+                        else "missing-compatible-consumer"
+                    ),
+                ),
+                ("snapshot-exact-process", subject.process.unit_name),
+                ("restart-exact-unit", subject.process.unit_name),
+                ("run-grounded-canary", subject.canary.canary_route),
+            ),
+            "rollback": (
+                (
+                    "deny-discovery",
+                    (
+                        f"{subject.registry.registry_id}"
+                        f"@{subject.registry.registry_digest}"
+                    ),
+                ),
+                (
+                    "deny-activation",
+                    f"{subject.organ_id}/{subject.policy_family}",
+                ),
+                (
+                    "verify-rollback-proof",
+                    subject.rollback.proof_ref or "missing",
+                ),
+                (
+                    "restore-exact-package",
+                    subject.rollback.last_known_good_package_digest or "missing",
+                ),
+                (
+                    "restore-deployed-tree",
+                    subject.rollback.last_known_good_deploy_tree_digest or "missing",
+                ),
+                (
+                    "restore-deploy-revision",
+                    subject.rollback.last_known_good_deploy_revision or "missing",
+                ),
+                (
+                    "restore-deployment-manifest",
+                    (
+                        subject.rollback.last_known_good_deploy_manifest_ref
+                        or "missing"
+                    ),
+                ),
+                (
+                    "verify-deployment-manifest-digest",
+                    (
+                        subject.rollback.last_known_good_deploy_manifest_digest
+                        or "missing"
+                    ),
+                ),
+                (
+                    "restore-unit",
+                    subject.rollback.last_known_good_unit_name or "missing.service",
+                ),
+                (
+                    "restore-credential-class",
+                    subject.rollback.last_known_good_credential_class or "missing",
+                ),
+                (
+                    "restore-executable",
+                    subject.rollback.last_known_good_executable_ref or "missing",
+                ),
+                (
+                    "restart-restored-process",
+                    subject.rollback.last_known_good_unit_name or "missing.service",
+                ),
+                (
+                    "verify-process-identity",
+                    subject.rollback.last_known_good_process_identity or "missing",
+                ),
+                (
+                    "restore-consumer-registration",
+                    (
+                        subject.rollback.last_known_good_consumer_registration_ref
+                        or "missing-rollback-consumer"
+                    ),
+                ),
+                (
+                    "run-grounded-canary",
+                    subject.rollback.last_known_good_canary_route or "missing",
+                ),
+            ),
+        }[plan_kind]
+        return tuple(
+            PlanStep(
+                order=index,
+                action=action,
+                exact_target=target,
+                expected_effect=f"prepare {action} for operator review",
+                stop_on=("unexpected-drift", "precondition-mismatch"),
+            )
+            for index, (action, target) in enumerate(actions, start=1)
+        )
+
+    def _result(
+        self,
+        observation: RuntimeObservation,
+        digest: str,
+        *,
+        primitive_id: str,
+        effect_class: str,
+        payload: dict[str, Any],
+        now: datetime,
+        freshness_state: str,
+        freshness_scope: str,
+    ) -> dict[str, Any]:
+        stale = observation.expires_at <= now
+        future = observation.generated_at > now + MAX_PLAN_FUTURE_SKEW
+        effective_freshness = freshness_state
+        if stale:
+            effective_freshness = self._worst_state(
+                [effective_freshness, "stale_readable"]
+            )
+        if future:
+            effective_freshness = self._worst_state(
+                [effective_freshness, "blocked"]
+            )
+        trace_id = sha256_digest(
+            {
+                "observation_digest": digest,
+                "primitive_id": primitive_id,
+                "payload": payload,
+            }
+        )
+        return {
+            "metadata": {
+                "contract_version": "abyss_stack_mcp_result_v1",
+                "source_owner": "abyss-stack",
+                "access_owner": "abyss-stack",
+                "runtime_owner": "abyss-stack",
+                "authority_ceiling": self.policy_family,
+                "observation_digest": digest,
+                "provider_watermark": observation.provider_watermark,
+                "observed_at": observation.generated_at.isoformat().replace(
+                    "+00:00", "Z"
+                ),
+                "freshness_state": effective_freshness,
+                "freshness_scope": freshness_scope,
+                "effect_class": effect_class,
+                "applied_state": "not_applied",
+                "execution_authorized": False,
+                "warnings": [
+                    *(
+                        ["runtime-observation-expired"]
+                        if stale
+                        else []
+                    ),
+                    *(
+                        ["runtime-observation-future-dated"]
+                        if future
+                        else []
+                    ),
+                ],
+                "trace_id": trace_id,
+            },
+            "owner_payload": payload,
+        }

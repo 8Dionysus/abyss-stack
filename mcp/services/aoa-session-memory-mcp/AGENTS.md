@@ -63,6 +63,14 @@ It does not own:
 - Search, atlas, and diagnostics are route companions. Raw transcript and
   segment indexes remain stronger evidence.
 - Maintenance remains outside MCP and requires explicit operator intent.
+- Keep the HTTP read contour owner-specific:
+  `AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN`,
+  `aoa-session-memory-mcp-read-bearer-token`,
+  `mcp:aoa-session-memory:read`, and
+  `aoa-loopback-codex:aoa-session-memory:read`.
+- Open generated SQLite fast paths with `mode=ro` and `query_only`; the
+  filesystem-read-only owner unit must remain executable without writable
+  projection paths.
 
 ## Run
 

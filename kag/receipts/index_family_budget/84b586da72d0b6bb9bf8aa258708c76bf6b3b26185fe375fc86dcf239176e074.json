@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 17491540,
+  "allowed_tracked_bytes": 25208898,
+  "approved_by": "repository-owner",
+  "base_ref": "e3f35444e4b527f26eeb9118f4bfeffff6c695d6",
+  "changed_generated_bytes": 17491540,
+  "changed_generated_files": 274,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "84b586da72d0b6bb9bf8aa258708c76bf6b3b26185fe375fc86dcf239176e074",
+  "reason": "Refresh the exact CI-pinned repository-local KAG family after server-side read-policy observation isolation without raising the standing budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 25208898,
+  "tracked_bytes_max": 24117248
+}

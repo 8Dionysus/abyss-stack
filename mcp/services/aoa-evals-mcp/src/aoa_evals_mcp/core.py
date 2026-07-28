@@ -37,6 +37,45 @@ LOCAL_PORT_INVENTORY_ACCEPTED_CONTRACT_SCHEMAS = {
     LOCAL_PORT_INVENTORY_CONTRACT_SCHEMA_V2,
 }
 LOCAL_PORT_DISCOVERY_DEFAULT_MAX_DEPTH = 4
+
+
+def _require_candidate_write_root(path: Path, *, label: str) -> None:
+    policy_family = os.environ.get("AOA_MCP_POLICY_FAMILY", "").strip()
+    if not policy_family:
+        return
+    if policy_family == "read":
+        raise PermissionError(f"{label} is denied in the MCP read contour")
+    if policy_family != "candidate":
+        raise PermissionError(
+            "AOA_MCP_POLICY_FAMILY must be read or candidate for MCP writes"
+        )
+    raw_roots = os.environ.get("AOA_EVALS_MCP_CANDIDATE_ROOTS", "").strip()
+    if not raw_roots:
+        raise PermissionError(
+            "eval candidate writes require AOA_EVALS_MCP_CANDIDATE_ROOTS"
+        )
+    resolved_path = path.expanduser().resolve()
+    for raw_root in raw_roots.split(os.pathsep):
+        if not raw_root:
+            continue
+        configured_root = Path(raw_root).expanduser()
+        if not configured_root.is_absolute():
+            raise PermissionError(
+                "AOA_EVALS_MCP_CANDIDATE_ROOTS must contain absolute paths"
+            )
+        if configured_root.is_symlink():
+            raise PermissionError(
+                "AOA_EVALS_MCP_CANDIDATE_ROOTS must not contain symlink roots"
+            )
+        resolved_root = configured_root.resolve()
+        try:
+            resolved_path.relative_to(resolved_root)
+        except ValueError:
+            continue
+        return
+    raise PermissionError(
+        f"{label} must stay inside an allowlisted eval candidate root"
+    )
 LOCAL_PORT_INVENTORY_BUILDER = Path("scripts/build_local_eval_port_inventory.py")
 LOCAL_SUITE_EXECUTION_STATES = ("absent", "invalid", "stale", "ready")
 LOCAL_SUITE_EXECUTION_AGGREGATE_PRIORITY = ("invalid", "stale", "ready", "absent")
@@ -2323,6 +2362,10 @@ class AoAEvalsMCPState:
         applied = bool(apply and write_allowed)
         port_activation_applied = False
         if apply and write_allowed:
+            _require_candidate_write_root(
+                repo_root / "evals",
+                label="local eval intake write",
+            )
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(json.dumps(packet, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             port_activation_applied = self._maybe_activate_port(repo_root, apply=True)
@@ -2395,6 +2438,10 @@ class AoAEvalsMCPState:
             "authority_boundary": LOCAL_WRITE_AUTHORITY_BOUNDARY,
         }
         if apply and write_allowed:
+            _require_candidate_write_root(
+                repo_root / "evals",
+                label=f"local eval {directory_name} write",
+            )
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(_note_markdown(frontmatter, str(title).strip(), body_markdown), encoding="utf-8")
             port_activation_applied = self._maybe_activate_port(repo_root, apply=True)

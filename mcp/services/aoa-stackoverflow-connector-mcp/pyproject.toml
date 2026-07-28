@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aoa-stackoverflow-connector-mcp"
+version = "0.1.0"
+description = "Read-only MCP access plane for the AoA StackOverflow connector"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "mcp>=1.27.2,<2",
+]
+
+[project.scripts]
+aoa-stackoverflow-connector-mcp = "aoa_stackoverflow_connector_mcp.cli:main"
+aoa-stackoverflow-connector-mcp-server = "aoa_stackoverflow_connector_mcp.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

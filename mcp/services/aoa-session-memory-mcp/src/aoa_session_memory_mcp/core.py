@@ -122,9 +122,42 @@ MCP_SERVER_LOADED_SHA256 = globals().get("MCP_SERVER_LOADED_SHA256") or _file_sh
 
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
 DEFAULT_TIMEOUT_SECONDS = 20.0
-HTTP_BEARER_TOKEN_ENV_VAR = "AOA_MCP_HTTP_BEARER_TOKEN"
-HTTP_BEARER_CREDENTIAL_NAME = "aoa-mcp-http-bearer-token"
+HTTP_BEARER_TOKEN_ENV_VAR = "AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN"
+HTTP_BEARER_CREDENTIAL_NAME = "aoa-session-memory-mcp-read-bearer-token"
 HTTP_BEARER_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9._~-]{43,512}")
+MCP_ARCHIVE_READ_COMMANDS = frozenset(
+    {
+        "agent-closeouts",
+        "agent-progress-updates",
+        "agent-reasoning-windows",
+        "agent-responses",
+        "answer-neighborhood",
+        "entity-usage-audit",
+        "entity-usage-neighborhood",
+        "entity-usage-scenario-audit",
+        "goal-lifecycles",
+        "literal-query-plan",
+        "live-scenario-audit",
+        "live-scenario-corpus",
+        "maintenance-status",
+        "rehydrate",
+        "retrieve",
+        "route-readiness",
+        "search",
+        "search-operational-direct-event-rollup-query",
+        "search-operational-route-rollup-query",
+        "search-provider-status",
+        "task-episodes",
+        "trace-route",
+        "usage-chain",
+    }
+)
+MCP_ARCHIVE_FORBIDDEN_FLAG_PREFIXES = (
+    "--apply",
+    "--refresh-host",
+    "--refresh-state",
+    "--write",
+)
 STATUS_TIMEOUT_SECONDS = 60.0
 SEARCH_TIMEOUT_SECONDS = 60.0
 EVIDENCE_PACKET_TIMEOUT_SECONDS = 90.0
@@ -273,7 +306,7 @@ def _http_bearer_next_action(configured_server: dict[str, Any]) -> str:
         )
     return (
         "Make the configured bearer credential available to the Codex process through "
-        "AOA_MCP_HTTP_BEARER_TOKEN without printing it."
+        "AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN without printing it."
     )
 
 ALLOWED_TRACE_KINDS = {
@@ -3448,7 +3481,7 @@ class AoASessionMemoryMCPState:
             },
             "configured_stdio_check_route": "python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py",
             "configured_transport_check_route": (
-                "systemctl --user status aoa-mcp-http@aoa-session-memory.service"
+                "systemctl --user status aoa-organ-mcp-read@aoa-session-memory.service"
                 if shared_http
                 else "python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py"
             ),
@@ -3464,6 +3497,18 @@ class AoASessionMemoryMCPState:
         allow_nonzero_json: bool = False,
         timeout_seconds: float | None = None,
     ) -> dict[str, Any]:
+        if command not in MCP_ARCHIVE_READ_COMMANDS:
+            raise ValueError(
+                f"archive command is not in the MCP read allowlist: {command}"
+            )
+        for argument in args or []:
+            if any(
+                argument.startswith(prefix)
+                for prefix in MCP_ARCHIVE_FORBIDDEN_FLAG_PREFIXES
+            ):
+                raise ValueError(
+                    f"persistent archive flag is forbidden through MCP: {argument}"
+                )
         argv = self._archive_argv(command, args)
         effective_timeout = float(timeout_seconds if timeout_seconds is not None else self.timeout_seconds)
         output = self.command_runner(argv, effective_timeout)
@@ -4206,7 +4251,11 @@ class AoASessionMemoryMCPState:
             return None
         conn: sqlite3.Connection | None = None
         try:
-            conn = sqlite3.connect(str(db_path))
+            conn = sqlite3.connect(
+                f"{db_path.resolve().as_uri()}?mode=ro",
+                uri=True,
+            )
+            conn.execute("PRAGMA query_only = ON")
             conn.row_factory = sqlite3.Row
             if not self._sqlite_table_exists(conn, "documents"):
                 return None
@@ -6151,7 +6200,11 @@ class AoASessionMemoryMCPState:
         where = " AND ".join(filters)
         conn: sqlite3.Connection | None = None
         try:
-            conn = sqlite3.connect(str(db_path))
+            conn = sqlite3.connect(
+                f"{db_path.resolve().as_uri()}?mode=ro",
+                uri=True,
+            )
+            conn.execute("PRAGMA query_only = ON")
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 f"""

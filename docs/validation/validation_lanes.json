@@ -156,6 +156,26 @@
     ],
     "mcp_services": [
       {
+        "label": "check mcp protocol lab status",
+        "command": ["python", "mcp/protocol-lab/scripts/build_protocol_lab_status.py", "--check"]
+      },
+      {
+        "label": "validate mcp protocol lab",
+        "command": ["python", "mcp/protocol-lab/scripts/validate_protocol_lab.py"]
+      },
+      {
+        "label": "test mcp protocol lab",
+        "command": ["python", "-m", "pytest", "-q", "mcp/protocol-lab/tests"]
+      },
+      {
+        "label": "validate abyss stack mcp",
+        "command": ["python", "mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py"]
+      },
+      {
+        "label": "test abyss stack mcp",
+        "command": ["python", "-m", "pytest", "-q", "mcp/services/abyss-stack-mcp/tests"]
+      },
+      {
         "label": "validate aoa memo mcp",
         "command": ["python", "mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py"]
       },
@@ -242,6 +262,30 @@
       {
         "label": "test aoa discord connector mcp",
         "command": ["python", "-m", "pytest", "-q", "mcp/services/aoa-discord-connector-mcp/tests"]
+      },
+      {
+        "label": "validate aoa course connector mcp",
+        "command": ["python", "mcp/services/aoa-course-connector-mcp/scripts/validate_course_connector_mcp.py"]
+      },
+      {
+        "label": "test aoa course connector mcp",
+        "command": ["python", "-m", "pytest", "-q", "mcp/services/aoa-course-connector-mcp/tests"]
+      },
+      {
+        "label": "validate aoa stackoverflow connector mcp",
+        "command": ["python", "mcp/services/aoa-stackoverflow-connector-mcp/scripts/validate_stackoverflow_connector_mcp.py"]
+      },
+      {
+        "label": "test aoa stackoverflow connector mcp",
+        "command": ["python", "-m", "pytest", "-q", "mcp/services/aoa-stackoverflow-connector-mcp/tests"]
+      },
+      {
+        "label": "validate aoa xda connector mcp",
+        "command": ["python", "mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py"]
+      },
+      {
+        "label": "test aoa xda connector mcp",
+        "command": ["python", "-m", "pytest", "-q", "mcp/services/aoa-xda-connector-mcp/tests"]
       }
     ],
     "shellcheck": [

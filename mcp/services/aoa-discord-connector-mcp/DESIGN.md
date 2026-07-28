@@ -28,3 +28,6 @@ applicability/warning reports, and local-search policy.
 The wrapper marks packets as `error` when connector output does not prove local,
 read-only behavior, especially when `network_touched=false` or
 `policy.internal_search_used=false` is missing.
+
+The HTTP lifecycle uses an exact Discord read credential and a read-only,
+no-network managed process rather than the compatibility shared contour.

@@ -45,7 +45,8 @@ MCP prompts, Tasks, or Apps, so the access plane publishes none.
 
 ## Transport
 
-Stdio is the portable process-local route. Streamable HTTP is a shared
-single-operator loopback route protected by bearer authentication, Host and
-Origin validation, fixed per-call bounds, and backend timeouts. Both
-transports expose the same tools, resources, and result contracts.
+Stdio is the portable process-local route. Streamable HTTP is an
+owner-specific read contour protected by the `aoa-kag` read bearer, scope,
+client identity, Host validation, Origin validation, fixed per-call bounds,
+and backend timeouts. Both transports expose the same tools, resources, and
+result contracts.

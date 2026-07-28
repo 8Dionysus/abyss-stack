@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 18376809,
+  "allowed_tracked_bytes": 25365170,
+  "approved_by": "repository-owner",
+  "base_ref": "0c930170c474eaaee1dc71d56ef4e00cc3b7e7e8",
+  "changed_generated_bytes": 18376809,
+  "changed_generated_files": 287,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "c892046a52729f5ad949dcce7063508cd59a7b7702d0e9be26a7cf6b0cf1f13e",
+  "reason": "Refresh the abyss-stack KAG family after serializing MCP Configs sync with runtime publication.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 25365170,
+  "tracked_bytes_max": 24117248
+}

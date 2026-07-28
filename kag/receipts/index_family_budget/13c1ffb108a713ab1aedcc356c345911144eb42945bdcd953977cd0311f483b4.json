@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 17740555,
+  "allowed_tracked_bytes": 25261424,
+  "approved_by": "repository-owner",
+  "base_ref": "296db48a8d3582bf3bc97b77b9edcf3b2d3560e6",
+  "changed_generated_bytes": 17740555,
+  "changed_generated_files": 277,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "13c1ffb108a713ab1aedcc356c345911144eb42945bdcd953977cd0311f483b4",
+  "reason": "Refresh the current-main KAG family after binding canary evidence to deployment, selecting the proof-named consumer, and safely resolving the bootstrap Python symlink without raising the budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 25261424,
+  "tracked_bytes_max": 24117248
+}

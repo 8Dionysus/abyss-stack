@@ -7,7 +7,8 @@
 | `aoa-memo` | reviewed memory truth and memory operation contracts | raw session archive or live host facts |
 | `.aoa` | raw session evidence, compaction intervals, indexes, rehydration evidence | reviewed memory truth |
 | local `memo/` ports | candidates, receipts, exports, local notes | central promotion |
-| `aoa-memo-mcp` | access, search, brief, candidate helper, local port index helper, intake export helper, validation helper | authority to promote durable memory |
+| `aoa-memo-mcp` read contour | access, search, brief, validation, pending-export inspection, non-writing plans | persistent local or durable memory mutation |
+| `aoa-memo-mcp` candidate contour | allowlisted local candidate, generated-index, export, and forwarding-receipt writes | durable corpus mutation, acceptance, arbitrary local-port discovery-as-authority |
 
 ## Interface
 
@@ -15,7 +16,11 @@ Local ports send candidates forward through reviewed intake.
 `aoa-memo-mcp` can create and validate a candidate, build or check the local
 port index, prepare reviewed-intake exports, and write local forwarding-check
 receipts.
-The reviewed landing belongs to `aoa-memo`.
+The reviewed landing belongs to `aoa-memo`. Read and candidate tools never
+share one MCP endpoint or bearer. The read process cannot enumerate persistent
+tools and its systemd filesystem is read-only. The candidate process has a
+finite application root allowlist plus exact systemd write paths; a newly
+discovered port remains unwritable until those source-owned lists change.
 
 Packet tools are confined to known local `memo/` ports. Candidate, export, and
 receipt references are local packet refs, not arbitrary absolute paths, and

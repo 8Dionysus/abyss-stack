@@ -12,6 +12,13 @@ restart_now=0
 link_all_user_units=0
 link_system_units=0
 provision_mcp_http_auth=0
+provision_organ_mcp_read_auth=0
+provision_organ_mcp_candidate_auth=0
+provision_abyss_stack_mcp_auth=0
+rotate_abyss_stack_mcp_auth=0
+provision_abyss_stack_mcp_runtime=0
+verify_abyss_stack_mcp_runtime=0
+launch_verified_abyss_stack_mcp=0
 install_mcp_http_codex_client=0
 remove_mcp_http_codex_client=0
 preset_spec=""
@@ -80,6 +87,27 @@ while (($#)); do
     --provision-mcp-http-auth)
       provision_mcp_http_auth=1
       ;;
+    --provision-organ-mcp-read-auth)
+      provision_organ_mcp_read_auth=1
+      ;;
+    --provision-organ-mcp-candidate-auth)
+      provision_organ_mcp_candidate_auth=1
+      ;;
+    --provision-abyss-stack-mcp-auth)
+      provision_abyss_stack_mcp_auth=1
+      ;;
+    --rotate-abyss-stack-mcp-auth)
+      rotate_abyss_stack_mcp_auth=1
+      ;;
+    --provision-abyss-stack-mcp-runtime)
+      provision_abyss_stack_mcp_runtime=1
+      ;;
+    --verify-abyss-stack-mcp-runtime)
+      verify_abyss_stack_mcp_runtime=1
+      ;;
+    --launch-verified-abyss-stack-mcp)
+      launch_verified_abyss_stack_mcp=1
+      ;;
     --install-mcp-http-codex-client)
       install_mcp_http_codex_client=1
       ;;
@@ -142,23 +170,131 @@ aoa_validate_overlay_spec "$overlay_spec"
 if ((install_mcp_http_codex_client && remove_mcp_http_codex_client)); then
   aoa_die "cannot install and remove the MCP HTTP Codex client in one transaction"
 fi
+if ((rotate_abyss_stack_mcp_auth && \
+      (provision_mcp_http_auth || provision_organ_mcp_read_auth || \
+       provision_organ_mcp_candidate_auth || \
+       provision_abyss_stack_mcp_auth || \
+       provision_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_runtime || \
+       launch_verified_abyss_stack_mcp || install_mcp_http_codex_client || \
+       remove_mcp_http_codex_client || enable_now || restart_now || \
+       link_all_user_units || link_system_units || selection_set || overlay_set))); then
+  aoa_die "abyss-stack MCP credential rotation must be a standalone action"
+fi
+if ((provision_abyss_stack_mcp_runtime && link_all_user_units)); then
+  aoa_die "link lock-aware user units in a separate transaction before abyss-stack MCP runtime provisioning"
+fi
+if ((verify_abyss_stack_mcp_runtime && \
+      (provision_mcp_http_auth || provision_organ_mcp_read_auth || \
+       provision_organ_mcp_candidate_auth || \
+       provision_abyss_stack_mcp_auth || \
+       provision_abyss_stack_mcp_runtime || install_mcp_http_codex_client || \
+       remove_mcp_http_codex_client || enable_now || restart_now || \
+       launch_verified_abyss_stack_mcp || link_all_user_units || \
+       link_system_units || selection_set || overlay_set))); then
+  aoa_die "abyss-stack MCP runtime verification must be a standalone read-only action"
+fi
+if ((launch_verified_abyss_stack_mcp && \
+      (provision_mcp_http_auth || provision_organ_mcp_read_auth || \
+       provision_organ_mcp_candidate_auth || \
+       provision_abyss_stack_mcp_auth || \
+       provision_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_runtime || \
+       install_mcp_http_codex_client || remove_mcp_http_codex_client || \
+       enable_now || restart_now || link_all_user_units || link_system_units || \
+       selection_set || overlay_set))); then
+  aoa_die "verified abyss-stack MCP launch must be a standalone unit action"
+fi
 if (((install_mcp_http_codex_client || remove_mcp_http_codex_client) && EUID == 0)); then
   aoa_die "MCP HTTP Codex client install and removal must run as the target user, not root"
+fi
+if (((provision_abyss_stack_mcp_auth || rotate_abyss_stack_mcp_auth) && EUID == 0)); then
+  aoa_die "abyss-stack MCP credential management must run as the target user, not root"
+fi
+if (((provision_organ_mcp_read_auth || provision_organ_mcp_candidate_auth) && EUID == 0)); then
+  aoa_die "organ MCP credential management must run as the target user, not root"
+fi
+if ((provision_abyss_stack_mcp_runtime && EUID == 0)); then
+  aoa_die "abyss-stack MCP runtime provisioning must run as the target user, not root"
+fi
+if ((launch_verified_abyss_stack_mcp && EUID == 0)); then
+  aoa_die "verified abyss-stack MCP launch must run as the target user, not root"
 fi
 
 mcp_http_credential_name="aoa-mcp-http-bearer-token"
 mcp_http_secret_dir="${AOA_STACK_ROOT}/Secrets/Configs"
-mcp_http_credential_path="${mcp_http_secret_dir}/${mcp_http_credential_name}"
+aoa_decisions_mcp_read_credential_name="aoa-decisions-mcp-read-bearer-token"
+aoa_memo_mcp_read_credential_name="aoa-memo-mcp-read-bearer-token"
+aoa_memo_mcp_candidate_credential_name="aoa-memo-mcp-candidate-bearer-token"
+aoa_kag_mcp_read_credential_name="aoa-kag-mcp-read-bearer-token"
+aoa_4pda_connector_mcp_read_credential_name="aoa-4pda-connector-mcp-read-bearer-token"
+aoa_course_connector_mcp_read_credential_name="aoa-course-connector-mcp-read-bearer-token"
+aoa_discord_connector_mcp_read_credential_name="aoa-discord-connector-mcp-read-bearer-token"
+aoa_session_memory_mcp_read_credential_name="aoa-session-memory-mcp-read-bearer-token"
+aoa_stackoverflow_connector_mcp_read_credential_name="aoa-stackoverflow-connector-mcp-read-bearer-token"
+aoa_evals_mcp_read_credential_name="aoa-evals-mcp-read-bearer-token"
+aoa_evals_mcp_candidate_credential_name="aoa-evals-mcp-candidate-bearer-token"
+aoa_stats_mcp_read_credential_name="aoa-stats-mcp-read-bearer-token"
+aoa_telegram_connector_mcp_read_credential_name="aoa-telegram-connector-mcp-read-bearer-token"
+aoa_xda_connector_mcp_read_credential_name="aoa-xda-connector-mcp-read-bearer-token"
+abyss_machine_mcp_read_credential_name="abyss-machine-mcp-read-bearer-token"
+tos_corpus_mcp_read_credential_name="tos-corpus-mcp-read-bearer-token"
+organ_mcp_read_auth_manifest_name="organ-mcp-read-auth-manifest.json"
+organ_mcp_read_auth_manifest_path="${mcp_http_secret_dir}/${organ_mcp_read_auth_manifest_name}"
+organ_mcp_candidate_auth_manifest_name="organ-mcp-candidate-auth-manifest.json"
+organ_mcp_candidate_auth_manifest_path="${mcp_http_secret_dir}/${organ_mcp_candidate_auth_manifest_name}"
+abyss_stack_mcp_read_credential_name="abyss-stack-mcp-read-bearer-token"
+abyss_stack_mcp_candidate_credential_name="abyss-stack-mcp-candidate-bearer-token"
+abyss_stack_mcp_auth_manifest_name="abyss-stack-mcp-auth-manifest.json"
+abyss_stack_mcp_auth_manifest_path="${mcp_http_secret_dir}/${abyss_stack_mcp_auth_manifest_name}"
+abyss_stack_mcp_service_root="${AOA_CONFIGS_ROOT}/mcp/services/abyss-stack-mcp"
+abyss_stack_mcp_runtime_root="${AOA_STACK_ROOT}/Services/abyss-stack-mcp"
+abyss_stack_mcp_venv="${abyss_stack_mcp_runtime_root}/venv"
+abyss_stack_mcp_runtime_lock="${abyss_stack_mcp_runtime_root}/.runtime-provision.lock"
+abyss_stack_mcp_audit_root="${AOA_STACK_ROOT}/Logs/mcp/audit"
+abyss_stack_mcp_read_audit_journal="${abyss_stack_mcp_audit_root}/policy-read.jsonl"
+abyss_stack_mcp_candidate_audit_journal="${abyss_stack_mcp_audit_root}/policy-candidate.jsonl"
+abyss_stack_mcp_source_lock_root="$(
+  dirname -- "${AOA_CONFIGS_ROOT%/}"
+)/Services/abyss-stack-mcp"
+abyss_stack_mcp_source_lock="${abyss_stack_mcp_source_lock_root}/.source-projection.lock"
+abyss_stack_mcp_bootstrap_python="${ABYSS_STACK_MCP_BOOTSTRAP_PYTHON:-/usr/bin/python3}"
+abyss_stack_mcp_units_error=""
 mcp_http_codex_launcher="${AOA_CONFIGS_ROOT}/mcp/services/_shared/codex_http_client.sh"
 mcp_http_codex_zshrc="${ZDOTDIR:-${HOME}}/.zshrc"
 mcp_http_codex_block_start="# >>> abyss-stack MCP HTTP Codex client >>>"
 mcp_http_codex_block_end="# <<< abyss-stack MCP HTTP Codex client <<<"
 mcp_http_codex_block_present=0
 
-aoa_provision_mcp_http_auth() {
+aoa_run_isolated_python() {
+  local python_executable="$1"
+  shift
+
+  /usr/bin/env -u PYTHONHOME -u PYTHONPATH \
+    "$python_executable" -I "$@"
+}
+
+aoa_validate_mcp_bearer_file() {
+  local credential_path="$1"
+  local credential_label="$2"
   local token=""
   local token_size=0
   local file_size=0
+
+  [[ -f "$credential_path" && ! -L "$credential_path" ]] || \
+    aoa_die "existing ${credential_label} must be a regular non-symlink file"
+  token="$(<"$credential_path")"
+  token_size="${#token}"
+  file_size="$(stat -c '%s' "$credential_path")"
+  if [[ ! "$token" =~ ^[A-Za-z0-9._~-]{43,512}$ ]] || \
+    ! ((file_size == token_size || file_size == token_size + 1)); then
+    aoa_die "existing ${credential_label} has invalid content"
+  fi
+  chmod 0600 "$credential_path"
+}
+
+aoa_provision_mcp_bearer() {
+  local credential_name="$1"
+  local credential_label="$2"
+  local credential_path="${mcp_http_secret_dir}/${credential_name}"
   local temp_path=""
 
   if [[ -e "$mcp_http_secret_dir" || -L "$mcp_http_secret_dir" ]]; then
@@ -167,29 +303,1147 @@ aoa_provision_mcp_http_auth() {
   else
     install -d -m 0700 "$mcp_http_secret_dir"
   fi
-  if [[ -e "$mcp_http_credential_path" || -L "$mcp_http_credential_path" ]]; then
-    [[ -f "$mcp_http_credential_path" && ! -L "$mcp_http_credential_path" ]] || \
-      aoa_die "existing MCP HTTP bearer credential must be a regular non-symlink file"
-    token="$(<"$mcp_http_credential_path")"
-    token_size="${#token}"
-    file_size="$(stat -c '%s' "$mcp_http_credential_path")"
-    if [[ ! "$token" =~ ^[A-Za-z0-9._~-]{43,512}$ ]] || \
-      ! ((file_size == token_size || file_size == token_size + 1)); then
-      aoa_die "existing MCP HTTP bearer credential has invalid content"
-    fi
-    chmod 0600 "$mcp_http_credential_path"
-    aoa_note "MCP HTTP bearer credential already provisioned under the deployed Secrets root"
+  if [[ -e "$credential_path" || -L "$credential_path" ]]; then
+    aoa_validate_mcp_bearer_file "$credential_path" "$credential_label"
+    aoa_note "${credential_label} already provisioned under the deployed Secrets root"
     return 0
   fi
 
-  temp_path="$(mktemp "${mcp_http_secret_dir}/.${mcp_http_credential_name}.XXXXXX")"
-  if ! /usr/bin/env python3 -c 'import secrets; print(secrets.token_urlsafe(48))' > "$temp_path"; then
+  temp_path="$(mktemp "${mcp_http_secret_dir}/.${credential_name}.XXXXXX")"
+  if ! aoa_run_isolated_python python3 \
+    -c 'import secrets; print(secrets.token_urlsafe(48))' > "$temp_path"; then
     rm -f -- "$temp_path"
     aoa_die "failed to generate MCP HTTP bearer credential"
   fi
   chmod 0600 "$temp_path"
-  mv -- "$temp_path" "$mcp_http_credential_path"
-  aoa_note "provisioned MCP HTTP bearer credential under the deployed Secrets root"
+  if ln -- "$temp_path" "$credential_path" 2>/dev/null; then
+    rm -f -- "$temp_path"
+    aoa_note "provisioned ${credential_label} under the deployed Secrets root"
+    return 0
+  fi
+  rm -f -- "$temp_path"
+  if [[ ! -e "$credential_path" && ! -L "$credential_path" ]]; then
+    aoa_die "failed to atomically provision ${credential_label}"
+  fi
+  aoa_validate_mcp_bearer_file "$credential_path" "$credential_label"
+  aoa_note "${credential_label} already provisioned under the deployed Secrets root"
+}
+
+aoa_provision_mcp_http_auth() {
+  aoa_provision_mcp_bearer \
+    "$mcp_http_credential_name" \
+    "MCP HTTP bearer credential"
+}
+
+aoa_provision_organ_mcp_read_auth() {
+  local decisions_path="${mcp_http_secret_dir}/${aoa_decisions_mcp_read_credential_name}"
+  local memo_path="${mcp_http_secret_dir}/${aoa_memo_mcp_read_credential_name}"
+  local evals_path="${mcp_http_secret_dir}/${aoa_evals_mcp_read_credential_name}"
+  local kag_path="${mcp_http_secret_dir}/${aoa_kag_mcp_read_credential_name}"
+  local connector_4pda_path="${mcp_http_secret_dir}/${aoa_4pda_connector_mcp_read_credential_name}"
+  local connector_course_path="${mcp_http_secret_dir}/${aoa_course_connector_mcp_read_credential_name}"
+  local connector_discord_path="${mcp_http_secret_dir}/${aoa_discord_connector_mcp_read_credential_name}"
+  local session_memory_path="${mcp_http_secret_dir}/${aoa_session_memory_mcp_read_credential_name}"
+  local connector_stackoverflow_path="${mcp_http_secret_dir}/${aoa_stackoverflow_connector_mcp_read_credential_name}"
+  local stats_path="${mcp_http_secret_dir}/${aoa_stats_mcp_read_credential_name}"
+  local connector_telegram_path="${mcp_http_secret_dir}/${aoa_telegram_connector_mcp_read_credential_name}"
+  local connector_xda_path="${mcp_http_secret_dir}/${aoa_xda_connector_mcp_read_credential_name}"
+  local machine_path="${mcp_http_secret_dir}/${abyss_machine_mcp_read_credential_name}"
+  local tos_corpus_path="${mcp_http_secret_dir}/${tos_corpus_mcp_read_credential_name}"
+  local decisions_token=""
+  local memo_token=""
+  local evals_token=""
+  local kag_token=""
+  local connector_4pda_token=""
+  local connector_course_token=""
+  local connector_discord_token=""
+  local session_memory_token=""
+  local connector_stackoverflow_token=""
+  local stats_token=""
+  local connector_telegram_token=""
+  local connector_xda_token=""
+  local machine_token=""
+  local tos_corpus_token=""
+  local decisions_digest=""
+  local memo_digest=""
+  local evals_digest=""
+  local kag_digest=""
+  local connector_4pda_digest=""
+  local connector_course_digest=""
+  local connector_discord_digest=""
+  local session_memory_digest=""
+  local connector_stackoverflow_digest=""
+  local stats_digest=""
+  local connector_telegram_digest=""
+  local connector_xda_digest=""
+  local machine_digest=""
+  local tos_corpus_digest=""
+  local manifest_temp=""
+
+  aoa_provision_mcp_bearer \
+    "$aoa_decisions_mcp_read_credential_name" \
+    "aoa-decisions MCP read bearer credential"
+  aoa_provision_mcp_bearer \
+    "$aoa_memo_mcp_read_credential_name" \
+    "aoa-memo MCP read bearer credential"
+  aoa_provision_mcp_bearer \
+    "$aoa_evals_mcp_read_credential_name" \
+    "aoa-evals MCP read bearer credential"
+  aoa_provision_mcp_bearer \
+    "$aoa_kag_mcp_read_credential_name" \
+    "aoa-kag MCP read bearer credential"
+  aoa_provision_mcp_bearer \
+    "$aoa_4pda_connector_mcp_read_credential_name" \
+    "aoa-4pda-connector MCP read bearer credential"
+  aoa_provision_mcp_bearer \
+    "$aoa_course_connector_mcp_read_credential_name" \
+    "aoa-course-connector MCP read bearer credential"
+  aoa_provision_mcp_bearer \
+    "$aoa_discord_connector_mcp_read_credential_name" \
+    "aoa-discord-connector MCP read bearer credential"
+  aoa_provision_mcp_bearer \
+    "$aoa_session_memory_mcp_read_credential_name" \
+    "aoa-session-memory MCP read bearer credential"
+  aoa_provision_mcp_bearer \
+    "$aoa_stackoverflow_connector_mcp_read_credential_name" \
+    "aoa-stackoverflow-connector MCP read bearer credential"
+  aoa_provision_mcp_bearer \
+    "$aoa_stats_mcp_read_credential_name" \
+    "aoa-stats MCP read bearer credential"
+  aoa_provision_mcp_bearer \
+    "$aoa_telegram_connector_mcp_read_credential_name" \
+    "aoa-telegram-connector MCP read bearer credential"
+  aoa_provision_mcp_bearer \
+    "$aoa_xda_connector_mcp_read_credential_name" \
+    "aoa-xda-connector MCP read bearer credential"
+  aoa_provision_mcp_bearer \
+    "$abyss_machine_mcp_read_credential_name" \
+    "abyss-machine MCP read bearer credential"
+  aoa_provision_mcp_bearer \
+    "$tos_corpus_mcp_read_credential_name" \
+    "tos-corpus MCP read bearer credential"
+
+  decisions_token="$(<"$decisions_path")"
+  memo_token="$(<"$memo_path")"
+  evals_token="$(<"$evals_path")"
+  kag_token="$(<"$kag_path")"
+  connector_4pda_token="$(<"$connector_4pda_path")"
+  connector_course_token="$(<"$connector_course_path")"
+  connector_discord_token="$(<"$connector_discord_path")"
+  session_memory_token="$(<"$session_memory_path")"
+  connector_stackoverflow_token="$(<"$connector_stackoverflow_path")"
+  stats_token="$(<"$stats_path")"
+  connector_telegram_token="$(<"$connector_telegram_path")"
+  connector_xda_token="$(<"$connector_xda_path")"
+  machine_token="$(<"$machine_path")"
+  tos_corpus_token="$(<"$tos_corpus_path")"
+  [[ "$(printf '%s\n' \
+      "$decisions_token" "$memo_token" "$evals_token" \
+      "$kag_token" "$connector_4pda_token" "$connector_course_token" \
+      "$connector_discord_token" "$session_memory_token" \
+      "$connector_stackoverflow_token" "$stats_token" \
+      "$connector_telegram_token" "$connector_xda_token" \
+      "$machine_token" "$tos_corpus_token" \
+      | sort -u | wc -l)" == "14" ]] || \
+    aoa_die "organ MCP read bearer credentials must be owner-distinct"
+
+  decisions_digest="$(
+    printf '%s' "$decisions_token" | sha256sum | cut -d' ' -f1
+  )"
+  memo_digest="$(
+    printf '%s' "$memo_token" | sha256sum | cut -d' ' -f1
+  )"
+  evals_digest="$(
+    printf '%s' "$evals_token" | sha256sum | cut -d' ' -f1
+  )"
+  kag_digest="$(
+    printf '%s' "$kag_token" | sha256sum | cut -d' ' -f1
+  )"
+  connector_4pda_digest="$(
+    printf '%s' "$connector_4pda_token" | sha256sum | cut -d' ' -f1
+  )"
+  connector_course_digest="$(
+    printf '%s' "$connector_course_token" | sha256sum | cut -d' ' -f1
+  )"
+  connector_discord_digest="$(
+    printf '%s' "$connector_discord_token" | sha256sum | cut -d' ' -f1
+  )"
+  session_memory_digest="$(
+    printf '%s' "$session_memory_token" | sha256sum | cut -d' ' -f1
+  )"
+  connector_stackoverflow_digest="$(
+    printf '%s' "$connector_stackoverflow_token" | sha256sum | cut -d' ' -f1
+  )"
+  stats_digest="$(
+    printf '%s' "$stats_token" | sha256sum | cut -d' ' -f1
+  )"
+  connector_telegram_digest="$(
+    printf '%s' "$connector_telegram_token" | sha256sum | cut -d' ' -f1
+  )"
+  connector_xda_digest="$(
+    printf '%s' "$connector_xda_token" | sha256sum | cut -d' ' -f1
+  )"
+  machine_digest="$(
+    printf '%s' "$machine_token" | sha256sum | cut -d' ' -f1
+  )"
+  tos_corpus_digest="$(
+    printf '%s' "$tos_corpus_token" | sha256sum | cut -d' ' -f1
+  )"
+  [[ "$decisions_digest" =~ ^[0-9a-f]{64}$ && \
+     "$memo_digest" =~ ^[0-9a-f]{64}$ && \
+     "$evals_digest" =~ ^[0-9a-f]{64}$ && \
+     "$kag_digest" =~ ^[0-9a-f]{64}$ && \
+     "$connector_4pda_digest" =~ ^[0-9a-f]{64}$ && \
+     "$connector_course_digest" =~ ^[0-9a-f]{64}$ && \
+     "$connector_discord_digest" =~ ^[0-9a-f]{64}$ && \
+     "$session_memory_digest" =~ ^[0-9a-f]{64}$ && \
+     "$connector_stackoverflow_digest" =~ ^[0-9a-f]{64}$ && \
+     "$stats_digest" =~ ^[0-9a-f]{64}$ && \
+     "$connector_telegram_digest" =~ ^[0-9a-f]{64}$ && \
+     "$connector_xda_digest" =~ ^[0-9a-f]{64}$ && \
+     "$machine_digest" =~ ^[0-9a-f]{64}$ && \
+     "$tos_corpus_digest" =~ ^[0-9a-f]{64}$ ]] || \
+    aoa_die "failed to bind organ MCP read credential digests"
+
+  if [[ -e "$organ_mcp_read_auth_manifest_path" || \
+        -L "$organ_mcp_read_auth_manifest_path" ]]; then
+    [[ -f "$organ_mcp_read_auth_manifest_path" && \
+       ! -L "$organ_mcp_read_auth_manifest_path" ]] || \
+      aoa_die "existing organ MCP read auth manifest must be a regular non-symlink file"
+  fi
+  manifest_temp="$(
+    mktemp "${mcp_http_secret_dir}/.${organ_mcp_read_auth_manifest_name}.XXXXXX"
+  )"
+  chmod 0600 "$manifest_temp"
+  if ! printf \
+      '{"credentials":{"abyss-machine":{"policy_family":"read","sha256":"%s"},"aoa-4pda-connector":{"policy_family":"read","sha256":"%s"},"aoa-course-connector":{"policy_family":"read","sha256":"%s"},"aoa-decisions":{"policy_family":"read","sha256":"%s"},"aoa-discord-connector":{"policy_family":"read","sha256":"%s"},"aoa-evals":{"policy_family":"read","sha256":"%s"},"aoa-kag":{"policy_family":"read","sha256":"%s"},"aoa-memo":{"policy_family":"read","sha256":"%s"},"aoa-session-memory":{"policy_family":"read","sha256":"%s"},"aoa-stackoverflow-connector":{"policy_family":"read","sha256":"%s"},"aoa-stats":{"policy_family":"read","sha256":"%s"},"aoa-telegram-connector":{"policy_family":"read","sha256":"%s"},"aoa-xda-connector":{"policy_family":"read","sha256":"%s"},"tos-corpus":{"policy_family":"read","sha256":"%s"}},"schema_version":"organ_mcp_read_auth_manifest_v1"}\n' \
+      "$machine_digest" \
+      "$connector_4pda_digest" \
+      "$connector_course_digest" \
+      "$decisions_digest" \
+      "$connector_discord_digest" \
+      "$evals_digest" \
+      "$kag_digest" \
+      "$memo_digest" \
+      "$session_memory_digest" \
+      "$connector_stackoverflow_digest" \
+      "$stats_digest" \
+      "$connector_telegram_digest" \
+      "$connector_xda_digest" \
+      "$tos_corpus_digest" > "$manifest_temp"; then
+    rm -f -- "$manifest_temp"
+    aoa_die "failed to stage the organ MCP read auth manifest"
+  fi
+  if ! mv -f -- "$manifest_temp" "$organ_mcp_read_auth_manifest_path"; then
+    rm -f -- "$manifest_temp"
+    aoa_die "failed to publish the organ MCP read auth manifest"
+  fi
+  chmod 0600 "$organ_mcp_read_auth_manifest_path"
+  aoa_note "refreshed owner-distinct organ MCP read credential manifest"
+}
+
+aoa_provision_organ_mcp_candidate_auth() {
+  local memo_candidate_path="${mcp_http_secret_dir}/${aoa_memo_mcp_candidate_credential_name}"
+  local evals_candidate_path="${mcp_http_secret_dir}/${aoa_evals_mcp_candidate_credential_name}"
+  local memo_candidate_token=""
+  local evals_candidate_token=""
+  local memo_candidate_digest=""
+  local evals_candidate_digest=""
+  local manifest_temp=""
+  local credential_name=""
+  local all_tokens=""
+
+  aoa_provision_organ_mcp_read_auth
+  aoa_provision_mcp_bearer \
+    "$aoa_memo_mcp_candidate_credential_name" \
+    "aoa-memo MCP candidate bearer credential"
+  aoa_provision_mcp_bearer \
+    "$aoa_evals_mcp_candidate_credential_name" \
+    "aoa-evals MCP candidate bearer credential"
+
+  memo_candidate_token="$(<"$memo_candidate_path")"
+  evals_candidate_token="$(<"$evals_candidate_path")"
+  for credential_name in \
+    "$aoa_decisions_mcp_read_credential_name" \
+    "$aoa_memo_mcp_read_credential_name" \
+    "$aoa_evals_mcp_read_credential_name" \
+    "$aoa_kag_mcp_read_credential_name" \
+    "$aoa_4pda_connector_mcp_read_credential_name" \
+    "$aoa_course_connector_mcp_read_credential_name" \
+    "$aoa_discord_connector_mcp_read_credential_name" \
+    "$aoa_session_memory_mcp_read_credential_name" \
+    "$aoa_stackoverflow_connector_mcp_read_credential_name" \
+    "$aoa_stats_mcp_read_credential_name" \
+    "$aoa_telegram_connector_mcp_read_credential_name" \
+    "$aoa_xda_connector_mcp_read_credential_name" \
+    "$abyss_machine_mcp_read_credential_name" \
+    "$tos_corpus_mcp_read_credential_name"; do
+    all_tokens+="$(<"${mcp_http_secret_dir}/${credential_name}")"$'\n'
+  done
+  all_tokens+="${memo_candidate_token}"$'\n'"${evals_candidate_token}"$'\n'
+  [[ "$(printf '%s' "$all_tokens" | sed '/^$/d' | sort -u | wc -l)" == "16" ]] || \
+    aoa_die "organ MCP read and candidate bearer credentials must be contour-distinct"
+
+  memo_candidate_digest="$(
+    printf '%s' "$memo_candidate_token" | sha256sum | cut -d' ' -f1
+  )"
+  evals_candidate_digest="$(
+    printf '%s' "$evals_candidate_token" | sha256sum | cut -d' ' -f1
+  )"
+  [[ "$memo_candidate_digest" =~ ^[0-9a-f]{64}$ && \
+     "$evals_candidate_digest" =~ ^[0-9a-f]{64}$ && \
+     "$memo_candidate_digest" != "$evals_candidate_digest" ]] || \
+    aoa_die "failed to bind organ MCP candidate credential digests"
+
+  if [[ -e "$organ_mcp_candidate_auth_manifest_path" || \
+        -L "$organ_mcp_candidate_auth_manifest_path" ]]; then
+    [[ -f "$organ_mcp_candidate_auth_manifest_path" && \
+       ! -L "$organ_mcp_candidate_auth_manifest_path" ]] || \
+      aoa_die "existing organ MCP candidate auth manifest must be a regular non-symlink file"
+  fi
+  manifest_temp="$(
+    mktemp "${mcp_http_secret_dir}/.${organ_mcp_candidate_auth_manifest_name}.XXXXXX"
+  )"
+  chmod 0600 "$manifest_temp"
+  if ! printf \
+      '{"credentials":{"aoa-evals":{"policy_family":"candidate","sha256":"%s"},"aoa-memo":{"policy_family":"candidate","sha256":"%s"}},"schema_version":"organ_mcp_candidate_auth_manifest_v1"}\n' \
+      "$evals_candidate_digest" \
+      "$memo_candidate_digest" > "$manifest_temp"; then
+    rm -f -- "$manifest_temp"
+    aoa_die "failed to stage the organ MCP candidate auth manifest"
+  fi
+  if ! mv -f -- "$manifest_temp" "$organ_mcp_candidate_auth_manifest_path"; then
+    rm -f -- "$manifest_temp"
+    aoa_die "failed to publish the organ MCP candidate auth manifest"
+  fi
+  chmod 0600 "$organ_mcp_candidate_auth_manifest_path"
+  aoa_note "refreshed contour-distinct organ MCP candidate credential manifest"
+}
+
+aoa_provision_abyss_stack_mcp_auth() {
+  local read_path="${mcp_http_secret_dir}/${abyss_stack_mcp_read_credential_name}"
+  local candidate_path="${mcp_http_secret_dir}/${abyss_stack_mcp_candidate_credential_name}"
+  local read_token=""
+  local candidate_token=""
+  local read_digest=""
+  local candidate_digest=""
+  local manifest_temp=""
+
+  aoa_provision_mcp_bearer \
+    "$abyss_stack_mcp_read_credential_name" \
+    "abyss-stack MCP read bearer credential"
+  aoa_provision_mcp_bearer \
+    "$abyss_stack_mcp_candidate_credential_name" \
+    "abyss-stack MCP candidate bearer credential"
+  read_token="$(<"$read_path")"
+  candidate_token="$(<"$candidate_path")"
+  [[ "$read_token" != "$candidate_token" ]] || \
+    aoa_die "abyss-stack MCP read and candidate bearer credentials must be distinct"
+  read_digest="$(
+    printf '%s' "$read_token" | sha256sum | cut -d' ' -f1
+  )"
+  candidate_digest="$(
+    printf '%s' "$candidate_token" | sha256sum | cut -d' ' -f1
+  )"
+  [[ "$read_digest" =~ ^[0-9a-f]{64}$ && \
+     "$candidate_digest" =~ ^[0-9a-f]{64}$ && \
+     "$read_digest" != "$candidate_digest" ]] || \
+    aoa_die "failed to bind distinct abyss-stack MCP credentials"
+  if [[ -e "$abyss_stack_mcp_auth_manifest_path" || \
+        -L "$abyss_stack_mcp_auth_manifest_path" ]]; then
+    [[ -f "$abyss_stack_mcp_auth_manifest_path" && \
+       ! -L "$abyss_stack_mcp_auth_manifest_path" ]] || \
+      aoa_die "existing abyss-stack MCP auth manifest must be a regular non-symlink file"
+  fi
+  manifest_temp="$(
+    mktemp "${mcp_http_secret_dir}/.${abyss_stack_mcp_auth_manifest_name}.XXXXXX"
+  )"
+  chmod 0600 "$manifest_temp"
+  if ! printf \
+      '{"candidate_sha256":"%s","read_sha256":"%s","schema_version":"abyss_stack_mcp_auth_manifest_v1"}\n' \
+      "$candidate_digest" "$read_digest" > "$manifest_temp"; then
+    rm -f -- "$manifest_temp"
+    aoa_die "failed to stage the abyss-stack MCP auth manifest"
+  fi
+  if ! mv -f -- "$manifest_temp" "$abyss_stack_mcp_auth_manifest_path"; then
+    rm -f -- "$manifest_temp"
+    aoa_die "failed to publish the abyss-stack MCP auth manifest"
+  fi
+  chmod 0600 "$abyss_stack_mcp_auth_manifest_path"
+  aoa_note "refreshed abyss-stack MCP credential separation manifest"
+}
+
+aoa_validate_abyss_stack_mcp_audit_journal() {
+  local journal_path="$1"
+  local journal_label="$2"
+  local journal_size=""
+
+  [[ -f "$journal_path" && ! -L "$journal_path" ]] || \
+    aoa_die "${journal_label} must be a regular non-symlink file"
+  [[ "$(stat -c '%a' "$journal_path")" == "600" ]] || \
+    aoa_die "${journal_label} must have mode 0600"
+  journal_size="$(stat -c '%s' "$journal_path")"
+  [[ "$journal_size" =~ ^[0-9]+$ ]] || \
+    aoa_die "${journal_label} size is invalid"
+  ((journal_size <= 33554432)) || \
+    aoa_die "${journal_label} exceeds the managed 32 MiB capacity"
+}
+
+aoa_verify_abyss_stack_mcp_audit_journals() {
+  [[ -d "$abyss_stack_mcp_audit_root" && \
+     ! -L "$abyss_stack_mcp_audit_root" ]] || \
+    aoa_die "abyss-stack MCP audit root must be a non-symlink directory"
+  [[ "$(stat -c '%a' "$abyss_stack_mcp_audit_root")" == "700" ]] || \
+    aoa_die "abyss-stack MCP audit root must have mode 0700"
+  aoa_validate_abyss_stack_mcp_audit_journal \
+    "$abyss_stack_mcp_read_audit_journal" \
+    "abyss-stack MCP read audit journal"
+  aoa_validate_abyss_stack_mcp_audit_journal \
+    "$abyss_stack_mcp_candidate_audit_journal" \
+    "abyss-stack MCP candidate audit journal"
+}
+
+aoa_provision_abyss_stack_mcp_audit_journals() {
+  local parent=""
+  local journal_path=""
+
+  [[ -d "$AOA_STACK_ROOT" && ! -L "$AOA_STACK_ROOT" ]] || \
+    aoa_die "abyss-stack runtime root must be a non-symlink directory"
+  for parent in \
+    "${AOA_STACK_ROOT}/Logs" \
+    "${AOA_STACK_ROOT}/Logs/mcp"; do
+    if [[ -e "$parent" || -L "$parent" ]]; then
+      [[ -d "$parent" && ! -L "$parent" ]] || \
+        aoa_die "abyss-stack MCP audit parent must be a non-symlink directory"
+    else
+      install -d -m 0750 "$parent"
+    fi
+  done
+  if [[ -e "$abyss_stack_mcp_audit_root" || \
+        -L "$abyss_stack_mcp_audit_root" ]]; then
+    [[ -d "$abyss_stack_mcp_audit_root" && \
+       ! -L "$abyss_stack_mcp_audit_root" ]] || \
+      aoa_die "abyss-stack MCP audit root must be a non-symlink directory"
+  else
+    install -d -m 0700 "$abyss_stack_mcp_audit_root"
+  fi
+  chmod 0700 "$abyss_stack_mcp_audit_root"
+
+  for journal_path in \
+    "$abyss_stack_mcp_read_audit_journal" \
+    "$abyss_stack_mcp_candidate_audit_journal"; do
+    if [[ -e "$journal_path" || -L "$journal_path" ]]; then
+      [[ -f "$journal_path" && ! -L "$journal_path" ]] || \
+        aoa_die "existing abyss-stack MCP audit journal must be a regular non-symlink file"
+    else
+      (
+        umask 077
+        set -o noclobber
+        : > "$journal_path"
+      ) 2>/dev/null || true
+      [[ -f "$journal_path" && ! -L "$journal_path" ]] || \
+        aoa_die "failed to create an abyss-stack MCP audit journal"
+    fi
+    chmod 0600 "$journal_path"
+  done
+  aoa_verify_abyss_stack_mcp_audit_journals
+}
+
+aoa_require_abyss_stack_mcp_units_stopped_for_rotation() {
+  local unit=""
+  local active_state=""
+
+  for unit in abyss-stack-mcp-read.service abyss-stack-mcp-candidate.service; do
+    if ! active_state="$(
+      systemctl --user show \
+        --property=ActiveState \
+        --value \
+        "$unit" 2>/dev/null
+    )"; then
+      aoa_die "cannot observe ${unit}; refusing credential rotation"
+    fi
+    case "$active_state" in
+      inactive|failed)
+        ;;
+      *)
+        aoa_die "refusing credential rotation while ${unit} is ${active_state:-unknown}"
+        ;;
+    esac
+  done
+}
+
+aoa_rotate_abyss_stack_mcp_auth() {
+  local read_path="${mcp_http_secret_dir}/${abyss_stack_mcp_read_credential_name}"
+  local candidate_path="${mcp_http_secret_dir}/${abyss_stack_mcp_candidate_credential_name}"
+  local read_temp=""
+  local candidate_temp=""
+  local manifest_temp=""
+  local read_token=""
+  local candidate_token=""
+  local read_digest=""
+  local candidate_digest=""
+
+  aoa_require_abyss_stack_mcp_units_stopped_for_rotation
+  aoa_provision_abyss_stack_mcp_auth
+  read_temp="$(
+    mktemp "${mcp_http_secret_dir}/.${abyss_stack_mcp_read_credential_name}.rotate.XXXXXX"
+  )"
+  candidate_temp="$(
+    mktemp "${mcp_http_secret_dir}/.${abyss_stack_mcp_candidate_credential_name}.rotate.XXXXXX"
+  )"
+  manifest_temp="$(
+    mktemp "${mcp_http_secret_dir}/.${abyss_stack_mcp_auth_manifest_name}.rotate.XXXXXX"
+  )"
+  if ! aoa_run_isolated_python python3 \
+      -c 'import secrets; print(secrets.token_urlsafe(48))' > "$read_temp" || \
+     ! aoa_run_isolated_python python3 \
+      -c 'import secrets; print(secrets.token_urlsafe(48))' > "$candidate_temp"; then
+    rm -f -- "$read_temp" "$candidate_temp" "$manifest_temp"
+    aoa_die "failed to generate rotated abyss-stack MCP credentials"
+  fi
+  chmod 0600 "$read_temp" "$candidate_temp" "$manifest_temp"
+  aoa_validate_mcp_bearer_file \
+    "$read_temp" \
+    "rotated abyss-stack MCP read bearer credential"
+  aoa_validate_mcp_bearer_file \
+    "$candidate_temp" \
+    "rotated abyss-stack MCP candidate bearer credential"
+  read_token="$(<"$read_temp")"
+  candidate_token="$(<"$candidate_temp")"
+  [[ "$read_token" != "$candidate_token" ]] || {
+    rm -f -- "$read_temp" "$candidate_temp" "$manifest_temp"
+    aoa_die "rotated abyss-stack MCP credentials must be distinct"
+  }
+  read_digest="$(
+    printf '%s' "$read_token" | sha256sum | cut -d' ' -f1
+  )"
+  candidate_digest="$(
+    printf '%s' "$candidate_token" | sha256sum | cut -d' ' -f1
+  )"
+  if ! printf \
+      '{"candidate_sha256":"%s","read_sha256":"%s","schema_version":"abyss_stack_mcp_auth_manifest_v1"}\n' \
+      "$candidate_digest" "$read_digest" > "$manifest_temp"; then
+    rm -f -- "$read_temp" "$candidate_temp" "$manifest_temp"
+    aoa_die "failed to stage the rotated abyss-stack MCP auth manifest"
+  fi
+  if ! mv -f -- "$read_temp" "$read_path"; then
+    rm -f -- "$read_temp" "$candidate_temp" "$manifest_temp"
+    aoa_die "failed to publish the rotated abyss-stack MCP read credential"
+  fi
+  if ! mv -f -- "$candidate_temp" "$candidate_path"; then
+    rm -f -- "$candidate_temp" "$manifest_temp"
+    aoa_die "credential rotation stopped in a fail-closed partial state"
+  fi
+  if ! mv -f -- "$manifest_temp" "$abyss_stack_mcp_auth_manifest_path"; then
+    rm -f -- "$manifest_temp"
+    aoa_die "credential rotation stopped before manifest publication"
+  fi
+  chmod 0600 \
+    "$read_path" \
+    "$candidate_path" \
+    "$abyss_stack_mcp_auth_manifest_path"
+  aoa_note "rotated both abyss-stack MCP credentials and their digest manifest"
+  aoa_note "managed units remain stopped; refresh consumers before a canary start"
+}
+
+aoa_require_abyss_stack_mcp_units_stopped() {
+  local unit=""
+  local unit_properties=""
+  local unit_load_state=""
+  local unit_state=""
+  local unit_fragment_path=""
+  local unit_exec_start=""
+  local expected_unit_source=""
+  local expected_unit_target=""
+  local resolved_unit_source=""
+  local resolved_unit_fragment=""
+  local expected_exec_start=""
+
+  abyss_stack_mcp_units_error=""
+  for unit in abyss-stack-mcp-read.service abyss-stack-mcp-candidate.service; do
+    expected_unit_source="${AOA_CONFIGS_ROOT}/systemd/user/${unit}"
+    expected_unit_target="${XDG_CONFIG_HOME:-${HOME}/.config}/systemd/user/${unit}"
+    expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_source_lock} /usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} /usr/bin/env ${AOA_CONFIGS_ROOT}/scripts/aoa-install-systemd --launch-verified-abyss-stack-mcp"
+    if [[ ! -f "$expected_unit_source" || -L "$expected_unit_source" ]]; then
+      abyss_stack_mcp_units_error="lock-aware source unit is unavailable for ${unit}; link and reload managed user units before provisioning"
+      return 1
+    fi
+    if ! grep -Fqx -- "ExecStart=${expected_exec_start}" \
+        "$expected_unit_source"; then
+      abyss_stack_mcp_units_error="managed source unit is not lock-aware for ${unit}; refusing runtime replacement"
+      return 1
+    fi
+    if [[ ! -L "$expected_unit_target" || \
+          "$(readlink -- "$expected_unit_target" 2>/dev/null)" != \
+            "$expected_unit_source" ]]; then
+      abyss_stack_mcp_units_error="managed lock-aware unit is not linked for ${unit}; link and reload managed user units before provisioning"
+      return 1
+    fi
+    if ! unit_properties="$(
+      systemctl --user show \
+        --no-pager \
+        --property=LoadState \
+        --property=ActiveState \
+        --property=FragmentPath \
+        --property=ExecStart \
+        "$unit"
+    )"; then
+      abyss_stack_mcp_units_error="cannot inspect the loaded definition for ${unit}; refusing runtime replacement"
+      return 1
+    fi
+    unit_load_state="$(
+      awk -F= '$1 == "LoadState" {print substr($0, index($0, "=") + 1)}' \
+        <<< "$unit_properties"
+    )"
+    unit_state="$(
+      awk -F= '$1 == "ActiveState" {print substr($0, index($0, "=") + 1)}' \
+        <<< "$unit_properties"
+    )"
+    unit_fragment_path="$(
+      awk -F= '$1 == "FragmentPath" {print substr($0, index($0, "=") + 1)}' \
+        <<< "$unit_properties"
+    )"
+    unit_exec_start="$(
+      awk -F= '$1 == "ExecStart" {print substr($0, index($0, "=") + 1)}' \
+        <<< "$unit_properties"
+    )"
+    if [[ "$unit_load_state" != "loaded" || -z "$unit_fragment_path" ]]; then
+      abyss_stack_mcp_units_error="${unit} is not loaded; link and reload managed user units before provisioning"
+      return 1
+    fi
+    resolved_unit_source="$(readlink -f -- "$expected_unit_source")" || {
+      abyss_stack_mcp_units_error="cannot resolve the lock-aware source for ${unit}; refusing runtime replacement"
+      return 1
+    }
+    resolved_unit_fragment="$(readlink -f -- "$unit_fragment_path")" || {
+      abyss_stack_mcp_units_error="cannot resolve the loaded fragment for ${unit}; refusing runtime replacement"
+      return 1
+    }
+    if [[ "$resolved_unit_fragment" != "$resolved_unit_source" ]]; then
+      abyss_stack_mcp_units_error="${unit} is loaded from an unexpected fragment; link and reload managed user units before provisioning"
+      return 1
+    fi
+    if [[ "$unit_exec_start" != \
+          "{ path=/usr/bin/flock ; argv[]=${expected_exec_start} ;"* ]]; then
+      abyss_stack_mcp_units_error="${unit} is not loaded with the lock-aware ExecStart; run daemon-reload before provisioning"
+      return 1
+    fi
+    case "$unit_state" in
+      inactive|failed)
+        ;;
+      active|activating|reloading|deactivating)
+        abyss_stack_mcp_units_error="refusing to replace abyss-stack MCP runtime while ${unit} is ${unit_state}"
+        return 1
+        ;;
+      *)
+        abyss_stack_mcp_units_error="unexpected ${unit} active state ${unit_state}; refusing runtime replacement"
+        return 1
+        ;;
+    esac
+  done
+}
+
+aoa_digest_abyss_stack_mcp_package() {
+  local package_root="$1"
+  local digest=""
+
+  digest="$(
+    cd "$package_root"
+    find . -type f \
+        ! -path '*/__pycache__/*' \
+        ! -path '*/.pytest_cache/*' \
+        ! -name '*.pyc' \
+        -print0 |
+        LC_ALL=C sort -z |
+        xargs -0 sha256sum |
+        sha256sum |
+        cut -d' ' -f1
+  )" || return 1
+  [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || return 1
+  printf '%s\n' "$digest"
+}
+
+aoa_digest_abyss_stack_mcp_runtime() {
+  local runtime_root="$1"
+  local digest=""
+  local resolved_interpreter=""
+  local interpreter_digest=""
+
+  [[ -d "$runtime_root" && ! -L "$runtime_root" ]] || return 1
+  resolved_interpreter="$(
+    readlink -f -- "${runtime_root}/bin/python"
+  )" || return 1
+  [[ "$resolved_interpreter" == /* && \
+     -f "$resolved_interpreter" && \
+     ! -L "$resolved_interpreter" && \
+     -x "$resolved_interpreter" ]] || return 1
+  interpreter_digest="$(
+    sha256sum -- "$resolved_interpreter" | cut -d' ' -f1
+  )" || return 1
+  [[ "$interpreter_digest" =~ ^[0-9a-f]{64}$ ]] || return 1
+  if [[ -n "$(
+    find "$runtime_root" \
+      ! -type f \
+      ! -type d \
+      ! -type l \
+      -print \
+      -quit
+  )" ]]; then
+    return 1
+  fi
+  digest="$(
+    cd "$runtime_root"
+    {
+      printf 'i\0./bin/python\0%s\0' "$interpreter_digest"
+      while IFS= read -r -d '' entry; do
+        local entry_type="${entry%% *}"
+        local entry_path="${entry#* }"
+        local entry_digest=""
+
+        if [[ "$entry_type" == "l" ]]; then
+          entry_digest="$(
+            readlink --zero -- "$entry_path" |
+              sha256sum |
+              cut -d' ' -f1
+          )" || exit 1
+        else
+          entry_digest="$(
+            sha256sum -- "$entry_path" | cut -d' ' -f1
+          )" || exit 1
+        fi
+        [[ "$entry_digest" =~ ^[0-9a-f]{64}$ ]] || exit 1
+        printf '%s\0%s\0%s\0' "$entry_type" "$entry_path" "$entry_digest"
+      done < <(
+        find . \
+          ! -name '.abyss-stack-mcp-runtime-identity' \
+          ! -name '.abyss-stack-mcp-runtime-content-digest' \
+          \( -type f -o -type l \) \
+          -printf '%y %p\0' |
+          LC_ALL=C sort -z
+      )
+    } |
+      sha256sum |
+      cut -d' ' -f1
+  )" || return 1
+  [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || return 1
+  printf '%s\n' "$digest"
+}
+
+aoa_verify_abyss_stack_mcp_runtime() {
+  local marker=".abyss-stack-mcp-runtime-identity"
+  local content_marker=".abyss-stack-mcp-runtime-content-digest"
+  local lock_path="${abyss_stack_mcp_service_root}/requirements.lock"
+  local source_digest=""
+  local lock_digest=""
+  local expected_identity=""
+  local recorded_identity=""
+  local recorded_content_digest=""
+  local observed_content_digest=""
+  local source_lock_fd=""
+  local runtime_lock_fd=""
+
+  aoa_verify_abyss_stack_mcp_audit_journals
+  [[ -f "$abyss_stack_mcp_source_lock" && \
+     ! -L "$abyss_stack_mcp_source_lock" ]] || \
+    aoa_die "abyss-stack MCP source projection lock is unavailable"
+  [[ -f "$abyss_stack_mcp_runtime_lock" && \
+     ! -L "$abyss_stack_mcp_runtime_lock" ]] || \
+    aoa_die "abyss-stack MCP runtime lock is unavailable"
+  exec {source_lock_fd}<> "$abyss_stack_mcp_source_lock"
+  if ! /usr/bin/flock --shared --nonblock "$source_lock_fd"; then
+    aoa_die "Configs sync or runtime provisioning holds the abyss-stack MCP source projection lock"
+  fi
+  exec {runtime_lock_fd}<> "$abyss_stack_mcp_runtime_lock"
+  if ! /usr/bin/flock --shared --nonblock "$runtime_lock_fd"; then
+    aoa_die "runtime provisioning holds the abyss-stack MCP runtime lock"
+  fi
+  [[ -d "$abyss_stack_mcp_service_root" && \
+     ! -L "$abyss_stack_mcp_service_root" ]] || \
+    aoa_die "deployed abyss-stack MCP package root is unavailable"
+  [[ -f "${abyss_stack_mcp_service_root}/pyproject.toml" && \
+     ! -L "${abyss_stack_mcp_service_root}/pyproject.toml" ]] || \
+    aoa_die "deployed abyss-stack MCP package metadata is unavailable"
+  [[ -f "$lock_path" && ! -L "$lock_path" ]] || \
+    aoa_die "deployed abyss-stack MCP hash lock is unavailable"
+  if [[ -n "$(
+    find "$abyss_stack_mcp_service_root" \
+      ! -type f \
+      ! -type d \
+      -print \
+      -quit
+  )" ]]; then
+    aoa_die "deployed abyss-stack MCP package must contain only regular files and directories"
+  fi
+  [[ -d "$abyss_stack_mcp_venv" && ! -L "$abyss_stack_mcp_venv" ]] || \
+    aoa_die "provisioned abyss-stack MCP runtime is unavailable"
+  [[ -f "${abyss_stack_mcp_venv}/${marker}" && \
+     ! -L "${abyss_stack_mcp_venv}/${marker}" ]] || \
+    aoa_die "abyss-stack MCP runtime identity marker is unavailable"
+  [[ -f "${abyss_stack_mcp_venv}/${content_marker}" && \
+     ! -L "${abyss_stack_mcp_venv}/${content_marker}" ]] || \
+    aoa_die "abyss-stack MCP runtime content marker is unavailable"
+
+  source_digest="$(
+    aoa_digest_abyss_stack_mcp_package "$abyss_stack_mcp_service_root"
+  )" || aoa_die "failed to digest the deployed abyss-stack MCP package"
+  lock_digest="$(sha256sum "$lock_path" | cut -d' ' -f1)"
+  [[ "$lock_digest" =~ ^[0-9a-f]{64}$ ]] || \
+    aoa_die "failed to digest the deployed abyss-stack MCP hash lock"
+  expected_identity="${source_digest}:${lock_digest}"
+  recorded_identity="$(<"${abyss_stack_mcp_venv}/${marker}")"
+  [[ "$recorded_identity" =~ ^[0-9a-f]{64}:[0-9a-f]{64}$ ]] || \
+    aoa_die "abyss-stack MCP runtime identity marker is invalid"
+  [[ "$recorded_identity" == "$expected_identity" ]] || \
+    aoa_die "abyss-stack MCP runtime source-and-lock identity mismatch"
+
+  recorded_content_digest="$(
+    <"${abyss_stack_mcp_venv}/${content_marker}"
+  )"
+  [[ "$recorded_content_digest" =~ ^[0-9a-f]{64}$ ]] || \
+    aoa_die "abyss-stack MCP runtime content marker is invalid"
+  observed_content_digest="$(
+    aoa_digest_abyss_stack_mcp_runtime "$abyss_stack_mcp_venv"
+  )" || aoa_die "failed to digest the provisioned abyss-stack MCP runtime"
+  [[ "$observed_content_digest" == "$recorded_content_digest" ]] || \
+    aoa_die "abyss-stack MCP runtime content digest mismatch"
+  exec {runtime_lock_fd}>&-
+  exec {source_lock_fd}>&-
+}
+
+aoa_launch_verified_abyss_stack_mcp() {
+  aoa_verify_abyss_stack_mcp_runtime
+  exec /usr/bin/env -u PYTHONHOME -u PYTHONPATH \
+    "$abyss_stack_mcp_venv/bin/python" \
+    -I -B -m abyss_stack_mcp.server
+}
+
+aoa_rewrite_abyss_stack_mcp_entrypoint_shebangs() {
+  local staged_root="$1"
+  local published_root="$2"
+  local entry=""
+  local first_line=""
+  local interpreter_suffix=""
+  local rewrite_path=""
+
+  while IFS= read -r -d '' entry; do
+    IFS= read -r first_line < "$entry" || continue
+    [[ "$first_line" == "#!${staged_root}/bin/python"* ]] || continue
+    interpreter_suffix="${first_line#\#!"${staged_root}"}"
+    [[ "$interpreter_suffix" =~ ^/bin/python([0-9]+([.][0-9]+)*)?([[:space:]].*)?$ ]] || \
+      return 1
+    rewrite_path="$(mktemp "${entry}.rewrite.XXXXXX")" || return 1
+    if ! {
+      printf '#!%s%s\n' "$published_root" "$interpreter_suffix"
+      tail -n +2 -- "$entry"
+    } > "$rewrite_path"; then
+      rm -f -- "$rewrite_path"
+      return 1
+    fi
+    chmod --reference="$entry" "$rewrite_path" || {
+      rm -f -- "$rewrite_path"
+      return 1
+    }
+    mv -- "$rewrite_path" "$entry" || {
+      rm -f -- "$rewrite_path"
+      return 1
+    }
+  done < <(
+    find "${staged_root}/bin" \
+      -maxdepth 1 \
+      -type f \
+      -print0
+  )
+
+  while IFS= read -r -d '' entry; do
+    IFS= read -r first_line < "$entry" || continue
+    [[ "$first_line" != "#!${staged_root}/"* ]] || return 1
+  done < <(
+    find "${staged_root}/bin" \
+      -maxdepth 1 \
+      -type f \
+      -print0
+  )
+}
+
+aoa_provision_abyss_stack_mcp_runtime() {
+  local source_digest=""
+  local deployed_digest=""
+  local snapshot_digest=""
+  local lock_digest=""
+  local snapshot_lock_digest=""
+  local runtime_identity=""
+  local existing_identity=""
+  local runtime_content_digest=""
+  local existing_content_digest=""
+  local observed_content_digest=""
+  local marker=".abyss-stack-mcp-runtime-identity"
+  local content_marker=".abyss-stack-mcp-runtime-content-digest"
+  local lock_path="${abyss_stack_mcp_service_root}/requirements.lock"
+  local snapshot_lock_path=""
+  local source_snapshot=""
+  local temp_venv=""
+  local backup_venv=""
+  local resolved_bootstrap_python=""
+  local runtime_lock_fd=""
+  local source_lock_fd=""
+
+  [[ "$abyss_stack_mcp_bootstrap_python" == /* ]] || \
+    aoa_die "ABYSS_STACK_MCP_BOOTSTRAP_PYTHON must be an absolute path"
+  resolved_bootstrap_python="$(
+    readlink -f -- "$abyss_stack_mcp_bootstrap_python"
+  )" || aoa_die "failed to resolve abyss-stack MCP bootstrap Python"
+  [[ "$resolved_bootstrap_python" == /* && \
+     -f "$resolved_bootstrap_python" && \
+     ! -L "$resolved_bootstrap_python" && \
+     -x "$resolved_bootstrap_python" ]] || \
+    aoa_die "abyss-stack MCP bootstrap Python is not an executable regular file"
+  abyss_stack_mcp_bootstrap_python="$resolved_bootstrap_python"
+  if [[ -e "$abyss_stack_mcp_source_lock_root" || \
+        -L "$abyss_stack_mcp_source_lock_root" ]]; then
+    [[ -d "$abyss_stack_mcp_source_lock_root" && \
+       ! -L "$abyss_stack_mcp_source_lock_root" ]] || \
+      aoa_die "abyss-stack MCP source projection lock root must be a non-symlink directory"
+  else
+    install -d -m 0750 "$abyss_stack_mcp_source_lock_root"
+  fi
+  if [[ -e "$abyss_stack_mcp_source_lock" || \
+        -L "$abyss_stack_mcp_source_lock" ]]; then
+    [[ -f "$abyss_stack_mcp_source_lock" && \
+       ! -L "$abyss_stack_mcp_source_lock" ]] || \
+      aoa_die "abyss-stack MCP source projection lock must be a regular non-symlink file"
+  else
+    (
+      umask 077
+      set -o noclobber
+      : > "$abyss_stack_mcp_source_lock"
+    ) 2>/dev/null || true
+    [[ -f "$abyss_stack_mcp_source_lock" && \
+       ! -L "$abyss_stack_mcp_source_lock" ]] || \
+      aoa_die "failed to create the abyss-stack MCP source projection lock"
+  fi
+  chmod 0600 "$abyss_stack_mcp_source_lock"
+  exec {source_lock_fd}<> "$abyss_stack_mcp_source_lock"
+  if ! /usr/bin/flock --exclusive --nonblock "$source_lock_fd"; then
+    aoa_die "Configs sync or another provisioner holds the abyss-stack MCP source projection lock"
+  fi
+  [[ -d "$abyss_stack_mcp_service_root" && \
+     ! -L "$abyss_stack_mcp_service_root" ]] || \
+    aoa_die "deployed abyss-stack MCP package root is unavailable"
+  [[ -f "${abyss_stack_mcp_service_root}/pyproject.toml" && \
+     ! -L "${abyss_stack_mcp_service_root}/pyproject.toml" ]] || \
+    aoa_die "deployed abyss-stack MCP package metadata is unavailable"
+  [[ -f "$lock_path" && ! -L "$lock_path" ]] || \
+    aoa_die "deployed abyss-stack MCP hash lock is unavailable"
+  if [[ -n "$(
+    find "$abyss_stack_mcp_service_root" \
+      ! -type f \
+      ! -type d \
+      -print \
+      -quit
+  )" ]]; then
+    aoa_die "deployed abyss-stack MCP package must contain only regular files and directories"
+  fi
+
+  source_digest="$(
+    aoa_digest_abyss_stack_mcp_package "$abyss_stack_mcp_service_root"
+  )" || \
+    aoa_die "failed to digest the deployed abyss-stack MCP package"
+  lock_digest="$(sha256sum "$lock_path" | cut -d' ' -f1)"
+  [[ "$lock_digest" =~ ^[0-9a-f]{64}$ ]] || \
+    aoa_die "failed to digest the deployed abyss-stack MCP hash lock"
+  runtime_identity="${source_digest}:${lock_digest}"
+
+  if [[ -e "$abyss_stack_mcp_runtime_root" || \
+        -L "$abyss_stack_mcp_runtime_root" ]]; then
+    [[ -d "$abyss_stack_mcp_runtime_root" && \
+       ! -L "$abyss_stack_mcp_runtime_root" ]] || \
+      aoa_die "abyss-stack MCP runtime root must be a non-symlink directory"
+  else
+    install -d -m 0750 "$abyss_stack_mcp_runtime_root"
+  fi
+  if [[ -e "$abyss_stack_mcp_runtime_lock" || \
+        -L "$abyss_stack_mcp_runtime_lock" ]]; then
+    [[ -f "$abyss_stack_mcp_runtime_lock" && \
+       ! -L "$abyss_stack_mcp_runtime_lock" ]] || \
+      aoa_die "abyss-stack MCP runtime lock must be a regular non-symlink file"
+  else
+    (
+      umask 077
+      set -o noclobber
+      : > "$abyss_stack_mcp_runtime_lock"
+    ) 2>/dev/null || true
+    [[ -f "$abyss_stack_mcp_runtime_lock" && \
+       ! -L "$abyss_stack_mcp_runtime_lock" ]] || \
+      aoa_die "failed to create the abyss-stack MCP runtime lock"
+  fi
+  chmod 0600 "$abyss_stack_mcp_runtime_lock"
+  aoa_provision_abyss_stack_mcp_audit_journals
+
+  if [[ -e "$abyss_stack_mcp_venv" || -L "$abyss_stack_mcp_venv" ]]; then
+    [[ -d "$abyss_stack_mcp_venv" && ! -L "$abyss_stack_mcp_venv" ]] || \
+      aoa_die "existing abyss-stack MCP runtime must be a non-symlink directory"
+    if [[ -f "${abyss_stack_mcp_venv}/${marker}" && \
+          ! -L "${abyss_stack_mcp_venv}/${marker}" ]]; then
+      existing_identity="$(<"${abyss_stack_mcp_venv}/${marker}")"
+    fi
+    if [[ -f "${abyss_stack_mcp_venv}/${content_marker}" && \
+          ! -L "${abyss_stack_mcp_venv}/${content_marker}" ]]; then
+      existing_content_digest="$(
+        <"${abyss_stack_mcp_venv}/${content_marker}"
+      )"
+    fi
+    if [[ "$existing_content_digest" =~ ^[0-9a-f]{64}$ ]]; then
+      observed_content_digest="$(
+        aoa_digest_abyss_stack_mcp_runtime "$abyss_stack_mcp_venv"
+      )" || observed_content_digest=""
+    fi
+    if [[ "$existing_identity" == "$runtime_identity" && \
+          "$observed_content_digest" == "$existing_content_digest" && \
+          -x "${abyss_stack_mcp_venv}/bin/python" ]] && \
+       PYTHONDONTWRITEBYTECODE=1 \
+         aoa_run_isolated_python \
+           "${abyss_stack_mcp_venv}/bin/python" -m pip check >/dev/null && \
+       PYTHONDONTWRITEBYTECODE=1 \
+         aoa_run_isolated_python "${abyss_stack_mcp_venv}/bin/python" -c \
+           'import abyss_stack_mcp, mcp, pydantic' >/dev/null; then
+      deployed_digest="$(
+        aoa_digest_abyss_stack_mcp_package "$abyss_stack_mcp_service_root"
+      )" || \
+        aoa_die "failed to recheck the deployed abyss-stack MCP package"
+      [[ "$deployed_digest" == "$source_digest" ]] || \
+        aoa_die "deployed abyss-stack MCP package changed during runtime verification"
+      aoa_note "abyss-stack MCP runtime already provisioned for deployed source ${source_digest} and lock ${lock_digest}"
+      exec {source_lock_fd}>&-
+      return 0
+    fi
+  fi
+
+  exec {runtime_lock_fd}<> "$abyss_stack_mcp_runtime_lock"
+  if ! /usr/bin/flock --exclusive --nonblock "$runtime_lock_fd"; then
+    aoa_die "another provisioner or a managed abyss-stack MCP plane holds the runtime lock"
+  fi
+  if ! aoa_require_abyss_stack_mcp_units_stopped; then
+    aoa_die "$abyss_stack_mcp_units_error"
+  fi
+
+  temp_venv="$(mktemp -d "${abyss_stack_mcp_runtime_root}/.venv.XXXXXX")"
+  if ! aoa_run_isolated_python \
+    "$abyss_stack_mcp_bootstrap_python" -m venv "$temp_venv"; then
+    rm -rf -- "$temp_venv"
+    aoa_die "failed to create the abyss-stack MCP runtime environment"
+  fi
+  source_snapshot="${temp_venv}/.source-snapshot"
+  install -d -m 0700 "$source_snapshot"
+  if ! cp -a -- "${abyss_stack_mcp_service_root}/." "$source_snapshot"; then
+    rm -rf -- "$temp_venv"
+    aoa_die "failed to stage the deployed abyss-stack MCP package snapshot"
+  fi
+  if [[ -n "$(
+    find "$source_snapshot" \
+      ! -type f \
+      ! -type d \
+      -print \
+      -quit
+  )" ]]; then
+    rm -rf -- "$temp_venv"
+    aoa_die "staged abyss-stack MCP package snapshot contains a non-regular entry"
+  fi
+  snapshot_digest="$(
+    aoa_digest_abyss_stack_mcp_package "$source_snapshot"
+  )" || {
+    rm -rf -- "$temp_venv"
+    aoa_die "failed to digest the staged abyss-stack MCP package snapshot"
+  }
+  if [[ "$snapshot_digest" != "$source_digest" ]]; then
+    rm -rf -- "$temp_venv"
+    aoa_die "deployed abyss-stack MCP package changed while staging its runtime snapshot"
+  fi
+  snapshot_lock_path="${source_snapshot}/requirements.lock"
+  snapshot_lock_digest="$(sha256sum "$snapshot_lock_path" | cut -d' ' -f1)"
+  if [[ "$snapshot_lock_digest" != "$lock_digest" ]]; then
+    rm -rf -- "$temp_venv"
+    aoa_die "deployed abyss-stack MCP hash lock changed while staging its runtime snapshot"
+  fi
+  if ! PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    aoa_run_isolated_python "${temp_venv}/bin/python" -m pip install \
+      --no-input \
+      --no-compile \
+      --require-hashes \
+      -r "$snapshot_lock_path"; then
+    rm -rf -- "$temp_venv"
+    aoa_die "failed to install the deployed abyss-stack MCP hash-locked dependency closure"
+  fi
+  if ! PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    aoa_run_isolated_python "${temp_venv}/bin/python" -m pip install \
+      --no-input \
+      --no-compile \
+      --no-deps \
+      --no-build-isolation \
+      "$source_snapshot"; then
+    rm -rf -- "$temp_venv"
+    aoa_die "failed to install the deployed abyss-stack MCP package"
+  fi
+  if ! PYTHONDONTWRITEBYTECODE=1 \
+       aoa_run_isolated_python \
+         "${temp_venv}/bin/python" -m pip check >/dev/null || \
+     ! PYTHONDONTWRITEBYTECODE=1 \
+       aoa_run_isolated_python "${temp_venv}/bin/python" -c \
+         'import abyss_stack_mcp, mcp, pydantic' >/dev/null; then
+    rm -rf -- "$temp_venv"
+    aoa_die "provisioned abyss-stack MCP runtime failed dependency verification"
+  fi
+  deployed_digest="$(
+    aoa_digest_abyss_stack_mcp_package "$abyss_stack_mcp_service_root"
+  )" || {
+    rm -rf -- "$temp_venv"
+    aoa_die "failed to recheck the deployed abyss-stack MCP package"
+  }
+  if [[ "$deployed_digest" != "$source_digest" ]]; then
+    rm -rf -- "$temp_venv"
+    aoa_die "deployed abyss-stack MCP package changed during runtime provisioning"
+  fi
+  rm -rf -- "$source_snapshot"
+  if ! aoa_rewrite_abyss_stack_mcp_entrypoint_shebangs \
+    "$temp_venv" \
+    "$abyss_stack_mcp_venv"; then
+    rm -rf -- "$temp_venv"
+    aoa_die "failed to bind abyss-stack MCP entry points to the published runtime"
+  fi
+  runtime_content_digest="$(
+    aoa_digest_abyss_stack_mcp_runtime "$temp_venv"
+  )" || {
+    rm -rf -- "$temp_venv"
+    aoa_die "failed to digest the provisioned abyss-stack MCP runtime"
+  }
+  printf '%s\n' "$runtime_content_digest" > "${temp_venv}/${content_marker}"
+  chmod 0644 "${temp_venv}/${content_marker}"
+  printf '%s\n' "$runtime_identity" > "${temp_venv}/${marker}"
+  chmod 0644 "${temp_venv}/${marker}"
+
+  if ! aoa_require_abyss_stack_mcp_units_stopped; then
+    rm -rf -- "$temp_venv"
+    aoa_die "$abyss_stack_mcp_units_error"
+  fi
+  if [[ -d "$abyss_stack_mcp_venv" ]]; then
+    backup_venv="$(mktemp -d "${abyss_stack_mcp_runtime_root}/.venv.previous.XXXXXX")"
+    rmdir -- "$backup_venv"
+    mv -- "$abyss_stack_mcp_venv" "$backup_venv"
+  fi
+  if ! mv -- "$temp_venv" "$abyss_stack_mcp_venv"; then
+    if [[ -n "$backup_venv" && -d "$backup_venv" ]]; then
+      mv -- "$backup_venv" "$abyss_stack_mcp_venv"
+    fi
+    rm -rf -- "$temp_venv"
+    aoa_die "failed to activate the provisioned abyss-stack MCP runtime"
+  fi
+  if [[ -n "$backup_venv" && -d "$backup_venv" ]]; then
+    rm -rf -- "$backup_venv"
+  fi
+  exec {runtime_lock_fd}>&-
+  exec {source_lock_fd}>&-
+  aoa_note "provisioned abyss-stack MCP runtime for deployed source ${source_digest} and lock ${lock_digest}"
 }
 
 aoa_validate_mcp_http_codex_zshrc() {
@@ -301,13 +1555,33 @@ aoa_remove_mcp_http_codex_client() {
 if ((provision_mcp_http_auth || install_mcp_http_codex_client)); then
   aoa_provision_mcp_http_auth
 fi
+if ((provision_organ_mcp_candidate_auth || install_mcp_http_codex_client)); then
+  aoa_provision_organ_mcp_candidate_auth
+elif ((provision_organ_mcp_read_auth)); then
+  aoa_provision_organ_mcp_read_auth
+fi
+if ((provision_abyss_stack_mcp_auth)); then
+  aoa_provision_abyss_stack_mcp_auth
+fi
+if ((rotate_abyss_stack_mcp_auth)); then
+  aoa_rotate_abyss_stack_mcp_auth
+fi
+if ((provision_abyss_stack_mcp_runtime)); then
+  aoa_provision_abyss_stack_mcp_runtime
+fi
+if ((verify_abyss_stack_mcp_runtime)); then
+  aoa_verify_abyss_stack_mcp_runtime
+fi
+if ((launch_verified_abyss_stack_mcp)); then
+  aoa_launch_verified_abyss_stack_mcp
+fi
 if ((install_mcp_http_codex_client)); then
   aoa_install_mcp_http_codex_client
 fi
 if ((remove_mcp_http_codex_client)); then
   aoa_remove_mcp_http_codex_client
 fi
-if ((provision_mcp_http_auth || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
+if ((provision_mcp_http_auth || provision_organ_mcp_read_auth || provision_organ_mcp_candidate_auth || provision_abyss_stack_mcp_auth || rotate_abyss_stack_mcp_auth || provision_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_runtime || launch_verified_abyss_stack_mcp || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
   ((!enable_now && !restart_now && !link_all_user_units && !link_system_units && !selection_set && !overlay_set)); then
   exit 0
 fi

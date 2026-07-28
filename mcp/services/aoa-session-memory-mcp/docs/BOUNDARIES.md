@@ -38,3 +38,7 @@ and MCP responses are not reviewed truth.
   sources.
 - No remote, wildcard-bind, gateway, or proxy exposure; optional shared HTTP
   remains authenticated and loopback-only under `ABYSS-STACK-D-0077`.
+- No shared owner credential: the read contour accepts only the
+  `aoa-session-memory` bearer, scope, and client identity.
+- No read-write SQLite connection in an MCP fast path; generated databases are
+  opened with `mode=ro` and `query_only`.

@@ -87,6 +87,45 @@ FALLBACK_VOCABULARY_TERMS = {
 }
 
 
+def _require_candidate_write_root(path: Path, *, label: str) -> None:
+    policy_family = os.environ.get("AOA_MCP_POLICY_FAMILY", "").strip()
+    if not policy_family:
+        return
+    if policy_family == "read":
+        raise PermissionError(f"{label} is denied in the MCP read contour")
+    if policy_family != "candidate":
+        raise PermissionError(
+            "AOA_MCP_POLICY_FAMILY must be read or candidate for MCP writes"
+        )
+    raw_roots = os.environ.get("AOA_MEMO_MCP_CANDIDATE_ROOTS", "").strip()
+    if not raw_roots:
+        raise PermissionError(
+            "memo candidate writes require AOA_MEMO_MCP_CANDIDATE_ROOTS"
+        )
+    resolved_path = path.expanduser().resolve()
+    for raw_root in raw_roots.split(os.pathsep):
+        if not raw_root:
+            continue
+        configured_root = Path(raw_root).expanduser()
+        if not configured_root.is_absolute():
+            raise PermissionError(
+                "AOA_MEMO_MCP_CANDIDATE_ROOTS must contain absolute paths"
+            )
+        if configured_root.is_symlink():
+            raise PermissionError(
+                "AOA_MEMO_MCP_CANDIDATE_ROOTS must not contain symlink roots"
+            )
+        resolved_root = configured_root.resolve()
+        try:
+            resolved_path.relative_to(resolved_root)
+        except ValueError:
+            continue
+        return
+    raise PermissionError(
+        f"{label} must stay inside an allowlisted memo candidate root"
+    )
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -305,6 +344,10 @@ class AoAMemoMCPState:
         if route.memo_port is None:
             raise ValueError(f"unknown repo or missing source root: {repo}")
         self._require_known_memo_port_route(route, "candidate writes")
+        _require_candidate_write_root(
+            route.memo_port,
+            label="candidate creation",
+        )
         candidates_dir = route.memo_port / "candidates"
         candidates_dir.mkdir(parents=True, exist_ok=True)
         stamp = _utc_stamp()
@@ -468,6 +511,10 @@ class AoAMemoMCPState:
             result["ok"] = not errors
             return result
         if write:
+            _require_candidate_write_root(
+                route.memo_port,
+                label="memo port index write",
+            )
             index_path.write_text(index_text, encoding="utf-8")
             markdown_path.write_text(markdown_text, encoding="utf-8")
             result["written"] = True
@@ -578,6 +625,10 @@ class AoAMemoMCPState:
         if errors:
             return {"schema": "aoa_local_memo_intake_prepare_v1", "repo": route.name, "ok": False, "errors": errors}
 
+        _require_candidate_write_root(
+            route.memo_port,
+            label="memo intake export write",
+        )
         stamp = _utc_stamp()
         slug = _id_slug(str(candidate_payloads[0].get("claim", "memo-intake")), 48)
         export_path = route.memo_port / "exports" / f"{stamp}.{slug}.aoa-memo-intake.json"
@@ -676,6 +727,10 @@ class AoAMemoMCPState:
                 "receipt": receipt,
                 "errors": errors,
             }
+        _require_candidate_write_root(
+            port,
+            label="memo forwarding receipt write",
+        )
         receipt_path.write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         self.build_port_index(repo_from_path, write=True)
         return {

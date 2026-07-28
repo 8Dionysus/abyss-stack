@@ -3,9 +3,11 @@ from __future__ import annotations
 import argparse
 import contextlib
 import io
+import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -24,6 +26,11 @@ SYNC_CONFIGS = (
     / "sync"
     / "aoa_sync_configs.sh"
 )
+MCP_DEPLOYMENT_MANIFEST = (
+    SYNC_CONFIGS.parent
+    / "scripts"
+    / "mcp_deployment_manifest.py"
+)
 
 
 def write_text(path: Path, content: str) -> None:
@@ -32,6 +39,64 @@ def write_text(path: Path, content: str) -> None:
 
 
 class SyncParityEntrypointContractsTests(unittest.TestCase):
+    def test_mcp_sync_fails_closed_while_runtime_provisioning_holds_lock(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            configs = root / "Configs"
+            projection_lock = (
+                root
+                / "Services"
+                / "abyss-stack-mcp"
+                / ".source-projection.lock"
+            )
+            write_text(projection_lock, "")
+            env = os.environ.copy()
+            env["AOA_STACK_ROOT"] = str(root)
+            env["AOA_CONFIGS_ROOT"] = str(configs)
+            lock_holder = subprocess.Popen(
+                [
+                    "/usr/bin/flock",
+                    "--exclusive",
+                    str(projection_lock),
+                    sys.executable,
+                    "-c",
+                    (
+                        "import sys; "
+                        "print('locked', flush=True); "
+                        "sys.stdin.buffer.read()"
+                    ),
+                ],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            self.assertIsNotNone(lock_holder.stdout)
+            self.assertEqual(lock_holder.stdout.readline().strip(), "locked")
+            try:
+                result = subprocess.run(
+                    ["bash", str(SYNC_CONFIGS), "--item", "mcp"],
+                    cwd=REPO_ROOT,
+                    env=env,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(
+                    "runtime provisioning holds the source projection lock",
+                    result.stderr,
+                )
+                self.assertFalse((configs / "mcp").exists())
+            finally:
+                self.assertIsNotNone(lock_holder.stdin)
+                lock_holder.stdin.close()
+                self.assertEqual(lock_holder.wait(timeout=5), 0)
+                lock_holder.stdout.close()
+                lock_holder.stderr.close()
+
     def test_sync_subset_supports_non_mutating_preview_and_apply(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             configs = Path(tmpdir) / "Configs"
@@ -95,15 +160,58 @@ class SyncParityEntrypointContractsTests(unittest.TestCase):
             backend = source / "mechanics" / "config-projection" / "parts" / "sync" / SYNC_CONFIGS.name
             backend.parent.mkdir(parents=True)
             shutil.copyfile(SYNC_CONFIGS, backend)
+            manifest_builder = (
+                backend.parent
+                / "scripts"
+                / MCP_DEPLOYMENT_MANIFEST.name
+            )
+            manifest_builder.parent.mkdir(parents=True)
+            shutil.copyfile(MCP_DEPLOYMENT_MANIFEST, manifest_builder)
             aoa_lib = source / "scripts" / "aoa-lib.sh"
             aoa_lib.parent.mkdir(parents=True)
             shutil.copyfile(REPO_ROOT / "scripts" / "aoa-lib.sh", aoa_lib)
-            write_text(source / "mcp" / "owner" / "server.py", "print('source')\n")
-            write_text(source / "mcp" / "owner" / "__pycache__" / "server.pyc", "cache\n")
-            write_text(source / "mcp" / "owner" / ".pytest_cache" / "marker", "cache\n")
-            write_text(source / "mcp" / "owner" / ".mypy_cache" / "marker", "cache\n")
-            write_text(source / "mcp" / "owner" / ".ruff_cache" / "marker", "cache\n")
-            write_text(source / "mcp" / "owner" / ".coverage", "cache\n")
+            service = source / "mcp" / "services" / "example-mcp"
+            write_text(
+                service / "pyproject.toml",
+                """\
+[project]
+name = "example-mcp"
+version = "0.1.0"
+
+[project.scripts]
+example-mcp-server = "example_mcp.server:main"
+""",
+            )
+            write_text(
+                service / "src" / "example_mcp" / "server.py",
+                "print('source')\n",
+            )
+            write_text(service / "__pycache__" / "server.pyc", "cache\n")
+            write_text(service / ".pytest_cache" / "marker", "cache\n")
+            write_text(service / ".mypy_cache" / "marker", "cache\n")
+            write_text(service / ".ruff_cache" / "marker", "cache\n")
+            write_text(service / ".coverage", "cache\n")
+            subprocess.run(
+                ["git", "init", "-q"],
+                cwd=source,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Abyss Test"],
+                cwd=source,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "abyss-test@example.invalid"],
+                cwd=source,
+                check=True,
+            )
+            subprocess.run(["git", "add", "."], cwd=source, check=True)
+            subprocess.run(
+                ["git", "commit", "-q", "-m", "fixture"],
+                cwd=source,
+                check=True,
+            )
 
             configs = root / "runtime" / "Configs"
             env = os.environ.copy()
@@ -119,12 +227,37 @@ class SyncParityEntrypointContractsTests(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertTrue((configs / "mcp" / "owner" / "server.py").is_file())
-            self.assertFalse((configs / "mcp" / "owner" / "__pycache__").exists())
-            self.assertFalse((configs / "mcp" / "owner" / ".pytest_cache").exists())
-            self.assertFalse((configs / "mcp" / "owner" / ".mypy_cache").exists())
-            self.assertFalse((configs / "mcp" / "owner" / ".ruff_cache").exists())
-            self.assertFalse((configs / "mcp" / "owner" / ".coverage").exists())
+            deployed_service = configs / "mcp" / "services" / "example-mcp"
+            self.assertTrue(
+                (deployed_service / "src" / "example_mcp" / "server.py").is_file()
+            )
+            self.assertFalse((deployed_service / "__pycache__").exists())
+            self.assertFalse((deployed_service / ".pytest_cache").exists())
+            self.assertFalse((deployed_service / ".mypy_cache").exists())
+            self.assertFalse((deployed_service / ".ruff_cache").exists())
+            self.assertFalse((deployed_service / ".coverage").exists())
+            projection_lock = (
+                root
+                / "runtime"
+                / "Services"
+                / "abyss-stack-mcp"
+                / ".source-projection.lock"
+            )
+            self.assertTrue(projection_lock.is_file())
+            self.assertEqual(projection_lock.stat().st_mode & 0o777, 0o600)
+            latest_manifest = (
+                root
+                / "runtime"
+                / "Logs"
+                / "mcp"
+                / "deployments"
+                / "latest.json"
+            )
+            self.assertTrue(latest_manifest.is_file())
+            payload = json.loads(latest_manifest.read_text(encoding="utf-8"))
+            self.assertEqual(payload["parity_state"], "exact")
+            self.assertEqual(payload["runtime_observation_state"], "not_observed")
+            self.assertEqual(payload["services"][0]["service_id"], "example-mcp")
 
     def test_validate_deployed_parity_accepts_matching_synced_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

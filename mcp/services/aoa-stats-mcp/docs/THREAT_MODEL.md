@@ -14,12 +14,13 @@ read models without granting arbitrary filesystem access or owner mutation.
 - Packet checks accept JSON objects, not filesystem paths.
 - The subprocess adapter uses no shell and has a timeout.
 - Every MCP tool is marked read-only, non-destructive, and idempotent.
-- HTTP is loopback-only and requires the shared bearer contract.
+- HTTP is loopback-only and requires the owner-specific `aoa-stats` read
+  bearer and scope.
 
 ## Residual risks
 
 Owner-authored payloads may be stale, incomplete, or wrong. The service reports
 their posture but cannot attest them. A same-user process that can read the
-workspace or bearer credential is outside the isolation provided by this
+workspace or same-UID bearer credential is outside the isolation provided by this
 adapter. Remote transport, write tools, raw-content reads, and validator or
 refresh execution require separate owner review.

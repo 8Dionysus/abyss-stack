@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "abyss-machine-mcp"
-version = "0.1.0"
-description = "MCP access plane for Abyss Machine host read models"
+version = "0.2.0"
+description = "Owner-bounded MCP read contour for Abyss Machine host models"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

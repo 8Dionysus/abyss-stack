@@ -1,0 +1,262 @@
+{
+  "$defs": {
+    "EvidenceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Evidence Ref",
+          "type": "string"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "owner": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Owner",
+          "type": "string"
+        },
+        "revision": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "evidence_ref",
+        "revision",
+        "observed_at"
+      ],
+      "title": "EvidenceRef",
+      "type": "object"
+    },
+    "PlanStep": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Action",
+          "type": "string"
+        },
+        "exact_target": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Exact Target",
+          "type": "string"
+        },
+        "expected_effect": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Expected Effect",
+          "type": "string"
+        },
+        "order": {
+          "maximum": 32,
+          "minimum": 1,
+          "title": "Order",
+          "type": "integer"
+        },
+        "stop_on": {
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "title": "Stop On",
+          "type": "array"
+        }
+      },
+      "required": [
+        "order",
+        "action",
+        "exact_target",
+        "expected_effect",
+        "stop_on"
+      ],
+      "title": "PlanStep",
+      "type": "object"
+    }
+  },
+  "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/runtime-plan-candidate.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "approval_required_before_execution": {
+      "const": true,
+      "default": true,
+      "title": "Approval Required Before Execution",
+      "type": "boolean"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "deployed_revision": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Deployed Revision",
+      "type": "string"
+    },
+    "effect_class": {
+      "const": "prepare_candidate",
+      "default": "prepare_candidate",
+      "title": "Effect Class",
+      "type": "string"
+    },
+    "exact_unit_name": {
+      "maxLength": 256,
+      "minLength": 3,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]*\\.(service|socket)$",
+      "title": "Exact Unit Name",
+      "type": "string"
+    },
+    "execution_authorized": {
+      "const": false,
+      "default": false,
+      "title": "Execution Authorized",
+      "type": "boolean"
+    },
+    "expected_observation_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Expected Observation Digest",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "package_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Package Digest",
+      "type": "string"
+    },
+    "plan_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "plan_kind": {
+      "enum": [
+        "sync",
+        "deploy",
+        "activate",
+        "restart",
+        "rollback"
+      ],
+      "title": "Plan Kind",
+      "type": "string"
+    },
+    "policy_family": {
+      "const": "candidate",
+      "default": "candidate",
+      "title": "Policy Family",
+      "type": "string"
+    },
+    "postcondition_deploy_tree_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Postcondition Deploy Tree Digest",
+      "type": "string"
+    },
+    "precondition_evidence": {
+      "items": {
+        "$ref": "#/$defs/EvidenceRef"
+      },
+      "title": "Precondition Evidence",
+      "type": "array"
+    },
+    "rollback_route": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Rollback Route",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "abyss_stack_runtime_plan_candidate_v1",
+      "default": "abyss_stack_runtime_plan_candidate_v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_revision": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Source Revision",
+      "type": "string"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/PlanStep"
+      },
+      "minItems": 1,
+      "title": "Steps",
+      "type": "array"
+    },
+    "target_organ_id": {
+      "maxLength": 160,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "title": "Target Organ Id",
+      "type": "string"
+    },
+    "target_policy_family": {
+      "enum": [
+        "read",
+        "candidate",
+        "internal_effect",
+        "external_effect"
+      ],
+      "title": "Target Policy Family",
+      "type": "string"
+    }
+  },
+  "required": [
+    "plan_id",
+    "plan_kind",
+    "target_organ_id",
+    "target_policy_family",
+    "expected_observation_digest",
+    "source_revision",
+    "package_digest",
+    "deployed_revision",
+    "postcondition_deploy_tree_digest",
+    "exact_unit_name",
+    "precondition_evidence",
+    "steps",
+    "rollback_route",
+    "created_at",
+    "expires_at"
+  ],
+  "title": "RuntimePlanCandidate",
+  "type": "object"
+}

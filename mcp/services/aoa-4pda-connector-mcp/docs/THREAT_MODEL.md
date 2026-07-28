@@ -26,5 +26,7 @@ truth and stack-owned MCP access behavior.
 - Tests use a fake command runner and assert answer packet preservation.
 - The validator checks package files, read-only source-route posture, server
   build, and a fake Xiaomi 13T answer packet.
-- Optional loopback HTTP requires the source-owned bearer credential before
-  MCP dispatch; stdio remains the portable default.
+- Optional loopback HTTP requires the exact 4PDA read credential, scope, and
+  client identity before MCP dispatch; its managed unit has no persistent
+  write path and denies non-loopback IP traffic. Stdio remains the portable
+  default.

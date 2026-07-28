@@ -12,11 +12,25 @@ from .core import ToSCorpusMCPState
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_HTTP_PORT = 5429
+READ_TOKEN_ENV_VAR = "TOS_CORPUS_MCP_READ_BEARER_TOKEN"
+READ_CREDENTIAL_NAME = "tos-corpus-mcp-read-bearer-token"
+READ_AUTH_SCOPE = "mcp:tos-corpus:read"
+READ_CLIENT_ID = "aoa-loopback-codex:tos-corpus:read"
+
+
+def _read_http_auth_kwargs() -> dict[str, Any]:
+    return _http_auth_kwargs(
+        DEFAULT_HTTP_PORT,
+        token_env_var=READ_TOKEN_ENV_VAR,
+        credential_name=READ_CREDENTIAL_NAME,
+        auth_scope=READ_AUTH_SCOPE,
+        client_id=READ_CLIENT_ID,
+    )
 
 
 def _run_server(server: Any) -> None:
     settings = _transport_settings(DEFAULT_HTTP_PORT)
-    _http_auth_kwargs(DEFAULT_HTTP_PORT)
+    _read_http_auth_kwargs()
     if settings.transport == "stdio":
         server.run(transport="stdio")
         return
@@ -35,10 +49,23 @@ def build_server(
 ) -> Any:
     try:
         from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
+        from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
         raise SystemExit("Missing dependency 'mcp'. Install with: python -m pip install -e .") from exc
 
-    mcp = FastMCP("tos-corpus-mcp", json_response=True, **_http_auth_kwargs(DEFAULT_HTTP_PORT))
+    mcp = FastMCP(
+        "tos-corpus-mcp",
+        json_response=True,
+        **_read_http_auth_kwargs(),
+    )
+    read_only_tool = mcp.tool(
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        )
+    )
 
     def current_state() -> ToSCorpusMCPState:
         return ToSCorpusMCPState.discover(
@@ -48,22 +75,22 @@ def build_server(
             philosophy_post_planting_audit_path=philosophy_post_planting_audit_path,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def tos_corpus_status() -> dict[str, Any]:
         """Return ToS corpus index path, counts, graph views, and authority boundary."""
         return current_state().status()
 
-    @mcp.tool()
+    @read_only_tool
     def tos_corpus_summary() -> dict[str, Any]:
         """Return a compact whole-corpus summary from the ToS-owned index."""
         return current_state().summary()
 
-    @mcp.tool()
+    @read_only_tool
     def tos_corpus_search(query: str, limit: int = 20, resource_kind: str | None = None) -> dict[str, Any]:
         """Search nodes, resources, manifests, branches, and graph views in the ToS corpus index."""
         return current_state().search(query=query, limit=limit, resource_kind=resource_kind)
 
-    @mcp.tool()
+    @read_only_tool
     def tos_corpus_resources(
         resource_kind: str | None = None,
         owner_branch: str | None = None,
@@ -72,57 +99,57 @@ def build_server(
         """List indexed ToS resources with optional kind and owner-branch filters."""
         return current_state().resources(resource_kind=resource_kind, owner_branch=owner_branch, limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def tos_corpus_node(node_id: str) -> dict[str, Any]:
         """Return one indexed ToS node and relation edges connected to it."""
         return current_state().node(node_id=node_id)
 
-    @mcp.tool()
+    @read_only_tool
     def tos_corpus_relation_pack(pack_id: str) -> dict[str, Any]:
         """Return one indexed ToS relation pack and its edges."""
         return current_state().relation_pack(pack_id=pack_id)
 
-    @mcp.tool()
+    @read_only_tool
     def tos_corpus_graph_view(view_id: str, limit: int = 100) -> dict[str, Any]:
         """Return a named graph review view over the whole ToS corpus index."""
         return current_state().graph_view(view_id=view_id, limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def tos_corpus_packet(query: str = "", view_id: str | None = None, limit: int = 20) -> dict[str, Any]:
         """Return a compact task packet with optional search and graph-view context."""
         return current_state().packet(query=query, view_id=view_id, limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_status() -> dict[str, Any]:
         """Return ToS philosophy graph projection path, counts, graph views, and authority boundary."""
         return current_state().philosophy_status()
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_views() -> dict[str, Any]:
         """List ToS philosophy graph views materialized by the ToS-owned projection export."""
         return current_state().philosophy_views()
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_layers() -> dict[str, Any]:
         """Return ToS-owned philosophy graph layers and layer counts for runtime filtering."""
         return current_state().philosophy_layers()
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_contracts() -> dict[str, Any]:
         """Return the bounded MCP access contract for ToS philosophy graph packets."""
         return current_state().philosophy_contracts()
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_scale_manifest(view_id: str | None = None, layers: list[str] | None = None) -> dict[str, Any]:
         """Return compact row counts and packet routes for ToS philosophy scale projection access."""
         return current_state().philosophy_scale_manifest(view_id=view_id, layers=layers)
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_view(view_id: str) -> dict[str, Any]:
         """Return one ToS philosophy graph view packet with projected nodes, edges, and source refs."""
         return current_state().philosophy_view(view_id=view_id)
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_clusters(
         view_id: str | None = None,
         cluster_kind: str | None = None,
@@ -131,17 +158,17 @@ def build_server(
         """Return compact ToS philosophy graph clusters, optionally filtered by view and cluster kind."""
         return current_state().philosophy_clusters(view_id=view_id, cluster_kind=cluster_kind, limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_node(node_id: str) -> dict[str, Any]:
         """Return one projected ToS philosophy node and related projected edges."""
         return current_state().philosophy_node(node_id=node_id)
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_edge(edge_id: str) -> dict[str, Any]:
         """Return one projected ToS philosophy edge and its endpoint nodes."""
         return current_state().philosophy_edge(edge_id=edge_id)
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_neighborhood(
         node_id: str,
         depth: int = 1,
@@ -158,7 +185,7 @@ def build_server(
             limit=limit,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_path(
         from_id: str,
         to_id: str,
@@ -175,42 +202,42 @@ def build_server(
             max_depth=max_depth,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_review_packet(view_id: str = "chronology") -> dict[str, Any]:
         """Return one compact ToS-owned review packet for a philosophy graph lens."""
         return current_state().philosophy_review_packet(view_id=view_id)
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_snapshot() -> dict[str, Any]:
         """Return ToS-owned philosophy graph snapshot fingerprints for diff-aware review."""
         return current_state().philosophy_snapshot()
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_audit() -> dict[str, Any]:
         """Return the ToS-owned post-planting audit packet when present."""
         return current_state().philosophy_audit()
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_unresolved(view_id: str | None = None) -> dict[str, Any]:
         """Return unresolved review surfaces for all philosophy graph lenses or one selected lens."""
         return current_state().philosophy_unresolved(view_id=view_id)
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_packet(query: str = "", view_id: str | None = None, limit: int = 20) -> dict[str, Any]:
         """Return a compact philosophy graph packet for agents with optional search and view context."""
         return current_state().philosophy_packet(query=query, view_id=view_id, limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_chronology_packet(limit: int = 20) -> dict[str, Any]:
         """Return the chronology lens packet for formation, fixation, canonization, and dating review."""
         return current_state().philosophy_lens_packet(view_id="chronology", limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_source_evidence_packet(limit: int = 20) -> dict[str, Any]:
         """Return the source-evidence lens packet for source refs, confidence, and witness review."""
         return current_state().philosophy_lens_packet(view_id="source-evidence", limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def tos_philosophy_graph_concept_lineage_packet(limit: int = 20) -> dict[str, Any]:
         """Return the concept-lineage lens packet for concept/problem pressure and lineage review."""
         return current_state().philosophy_lens_packet(view_id="concept-lineage", limit=limit)

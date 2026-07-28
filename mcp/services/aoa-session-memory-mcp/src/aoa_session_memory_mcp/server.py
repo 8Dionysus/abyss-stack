@@ -14,11 +14,25 @@ from ._http_auth import transport_settings as _transport_settings
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_HTTP_PORT = 5422
+READ_TOKEN_ENV_VAR = "AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN"
+READ_CREDENTIAL_NAME = "aoa-session-memory-mcp-read-bearer-token"
+READ_AUTH_SCOPE = "mcp:aoa-session-memory:read"
+READ_CLIENT_ID = "aoa-loopback-codex:aoa-session-memory:read"
+
+
+def _read_http_auth_kwargs() -> dict[str, Any]:
+    return _http_auth_kwargs(
+        DEFAULT_HTTP_PORT,
+        token_env_var=READ_TOKEN_ENV_VAR,
+        credential_name=READ_CREDENTIAL_NAME,
+        auth_scope=READ_AUTH_SCOPE,
+        client_id=READ_CLIENT_ID,
+    )
 
 
 def _run_server(server: Any) -> None:
     settings = _transport_settings(DEFAULT_HTTP_PORT)
-    _http_auth_kwargs(DEFAULT_HTTP_PORT)
+    _read_http_auth_kwargs()
     if settings.transport == "stdio":
         server.run(transport="stdio")
         return
@@ -69,7 +83,7 @@ def build_server(
     mcp = FastMCP(
         "aoa-session-memory-mcp",
         json_response=True,
-        **_http_auth_kwargs(DEFAULT_HTTP_PORT),
+        **_read_http_auth_kwargs(),
     )
     read_only_tool = mcp.tool(
         annotations=ToolAnnotations(

@@ -11,11 +11,15 @@ from .core import AoAStatsMCPState
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_HTTP_PORT = 5430
+READ_TOKEN_ENV_VAR = "AOA_STATS_MCP_READ_BEARER_TOKEN"
+READ_CREDENTIAL_NAME = "aoa-stats-mcp-read-bearer-token"
+READ_AUTH_SCOPE = "mcp:aoa-stats:read"
+READ_CLIENT_ID = "aoa-loopback-codex:aoa-stats:read"
 
 
 def _run_server(server: Any) -> None:
     settings = _transport_settings(DEFAULT_HTTP_PORT)
-    _http_auth_kwargs(DEFAULT_HTTP_PORT)
+    _read_http_auth_kwargs()
     if settings.transport == "stdio":
         server.run(transport="stdio")
         return
@@ -24,6 +28,16 @@ def _run_server(server: Any) -> None:
     server.settings.host = settings.host
     server.settings.port = settings.port
     server.run(transport="streamable-http")
+
+
+def _read_http_auth_kwargs() -> dict[str, Any]:
+    return _http_auth_kwargs(
+        DEFAULT_HTTP_PORT,
+        token_env_var=READ_TOKEN_ENV_VAR,
+        credential_name=READ_CREDENTIAL_NAME,
+        auth_scope=READ_AUTH_SCOPE,
+        client_id=READ_CLIENT_ID,
+    )
 
 
 def build_server(
@@ -35,12 +49,14 @@ def build_server(
         from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
         from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
-        raise SystemExit("Missing dependency 'mcp'. Install with: python -m pip install -e .") from exc
+        raise SystemExit(
+            "Missing dependency 'mcp'. Install with: python -m pip install -e ."
+        ) from exc
 
     mcp = FastMCP(
         "aoa-stats-mcp",
         json_response=True,
-        **_http_auth_kwargs(DEFAULT_HTTP_PORT),
+        **_read_http_auth_kwargs(),
     )
     read_only_tool = mcp.tool(
         annotations=ToolAnnotations(

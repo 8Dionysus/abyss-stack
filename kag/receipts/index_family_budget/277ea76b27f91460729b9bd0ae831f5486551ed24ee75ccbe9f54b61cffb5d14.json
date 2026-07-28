@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 17748400,
+  "allowed_tracked_bytes": 25250283,
+  "approved_by": "repository-owner",
+  "base_ref": "e3f35444e4b527f26eeb9118f4bfeffff6c695d6",
+  "changed_generated_bytes": 17748400,
+  "changed_generated_files": 277,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "277ea76b27f91460729b9bd0ae831f5486551ed24ee75ccbe9f54b61cffb5d14",
+  "reason": "Refresh the KAG family for bounded recursive scanning of encoded reference parameters without raising the standing budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 25250283,
+  "tracked_bytes_max": 24117248
+}

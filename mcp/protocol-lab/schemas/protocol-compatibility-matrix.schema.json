@@ -1,0 +1,476 @@
+{
+  "$id": "https://abyss-stack.local/schemas/mcp-protocol-compatibility-matrix.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "abyss_mcp_protocol_compatibility_matrix_v1"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "production_protocol": {
+      "const": "2025-11-25"
+    },
+    "stable_spec": {
+      "$ref": "#/$defs/spec"
+    },
+    "next_spec": {
+      "$ref": "#/$defs/spec"
+    },
+    "official_conformance": {
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "format": "uri",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "commit": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "next_suite_executed": {
+          "type": "boolean"
+        },
+        "receipt_refs": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "repository",
+        "version",
+        "commit",
+        "next_suite_executed",
+        "receipt_refs"
+      ],
+      "type": "object"
+    },
+    "sdk_lines": {
+      "items": {
+        "$ref": "#/$defs/sdk"
+      },
+      "minItems": 3,
+      "type": "array"
+    },
+    "consumer_pairs": {
+      "items": {
+        "$ref": "#/$defs/consumer"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "migration_gates": {
+      "items": {
+        "$ref": "#/$defs/gate"
+      },
+      "maxItems": 14,
+      "minItems": 14,
+      "type": "array"
+    },
+    "capability_matrix": {
+      "items": {
+        "$ref": "#/$defs/capability"
+      },
+      "minItems": 8,
+      "type": "array"
+    },
+    "pilot": {
+      "$ref": "#/$defs/pilot"
+    },
+    "dual_support": {
+      "additionalProperties": false,
+      "properties": {
+        "stable_registration_retained": {
+          "const": true
+        },
+        "next_registration_separate": {
+          "const": true
+        },
+        "shared_credential_forbidden": {
+          "const": true
+        },
+        "rollback_without_stable_mutation": {
+          "const": true
+        },
+        "mass_migration_allowed": {
+          "const": false
+        }
+      },
+      "required": [
+        "stable_registration_retained",
+        "next_registration_separate",
+        "shared_credential_forbidden",
+        "rollback_without_stable_mutation",
+        "mass_migration_allowed"
+      ],
+      "type": "object"
+    },
+    "refresh_triggers": {
+      "items": {
+        "minLength": 3,
+        "type": "string"
+      },
+      "minItems": 5,
+      "type": "array"
+    },
+    "claim_limits": {
+      "items": {
+        "minLength": 3,
+        "type": "string"
+      },
+      "minItems": 5,
+      "type": "array"
+    },
+    "sources": {
+      "items": {
+        "format": "uri",
+        "type": "string"
+      },
+      "minItems": 5,
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "observed_at",
+    "expires_at",
+    "production_protocol",
+    "stable_spec",
+    "next_spec",
+    "official_conformance",
+    "sdk_lines",
+    "consumer_pairs",
+    "migration_gates",
+    "capability_matrix",
+    "pilot",
+    "dual_support",
+    "refresh_triggers",
+    "claim_limits",
+    "sources"
+  ],
+  "title": "OS Abyss MCP protocol compatibility matrix",
+  "type": "object",
+  "$defs": {
+    "capability": {
+      "additionalProperties": false,
+      "properties": {
+        "capability": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "stable": {
+          "enum": [
+            "supported",
+            "not_applicable",
+            "deprecated",
+            "unknown"
+          ]
+        },
+        "next": {
+          "enum": [
+            "rc_defined",
+            "extension",
+            "deprecated",
+            "unknown"
+          ]
+        },
+        "production_use": {
+          "enum": [
+            "stable_only",
+            "forbidden",
+            "separate_gate"
+          ]
+        },
+        "notes": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "capability",
+        "stable",
+        "next",
+        "production_use",
+        "notes"
+      ],
+      "type": "object"
+    },
+    "consumer": {
+      "additionalProperties": false,
+      "properties": {
+        "consumer_id": {
+          "minLength": 2,
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "stable_pair_observed": {
+          "type": "boolean"
+        },
+        "next_protocol_literal_present": {
+          "type": "boolean"
+        },
+        "next_wire_pair_observed": {
+          "type": "boolean"
+        },
+        "server_discover_observed": {
+          "type": "boolean"
+        },
+        "tasks_wire_pair_observed": {
+          "type": "boolean"
+        },
+        "capability_posture": {
+          "enum": [
+            "supported",
+            "unknown",
+            "blocked"
+          ]
+        },
+        "evidence": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "consumer_id",
+        "version",
+        "stable_pair_observed",
+        "next_protocol_literal_present",
+        "next_wire_pair_observed",
+        "server_discover_observed",
+        "tasks_wire_pair_observed",
+        "capability_posture",
+        "evidence"
+      ],
+      "type": "object"
+    },
+    "gate": {
+      "additionalProperties": false,
+      "properties": {
+        "gate_id": {
+          "pattern": "^P1-[0-9]{2}$",
+          "type": "string"
+        },
+        "requirement": {
+          "minLength": 3,
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "blocked",
+            "pending"
+          ]
+        },
+        "evidence_refs": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reason": {
+          "minLength": 3,
+          "type": "string"
+        }
+      },
+      "required": [
+        "gate_id",
+        "requirement",
+        "status",
+        "evidence_refs",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "pilot": {
+      "additionalProperties": false,
+      "properties": {
+        "organ_id": {
+          "const": "aoa-kag"
+        },
+        "policy_family": {
+          "const": "read"
+        },
+        "effectful": {
+          "const": false
+        },
+        "stable_registration": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next_lab_registration": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next_lab_registration_enabled": {
+          "const": false
+        },
+        "state": {
+          "enum": [
+            "blocked",
+            "ready",
+            "running",
+            "passed",
+            "failed",
+            "rolled_back"
+          ]
+        },
+        "rollback": {
+          "items": {
+            "minLength": 3,
+            "type": "string"
+          },
+          "minItems": 3,
+          "type": "array"
+        }
+      },
+      "required": [
+        "organ_id",
+        "policy_family",
+        "effectful",
+        "stable_registration",
+        "next_lab_registration",
+        "next_lab_registration_enabled",
+        "state",
+        "rollback"
+      ],
+      "type": "object"
+    },
+    "sdk": {
+      "additionalProperties": false,
+      "properties": {
+        "sdk_id": {
+          "minLength": 2,
+          "type": "string"
+        },
+        "ecosystem": {
+          "enum": [
+            "python",
+            "typescript"
+          ]
+        },
+        "version": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "release_status": {
+          "enum": [
+            "stable",
+            "beta",
+            "alpha"
+          ]
+        },
+        "commit": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "protocol_versions": {
+          "items": {
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "production_allowed": {
+          "type": "boolean"
+        },
+        "stack_pin": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stack_pin_status": {
+          "enum": [
+            "exact",
+            "compatible_maintenance_drift",
+            "not_used",
+            "blocked"
+          ]
+        }
+      },
+      "required": [
+        "sdk_id",
+        "ecosystem",
+        "version",
+        "release_status",
+        "commit",
+        "protocol_versions",
+        "production_allowed",
+        "stack_pin",
+        "stack_pin_status"
+      ],
+      "type": "object"
+    },
+    "spec": {
+      "additionalProperties": false,
+      "properties": {
+        "wire_version": {
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "type": "string"
+        },
+        "release_label": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "release_status": {
+          "enum": [
+            "final",
+            "release_candidate",
+            "draft"
+          ]
+        },
+        "tag": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "commit": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "final_published": {
+          "type": "boolean"
+        },
+        "production_allowed": {
+          "type": "boolean"
+        },
+        "source": {
+          "format": "uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "wire_version",
+        "release_label",
+        "release_status",
+        "tag",
+        "commit",
+        "final_published",
+        "production_allowed",
+        "source"
+      ],
+      "type": "object"
+    }
+  }
+}

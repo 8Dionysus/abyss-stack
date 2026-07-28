@@ -27,8 +27,11 @@ It returns:
 `aoa-4pda-connector` owns 4PDA-specific source policy, local data contracts,
 CLI behavior, schemas, and answer packet semantics. `abyss-stack` owns this MCP
 runtime package and local transport access: portable stdio by default and an
-optional authenticated loopback shared HTTP owner. Generated corpora, indexes,
-vectors, graphs, receipts, and caches remain outside Git.
+optional authenticated loopback HTTP owner using
+`AOA_4PDA_CONNECTOR_MCP_READ_BEARER_TOKEN`,
+`mcp:aoa-4pda-connector:read`, and port `5426`. The managed read unit has no
+persistent write path and denies non-loopback IP traffic. Generated corpora,
+indexes, vectors, graphs, receipts, and caches remain outside Git.
 
 ## Configuration
 

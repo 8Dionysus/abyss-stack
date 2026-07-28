@@ -33,5 +33,7 @@ owner payload says more.
 
 ## Runtime
 
-The package supports portable stdio and the stack's authenticated loopback
-HTTP contract. Transport does not change tool semantics or source authority.
+The package supports portable stdio and an owner-specific authenticated
+loopback HTTP read contour. Transport does not change tool semantics or source
+authority. The `aoa-stats` read token, credential name, scope, and client
+identity are not accepted by sibling owners.

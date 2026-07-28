@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 from pathlib import Path
@@ -54,22 +55,28 @@ def main() -> None:
         raise SystemExit(f"machine context packet surface failed: {packet}")
     if packet.get("packet_schema") not in {"abyss_machine_maps_context_packet_v1", "abyss_machine_maps_packet_v1"}:
         raise SystemExit(f"machine context packet schema drifted: {packet}")
-    maps_validate = state.surface("maps-validate")
-    if not maps_validate["ok"]:
-        raise SystemExit(f"machine maps validator surface failed: {maps_validate}")
-    rag = state.machine_rag_trace("validate abyss-machine MCP RAG trace", limit=4, evidence_limit=6)
-    if not rag["ok"]:
-        raise SystemExit(f"machine RAG trace surface failed: {rag}")
-    if rag.get("trace_schema") != "abyss_machine_rag_trace_v1":
-        raise SystemExit(f"machine RAG trace schema drifted: {rag}")
-    if rag.get("eval", {}).get("ok") is not True:
-        raise SystemExit(f"machine RAG trace eval failed: {rag}")
-    rag_validate = state.surface("rag-validate")
-    if not rag_validate["ok"]:
-        raise SystemExit(f"machine RAG validator surface failed: {rag_validate}")
-    artifact_coverage = state.surface("artifact-trust-coverage", include_payload=False)
-    if not artifact_coverage["ok"]:
-        raise SystemExit(f"artifact trust coverage surface failed: {artifact_coverage}")
+    catalog = state.available_surfaces()
+    if catalog.get("policy_family") != "read":
+        raise SystemExit(f"surface catalog policy drifted: {catalog}")
+    if any(
+        item.get("effect") != "read" or item.get("persistent_writes") is not False
+        for item in catalog.get("surfaces", [])
+    ):
+        raise SystemExit(f"surface catalog contains a non-read route: {catalog}")
+    for withdrawn in (
+        "nervous-recall",
+        "rag-trace",
+        "maps-validate",
+        "artifact-trust-coverage",
+        "artifact-trust-validate",
+    ):
+        try:
+            state.surface(withdrawn)
+        except ValueError as exc:
+            if "effectful and unavailable" not in str(exc):
+                raise
+        else:
+            raise SystemExit(f"effectful surface leaked into read contour: {withdrawn}")
     artifact_gate = state.surface(
         "artifact-trust-gate",
         artifact_class="public_source_seed",
@@ -78,9 +85,6 @@ def main() -> None:
     )
     if not artifact_gate["ok"]:
         raise SystemExit(f"artifact trust gate surface failed: {artifact_gate}")
-    artifact_validate = state.surface("artifact-trust-validate", include_payload=False)
-    if not artifact_validate["ok"]:
-        raise SystemExit(f"artifact trust validator surface failed: {artifact_validate}")
     try:
         state.surface("artifacts")
     except ValueError:
@@ -96,6 +100,9 @@ def main() -> None:
     server = build_server()
     if server is None:
         raise SystemExit("MCP server did not build")
+    tools = {tool.name for tool in asyncio.run(server.list_tools())}
+    if {"abyss_machine_recall", "abyss_machine_rag_trace"} & tools:
+        raise SystemExit(f"effectful tools leaked into server catalog: {sorted(tools)}")
 
     print(
         json.dumps(
@@ -110,13 +117,13 @@ def main() -> None:
                 "maps_result_count": maps["result_count"],
                 "context_packet_ok": packet["ok"],
                 "context_packet_schema": packet.get("packet_schema"),
-                "rag_trace_ok": rag["ok"],
-                "rag_trace_schema": rag.get("trace_schema"),
-                "rag_eval_ok": rag.get("eval", {}).get("ok"),
-                "artifact_trust_coverage_ok": artifact_coverage["ok"],
+                "surface_count": catalog["count"],
+                "withdrawn_effectful_surface_count": catalog[
+                    "withdrawn_effectful_surface_count"
+                ],
                 "artifact_trust_gate_ok": artifact_gate["ok"],
-                "artifact_trust_validate_ok": artifact_validate["ok"],
                 "artifact_trust_generic_surface_rejected": artifact_reject_ok,
+                "server_tool_count": len(tools),
                 "route_posture": route["route_posture"],
             },
             indent=2,

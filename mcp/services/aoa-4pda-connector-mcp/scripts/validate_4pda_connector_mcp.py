@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 import tempfile
@@ -125,6 +126,14 @@ def main() -> None:
         server = build_server(connector_repo=connector_repo)
         if server is None:
             raise SystemExit("MCP server did not build")
+        tools = asyncio.run(server.list_tools())
+        if len(tools) != 5 or any(
+            tool.annotations.readOnlyHint is not True
+            or tool.annotations.destructiveHint is not False
+            or tool.annotations.openWorldHint is not False
+            for tool in tools
+        ):
+            raise SystemExit("4PDA read tool catalog or annotations drifted")
 
         print(
             json.dumps(
@@ -135,6 +144,7 @@ def main() -> None:
                     "answer_schema": answer["schema"],
                     "answer_status": answer["agent_answer"]["status"],
                     "network_touched": answer["network_touched"],
+                    "tool_count": len(tools),
                 },
                 indent=2,
             )

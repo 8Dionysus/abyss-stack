@@ -24,5 +24,7 @@
   fields.
 - Boundary checks flag packets that do not prove local search behavior.
 - Runtime storage roots are configured outside abyss-stack.
-- Optional loopback HTTP requires the source-owned bearer credential before
-  MCP dispatch; stdio remains the portable default.
+- Optional loopback HTTP requires the exact Telegram read credential, scope,
+  and client identity before MCP dispatch; its managed unit has no persistent
+  write path and denies non-loopback IP traffic. Stdio remains the portable
+  default.

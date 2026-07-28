@@ -16,6 +16,10 @@ from .runtime import build_application
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_HTTP_PORT = 5425
+READ_TOKEN_ENV_VAR = "AOA_KAG_MCP_READ_BEARER_TOKEN"
+READ_CREDENTIAL_NAME = "aoa-kag-mcp-read-bearer-token"
+READ_AUTH_SCOPE = "mcp:aoa-kag:read"
+READ_CLIENT_ID = "aoa-loopback-codex:aoa-kag:read"
 Detail = Literal["compact", "summary", "full"]
 Strategy = Literal["auto", "exact", "lexical", "semantic", "hybrid", "graph"]
 Direction = Literal["outgoing", "incoming", "both"]
@@ -25,7 +29,7 @@ TraversalDepth = Annotated[int, Field(ge=1, le=4)]
 
 def _run_server(server: Any) -> None:
     settings = _transport_settings(DEFAULT_HTTP_PORT)
-    _http_auth_kwargs(DEFAULT_HTTP_PORT)
+    _read_http_auth_kwargs()
     if settings.transport == "stdio":
         server.run(transport="stdio")
         return
@@ -34,6 +38,16 @@ def _run_server(server: Any) -> None:
     server.settings.host = settings.host
     server.settings.port = settings.port
     server.run(transport="streamable-http")
+
+
+def _read_http_auth_kwargs() -> dict[str, Any]:
+    return _http_auth_kwargs(
+        DEFAULT_HTTP_PORT,
+        token_env_var=READ_TOKEN_ENV_VAR,
+        credential_name=READ_CREDENTIAL_NAME,
+        auth_scope=READ_AUTH_SCOPE,
+        client_id=READ_CLIENT_ID,
+    )
 
 
 def _json(payload: dict[str, Any]) -> str:
@@ -86,7 +100,7 @@ def build_server(
             "the evidence trace used for each answer."
         ),
         json_response=True,
-        **_http_auth_kwargs(DEFAULT_HTTP_PORT),
+        **_read_http_auth_kwargs(),
     )
 
     @mcp.tool(annotations=annotations, structured_output=True)

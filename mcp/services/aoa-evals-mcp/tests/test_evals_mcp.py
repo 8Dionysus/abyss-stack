@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -1999,6 +2000,125 @@ def test_write_local_note_rejects_private_or_traversing_refs(tmp_path: Path) -> 
     assert any("ref" in issue for issue in result["validation"]["issues"])
 
 
-def test_server_builds(tmp_path: Path) -> None:
+def test_server_contours_have_disjoint_annotated_tool_catalogs(
+    tmp_path: Path,
+) -> None:
     seed_evals(tmp_path)
-    assert build_server(workspace_root=tmp_path) is not None
+    read_server = build_server(
+        workspace_root=tmp_path,
+        policy_family="read",
+    )
+    candidate_server = build_server(
+        workspace_root=tmp_path,
+        policy_family="candidate",
+    )
+
+    async def inspect(server):
+        return (
+            {
+                tool.name: tool.annotations
+                for tool in await server.list_tools()
+            },
+            {prompt.name for prompt in await server.list_prompts()},
+            {
+                template.uriTemplate
+                for template in await server.list_resource_templates()
+            },
+        )
+
+    read_tools, read_prompts, read_templates = asyncio.run(
+        inspect(read_server)
+    )
+    candidate_tools, candidate_prompts, candidate_templates = asyncio.run(
+        inspect(candidate_server)
+    )
+    assert set(read_tools) == {
+        "aoa_evals_comparison",
+        "aoa_evals_expand",
+        "aoa_evals_find_or_propose",
+        "aoa_evals_find_or_propose_local",
+        "aoa_evals_forge_access_packet",
+        "aoa_evals_inspect",
+        "aoa_evals_local_port",
+        "aoa_evals_local_ports",
+        "aoa_evals_read_runtime_candidate_export",
+        "aoa_evals_report_skeleton",
+        "aoa_evals_runtime_candidate_exports",
+        "aoa_evals_runtime_evidence_template",
+        "aoa_evals_runtime_status",
+        "aoa_evals_select",
+        "aoa_evals_validate_evidence_candidate",
+    }
+    assert set(candidate_tools) == {
+        "aoa_evals_write_local_intake",
+        "aoa_evals_write_local_report_note",
+        "aoa_evals_write_local_suite_note",
+    }
+    assert set(read_tools).isdisjoint(candidate_tools)
+    for tool_annotations in read_tools.values():
+        assert tool_annotations.readOnlyHint is True
+        assert tool_annotations.destructiveHint is False
+        assert tool_annotations.idempotentHint is True
+        assert tool_annotations.openWorldHint is False
+    for tool_annotations in candidate_tools.values():
+        assert tool_annotations.readOnlyHint is False
+        assert tool_annotations.destructiveHint is True
+        assert tool_annotations.idempotentHint is False
+        assert tool_annotations.openWorldHint is False
+    assert read_prompts == {
+        "eval-find-or-propose",
+        "eval-forge-access",
+        "eval-review",
+        "eval-select",
+        "evidence-packet",
+        "local-eval-port",
+        "report-skeleton",
+    }
+    assert candidate_prompts == {"local-eval-port-write"}
+    assert "aoa-evals://bundle/{name}" in read_templates
+    assert (
+        "aoa-evals://local-port/{repo}/reports"
+        in read_templates
+    )
+    assert candidate_templates == set()
+
+
+def test_evals_candidate_root_gate_denies_read_and_unlisted_writes(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    seed_evals(tmp_path)
+    repo_root = seed_local_eval_port(tmp_path, status="skeleton")
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    monkeypatch.setenv("AOA_MCP_POLICY_FAMILY", "read")
+    with pytest.raises(PermissionError, match="read contour"):
+        state.write_local_intake(
+            "aoa-memo",
+            valid_eval_need_packet(),
+            apply=True,
+        )
+
+    monkeypatch.setenv("AOA_MCP_POLICY_FAMILY", "candidate")
+    monkeypatch.delenv("AOA_EVALS_MCP_CANDIDATE_ROOTS", raising=False)
+    with pytest.raises(
+        PermissionError,
+        match="AOA_EVALS_MCP_CANDIDATE_ROOTS",
+    ):
+        state.write_local_intake(
+            "aoa-memo",
+            valid_eval_need_packet(),
+            apply=True,
+        )
+
+    monkeypatch.setenv(
+        "AOA_EVALS_MCP_CANDIDATE_ROOTS",
+        str(repo_root / "evals"),
+    )
+    result = state.write_local_intake(
+        "aoa-memo",
+        valid_eval_need_packet(),
+        apply=True,
+    )
+    assert result["applied"] is True
+    assert Path(result["target_path"]).is_file()

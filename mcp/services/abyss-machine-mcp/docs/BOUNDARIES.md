@@ -16,14 +16,12 @@
 allowlist. It returns compact JSON objects with source refs and explicit
 authority boundaries.
 
-The fast brief reads `stack-bridge`, which is an owner-routed bridge contract
-and evidence map. Targeted surfaces read one live command at a time.
+The fast brief reads the existing `stack-bridge latest`; it never refreshes the
+bridge. Targeted surfaces execute only commands in the read catalog.
 
-Artifact trust surfaces are targeted read models over `abyss-machine artifacts`
-commands. They may expose requirements, producer profiles, affected/drift
-posture, coverage, trust-gate verdicts, registry latest selection, scenarios,
-and validator status. They may not build sidecars, sign, verify, promote,
-repair registry state, write evidence, or decide proof verdicts.
+Artifact trust access is limited to trust-gate and registry-latest reads.
+Requirements, producer profiles, affected/drift, coverage, scenarios, and
+validation currently persist generated state in the owner CLI and are denied.
 
 Generated latest files, bridge refs, machine atlas map entries, context
 packets, and machine RAG traces are evidence. They help agents route work, but
@@ -42,6 +40,8 @@ intent.
 - No artifact signing, sidecar building, evidence promotion, registry writes,
   or trust-root mutation.
 - No KAG publication or delivery into AoA organs.
+- No cache, latest, index, trace, eval, evidence-pack, or validation refresh.
+- No reuse of another organ's read bearer or the transitional shared bearer.
 - No exposure beyond portable stdio or the decision-bound authenticated
   loopback shared HTTP owner; remote, wildcard-bind, gateway, or proxy
   exposure requires a later decision.

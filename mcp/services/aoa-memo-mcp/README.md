@@ -1,6 +1,17 @@
 # aoa-memo-mcp
 
-`aoa-memo-mcp` exposes OS Abyss memory through a small MCP access plane.
+`aoa-memo-mcp` exposes OS Abyss memory through two process-isolated MCP
+contours:
+
+- read on `127.0.0.1:5421`, authenticated by the
+  `aoa-memo-mcp-read-bearer-token` credential and
+  `mcp:aoa-memo:read` scope;
+- candidate on `127.0.0.1:5434`, authenticated by the distinct
+  `aoa-memo-mcp-candidate-bearer-token` credential and
+  `mcp:aoa-memo:candidate` scope.
+
+The read catalog contains no persistent tool. The candidate catalog contains
+only local candidate/index/export/forwarding-receipt helpers and no resources.
 
 It does not replace `aoa-memo`, `.aoa`, or local `memo/` ports. It gives agents
 one repeatable route to ask:
@@ -23,7 +34,7 @@ one repeatable route to ask:
 
 ## MCP Surface
 
-Resources:
+Read-contour resources:
 
 - `aoa-memo://brief/repo/{repo}`
 - `aoa-memo://memory/object/{id}`
@@ -35,27 +46,32 @@ Resources:
 - `aoa-memo://repo/{repo}/memo-vocabulary`
 - `aoa-memo://intake/{packet_id}/review`
 
-Tools:
+Read-contour tools:
 
 - `aoa_memo_brief(repo, intent)`
 - `aoa_memo_search(query, scope, mode)`
-- `aoa_memo_create_candidate(repo, evidence_refs, claim)`
 - `aoa_memo_validate_candidate(path)`
-- `aoa_memo_build_port_index(repo, write, check)`
+- `aoa_memo_build_port_index(repo, check)` without a write parameter
 - `aoa_memo_validate_port(repo)`
-- `aoa_memo_prepare_intake_packet(repo, candidate_refs, receipt_refs)`
-- `aoa_memo_review_intake(path)` as a local forwarding check, not durable review
 - `aoa_memo_pending_exports(repo)`
 - `aoa_memo_landing_plan(repo, export_ref, ...)` as a readiness and dry-run
   helper, not durable landing
 
-Prompts:
+Candidate-contour tools:
+
+- `aoa_memo_create_candidate(repo, evidence_refs, claim)`
+- `aoa_memo_write_port_index(repo)`
+- `aoa_memo_prepare_intake_packet(repo, candidate_refs, receipt_refs)`
+- `aoa_memo_review_intake(path)` as a local forwarding check, not durable
+  review
+
+Read prompts:
 
 - `memo-brief`
-- `memo-intake`
-- `memo-review`
 - `memo-landing-plan`
 - `session-rehydrate`
+
+Candidate prompts are `memo-intake` and `memo-review`.
 
 Index and intake tools operate only on local `memo/` port packet state. They do
 not land durable reviewed memory into `aoa-memo`. Landing-plan helpers may
@@ -64,7 +80,11 @@ export is blocked, ready, or already landed, but the durable write still happens
 as an `aoa-memo` source patch with validators and review. Candidate, export,
 receipt, port, and port-index packets are validated against `aoa-memo`
 memory-port schemas, and packet paths must resolve under a known local
-`memo/` port.
+`memo/` port. Managed candidate startup also supplies an exact
+`AOA_MEMO_MCP_CANDIDATE_ROOTS` application allowlist. Its systemd unit keeps
+the filesystem read-only except for each admitted port's `candidates/`,
+`exports/`, `receipts/`, `INDEX.md`, and `index.min.json` paths. The
+`aoa-memo/memo/objects/` durable corpus is never writable by this process.
 
 Search starts with `aoa-memo` generated memory-object read models when the
 scope is `corpus`, `reviewed`, `central`, `aoa-memo`, or `all`. Use compact
@@ -77,7 +97,9 @@ In the shared AoA Codex plane this service is registered as `aoa_memo` through
 `8Dionysus:config/codex_plane/runtime_manifest.v1.json`. The workspace launcher
 is `<workspace-root>/.codex/bin/aoa-memo-mcp-server.py`; it resolves this
 stack-owned service without making `8Dionysus` the service authority.
-When installed as a package, the direct server entry point is
+The managed read and candidate units set `AOA_MCP_POLICY_FAMILY` to select a
+disjoint catalog. Stdio defaults to the read contour; a candidate process must
+be selected explicitly. When installed as a package, the direct server entry point is
 `aoa-memo-mcp-server`; `aoa-memo-mcp` remains the CLI entry point.
 
 ## Agent Route

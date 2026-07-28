@@ -112,11 +112,51 @@ The user unit consumes the file through `LoadCredential`; Codex config stores
 only `bearer_token_env_var = "AOA_MCP_HTTP_BEARER_TOKEN"`. General layout
 checks do not require this optional secret when MCP remains on stdio.
 
+The source-isolated owner-bounded read set uses eight additional non-committed
+files:
+
+- `aoa-decisions-mcp-read-bearer-token`
+- `aoa-memo-mcp-read-bearer-token`
+- `aoa-evals-mcp-read-bearer-token`
+- `aoa-kag-mcp-read-bearer-token`
+- `aoa-session-memory-mcp-read-bearer-token`
+- `aoa-stats-mcp-read-bearer-token`
+- `abyss-machine-mcp-read-bearer-token`
+- `tos-corpus-mcp-read-bearer-token`
+
+Provision them with:
+
+```bash
+scripts/aoa-install-systemd --provision-organ-mcp-read-auth
+```
+
+The command rejects equal owner tokens and emits only a secret-local digest
+manifest. Corresponding Codex registrations name the exact owner environment
+variable; no token value belongs in `config.toml`. The ToS credential may be
+provisioned before its wrapper/canary gate, but must not be interpreted as live
+bundle admission.
+
+Memo and Evals use two additional candidate credentials:
+
+- `aoa-memo-mcp-candidate-bearer-token`
+- `aoa-evals-mcp-candidate-bearer-token`
+
+Provision them with:
+
+```bash
+scripts/aoa-install-systemd --provision-organ-mcp-candidate-auth
+```
+
+This action also ensures the fourteen read credentials exist, rejects any
+equal value across the complete sixteen-credential set, and publishes only
+candidate digests in a separate secret-local manifest.
+
 ## Minimum expectation
 
 Before trying to run the full Intel-aware or local-worker surface, ensure that
-its required paths exist in real form. Provision the optional MCP bearer before
-starting any `aoa-mcp-http@...` owner.
+its required paths exist in real form. Provision the transitional bearer
+before starting an `aoa-mcp-http@...` owner and the owner read bearers before
+starting an `aoa-organ-mcp-read@...` owner.
 
 ## Helpful check
 

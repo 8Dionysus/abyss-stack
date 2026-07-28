@@ -1,0 +1,310 @@
+# abyss-stack-mcp
+
+`abyss-stack-mcp` is the stack-owned evidence plane for MCP runtime topology.
+It answers questions about the chain from reviewed source through package,
+deploy, process, endpoint, registry, consumer schema observation, grounded
+canary, and rollback readiness.
+
+It is not a gateway, does not proxy owner tools, does not flatten nested state
+into `healthy`, and does not own proof, memory, source truth, or owner
+acceptance.
+
+For the exact boundary between stack runtime receipts and the source-owned
+Codex organ-fabric projection, read
+[`docs/CODEX_CONSUMER_HANDOFF.md`](docs/CODEX_CONSUMER_HANDOFF.md). Service
+presence cannot register, reload, or remove a Codex consumer.
+
+## Process contours
+
+The read process exposes only:
+
+- `stack_runtime_catalog`: compact discovery with zero detail-schema bytes;
+- `stack_runtime_inspect`: one exact owner/policy target and one selected
+  evidence view.
+
+Both read tools are server-filtered to `policy_family=read`; omitting the
+catalog filter cannot enumerate candidate or effect subjects, and inspection
+rejects every higher-policy contour before loading an observation.
+
+The candidate process exposes only:
+
+- `stack_prepare_runtime_plan`: a content-addressed `sync`, `deploy`,
+  `activate`, `restart`, or `rollback` candidate.
+
+The processes use different tools, default ports (`5431`, `5433`), environment
+variables, systemd credential names, scopes, and client identities. A read
+credential cannot authenticate to or enumerate the candidate process.
+Both contours publish the `abyss-stack-mcp` application version in
+`serverInfo.version`; the pinned SDK version is dependency evidence, not the
+server identity.
+Every exported primitive also crosses the package-local protocol-independent
+policy seam. The seam rechecks the authenticated contour identity and scope,
+uses an exact tool/effect allowlist, limits canonical input and output bytes,
+in-flight calls, starts per minute, and dispatch time, propagates caller
+cancellation, rejects secret-bearing inputs or results, and emits a
+secret-free allow/deny/cancel receipt containing digests rather than values.
+All returned owner/runtime text is marked `content_trust=untrusted_data` and
+`instruction_authority=none`. The candidate primitive remains
+`prepare_candidate`; its policy receipt never authorizes a runtime effect.
+When `ABYSS_STACK_MCP_AUDIT_JOURNAL_PATH` is set, every receipt is appended
+before it enters the bounded in-memory read model to one contour-specific,
+mode-`0600`, canonical-JSONL hash chain. Startup replays the complete bounded
+chain and fails closed on a partial record, digest or sequence drift, a foreign
+owner/policy contour, a symlink, broad file permissions, or external size
+change. The public-safe `abyss-stack-mcp-audit` summary exposes counts and
+continuity metadata, not request/result values. It proves only local journal
+shape and hash-chain continuity; it does not prove caller intent, grounding,
+admission, owner acceptance, or a runtime effect.
+Provisioning validates the two existing or newly created bearer values
+together and fails closed if they are identical. It also atomically publishes
+a non-secret digest manifest. Each managed startup receives only its own
+bearer plus that manifest, verifies that the two committed digests are
+distinct, and binds its loaded bearer to the matching contour digest before
+the server can listen. Copying or rotating a credential file without
+refreshing a valid separated pair therefore fails closed on the next start.
+The lifecycle-owned rotation command changes both contour values and their
+manifest only while both managed units are observably stopped, never prints a
+value, and leaves consumer refresh plus restart to a later canary transaction.
+
+Every candidate remains `execution_authorized=false`, requires separate human
+approval before any effect, contains no free-form shell command, expires in at
+most ten minutes, and stops on observation drift or precondition mismatch.
+Every plan requires usable subject freshness. Activation additionally requires
+an active process with an observed process identity, a ready endpoint, a
+registered consumer with the exact server schema digest and an overlapping MCP
+protocol version, a passed central-proof verdict issued by `proof_owner` and
+bound to the current source revision and source-tree digest, package, deployed
+revision, tree digest, and content-addressed deployment-manifest digest, schema,
+running process identity, consumer, and exact canary route and receipt, named
+acceptance-owner evidence bound to the current source revision and package
+digest, a grounded canary, and usable
+rollback proof. Activation or restart of `internal_effect` and
+`external_effect` targets is rejected because this package does not model
+their separately required threat, approval, egress, compensation, or rollback
+contracts. The central-proof and acceptance receipts plus the selected
+compatible consumer's exact
+`registration_ref` are embedded in ordered activation steps, preceded by exact
+process-identity verification. A shadow registry receives an exact admission
+action after those gates; an already admitted registry receives verification.
+All receipts are copied into the expiring precondition evidence. Rollback requires
+usable registry, selected consumer-registration, canary-route, and rollback
+evidence, embeds the selected registration target, and carries every one of
+those proofs into the candidate. A ready rollback proof must identify the
+complete last-known-good consumer registration, package, deploy revision and
+tree, content-addressed deployment-manifest ref and digest, unit, credential
+class, executable, process identity, and canary route and receipt. The proof
+carries a second typed target that must exactly equal that full restoration
+contour before readiness is accepted. Its ordered steps
+first deny discovery and activation, restore that runtime floor, restore the
+consumer registration, and finally run the proven last-known-good canary
+rather than the current deployment's canary. Rollback planning relies on the
+usable rollback proof that binds that LKG route and receipt; it neither validates
+nor copies the current deployment's canary evidence, which may be failed,
+blocked, or expired in the recovery scenario. Restart plans also require and
+carry usable current-canary and central-proof evidence, verify that the passed
+proof names the exact current source, package, deploy, process, server schema,
+compatible consumer registration, canary route, and canary receipt before the
+restart snapshot, and reject inactive processes, which must use the full
+activation contour instead. The selected consumer registration evidence is
+copied and expiry-bounded by the restart candidate. A plan expires at the
+earliest of ten minutes, its observation/freshness envelopes, every required
+link, and every copied evidence ref; it cannot outlive its proof. Candidate
+planning allows at most 30 seconds of positive clock skew and rejects
+future-dated observations, required links, evidence refs, freshness, or deploy
+timestamps beyond it. Required observations must also fall no later than 30
+seconds after their enclosing observation snapshot, so an older snapshot
+cannot carry causally newer proof. Activation and rollback causality checks use
+only the exact proof-selected or last-known-good consumer; unrelated consumer
+observations cannot veto a candidate and are not copied into it. Candidate
+result freshness is the worst effective state across subject freshness and
+every exact link the plan copies, so a drift-backed plan cannot claim `exact`.
+Every usable deploy manifest, registered consumer, passed central proof,
+accepted owner decision, successful canary, and ready rollback proof also binds
+its named receipt or registration target to one contained `EvidenceRef`; for
+proof and acceptance, that same ref must be issued by the declared owner. The
+candidate copies and expiry-bounds that exact identity before any step can name
+it. A deploy manifest ref is valid only at the stack-owned immutable record path
+derived from its `sha256:` manifest digest. Package identity also names the
+source revision from which the artifact was built.
+Central proof cannot predate the canary link or evidence refs it names.
+Duplicate evidence identities with conflicting `observed_at` values are
+rejected before expiry deduplication.
+Catalog and inspection apply the same 30-second future-skew bound to the
+observation envelope, links, freshness, and nested evidence timestamps, using
+the earlier of wall-clock time and the enclosing observation snapshot;
+causally future usable evidence is reported as `blocked`, never as current,
+before candidate planning is involved.
+An expired observation envelope likewise downgrades both result metadata and
+the derived catalog/freshness/drift fields to at least `stale_readable`, even
+when the enclosed subject freshness expires later.
+Inspection also folds the effective state of the selected evidence view into
+result freshness metadata and exposes it beside the immutable raw owner state.
+`rollback_required` is accepted only while its own link and evidence refs are
+unexpired; a bare or expired rollback signal is a controlled precondition
+failure.
+Every plan also names one exact deployed-tree postcondition. Sync takes that
+target from the reviewed source identity, deploy takes it from the exact
+package identity, activate and restart preserve the observed deployed tree,
+and rollback restores the last-known-good tree. The ordered sync/deploy
+comparison step uses this future target rather than the pre-action deployed
+digest. Rollback denies discovery for the exact registry ID and registry digest
+observed by the candidate, not for a mutable registry name alone.
+
+## Observation input
+
+Set `ABYSS_STACK_MCP_OBSERVATION_PATH` to one explicit secret-free
+`abyss_stack_runtime_observation_v1` file. The default live route is:
+
+```text
+/srv/AbyssOS/abyss-stack/Logs/mcp/organ-runtime-observation.json
+```
+
+The loader rejects symlinks, non-files, payloads above 2 MiB, unknown contract
+fields, secret-like keys or values, shared credential classes, non-loopback
+HTTP endpoints, credentials embedded in URI userinfo/path/query/fragment references,
+encoded nested credential references, unparseable or excessively nested
+URI-like references, whitespace-only exact targets, and unsupported effect
+classes. Credential-key screening includes passphrases and recognizes
+namespaced separator and camel-case token sequences rather than only exact key
+spellings. Unambiguous credential components such as `secret_access_key` are
+rejected even without a provider namespace, including AWS-style
+`aws_secret_access_key`. Exact `credential` and `credentials` keys are also
+rejected without treating the typed `credential_class` identity field as
+secret material. AWS presigned-query keys `X-Amz-Credential`,
+`X-Amz-Signature`, and `X-Amz-Security-Token` are rejected as bounded
+credential material. Concatenated
+matches require a recognized provider/consumer namespace or credential-value
+attribute boundary, so ordinary keys such as `tokenizer`, `passwordless`, and
+`authorizationPolicy` remain valid.
+Basic/Bearer prefix checks ignore leading whitespace. Bounded provider-token
+patterns are scanned throughout direct and decoded reference values, covering
+the standard OpenAI, GitHub, and GitLab token families, including GitLab
+personal, deploy, runner, job, trigger, agent, workspace, SCIM, and feature-flag
+client tokens. Expired observations remain visible as stale read evidence but
+cannot produce a candidate plan.
+The generated Draft 2020-12 schema includes the conditional invariants for
+usable links and freshness, endpoint readiness, consumer registration,
+active-process identity, accepted-target completeness, successful canaries,
+central-proof target completeness, rollback readiness, and policy/effect
+pairing. The Pydantic loader remains the final authority for loopback endpoint
+parsing, relative clock-skew, relational timestamp, proof/acceptance-owner
+provenance, target and proof-before-acceptance ordering, uniqueness, and
+content-address checks that JSON Schema cannot express.
+
+The committed example is fictional and public-safe. It is neither a live
+runtime capture nor admission evidence.
+
+## Portable use
+
+```bash
+python -m pip install -e mcp/services/abyss-stack-mcp
+abyss-stack-mcp --observation-path /path/to/observation.json catalog
+abyss-stack-mcp --observation-path /path/to/observation.json \
+  inspect aoa-kag read --view proof
+ABYSS_STACK_MCP_POLICY_FAMILY=read abyss-stack-mcp-server
+abyss-stack-mcp-audit --journal /absolute/policy-read.jsonl \
+  --policy-family read
+```
+
+Stdio is the portable default. Authenticated loopback Streamable HTTP is
+selected through `AOA_MCP_TRANSPORT=streamable-http`; it requires the
+plane-specific credential. Portable `catalog` and `inspect` are read-contour
+commands; `plan` requires explicit `--policy-family candidate`.
+
+The managed user units do not use ambient Python. After syncing the package to
+`Configs`, first link and reload the lock-aware units, then provision the
+source-addressed runtime explicitly:
+
+```bash
+scripts/aoa-install-systemd --all-user-units
+scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime
+```
+
+These are intentionally separate transactions; combining both flags is
+rejected so provisioning cannot run before the link-and-reload phase. The
+standalone provision step verifies that both units are loaded from the
+expected managed fragments and that user systemd's effective `ExecStart`
+contains the exact shared runtime lock; absent, stale, or unexpectedly sourced
+unit definitions fail closed and require another `daemon-reload`.
+This creates or refreshes
+`${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv`, installs the exact
+`requirements.lock` closure with `--require-hashes`, verifies its dependencies,
+and records a runtime identity composed from both the deployed-package digest
+and the lock digest, plus a deterministic content digest of the installed
+runtime files, symlink targets, and bytes of the fully resolved
+`bin/python` interpreter. Before that digest is recorded, generated entry-point
+shebangs are rebound from the private staging directory to the stable published
+venv path, so atomic publication does not leave launchers pointing at a removed
+directory. Repeating the command with unchanged source and lock rehashes the
+installed environment before verification and reuses it only when the content
+digest still matches; missing or changed installed or interpreter bytes force a
+guarded rebuild. A changed identity is never installed
+over a running plane: provisioning fails closed while either the read or
+candidate unit is active or their user-systemd state cannot be observed. Stop
+both units explicitly before reprovisioning, then start or canary them as a
+separate action. The units have `ConditionPathExists` guards for the runtime
+and both lock files, an executable `ExecCondition`, and a read-only verifier
+condition. Their final launch path then acquires the shared source-projection
+lock followed by the shared runtime lock, repeats the complete deployed
+source-and-lock plus runtime-content verification under those locks, and only
+then `exec`s the server. They remain inactive when the runtime is absent,
+unusable, drifted, or no longer matches the deployed package. Both shared locks
+remain held for the full process lifetime. Changed provisioning and applying
+MCP Configs sync therefore fail closed while either plane runs; stop both
+planes explicitly before either operation. Provisioning checks both unit
+states before the build and again immediately before the guarded environment
+swap, and aborts if a start races the build. Linking and reloading the
+committed units before provisioning is therefore a required rollout
+precondition.
+The provisioner copies the deployed package into a private staged snapshot,
+requires that snapshot and its lock to match the initial digests, installs only
+from the snapshot, and rechecks the deployed tree before writing the runtime
+identity or swapping the environment. It also holds the same exclusive
+source-projection lock that an applying MCP Configs sync holds for its complete
+rsync transaction. A sync and provision transaction therefore cannot cross
+each other's publication boundary or publish mixed or mislabelled runtime
+bytes.
+Every provisioner Python call clears inherited `PYTHONHOME`/`PYTHONPATH` and
+uses isolated interpreter mode, including venv creation, pip installation,
+dependency checks, and import verification.
+They execute the package installed inside that venv, not `Configs/src`.
+Both units clear ambient `PYTHONHOME`/`PYTHONPATH`, invoke the venv with Python
+isolated mode, and pass `-B` explicitly so service imports cannot add bytecode
+to the measured environment. A user-manager import override therefore cannot
+precede the measured site-packages, and a normal launch cannot invalidate the
+recorded runtime-content digest.
+Consequently, a later Configs sync cannot cross a running plane or mix new code
+with an older dependency closure; after explicitly stopping both planes, the
+synced package becomes eligible for a later start only after this explicit
+reprovision step succeeds.
+The same explicit provision action creates, but never truncates, the
+contour-specific audit journals at
+`${AOA_STACK_ROOT}/Logs/mcp/audit/policy-read.jsonl` and
+`policy-candidate.jsonl`. The directory is mode `0700`, each file is mode
+`0600`, and the read-only runtime verifier requires both safe paths. Each unit
+can write only its own journal under `ProtectSystem=strict` and makes the other
+contour's journal inaccessible. Managed startup requires the configured
+journal and validates its complete chain before listening.
+
+Runtime dependencies and the build backend are exact pins in
+`requirements.constraints`; the committed `requirements.lock` carries the
+resolved closure and artifact hashes. Regenerate it from the repository root
+with the reviewed `pip-tools` version:
+
+```bash
+pip-compile --generate-hashes --resolver=backtracking --strip-extras \
+  --all-build-deps --allow-unsafe \
+  --constraint mcp/services/abyss-stack-mcp/requirements.constraints \
+  --output-file mcp/services/abyss-stack-mcp/requirements.lock \
+  mcp/services/abyss-stack-mcp/pyproject.toml
+```
+
+The managed journal limit is 32 MiB per contour. Capacity exhaustion rejects
+the next policy decision instead of dropping or overwriting evidence.
+Automatic rotation is intentionally not admitted yet: stop the affected plane
+and use a reviewed archival/continuity handoff before replacing a journal. Do
+not rotate, truncate, or edit it while the plane is active.
+
+## Validation
+
+Run the commands in [AGENTS.md](AGENTS.md).

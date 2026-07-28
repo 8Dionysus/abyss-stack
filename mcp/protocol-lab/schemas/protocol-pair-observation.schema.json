@@ -1,0 +1,152 @@
+{
+  "$id": "https://abyss-stack.local/schemas/mcp-protocol-pair-observation.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "abyss_mcp_protocol_pair_observation_v1"
+    },
+    "observation_id": {
+      "pattern": "^[a-z0-9][a-z0-9._-]+$",
+      "type": "string"
+    },
+    "matrix_version": {
+      "const": "abyss_mcp_protocol_compatibility_matrix_v1"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "spec_final_observed": {
+      "type": "boolean"
+    },
+    "stable_sdk_release_observed": {
+      "type": "boolean"
+    },
+    "consumer_next_pair_observed": {
+      "type": "boolean"
+    },
+    "server_discover_observed": {
+      "type": "boolean"
+    },
+    "stateless_behavior_observed": {
+      "type": "boolean"
+    },
+    "explicit_handles_observed": {
+      "type": "boolean"
+    },
+    "trace_cache_metadata_observed": {
+      "type": "boolean"
+    },
+    "official_conformance": {
+      "$ref": "#/$defs/check"
+    },
+    "abyss_pair_conformance": {
+      "$ref": "#/$defs/check"
+    },
+    "tasks_extension": {
+      "$ref": "#/$defs/check"
+    },
+    "read_only_canary": {
+      "$ref": "#/$defs/check"
+    },
+    "compatibility_aliases": {
+      "$ref": "#/$defs/check"
+    },
+    "dual_support": {
+      "$ref": "#/$defs/check"
+    },
+    "rollback": {
+      "$ref": "#/$defs/check"
+    },
+    "receipt_refs": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "verdict": {
+      "enum": [
+        "blocked",
+        "candidate",
+        "passed",
+        "failed",
+        "rolled_back"
+      ]
+    },
+    "reason_codes": {
+      "items": {
+        "pattern": "^[a-z0-9][a-z0-9._-]+$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "effectful_organs_migrated": {
+      "const": false
+    },
+    "authority_move_combined": {
+      "const": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "observation_id",
+    "matrix_version",
+    "observed_at",
+    "spec_final_observed",
+    "stable_sdk_release_observed",
+    "consumer_next_pair_observed",
+    "server_discover_observed",
+    "stateless_behavior_observed",
+    "explicit_handles_observed",
+    "trace_cache_metadata_observed",
+    "official_conformance",
+    "abyss_pair_conformance",
+    "tasks_extension",
+    "read_only_canary",
+    "compatibility_aliases",
+    "dual_support",
+    "rollback",
+    "receipt_refs",
+    "verdict",
+    "reason_codes",
+    "effectful_organs_migrated",
+    "authority_move_combined"
+  ],
+  "title": "OS Abyss MCP protocol pair observation",
+  "type": "object",
+  "$defs": {
+    "check": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "not_run",
+            "passed",
+            "failed",
+            "blocked"
+          ]
+        },
+        "receipt_refs": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reason": {
+          "minLength": 3,
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "receipt_refs",
+        "reason"
+      ],
+      "type": "object"
+    }
+  }
+}

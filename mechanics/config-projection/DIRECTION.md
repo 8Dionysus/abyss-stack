@@ -11,6 +11,9 @@ Current posture:
 - keep stable root commands as wrappers while implementation bodies live under
   package parts
 - keep deployed `Configs` as a projection target, not source truth
+- issue an MCP deployment receipt only from a clean exact source revision and
+  exact source/deployed byte parity; keep later runtime and owner evidence
+  outside the config projection claim
 
 Near direction:
 

@@ -46,6 +46,7 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 | repo-self KAG runtime | `/srv/AbyssOS/abyss-stack/Knowledge/kag/repo-self` |
 | logs | `/srv/AbyssOS/abyss-stack/Logs` |
 | stack-side machine bridge logs | `/srv/AbyssOS/abyss-stack/Logs/machine-bridge` |
+| stack MCP policy audit journals | `/srv/AbyssOS/abyss-stack/Logs/mcp/audit` |
 | codex home | `/srv/AbyssOS/abyss-stack/.codex-home` |
 | optional vault | `/abyss` |
 | shared AbyssOS workspace root | `/srv/AbyssOS` |

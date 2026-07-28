@@ -1,0 +1,37 @@
+# AGENTS.md
+
+## Applies to
+
+This card applies to `mcp/protocol-lab/`.
+
+## Role
+
+The protocol lab is the fail-closed compatibility and migration gate for the
+production MCP wire pair used by OS Abyss. It compares the current stable pair
+with one isolated next-protocol candidate without changing registrations,
+runtime credentials, owner authority, or deployed services.
+
+## Boundaries
+
+- Production remains on the exact protocol named by the compatibility matrix.
+- Release candidates, prerelease SDKs, binary literals, and successful schema
+  listing are evidence inputs, not migration authority.
+- A next-protocol registration must be separately named, separately
+  credentialed, disabled before its prerequisites pass, and removable without
+  mutating the stable registration.
+- The first pilot is `aoa-kag` read-only. Candidate and effect organs are out of
+  scope until a later decision with separate proof.
+- Tasks is an extension gate and never follows automatically from core
+  protocol compatibility.
+- Protocol migration must not be combined with an owner-authority move.
+
+## Validation
+
+```bash
+python mcp/protocol-lab/scripts/build_protocol_lab_status.py --check
+python mcp/protocol-lab/scripts/validate_protocol_lab.py
+python -m pytest -q mcp/protocol-lab/tests
+```
+
+Do not edit the generated status directly. Refresh the source matrix and pair
+observation, then run the builder.

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import importlib
+import json
 import os
 import shutil
 import socket
@@ -17,21 +19,168 @@ from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-INSTALL_SYSTEMD = REPO_ROOT / "mechanics" / "runtime-lifecycle" / "parts" / "user-unit" / "aoa_install_systemd.sh"
+INSTALL_SYSTEMD = (
+    REPO_ROOT
+    / "mechanics"
+    / "runtime-lifecycle"
+    / "parts"
+    / "user-unit"
+    / "aoa_install_systemd.sh"
+)
 STATS_PATH_UNIT = REPO_ROOT / "systemd" / "user" / "aoa-stats-live-refresh.path"
 STATS_SERVICE_UNIT = REPO_ROOT / "systemd" / "user" / "aoa-stats-live-refresh.service"
 MCP_HTTP_TEMPLATE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http@.service"
+ORGAN_MCP_READ_TEMPLATE = REPO_ROOT / "systemd" / "user" / "aoa-organ-mcp-read@.service"
+MEMO_MCP_CANDIDATE_UNIT = (
+    REPO_ROOT / "systemd" / "user" / "aoa-memo-mcp-candidate.service"
+)
+EVALS_MCP_CANDIDATE_UNIT = (
+    REPO_ROOT / "systemd" / "user" / "aoa-evals-mcp-candidate.service"
+)
 MCP_HTTP_BUNDLE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http.service"
+STACK_MCP_READ_UNIT = REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-read.service"
+STACK_MCP_CANDIDATE_UNIT = (
+    REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-candidate.service"
+)
 STACK_RUNTIME_UNIT = REPO_ROOT / "systemd" / "user" / "podman-compose-abyss.service"
-STACK_RUNTIME_DROPIN = REPO_ROOT / "systemd" / "user" / "podman-compose-abyss.service.d" / "99-runtime-lifecycle.conf"
+STACK_RUNTIME_DROPIN = (
+    REPO_ROOT
+    / "systemd"
+    / "user"
+    / "podman-compose-abyss.service.d"
+    / "99-runtime-lifecycle.conf"
+)
 GEMMA_DIGEST_UNIT = REPO_ROOT / "systemd" / "user" / "abyss-gemma4-spark-digest.service"
 STORAGE_MONITOR_UNIT = REPO_ROOT / "systemd" / "user" / "abyss-storage-monitor.service"
 MANAGED_USER_UNITS = REPO_ROOT / "systemd" / "user" / "managed-units.txt"
-MCP_HTTP_AUTH_BUILDER = REPO_ROOT / "mcp" / "services" / "_shared" / "build_http_auth_vendors.py"
-MCP_HTTP_CODEX_CLIENT = REPO_ROOT / "mcp" / "services" / "_shared" / "codex_http_client.sh"
+MCP_HTTP_AUTH_BUILDER = (
+    REPO_ROOT / "mcp" / "services" / "_shared" / "build_http_auth_vendors.py"
+)
+MCP_HTTP_CODEX_CLIENT = (
+    REPO_ROOT / "mcp" / "services" / "_shared" / "codex_http_client.sh"
+)
 MCP_HTTP_AUTH_TOKEN = "test-only-" + ("a" * 54)
 MCP_HTTP_CREDENTIAL_NAME = "aoa-mcp-http-bearer-token"
 MCP_HTTP_SECRET_RELATIVE = Path("Secrets") / "Configs" / MCP_HTTP_CREDENTIAL_NAME
+STACK_MCP_CREDENTIAL_NAMES = (
+    "abyss-stack-mcp-read-bearer-token",
+    "abyss-stack-mcp-candidate-bearer-token",
+)
+ORGAN_MCP_READ_CREDENTIAL_NAMES = (
+    "aoa-decisions-mcp-read-bearer-token",
+    "aoa-memo-mcp-read-bearer-token",
+    "aoa-evals-mcp-read-bearer-token",
+    "aoa-kag-mcp-read-bearer-token",
+    "aoa-4pda-connector-mcp-read-bearer-token",
+    "aoa-course-connector-mcp-read-bearer-token",
+    "aoa-discord-connector-mcp-read-bearer-token",
+    "aoa-session-memory-mcp-read-bearer-token",
+    "aoa-stackoverflow-connector-mcp-read-bearer-token",
+    "aoa-stats-mcp-read-bearer-token",
+    "aoa-telegram-connector-mcp-read-bearer-token",
+    "aoa-xda-connector-mcp-read-bearer-token",
+    "abyss-machine-mcp-read-bearer-token",
+    "tos-corpus-mcp-read-bearer-token",
+)
+ORGAN_MCP_CANDIDATE_CREDENTIAL_NAMES = (
+    "aoa-memo-mcp-candidate-bearer-token",
+    "aoa-evals-mcp-candidate-bearer-token",
+)
+ORGAN_MCP_READ_AUTH_MANIFEST_NAME = "organ-mcp-read-auth-manifest.json"
+ORGAN_MCP_CANDIDATE_AUTH_MANIFEST_NAME = (
+    "organ-mcp-candidate-auth-manifest.json"
+)
+ORGAN_MCP_READ_AUTH = {
+    "abyss_machine_mcp": {
+        "env": "ABYSS_MACHINE_MCP_READ_BEARER_TOKEN",
+        "credential": "abyss-machine-mcp-read-bearer-token",
+        "scope": "mcp:abyss-machine:read",
+        "client_id": "aoa-loopback-codex:abyss-machine:read",
+    },
+    "aoa_decisions_mcp": {
+        "env": "AOA_DECISIONS_MCP_READ_BEARER_TOKEN",
+        "credential": "aoa-decisions-mcp-read-bearer-token",
+        "scope": "mcp:aoa-decisions:read",
+        "client_id": "aoa-loopback-codex:aoa-decisions:read",
+    },
+    "aoa_4pda_connector_mcp": {
+        "env": "AOA_4PDA_CONNECTOR_MCP_READ_BEARER_TOKEN",
+        "credential": "aoa-4pda-connector-mcp-read-bearer-token",
+        "scope": "mcp:aoa-4pda-connector:read",
+        "client_id": "aoa-loopback-codex:aoa-4pda-connector:read",
+    },
+    "aoa_course_connector_mcp": {
+        "env": "AOA_COURSE_CONNECTOR_MCP_READ_BEARER_TOKEN",
+        "credential": "aoa-course-connector-mcp-read-bearer-token",
+        "scope": "mcp:aoa-course-connector:read",
+        "client_id": "aoa-loopback-codex:aoa-course-connector:read",
+    },
+    "aoa_discord_connector_mcp": {
+        "env": "AOA_DISCORD_CONNECTOR_MCP_READ_BEARER_TOKEN",
+        "credential": "aoa-discord-connector-mcp-read-bearer-token",
+        "scope": "mcp:aoa-discord-connector:read",
+        "client_id": "aoa-loopback-codex:aoa-discord-connector:read",
+    },
+    "aoa_memo_mcp": {
+        "env": "AOA_MEMO_MCP_READ_BEARER_TOKEN",
+        "credential": "aoa-memo-mcp-read-bearer-token",
+        "scope": "mcp:aoa-memo:read",
+        "client_id": "aoa-loopback-codex:aoa-memo:read",
+    },
+    "aoa_evals_mcp": {
+        "env": "AOA_EVALS_MCP_READ_BEARER_TOKEN",
+        "credential": "aoa-evals-mcp-read-bearer-token",
+        "scope": "mcp:aoa-evals:read",
+        "client_id": "aoa-loopback-codex:aoa-evals:read",
+    },
+    "aoa_kag_mcp": {
+        "env": "AOA_KAG_MCP_READ_BEARER_TOKEN",
+        "credential": "aoa-kag-mcp-read-bearer-token",
+        "scope": "mcp:aoa-kag:read",
+        "client_id": "aoa-loopback-codex:aoa-kag:read",
+    },
+    "aoa_session_memory_mcp": {
+        "env": "AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN",
+        "credential": "aoa-session-memory-mcp-read-bearer-token",
+        "scope": "mcp:aoa-session-memory:read",
+        "client_id": "aoa-loopback-codex:aoa-session-memory:read",
+    },
+    "aoa_stats_mcp": {
+        "env": "AOA_STATS_MCP_READ_BEARER_TOKEN",
+        "credential": "aoa-stats-mcp-read-bearer-token",
+        "scope": "mcp:aoa-stats:read",
+        "client_id": "aoa-loopback-codex:aoa-stats:read",
+    },
+    "aoa_stackoverflow_connector_mcp": {
+        "env": "AOA_STACKOVERFLOW_CONNECTOR_MCP_READ_BEARER_TOKEN",
+        "credential": "aoa-stackoverflow-connector-mcp-read-bearer-token",
+        "scope": "mcp:aoa-stackoverflow-connector:read",
+        "client_id": "aoa-loopback-codex:aoa-stackoverflow-connector:read",
+    },
+    "aoa_telegram_connector_mcp": {
+        "env": "AOA_TELEGRAM_CONNECTOR_MCP_READ_BEARER_TOKEN",
+        "credential": "aoa-telegram-connector-mcp-read-bearer-token",
+        "scope": "mcp:aoa-telegram-connector:read",
+        "client_id": "aoa-loopback-codex:aoa-telegram-connector:read",
+    },
+    "tos_corpus_mcp": {
+        "env": "TOS_CORPUS_MCP_READ_BEARER_TOKEN",
+        "credential": "tos-corpus-mcp-read-bearer-token",
+        "scope": "mcp:tos-corpus:read",
+        "client_id": "aoa-loopback-codex:tos-corpus:read",
+    },
+    "aoa_xda_connector_mcp": {
+        "env": "AOA_XDA_CONNECTOR_MCP_READ_BEARER_TOKEN",
+        "credential": "aoa-xda-connector-mcp-read-bearer-token",
+        "scope": "mcp:aoa-xda-connector:read",
+        "client_id": "aoa-loopback-codex:aoa-xda-connector:read",
+    },
+}
+ORGAN_MCP_READ_OWNER_BY_CREDENTIAL = {
+    auth["credential"]: module.removesuffix("_mcp").replace("_", "-")
+    for module, auth in ORGAN_MCP_READ_AUTH.items()
+}
+STACK_MCP_AUTH_MANIFEST_NAME = "abyss-stack-mcp-auth-manifest.json"
 EXPECTED_STATS_RECEIPT_PATHS = (
     "/srv/AbyssOS/aoa-skills/.aoa/live_receipts/session-harvest-family.jsonl",
     "/srv/AbyssOS/aoa-skills/.aoa/live_receipts/core-skill-applications.jsonl",
@@ -52,18 +201,29 @@ MCP_SERVER_PACKAGES = {
     "aoa_discord_connector_mcp": ("aoa-discord-connector-mcp", 5428),
     "tos_corpus_mcp": ("tos-corpus-mcp", 5429),
     "aoa_stats_mcp": ("aoa-stats-mcp", 5430),
+    "aoa_course_connector_mcp": ("aoa-course-connector-mcp", 5436),
+    "aoa_stackoverflow_connector_mcp": (
+        "aoa-stackoverflow-connector-mcp",
+        5437,
+    ),
+    "aoa_xda_connector_mcp": ("aoa-xda-connector-mcp", 5438),
 }
 EXPECTED_MCP_HTTP_INSTANCES = {
-    "aoa-mcp-http@aoa-decisions.service",
-    "aoa-mcp-http@aoa-memo.service",
-    "aoa-mcp-http@aoa-session-memory.service",
-    "aoa-mcp-http@abyss-machine.service",
-    "aoa-mcp-http@aoa-evals.service",
-    "aoa-mcp-http@aoa-kag.service",
-    "aoa-mcp-http@aoa-stats.service",
-    "aoa-mcp-http@aoa-4pda-connector.service",
-    "aoa-mcp-http@aoa-telegram-connector.service",
-    "aoa-mcp-http@aoa-discord-connector.service",
+    "aoa-organ-mcp-read@aoa-decisions.service",
+    "aoa-organ-mcp-read@aoa-memo.service",
+    "aoa-memo-mcp-candidate.service",
+    "aoa-organ-mcp-read@aoa-session-memory.service",
+    "aoa-organ-mcp-read@abyss-machine.service",
+    "aoa-organ-mcp-read@aoa-evals.service",
+    "aoa-evals-mcp-candidate.service",
+    "aoa-organ-mcp-read@aoa-kag.service",
+    "aoa-organ-mcp-read@aoa-stats.service",
+    "aoa-organ-mcp-read@aoa-4pda-connector.service",
+    "aoa-organ-mcp-read@aoa-course-connector.service",
+    "aoa-organ-mcp-read@aoa-discord-connector.service",
+    "aoa-organ-mcp-read@aoa-stackoverflow-connector.service",
+    "aoa-organ-mcp-read@aoa-telegram-connector.service",
+    "aoa-organ-mcp-read@aoa-xda-connector.service",
 }
 
 
@@ -88,11 +248,43 @@ def mcp_environment(**overrides: str) -> dict[str, str]:
         "AOA_MCP_HOST",
         "AOA_MCP_PORT",
         "AOA_MCP_HTTP_BEARER_TOKEN",
+        "AOA_DECISIONS_MCP_READ_BEARER_TOKEN",
+        "AOA_DECISIONS_MCP_INTERNAL_EFFECT_BEARER_TOKEN",
+        "AOA_MEMO_MCP_READ_BEARER_TOKEN",
+        "AOA_MEMO_MCP_CANDIDATE_BEARER_TOKEN",
+        "AOA_EVALS_MCP_READ_BEARER_TOKEN",
+        "AOA_EVALS_MCP_CANDIDATE_BEARER_TOKEN",
+        "AOA_KAG_MCP_READ_BEARER_TOKEN",
+        "AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN",
+        "AOA_STATS_MCP_READ_BEARER_TOKEN",
+        "ABYSS_MACHINE_MCP_READ_BEARER_TOKEN",
+        "TOS_CORPUS_MCP_READ_BEARER_TOKEN",
+        "AOA_DECISIONS_MCP_CONTOUR",
+        "AOA_MCP_POLICY_FAMILY",
+        "AOA_MEMO_MCP_CANDIDATE_ROOTS",
+        "AOA_EVALS_MCP_CANDIDATE_ROOTS",
         "CREDENTIALS_DIRECTORY",
     ):
         env.pop(name, None)
+    for auth in ORGAN_MCP_READ_AUTH.values():
+        env.pop(auth["env"], None)
     env.update(overrides)
     return env
+
+
+def mcp_server_auth_kwargs(module, package: str):
+    if package == "aoa_decisions_mcp":
+        return module._contour_http_auth_kwargs("read")
+    if package in ORGAN_MCP_READ_AUTH:
+        return module._read_http_auth_kwargs()
+    return module._http_auth_kwargs(module.DEFAULT_HTTP_PORT)
+
+
+def mcp_server_token_environment(package: str) -> str:
+    return ORGAN_MCP_READ_AUTH.get(package, {}).get(
+        "env",
+        "AOA_MCP_HTTP_BEARER_TOKEN",
+    )
 
 
 def import_mcp_server(package: str, directory: str):
@@ -197,9 +389,13 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             if line.startswith("ExecStart=")
         )
 
-        self.assertTrue(exec_start.startswith("/usr/local/bin/abyss-machine resource launch "))
+        self.assertTrue(
+            exec_start.startswith("/usr/local/bin/abyss-machine resource launch ")
+        )
         self.assertIn("--memory-demand-mib 2048", exec_start)
-        self.assertIn("--demand-key abyss-stack:llama-cpp:gemma4-e2b-background-wake", exec_start)
+        self.assertIn(
+            "--demand-key abyss-stack:llama-cpp:gemma4-e2b-background-wake", exec_start
+        )
         self.assertIn("--demand-owner abyss-stack", exec_start)
         self.assertIn("--success-on-block", exec_start)
         self.assertTrue(
@@ -216,7 +412,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             if line.startswith("ExecStart=")
         )
 
-        self.assertTrue(exec_start.startswith("/usr/local/bin/abyss-machine resource launch "))
+        self.assertTrue(
+            exec_start.startswith("/usr/local/bin/abyss-machine resource launch ")
+        )
         self.assertIn("--memory-demand-mib 2048", exec_start)
         self.assertIn("--demand-key abyss-machine:storage-monitor:hourly", exec_start)
         self.assertIn("--demand-owner abyss-machine-storage", exec_start)
@@ -224,7 +422,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertIn("--estimate-confidence high", exec_start)
         self.assertIn("--success-on-block", exec_start)
         self.assertTrue(
-            exec_start.endswith("-- /usr/local/bin/abyss-machine storage monitor --json")
+            exec_start.endswith(
+                "-- /usr/local/bin/abyss-machine storage monitor --json"
+            )
         )
         self.assertNotIn("MemoryHigh=", unit)
         self.assertNotIn("MemoryMax=", unit)
@@ -239,7 +439,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("profile must not be empty", result.stderr)
 
-    def test_aoa_stats_adapter_delegates_source_selection_to_sibling_owner(self) -> None:
+    def test_aoa_stats_adapter_delegates_source_selection_to_sibling_owner(
+        self,
+    ) -> None:
         path_unit = STATS_PATH_UNIT.read_text(encoding="utf-8")
         receipt_paths = tuple(
             line.removeprefix("PathModified=")
@@ -269,7 +471,11 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             configs = root / "Configs"
             unit_source = configs / "systemd" / "user"
             unit_source.mkdir(parents=True)
-            for name in ("podman-compose-abyss.service", "masked.service", "linked.service"):
+            for name in (
+                "podman-compose-abyss.service",
+                "masked.service",
+                "linked.service",
+            ):
                 (unit_source / name).write_text(
                     "[Service]\nType=oneshot\nExecStart=/usr/bin/true\n",
                     encoding="utf-8",
@@ -314,7 +520,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertIn("preserving masked user unit", result.stdout)
 
-    def test_mcp_http_auth_provision_is_explicit_idempotent_and_secret_safe(self) -> None:
+    def test_mcp_http_auth_provision_is_explicit_idempotent_and_secret_safe(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             stack_root = root / "stack"
@@ -357,9 +565,1268 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(second.returncode, 0, second.stderr)
-            self.assertEqual(token_path.read_text(encoding="utf-8").removesuffix("\n"), token)
+            self.assertEqual(
+                token_path.read_text(encoding="utf-8").removesuffix("\n"), token
+            )
             self.assertNotIn(token, second.stdout + second.stderr)
             self.assertIn("already provisioned", second.stdout)
+
+    def test_mcp_http_auth_concurrent_first_write_keeps_one_valid_winner(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            race_root = root / "race"
+            race_root.mkdir()
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            python = fake_bin / "python3"
+            python.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                'touch "$RACE_ROOT/ready.$$"\n'
+                "while (( $(find \"$RACE_ROOT\" -maxdepth 1 -name 'ready.*' "
+                "-type f | wc -l) < 2 )); do\n"
+                "  sleep 0.01\n"
+                "done\n"
+                "printf 'race-%s-' \"$$\"\n"
+                "printf '%050d\\n' 0\n",
+                encoding="utf-8",
+            )
+            python.chmod(0o755)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CONFIGS_ROOT": str(root / "Configs"),
+                    "HOME": str(root / "home"),
+                    "XDG_CONFIG_HOME": str(root / "xdg-config"),
+                    "PATH": f"{fake_bin}:{env['PATH']}",
+                    "RACE_ROOT": str(race_root),
+                }
+            )
+            command = [
+                "bash",
+                str(INSTALL_SYSTEMD),
+                "--provision-mcp-http-auth",
+            ]
+            processes = [
+                subprocess.Popen(
+                    command,
+                    cwd=REPO_ROOT,
+                    env=env,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                for _ in range(2)
+            ]
+            results = [process.communicate(timeout=10) for process in processes]
+
+            for process, (stdout, stderr) in zip(processes, results, strict=True):
+                self.assertEqual(process.returncode, 0, stderr)
+                self.assertNotIn("race-", stderr)
+                self.assertNotRegex(stdout, r"race-[0-9]+-")
+            token_path = stack_root / MCP_HTTP_SECRET_RELATIVE
+            token = token_path.read_text(encoding="utf-8").removesuffix("\n")
+            self.assertRegex(token, r"\A[A-Za-z0-9._~-]{43,512}\Z")
+            self.assertEqual(token_path.stat().st_mode & 0o777, 0o600)
+            combined_stdout = "".join(stdout for stdout, _ in results)
+            self.assertEqual(combined_stdout.count("already provisioned"), 1)
+            provisioned_without_already = [
+                line
+                for line in combined_stdout.splitlines()
+                if "provisioned MCP HTTP bearer credential" in line
+                and "already" not in line
+            ]
+            self.assertEqual(len(provisioned_without_already), 1)
+
+    @unittest.skipIf(
+        hasattr(os, "geteuid") and os.geteuid() == 0,
+        "organ MCP read credential provisioning intentionally rejects root",
+    )
+    def test_organ_mcp_read_auth_provisions_owner_distinct_credentials(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            secret_dir = stack_root / "Secrets" / "Configs"
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CONFIGS_ROOT": str(root / "Configs"),
+                    "HOME": str(root / "home"),
+                    "XDG_CONFIG_HOME": str(root / "xdg-config"),
+                }
+            )
+
+            first = subprocess.run(
+                [
+                    "bash",
+                    str(INSTALL_SYSTEMD),
+                    "--provision-organ-mcp-read-auth",
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(first.returncode, 0, first.stderr)
+            credentials = {
+                name: secret_dir.joinpath(name)
+                .read_text(encoding="utf-8")
+                .removesuffix("\n")
+                for name in ORGAN_MCP_READ_CREDENTIAL_NAMES
+            }
+            self.assertEqual(len(set(credentials.values())), len(credentials))
+            for name, token in credentials.items():
+                with self.subTest(name=name):
+                    self.assertRegex(token, r"\A[A-Za-z0-9._~-]{43,512}\Z")
+                    self.assertEqual(
+                        secret_dir.joinpath(name).stat().st_mode & 0o777,
+                        0o600,
+                    )
+                    self.assertNotIn(token, first.stdout + first.stderr)
+
+            manifest_path = secret_dir / ORGAN_MCP_READ_AUTH_MANIFEST_NAME
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                manifest,
+                {
+                    "credentials": {
+                        owner: {
+                            "policy_family": "read",
+                            "sha256": hashlib.sha256(
+                                credentials[credential].encode("utf-8")
+                            ).hexdigest(),
+                        }
+                        for credential, owner in (
+                            ORGAN_MCP_READ_OWNER_BY_CREDENTIAL.items()
+                        )
+                    },
+                    "schema_version": "organ_mcp_read_auth_manifest_v1",
+                },
+            )
+            self.assertEqual(manifest_path.stat().st_mode & 0o777, 0o600)
+            self.assertIn(
+                "refreshed owner-distinct organ MCP read credential manifest",
+                first.stdout,
+            )
+
+            second = subprocess.run(
+                [
+                    "bash",
+                    str(INSTALL_SYSTEMD),
+                    "--provision-organ-mcp-read-auth",
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertEqual(
+                second.stdout.count("already provisioned"),
+                len(ORGAN_MCP_READ_CREDENTIAL_NAMES),
+            )
+            for name, token in credentials.items():
+                self.assertEqual(
+                    secret_dir.joinpath(name)
+                    .read_text(encoding="utf-8")
+                    .removesuffix("\n"),
+                    token,
+                )
+
+    @unittest.skipIf(
+        hasattr(os, "geteuid") and os.geteuid() == 0,
+        "organ MCP candidate credential provisioning intentionally rejects root",
+    )
+    def test_organ_mcp_candidate_auth_is_distinct_from_every_read_credential(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            secret_dir = stack_root / "Secrets" / "Configs"
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CONFIGS_ROOT": str(root / "Configs"),
+                    "HOME": str(root / "home"),
+                    "XDG_CONFIG_HOME": str(root / "xdg-config"),
+                }
+            )
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(INSTALL_SYSTEMD),
+                    "--provision-organ-mcp-candidate-auth",
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            names = (
+                *ORGAN_MCP_READ_CREDENTIAL_NAMES,
+                *ORGAN_MCP_CANDIDATE_CREDENTIAL_NAMES,
+            )
+            credentials = {
+                name: (secret_dir / name)
+                .read_text(encoding="utf-8")
+                .removesuffix("\n")
+                for name in names
+            }
+            self.assertEqual(len(set(credentials.values())), len(names))
+            manifest_path = (
+                secret_dir / ORGAN_MCP_CANDIDATE_AUTH_MANIFEST_NAME
+            )
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                manifest,
+                {
+                    "credentials": {
+                        "aoa-evals": {
+                            "policy_family": "candidate",
+                            "sha256": hashlib.sha256(
+                                credentials[
+                                    "aoa-evals-mcp-candidate-bearer-token"
+                                ].encode("utf-8")
+                            ).hexdigest(),
+                        },
+                        "aoa-memo": {
+                            "policy_family": "candidate",
+                            "sha256": hashlib.sha256(
+                                credentials[
+                                    "aoa-memo-mcp-candidate-bearer-token"
+                                ].encode("utf-8")
+                            ).hexdigest(),
+                        },
+                    },
+                    "schema_version": "organ_mcp_candidate_auth_manifest_v1",
+                },
+            )
+            self.assertEqual(manifest_path.stat().st_mode & 0o777, 0o600)
+            for token in credentials.values():
+                self.assertNotIn(token, result.stdout + result.stderr)
+
+    @unittest.skipIf(
+        hasattr(os, "geteuid") and os.geteuid() == 0,
+        "abyss-stack MCP credential provisioning intentionally rejects root",
+    )
+    def test_stack_mcp_auth_provisions_distinct_secret_safe_credentials(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            secret_dir = stack_root / "Secrets" / "Configs"
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CONFIGS_ROOT": str(root / "Configs"),
+                    "HOME": str(root / "home"),
+                    "XDG_CONFIG_HOME": str(root / "xdg-config"),
+                }
+            )
+
+            first = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--provision-abyss-stack-mcp-auth"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(first.returncode, 0, first.stderr)
+            credentials = {
+                name: secret_dir.joinpath(name)
+                .read_text(encoding="utf-8")
+                .removesuffix("\n")
+                for name in STACK_MCP_CREDENTIAL_NAMES
+            }
+            self.assertEqual(len(set(credentials.values())), len(credentials))
+            self.assertEqual(secret_dir.stat().st_mode & 0o777, 0o700)
+            for name, token in credentials.items():
+                with self.subTest(name=name):
+                    path = secret_dir / name
+                    self.assertRegex(token, r"\A[A-Za-z0-9._~-]{43,512}\Z")
+                    self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+                    self.assertNotIn(token, first.stdout + first.stderr)
+            manifest_path = secret_dir / STACK_MCP_AUTH_MANIFEST_NAME
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                manifest,
+                {
+                    "candidate_sha256": hashlib.sha256(
+                        credentials["abyss-stack-mcp-candidate-bearer-token"].encode(
+                            "utf-8"
+                        )
+                    ).hexdigest(),
+                    "read_sha256": hashlib.sha256(
+                        credentials["abyss-stack-mcp-read-bearer-token"].encode("utf-8")
+                    ).hexdigest(),
+                    "schema_version": "abyss_stack_mcp_auth_manifest_v1",
+                },
+            )
+            self.assertEqual(manifest_path.stat().st_mode & 0o777, 0o600)
+            self.assertIn(
+                "provisioned abyss-stack MCP read bearer credential", first.stdout
+            )
+            self.assertIn(
+                "provisioned abyss-stack MCP candidate bearer credential",
+                first.stdout,
+            )
+            self.assertNotIn("unit linked", first.stdout)
+
+            second = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--provision-abyss-stack-mcp-auth"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(second.returncode, 0, second.stderr)
+            for name, token in credentials.items():
+                with self.subTest(name=name):
+                    self.assertEqual(
+                        secret_dir.joinpath(name)
+                        .read_text(encoding="utf-8")
+                        .removesuffix("\n"),
+                        token,
+                    )
+                    self.assertNotIn(token, second.stdout + second.stderr)
+            self.assertEqual(second.stdout.count("already provisioned"), 2)
+            self.assertIn(
+                "refreshed abyss-stack MCP credential separation manifest",
+                second.stdout,
+            )
+
+    @unittest.skipIf(
+        hasattr(os, "geteuid") and os.geteuid() == 0,
+        "abyss-stack MCP credential provisioning intentionally rejects root",
+    )
+    def test_stack_mcp_auth_rejects_matching_contour_credentials(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            secret_dir = stack_root / "Secrets" / "Configs"
+            secret_dir.mkdir(parents=True, mode=0o700)
+            shared_token = "same-contour-token-" + ("a" * 48)
+            for name in STACK_MCP_CREDENTIAL_NAMES:
+                credential = secret_dir / name
+                credential.write_text(shared_token + "\n", encoding="utf-8")
+                credential.chmod(0o600)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CONFIGS_ROOT": str(root / "Configs"),
+                    "HOME": str(root / "home"),
+                    "XDG_CONFIG_HOME": str(root / "xdg-config"),
+                }
+            )
+
+            result = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--provision-abyss-stack-mcp-auth"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "read and candidate bearer credentials must be distinct",
+                result.stderr,
+            )
+            self.assertNotIn(shared_token, result.stdout + result.stderr)
+
+    @unittest.skipIf(
+        hasattr(os, "geteuid") and os.geteuid() == 0,
+        "abyss-stack MCP credential rotation intentionally rejects root",
+    )
+    def test_stack_mcp_auth_rotation_is_stopped_secret_safe_and_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            secret_dir = stack_root / "Secrets" / "Configs"
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            systemctl = fake_bin / "systemctl"
+            systemctl.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "printf '%s\\n' "
+                '"${ABYSS_STACK_MCP_TEST_ACTIVE_STATE:-inactive}"\n',
+                encoding="utf-8",
+            )
+            systemctl.chmod(0o755)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CONFIGS_ROOT": str(root / "Configs"),
+                    "HOME": str(root / "home"),
+                    "XDG_CONFIG_HOME": str(root / "xdg-config"),
+                    "PATH": f"{fake_bin}:{env['PATH']}",
+                }
+            )
+            provision = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--provision-abyss-stack-mcp-auth"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(provision.returncode, 0, provision.stderr)
+            before = {
+                name: secret_dir.joinpath(name)
+                .read_text(encoding="utf-8")
+                .removesuffix("\n")
+                for name in STACK_MCP_CREDENTIAL_NAMES
+            }
+
+            rotate = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--rotate-abyss-stack-mcp-auth"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(rotate.returncode, 0, rotate.stderr)
+            after = {
+                name: secret_dir.joinpath(name)
+                .read_text(encoding="utf-8")
+                .removesuffix("\n")
+                for name in STACK_MCP_CREDENTIAL_NAMES
+            }
+            self.assertEqual(len(set(after.values())), 2)
+            for name in STACK_MCP_CREDENTIAL_NAMES:
+                self.assertNotEqual(before[name], after[name])
+                self.assertNotIn(after[name], rotate.stdout + rotate.stderr)
+            manifest = json.loads(
+                secret_dir.joinpath(STACK_MCP_AUTH_MANIFEST_NAME).read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(
+                manifest["read_sha256"],
+                hashlib.sha256(
+                    after["abyss-stack-mcp-read-bearer-token"].encode("utf-8")
+                ).hexdigest(),
+            )
+            self.assertEqual(
+                manifest["candidate_sha256"],
+                hashlib.sha256(
+                    after["abyss-stack-mcp-candidate-bearer-token"].encode("utf-8")
+                ).hexdigest(),
+            )
+            self.assertIn("managed units remain stopped", rotate.stdout)
+
+            blocked = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--rotate-abyss-stack-mcp-auth"],
+                cwd=REPO_ROOT,
+                env={**env, "ABYSS_STACK_MCP_TEST_ACTIVE_STATE": "active"},
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(blocked.returncode, 0)
+            self.assertIn("refusing credential rotation while", blocked.stderr)
+            for name, token in after.items():
+                self.assertEqual(
+                    secret_dir.joinpath(name)
+                    .read_text(encoding="utf-8")
+                    .removesuffix("\n"),
+                    token,
+                )
+                self.assertNotIn(token, blocked.stdout + blocked.stderr)
+
+    def test_stack_mcp_credential_provisioning_is_user_scoped(self) -> None:
+        installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")
+        self.assertIn(
+            "if (((provision_abyss_stack_mcp_auth || "
+            "rotate_abyss_stack_mcp_auth) && EUID == 0)); then",
+            installer,
+        )
+        self.assertIn(
+            "abyss-stack MCP credential management must run as the target user, "
+            "not root",
+            installer,
+        )
+
+    @unittest.skipIf(
+        hasattr(os, "geteuid") and os.geteuid() == 0,
+        "abyss-stack MCP runtime provisioning intentionally rejects root",
+    )
+    def test_stack_mcp_runtime_provision_is_explicit_and_source_addressed(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            service_root = (
+                stack_root / "Configs" / "mcp" / "services" / "abyss-stack-mcp"
+            )
+            service_root.mkdir(parents=True)
+            (service_root / "pyproject.toml").write_text(
+                '[project]\nname = "abyss-stack-mcp"\nversion = "0.1.0"\n',
+                encoding="utf-8",
+            )
+            lock_path = service_root / "requirements.lock"
+            lock_path.write_text(
+                "test-package==1.0.0 \\\n    --hash=sha256:" + ("0" * 64) + "\n",
+                encoding="utf-8",
+            )
+            source_file = service_root / "service.py"
+            source_file.write_text("VALUE = 1\n", encoding="utf-8")
+            pip_log = root / "pip.log"
+            server_log = root / "server.log"
+            bootstrap = root / "fake-python"
+            bootstrap.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                'if [[ -n "${PYTHONHOME+x}" || '
+                '-n "${PYTHONPATH+x}" ]]; then\n'
+                "  exit 65\n"
+                "fi\n"
+                'if [[ "${1:-}" != "-I" ]]; then\n'
+                "  exit 66\n"
+                "fi\n"
+                "shift\n"
+                'if [[ "$1" == "-B" && "$2" == "-m" && '
+                '"$3" == "abyss_stack_mcp.server" ]]; then\n'
+                '  source_lock="${AOA_STACK_ROOT}/Services/'
+                'abyss-stack-mcp/.source-projection.lock"\n'
+                '  runtime_lock="${AOA_STACK_ROOT}/Services/'
+                'abyss-stack-mcp/.runtime-provision.lock"\n'
+                "  if /usr/bin/flock --exclusive --nonblock "
+                '"$source_lock" /usr/bin/true; then\n'
+                "    exit 67\n"
+                "  fi\n"
+                "  if /usr/bin/flock --exclusive --nonblock "
+                '"$runtime_lock" /usr/bin/true; then\n'
+                "    exit 68\n"
+                "  fi\n"
+                "  printf 'verified-and-locked\\n' > "
+                '"$ABYSS_STACK_MCP_TEST_SERVER_LOG"\n'
+                "  exit 0\n"
+                "fi\n"
+                'if [[ "$1" == "-m" && "$2" == "venv" ]]; then\n'
+                '  mkdir -p "$3/bin"\n'
+                '  ln -s "$0" "$3/bin/python"\n'
+                "  exit 0\n"
+                "fi\n"
+                'if [[ "$1" == "-m" && "$2" == "pip" ]]; then\n'
+                '  printf \'%s\\n\' "$*" >> "$ABYSS_STACK_MCP_TEST_PIP_LOG"\n'
+                '  if [[ "$*" == *"--require-hashes"* ]]; then\n'
+                '    package_root="$(dirname "$0")/../lib/python/site-packages/'
+                'test_package"\n'
+                '    mkdir -p "$package_root"\n'
+                "    printf 'VALUE = 1\\n' > \"$package_root/__init__.py\"\n"
+                "  fi\n"
+                '  if [[ "$*" == *"--no-deps --no-build-isolation"* ]]; then\n'
+                '    entrypoint="$(dirname "$0")/abyss-stack-mcp"\n'
+                '    printf \'#!%s\\nexit 0\\n\' "$0" > "$entrypoint"\n'
+                '    chmod 0755 "$entrypoint"\n'
+                "  fi\n"
+                '  if [[ -n "${ABYSS_STACK_MCP_TEST_MUTATE_SOURCE_DURING_BUILD:-}" ]]; then\n'
+                "    printf 'VALUE = 99\\n' > "
+                '"$ABYSS_STACK_MCP_TEST_MUTATE_SOURCE_DURING_BUILD"\n'
+                "  fi\n"
+                '  if [[ -n "${ABYSS_STACK_MCP_TEST_ACTIVATE_DURING_BUILD:-}" ]]; then\n'
+                '    : > "$ABYSS_STACK_MCP_TEST_ACTIVATE_DURING_BUILD"\n'
+                "  fi\n"
+                "  exit 0\n"
+                "fi\n"
+                'if [[ "$1" == "-c" ]]; then\n'
+                "  exit 0\n"
+                "fi\n"
+                "exit 64\n",
+                encoding="utf-8",
+            )
+            bootstrap.chmod(0o755)
+            bootstrap_link = root / "fake-python-link"
+            bootstrap_link.symlink_to(bootstrap)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            unit_source_dir = stack_root / "Configs" / "systemd" / "user"
+            unit_source_dir.mkdir(parents=True)
+            unit_target_dir = root / "xdg-config" / "systemd" / "user"
+            unit_target_dir.mkdir(parents=True)
+            for source_unit in (
+                STACK_MCP_READ_UNIT,
+                STACK_MCP_CANDIDATE_UNIT,
+            ):
+                source_path = unit_source_dir / source_unit.name
+                source_path.write_text(
+                    source_unit.read_text(encoding="utf-8").replace(
+                        "/srv/AbyssOS/abyss-stack",
+                        str(stack_root),
+                    ),
+                    encoding="utf-8",
+                )
+                (unit_target_dir / source_unit.name).symlink_to(source_path)
+            systemctl = fake_bin / "systemctl"
+            systemctl.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                'unit="${!#}"\n'
+                'if [[ "${ABYSS_STACK_MCP_TEST_SYSTEMCTL_FAIL:-0}" == 1 ]]; '
+                "then\n"
+                "  exit 1\n"
+                "fi\n"
+                "load_state=loaded\n"
+                "active_state=inactive\n"
+                'fragment_path="${XDG_CONFIG_HOME}/systemd/user/${unit}"\n'
+                "exec_path=/usr/bin/flock\n"
+                'exec_start="/usr/bin/flock --shared --no-fork '
+                "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/"
+                ".source-projection.lock /usr/bin/flock --shared --no-fork "
+                "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/"
+                ".runtime-provision.lock /usr/bin/env "
+                "${AOA_CONFIGS_ROOT}/scripts/aoa-install-systemd "
+                '--launch-verified-abyss-stack-mcp"\n'
+                'if [[ "${ABYSS_STACK_MCP_TEST_UNLOADED_UNIT:-}" == '
+                '"$unit" ]]; then\n'
+                "  load_state=not-found\n"
+                "  fragment_path=\n"
+                "  exec_path=\n"
+                "  exec_start=\n"
+                "fi\n"
+                'if [[ "${ABYSS_STACK_MCP_TEST_STALE_UNIT:-}" == '
+                '"$unit" ]]; then\n'
+                "  exec_path=/usr/bin/env\n"
+                '  exec_start="/usr/bin/env '
+                "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv/bin/python "
+                '-I -B -m abyss_stack_mcp.server"\n'
+                "fi\n"
+                'if [[ "${ABYSS_STACK_MCP_TEST_ACTIVE_UNIT:-}" == '
+                '"$unit" ]]; then\n'
+                "  active_state=active\n"
+                'elif [[ "$unit" == "abyss-stack-mcp-read.service" && '
+                '-f "${ABYSS_STACK_MCP_TEST_ACTIVATE_DURING_BUILD:-'
+                '/nonexistent}" ]]; then\n'
+                "  active_state=active\n"
+                "fi\n"
+                "printf 'LoadState=%s\\n' \"$load_state\"\n"
+                "printf 'ActiveState=%s\\n' \"$active_state\"\n"
+                "printf 'FragmentPath=%s\\n' \"$fragment_path\"\n"
+                'if [[ -n "$exec_start" ]]; then\n'
+                "  printf 'ExecStart={ path=%s ; argv[]=%s ; "
+                "ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; "
+                "pid=0 ; code=(null) ; status=0/0 }\\n' "
+                '"$exec_path" "$exec_start"\n'
+                "else\n"
+                "  printf 'ExecStart=\\n'\n"
+                "fi\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            systemctl.chmod(0o755)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CONFIGS_ROOT": str(stack_root / "Configs"),
+                    "ABYSS_STACK_MCP_BOOTSTRAP_PYTHON": str(bootstrap_link),
+                    "ABYSS_STACK_MCP_TEST_PIP_LOG": str(pip_log),
+                    "ABYSS_STACK_MCP_TEST_SERVER_LOG": str(server_log),
+                    "HOME": str(root / "home"),
+                    "XDG_CONFIG_HOME": str(root / "xdg-config"),
+                    "PATH": f"{fake_bin}:{env['PATH']}",
+                    "PYTHONHOME": str(root / "hostile-python-home"),
+                    "PYTHONPATH": str(root / "hostile-python-path"),
+                }
+            )
+            command = [
+                "bash",
+                str(INSTALL_SYSTEMD),
+                "--provision-abyss-stack-mcp-runtime",
+            ]
+            verify_command = [
+                "bash",
+                str(INSTALL_SYSTEMD),
+                "--verify-abyss-stack-mcp-runtime",
+            ]
+
+            read_unit_source = unit_source_dir / "abyss-stack-mcp-read.service"
+            lock_aware_source = read_unit_source.read_text(encoding="utf-8")
+            read_unit_source.write_text(
+                lock_aware_source.replace(
+                    "ExecStart=/usr/bin/flock --shared --no-fork ",
+                    "ExecStart=/usr/bin/env ",
+                ),
+                encoding="utf-8",
+            )
+            stale_source = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(stale_source.returncode, 0)
+            self.assertIn(
+                "managed source unit is not lock-aware",
+                stale_source.stderr,
+            )
+            self.assertFalse(pip_log.exists())
+            read_unit_source.write_text(
+                lock_aware_source,
+                encoding="utf-8",
+            )
+
+            for environment_key, expected_error in (
+                (
+                    "ABYSS_STACK_MCP_TEST_UNLOADED_UNIT",
+                    "is not loaded; link and reload managed user units",
+                ),
+                (
+                    "ABYSS_STACK_MCP_TEST_STALE_UNIT",
+                    "is not loaded with the lock-aware ExecStart",
+                ),
+            ):
+                with self.subTest(environment_key=environment_key):
+                    missing_prerequisite = subprocess.run(
+                        command,
+                        cwd=REPO_ROOT,
+                        env={
+                            **env,
+                            environment_key: "abyss-stack-mcp-read.service",
+                        },
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(missing_prerequisite.returncode, 0)
+                    self.assertIn(
+                        expected_error,
+                        missing_prerequisite.stderr,
+                    )
+                    self.assertFalse(pip_log.exists())
+
+            first = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(first.returncode, 0, first.stderr)
+            venv = stack_root / "Services" / "abyss-stack-mcp" / "venv"
+            marker = venv / ".abyss-stack-mcp-runtime-identity"
+            content_marker = venv / ".abyss-stack-mcp-runtime-content-digest"
+            runtime_lock = (
+                stack_root / "Services" / "abyss-stack-mcp" / ".runtime-provision.lock"
+            )
+            source_projection_lock = (
+                stack_root / "Services" / "abyss-stack-mcp" / ".source-projection.lock"
+            )
+            audit_root = stack_root / "Logs" / "mcp" / "audit"
+            read_audit_journal = audit_root / "policy-read.jsonl"
+            candidate_audit_journal = audit_root / "policy-candidate.jsonl"
+            first_identity = marker.read_text(encoding="utf-8").strip()
+            self.assertRegex(first_identity, r"\A[0-9a-f]{64}:[0-9a-f]{64}\Z")
+            first_content_digest = content_marker.read_text(encoding="utf-8").strip()
+            self.assertRegex(
+                first_content_digest,
+                r"\A[0-9a-f]{64}\Z",
+            )
+            self.assertTrue((venv / "bin" / "python").is_file())
+            self.assertTrue((venv / "bin" / "python").is_symlink())
+            self.assertEqual(
+                (venv / "bin" / "python").resolve(),
+                bootstrap.resolve(),
+            )
+            entrypoint = venv / "bin" / "abyss-stack-mcp"
+            self.assertEqual(
+                entrypoint.read_text(encoding="utf-8").splitlines()[0],
+                f"#!{venv}/bin/python",
+            )
+            self.assertNotIn(
+                "/.venv.",
+                entrypoint.read_text(encoding="utf-8").splitlines()[0],
+            )
+            self.assertTrue(runtime_lock.is_file())
+            self.assertEqual(runtime_lock.stat().st_mode & 0o777, 0o600)
+            self.assertTrue(source_projection_lock.is_file())
+            self.assertEqual(
+                source_projection_lock.stat().st_mode & 0o777,
+                0o600,
+            )
+            self.assertEqual(audit_root.stat().st_mode & 0o777, 0o700)
+            self.assertEqual(
+                read_audit_journal.stat().st_mode & 0o777,
+                0o600,
+            )
+            self.assertEqual(
+                candidate_audit_journal.stat().st_mode & 0o777,
+                0o600,
+            )
+            self.assertNotEqual(read_audit_journal, candidate_audit_journal)
+            self.assertIn("provisioned abyss-stack MCP runtime", first.stdout)
+            self.assertNotIn("unit linked", first.stdout)
+            pip_calls = pip_log.read_text(encoding="utf-8").splitlines()
+            self.assertTrue(
+                any(
+                    "--require-hashes -r " in line
+                    and "/.source-snapshot/requirements.lock" in line
+                    for line in pip_calls
+                )
+            )
+            self.assertTrue(
+                any(
+                    "--no-deps --no-build-isolation " in line
+                    and line.endswith("/.source-snapshot")
+                    for line in pip_calls
+                )
+            )
+            self.assertTrue(all(str(service_root) not in line for line in pip_calls))
+
+            candidate_audit_journal.unlink()
+            unsafe_target = root / "unsafe-audit-target.jsonl"
+            unsafe_target.touch(mode=0o600)
+            candidate_audit_journal.symlink_to(unsafe_target)
+            unsafe_audit = subprocess.run(
+                verify_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(unsafe_audit.returncode, 0)
+            self.assertIn(
+                "candidate audit journal must be a regular non-symlink file",
+                unsafe_audit.stderr,
+            )
+            candidate_audit_journal.unlink()
+            candidate_audit_journal.touch(mode=0o600)
+
+            verified = subprocess.run(
+                verify_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(verified.returncode, 0, verified.stderr)
+            self.assertEqual(verified.stdout, "")
+
+            launched = subprocess.run(
+                [
+                    "/usr/bin/flock",
+                    "--shared",
+                    "--no-fork",
+                    str(source_projection_lock),
+                    "/usr/bin/flock",
+                    "--shared",
+                    "--no-fork",
+                    str(runtime_lock),
+                    "/usr/bin/env",
+                    str(INSTALL_SYSTEMD),
+                    "--launch-verified-abyss-stack-mcp",
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(launched.returncode, 0, launched.stderr)
+            self.assertEqual(
+                server_log.read_text(encoding="utf-8"),
+                "verified-and-locked\n",
+            )
+
+            second = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertIn("already provisioned", second.stdout)
+            self.assertEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
+
+            source_file.write_text("VALUE = 2\n", encoding="utf-8")
+            source_drift = subprocess.run(
+                verify_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(source_drift.returncode, 0)
+            self.assertIn(
+                "runtime source-and-lock identity mismatch",
+                source_drift.stderr,
+            )
+            source_file.write_text("VALUE = 1\n", encoding="utf-8")
+
+            bootstrap.write_text(
+                bootstrap.read_text(encoding="utf-8")
+                + "\n# simulated host interpreter update\n",
+                encoding="utf-8",
+            )
+            interpreter_drift = subprocess.run(
+                verify_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(interpreter_drift.returncode, 0)
+            self.assertIn(
+                "abyss-stack MCP runtime content digest mismatch",
+                interpreter_drift.stderr,
+            )
+            interpreter_rebuilt = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                interpreter_rebuilt.returncode,
+                0,
+                interpreter_rebuilt.stderr,
+            )
+            self.assertIn(
+                "provisioned abyss-stack MCP runtime",
+                interpreter_rebuilt.stdout,
+            )
+            self.assertNotIn("already provisioned", interpreter_rebuilt.stdout)
+            self.assertNotEqual(
+                content_marker.read_text(encoding="utf-8").strip(),
+                first_content_digest,
+            )
+            self.assertEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
+
+            installed_dependency = (
+                venv
+                / "lib"
+                / "python"
+                / "site-packages"
+                / "test_package"
+                / "__init__.py"
+            )
+            installed_dependency.write_text(
+                "VALUE = 'tampered'\n",
+                encoding="utf-8",
+            )
+            pip_log_before_tamper = pip_log.read_text(encoding="utf-8")
+            rebuilt = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(rebuilt.returncode, 0, rebuilt.stderr)
+            self.assertIn("provisioned abyss-stack MCP runtime", rebuilt.stdout)
+            self.assertNotIn("already provisioned", rebuilt.stdout)
+            self.assertNotEqual(
+                pip_log.read_text(encoding="utf-8"),
+                pip_log_before_tamper,
+            )
+            self.assertEqual(
+                installed_dependency.read_text(encoding="utf-8"),
+                "VALUE = 1\n",
+            )
+            self.assertEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
+
+            source_file.write_text("VALUE = 2\n", encoding="utf-8")
+            pip_log_before_block = pip_log.read_text(encoding="utf-8")
+            source_lock_holder = subprocess.Popen(
+                [
+                    "/usr/bin/flock",
+                    "--exclusive",
+                    str(source_projection_lock),
+                    sys.executable,
+                    "-c",
+                    (
+                        "import sys; "
+                        "print('locked', flush=True); "
+                        "sys.stdin.buffer.read()"
+                    ),
+                ],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            self.assertIsNotNone(source_lock_holder.stdout)
+            self.assertEqual(
+                source_lock_holder.stdout.readline().strip(),
+                "locked",
+            )
+            source_locked = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(source_locked.returncode, 0)
+            self.assertIn(
+                "source projection lock",
+                source_locked.stderr,
+            )
+            self.assertEqual(
+                pip_log.read_text(encoding="utf-8"),
+                pip_log_before_block,
+            )
+            self.assertIsNotNone(source_lock_holder.stdin)
+            source_lock_holder.stdin.close()
+            self.assertEqual(source_lock_holder.wait(timeout=5), 0)
+            source_lock_holder.stdout.close()
+            source_lock_holder.stderr.close()
+
+            lock_holder = subprocess.Popen(
+                [
+                    "/usr/bin/flock",
+                    "--shared",
+                    str(runtime_lock),
+                    sys.executable,
+                    "-c",
+                    (
+                        "import sys; "
+                        "print('locked', flush=True); "
+                        "sys.stdin.buffer.read()"
+                    ),
+                ],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            self.assertIsNotNone(lock_holder.stdout)
+            self.assertEqual(lock_holder.stdout.readline().strip(), "locked")
+            locked = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(locked.returncode, 0)
+            self.assertIn("holds the runtime lock", locked.stderr)
+            self.assertEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
+            self.assertEqual(
+                pip_log.read_text(encoding="utf-8"),
+                pip_log_before_block,
+            )
+            self.assertIsNotNone(lock_holder.stdin)
+            lock_holder.stdin.close()
+            self.assertEqual(lock_holder.wait(timeout=5), 0)
+            lock_holder.stdout.close()
+            lock_holder.stderr.close()
+
+            for active_unit in (
+                "abyss-stack-mcp-read.service",
+                "abyss-stack-mcp-candidate.service",
+            ):
+                with self.subTest(active_unit=active_unit):
+                    blocked = subprocess.run(
+                        command,
+                        cwd=REPO_ROOT,
+                        env={
+                            **env,
+                            "ABYSS_STACK_MCP_TEST_ACTIVE_UNIT": active_unit,
+                        },
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(blocked.returncode, 0)
+                    self.assertIn(
+                        f"while {active_unit} is active",
+                        blocked.stderr,
+                    )
+                    self.assertEqual(
+                        marker.read_text(encoding="utf-8").strip(),
+                        first_identity,
+                    )
+                    self.assertEqual(
+                        pip_log.read_text(encoding="utf-8"),
+                        pip_log_before_block,
+                    )
+
+            unobservable = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_SYSTEMCTL_FAIL": "1",
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(unobservable.returncode, 0)
+            self.assertIn(
+                "cannot inspect the loaded definition for abyss-stack-mcp-read.service",
+                unobservable.stderr,
+            )
+            self.assertEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
+            self.assertEqual(
+                pip_log.read_text(encoding="utf-8"),
+                pip_log_before_block,
+            )
+
+            activation_signal = root / "activate-during-build"
+            raced = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_ACTIVATE_DURING_BUILD": str(
+                        activation_signal
+                    ),
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(raced.returncode, 0)
+            self.assertIn(
+                "while abyss-stack-mcp-read.service is active",
+                raced.stderr,
+            )
+            self.assertEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
+            self.assertNotEqual(
+                pip_log.read_text(encoding="utf-8"),
+                pip_log_before_block,
+            )
+            activation_signal.unlink()
+
+            pip_log_before_source_race = pip_log.read_text(encoding="utf-8")
+            source_raced = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_MUTATE_SOURCE_DURING_BUILD": str(source_file),
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(source_raced.returncode, 0)
+            self.assertIn(
+                "package changed during runtime provisioning",
+                source_raced.stderr,
+            )
+            self.assertEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
+            self.assertNotEqual(
+                pip_log.read_text(encoding="utf-8"),
+                pip_log_before_source_race,
+            )
+            source_file.write_text("VALUE = 2\n", encoding="utf-8")
+
+            third = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(third.returncode, 0, third.stderr)
+            self.assertIn("provisioned abyss-stack MCP runtime", third.stdout)
+            self.assertNotEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
+
+    def test_stack_mcp_runtime_provision_rejects_combined_unit_linking(
+        self,
+    ) -> None:
+        result = self.run_install_systemd(
+            "--all-user-units",
+            "--provision-abyss-stack-mcp-runtime",
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "link lock-aware user units in a separate transaction",
+            result.stderr,
+        )
+
+    def test_stack_mcp_runtime_verification_is_read_only_and_standalone(
+        self,
+    ) -> None:
+        result = self.run_install_systemd(
+            "--verify-abyss-stack-mcp-runtime",
+            "--restart-now",
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "runtime verification must be a standalone read-only action",
+            result.stderr,
+        )
+
+        launch_result = self.run_install_systemd(
+            "--launch-verified-abyss-stack-mcp",
+            "--restart-now",
+        )
+        self.assertNotEqual(launch_result.returncode, 0)
+        self.assertIn(
+            "verified abyss-stack MCP launch must be a standalone unit action",
+            launch_result.stderr,
+        )
 
     def test_mcp_http_auth_provision_creates_a_private_secret_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -420,7 +1887,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
 
             self.assertNotEqual(symlinked_root.returncode, 0)
-            self.assertIn("secret root must be a directory, not a symlink", symlinked_root.stderr)
+            self.assertIn(
+                "secret root must be a directory, not a symlink", symlinked_root.stderr
+            )
             self.assertFalse(outside.joinpath(MCP_HTTP_CREDENTIAL_NAME).exists())
 
             secret_dir.unlink()
@@ -440,7 +1909,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
 
             self.assertNotEqual(symlinked_token.returncode, 0)
             self.assertIn("regular non-symlink file", symlinked_token.stderr)
-            self.assertEqual(outside_token.read_text(encoding="utf-8"), MCP_HTTP_AUTH_TOKEN)
+            self.assertEqual(
+                outside_token.read_text(encoding="utf-8"), MCP_HTTP_AUTH_TOKEN
+            )
 
     def test_mcp_http_codex_client_scopes_bearer_to_execed_codex(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -450,13 +1921,42 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             credential.parent.mkdir(parents=True)
             credential.write_text(f"{MCP_HTTP_AUTH_TOKEN}\n", encoding="utf-8")
             credential.chmod(0o600)
+            owner_tokens: list[str] = []
+            for index, name in enumerate(
+                (
+                    *ORGAN_MCP_READ_CREDENTIAL_NAMES,
+                    *ORGAN_MCP_CANDIDATE_CREDENTIAL_NAMES,
+                )
+            ):
+                owner_token = f"test-owner-{index}-" + (chr(ord("b") + index) * 50)
+                owner_tokens.append(owner_token)
+                owner_credential = credential.parent / name
+                owner_credential.write_text(f"{owner_token}\n", encoding="utf-8")
+                owner_credential.chmod(0o600)
             capture_token = root / "captured-token"
             capture_args = root / "captured-args"
             fake_codex = root / "codex"
             fake_codex.write_text(
                 "#!/usr/bin/env bash\n"
-                "printf '%s' \"$AOA_MCP_HTTP_BEARER_TOKEN\" > \"$CAPTURE_TOKEN\"\n"
-                "printf '%s\\n' \"$@\" > \"$CAPTURE_ARGS\"\n",
+                "printf '%s\\n' "
+                '"$AOA_MCP_HTTP_BEARER_TOKEN" '
+                '"$AOA_DECISIONS_MCP_READ_BEARER_TOKEN" '
+                '"$AOA_MEMO_MCP_READ_BEARER_TOKEN" '
+                '"$AOA_EVALS_MCP_READ_BEARER_TOKEN" '
+                '"$AOA_KAG_MCP_READ_BEARER_TOKEN" '
+                '"$AOA_4PDA_CONNECTOR_MCP_READ_BEARER_TOKEN" '
+                '"$AOA_COURSE_CONNECTOR_MCP_READ_BEARER_TOKEN" '
+                '"$AOA_DISCORD_CONNECTOR_MCP_READ_BEARER_TOKEN" '
+                '"$AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN" '
+                '"$AOA_STACKOVERFLOW_CONNECTOR_MCP_READ_BEARER_TOKEN" '
+                '"$AOA_STATS_MCP_READ_BEARER_TOKEN" '
+                '"$AOA_TELEGRAM_CONNECTOR_MCP_READ_BEARER_TOKEN" '
+                '"$AOA_XDA_CONNECTOR_MCP_READ_BEARER_TOKEN" '
+                '"$ABYSS_MACHINE_MCP_READ_BEARER_TOKEN" '
+                '"$TOS_CORPUS_MCP_READ_BEARER_TOKEN" '
+                '"$AOA_MEMO_MCP_CANDIDATE_BEARER_TOKEN" '
+                '"$AOA_EVALS_MCP_CANDIDATE_BEARER_TOKEN" > "$CAPTURE_TOKEN"\n'
+                'printf \'%s\\n\' "$@" > "$CAPTURE_ARGS"\n',
                 encoding="utf-8",
             )
             fake_codex.chmod(0o755)
@@ -469,7 +1969,26 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                     "CAPTURE_ARGS": str(capture_args),
                 }
             )
-            env.pop("AOA_MCP_HTTP_BEARER_TOKEN", None)
+            for environment_name in (
+                "AOA_MCP_HTTP_BEARER_TOKEN",
+                "AOA_DECISIONS_MCP_READ_BEARER_TOKEN",
+                "AOA_MEMO_MCP_READ_BEARER_TOKEN",
+                "AOA_MEMO_MCP_CANDIDATE_BEARER_TOKEN",
+                "AOA_EVALS_MCP_READ_BEARER_TOKEN",
+                "AOA_EVALS_MCP_CANDIDATE_BEARER_TOKEN",
+                "AOA_KAG_MCP_READ_BEARER_TOKEN",
+                "AOA_4PDA_CONNECTOR_MCP_READ_BEARER_TOKEN",
+                "AOA_COURSE_CONNECTOR_MCP_READ_BEARER_TOKEN",
+                "AOA_DISCORD_CONNECTOR_MCP_READ_BEARER_TOKEN",
+                "AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN",
+                "AOA_STACKOVERFLOW_CONNECTOR_MCP_READ_BEARER_TOKEN",
+                "AOA_STATS_MCP_READ_BEARER_TOKEN",
+                "AOA_TELEGRAM_CONNECTOR_MCP_READ_BEARER_TOKEN",
+                "AOA_XDA_CONNECTOR_MCP_READ_BEARER_TOKEN",
+                "ABYSS_MACHINE_MCP_READ_BEARER_TOKEN",
+                "TOS_CORPUS_MCP_READ_BEARER_TOKEN",
+            ):
+                env.pop(environment_name, None)
 
             result = subprocess.run(
                 [str(MCP_HTTP_CODEX_CLIENT), "resume", "test-thread"],
@@ -481,7 +2000,10 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(capture_token.read_text(encoding="utf-8"), MCP_HTTP_AUTH_TOKEN)
+            self.assertEqual(
+                capture_token.read_text(encoding="utf-8").splitlines(),
+                [MCP_HTTP_AUTH_TOKEN, *owner_tokens],
+            )
             self.assertEqual(
                 capture_args.read_text(encoding="utf-8").splitlines(),
                 ["resume", "test-thread"],
@@ -529,7 +2051,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             capture_token = root / "captured-token"
             fake_codex.write_text(
                 "#!/usr/bin/env bash\n"
-                "printf '%s' \"$AOA_MCP_HTTP_BEARER_TOKEN\" > \"$CAPTURE_TOKEN\"\n",
+                'printf \'%s\' "$AOA_MCP_HTTP_BEARER_TOKEN" > "$CAPTURE_TOKEN"\n',
                 encoding="utf-8",
             )
             fake_codex.chmod(0o755)
@@ -544,7 +2066,20 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 }
             )
             env.pop("ZDOTDIR", None)
-            env.pop("AOA_MCP_HTTP_BEARER_TOKEN", None)
+            for environment_name in (
+                "AOA_MCP_HTTP_BEARER_TOKEN",
+                "AOA_DECISIONS_MCP_READ_BEARER_TOKEN",
+                "AOA_MEMO_MCP_READ_BEARER_TOKEN",
+                "AOA_MEMO_MCP_CANDIDATE_BEARER_TOKEN",
+                "AOA_EVALS_MCP_READ_BEARER_TOKEN",
+                "AOA_EVALS_MCP_CANDIDATE_BEARER_TOKEN",
+                "AOA_KAG_MCP_READ_BEARER_TOKEN",
+                "AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN",
+                "AOA_STATS_MCP_READ_BEARER_TOKEN",
+                "ABYSS_MACHINE_MCP_READ_BEARER_TOKEN",
+                "TOS_CORPUS_MCP_READ_BEARER_TOKEN",
+            ):
+                env.pop(environment_name, None)
 
             first = subprocess.run(
                 ["bash", str(INSTALL_SYSTEMD), "--install-mcp-http-codex-client"],
@@ -556,10 +2091,14 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertEqual(first.returncode, 0, first.stderr)
             first_zshrc = zshrc.read_text(encoding="utf-8")
-            self.assertEqual(first_zshrc.count("abyss-stack MCP HTTP Codex client >>>"), 1)
+            self.assertEqual(
+                first_zshrc.count("abyss-stack MCP HTTP Codex client >>>"), 1
+            )
             self.assertIn(str(deployed_launcher), first_zshrc)
             self.assertIn("export KEEP_EXISTING=1", first_zshrc)
-            self.assertNotIn(MCP_HTTP_AUTH_TOKEN, first_zshrc + first.stdout + first.stderr)
+            self.assertNotIn(
+                MCP_HTTP_AUTH_TOKEN, first_zshrc + first.stdout + first.stderr
+            )
             self.assertEqual(zshrc.stat().st_mode & 0o777, 0o640)
 
             second = subprocess.run(
@@ -593,7 +2132,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                     text=True,
                 )
                 self.assertEqual(launch.returncode, 0, launch.stderr)
-                self.assertEqual(capture_token.read_text(encoding="utf-8"), MCP_HTTP_AUTH_TOKEN)
+                self.assertEqual(
+                    capture_token.read_text(encoding="utf-8"), MCP_HTTP_AUTH_TOKEN
+                )
 
             remove = subprocess.run(
                 ["bash", str(INSTALL_SYSTEMD), "--remove-mcp-http-codex-client"],
@@ -611,6 +2152,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
 
     def test_loopback_mcp_units_keep_owner_processes_and_deployed_paths(self) -> None:
         template = MCP_HTTP_TEMPLATE.read_text(encoding="utf-8")
+        organ_read_template = ORGAN_MCP_READ_TEMPLATE.read_text(encoding="utf-8")
         self.assertIn("Environment=AOA_MCP_TRANSPORT=streamable-http", template)
         self.assertIn("Environment=AOA_MCP_HOST=127.0.0.1", template)
         self.assertIn(
@@ -618,12 +2160,39 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             template,
         )
         self.assertNotIn("Environment=AOA_MCP_HTTP_BEARER_TOKEN", template)
-        self.assertIn("Environment=AOA_ABYSS_STACK_ROOT=/srv/AbyssOS/abyss-stack/Configs", template)
+        self.assertIn(
+            "Environment=AOA_ABYSS_STACK_ROOT=/srv/AbyssOS/abyss-stack/Configs",
+            template,
+        )
         self.assertIn("WorkingDirectory=/srv/AbyssOS", template)
-        self.assertIn("ExecStart=/usr/bin/env python3 /srv/AbyssOS/.codex/bin/%i-mcp-server.py", template)
+        self.assertIn(
+            "ExecStart=/usr/bin/env python3 /srv/AbyssOS/.codex/bin/%i-mcp-server.py",
+            template,
+        )
         self.assertIn("RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6", template)
         self.assertIn("Restart=on-failure", template)
         self.assertNotIn(str(REPO_ROOT), template)
+
+        self.assertIn(
+            "LoadCredential=%i-mcp-read-bearer-token:"
+            "/srv/AbyssOS/abyss-stack/Secrets/Configs/"
+            "%i-mcp-read-bearer-token",
+            organ_read_template,
+        )
+        self.assertIn(
+            "Environment=AOA_MCP_POLICY_FAMILY=read",
+            organ_read_template,
+        )
+        self.assertIn("ProtectSystem=strict", organ_read_template)
+        self.assertIn("ProtectHome=read-only", organ_read_template)
+        self.assertIn("IPAddressDeny=any", organ_read_template)
+        self.assertIn("IPAddressAllow=localhost", organ_read_template)
+        self.assertNotIn("ReadWritePaths=", organ_read_template)
+        self.assertNotIn(
+            "Environment=AOA_MCP_HTTP_BEARER_TOKEN",
+            organ_read_template,
+        )
+        self.assertNotIn(str(REPO_ROOT), organ_read_template)
 
         bundle = MCP_HTTP_BUNDLE.read_text(encoding="utf-8")
         wants = {
@@ -641,7 +2210,201 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             if line.split("#", 1)[0].strip()
         }
         self.assertIn("aoa-mcp-http@.service", managed_units)
+        self.assertIn("aoa-organ-mcp-read@.service", managed_units)
+        self.assertIn("aoa-memo-mcp-candidate.service", managed_units)
+        self.assertIn("aoa-evals-mcp-candidate.service", managed_units)
         self.assertIn("aoa-mcp-http.service", managed_units)
+
+        memo_candidate = MEMO_MCP_CANDIDATE_UNIT.read_text(
+            encoding="utf-8"
+        )
+        evals_candidate = EVALS_MCP_CANDIDATE_UNIT.read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Environment=AOA_MCP_PORT=5434", memo_candidate)
+        self.assertIn("Environment=AOA_MCP_PORT=5435", evals_candidate)
+        self.assertIn(
+            "LoadCredential=aoa-memo-mcp-candidate-bearer-token:",
+            memo_candidate,
+        )
+        self.assertIn(
+            "LoadCredential=aoa-evals-mcp-candidate-bearer-token:",
+            evals_candidate,
+        )
+        for unit in (memo_candidate, evals_candidate):
+            self.assertIn(
+                "Environment=AOA_MCP_POLICY_FAMILY=candidate",
+                unit,
+            )
+            self.assertIn("ProtectSystem=strict", unit)
+            self.assertIn("ProtectHome=read-only", unit)
+            self.assertIn("IPAddressDeny=any", unit)
+            self.assertIn("IPAddressAllow=localhost", unit)
+            self.assertNotIn("ReadWritePaths=/srv/AbyssOS\n", unit)
+        self.assertIn(
+            "ReadWritePaths=-/srv/AbyssOS/aoa-evals/memo/candidates",
+            memo_candidate,
+        )
+        self.assertNotIn(
+            "ReadWritePaths=-/srv/AbyssOS/aoa-memo/memo/objects",
+            memo_candidate,
+        )
+        self.assertIn(
+            "ReadWritePaths=-/srv/AbyssOS/aoa-memo/evals/intake",
+            evals_candidate,
+        )
+        self.assertNotIn("evals/suites/*.suite.json", evals_candidate)
+
+    def test_stack_mcp_units_keep_read_and_candidate_contours_disjoint(self) -> None:
+        read_unit = STACK_MCP_READ_UNIT.read_text(encoding="utf-8")
+        candidate_unit = STACK_MCP_CANDIDATE_UNIT.read_text(encoding="utf-8")
+        observation_path = (
+            "Environment=ABYSS_STACK_MCP_OBSERVATION_PATH="
+            "/srv/AbyssOS/abyss-stack/Logs/mcp/organ-runtime-observation.json"
+        )
+        deployed_entrypoint = (
+            "ExecStart=/usr/bin/flock --shared --no-fork "
+            "/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/"
+            ".source-projection.lock /usr/bin/flock --shared --no-fork "
+            "/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/"
+            ".runtime-provision.lock /usr/bin/env "
+            "/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd "
+            "--launch-verified-abyss-stack-mcp"
+        )
+        runtime_condition = (
+            "ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/"
+            "abyss-stack-mcp/venv/bin/python"
+        )
+        source_lock_condition = (
+            "ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/"
+            "abyss-stack-mcp/.source-projection.lock"
+        )
+        runtime_lock_condition = (
+            "ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/"
+            "abyss-stack-mcp/.runtime-provision.lock"
+        )
+        read_audit_path = "/srv/AbyssOS/abyss-stack/Logs/mcp/audit/policy-read.jsonl"
+        candidate_audit_path = (
+            "/srv/AbyssOS/abyss-stack/Logs/mcp/audit/policy-candidate.jsonl"
+        )
+        runtime_exec_condition = (
+            "ExecCondition=/usr/bin/test -x /srv/AbyssOS/abyss-stack/Services/"
+            "abyss-stack-mcp/venv/bin/python"
+        )
+        runtime_verifier_condition = (
+            "ExecCondition=/srv/AbyssOS/abyss-stack/Configs/scripts/"
+            "aoa-install-systemd --verify-abyss-stack-mcp-runtime"
+        )
+        installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")
+        self.assertIn("aoa_launch_verified_abyss_stack_mcp()", installer)
+        self.assertIn(
+            '"$abyss_stack_mcp_venv/bin/python" \\\n'
+            "    -I -B -m abyss_stack_mcp.server",
+            installer,
+        )
+
+        self.assertIn("Environment=ABYSS_STACK_MCP_POLICY_FAMILY=read", read_unit)
+        self.assertNotIn(
+            "Environment=ABYSS_STACK_MCP_POLICY_FAMILY=candidate", read_unit
+        )
+        self.assertIn(
+            "Environment=ABYSS_STACK_MCP_POLICY_FAMILY=candidate", candidate_unit
+        )
+        self.assertNotIn(
+            "Environment=ABYSS_STACK_MCP_POLICY_FAMILY=read", candidate_unit
+        )
+        self.assertIn(observation_path, read_unit)
+        self.assertIn(observation_path, candidate_unit)
+        self.assertIn("Environment=AOA_MCP_PORT=5431", read_unit)
+        self.assertNotIn("Environment=AOA_MCP_PORT=5433", read_unit)
+        self.assertIn("Environment=AOA_MCP_PORT=5433", candidate_unit)
+        self.assertNotIn("Environment=AOA_MCP_PORT=5431", candidate_unit)
+        self.assertIn(
+            "LoadCredential=abyss-stack-mcp-read-bearer-token:"
+            "/srv/AbyssOS/abyss-stack/Secrets/Configs/"
+            "abyss-stack-mcp-read-bearer-token",
+            read_unit,
+        )
+        self.assertNotIn("candidate-bearer-token", read_unit)
+        self.assertIn(
+            "LoadCredential=abyss-stack-mcp-candidate-bearer-token:"
+            "/srv/AbyssOS/abyss-stack/Secrets/Configs/"
+            "abyss-stack-mcp-candidate-bearer-token",
+            candidate_unit,
+        )
+        self.assertNotIn("read-bearer-token", candidate_unit)
+        self.assertIn(
+            f"ConditionPathExists={read_audit_path}",
+            read_unit,
+        )
+        self.assertIn(
+            f"Environment=ABYSS_STACK_MCP_AUDIT_JOURNAL_PATH={read_audit_path}",
+            read_unit,
+        )
+        self.assertIn(f"ReadWritePaths={read_audit_path}", read_unit)
+        self.assertIn(
+            f"InaccessiblePaths={candidate_audit_path}",
+            read_unit,
+        )
+        self.assertNotIn(f"ReadWritePaths={candidate_audit_path}", read_unit)
+        self.assertIn(
+            f"ConditionPathExists={candidate_audit_path}",
+            candidate_unit,
+        )
+        self.assertIn(
+            f"Environment=ABYSS_STACK_MCP_AUDIT_JOURNAL_PATH={candidate_audit_path}",
+            candidate_unit,
+        )
+        self.assertIn(
+            f"ReadWritePaths={candidate_audit_path}",
+            candidate_unit,
+        )
+        self.assertIn(f"InaccessiblePaths={read_audit_path}", candidate_unit)
+        self.assertNotIn(f"ReadWritePaths={read_audit_path}", candidate_unit)
+        for unit in (read_unit, candidate_unit):
+            self.assertIn(
+                "Environment=ABYSS_STACK_MCP_REQUIRE_AUTH_MANIFEST=1",
+                unit,
+            )
+            self.assertIn(
+                "Environment=ABYSS_STACK_MCP_REQUIRE_AUDIT_JOURNAL=1",
+                unit,
+            )
+            self.assertIn(
+                "LoadCredential=abyss-stack-mcp-auth-manifest.json:"
+                "/srv/AbyssOS/abyss-stack/Secrets/Configs/"
+                "abyss-stack-mcp-auth-manifest.json",
+                unit,
+            )
+            self.assertIn("Environment=AOA_MCP_HOST=127.0.0.1", unit)
+            self.assertIn("Environment=PYTHONHOME=", unit)
+            self.assertIn("Environment=PYTHONPATH=", unit)
+            self.assertIn(runtime_condition, unit)
+            self.assertIn(source_lock_condition, unit)
+            self.assertIn(runtime_lock_condition, unit)
+            self.assertIn(runtime_exec_condition, unit)
+            self.assertIn(runtime_verifier_condition, unit)
+            self.assertIn(deployed_entrypoint, unit)
+            self.assertIn("ProtectSystem=strict", unit)
+            self.assertIn("ProtectHome=read-only", unit)
+            self.assertIn("IPAddressDeny=any", unit)
+            self.assertIn("IPAddressAllow=localhost", unit)
+            self.assertNotIn(
+                "/Configs/mcp/services/abyss-stack-mcp/scripts/"
+                "abyss_stack_mcp_server.py",
+                unit,
+            )
+            self.assertIn("NoNewPrivileges=yes", unit)
+            self.assertNotIn("Environment=AOA_MCP_HTTP_BEARER_TOKEN", unit)
+            self.assertNotIn(str(REPO_ROOT), unit)
+
+        managed_units = {
+            line.split("#", 1)[0].strip()
+            for line in MANAGED_USER_UNITS.read_text(encoding="utf-8").splitlines()
+            if line.split("#", 1)[0].strip()
+        }
+        self.assertIn(STACK_MCP_READ_UNIT.name, managed_units)
+        self.assertIn(STACK_MCP_CANDIDATE_UNIT.name, managed_units)
 
 
 class McpLoopbackLifecycleTests(unittest.TestCase):
@@ -677,11 +2440,12 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 self.assertEqual(server.transports, ["stdio"])
 
                 server = DummyServer()
+                token_environment = mcp_server_token_environment(package)
                 with mock.patch.dict(
                     os.environ,
                     mcp_environment(
                         AOA_MCP_TRANSPORT="streamable-http",
-                        AOA_MCP_HTTP_BEARER_TOKEN=MCP_HTTP_AUTH_TOKEN,
+                        **{token_environment: MCP_HTTP_AUTH_TOKEN},
                     ),
                     clear=True,
                 ):
@@ -697,7 +2461,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                         AOA_MCP_TRANSPORT="streamable-http",
                         AOA_MCP_HOST="localhost",
                         AOA_MCP_PORT="6543",
-                        AOA_MCP_HTTP_BEARER_TOKEN=MCP_HTTP_AUTH_TOKEN,
+                        **{token_environment: MCP_HTTP_AUTH_TOKEN},
                     ),
                     clear=True,
                 ):
@@ -710,7 +2474,9 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                     mcp_environment(AOA_MCP_TRANSPORT="websocket"),
                     clear=True,
                 ):
-                    with self.assertRaisesRegex(SystemExit, "unsupported AOA_MCP_TRANSPORT"):
+                    with self.assertRaisesRegex(
+                        SystemExit, "unsupported AOA_MCP_TRANSPORT"
+                    ):
                         module._run_server(DummyServer())
 
                 with mock.patch.dict(
@@ -718,7 +2484,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                     mcp_environment(
                         AOA_MCP_TRANSPORT="streamable-http",
                         AOA_MCP_HOST="0.0.0.0",
-                        AOA_MCP_HTTP_BEARER_TOKEN=MCP_HTTP_AUTH_TOKEN,
+                        **{token_environment: MCP_HTTP_AUTH_TOKEN},
                     ),
                     clear=True,
                 ):
@@ -727,11 +2493,16 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
 
                 built_server = DummyServer()
                 with (
-                    mock.patch.object(module, "build_server", return_value=built_server),
+                    mock.patch.object(
+                        module, "build_server", return_value=built_server
+                    ),
                     mock.patch.object(module, "_run_server") as run_server,
                 ):
                     module.main()
-                run_server.assert_called_once_with(built_server)
+                if package == "aoa_decisions_mcp":
+                    run_server.assert_called_once_with(built_server, contour="read")
+                else:
+                    run_server.assert_called_once_with(built_server)
 
         self.assertEqual(len(ports), len(MCP_SERVER_PACKAGES))
 
@@ -739,36 +2510,48 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
         for package, (directory, expected_port) in MCP_SERVER_PACKAGES.items():
             with self.subTest(package=package):
                 module = import_mcp_server(package, directory)
+                token_environment = mcp_server_token_environment(package)
                 with mock.patch.dict(
                     os.environ,
                     mcp_environment(AOA_MCP_TRANSPORT="streamable-http"),
                     clear=True,
                 ):
                     with self.assertRaisesRegex(SystemExit, "bearer authentication"):
-                        module._http_auth_kwargs(expected_port)
+                        mcp_server_auth_kwargs(module, package)
 
                 with mock.patch.dict(
                     os.environ,
                     mcp_environment(
                         AOA_MCP_TRANSPORT="streamable-http",
-                        AOA_MCP_HTTP_BEARER_TOKEN="too-short",
+                        **{token_environment: "too-short"},
                     ),
                     clear=True,
                 ):
-                    with self.assertRaisesRegex(SystemExit, "invalid bearer credential"):
-                        module._http_auth_kwargs(expected_port)
+                    with self.assertRaisesRegex(
+                        SystemExit, "invalid bearer credential"
+                    ):
+                        mcp_server_auth_kwargs(module, package)
 
                 with mock.patch.dict(
                     os.environ,
                     mcp_environment(
                         AOA_MCP_TRANSPORT="streamable-http",
-                        AOA_MCP_HTTP_BEARER_TOKEN=MCP_HTTP_AUTH_TOKEN,
+                        **{token_environment: MCP_HTTP_AUTH_TOKEN},
                     ),
                     clear=True,
                 ):
-                    kwargs = module._http_auth_kwargs(expected_port)
+                    kwargs = mcp_server_auth_kwargs(module, package)
 
-                self.assertEqual(kwargs["auth"].required_scopes, ["mcp:access"])
+                expected_auth = ORGAN_MCP_READ_AUTH.get(package)
+                expected_scope = (
+                    expected_auth["scope"] if expected_auth else "mcp:access"
+                )
+                expected_client_id = (
+                    expected_auth["client_id"]
+                    if expected_auth
+                    else "aoa-loopback-codex"
+                )
+                self.assertEqual(kwargs["auth"].required_scopes, [expected_scope])
                 security = kwargs["transport_security"]
                 self.assertTrue(security.enable_dns_rebinding_protection)
                 self.assertEqual(
@@ -784,8 +2567,128 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 access = asyncio.run(verifier.verify_token(MCP_HTTP_AUTH_TOKEN))
                 self.assertIsNotNone(access)
                 assert access is not None
-                self.assertEqual(access.client_id, "aoa-loopback-codex")
-                self.assertEqual(access.scopes, ["mcp:access"])
+                self.assertEqual(access.client_id, expected_client_id)
+                self.assertEqual(access.scopes, [expected_scope])
+
+    def test_first_wave_owner_and_effect_credentials_do_not_cross_authenticate(
+        self,
+    ) -> None:
+        packages = {
+            package: import_mcp_server(package, MCP_SERVER_PACKAGES[package][0])
+            for package in ORGAN_MCP_READ_AUTH
+        }
+        owner_env_names = {auth["env"] for auth in ORGAN_MCP_READ_AUTH.values()}
+        for package, module in packages.items():
+            correct_env = ORGAN_MCP_READ_AUTH[package]["env"]
+            wrong_env = next(name for name in owner_env_names if name != correct_env)
+            with self.subTest(package=package, posture="wrong-owner"):
+                with mock.patch.dict(
+                    os.environ,
+                    mcp_environment(
+                        AOA_MCP_TRANSPORT="streamable-http",
+                        **{wrong_env: MCP_HTTP_AUTH_TOKEN},
+                    ),
+                    clear=True,
+                ):
+                    with self.assertRaisesRegex(
+                        SystemExit,
+                        "bearer authentication",
+                    ):
+                        mcp_server_auth_kwargs(module, package)
+
+        decisions = packages["aoa_decisions_mcp"]
+        with mock.patch.dict(
+            os.environ,
+            mcp_environment(
+                AOA_MCP_TRANSPORT="streamable-http",
+                AOA_DECISIONS_MCP_READ_BEARER_TOKEN=MCP_HTTP_AUTH_TOKEN,
+            ),
+            clear=True,
+        ):
+            with self.assertRaisesRegex(SystemExit, "bearer authentication"):
+                decisions._contour_http_auth_kwargs("internal_effect")
+
+        with mock.patch.dict(
+            os.environ,
+            mcp_environment(
+                AOA_MCP_TRANSPORT="streamable-http",
+                AOA_DECISIONS_MCP_INTERNAL_EFFECT_BEARER_TOKEN=MCP_HTTP_AUTH_TOKEN,
+            ),
+            clear=True,
+        ):
+            kwargs = decisions._contour_http_auth_kwargs("internal_effect")
+        self.assertEqual(
+            kwargs["auth"].required_scopes,
+            ["mcp:aoa-decisions:internal-effect"],
+        )
+        access = asyncio.run(kwargs["token_verifier"].verify_token(MCP_HTTP_AUTH_TOKEN))
+        self.assertIsNotNone(access)
+        assert access is not None
+        self.assertEqual(
+            access.client_id,
+            "aoa-loopback-codex:aoa-decisions:internal-effect",
+        )
+
+    def test_memo_and_evals_candidate_credentials_are_contour_specific(
+        self,
+    ) -> None:
+        cases = (
+            (
+                "aoa_memo_mcp",
+                "aoa-memo-mcp",
+                "AOA_MEMO_MCP_READ_BEARER_TOKEN",
+                "AOA_MEMO_MCP_CANDIDATE_BEARER_TOKEN",
+                "mcp:aoa-memo:candidate",
+                "aoa-loopback-codex:aoa-memo:candidate",
+            ),
+            (
+                "aoa_evals_mcp",
+                "aoa-evals-mcp",
+                "AOA_EVALS_MCP_READ_BEARER_TOKEN",
+                "AOA_EVALS_MCP_CANDIDATE_BEARER_TOKEN",
+                "mcp:aoa-evals:candidate",
+                "aoa-loopback-codex:aoa-evals:candidate",
+            ),
+        )
+        for (
+            package,
+            directory,
+            read_env,
+            candidate_env,
+            scope,
+            client_id,
+        ) in cases:
+            module = import_mcp_server(package, directory)
+            with self.subTest(package=package, posture="read-token-denied"):
+                with mock.patch.dict(
+                    os.environ,
+                    mcp_environment(
+                        AOA_MCP_TRANSPORT="streamable-http",
+                        **{read_env: MCP_HTTP_AUTH_TOKEN},
+                    ),
+                    clear=True,
+                ):
+                    with self.assertRaisesRegex(
+                        SystemExit,
+                        "bearer authentication",
+                    ):
+                        module._contour_http_auth_kwargs("candidate")
+            with mock.patch.dict(
+                os.environ,
+                mcp_environment(
+                    AOA_MCP_TRANSPORT="streamable-http",
+                    **{candidate_env: MCP_HTTP_AUTH_TOKEN},
+                ),
+                clear=True,
+            ):
+                kwargs = module._contour_http_auth_kwargs("candidate")
+            self.assertEqual(kwargs["auth"].required_scopes, [scope])
+            access = asyncio.run(
+                kwargs["token_verifier"].verify_token(MCP_HTTP_AUTH_TOKEN)
+            )
+            self.assertIsNotNone(access)
+            assert access is not None
+            self.assertEqual(access.client_id, client_id)
 
     def test_http_auth_accepts_systemd_credential_and_rejects_conflict(self) -> None:
         module = import_mcp_server("aoa_decisions_mcp", "aoa-decisions-mcp")
@@ -804,7 +2707,9 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 clear=True,
             ):
                 kwargs = module._http_auth_kwargs(module.DEFAULT_HTTP_PORT)
-            access = asyncio.run(kwargs["token_verifier"].verify_token(MCP_HTTP_AUTH_TOKEN))
+            access = asyncio.run(
+                kwargs["token_verifier"].verify_token(MCP_HTTP_AUTH_TOKEN)
+            )
             self.assertIsNotNone(access)
 
             with mock.patch.dict(
@@ -816,7 +2721,9 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 ),
                 clear=True,
             ):
-                with self.assertRaisesRegex(SystemExit, "conflicting bearer credentials"):
+                with self.assertRaisesRegex(
+                    SystemExit, "conflicting bearer credentials"
+                ):
                     module._http_auth_kwargs(module.DEFAULT_HTTP_PORT)
 
             with mock.patch.dict(
@@ -904,7 +2811,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
             AOA_MCP_TRANSPORT="streamable-http",
             AOA_MCP_HOST="127.0.0.1",
             AOA_MCP_PORT=str(port),
-            AOA_MCP_HTTP_BEARER_TOKEN=MCP_HTTP_AUTH_TOKEN,
+            AOA_DECISIONS_MCP_READ_BEARER_TOKEN=MCP_HTTP_AUTH_TOKEN,
         )
         process = subprocess.Popen(
             [sys.executable, str(script)],
@@ -927,7 +2834,9 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
             else:
                 self.fail("aoa-decisions MCP did not bind its loopback HTTP port")
 
-            self.assertIsNone(process.poll(), "aoa-decisions MCP exited after declaring readiness")
+            self.assertIsNone(
+                process.poll(), "aoa-decisions MCP exited after declaring readiness"
+            )
             with socket.create_connection(("127.0.0.1", port), timeout=1):
                 pass
 

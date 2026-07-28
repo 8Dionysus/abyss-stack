@@ -152,9 +152,15 @@ Preview the exact bounded projection before a lifecycle-sensitive rollout:
 ```bash
 scripts/aoa-sync-configs --dry-run --item mcp --item schemas --item systemd
 scripts/aoa-sync-configs --item mcp --item schemas --item systemd
-scripts/aoa-install-systemd --provision-mcp-http-auth
-scripts/aoa-install-systemd --install-mcp-http-codex-client
 scripts/aoa-install-systemd --all-user-units
+scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime
+scripts/aoa-install-systemd --provision-mcp-http-auth
+scripts/aoa-install-systemd --provision-organ-mcp-read-auth
+scripts/aoa-install-systemd --provision-organ-mcp-candidate-auth
+scripts/aoa-install-systemd --provision-abyss-stack-mcp-auth
+# Later standalone rotation, only with both stack MCP planes stopped:
+scripts/aoa-install-systemd --rotate-abyss-stack-mcp-auth
+scripts/aoa-install-systemd --install-mcp-http-codex-client
 ```
 
 `--item` is repeatable and accepts only the public-safe managed allowlist;
@@ -162,10 +168,85 @@ unknown items and `Secrets` fail closed. `--dry-run` requires an existing
 target and never mutates it. Source-control, bytecode, and test/tool caches are
 excluded from deployment. The systemd installer links and reloads only,
 preserves existing masks, and does not start or restart the newly linked MCP
-owners. The explicit provision action creates the optional host-local MCP
-bearer under `Secrets/Configs` without printing or replacing it. Shared HTTP
-Codex entries must name `AOA_MCP_HTTP_BEARER_TOKEN` through
-`bearer_token_env_var`; the value must never be copied into `config.toml`.
+owners. The legacy provision action creates the transitional shared bearer
+under `Secrets/Configs` without printing or replacing it. The organ read
+provision action creates owner-distinct read credentials for `aoa-decisions`,
+`aoa-memo`, `aoa-evals`, `aoa-kag`, `aoa-session-memory`, `aoa-stats`,
+`abyss-machine`, `tos-corpus`, `aoa-4pda-connector`,
+`aoa-telegram-connector`, `aoa-discord-connector`,
+`aoa-course-connector`, `aoa-stackoverflow-connector`, and
+`aoa-xda-connector`, rejects equal values, and publishes only their digests in
+a secret-local manifest. The candidate provision action also creates distinct
+`aoa-memo` and `aoa-evals` candidate credentials and verifies that all sixteen
+owner/contour values differ. Codex entries use matching named variables:
+`AOA_DECISIONS_MCP_READ_BEARER_TOKEN`,
+`AOA_MEMO_MCP_READ_BEARER_TOKEN`, `AOA_EVALS_MCP_READ_BEARER_TOKEN`,
+`AOA_KAG_MCP_READ_BEARER_TOKEN`,
+`AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN`,
+`AOA_STATS_MCP_READ_BEARER_TOKEN`, `ABYSS_MACHINE_MCP_READ_BEARER_TOKEN`, or
+`TOS_CORPUS_MCP_READ_BEARER_TOKEN`, with exact connector-specific variables
+for all six connector packages. The ToS credential is staged for a later
+wrapper/canary admission; it does not add that owner to the bundle. The legacy
+compatibility template continues to name `AOA_MCP_HTTP_BEARER_TOKEN`. No value
+may be copied into `config.toml`.
+
+Memo and Evals candidate services use ports `5434` and `5435`, distinct
+candidate variables, disjoint tool catalogs, and source-enumerated application
+plus systemd write allowlists. Provisioning, linking, package deployment,
+starting, and client registration remain separate actions.
+Course, StackOverflow, and XDA use `5436`, `5437`, and `5438`, preserving the
+stack MCP ports `5431`/`5433` and PostgreSQL reservation `5432`.
+
+An applying sync that includes `mcp` additionally requires a clean exact Git
+revision. After rsync it compares the complete source and deployed MCP service
+trees and each package, including modes, versions, entrypoints, and dependency
+locks. Each package entry also binds the exact source revision. Exact parity
+publishes one immutable content-addressed record under
+`${AOA_STACK_ROOT}/Logs/mcp/deployments/records/` and atomically refreshes
+`latest.json`. Drift or symlinks make the sync non-zero and issue no new exact
+receipt. This deployment manifest proves only source-to-`Configs` package
+parity; it explicitly leaves process, endpoint, registry, consumer schema,
+grounded result, acceptance, admission, and rollback unobserved.
+
+The stack MCP provision action creates distinct read and non-executing
+candidate credentials; neither credential is shared with the owner adapters or
+with the other stack contour. Existing equal values are rejected without
+printing them. It does not register either service with Codex
+and does not start a unit. Start remains a later canary decision after the
+typed runtime observation, deployed parity, and consumer contract are ready.
+Both managed stack MCP units treat loopback as locality rather than identity:
+bearer scope remains mandatory, and the unit sandbox denies non-loopback IP
+traffic while leaving the two loopback listeners available.
+Credential rotation is an explicit standalone operation. It refuses active or
+unobservable stack MCP units, changes both contour credentials and their
+digest manifest without printing values, and never restarts a process. Refresh
+the registered consumers before the subsequent sequential canary.
+The stack MCP runtime provision action builds a source-addressed virtual
+environment under `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv` from the
+already deployed package, installs its exact hash-locked dependency closure,
+verifies dependencies and imports, and records both source and lock digests.
+It also records a deterministic digest of the installed runtime files, symlink
+targets, and bytes behind the fully resolved `bin/python` chain after rebinding
+generated entry-point shebangs from the private staging path to the stable
+published venv path. It does not link, stop, start, or register a service.
+Repeating it against the same deployed package and lock rehashes the installed
+environment and reuses it only when that digest still matches; missing or
+changed runtime bytes force the same guarded rebuild path. A changed
+runtime identity fails closed while either stack MCP unit is active or its
+user-systemd state cannot be observed; stop both planes explicitly before
+reprovisioning. Each plane holds shared source-projection and runtime locks for
+its full lifetime; changed provisioning takes the exclusive runtime lock and
+repeats the stopped-state check immediately before swapping the environment.
+The preceding
+`--all-user-units` link-and-reload step is required so every later start
+participates in that lock; combining it with runtime provisioning in one
+installer invocation is rejected. Provisioning installs only from a private
+snapshot whose package and lock digests match the initial deployed tree, then
+rehashes deployed source before publishing the runtime identity and swapping
+the environment. It holds a source-projection lock from before its first
+deployed-source read through the swap; an applying MCP Configs sync holds the
+same exclusive lock for its full rsync transaction. Either command fails
+closed rather than crossing the other's publication boundary.
 The Codex client install adds a removable Zsh launch function that delegates
 to the deployed launcher without replacing the managed Codex executable or
 exporting the bearer into the parent shell. It affects only new interactive
@@ -388,6 +469,78 @@ This links every unit in `systemd/user/managed-units.txt` from
 `${AOA_CONFIGS_ROOT}/systemd/user` into `~/.config/systemd/user` and runs
 `systemctl --user daemon-reload`. It intentionally does not start, stop,
 restart, enable, disable, or mask services.
+
+Use `--provision-abyss-stack-mcp-auth` before canarying the stack-owned MCP
+read or candidate process. It creates separate read and candidate bearer
+credentials under `${AOA_STACK_ROOT}/Secrets/Configs`, keeps each file at mode
+`0600`, is idempotent, and never prints or replaces a valid existing value.
+It also compares the resulting values and fails closed if read and candidate
+would share one bearer.
+Use `--rotate-abyss-stack-mcp-auth` later as a standalone operation with both
+managed planes stopped. It rotates the pair and binding manifest together,
+does not print values or restart units, and requires consumer refresh before
+the next sequential canary.
+This action grants no runtime-effect authority: the candidate process only
+compiles an expiring content-addressed plan with
+`execution_authorized=false`.
+
+Use `--provision-abyss-stack-mcp-runtime` after syncing the MCP package and
+after `--all-user-units` has linked and reloaded the lock-aware units, but
+before canarying either stack-owned plane. It must run as the target user,
+installs the deployed package and the exact `requirements.lock` closure with
+artifact-hash enforcement into
+`${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv`, verifies `pip check` and
+runtime imports, and records a runtime identity containing both the exact
+deployed-package digest and lock digest, plus a deterministic digest over the
+installed runtime files, symlink targets, and fully resolved interpreter bytes.
+It also creates, without truncation, separate read and candidate policy audit
+journals under `${AOA_STACK_ROOT}/Logs/mcp/audit`, enforces directory mode
+`0700`, file mode `0600`, regular non-symlink files, and the managed 32 MiB
+per-contour capacity. The read-only verifier requires this safe path shape; the
+server validates the complete receipt hash chain before bind.
+Generated console-script shebangs are rebound to the stable published venv
+before that digest and the atomic rename, so no launcher retains the removed
+staging path. Reuse requires the observed runtime digest to match that recorded
+value; otherwise provisioning rebuilds under the same lock and stopped-plane
+guards. If the source-and-lock identity
+changes while either
+`abyss-stack-mcp-read.service` or `abyss-stack-mcp-candidate.service` is
+active, or when their user-systemd state cannot be observed, the action refuses
+to mutate the environment; stopping and later starting those units remain
+explicit operator actions. The units hold a shared lock for their whole
+process lifetime and also retain the shared source-projection lock.
+Provisioning takes the exclusive form of the runtime lock and rechecks both
+unit states after the build, immediately before the environment swap, so a
+concurrent start cannot cross the replacement boundary. Do not combine this
+flag with `--all-user-units`; the installer rejects that ordering.
+The package and hash lock are copied to a private digest-matched snapshot and
+pip reads only that snapshot. The deployed tree is rehashed before the marker
+and swap. Provisioning holds the same source-projection lock that an applying
+MCP Configs sync holds across its full rsync transaction, so the deployed
+source and published runtime identity cannot pass each other between recheck
+and environment replacement.
+The user units point only at this environment and use `ConditionPathExists`,
+an executable `ExecCondition`, and
+`--verify-abyss-stack-mcp-runtime` as a read-only second condition. Before every
+launch it recomputes the deployed source-and-lock identity and the measured
+runtime-content digest, including resolved interpreter bytes, so a missing,
+unusable, drifted, or source-mismatched runtime leaves the unit inactive
+instead of entering a restart loop.
+The final `ExecStart` acquires the shared source-projection lock followed by
+the shared runtime lock, repeats the verifier under both, and `exec`s the
+server while retaining both locks for the process lifetime. Applying MCP
+Configs sync and changed provisioning therefore fail closed while either plane
+runs; stop both planes explicitly before sync or reprovisioning, then start
+them only after both operations and their parity checks succeed.
+They clear ambient `PYTHONHOME`/`PYTHONPATH`, invoke that venv in isolated
+Python mode with explicit bytecode writes disabled, and execute its installed
+package rather than importing `Configs/src` or an inherited user-manager
+module. After a later stopped-plane Configs sync, rerun this provision action
+before starting or restarting either plane.
+Each unit can write only its own exact journal path and cannot access the
+opposite contour journal. Capacity exhaustion fails closed. Automatic
+rotation is not installed; stop the affected plane and use a reviewed archive
+continuity handoff rather than truncating or replacing a live journal.
 
 Use `--system-units` only through a privileged route after the Configs mirror is
 synced:

@@ -17,6 +17,11 @@ state, including `init`, `materialize`, `build-index`, `build-graph`, account
 login/session flows, imports, crawls, refreshes, or eval commands that
 materialize proof fixtures.
 
+Optional loopback HTTP uses
+`AOA_DISCORD_CONNECTOR_MCP_READ_BEARER_TOKEN`,
+`mcp:aoa-discord-connector:read`, and port `5428`. Its managed read unit has no
+persistent writable path and denies non-loopback IP traffic.
+
 ## Tools
 
 - `aoa_discord_connector_status`

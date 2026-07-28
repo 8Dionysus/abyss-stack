@@ -25,6 +25,13 @@ named by the service-local route card.
 
 ## Validation
 
+For `abyss-stack-mcp`, run:
+
+```bash
+python mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py
+python -m pytest mcp/services/abyss-stack-mcp/tests -q
+```
+
 For `aoa-memo-mcp`, run:
 
 ```bash
@@ -100,6 +107,27 @@ For `aoa-discord-connector-mcp`, run:
 ```bash
 python mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py
 python -m pytest mcp/services/aoa-discord-connector-mcp/tests -q
+```
+
+For `aoa-course-connector-mcp`, run:
+
+```bash
+python mcp/services/aoa-course-connector-mcp/scripts/validate_course_connector_mcp.py
+python -m pytest mcp/services/aoa-course-connector-mcp/tests -q
+```
+
+For `aoa-stackoverflow-connector-mcp`, run:
+
+```bash
+python mcp/services/aoa-stackoverflow-connector-mcp/scripts/validate_stackoverflow_connector_mcp.py
+python -m pytest mcp/services/aoa-stackoverflow-connector-mcp/tests -q
+```
+
+For `aoa-xda-connector-mcp`, run:
+
+```bash
+python mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py
+python -m pytest mcp/services/aoa-xda-connector-mcp/tests -q
 ```
 
 When a service path, local route card, or root district route changes, also run:

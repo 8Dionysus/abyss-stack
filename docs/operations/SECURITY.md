@@ -17,12 +17,33 @@ Expected live pattern:
 - example env files in `env/`
 - real env files never committed
 
-Optional shared MCP HTTP owners use the host-local
-`Secrets/Configs/aoa-mcp-http-bearer-token`. The server receives it through a
-systemd credential and Codex receives it through the named environment
-variable; neither committed units nor `config.toml` contain the value. Bearer
-authentication blocks anonymous local callers but does not isolate mutually
-untrusted processes running as the same OS user.
+Transitional shadow MCP HTTP owners use the host-local
+`Secrets/Configs/aoa-mcp-http-bearer-token`. Migrated owner-bounded read
+contours use distinct `aoa-decisions-mcp-read-bearer-token`,
+`aoa-memo-mcp-read-bearer-token`, `aoa-evals-mcp-read-bearer-token`,
+`aoa-kag-mcp-read-bearer-token`,
+`aoa-session-memory-mcp-read-bearer-token`,
+`aoa-stats-mcp-read-bearer-token`, `abyss-machine-mcp-read-bearer-token`, and
+`tos-corpus-mcp-read-bearer-token` files, plus exact read credentials for
+`aoa-4pda-connector`, `aoa-telegram-connector`, `aoa-discord-connector`,
+`aoa-course-connector`, `aoa-stackoverflow-connector`, and
+`aoa-xda-connector`.
+Memo and Evals candidate processes additionally use distinct
+`aoa-memo-mcp-candidate-bearer-token` and
+`aoa-evals-mcp-candidate-bearer-token` files. They run on separate ports and
+cannot enumerate the read catalog; the read processes cannot enumerate
+persistent writers. Candidate writes require both a source-enumerated
+application root and an exact systemd `ReadWritePaths` lane.
+Servers receive only their exact credential through systemd; Codex receives
+the corresponding named environment variables. Neither committed units nor
+`config.toml` contain values. Bearer authentication and owner/contour
+separation block anonymous, cross-owner, and read-to-candidate use, but do not isolate mutually untrusted processes
+running as the same OS user. Provisioning a credential alone is not runtime
+admission; ToS remains outside the bundle until its wrapper and live canary
+exist. All six connector instances use the generic read unit with no
+persistent writable path and non-loopback IP traffic denied. Course
+additionally filters the broader owner MCP dispatcher; StackOverflow and XDA
+withhold the hybrid route absent from their current owner CLIs.
 
 ## Forbidden habits
 

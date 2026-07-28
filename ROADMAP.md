@@ -117,6 +117,27 @@ The current direction is:
   source parity is not live service health, and live runtime state is not
   committed to the GitHub mirror.
 
+## Horizon: MCP Access Fabric
+
+- Current posture:
+  the shared owner adapters retain direct, authenticated loopback access while
+  the first `abyss-stack-mcp` source candidate separates compact runtime
+  observation from immutable non-executing plan preparation. The two stack
+  contours have disjoint tools, ports, scopes, client identities, and
+  atomically provisioned credentials. Their managed environment binds deployed
+  source to an exact artifact-hashed lock and cannot be replaced while either
+  plane is active. Neither contour is admitted or live merely because its
+  package and unit files exist.
+- Next honest move:
+  land and deploy the typed source-to-runtime provenance spine, generate one
+  secret-free runtime observation from exact source and deployed identities,
+  then advance read and candidate processes independently through registry
+  shadow, consumer schema observation, grounded canary, central proof, owner
+  acceptance, and rollback evidence.
+- Guardrail:
+  `abyss-stack-mcp` is runtime evidence and bounded plan preparation, not a
+  gateway, domain authority, proof owner, or implicit runtime-effect plane.
+
 ## Horizon: Live Runtime Cutover
 
 - Current posture:

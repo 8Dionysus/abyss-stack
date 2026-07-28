@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 17836067,
+  "allowed_tracked_bytes": 25255707,
+  "approved_by": "repository-owner",
+  "base_ref": "e3f35444e4b527f26eeb9118f4bfeffff6c695d6",
+  "changed_generated_bytes": 17836067,
+  "changed_generated_files": 280,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "e4e6a9c91add19c0bd3c71633f11257faebe93742eec5a93d8e967a0d517fc34",
+  "reason": "Refresh the combined KAG family after merging current main and enforcing nonblank targets and whitespace-normalized secret checks without raising the standing budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 25255707,
+  "tracked_bytes_max": 24117248
+}

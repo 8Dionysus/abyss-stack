@@ -9,6 +9,84 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Added
 
+- A standalone `abyss-stack-mcp` source candidate now exposes a compact
+  stack-owned runtime-evidence read plane and a credential-disjoint,
+  non-executing plan-candidate plane. Typed contracts keep source, package,
+  deploy, process, endpoint, registry, consumer-schema, canary, freshness, and
+  rollback evidence separate; generated public examples are fictional, and
+  source-owned user units remain unstarted until provenance, deployment
+  parity, registry, consumer, canary, proof, and acceptance gates are met.
+- The stack MCP candidate contour now avoids PostgreSQL on port `5432`, uses
+  explicit port `5433`, provisions a source-and-lock-addressed Python runtime
+  from exact artifact hashes before unit activation, coordinates each
+  plane's lifetime shared lock against exclusive provisioning, rechecks unit
+  state immediately before replacement, installs only from a private
+  digest-matched package snapshot, rehashes installed runtime files and
+  symlink targets before reuse, serializes MCP Configs sync and runtime
+  publication with a separate source-projection lock, rejects a combined
+  unit-link/provision transaction, and fails activation-plan preparation
+  on unusable freshness, endpoint/process unreadiness, incompatible consumers,
+  ungrounded canaries, or missing rollback proof. Concurrent first credential
+  writes publish one atomically selected value without clobbering the winner.
+- Published stack MCP schemas now encode conditional runtime invariants;
+  freshness includes supporting-ref expiry, plan TTL cannot outlive any copied
+  precondition, central proof binds the exact deployed-tree digest and running
+  process identity as well as the source-tree digest and exact canary route,
+  activation steps name the exact selected compatible consumer registration,
+  and effect planes cannot be activated or restarted
+  before their distinct contracts
+  exist. Sync and deploy candidates now bind their distinct expected
+  post-action tree digests, rollback denial binds the exact registry digest,
+  and secret screening covers separator/camel credential names plus
+  concatenated keys at recognized namespace or attribute boundaries without
+  blocking ordinary word substrings, compact
+  JWT values, and encoded URI path segments as well as
+  userinfo/query/fragment surfaces. Rollback proof now binds every
+  last-known-good restoration field including its distinct canary, and staged
+  runtime entry-point shebangs are rebound before content-addressed
+  publication. Provisioning and managed units clear ambient Python import roots
+  and use isolated mode, while read catalog/inspection apply the earlier
+  wall-clock/snapshot bound and downgrade a causally future observation
+  envelope, link, freshness, or nested evidence timestamp to `blocked`;
+  inspection also folds its selected effective link state into response
+  freshness while preserving the raw owner claim. Existing equal
+  read/candidate bearer values fail closed instead of collapsing the contours.
+- Read payloads now propagate an expired observation envelope into their
+  derived catalog/freshness/drift states, raw references reject the standard
+  GitLab token-prefix families, and standalone runtime provisioning verifies
+  that user systemd has loaded both expected fragments with the exact
+  lock-aware `ExecStart` before it can replace the venv.
+- Candidate result freshness now folds every copied plan link, and activation
+  or rollback causality checks ignore unrelated consumers in favor of the
+  exact proof-selected or last-known-good registration.
+- Step-relevant deploy, consumer-registration, proof, acceptance, canary, and
+  rollback targets now have to match evidence identities copied into and
+  expiry-bounded by the candidate; proof and acceptance bind the named ref and
+  declared owner in the same evidence item. Managed stack MCP launches also
+  disable bytecode writes explicitly so isolated mode cannot mutate the
+  measured runtime after provisioning.
+- Secret screening now detects bounded provider-token patterns inside
+  descriptive references and passphrase-bearing exact or namespaced keys;
+  rollback restoration requires evidence bound to an absent consumer's exact
+  registration target, and runtime reuse binds the bytes behind the fully
+  resolved venv interpreter symlink chain.
+- Rollback candidate preparation now relies on the usable, typed
+  last-known-good rollback proof and no longer blocks on or copies canary
+  evidence from the current deployment.
+- Restart candidates now reject inactive processes instead of allowing the
+  restart step to act as an ungated start path. They also carry and verify the
+  central proof that binds their exact current source, package, deploy,
+  process, schema, compatible consumer registration, canary route, and receipt.
+- Managed stack MCP units now verify deployed source-and-lock identity and the
+  complete measured runtime-content digest before every launch, while secret
+  screening rejects unambiguous compound credential keys such as
+  `aws_secret_access_key`, exact `credential`/`credentials` references, and
+  AWS presigned credential/signature/session-token query keys. Final launch
+  repeats verification while holding source-projection and runtime locks that
+  remain live across `exec`, closing the sync-to-launch race.
+- Rollback plans now admit fresh `rollback_required` failed-link evidence
+  without weakening other blockers, while managed units execute only the
+  digest-matched package installed in their provisioned venv.
 - A distinct, inert `aoa-routing-cutover` path now admits only a
   receipt-bound `aoa-sdk` canonical routing release with exact public-release
   runtime trust, verified subject-store bytes, explicit G5 authority, atomic

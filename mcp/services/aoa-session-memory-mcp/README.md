@@ -284,9 +284,12 @@ import path still require restarting the configured owner and, when the client
 registry changed, the Codex client before using live output as proof.
 Source-local CLI smokes prove the code path. The package validator proves a
 fresh stdio process; `systemctl --user status
-aoa-mcp-http@aoa-session-memory.service` is the owner check for configured
+aoa-organ-mcp-read@aoa-session-memory.service` is the owner check for configured
 shared HTTP. A shared HTTP Codex entry must set
-`bearer_token_env_var = "AOA_MCP_HTTP_BEARER_TOKEN"`, and the corresponding
+`bearer_token_env_var = "AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN"`. The
+owner process loads `aoa-session-memory-mcp-read-bearer-token`, requires
+`mcp:aoa-session-memory:read`, and reports the
+`aoa-loopback-codex:aoa-session-memory:read` client identity. The corresponding
 credential must be present in the Codex process environment. The preflight
 reports URL validity, bearer configuration, execution context, environment and
 systemd-credential readiness, source conflicts, and transport-specific process
@@ -295,6 +298,11 @@ the environment credential proves client smoke readiness; inside the shared
 owner, either its environment credential or its systemd credential may prove
 owner startup readiness. It does not treat the absence of a per-Codex child as
 failure when a fresh, authenticated loopback owner is configured.
+
+MCP-local SQLite fast paths open generated search state with `mode=ro` and
+`PRAGMA query_only`; the source contract therefore remains executable under
+`aoa-organ-mcp-read@aoa-session-memory.service` without writable projection
+paths.
 
 ## Agent Route
 

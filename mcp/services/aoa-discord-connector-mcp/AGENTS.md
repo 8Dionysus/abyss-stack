@@ -33,6 +33,8 @@ policy, parser logic, index construction, graph construction, or generated data.
   account/session files into this repository.
 - Treat `network_touched=false` and local packet provenance as boundary evidence,
   not as decorative metadata.
+- HTTP uses the exact Discord read credential, scope, client identity, and a
+  managed no-write/no-network contour on loopback.
 
 ## Validation
 

@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 23812167,
+  "allowed_tracked_bytes": 26977419,
+  "approved_by": "repository-owner",
+  "base_ref": "59e65abe6a2340c90ea9c4c00ee41081e1921fba",
+  "changed_generated_bytes": 23812167,
+  "changed_generated_files": 436,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "4b8f22a9959ebd16f1b37575c538afe10e5cfab4d4f1e6242406d362ec72bf11",
+  "reason": "Integrated MCP organ fabric converged with current main and regenerates the reviewed combined portable KAG family.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 26977419,
+  "tracked_bytes_max": 24117248
+}

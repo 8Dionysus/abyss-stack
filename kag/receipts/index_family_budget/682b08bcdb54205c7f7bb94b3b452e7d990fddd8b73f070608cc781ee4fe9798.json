@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 18429255,
+  "allowed_tracked_bytes": 25421446,
+  "approved_by": "repository-owner",
+  "base_ref": "0c930170c474eaaee1dc71d56ef4e00cc3b7e7e8",
+  "changed_generated_bytes": 18429255,
+  "changed_generated_files": 287,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "682b08bcdb54205c7f7bb94b3b452e7d990fddd8b73f070608cc781ee4fe9798",
+  "reason": "MCP secret rollback and interpreter evidence controls changed",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 25421446,
+  "tracked_bytes_max": 24117248
+}

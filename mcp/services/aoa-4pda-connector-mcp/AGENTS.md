@@ -31,8 +31,8 @@ Answer packets must preserve `agent_answer`, evidence-chain fields, and
   index, graph, answer packet, readiness, and storage contracts.
 - Keep `abyss-stack` responsible only for MCP packaging, local transport
   access, stack validation, and deployment posture. Stdio remains the portable
-  default; optional shared HTTP stays authenticated and loopback-only under
-  `ABYSS-STACK-D-0077`.
+  default; optional HTTP uses the exact 4PDA read bearer, scope, and client
+  identity on loopback under `ABYSS-STACK-D-0077`.
 - Do not expose crawl, refresh-build, materialize, reindex, seed-edit, or write
   tools in this first slice.
 - Do not call 4PDA internal search, network routes, login/private/QMS/post,
@@ -40,6 +40,8 @@ Answer packets must preserve `agent_answer`, evidence-chain fields, and
 - Do not commit corpora, raw captures, indexes, vectors, graphs, sqlite,
   parquet, qdrant, lancedb, receipts, or caches here.
 - MCP packets are access aids, not source truth.
+- The managed read contour has no persistent writable filesystem path and
+  denies non-loopback IP traffic.
 
 ## Validation
 

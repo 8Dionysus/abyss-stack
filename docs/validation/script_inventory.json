@@ -264,11 +264,40 @@
       "disposition": "keep"
     },
     {
+      "family": "config-projection-mcp-deployment-manifest",
+      "paths": [
+        "mechanics/config-projection/parts/sync/scripts/mcp_deployment_manifest.py"
+      ],
+      "organ_lane": "mechanic/package-local MCP deployment provenance",
+      "owner_surface": "mechanics/config-projection/parts/sync/README.md",
+      "source_truth": [
+        "mechanics/config-projection/parts/sync/aoa_sync_configs.sh",
+        "mechanics/config-projection/parts/sync/schemas/mcp-deployment-manifest.schema.json",
+        "docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md"
+      ],
+      "reads": [
+        "clean abyss-stack source revision",
+        "source MCP service packages",
+        "deployed Configs MCP service packages"
+      ],
+      "writes": [
+        "content-addressed MCP deployment records and atomic latest reader under the runtime Logs tree"
+      ],
+      "side_effects": "publishes a deployment receipt only after exact source/deployed parity; never starts, registers, admits, or calls an MCP process",
+      "validation_lane": "config-projection/tests/release",
+      "ci_inclusion": "focused mechanic test plus root sync parity and release lanes",
+      "test_target": "mechanics/config-projection/parts/sync/tests/test_mcp_deployment_manifest.py",
+      "disposition": "keep"
+    },
+    {
       "family": "mcp-service-scripts",
       "paths": [
         "mcp/services/abyss-machine-mcp/scripts/abyss_machine_mcp_server.py",
         "mcp/services/abyss-machine-mcp/scripts/release_check.py",
         "mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py",
+        "mcp/services/abyss-stack-mcp/scripts/abyss_stack_mcp_server.py",
+        "mcp/services/abyss-stack-mcp/scripts/generate_stack_mcp_contracts.py",
+        "mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py",
         "mcp/services/aoa-decisions-mcp/scripts/aoa_decisions_mcp_server.py",
         "mcp/services/aoa-decisions-mcp/scripts/release_check.py",
         "mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py",
@@ -291,6 +320,12 @@
         "mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py",
         "mcp/services/aoa-discord-connector-mcp/scripts/aoa_discord_connector_mcp_server.py",
         "mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py",
+        "mcp/services/aoa-course-connector-mcp/scripts/aoa_course_connector_mcp_server.py",
+        "mcp/services/aoa-course-connector-mcp/scripts/validate_course_connector_mcp.py",
+        "mcp/services/aoa-stackoverflow-connector-mcp/scripts/aoa_stackoverflow_connector_mcp_server.py",
+        "mcp/services/aoa-stackoverflow-connector-mcp/scripts/validate_stackoverflow_connector_mcp.py",
+        "mcp/services/aoa-xda-connector-mcp/scripts/aoa_xda_connector_mcp_server.py",
+        "mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py",
         "mcp/services/tos-corpus-mcp/scripts/tos_corpus_mcp_server.py",
         "mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py"
       ],
@@ -310,6 +345,31 @@
       "validation_lane": "mcp-services/release",
       "ci_inclusion": "mcp-services lane and default pytest collection",
       "test_target": "mcp/services/*/tests",
+      "disposition": "keep"
+    },
+    {
+      "family": "mcp-protocol-lab-scripts",
+      "paths": [
+        "mcp/protocol-lab/scripts/build_protocol_lab_status.py",
+        "mcp/protocol-lab/scripts/validate_protocol_lab.py"
+      ],
+      "organ_lane": "MCP protocol compatibility gate",
+      "owner_surface": "mcp/protocol-lab/AGENTS.md",
+      "source_truth": [
+        "mcp/protocol-lab/protocol-compatibility-matrix.v1.json",
+        "mcp/protocol-lab/fixtures/current-pair-observation.json"
+      ],
+      "reads": [
+        "protocol lab source contracts",
+        "stack MCP package constraints and exact lock"
+      ],
+      "writes": [
+        "deterministic generated protocol-lab status when the builder runs without --check"
+      ],
+      "side_effects": "source-local generation and validation only; no registration, process, credential, or runtime mutation",
+      "validation_lane": "mcp-services/release",
+      "ci_inclusion": "mcp-services lane and default pytest collection",
+      "test_target": "mcp/protocol-lab/tests/test_protocol_lab.py",
       "disposition": "keep"
     },
     {

@@ -17,6 +17,11 @@ state, including `init`, `materialize`, `build-index`, `build-graph`, account
 login/session flows, imports, crawls, refreshes, or eval commands that
 materialize proof fixtures.
 
+Optional loopback HTTP uses
+`AOA_TELEGRAM_CONNECTOR_MCP_READ_BEARER_TOKEN`,
+`mcp:aoa-telegram-connector:read`, and port `5427`. Its managed read unit has
+no persistent writable path and denies non-loopback IP traffic.
+
 ## Tools
 
 - `aoa_telegram_connector_status`

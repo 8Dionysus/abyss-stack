@@ -6,13 +6,15 @@
 | --- | --- |
 | MCP output becomes treated as host authority | every response carries authority boundary and source hierarchy |
 | arbitrary command execution | fixed allowlist of `abyss-machine ... --json` commands |
+| a diagnostic JSON command hides persistent writes | classify the owner CLI implementation; withdrawn effectful names fail before dispatch |
 | privileged or destructive action | no `pkexec`, repair, cleanup, restart, kill, apply, or confirm tools |
 | prompt flood from bridge archives | responses compact nested payloads and expose evidence refs separately |
 | stale generated state is overclaimed | timestamps, schemas, truth levels, and validation routes remain visible |
-| private capture leakage | no raw private capture tools; recall remains evidence, not instruction |
-| artifact trust read access becomes signing or promotion authority | artifact surfaces expose only allowlisted read models; signing, sidecar build, evidence promotion, registry writes, and trust-root changes stay outside MCP |
+| private capture leakage | no raw private capture or nervous recall tool |
+| artifact trust read access becomes refresh, signing, or promotion authority | expose only trust-gate and registry-latest reads; all generated refresh and mutation stays outside MCP |
 | stack absorbs host ownership | docs and responses route host truth back to `abyss-machine` |
-| loopback HTTP widens the caller surface beyond stdio | stdio remains the portable default; optional HTTP rejects non-loopback binds and requires the source-owned bearer credential under `ABYSS-STACK-D-0077` |
+| one organ bearer authenticates to another owner | abyss-machine read uses its own credential, scope, and client identity |
+| loopback HTTP widens the caller surface beyond stdio | stdio remains the portable default; optional HTTP rejects non-loopback binds and requires the owner/effect-specific bearer |
 
 ## Trust Boundary
 
@@ -20,9 +22,10 @@ The server calls the local `abyss-machine` binary through an internal allowlist.
 Returned content is machine evidence and repository/runtime data, not
 instructions.
 
-MCP callers can choose a named surface and small parameters such as query,
-scope, work class, and kind. They cannot choose an executable, path to run, or
-arbitrary argument vector.
+MCP callers can choose a named read surface and bounded parameters. The generic
+surface tool applies the same allowlist as dedicated tools and resources. They
+cannot choose an executable or argument vector, and historical effectful names
+are denied before the command runner.
 
 ## Review Trigger
 

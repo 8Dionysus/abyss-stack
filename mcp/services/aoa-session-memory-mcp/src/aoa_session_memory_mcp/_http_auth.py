@@ -16,6 +16,9 @@ TOKEN_ENV_VAR = "AOA_MCP_HTTP_BEARER_TOKEN"
 CREDENTIAL_NAME = "aoa-mcp-http-bearer-token"
 AUTH_SCOPE = "mcp:access"
 _TOKEN_PATTERN = re.compile(r"[A-Za-z0-9._~-]{43,512}")
+_CREDENTIAL_NAME_PATTERN = re.compile(r"[A-Za-z0-9_.-]{1,128}")
+_ENV_NAME_PATTERN = re.compile(r"[A-Z][A-Z0-9_]{0,127}")
+_SCOPE_PATTERN = re.compile(r"[A-Za-z0-9:._/-]{1,128}")
 _LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 
@@ -28,12 +31,22 @@ class TransportSettings(NamedTuple):
 class StaticBearerTokenVerifier:
     """Verify one host-local bearer without logging or serializing it."""
 
-    __slots__ = ("_expected", "_issuer", "_resource")
+    __slots__ = ("_client_id", "_expected", "_issuer", "_resource", "_scope")
 
-    def __init__(self, token: str, *, issuer: str, resource: str) -> None:
+    def __init__(
+        self,
+        token: str,
+        *,
+        issuer: str,
+        resource: str,
+        scope: str = AUTH_SCOPE,
+        client_id: str = "aoa-loopback-codex",
+    ) -> None:
         self._expected = token.encode("utf-8")
         self._issuer = issuer
         self._resource = resource
+        self._scope = scope
+        self._client_id = client_id
 
     async def verify_token(self, token: str) -> Any | None:
         from mcp.server.auth.provider import AccessToken  # type: ignore[import-not-found]
@@ -42,8 +55,8 @@ class StaticBearerTokenVerifier:
             return None
         return AccessToken(
             token=token,
-            client_id="aoa-loopback-codex",
-            scopes=[AUTH_SCOPE],
+            client_id=self._client_id,
+            scopes=[self._scope],
             resource=self._resource,
             subject="local-operator",
             claims={"iss": self._issuer},
@@ -71,11 +84,11 @@ def transport_settings(default_port: int) -> TransportSettings:
     return TransportSettings(transport=transport, host=host, port=port)
 
 
-def _credential_token() -> str | None:
+def _credential_token(credential_name: str = CREDENTIAL_NAME) -> str | None:
     credential_dir = os.environ.get("CREDENTIALS_DIRECTORY", "").strip()
     if not credential_dir:
         return None
-    credential_path = Path(credential_dir) / CREDENTIAL_NAME
+    credential_path = Path(credential_dir) / credential_name
     if not credential_path.exists() and not credential_path.is_symlink():
         return None
     if credential_path.is_symlink() or not credential_path.is_file():
@@ -87,9 +100,13 @@ def _credential_token() -> str | None:
     return raw.removesuffix("\n")
 
 
-def _bearer_token() -> str:
-    env_token = os.environ.get(TOKEN_ENV_VAR)
-    credential_token = _credential_token()
+def _bearer_token(
+    *,
+    token_env_var: str = TOKEN_ENV_VAR,
+    credential_name: str = CREDENTIAL_NAME,
+) -> str:
+    env_token = os.environ.get(token_env_var)
+    credential_token = _credential_token(credential_name)
     for candidate in (env_token, credential_token):
         if candidate is not None and _TOKEN_PATTERN.fullmatch(candidate) is None:
             raise SystemExit("invalid bearer credential; require 43-512 URL-safe characters")
@@ -100,7 +117,7 @@ def _bearer_token() -> str:
     if token is None:
         raise SystemExit(
             "streamable HTTP requires bearer authentication via "
-            f"{TOKEN_ENV_VAR} or systemd credential {CREDENTIAL_NAME}"
+            f"{token_env_var} or systemd credential {credential_name}"
         )
     return token
 
@@ -127,14 +144,32 @@ def _loopback_transport_security(port: int) -> Any:
     )
 
 
-def http_auth_kwargs(default_port: int) -> dict[str, Any]:
+def http_auth_kwargs(
+    default_port: int,
+    *,
+    token_env_var: str = TOKEN_ENV_VAR,
+    credential_name: str = CREDENTIAL_NAME,
+    auth_scope: str = AUTH_SCOPE,
+    client_id: str = "aoa-loopback-codex",
+) -> dict[str, Any]:
+    if _ENV_NAME_PATTERN.fullmatch(token_env_var) is None:
+        raise SystemExit("invalid MCP bearer environment-variable name")
+    if _CREDENTIAL_NAME_PATTERN.fullmatch(credential_name) is None:
+        raise SystemExit("invalid MCP systemd credential name")
+    if _SCOPE_PATTERN.fullmatch(auth_scope) is None:
+        raise SystemExit("invalid MCP authorization scope")
+    if not client_id or len(client_id) > 128:
+        raise SystemExit("invalid MCP client identity")
     settings = transport_settings(default_port)
     if settings.transport == "stdio":
         return {}
     assert settings.host is not None
     assert settings.port is not None
 
-    token = _bearer_token()
+    token = _bearer_token(
+        token_env_var=token_env_var,
+        credential_name=credential_name,
+    )
     authority = _http_authority(settings.host, settings.port)
     issuer = f"{authority}/"
     resource = f"{authority}/mcp"
@@ -144,13 +179,15 @@ def http_auth_kwargs(default_port: int) -> dict[str, Any]:
     return {
         "auth": AuthSettings(
             issuer_url=issuer,
-            required_scopes=[AUTH_SCOPE],
+            required_scopes=[auth_scope],
             resource_server_url=resource,
         ),
         "token_verifier": StaticBearerTokenVerifier(
             token,
             issuer=issuer,
             resource=resource,
+            scope=auth_scope,
+            client_id=client_id,
         ),
         "transport_security": _loopback_transport_security(settings.port),
     }

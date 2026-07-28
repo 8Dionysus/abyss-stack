@@ -1,7 +1,17 @@
 # aoa-evals-mcp
 
-`aoa-evals-mcp` exposes `aoa-evals` bounded proof surfaces through a small MCP
-access plane.
+`aoa-evals-mcp` exposes `aoa-evals` bounded proof surfaces through two
+process-isolated MCP contours:
+
+- read on `127.0.0.1:5424`, with
+  `aoa-evals-mcp-read-bearer-token` and `mcp:aoa-evals:read`;
+- candidate on `127.0.0.1:5435`, with the distinct
+  `aoa-evals-mcp-candidate-bearer-token` and
+  `mcp:aoa-evals:candidate`.
+
+The read catalog contains all resources and non-persistent tools. The
+candidate catalog contains only the three gated local-port writer tools and no
+resources.
 
 It does not replace `aoa-evals`, generated readers, bundle-local review, or
 runtime-candidate contracts. It gives agents one repeatable route to ask:
@@ -37,7 +47,7 @@ runtime-candidate contracts. It gives agents one repeatable route to ask:
 
 ## MCP Surface
 
-Resources:
+Read-contour resources:
 
 - `aoa-evals://catalog`
 - `aoa-evals://bundle/{name}`
@@ -56,7 +66,7 @@ Resources:
 - `aoa-evals://local-port/{repo}/suites`
 - `aoa-evals://local-port/{repo}/reports`
 
-Tools:
+Read-contour tools:
 
 - `aoa_evals_select(proof_question, filters)`
 - `aoa_evals_find_or_propose(proof_question, proposal)`
@@ -73,11 +83,13 @@ Tools:
 - `aoa_evals_local_ports(status, include_skeleton)`
 - `aoa_evals_local_port(repo)`
 - `aoa_evals_find_or_propose_local(repo, proof_question, proposal)`
+Candidate-contour tools:
+
 - `aoa_evals_write_local_intake(repo, packet, file_slug, apply, replace_existing)`
 - `aoa_evals_write_local_suite_note(repo, suite_slug, title, summary, body_markdown, refs, apply, replace_existing)`
 - `aoa_evals_write_local_report_note(repo, report_slug, title, summary, body_markdown, refs, apply, replace_existing)`
 
-Prompts:
+Read prompts:
 
 - `eval-select`
 - `eval-find-or-propose`
@@ -86,6 +98,8 @@ Prompts:
 - `eval-forge-access`
 - `local-eval-port`
 - `report-skeleton`
+
+The candidate contour exposes only `local-eval-port-write`.
 
 Selection, find-or-propose, inspection, expansion, comparison,
 evidence-template, runtime export, local-port inspection, and skeleton tools are
@@ -97,6 +111,10 @@ Every write response includes a `write_receipt` that records dry-run/apply
 state, target path confinement, allowed local-port globs, validation issues,
 `PORT.yaml` activation, side effects, and the explicit absence of proof
 authority, promotion, central mutation, verdicts, or scoring.
+Managed candidate startup additionally requires the selected port under
+`AOA_EVALS_MCP_CANDIDATE_ROOTS`. The systemd sandbox makes only each admitted
+port's `intake/`, `suites/`, `reports/`, and `PORT.yaml` writable. Suite
+execution sidecars remain read-only even inside the candidate process.
 
 The service does not run evals, compute verdicts, publish receipts, promote
 bundles, ingest or accept evidence, approve proposals, create central bundles,
@@ -138,6 +156,8 @@ In the shared AoA Codex plane this service is registered as `aoa_evals` through
 `8Dionysus:config/codex_plane/runtime_manifest.v1.json`. The workspace launcher
 is `<workspace-root>/.codex/bin/aoa-evals-mcp-server.py`; it resolves this
 stack-owned service without making `8Dionysus` the service authority.
+Managed read and candidate units select disjoint catalogs through
+`AOA_MCP_POLICY_FAMILY`. Stdio defaults to read and candidate must be explicit.
 When installed as a package, the direct server entry point is
 `aoa-evals-mcp-server`; `aoa-evals-mcp` remains the CLI entry point.
 

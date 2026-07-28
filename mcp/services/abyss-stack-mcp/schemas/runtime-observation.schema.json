@@ -1,0 +1,1938 @@
+{
+  "$defs": {
+    "CanaryObservation": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "succeeded": {
+                "const": true
+              }
+            },
+            "required": [
+              "succeeded"
+            ]
+          },
+          "then": {
+            "properties": {
+              "canary_ref": {
+                "type": "string"
+              },
+              "evidence": {
+                "properties": {
+                  "evidence_refs": {
+                    "minItems": 1
+                  }
+                }
+              },
+              "result_grounded": {
+                "const": true
+              }
+            },
+            "required": [
+              "result_grounded",
+              "canary_ref",
+              "evidence"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "canary_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Canary Ref"
+        },
+        "canary_route": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Canary Route",
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "result_grounded": {
+          "title": "Result Grounded",
+          "type": "boolean"
+        },
+        "succeeded": {
+          "title": "Succeeded",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "succeeded",
+        "result_grounded",
+        "canary_route",
+        "evidence"
+      ],
+      "title": "CanaryObservation",
+      "type": "object"
+    },
+    "CentralProofObservation": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "verdict": {
+                "const": "passed"
+              }
+            },
+            "required": [
+              "verdict"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evaluated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "evidence": {
+                "properties": {
+                  "evidence_refs": {
+                    "minItems": 1
+                  },
+                  "state": {
+                    "enum": [
+                      "exact",
+                      "compatible_drift"
+                    ]
+                  }
+                }
+              },
+              "proof_ref": {
+                "type": "string"
+              },
+              "proved_canary_ref": {
+                "type": "string"
+              },
+              "proved_canary_route": {
+                "type": "string"
+              },
+              "proved_consumer_registration_ref": {
+                "type": "string"
+              },
+              "proved_deploy_manifest_digest": {
+                "type": "string"
+              },
+              "proved_deploy_revision": {
+                "type": "string"
+              },
+              "proved_deploy_tree_digest": {
+                "type": "string"
+              },
+              "proved_package_digest": {
+                "type": "string"
+              },
+              "proved_process_identity": {
+                "type": "string"
+              },
+              "proved_server_schema_digest": {
+                "type": "string"
+              },
+              "proved_source_revision": {
+                "type": "string"
+              },
+              "proved_source_tree_digest": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "proof_ref",
+              "evaluated_at",
+              "proved_source_revision",
+              "proved_source_tree_digest",
+              "proved_package_digest",
+              "proved_deploy_revision",
+              "proved_deploy_tree_digest",
+              "proved_deploy_manifest_digest",
+              "proved_process_identity",
+              "proved_server_schema_digest",
+              "proved_consumer_registration_ref",
+              "proved_canary_route",
+              "proved_canary_ref",
+              "evidence"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "evaluated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evaluated At"
+        },
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "proof_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proof Ref"
+        },
+        "proved_canary_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Canary Ref"
+        },
+        "proved_canary_route": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Canary Route"
+        },
+        "proved_consumer_registration_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Consumer Registration Ref"
+        },
+        "proved_deploy_manifest_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Deploy Manifest Digest"
+        },
+        "proved_deploy_revision": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Deploy Revision"
+        },
+        "proved_deploy_tree_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Deploy Tree Digest"
+        },
+        "proved_package_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Package Digest"
+        },
+        "proved_process_identity": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Process Identity"
+        },
+        "proved_server_schema_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Server Schema Digest"
+        },
+        "proved_source_revision": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Source Revision"
+        },
+        "proved_source_tree_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Source Tree Digest"
+        },
+        "verdict": {
+          "enum": [
+            "passed",
+            "failed",
+            "unknown"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        }
+      },
+      "required": [
+        "verdict",
+        "evidence"
+      ],
+      "title": "CentralProofObservation",
+      "type": "object"
+    },
+    "ConsumerObservation": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "registered": {
+                "const": true
+              }
+            },
+            "required": [
+              "registered"
+            ]
+          },
+          "then": {
+            "properties": {
+              "observed_protocol_versions": {
+                "minItems": 1
+              },
+              "observed_schema_digest": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "observed_schema_digest",
+              "observed_protocol_versions"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "consumer_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Consumer Id",
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "observed_protocol_versions": {
+          "default": [],
+          "items": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "title": "Observed Protocol Versions",
+          "type": "array"
+        },
+        "observed_schema_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed Schema Digest"
+        },
+        "registered": {
+          "title": "Registered",
+          "type": "boolean"
+        },
+        "registration_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Registration Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "consumer_id",
+        "registration_ref",
+        "registered",
+        "evidence"
+      ],
+      "title": "ConsumerObservation",
+      "type": "object"
+    },
+    "DeployIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "deployed_at": {
+          "format": "date-time",
+          "title": "Deployed At",
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "manifest_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Manifest Digest",
+          "type": "string"
+        },
+        "manifest_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Manifest Ref",
+          "type": "string"
+        },
+        "revision": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Revision",
+          "type": "string"
+        },
+        "tree_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Tree Digest",
+          "type": "string"
+        }
+      },
+      "required": [
+        "revision",
+        "tree_digest",
+        "manifest_ref",
+        "manifest_digest",
+        "deployed_at",
+        "evidence"
+      ],
+      "title": "DeployIdentity",
+      "type": "object"
+    },
+    "EndpointObservation": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "ready": {
+                "const": true
+              }
+            },
+            "required": [
+              "ready"
+            ]
+          },
+          "then": {
+            "properties": {
+              "server_schema_digest": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "server_schema_digest"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "endpoint_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Endpoint Ref",
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "protocol_versions": {
+          "items": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Protocol Versions",
+          "type": "array"
+        },
+        "ready": {
+          "title": "Ready",
+          "type": "boolean"
+        },
+        "server_schema_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Server Schema Digest"
+        },
+        "transport": {
+          "enum": [
+            "stdio",
+            "streamable-http"
+          ],
+          "title": "Transport",
+          "type": "string"
+        }
+      },
+      "required": [
+        "transport",
+        "endpoint_ref",
+        "protocol_versions",
+        "ready",
+        "evidence"
+      ],
+      "title": "EndpointObservation",
+      "type": "object"
+    },
+    "EvidenceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Evidence Ref",
+          "type": "string"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "owner": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Owner",
+          "type": "string"
+        },
+        "revision": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "evidence_ref",
+        "revision",
+        "observed_at"
+      ],
+      "title": "EvidenceRef",
+      "type": "object"
+    },
+    "FreshnessObservation": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "exact",
+                  "compatible_drift"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_refs": {
+                "minItems": 1
+              },
+              "provider_watermark": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider_watermark",
+              "evidence_refs"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "compatible_drift",
+                  "stale_readable",
+                  "blocked",
+                  "unknown",
+                  "rollback_required"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reason_codes": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "reason_codes"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "provider_watermark": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider Watermark"
+        },
+        "reason_codes": {
+          "default": [],
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "state": {
+          "enum": [
+            "exact",
+            "compatible_drift",
+            "stale_readable",
+            "blocked",
+            "unknown",
+            "rollback_required"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "observed_at",
+        "expires_at",
+        "evidence_refs"
+      ],
+      "title": "FreshnessObservation",
+      "type": "object"
+    },
+    "LinkEvidence": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "exact",
+                  "compatible_drift"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_refs": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "compatible_drift",
+                  "stale_readable",
+                  "blocked",
+                  "unknown",
+                  "rollback_required"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reason_codes": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "reason_codes"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "rollback_required"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_refs": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "reason_codes": {
+          "default": [],
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "state": {
+          "enum": [
+            "exact",
+            "compatible_drift",
+            "stale_readable",
+            "blocked",
+            "unknown",
+            "rollback_required"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "observed_at",
+        "evidence_refs"
+      ],
+      "title": "LinkEvidence",
+      "type": "object"
+    },
+    "OwnerAcceptanceObservation": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "accepted": {
+                "const": true
+              }
+            },
+            "required": [
+              "accepted"
+            ]
+          },
+          "then": {
+            "properties": {
+              "acceptance_ref": {
+                "type": "string"
+              },
+              "accepted_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "accepted_package_digest": {
+                "type": "string"
+              },
+              "accepted_source_revision": {
+                "type": "string"
+              },
+              "evidence": {
+                "properties": {
+                  "evidence_refs": {
+                    "minItems": 1
+                  },
+                  "state": {
+                    "enum": [
+                      "exact",
+                      "compatible_drift"
+                    ]
+                  }
+                }
+              }
+            },
+            "required": [
+              "acceptance_ref",
+              "accepted_at",
+              "accepted_source_revision",
+              "accepted_package_digest",
+              "evidence"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "acceptance_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Acceptance Ref"
+        },
+        "accepted": {
+          "title": "Accepted",
+          "type": "boolean"
+        },
+        "accepted_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accepted At"
+        },
+        "accepted_package_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accepted Package Digest"
+        },
+        "accepted_source_revision": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accepted Source Revision"
+        },
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        }
+      },
+      "required": [
+        "accepted",
+        "evidence"
+      ],
+      "title": "OwnerAcceptanceObservation",
+      "type": "object"
+    },
+    "OwnerRoles": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_owner": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Acceptance Owner",
+          "type": "string"
+        },
+        "access_owner": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Access Owner",
+          "type": "string"
+        },
+        "proof_owner": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Proof Owner",
+          "type": "string"
+        },
+        "runtime_owner": {
+          "const": "abyss-stack",
+          "default": "abyss-stack",
+          "title": "Runtime Owner",
+          "type": "string"
+        },
+        "source_owner": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Source Owner",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_owner",
+        "access_owner",
+        "proof_owner",
+        "acceptance_owner"
+      ],
+      "title": "OwnerRoles",
+      "type": "object"
+    },
+    "PackageIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Artifact Digest",
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "expected_deploy_tree_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Expected Deploy Tree Digest",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "source_revision": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Source Revision",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "source_revision",
+        "artifact_digest",
+        "expected_deploy_tree_digest",
+        "evidence"
+      ],
+      "title": "PackageIdentity",
+      "type": "object"
+    },
+    "ProcessObservation": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "active": {
+                "const": true
+              }
+            },
+            "required": [
+              "active"
+            ]
+          },
+          "then": {
+            "properties": {
+              "process_identity": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "process_identity"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "active": {
+          "title": "Active",
+          "type": "boolean"
+        },
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "executable_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Executable Ref",
+          "type": "string"
+        },
+        "process_identity": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Process Identity"
+        },
+        "unit_name": {
+          "maxLength": 256,
+          "minLength": 3,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]*\\.(service|socket)$",
+          "title": "Unit Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "unit_name",
+        "executable_ref",
+        "active",
+        "evidence"
+      ],
+      "title": "ProcessObservation",
+      "type": "object"
+    },
+    "RegistryObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "registry_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Registry Digest",
+          "type": "string"
+        },
+        "registry_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Registry Id",
+          "type": "string"
+        },
+        "registry_state": {
+          "enum": [
+            "declared",
+            "package_candidate",
+            "deploy_candidate",
+            "shadow",
+            "admitted",
+            "suspended",
+            "deprecated",
+            "retired"
+          ],
+          "title": "Registry State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "registry_id",
+        "registry_digest",
+        "registry_state",
+        "evidence"
+      ],
+      "title": "RegistryObservation",
+      "type": "object"
+    },
+    "RollbackObservation": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "ready": {
+                "const": true
+              }
+            },
+            "required": [
+              "ready"
+            ]
+          },
+          "then": {
+            "properties": {
+              "last_known_good_canary_ref": {
+                "type": "string"
+              },
+              "last_known_good_canary_route": {
+                "type": "string"
+              },
+              "last_known_good_consumer_registration_ref": {
+                "type": "string"
+              },
+              "last_known_good_credential_class": {
+                "type": "string"
+              },
+              "last_known_good_deploy_manifest_digest": {
+                "type": "string"
+              },
+              "last_known_good_deploy_manifest_ref": {
+                "type": "string"
+              },
+              "last_known_good_deploy_revision": {
+                "type": "string"
+              },
+              "last_known_good_deploy_tree_digest": {
+                "type": "string"
+              },
+              "last_known_good_executable_ref": {
+                "type": "string"
+              },
+              "last_known_good_package_digest": {
+                "type": "string"
+              },
+              "last_known_good_process_identity": {
+                "type": "string"
+              },
+              "last_known_good_unit_name": {
+                "type": "string"
+              },
+              "proof_ref": {
+                "type": "string"
+              },
+              "proved_target": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "last_known_good_consumer_registration_ref",
+              "last_known_good_package_digest",
+              "last_known_good_deploy_revision",
+              "last_known_good_deploy_tree_digest",
+              "last_known_good_deploy_manifest_ref",
+              "last_known_good_deploy_manifest_digest",
+              "last_known_good_unit_name",
+              "last_known_good_credential_class",
+              "last_known_good_executable_ref",
+              "last_known_good_process_identity",
+              "last_known_good_canary_route",
+              "last_known_good_canary_ref",
+              "proof_ref",
+              "proved_target"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "last_known_good_canary_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Canary Ref"
+        },
+        "last_known_good_canary_route": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Canary Route"
+        },
+        "last_known_good_consumer_registration_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Consumer Registration Ref"
+        },
+        "last_known_good_credential_class": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Credential Class"
+        },
+        "last_known_good_deploy_manifest_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Deploy Manifest Digest"
+        },
+        "last_known_good_deploy_manifest_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Deploy Manifest Ref"
+        },
+        "last_known_good_deploy_revision": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Deploy Revision"
+        },
+        "last_known_good_deploy_tree_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Deploy Tree Digest"
+        },
+        "last_known_good_executable_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Executable Ref"
+        },
+        "last_known_good_package_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Package Digest"
+        },
+        "last_known_good_process_identity": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Process Identity"
+        },
+        "last_known_good_unit_name": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 3,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]*\\.(service|socket)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Unit Name"
+        },
+        "proof_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proof Ref"
+        },
+        "proved_target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RollbackProofTarget"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ready": {
+          "title": "Ready",
+          "type": "boolean"
+        },
+        "rollback_route": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Rollback Route",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ready",
+        "rollback_route",
+        "evidence"
+      ],
+      "title": "RollbackObservation",
+      "type": "object"
+    },
+    "RollbackProofTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "canary_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Canary Ref",
+          "type": "string"
+        },
+        "canary_route": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Canary Route",
+          "type": "string"
+        },
+        "consumer_registration_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Consumer Registration Ref",
+          "type": "string"
+        },
+        "credential_class": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Credential Class",
+          "type": "string"
+        },
+        "deploy_manifest_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Deploy Manifest Digest",
+          "type": "string"
+        },
+        "deploy_manifest_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Deploy Manifest Ref",
+          "type": "string"
+        },
+        "deploy_revision": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Deploy Revision",
+          "type": "string"
+        },
+        "deploy_tree_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Deploy Tree Digest",
+          "type": "string"
+        },
+        "executable_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Executable Ref",
+          "type": "string"
+        },
+        "package_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Package Digest",
+          "type": "string"
+        },
+        "process_identity": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Process Identity",
+          "type": "string"
+        },
+        "unit_name": {
+          "maxLength": 256,
+          "minLength": 3,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]*\\.(service|socket)$",
+          "title": "Unit Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "consumer_registration_ref",
+        "package_digest",
+        "deploy_revision",
+        "deploy_tree_digest",
+        "deploy_manifest_ref",
+        "deploy_manifest_digest",
+        "unit_name",
+        "credential_class",
+        "executable_ref",
+        "process_identity",
+        "canary_route",
+        "canary_ref"
+      ],
+      "title": "RollbackProofTarget",
+      "type": "object"
+    },
+    "RuntimeSubject": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "policy_family": {
+                "const": "read"
+              }
+            },
+            "required": [
+              "policy_family"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effect_classes": {
+                "items": {
+                  "enum": [
+                    "observe",
+                    "derive",
+                    "validate"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "policy_family": {
+                "const": "candidate"
+              }
+            },
+            "required": [
+              "policy_family"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effect_classes": {
+                "items": {
+                  "const": "prepare_candidate"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "policy_family": {
+                "const": "internal_effect"
+              }
+            },
+            "required": [
+              "policy_family"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effect_classes": {
+                "items": {
+                  "enum": [
+                    "apply_runtime",
+                    "accept_source"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "policy_family": {
+                "const": "external_effect"
+              }
+            },
+            "required": [
+              "policy_family"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effect_classes": {
+                "items": {
+                  "enum": [
+                    "external_emit",
+                    "external_change"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "acceptance": {
+          "$ref": "#/$defs/OwnerAcceptanceObservation"
+        },
+        "canary": {
+          "$ref": "#/$defs/CanaryObservation"
+        },
+        "consumers": {
+          "items": {
+            "$ref": "#/$defs/ConsumerObservation"
+          },
+          "title": "Consumers",
+          "type": "array"
+        },
+        "credential_class": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Credential Class",
+          "type": "string"
+        },
+        "deploy": {
+          "$ref": "#/$defs/DeployIdentity"
+        },
+        "effect_classes": {
+          "items": {
+            "enum": [
+              "observe",
+              "derive",
+              "validate",
+              "prepare_candidate",
+              "apply_runtime",
+              "accept_source",
+              "external_emit",
+              "external_change"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Effect Classes",
+          "type": "array"
+        },
+        "endpoint": {
+          "$ref": "#/$defs/EndpointObservation"
+        },
+        "freshness": {
+          "$ref": "#/$defs/FreshnessObservation"
+        },
+        "organ_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Organ Id",
+          "type": "string"
+        },
+        "owners": {
+          "$ref": "#/$defs/OwnerRoles"
+        },
+        "package": {
+          "$ref": "#/$defs/PackageIdentity"
+        },
+        "policy_family": {
+          "enum": [
+            "read",
+            "candidate",
+            "internal_effect",
+            "external_effect"
+          ],
+          "title": "Policy Family",
+          "type": "string"
+        },
+        "process": {
+          "$ref": "#/$defs/ProcessObservation"
+        },
+        "proof": {
+          "$ref": "#/$defs/CentralProofObservation"
+        },
+        "registry": {
+          "$ref": "#/$defs/RegistryObservation"
+        },
+        "rollback": {
+          "$ref": "#/$defs/RollbackObservation"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceIdentity"
+        }
+      },
+      "required": [
+        "organ_id",
+        "policy_family",
+        "owners",
+        "credential_class",
+        "effect_classes",
+        "source",
+        "package",
+        "deploy",
+        "process",
+        "endpoint",
+        "registry",
+        "consumers",
+        "freshness",
+        "proof",
+        "acceptance",
+        "canary",
+        "rollback"
+      ],
+      "title": "RuntimeSubject",
+      "type": "object"
+    },
+    "SourceIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "expected_sync_tree_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Expected Sync Tree Digest",
+          "type": "string"
+        },
+        "revision": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Revision",
+          "type": "string"
+        },
+        "tree_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Tree Digest",
+          "type": "string"
+        }
+      },
+      "required": [
+        "revision",
+        "tree_digest",
+        "expected_sync_tree_digest",
+        "evidence"
+      ],
+      "title": "SourceIdentity",
+      "type": "object"
+    }
+  },
+  "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/runtime-observation.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "contains_secrets": {
+      "const": false,
+      "default": false,
+      "title": "Contains Secrets",
+      "type": "boolean"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "provider": {
+      "const": "abyss-stack",
+      "default": "abyss-stack",
+      "title": "Provider",
+      "type": "string"
+    },
+    "provider_watermark": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Provider Watermark",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "abyss_stack_runtime_observation_v1",
+      "default": "abyss_stack_runtime_observation_v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "subjects": {
+      "items": {
+        "$ref": "#/$defs/RuntimeSubject"
+      },
+      "title": "Subjects",
+      "type": "array"
+    }
+  },
+  "required": [
+    "provider_watermark",
+    "generated_at",
+    "expires_at",
+    "subjects"
+  ],
+  "title": "RuntimeObservation",
+  "type": "object"
+}

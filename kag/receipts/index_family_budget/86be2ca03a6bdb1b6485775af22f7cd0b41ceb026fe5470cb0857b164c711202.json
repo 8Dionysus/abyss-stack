@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 18012709,
+  "allowed_tracked_bytes": 25336290,
+  "approved_by": "repository-owner",
+  "base_ref": "0c930170c474eaaee1dc71d56ef4e00cc3b7e7e8",
+  "changed_generated_bytes": 18012709,
+  "changed_generated_files": 280,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "86be2ca03a6bdb1b6485775af22f7cd0b41ceb026fe5470cb0857b164c711202",
+  "reason": "Regenerate the merged abyss-stack portable KAG family on the current main base after MCP transition and runtime-race closure.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 25336290,
+  "tracked_bytes_max": 24117248
+}

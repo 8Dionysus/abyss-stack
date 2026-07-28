@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 17754240,
+  "allowed_tracked_bytes": 25286284,
+  "approved_by": "repository-owner",
+  "base_ref": "5b95cd7d09017ee3620d6c694ede4f07a1e6ab42",
+  "changed_generated_bytes": 17754240,
+  "changed_generated_files": 277,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "4971502ee3d84310f6c19dba1edddfeb6aba7d4ea933f5b28980b818908b1bd4",
+  "reason": "Align the MCP branch KAG family with the current main routing-autonomy closure and preserve the activation-proof fixes without raising the standing budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 25286284,
+  "tracked_bytes_max": 24117248
+}

@@ -2,20 +2,82 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from ._http_auth import http_auth_kwargs as _http_auth_kwargs
 from ._http_auth import transport_settings as _transport_settings
 from .core import AoAMemoMCPState
 
 LOGGER = logging.getLogger(__name__)
-DEFAULT_HTTP_PORT = 5421
+READ_HTTP_PORT = 5421
+CANDIDATE_HTTP_PORT = 5434
+DEFAULT_HTTP_PORT = READ_HTTP_PORT
+PolicyFamily = Literal["read", "candidate"]
+
+READ_TOKEN_ENV_VAR = "AOA_MEMO_MCP_READ_BEARER_TOKEN"
+READ_CREDENTIAL_NAME = "aoa-memo-mcp-read-bearer-token"
+READ_AUTH_SCOPE = "mcp:aoa-memo:read"
+READ_CLIENT_ID = "aoa-loopback-codex:aoa-memo:read"
+
+CANDIDATE_TOKEN_ENV_VAR = "AOA_MEMO_MCP_CANDIDATE_BEARER_TOKEN"
+CANDIDATE_CREDENTIAL_NAME = "aoa-memo-mcp-candidate-bearer-token"
+CANDIDATE_AUTH_SCOPE = "mcp:aoa-memo:candidate"
+CANDIDATE_CLIENT_ID = "aoa-loopback-codex:aoa-memo:candidate"
+
+
+def configured_policy_family() -> PolicyFamily:
+    value = os.environ.get("AOA_MCP_POLICY_FAMILY", "read").strip()
+    if value not in {"read", "candidate"}:
+        raise SystemExit("AOA_MCP_POLICY_FAMILY must be read or candidate")
+    return value  # type: ignore[return-value]
+
+
+def _contour(
+    policy_family: PolicyFamily,
+) -> tuple[int, str, str, str, str]:
+    if policy_family == "read":
+        return (
+            READ_HTTP_PORT,
+            READ_TOKEN_ENV_VAR,
+            READ_CREDENTIAL_NAME,
+            READ_AUTH_SCOPE,
+            READ_CLIENT_ID,
+        )
+    return (
+        CANDIDATE_HTTP_PORT,
+        CANDIDATE_TOKEN_ENV_VAR,
+        CANDIDATE_CREDENTIAL_NAME,
+        CANDIDATE_AUTH_SCOPE,
+        CANDIDATE_CLIENT_ID,
+    )
+
+
+def _contour_http_auth_kwargs(
+    policy_family: PolicyFamily,
+) -> dict[str, Any]:
+    port, token_env_var, credential_name, auth_scope, client_id = _contour(
+        policy_family
+    )
+    return _http_auth_kwargs(
+        port,
+        token_env_var=token_env_var,
+        credential_name=credential_name,
+        auth_scope=auth_scope,
+        client_id=client_id,
+    )
+
+
+def _read_http_auth_kwargs() -> dict[str, Any]:
+    return _contour_http_auth_kwargs("read")
 
 
 def _run_server(server: Any) -> None:
-    settings = _transport_settings(DEFAULT_HTTP_PORT)
-    _http_auth_kwargs(DEFAULT_HTTP_PORT)
+    policy_family = configured_policy_family()
+    port, *_ = _contour(policy_family)
+    settings = _transport_settings(port)
+    _contour_http_auth_kwargs(policy_family)
     if settings.transport == "stdio":
         server.run(transport="stdio")
         return
@@ -26,186 +88,291 @@ def _run_server(server: Any) -> None:
     server.run(transport="streamable-http")
 
 
-def build_server(workspace_root: str | Path | None = None) -> Any:
+def build_server(
+    workspace_root: str | Path | None = None,
+    *,
+    policy_family: PolicyFamily | None = None,
+) -> Any:
     try:
         from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
+        from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
-        raise SystemExit("Missing dependency 'mcp'. Install with: python -m pip install -e .") from exc
+        raise SystemExit(
+            "Missing dependency 'mcp'. Install with: python -m pip install -e ."
+        ) from exc
 
-    mcp = FastMCP("aoa-memo-mcp", json_response=True, **_http_auth_kwargs(DEFAULT_HTTP_PORT))
+    contour = policy_family or configured_policy_family()
+    mcp = FastMCP(
+        f"aoa-memo-mcp-{contour}",
+        json_response=True,
+        **_contour_http_auth_kwargs(contour),
+    )
+    read_only_tool = mcp.tool(
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        )
+    )
+    candidate_tool = mcp.tool(
+        annotations=ToolAnnotations(
+            readOnlyHint=False,
+            destructiveHint=True,
+            idempotentHint=False,
+            openWorldHint=False,
+        )
+    )
 
     def current_state() -> AoAMemoMCPState:
         return AoAMemoMCPState.discover(workspace_root)
 
-    @mcp.tool()
-    def aoa_memo_brief(repo: str, intent: str = "") -> dict[str, Any]:
-        """Return a compact memory route brief for a repository or host layer."""
-        return current_state().build_brief(repo=repo, intent=intent)
+    if contour == "read":
 
-    @mcp.tool()
-    def aoa_memo_search(query: str, scope: str = "all", mode: str = "brief") -> dict[str, Any]:
-        """Search central memory contracts, local memo ports, and session indexes."""
-        return current_state().search(query=query, scope=scope, mode=mode)
+        @read_only_tool
+        def aoa_memo_brief(
+            repo: str,
+            intent: str = "",
+        ) -> dict[str, Any]:
+            """Return a compact memory route brief for a repository or host layer."""
+            return current_state().build_brief(repo=repo, intent=intent)
 
-    @mcp.tool()
-    def aoa_memo_create_candidate(
-        repo: str,
-        evidence_refs: list[str],
-        claim: str,
-        source_trust: str = "review_required",
-        kind: str = "route",
-        family: str = "memory-access",
-        scope: str = "repo",
-        source_refs: list[str] | None = None,
-    ) -> dict[str, Any]:
-        """Create a local memory candidate under the repo memo port."""
-        return current_state().create_candidate(
-            repo=repo,
-            evidence_refs=evidence_refs,
-            claim=claim,
-            source_trust=source_trust,
-            kind=kind,
-            family=family,
-            scope=scope,
-            source_refs=source_refs,
-        )
+        @read_only_tool
+        def aoa_memo_search(
+            query: str,
+            scope: str = "all",
+            mode: str = "brief",
+        ) -> dict[str, Any]:
+            """Search central memory contracts, local memo ports, and session indexes."""
+            return current_state().search(query=query, scope=scope, mode=mode)
 
-    @mcp.tool()
-    def aoa_memo_validate_candidate(path: str) -> dict[str, Any]:
-        """Validate a local memory candidate before reviewed intake."""
-        return current_state().validate_candidate(path)
+        @read_only_tool
+        def aoa_memo_validate_candidate(path: str) -> dict[str, Any]:
+            """Validate a local memory candidate before reviewed intake."""
+            return current_state().validate_candidate(path)
 
-    @mcp.tool()
-    def aoa_memo_build_port_index(repo: str, write: bool = False, check: bool = False) -> dict[str, Any]:
-        """Build or check the generated local memo port index."""
-        return current_state().build_port_index(repo=repo, write=write, check=check)
+        @read_only_tool
+        def aoa_memo_build_port_index(
+            repo: str,
+            check: bool = False,
+        ) -> dict[str, Any]:
+            """Build an in-memory local memo index or check its stored projection."""
+            return current_state().build_port_index(
+                repo=repo,
+                write=False,
+                check=check,
+            )
 
-    @mcp.tool()
-    def aoa_memo_validate_port(repo: str) -> dict[str, Any]:
-        """Validate a local memo port contract, packets, and generated index."""
-        return current_state().validate_port(repo)
+        @read_only_tool
+        def aoa_memo_validate_port(repo: str) -> dict[str, Any]:
+            """Validate a local memo port contract, packets, and generated index."""
+            return current_state().validate_port(repo)
 
-    @mcp.tool()
-    def aoa_memo_prepare_intake_packet(
-        repo: str,
-        candidate_refs: list[str],
-        receipt_refs: list[str] | None = None,
-    ) -> dict[str, Any]:
-        """Prepare a reviewed-intake export packet from local candidates."""
-        return current_state().prepare_intake_packet(repo=repo, candidate_refs=candidate_refs, receipt_refs=receipt_refs)
+        @read_only_tool
+        def aoa_memo_pending_exports(repo: str) -> dict[str, Any]:
+            """List local reviewed-intake exports and their landing readiness."""
+            return current_state().list_pending_exports(repo)
 
-    @mcp.tool()
-    def aoa_memo_review_intake(path: str) -> dict[str, Any]:
-        """Check a local reviewed-intake export and write a forwarding receipt."""
-        return current_state().review_intake(path)
+        @read_only_tool
+        def aoa_memo_landing_plan(
+            repo: str,
+            export_ref: str,
+            object_kind: str = "decision",
+            slug: str | None = None,
+            title: str | None = None,
+            summary: str | None = None,
+            reviewed_at: str | None = None,
+            run_dry_run: bool = False,
+        ) -> dict[str, Any]:
+            """Prepare or dry-run an aoa-memo landing plan without durable write."""
+            return current_state().build_landing_plan(
+                repo=repo,
+                export_ref=export_ref,
+                object_kind=object_kind,
+                slug=slug,
+                title=title,
+                summary=summary,
+                reviewed_at=reviewed_at,
+                run_dry_run=run_dry_run,
+            )
 
-    @mcp.tool()
-    def aoa_memo_pending_exports(repo: str) -> dict[str, Any]:
-        """List local reviewed-intake exports and their landing readiness."""
-        return current_state().list_pending_exports(repo)
+        @mcp.resource("aoa-memo://brief/repo/{repo}")
+        def brief_resource(repo: str) -> str:
+            return json.dumps(
+                current_state().build_brief(repo),
+                ensure_ascii=False,
+                indent=2,
+            )
 
-    @mcp.tool()
-    def aoa_memo_landing_plan(
-        repo: str,
-        export_ref: str,
-        object_kind: str = "decision",
-        slug: str | None = None,
-        title: str | None = None,
-        summary: str | None = None,
-        reviewed_at: str | None = None,
-        run_dry_run: bool = False,
-    ) -> dict[str, Any]:
-        """Prepare or dry-run an aoa-memo landing plan without durable write."""
-        return current_state().build_landing_plan(
-            repo=repo,
-            export_ref=export_ref,
-            object_kind=object_kind,
-            slug=slug,
-            title=title,
-            summary=summary,
-            reviewed_at=reviewed_at,
-            run_dry_run=run_dry_run,
-        )
+        @mcp.resource("aoa-memo://memory/object/{object_id}")
+        def memory_object_resource(object_id: str) -> str:
+            return json.dumps(
+                current_state().build_memory_object(object_id),
+                ensure_ascii=False,
+                indent=2,
+            )
 
-    @mcp.resource("aoa-memo://brief/repo/{repo}")
-    def brief_resource(repo: str) -> str:
-        return json.dumps(current_state().build_brief(repo), ensure_ascii=False, indent=2)
+        @mcp.resource("aoa-memo://session/{session_id}/rehydrate")
+        def session_rehydrate_resource(session_id: str) -> str:
+            return json.dumps(
+                current_state().build_session_rehydrate(session_id),
+                ensure_ascii=False,
+                indent=2,
+            )
 
-    @mcp.resource("aoa-memo://memory/object/{object_id}")
-    def memory_object_resource(object_id: str) -> str:
-        return json.dumps(current_state().build_memory_object(object_id), ensure_ascii=False, indent=2)
+        @mcp.resource("aoa-memo://repo/{repo}/local-port-status")
+        def local_port_status_resource(repo: str) -> str:
+            return json.dumps(
+                current_state().build_local_port_status(repo),
+                ensure_ascii=False,
+                indent=2,
+            )
 
-    @mcp.resource("aoa-memo://session/{session_id}/rehydrate")
-    def session_rehydrate_resource(session_id: str) -> str:
-        return json.dumps(current_state().build_session_rehydrate(session_id), ensure_ascii=False, indent=2)
+        @mcp.resource("aoa-memo://repo/{repo}/memo-port-index")
+        def memo_port_index_resource(repo: str) -> str:
+            return json.dumps(
+                current_state().build_port_index(repo),
+                ensure_ascii=False,
+                indent=2,
+            )
 
-    @mcp.resource("aoa-memo://repo/{repo}/local-port-status")
-    def local_port_status_resource(repo: str) -> str:
-        return json.dumps(current_state().build_local_port_status(repo), ensure_ascii=False, indent=2)
+        @mcp.resource("aoa-memo://repo/{repo}/memo-open-items")
+        def memo_open_items_resource(repo: str) -> str:
+            return json.dumps(
+                current_state().read_resource(
+                    f"aoa-memo://repo/{repo}/memo-open-items"
+                ),
+                ensure_ascii=False,
+                indent=2,
+            )
 
-    @mcp.resource("aoa-memo://repo/{repo}/memo-port-index")
-    def memo_port_index_resource(repo: str) -> str:
-        return json.dumps(current_state().build_port_index(repo), ensure_ascii=False, indent=2)
+        @mcp.resource("aoa-memo://repo/{repo}/pending-exports")
+        def pending_exports_resource(repo: str) -> str:
+            return json.dumps(
+                current_state().list_pending_exports(repo),
+                ensure_ascii=False,
+                indent=2,
+            )
 
-    @mcp.resource("aoa-memo://repo/{repo}/memo-open-items")
-    def memo_open_items_resource(repo: str) -> str:
-        return json.dumps(current_state().read_resource(f"aoa-memo://repo/{repo}/memo-open-items"), ensure_ascii=False, indent=2)
+        @mcp.resource("aoa-memo://repo/{repo}/memo-vocabulary")
+        def memo_vocabulary_resource(repo: str) -> str:
+            del repo
+            return json.dumps(
+                current_state().build_memo_port_vocabulary(),
+                ensure_ascii=False,
+                indent=2,
+            )
 
-    @mcp.resource("aoa-memo://repo/{repo}/pending-exports")
-    def pending_exports_resource(repo: str) -> str:
-        return json.dumps(current_state().list_pending_exports(repo), ensure_ascii=False, indent=2)
+        @mcp.resource("aoa-memo://intake/{packet_id}/review")
+        def intake_review_resource(packet_id: str) -> str:
+            return json.dumps(
+                current_state().find_intake_review(packet_id),
+                ensure_ascii=False,
+                indent=2,
+            )
 
-    @mcp.resource("aoa-memo://repo/{repo}/memo-vocabulary")
-    def memo_vocabulary_resource(repo: str) -> str:
-        return json.dumps(current_state().build_memo_port_vocabulary(), ensure_ascii=False, indent=2)
+        @mcp.prompt(name="memo-brief")
+        def memo_brief(repo: str, intent: str = "") -> str:
+            """Prompt route for obtaining a memory brief."""
+            return (
+                f"Use aoa_memo_brief(repo={repo!r}, intent={intent!r}). "
+                "Read the local port status, operation mode, owner note, and "
+                "validation commands before acting."
+            )
 
-    @mcp.resource("aoa-memo://intake/{packet_id}/review")
-    def intake_review_resource(packet_id: str) -> str:
-        return json.dumps(current_state().find_intake_review(packet_id), ensure_ascii=False, indent=2)
+        @mcp.prompt(name="memo-landing-plan")
+        def memo_landing_plan(repo: str, export_ref: str) -> str:
+            """Prompt route for planning reviewed aoa-memo landing."""
+            return (
+                f"Use aoa_memo_pending_exports(repo={repo!r}), then "
+                f"aoa_memo_landing_plan(repo={repo!r}, "
+                f"export_ref={export_ref!r}, run_dry_run=True). "
+                "Inspect readiness and dry-run output; durable landing still "
+                "requires an aoa-memo source patch and validators."
+            )
 
-    @mcp.prompt(name="memo-brief")
-    def memo_brief(repo: str, intent: str = "") -> str:
-        """Prompt route for obtaining a memory brief."""
-        return (
-            f"Use aoa_memo_brief(repo={repo!r}, intent={intent!r}). "
-            "Read the local port status, operation mode, owner note, and validation commands before acting."
-        )
+        @mcp.prompt(name="session-rehydrate")
+        def session_rehydrate(session_id: str) -> str:
+            """Prompt route for session evidence rehydration."""
+            return (
+                f"Use aoa-memo://session/{session_id}/rehydrate to get archive "
+                "pointers. Inspect AGENTS.md, SESSION.md, manifest, and index "
+                "before opening raw evidence."
+            )
 
-    @mcp.prompt(name="memo-intake")
-    def memo_intake(repo: str, claim: str) -> str:
-        """Prompt route for creating a memory candidate."""
-        return (
-            f"Create a local candidate for {repo!r} with claim {claim!r}. "
-            "Use evidence refs from current files or session archive pointers. "
-            "Run aoa_memo_validate_candidate, aoa_memo_prepare_intake_packet, and aoa_memo_review_intake as a forwarding check before proposing durable aoa-memo landing."
-        )
+    else:
 
-    @mcp.prompt(name="memo-review")
-    def memo_review(candidate_path: str) -> str:
-        """Prompt route for checking a memory candidate before forwarding."""
-        return (
-            f"Validate {candidate_path!r}; compare evidence refs against current owner files; "
-            "then prepare/check an intake packet, keep local, or reject. MCP forwarding checks are not durable memory review."
-        )
+        @candidate_tool
+        def aoa_memo_create_candidate(
+            repo: str,
+            evidence_refs: list[str],
+            claim: str,
+            source_trust: str = "review_required",
+            kind: str = "route",
+            family: str = "memory-access",
+            scope: str = "repo",
+            source_refs: list[str] | None = None,
+        ) -> dict[str, Any]:
+            """Create one repo-local memory candidate below durable memory authority."""
+            return current_state().create_candidate(
+                repo=repo,
+                evidence_refs=evidence_refs,
+                claim=claim,
+                source_trust=source_trust,
+                kind=kind,
+                family=family,
+                scope=scope,
+                source_refs=source_refs,
+            )
 
-    @mcp.prompt(name="memo-landing-plan")
-    def memo_landing_plan(repo: str, export_ref: str) -> str:
-        """Prompt route for planning reviewed aoa-memo landing."""
-        return (
-            f"Use aoa_memo_pending_exports(repo={repo!r}), then "
-            f"aoa_memo_landing_plan(repo={repo!r}, export_ref={export_ref!r}, run_dry_run=True). "
-            "Inspect readiness and dry-run output; durable landing still requires an aoa-memo source patch and validators."
-        )
+        @candidate_tool
+        def aoa_memo_write_port_index(
+            repo: str,
+        ) -> dict[str, Any]:
+            """Build and explicitly write the generated local memo index."""
+            return current_state().build_port_index(
+                repo=repo,
+                write=True,
+            )
 
-    @mcp.prompt(name="session-rehydrate")
-    def session_rehydrate(session_id: str) -> str:
-        """Prompt route for session evidence rehydration."""
-        return (
-            f"Use aoa-memo://session/{session_id}/rehydrate to get archive pointers. "
-            "Inspect AGENTS.md, SESSION.md, manifest, and index before opening raw evidence."
-        )
+        @candidate_tool
+        def aoa_memo_prepare_intake_packet(
+            repo: str,
+            candidate_refs: list[str],
+            receipt_refs: list[str] | None = None,
+        ) -> dict[str, Any]:
+            """Write a candidate-only reviewed-intake export packet."""
+            return current_state().prepare_intake_packet(
+                repo=repo,
+                candidate_refs=candidate_refs,
+                receipt_refs=receipt_refs,
+            )
 
-    LOGGER.info("AoA memo MCP server ready")
+        @candidate_tool
+        def aoa_memo_review_intake(path: str) -> dict[str, Any]:
+            """Write a forwarding-check receipt without accepting durable memory."""
+            return current_state().review_intake(path)
+
+        @mcp.prompt(name="memo-intake")
+        def memo_intake(repo: str, claim: str) -> str:
+            """Prompt route for creating a repo-local memory candidate."""
+            return (
+                f"Create a local candidate for {repo!r} with claim {claim!r}. "
+                "Use current source and evidence refs. This candidate contour "
+                "may write only its allowlisted local memo ports and cannot "
+                "accept durable memory."
+            )
+
+        @mcp.prompt(name="memo-review")
+        def memo_review(candidate_path: str) -> str:
+            """Prompt route for forwarding checks below durable review."""
+            return (
+                f"Use the read contour to validate {candidate_path!r}; then use "
+                "this candidate contour only for an allowlisted export or "
+                "forwarding-check receipt. MCP is not aoa-memo review."
+            )
+
+    LOGGER.info("AoA memo MCP %s contour ready", contour)
     return mcp
 
 

@@ -1,0 +1,48 @@
+[Unit]
+Description=abyss-stack MCP non-executing candidate plane
+Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/README.md
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.source-projection.lock
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/audit/policy-candidate.jsonl
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp
+Environment=ABYSS_STACK_MCP_POLICY_FAMILY=candidate
+Environment=ABYSS_STACK_MCP_OBSERVATION_PATH=/srv/AbyssOS/abyss-stack/Logs/mcp/organ-runtime-observation.json
+Environment=AOA_MCP_TRANSPORT=streamable-http
+Environment=AOA_MCP_HOST=127.0.0.1
+Environment=AOA_MCP_PORT=5433
+Environment=ABYSS_STACK_MCP_REQUIRE_AUTH_MANIFEST=1
+Environment=ABYSS_STACK_MCP_AUDIT_JOURNAL_PATH=/srv/AbyssOS/abyss-stack/Logs/mcp/audit/policy-candidate.jsonl
+Environment=ABYSS_STACK_MCP_REQUIRE_AUDIT_JOURNAL=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONHOME=
+Environment=PYTHONPATH=
+LoadCredential=abyss-stack-mcp-candidate-bearer-token:/srv/AbyssOS/abyss-stack/Secrets/Configs/abyss-stack-mcp-candidate-bearer-token
+LoadCredential=abyss-stack-mcp-auth-manifest.json:/srv/AbyssOS/abyss-stack/Secrets/Configs/abyss-stack-mcp-auth-manifest.json
+ExecCondition=/usr/bin/test -x /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
+ExecCondition=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --verify-abyss-stack-mcp-runtime
+ExecStart=/usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.source-projection.lock /usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock /usr/bin/env /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --launch-verified-abyss-stack-mcp
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=20
+KillMode=control-group
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/AbyssOS/abyss-stack/Logs/mcp/audit/policy-candidate.jsonl
+InaccessiblePaths=/srv/AbyssOS/abyss-stack/Logs/mcp/audit/policy-read.jsonl
+PrivateTmp=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+UMask=0077
+
+[Install]
+WantedBy=default.target

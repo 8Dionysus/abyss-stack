@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/abyss-stack-mcp/policy-audit-summary.schema.json",
+  "title": "abyss-stack MCP policy audit summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "owner",
+    "policy_family",
+    "journal_ref",
+    "continuity_state",
+    "records",
+    "byte_count",
+    "max_bytes",
+    "remaining_bytes",
+    "first_recorded_at",
+    "last_recorded_at",
+    "latest_record_id",
+    "decision_counts",
+    "reason_counts",
+    "tool_counts",
+    "contains_secrets",
+    "claim_limit"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "abyss_stack_mcp_policy_audit_summary_v1"
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "policy_family": {
+      "enum": [
+        "read",
+        "candidate"
+      ]
+    },
+    "journal_ref": {
+      "type": "string",
+      "pattern": "^policy-audit://[^/]+/(read|candidate)$"
+    },
+    "continuity_state": {
+      "const": "exact"
+    },
+    "records": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "byte_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "max_bytes": {
+      "type": "integer",
+      "minimum": 65536,
+      "maximum": 1073741824
+    },
+    "remaining_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "first_recorded_at": {
+      "oneOf": [
+        {
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "last_recorded_at": {
+      "oneOf": [
+        {
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "latest_record_id": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "decision_counts": {
+      "$ref": "#/$defs/nonNegativeCounts"
+    },
+    "reason_counts": {
+      "$ref": "#/$defs/nonNegativeCounts"
+    },
+    "tool_counts": {
+      "$ref": "#/$defs/nonNegativeCounts"
+    },
+    "contains_secrets": {
+      "const": false
+    },
+    "claim_limit": {
+      "const": "This summary proves local journal shape and hash-chain continuity only. It does not prove caller intent, result grounding, owner acceptance, admission, or runtime effects."
+    }
+  },
+  "$defs": {
+    "nonNegativeCounts": {
+      "type": "object",
+      "propertyNames": {
+        "minLength": 1,
+        "maxLength": 256
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    }
+  }
+}

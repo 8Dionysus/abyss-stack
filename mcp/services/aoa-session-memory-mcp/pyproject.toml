@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aoa-session-memory-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP access plane for AoA session evidence and route intelligence"
 readme = "README.md"
 requires-python = ">=3.11"

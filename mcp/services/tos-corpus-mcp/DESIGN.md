@@ -44,3 +44,17 @@ The MCP package owns access behavior only. It does not own source witnesses,
 canon, relation packs, research packets, contracts, derived exports, or graph
 meaning. Runtime projection stores such as Neo4j remain caches and query
 surfaces.
+
+## Runtime contour
+
+The package exposes one `read` policy family. It opens owner-produced JSON
+exports without writeback or network dispatch and advertises the closed-world
+read-only MCP tool contract. Optional HTTP authentication uses a ToS
+corpus-specific bearer, scope, credential name, and client identity. The
+generic shared bearer cannot authenticate this contour.
+
+The generic filesystem-read-only owner unit is the intended runtime shape, but
+the package is not in the default owner bundle while the deployed
+`tos-corpus-mcp-server.py` workspace wrapper and a grounded live canary are
+absent. Source correctness and credential provisioning therefore remain
+separate from runtime admission.

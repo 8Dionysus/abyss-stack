@@ -55,11 +55,17 @@ def discover_stack_root(
     )
 
 
-DEFAULT_STACK_ROOT = _root_from_path_with_builder(Path(__file__)) or Path.cwd().resolve()
+DEFAULT_STACK_ROOT = (
+    _root_from_path_with_builder(Path(__file__)) or Path.cwd().resolve()
+)
 DEFAULT_OUTPUT_DIR = Path("Logs/decision-graph/latest")
 GRAPH_FILE = "workspace_decision_graph.json"
 SUMMARY_FILE = "summary.json"
 LOCK_NAME = ".refresh.lock"
+
+
+class DecisionGraphCacheUnavailable(RuntimeError):
+    """The read contour cannot serve a missing or stale decision graph cache."""
 
 
 def _read_json(path: Path) -> Any | None:
@@ -102,7 +108,10 @@ def _path_matches(surface: str, path: str) -> bool:
 
 
 def _is_route_anchor_node(node: dict[str, Any]) -> bool:
-    return node.get("type") == "decision_facet" and node.get("facet_key") == "Route anchors"
+    return (
+        node.get("type") == "decision_facet"
+        and node.get("facet_key") == "Route anchors"
+    )
 
 
 @dataclass(slots=True)
@@ -111,6 +120,7 @@ class AoADecisionsMCPState:
     stack_root: Path
     output_dir: Path
     include_stack_repo: bool = True
+    cache_write_allowed: bool = True
 
     @classmethod
     def discover(
@@ -119,12 +129,17 @@ class AoADecisionsMCPState:
         stack_root: str | Path | None = None,
         output_dir: str | Path | None = None,
         include_stack_repo: bool = True,
+        cache_write_allowed: bool = True,
     ) -> "AoADecisionsMCPState":
-        stack = Path(
-            stack_root
-            or os.environ.get("AOA_ABYSS_STACK_ROOT")
-            or discover_stack_root()
-        ).expanduser().resolve()
+        stack = (
+            Path(
+                stack_root
+                or os.environ.get("AOA_ABYSS_STACK_ROOT")
+                or discover_stack_root()
+            )
+            .expanduser()
+            .resolve()
+        )
         output = Path(
             output_dir
             or os.environ.get("AOA_DECISIONS_GRAPH_DIR")
@@ -137,10 +152,13 @@ class AoADecisionsMCPState:
                 workspace_root
                 or os.environ.get("AOA_WORKSPACE_ROOT")
                 or DEFAULT_WORKSPACE_ROOT
-            ).expanduser().resolve(),
+            )
+            .expanduser()
+            .resolve(),
             stack_root=stack,
             output_dir=output.resolve(),
             include_stack_repo=include_stack_repo,
+            cache_write_allowed=cache_write_allowed,
         )
 
     @property
@@ -155,7 +173,9 @@ class AoADecisionsMCPState:
         path = self.stack_root / "scripts" / "build_workspace_decision_graph.py"
         if not path.is_file():
             raise FileNotFoundError(f"missing decision graph builder: {path}")
-        spec = importlib.util.spec_from_file_location("aoa_workspace_decision_graph_builder", path)
+        spec = importlib.util.spec_from_file_location(
+            "aoa_workspace_decision_graph_builder", path
+        )
         if spec is None or spec.loader is None:
             raise RuntimeError(f"cannot load decision graph builder: {path}")
         module = importlib.util.module_from_spec(spec)
@@ -189,6 +209,55 @@ class AoADecisionsMCPState:
             return False
         return summary.get("input_fingerprint") == self.current_input_fingerprint()
 
+    def cache_posture(self) -> dict[str, Any]:
+        """Inspect cache readiness without creating or updating cache files."""
+        summary = self.cached_summary()
+        current_fingerprint = self.current_input_fingerprint()
+        cached_fingerprint = summary.get("input_fingerprint") if summary else None
+        graph_present = self.graph_path.is_file()
+        if not summary or not graph_present:
+            status = "missing"
+        elif cached_fingerprint != current_fingerprint:
+            status = "stale"
+        else:
+            status = "fresh"
+        return {
+            "schema": "aoa_decisions_graph_cache_posture_v1",
+            "status": status,
+            "cache_write_allowed": self.cache_write_allowed,
+            "freshness_scope": "local_workspace_filesystem",
+            "remote_freshness_checked": False,
+            "output_dir": self.output_dir.as_posix(),
+            "graph_path": self.graph_path.as_posix(),
+            "summary_path": self.summary_path.as_posix(),
+            "graph_present": graph_present,
+            "summary_present": summary is not None,
+            "cached_input_fingerprint": cached_fingerprint,
+            "current_input_fingerprint": current_fingerprint,
+            "decision_count": int((summary or {}).get("decision_count") or 0),
+            "issue_count": int((summary or {}).get("issue_count") or 0),
+            "claim_limits": [
+                "fresh means cache parity with current local filesystem inputs only",
+                "no remote fetch or owner-source acceptance was performed",
+                "this posture check never creates, refreshes, or repairs cache files",
+            ],
+        }
+
+    def require_fresh(self) -> dict[str, Any]:
+        """Return freshness only when an existing cache matches local inputs."""
+        posture = self.cache_posture()
+        if posture["status"] != "fresh":
+            raise DecisionGraphCacheUnavailable(
+                "decision graph cache is "
+                f"{posture['status']}; the read contour cannot refresh it; "
+                "run the owner-controlled refresh contour before retrying"
+            )
+        summary = self.cached_summary()
+        assert summary is not None
+        return self._freshness_payload(
+            refreshed=False, cache_status="fresh", summary=summary
+        )
+
     @contextmanager
     def _refresh_lock(self) -> Iterator[None]:
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -208,7 +277,9 @@ class AoADecisionsMCPState:
                     pass
                 time.sleep(0.05)
         if not acquired:
-            raise TimeoutError(f"timed out waiting for decision graph refresh lock: {lock_dir}")
+            raise TimeoutError(
+                f"timed out waiting for decision graph refresh lock: {lock_dir}"
+            )
         try:
             yield
         finally:
@@ -218,21 +289,39 @@ class AoADecisionsMCPState:
                 pass
 
     def ensure_fresh(self, force: bool = False) -> dict[str, Any]:
+        if not self.cache_write_allowed:
+            if force:
+                raise DecisionGraphCacheUnavailable(
+                    "forced refresh is forbidden in the decision graph read contour"
+                )
+            return self.require_fresh()
         before = self.cached_summary()
         before_fingerprint = before.get("input_fingerprint") if before else None
         current_fingerprint = self.current_input_fingerprint()
-        if not force and before_fingerprint == current_fingerprint and self.graph_path.is_file():
-            return self._freshness_payload(refreshed=False, cache_status="fresh", summary=before)
+        if (
+            not force
+            and before_fingerprint == current_fingerprint
+            and self.graph_path.is_file()
+        ):
+            return self._freshness_payload(
+                refreshed=False, cache_status="fresh", summary=before
+            )
 
         with self._refresh_lock():
             if not force and self.cache_is_fresh():
-                return self._freshness_payload(refreshed=False, cache_status="fresh", summary=self.cached_summary())
+                return self._freshness_payload(
+                    refreshed=False, cache_status="fresh", summary=self.cached_summary()
+                )
 
             builder = self._builder()
             repo_roots = self.repo_roots()
-            records, surfaces, issues = builder.collect_workspace_decision_inputs(repo_roots)
+            records, surfaces, issues = builder.collect_workspace_decision_inputs(
+                repo_roots
+            )
             repo_source_postures = builder.collect_repo_source_postures(repo_roots)
-            fingerprint = builder.workspace_input_fingerprint(repo_roots, repo_source_postures)
+            fingerprint = builder.workspace_input_fingerprint(
+                repo_roots, repo_source_postures
+            )
             graph = builder.build_workspace_graph(
                 records,
                 surfaces=surfaces,
@@ -241,7 +330,9 @@ class AoADecisionsMCPState:
             )
             builder.write_graph_outputs(graph, issues, self.output_dir)
             summary = builder.graph_summary(graph, issues)
-            return self._freshness_payload(refreshed=True, cache_status="refreshed", summary=summary)
+            return self._freshness_payload(
+                refreshed=True, cache_status="refreshed", summary=summary
+            )
 
     def _freshness_payload(
         self,
@@ -263,7 +354,10 @@ class AoADecisionsMCPState:
             }
             for posture in summary.get("repo_source_postures", [])
             if isinstance(posture, dict)
-            and (posture.get("relation") != "aligned" or posture.get("dirty") is not False)
+            and (
+                posture.get("relation") != "aligned"
+                or posture.get("dirty") is not False
+            )
         ]
         status = cache_status
         if issue_count:
@@ -275,9 +369,15 @@ class AoADecisionsMCPState:
             "status": status,
             "cache_status": cache_status,
             "refreshed": refreshed,
-            "freshness_scope": summary.get("freshness_scope", "local_workspace_filesystem"),
-            "remote_freshness_checked": bool(summary.get("remote_freshness_checked", False)),
-            "source_posture_status": "warnings" if source_warning_repo_count else "aligned",
+            "freshness_scope": summary.get(
+                "freshness_scope", "local_workspace_filesystem"
+            ),
+            "remote_freshness_checked": bool(
+                summary.get("remote_freshness_checked", False)
+            ),
+            "source_posture_status": "warnings"
+            if source_warning_repo_count
+            else "aligned",
             "source_posture_note": summary.get("source_posture_note"),
             "output_dir": self.output_dir.as_posix(),
             "graph_path": self.graph_path.as_posix(),
@@ -292,17 +392,25 @@ class AoADecisionsMCPState:
             "repo_source_posture_counts": summary.get("repo_source_posture_counts", {}),
             "source_warnings": source_warnings,
             "source_warning_repo_count": source_warning_repo_count,
-            "local_tracking_lag_repo_count": summary.get("local_tracking_lag_repo_count", 0),
-            "local_unpublished_repo_count": summary.get("local_unpublished_repo_count", 0),
+            "local_tracking_lag_repo_count": summary.get(
+                "local_tracking_lag_repo_count", 0
+            ),
+            "local_unpublished_repo_count": summary.get(
+                "local_unpublished_repo_count", 0
+            ),
             "dirty_repo_count": summary.get("dirty_repo_count", 0),
-            "unknown_source_posture_count": summary.get("unknown_source_posture_count", 0),
+            "unknown_source_posture_count": summary.get(
+                "unknown_source_posture_count", 0
+            ),
         }
 
     def graph(self) -> dict[str, Any]:
         freshness = self.ensure_fresh()
         payload = _read_json(self.graph_path)
         if not isinstance(payload, dict):
-            raise RuntimeError(f"decision graph is not readable after refresh: {self.graph_path}")
+            raise RuntimeError(
+                f"decision graph is not readable after refresh: {self.graph_path}"
+            )
         payload.setdefault("freshness", freshness)
         return payload
 
@@ -310,7 +418,9 @@ class AoADecisionsMCPState:
         freshness = self.ensure_fresh()
         summary = self.cached_summary()
         if not isinstance(summary, dict):
-            raise RuntimeError(f"decision graph summary is not readable after refresh: {self.summary_path}")
+            raise RuntimeError(
+                f"decision graph summary is not readable after refresh: {self.summary_path}"
+            )
         return {**summary, "freshness": freshness}
 
     def repo(self, repo: str) -> dict[str, Any]:
@@ -354,7 +464,9 @@ class AoADecisionsMCPState:
                 continue
             if repo and node.get("repo") != repo:
                 continue
-            if str(node.get("label", "")).upper() == needle or str(node.get("id", "")).upper().endswith(":" + needle):
+            if str(node.get("label", "")).upper() == needle or str(
+                node.get("id", "")
+            ).upper().endswith(":" + needle):
                 matches.append(node)
         related_ids = {node["id"] for node in matches}
         related_edges = [
@@ -368,7 +480,9 @@ class AoADecisionsMCPState:
             for endpoint in (edge.get("source"), edge.get("target"))
             if isinstance(endpoint, str)
         }
-        related_nodes = [node for node in graph.get("nodes", []) if node.get("id") in neighbor_ids]
+        related_nodes = [
+            node for node in graph.get("nodes", []) if node.get("id") in neighbor_ids
+        ]
         return {
             "schema": "aoa_decisions_decision_packet_v1",
             "decision_id": decision_id,
@@ -380,7 +494,9 @@ class AoADecisionsMCPState:
             "authority_note": graph.get("authority_note"),
         }
 
-    def search(self, query: str, repo: str | None = None, limit: int = 20) -> dict[str, Any]:
+    def search(
+        self, query: str, repo: str | None = None, limit: int = 20
+    ) -> dict[str, Any]:
         graph = self.graph()
         needle = query.lower().strip()
         results: list[dict[str, Any]] = []
@@ -415,15 +531,24 @@ class AoADecisionsMCPState:
         graph = self.graph()
         candidates: list[dict[str, Any]] = []
         query_text = query.lower().strip()
-        path_decision_ids, path_edges, _path_surfaces = self._path_impact(graph, path or "", repo=repo)
+        path_decision_ids, path_edges, _path_surfaces = self._path_impact(
+            graph, path or "", repo=repo
+        )
         for node in graph.get("nodes", []):
             if node.get("type") != "decision":
                 continue
             if repo and node.get("repo") != repo:
                 continue
-            if decision_id and str(node.get("label", "")).upper() != decision_id.upper():
+            if (
+                decision_id
+                and str(node.get("label", "")).upper() != decision_id.upper()
+            ):
                 continue
-            if path and node.get("id") not in path_decision_ids and not _path_matches(str(node.get("path", "")), path):
+            if (
+                path
+                and node.get("id") not in path_decision_ids
+                and not _path_matches(str(node.get("path", "")), path)
+            ):
                 continue
             if query_text and not _contains(node, query_text):
                 continue
@@ -448,7 +573,11 @@ class AoADecisionsMCPState:
             for endpoint in (edge.get("source"), edge.get("target"))
             if isinstance(endpoint, str)
         } | decision_ids
-        related_nodes = [node for node in graph.get("nodes", []) if node.get("id") in related_node_ids]
+        related_nodes = [
+            node
+            for node in graph.get("nodes", [])
+            if node.get("id") in related_node_ids
+        ]
         return {
             "schema": "aoa_decisions_packet_v1",
             "query": query,
@@ -468,7 +597,9 @@ class AoADecisionsMCPState:
             ],
         }
 
-    def source_surface(self, source_surface: str, repo: str | None = None, limit: int = 50) -> dict[str, Any]:
+    def source_surface(
+        self, source_surface: str, repo: str | None = None, limit: int = 50
+    ) -> dict[str, Any]:
         return self._surface_packet(
             schema="aoa_decisions_source_surface_packet_v1",
             query=source_surface,
@@ -478,7 +609,9 @@ class AoADecisionsMCPState:
             limit=limit,
         )
 
-    def owner_surface(self, owner_surface: str, repo: str | None = None, limit: int = 50) -> dict[str, Any]:
+    def owner_surface(
+        self, owner_surface: str, repo: str | None = None, limit: int = 50
+    ) -> dict[str, Any]:
         return self._surface_packet(
             schema="aoa_decisions_owner_surface_packet_v1",
             query=owner_surface,
@@ -513,7 +646,11 @@ class AoADecisionsMCPState:
             for edge in graph.get("edges", [])
             if edge.get("type") == edge_type and edge.get("target") in surface_ids
         ]
-        decision_ids = {edge["source"] for edge in matched_edges if isinstance(edge.get("source"), str)}
+        decision_ids = {
+            edge["source"]
+            for edge in matched_edges
+            if isinstance(edge.get("source"), str)
+        }
         decisions = [
             node
             for node in graph.get("nodes", [])
@@ -521,9 +658,7 @@ class AoADecisionsMCPState:
         ][:limit]
         limited_decision_ids = {node["id"] for node in decisions}
         related_edges = [
-            edge
-            for edge in matched_edges
-            if edge.get("source") in limited_decision_ids
+            edge for edge in matched_edges if edge.get("source") in limited_decision_ids
         ]
         return {
             "schema": schema,
@@ -541,16 +676,22 @@ class AoADecisionsMCPState:
             ],
         }
 
-    def changed_path(self, path: str, repo: str | None = None, limit: int = 50) -> dict[str, Any]:
+    def changed_path(
+        self, path: str, repo: str | None = None, limit: int = 50
+    ) -> dict[str, Any]:
         graph = self.graph()
-        decision_ids, matched_edges, surface_nodes = self._path_impact(graph, path, repo=repo)
+        decision_ids, matched_edges, surface_nodes = self._path_impact(
+            graph, path, repo=repo
+        )
         decisions = [
             node
             for node in graph.get("nodes", [])
             if node.get("type") == "decision" and node.get("id") in decision_ids
         ][:limit]
         limited_decision_ids = {node["id"] for node in decisions}
-        related_edges = [edge for edge in matched_edges if edge.get("source") in limited_decision_ids]
+        related_edges = [
+            edge for edge in matched_edges if edge.get("source") in limited_decision_ids
+        ]
         return {
             "schema": "aoa_decisions_changed_path_packet_v1",
             "path": path,
@@ -592,7 +733,8 @@ class AoADecisionsMCPState:
             edge
             for edge in graph.get("edges", [])
             if edge.get("target") in surface_ids
-            and edge.get("type") in {"CITES_SOURCE_SURFACE", "OWNED_BY_SURFACE", "HAS_DECISION_FACET"}
+            and edge.get("type")
+            in {"CITES_SOURCE_SURFACE", "OWNED_BY_SURFACE", "HAS_DECISION_FACET"}
         ]
         if repo:
             repo_decision_ids = {
@@ -605,8 +747,16 @@ class AoADecisionsMCPState:
                 for edge in matched_edges
                 if edge.get("source") in repo_decision_ids
             ]
-        decision_ids = {edge["source"] for edge in matched_edges if isinstance(edge.get("source"), str)}
-        matched_surface_ids = {edge["target"] for edge in matched_edges if isinstance(edge.get("target"), str)}
+        decision_ids = {
+            edge["source"]
+            for edge in matched_edges
+            if isinstance(edge.get("source"), str)
+        }
+        matched_surface_ids = {
+            edge["target"]
+            for edge in matched_edges
+            if isinstance(edge.get("target"), str)
+        }
         matched_surface_nodes = [
             node
             for node in [*surface_nodes, *route_anchor_nodes]
@@ -631,18 +781,28 @@ class AoADecisionsMCPState:
             lane_docs = [
                 node
                 for node in graph.get("nodes", [])
-                if node.get("type") == "decision_lane_doc" and node.get("repo") == repo_name
+                if node.get("type") == "decision_lane_doc"
+                and node.get("repo") == repo_name
             ]
             indexes = [
                 node
                 for node in graph.get("nodes", [])
-                if node.get("type") == "decision_index" and node.get("repo") == repo_name
+                if node.get("type") == "decision_index"
+                and node.get("repo") == repo_name
             ]
-            surface_kinds = sorted({str(node.get("surface_kind")) for node in lane_docs if node.get("surface_kind")})
+            surface_kinds = sorted(
+                {
+                    str(node.get("surface_kind"))
+                    for node in lane_docs
+                    if node.get("surface_kind")
+                }
+            )
             repo_packets.append(
                 {
                     "repo": repo_name,
-                    "decision_count": summary.get("repo_decision_counts", {}).get(repo_name, 0),
+                    "decision_count": summary.get("repo_decision_counts", {}).get(
+                        repo_name, 0
+                    ),
                     "lane_doc_count": len(lane_docs),
                     "decision_index_count": len(indexes),
                     "lane_doc_surface_kinds": surface_kinds,
@@ -651,7 +811,8 @@ class AoADecisionsMCPState:
                         (
                             posture
                             for posture in graph.get("repo_source_postures", [])
-                            if isinstance(posture, dict) and posture.get("repo") == repo_name
+                            if isinstance(posture, dict)
+                            and posture.get("repo") == repo_name
                         ),
                         None,
                     ),
@@ -682,18 +843,24 @@ class AoADecisionsMCPState:
             "issues": issues,
             "summary_issue_count": summary.get("issue_count", 0),
             "source_posture_status": summary["freshness"].get("source_posture_status"),
-            "source_warning_repo_count": summary["freshness"].get("source_warning_repo_count", 0),
+            "source_warning_repo_count": summary["freshness"].get(
+                "source_warning_repo_count", 0
+            ),
             "source_postures": [
                 posture
                 for posture in summary.get("repo_source_postures", [])
-                if isinstance(posture, dict) and (not repo or posture.get("repo") == repo)
+                if isinstance(posture, dict)
+                and (not repo or posture.get("repo") == repo)
             ],
         }
 
     def read_resource(self, uri: str) -> dict[str, Any]:
         prefix = "aoa-decisions://"
         if not uri.startswith(prefix):
-            return {"schema": "aoa_decisions_resource_error_v1", "error": f"unsupported uri: {uri}"}
+            return {
+                "schema": "aoa_decisions_resource_error_v1",
+                "error": f"unsupported uri: {uri}",
+            }
         route = uri[len(prefix) :]
         if route == "status":
             return self.ensure_fresh()
@@ -706,7 +873,10 @@ class AoADecisionsMCPState:
         if route.startswith("issues"):
             _, _, repo = route.partition("/")
             return self.issues(repo=repo or None)
-        return {"schema": "aoa_decisions_resource_error_v1", "error": f"unknown resource route: {uri}"}
+        return {
+            "schema": "aoa_decisions_resource_error_v1",
+            "error": f"unknown resource route: {uri}",
+        }
 
     def render_resource(self, uri: str) -> str:
         return _json(self.read_resource(uri))

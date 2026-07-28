@@ -129,6 +129,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
     'mcp/AGENTS.md': (
         'Model Context Protocol',
         'access planes',
+        'mcp/protocol-lab/',
         'mcp/services/aoa-memo-mcp/',
         'mcp/services/aoa-decisions-mcp/',
         'mcp/services/aoa-evals-mcp/',
@@ -140,6 +141,11 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'mcp/services/aoa-4pda-connector-mcp/',
         'mcp/services/aoa-telegram-connector-mcp/',
         'mcp/services/aoa-discord-connector-mcp/',
+        'mcp/services/aoa-course-connector-mcp/',
+        'mcp/services/aoa-stackoverflow-connector-mcp/',
+        'mcp/services/aoa-xda-connector-mcp/',
+        'mcp/services/abyss-stack-mcp/',
+        'python mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py',
         'python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py',
         'python mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py',
         'python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py',
@@ -151,6 +157,19 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'python mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py',
         'python mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py',
         'python mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py',
+        'python mcp/services/aoa-course-connector-mcp/scripts/validate_course_connector_mcp.py',
+        'python mcp/services/aoa-stackoverflow-connector-mcp/scripts/validate_stackoverflow_connector_mcp.py',
+        'python mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py',
+        'python mcp/protocol-lab/scripts/validate_protocol_lab.py',
+    ),
+    'mcp/protocol-lab/AGENTS.md': (
+        'fail-closed compatibility',
+        'Production remains',
+        'aoa-kag',
+        'Tasks',
+        'python mcp/protocol-lab/scripts/build_protocol_lab_status.py --check',
+        'python mcp/protocol-lab/scripts/validate_protocol_lab.py',
+        'python -m pytest -q mcp/protocol-lab/tests',
     ),
     'mcp/services/AGENTS.md': (
         'service-package district',
@@ -166,6 +185,11 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'aoa-4pda-connector-mcp',
         'aoa-telegram-connector-mcp',
         'aoa-discord-connector-mcp',
+        'aoa-course-connector-mcp',
+        'aoa-stackoverflow-connector-mcp',
+        'aoa-xda-connector-mcp',
+        'abyss-stack-mcp',
+        'python mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py',
         'python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py',
         'python mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py',
         'python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py',
@@ -177,6 +201,9 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'python mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py',
         'python mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py',
         'python mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py',
+        'python mcp/services/aoa-course-connector-mcp/scripts/validate_course_connector_mcp.py',
+        'python mcp/services/aoa-stackoverflow-connector-mcp/scripts/validate_stackoverflow_connector_mcp.py',
+        'python mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py',
     ),
     'mcp/services/aoa-4pda-connector-mcp/AGENTS.md': (
         'read-only MCP access plane',
@@ -184,6 +211,12 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'agent_answer',
         'network_touched=false',
         'python mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py',
+    ),
+    'mcp/services/abyss-stack-mcp/AGENTS.md': (
+        'runtime observation',
+        'not a gateway',
+        'execution_authorized=false',
+        'python mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py',
     ),
     'mcp/services/aoa-telegram-connector-mcp/AGENTS.md': (
         'read-only',
@@ -199,6 +232,27 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'network_touched=false',
         'python mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py',
     ),
+    'mcp/services/aoa-course-connector-mcp/AGENTS.md': (
+        'stack-owned package',
+        'aoa-course-connector',
+        'connected_run',
+        'read contour',
+        'python mcp/services/aoa-course-connector-mcp/scripts/validate_course_connector_mcp.py',
+    ),
+    'mcp/services/aoa-stackoverflow-connector-mcp/AGENTS.md': (
+        'read-only access plane',
+        'aoa-stackoverflow-connector',
+        'query-hybrid',
+        'network_touched=false',
+        'python mcp/services/aoa-stackoverflow-connector-mcp/scripts/validate_stackoverflow_connector_mcp.py',
+    ),
+    'mcp/services/aoa-xda-connector-mcp/AGENTS.md': (
+        'read-only MCP access plane',
+        'aoa-xda-connector',
+        'query-hybrid',
+        'network_touched=false',
+        'python mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py',
+    ),
     'mcp/services/aoa-memo-mcp/AGENTS.md': (
         'thin MCP access plane',
         'aoa-memo',
@@ -208,7 +262,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
     'mcp/services/aoa-decisions-mcp/AGENTS.md': (
         'thin MCP access plane',
         'decision graph',
-        'ensure_fresh()',
+        'require_fresh()',
         'python mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py',
     ),
     'mcp/services/aoa-evals-mcp/AGENTS.md': (
@@ -294,6 +348,8 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'runtime validation gate',
         'tests/README.md',
         'Package-owned mechanics tests',
+        'deterministic and public-safe',
+        'no live host state',
         'python -m pytest',
     ),
     'mechanics/AGENTS.md': (
@@ -378,12 +434,6 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'degradation receipts',
         'repair-safe closeout',
         'Do not perform repair',
-    ),
-    'tests/AGENTS.md': (
-        'runtime validation gate',
-        'deterministic and public-safe',
-        'no live host state',
-        'python -m pytest',
     ),
 }
 LEGACY_ARCHIVE_AGENTS_DOCS: tuple[str, ...] = (
