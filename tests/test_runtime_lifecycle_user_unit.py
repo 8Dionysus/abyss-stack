@@ -1470,6 +1470,8 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             candidate_audit_journal.chmod(0o600)
 
+            source_projection_lock.chmod(0o400)
+            runtime_lock.chmod(0o400)
             verified = subprocess.run(
                 verify_command,
                 cwd=REPO_ROOT,
@@ -1525,6 +1527,8 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 server_log.read_text(encoding="utf-8"),
                 "verified-and-locked\n",
             )
+            source_projection_lock.chmod(0o600)
+            runtime_lock.chmod(0o600)
 
             second = subprocess.run(
                 command,

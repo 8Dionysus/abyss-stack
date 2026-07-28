@@ -105,6 +105,9 @@ source-projection lock is held from before the first deployed-source read
 through the environment swap; an MCP Configs sync takes the same lock around
 its full rsync transaction, so neither publication can cross the other's
 commit boundary.
+Pre-launch verification opens both lock files read-only and takes shared locks,
+so it remains valid inside `ProtectSystem=strict`; mutation paths keep their
+exclusive read/write lock ownership.
 The same runtime provision action creates two persistent, non-truncated policy
 audit journals under `${AOA_STACK_ROOT}/Logs/mcp/audit`: `policy-read.jsonl`
 and `policy-candidate.jsonl`. The root is mode `0700` and files are mode

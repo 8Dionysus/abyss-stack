@@ -531,7 +531,10 @@ a missing, unusable, drifted, or source-mismatched runtime leaves the unit
 inactive instead of entering a restart loop.
 The final `ExecStart` acquires the shared source-projection lock followed by
 the shared runtime lock, repeats the verifier under both, and `exec`s the
-server while retaining both locks for the process lifetime. Applying MCP
+server while retaining both locks for the process lifetime. The verifier opens
+both lock files read-only, so this guard remains compatible with
+`ProtectSystem=strict`; only sync and provisioning open them for mutation.
+Applying MCP
 Configs sync and changed provisioning therefore fail closed while either plane
 runs; stop both planes explicitly before sync or reprovisioning, then start
 them only after both operations and their parity checks succeed.
