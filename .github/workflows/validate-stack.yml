@@ -19,6 +19,13 @@ jobs:
           history-ref: ${{ github.event.pull_request.base.sha || (github.ref == 'refs/heads/main' && github.event.before) || '' }}
           event-history-ref: ${{ github.event.pull_request.base.sha || (github.ref == 'refs/heads/main' && github.event.before) || '' }}
 
+      - name: Checkout canonical aoa-sdk
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: 8Dionysus/aoa-sdk
+          ref: 7fba39d38cf5902c41dfbb7ae91f405b849880b7
+          path: .deps/aoa-sdk
+
       - name: Clone abyss-machine verifier
         run: git clone --depth 1 https://github.com/8Dionysus/abyss-machine "$RUNNER_TEMP/abyss-machine-verifier"
 
@@ -35,7 +42,9 @@ jobs:
           python-version: "3.12"
 
       - name: Install test dependencies
-        run: python -m pip install -r requirements-dev.txt
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python -m pip install ./.deps/aoa-sdk
 
       - name: Install shellcheck, rsync, zsh, podman and podman-compose
         run: |
@@ -45,6 +54,7 @@ jobs:
       - name: Run release audit including routing canary contract
         env:
           ABYSS_MACHINE_REPO_ROOT: ${{ runner.temp }}/abyss-machine-verifier
+          AOA_SDK_SOURCE_ROOT: ${{ github.workspace }}/.deps/aoa-sdk
           AOA_STATS_ROOT: ${{ runner.temp }}/aoa-stats-validator
         run: python scripts/ci_gate.py --mode release
 

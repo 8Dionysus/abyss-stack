@@ -81,6 +81,10 @@ def test_workflow_routes_reusable_commands_through_ci_gate() -> None:
     assert "python scripts/ci_gate.py --mode release" in workflow
     assert "python scripts/ci_gate.py --mode shellcheck" in workflow
     assert "run: python scripts/release_check.py" not in workflow
+    assert "repository: 8Dionysus/aoa-sdk" in workflow
+    assert "ref: 7fba39d38cf5902c41dfbb7ae91f405b849880b7" in workflow
+    assert "python -m pip install ./.deps/aoa-sdk" in workflow
+    assert "AOA_SDK_SOURCE_ROOT: ${{ github.workspace }}/.deps/aoa-sdk" in workflow
     assert shellcheck_commands[0]["command"][0] == "shellcheck"
 
 
