@@ -27,9 +27,12 @@ The default command projects the complete public-safe allowlist. Use repeatable
 rsync changes without creating or modifying the target:
 
 ```bash
-scripts/aoa-sync-configs --dry-run --item mcp --item schemas --item systemd
-scripts/aoa-sync-configs --item mcp --item schemas --item systemd
+scripts/aoa-sync-configs --dry-run --item mcp --item schemas --item systemd --item scripts --item mechanics
+scripts/aoa-sync-configs --item mcp --item schemas --item systemd --item scripts --item mechanics
 ```
+
+Include `scripts` and `mechanics` with the bounded MCP lifecycle projection so
+new unit arguments and the deployed installer implementation cannot drift.
 
 Unknown items and `Secrets` are rejected. Preview requires an existing target.
 Source-control and interpreter/test cache material (`.git`, `__pycache__`,

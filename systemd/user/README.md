@@ -150,8 +150,10 @@ That runtime provision action also creates the persistent policy journals at
 `policy-candidate.jsonl` without truncating existing evidence. Both units
 require the safe `0700/0600` path shape before launch. Under
 `ProtectSystem=strict`, each process receives one exact writable journal and
-an inaccessible path for the opposite contour; startup validates the complete
-bounded hash chain before bind.
+an inaccessible path for the opposite contour; the contour-explicit unit
+verifier checks only the visible journal and rejects a policy-family mismatch,
+while provisioning and unsuffixed manual verification check both journals.
+Startup validates the complete bounded hash chain before bind.
 Provisioning installs the exact artifact-hashed lock, binds the bytes behind
 the resolved venv interpreter into the runtime-content digest, and refuses to
 replace a changed environment while either stack MCP unit is active or its

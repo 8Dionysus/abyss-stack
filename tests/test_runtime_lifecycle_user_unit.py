@@ -1195,6 +1195,8 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "load_state=loaded\n"
                 "active_state=inactive\n"
                 'fragment_path="${XDG_CONFIG_HOME}/systemd/user/${unit}"\n'
+                'contour="${unit#abyss-stack-mcp-}"\n'
+                'contour="${contour%.service}"\n'
                 "exec_path=/usr/bin/flock\n"
                 'exec_start="/usr/bin/flock --shared --no-fork '
                 "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/"
@@ -1202,7 +1204,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/"
                 ".runtime-provision.lock /usr/bin/env "
                 "${AOA_CONFIGS_ROOT}/scripts/aoa-install-systemd "
-                '--launch-verified-abyss-stack-mcp"\n'
+                '--launch-verified-abyss-stack-mcp=${contour}"\n'
                 'if [[ "${ABYSS_STACK_MCP_TEST_UNLOADED_UNIT:-}" == '
                 '"$unit" ]]; then\n'
                 "  load_state=not-found\n"
@@ -1422,6 +1424,52 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             candidate_audit_journal.unlink()
             candidate_audit_journal.touch(mode=0o600)
 
+            candidate_audit_journal.chmod(0o640)
+            full_audit_rejects_candidate_drift = subprocess.run(
+                verify_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(
+                full_audit_rejects_candidate_drift.returncode,
+                0,
+            )
+            self.assertIn(
+                "candidate audit journal must have mode 0600",
+                full_audit_rejects_candidate_drift.stderr,
+            )
+
+            read_contour_verification = subprocess.run(
+                [*verify_command[:-1], f"{verify_command[-1]}=read"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                read_contour_verification.returncode,
+                0,
+                read_contour_verification.stderr,
+            )
+            candidate_contour_verification = subprocess.run(
+                [*verify_command[:-1], f"{verify_command[-1]}=candidate"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(candidate_contour_verification.returncode, 0)
+            self.assertIn(
+                "candidate audit journal must have mode 0600",
+                candidate_contour_verification.stderr,
+            )
+            candidate_audit_journal.chmod(0o600)
+
             verified = subprocess.run(
                 verify_command,
                 cwd=REPO_ROOT,
@@ -1432,6 +1480,25 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertEqual(verified.returncode, 0, verified.stderr)
             self.assertEqual(verified.stdout, "")
+
+            env["ABYSS_STACK_MCP_POLICY_FAMILY"] = "read"
+            mismatched_launch = subprocess.run(
+                [
+                    "bash",
+                    str(INSTALL_SYSTEMD),
+                    "--launch-verified-abyss-stack-mcp=candidate",
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(mismatched_launch.returncode, 0)
+            self.assertIn(
+                "launch contour does not match the policy family",
+                mismatched_launch.stderr,
+            )
 
             launched = subprocess.run(
                 [
@@ -1445,7 +1512,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                     str(runtime_lock),
                     "/usr/bin/env",
                     str(INSTALL_SYSTEMD),
-                    "--launch-verified-abyss-stack-mcp",
+                    "--launch-verified-abyss-stack-mcp=read",
                 ],
                 cwd=REPO_ROOT,
                 env=env,
@@ -1826,6 +1893,15 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertIn(
             "verified abyss-stack MCP launch must be a standalone unit action",
             launch_result.stderr,
+        )
+
+        invalid_contour = self.run_install_systemd(
+            "--verify-abyss-stack-mcp-runtime=effect",
+        )
+        self.assertNotEqual(invalid_contour.returncode, 0)
+        self.assertIn(
+            "runtime verification contour must be all, read, or candidate",
+            invalid_contour.stderr,
         )
 
     def test_mcp_http_auth_provision_creates_a_private_secret_root(self) -> None:
@@ -2262,7 +2338,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             "Environment=ABYSS_STACK_MCP_OBSERVATION_PATH="
             "/srv/AbyssOS/abyss-stack/Logs/mcp/organ-runtime-observation.json"
         )
-        deployed_entrypoint = (
+        deployed_entrypoint_prefix = (
             "ExecStart=/usr/bin/flock --shared --no-fork "
             "/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/"
             ".source-projection.lock /usr/bin/flock --shared --no-fork "
@@ -2270,6 +2346,10 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             ".runtime-provision.lock /usr/bin/env "
             "/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd "
             "--launch-verified-abyss-stack-mcp"
+        )
+        read_deployed_entrypoint = f"{deployed_entrypoint_prefix}=read"
+        candidate_deployed_entrypoint = (
+            f"{deployed_entrypoint_prefix}=candidate"
         )
         runtime_condition = (
             "ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/"
@@ -2291,9 +2371,15 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             "ExecCondition=/usr/bin/test -x /srv/AbyssOS/abyss-stack/Services/"
             "abyss-stack-mcp/venv/bin/python"
         )
-        runtime_verifier_condition = (
+        runtime_verifier_condition_prefix = (
             "ExecCondition=/srv/AbyssOS/abyss-stack/Configs/scripts/"
             "aoa-install-systemd --verify-abyss-stack-mcp-runtime"
+        )
+        read_runtime_verifier_condition = (
+            f"{runtime_verifier_condition_prefix}=read"
+        )
+        candidate_runtime_verifier_condition = (
+            f"{runtime_verifier_condition_prefix}=candidate"
         )
         installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")
         self.assertIn("aoa_launch_verified_abyss_stack_mcp()", installer)
@@ -2361,6 +2447,14 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         )
         self.assertIn(f"InaccessiblePaths={read_audit_path}", candidate_unit)
         self.assertNotIn(f"ReadWritePaths={read_audit_path}", candidate_unit)
+        self.assertIn(read_runtime_verifier_condition, read_unit)
+        self.assertNotIn(candidate_runtime_verifier_condition, read_unit)
+        self.assertIn(candidate_runtime_verifier_condition, candidate_unit)
+        self.assertNotIn(read_runtime_verifier_condition, candidate_unit)
+        self.assertIn(read_deployed_entrypoint, read_unit)
+        self.assertNotIn(candidate_deployed_entrypoint, read_unit)
+        self.assertIn(candidate_deployed_entrypoint, candidate_unit)
+        self.assertNotIn(read_deployed_entrypoint, candidate_unit)
         for unit in (read_unit, candidate_unit):
             self.assertIn(
                 "Environment=ABYSS_STACK_MCP_REQUIRE_AUTH_MANIFEST=1",
@@ -2383,8 +2477,6 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             self.assertIn(source_lock_condition, unit)
             self.assertIn(runtime_lock_condition, unit)
             self.assertIn(runtime_exec_condition, unit)
-            self.assertIn(runtime_verifier_condition, unit)
-            self.assertIn(deployed_entrypoint, unit)
             self.assertIn("ProtectSystem=strict", unit)
             self.assertIn("ProtectHome=read-only", unit)
             self.assertIn("IPAddressDeny=any", unit)

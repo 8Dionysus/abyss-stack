@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 3653427,
+  "allowed_tracked_bytes": 26999232,
+  "approved_by": "repository-owner",
+  "base_ref": "73253f417b60f392bfed2191a78cd940e0254cd4",
+  "changed_generated_bytes": 3653427,
+  "changed_generated_files": 50,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "cb2f35cf1c2581683dba7224d7f031237bac4327bb5b0f4d20871cc561e12e05",
+  "reason": "Refresh the portable KAG family after owner-reviewed stack MCP runtime contour verification and bounded deployment route correction.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 26999232,
+  "tracked_bytes_max": 24117248
+}

@@ -150,8 +150,8 @@ entrypoints under `Configs/mcp`, while deployed decision-graph validation reads
 Preview the exact bounded projection before a lifecycle-sensitive rollout:
 
 ```bash
-scripts/aoa-sync-configs --dry-run --item mcp --item schemas --item systemd
-scripts/aoa-sync-configs --item mcp --item schemas --item systemd
+scripts/aoa-sync-configs --dry-run --item mcp --item schemas --item systemd --item scripts --item mechanics
+scripts/aoa-sync-configs --item mcp --item schemas --item systemd --item scripts --item mechanics
 scripts/aoa-install-systemd --all-user-units
 scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime
 scripts/aoa-install-systemd --provision-mcp-http-auth
@@ -520,12 +520,15 @@ MCP Configs sync holds across its full rsync transaction, so the deployed
 source and published runtime identity cannot pass each other between recheck
 and environment replacement.
 The user units point only at this environment and use `ConditionPathExists`,
-an executable `ExecCondition`, and
-`--verify-abyss-stack-mcp-runtime` as a read-only second condition. Before every
-launch it recomputes the deployed source-and-lock identity and the measured
-runtime-content digest, including resolved interpreter bytes, so a missing,
-unusable, drifted, or source-mismatched runtime leaves the unit inactive
-instead of entering a restart loop.
+an executable `ExecCondition`, and a contour-explicit
+`--verify-abyss-stack-mcp-runtime=read|candidate` as a read-only second
+condition. Each unit checks only its own audit journal because systemd
+intentionally makes the opposite contour inaccessible. The unsuffixed manual
+verification and runtime provisioning still check both journals. Before every
+launch the unit verifier recomputes the deployed source-and-lock identity and
+the measured runtime-content digest, including resolved interpreter bytes, so
+a missing, unusable, drifted, or source-mismatched runtime leaves the unit
+inactive instead of entering a restart loop.
 The final `ExecStart` acquires the shared source-projection lock followed by
 the shared runtime lock, repeats the verifier under both, and `exec`s the
 server while retaining both locks for the process lifetime. Applying MCP
