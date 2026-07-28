@@ -1331,6 +1331,8 @@ def test_observation_store_redacts_secret_material_from_forbidden_keys(
         "nested-value",
         "double-key",
         "path",
+        "relative-path",
+        "encoded-relative-path",
         "encoded-path",
         "path-token",
         "namespaced-query-key",
@@ -1455,6 +1457,14 @@ def test_observation_store_rejects_credentials_inside_references(
     elif reference_surface == "path":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"https://acceptance.invalid/report/api_key/{secret_value}"
+        )
+    elif reference_surface == "relative-path":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"Logs/receipts/password/{secret_value}"
+        )
+    elif reference_surface == "encoded-relative-path":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"Logs%2Freceipts%2Fpassword%2F{secret_value}"
         )
     elif reference_surface == "encoded-path":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
@@ -1581,6 +1591,22 @@ def test_observation_store_allows_noncredential_substrings_in_reference_keys(
     assert loaded.subjects[0].acceptance.acceptance_ref.endswith(
         "tokenizer=model&passwordless=true&authorizationPolicy=local"
     )
+
+
+def test_observation_store_allows_noncredential_relative_reference_paths(
+    tmp_path: Path,
+) -> None:
+    payload = observation(subject())
+    safe_reference = "Logs/receipts/passwordless/result.json"
+    payload["subjects"][0]["acceptance"]["acceptance_ref"] = safe_reference
+    payload["subjects"][0]["acceptance"]["evidence"]["evidence_refs"][0][
+        "evidence_ref"
+    ] = safe_reference
+    path = write_observation(tmp_path / "safe-relative-path.json", payload)
+
+    loaded, _ = ObservationStore(path).load()
+
+    assert loaded.subjects[0].acceptance.acceptance_ref == safe_reference
 
 
 @pytest.mark.parametrize(

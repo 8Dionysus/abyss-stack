@@ -9,6 +9,7 @@ import json
 import os
 import re
 import stat
+import subprocess
 import sys
 import tempfile
 import tomllib
@@ -350,6 +351,45 @@ def build_manifest(
     }
 
 
+def verify_git_source_snapshot(
+    source_root: Path,
+    source_revision: str,
+) -> None:
+    source_root = _require_directory(source_root, "source root")
+    if SOURCE_REVISION_PATTERN.fullmatch(source_revision) is None:
+        raise ManifestError("source revision must be one exact lowercase Git SHA")
+
+    def git_output(*arguments: str) -> str:
+        try:
+            completed = subprocess.run(
+                ("git", "-C", str(source_root), *arguments),
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except OSError as exc:
+            raise ManifestError("git is required for source verification") from exc
+        if completed.returncode != 0:
+            raise ManifestError(
+                "unable to verify the Git source snapshot"
+            )
+        return completed.stdout.strip()
+
+    observed_revision = git_output("rev-parse", "--verify", "HEAD")
+    if observed_revision != source_revision:
+        raise ManifestError(
+            "Git source revision changed during deployment manifest creation"
+        )
+    if git_output(
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+    ):
+        raise ManifestError(
+            "Git source worktree changed during deployment manifest creation"
+        )
+
+
 def verify_manifest_id(payload: dict[str, Any]) -> None:
     unsigned = {
         key: value
@@ -466,12 +506,20 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_parser().parse_args()
     try:
+        verify_git_source_snapshot(
+            args.source_root,
+            args.source_revision,
+        )
         payload = build_manifest(
             source_root=args.source_root,
             deployed_root=args.deployed_root,
             source_revision=args.source_revision,
             deployed_at=_parse_deployed_at(args.deployed_at),
             delete_mode=args.delete_mode,
+        )
+        verify_git_source_snapshot(
+            args.source_root,
+            args.source_revision,
         )
         verify_manifest_id(payload)
         if args.check_only:

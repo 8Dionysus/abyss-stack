@@ -3,10 +3,12 @@ from __future__ import annotations
 import importlib.util
 import json
 import shutil
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import pytest
 from jsonschema import Draft202012Validator, FormatChecker
@@ -77,6 +79,42 @@ def copy_projection(source_root: Path, deployed_root: Path) -> None:
     deployed_services = deployed_root / "mcp" / "services"
     deployed_services.parent.mkdir(parents=True)
     shutil.copytree(source_services, deployed_services)
+
+
+def initialize_git_source(source_root: Path) -> str:
+    subprocess.run(
+        ("git", "init", "--quiet", str(source_root)),
+        check=True,
+    )
+    subprocess.run(
+        ("git", "-C", str(source_root), "config", "user.name", "Test Operator"),
+        check=True,
+    )
+    subprocess.run(
+        (
+            "git",
+            "-C",
+            str(source_root),
+            "config",
+            "user.email",
+            "operator@example.invalid",
+        ),
+        check=True,
+    )
+    subprocess.run(
+        ("git", "-C", str(source_root), "add", "."),
+        check=True,
+    )
+    subprocess.run(
+        ("git", "-C", str(source_root), "commit", "--quiet", "-m", "fixture"),
+        check=True,
+    )
+    return subprocess.run(
+        ("git", "-C", str(source_root), "rev-parse", "--verify", "HEAD"),
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
 
 
 def build_exact(tmp_path: Path) -> tuple[dict, Path]:
@@ -169,6 +207,62 @@ def test_projection_drift_fails_without_publishing_receipt(
         )
 
     assert not (tmp_path / "runtime" / "Logs").exists()
+
+
+def test_git_source_verification_rejects_dirty_worktree(tmp_path: Path) -> None:
+    source_root = tmp_path / "source"
+    service = write_service(source_root)
+    source_revision = initialize_git_source(source_root)
+    manifest.verify_git_source_snapshot(source_root, source_revision)
+
+    (service / "pyproject.toml").write_text(
+        "[project]\nname = \"mutated\"\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(manifest.ManifestError, match="worktree changed"):
+        manifest.verify_git_source_snapshot(source_root, source_revision)
+
+
+def test_main_revalidates_source_after_manifest_hashing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_root = tmp_path / "source"
+    deployed_root = tmp_path / "runtime" / "Configs"
+    service = write_service(source_root)
+    copy_projection(source_root, deployed_root)
+    source_revision = initialize_git_source(source_root)
+    output_root = tmp_path / "runtime" / "Logs" / "mcp" / "deployments"
+    original_build_manifest = manifest.build_manifest
+
+    def build_then_mutate(**kwargs: Any) -> dict[str, Any]:
+        payload = original_build_manifest(**kwargs)
+        (service / "pyproject.toml").write_text(
+            "[project]\nname = \"mutated\"\n",
+            encoding="utf-8",
+        )
+        return payload
+
+    monkeypatch.setattr(manifest, "build_manifest", build_then_mutate)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(SCRIPT_PATH),
+            "--source-root",
+            str(source_root),
+            "--deployed-root",
+            str(deployed_root),
+            "--output-root",
+            str(output_root),
+            "--source-revision",
+            source_revision,
+        ],
+    )
+
+    assert manifest.main() == 1
+    assert not output_root.exists()
 
 
 def test_projection_rejects_symlinked_source_content(tmp_path: Path) -> None:

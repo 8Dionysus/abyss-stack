@@ -38,6 +38,16 @@ syncs_abyss_stack_mcp=0
 abyss_stack_mcp_projection_lock_fd=""
 source_revision=""
 
+aoa_verify_mcp_source_snapshot() {
+  local observed_revision
+  observed_revision="$(git -C "$SOURCE_ROOT" rev-parse --verify HEAD)"
+  [[ "$observed_revision" == "$source_revision" ]] || \
+    aoa_die "MCP deployment source revision changed during synchronization"
+  if [[ -n "$(git -C "$SOURCE_ROOT" status --porcelain=v1 --untracked-files=all)" ]]; then
+    aoa_die "MCP deployment source worktree changed during synchronization"
+  fi
+}
+
 aoa_select_sync_item() {
   local requested="$1"
   local candidate
@@ -134,9 +144,7 @@ if ((!dry_run && syncs_abyss_stack_mcp)); then
   source_revision="$(git -C "$SOURCE_ROOT" rev-parse --verify HEAD)"
   [[ "$source_revision" =~ ^[0-9a-f]{40}$ ]] || \
     aoa_die "MCP deployment requires one exact source commit"
-  if [[ -n "$(git -C "$SOURCE_ROOT" status --porcelain=v1 --untracked-files=all)" ]]; then
-    aoa_die "MCP deployment provenance requires a clean source worktree"
-  fi
+  aoa_verify_mcp_source_snapshot
 fi
 
 rsync_flags=(
@@ -174,6 +182,7 @@ if ((dry_run)); then
   aoa_note "config sync preview complete; no files changed"
 else
   if ((syncs_abyss_stack_mcp)); then
+    aoa_verify_mcp_source_snapshot
     deployment_manifest_command=(
       python3
       "${MECHANIC_SCRIPT_DIR}/scripts/mcp_deployment_manifest.py"

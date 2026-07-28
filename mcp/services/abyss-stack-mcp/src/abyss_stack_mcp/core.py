@@ -305,6 +305,39 @@ def _reject_credential_assignments(value: str, path: str) -> None:
             )
 
 
+def _reject_reference_path_segments(
+    value: str,
+    path: str,
+    *,
+    reference_depth: int,
+) -> None:
+    if reference_depth >= MAX_REFERENCE_DECODE_DEPTH:
+        raise StackMCPError(f"nested reference depth is forbidden at {path}")
+    for index, segment in enumerate(value.split("/")):
+        if not segment:
+            continue
+        segment_path = f"{path}.path[{index}]"
+        for decoded_segment in _decoded_reference_variants(
+            segment,
+            segment_path,
+        ):
+            key_candidate = re.split(
+                r"[=:;,]",
+                decoded_segment,
+                maxsplit=1,
+            )[0]
+            if _is_forbidden_credential_key(key_candidate):
+                raise StackMCPError(
+                    "secret-bearing reference path is forbidden at "
+                    f"{segment_path}"
+                )
+            _reject_secret_material(
+                decoded_segment,
+                segment_path,
+                reference_depth=reference_depth + 1,
+            )
+
+
 def _reject_secret_material(
     value: Any,
     path: str = "$",
@@ -342,7 +375,7 @@ def _reject_secret_material(
                 _looks_like_secret_value(decoded_variant)
                 or any(
                     marker in decoded_variant
-                    for marker in ("://", "//", "?", "#")
+                    for marker in ("://", "//", "/", "?", "#")
                 )
             ):
                 if reference_depth >= MAX_REFERENCE_DECODE_DEPTH:
@@ -354,6 +387,14 @@ def _reject_secret_material(
                     path,
                     reference_depth=reference_depth + 1,
                 )
+        if "/" in value and not any(
+            marker in value for marker in ("://", "//", "?", "#")
+        ):
+            _reject_reference_path_segments(
+                value,
+                path,
+                reference_depth=reference_depth,
+            )
         if any(marker in value for marker in ("://", "//", "?", "#")):
             if reference_depth >= MAX_REFERENCE_DECODE_DEPTH:
                 raise StackMCPError(
@@ -369,29 +410,11 @@ def _reject_secret_material(
                 raise StackMCPError(
                     f"credential-bearing reference is forbidden at {path}"
                 )
-            for index, segment in enumerate(parsed.path.split("/")):
-                if not segment:
-                    continue
-                segment_path = f"{path}.path[{index}]"
-                for decoded_segment in _decoded_reference_variants(
-                    segment,
-                    segment_path,
-                ):
-                    key_candidate = re.split(
-                        r"[=:;,]",
-                        decoded_segment,
-                        maxsplit=1,
-                    )[0]
-                    if _is_forbidden_credential_key(key_candidate):
-                        raise StackMCPError(
-                            "secret-bearing reference path is forbidden at "
-                            f"{segment_path}"
-                        )
-                    _reject_secret_material(
-                        decoded_segment,
-                        segment_path,
-                        reference_depth=reference_depth + 1,
-                    )
+            _reject_reference_path_segments(
+                parsed.path,
+                path,
+                reference_depth=reference_depth,
+            )
             for component_name, component in (
                 ("query", parsed.query),
                 ("fragment", parsed.fragment),
