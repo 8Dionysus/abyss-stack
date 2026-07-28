@@ -1105,11 +1105,11 @@ aoa_verify_abyss_stack_mcp_runtime() {
   [[ -f "$abyss_stack_mcp_runtime_lock" && \
      ! -L "$abyss_stack_mcp_runtime_lock" ]] || \
     aoa_die "abyss-stack MCP runtime lock is unavailable"
-  exec {source_lock_fd}<> "$abyss_stack_mcp_source_lock"
+  exec {source_lock_fd}< "$abyss_stack_mcp_source_lock"
   if ! /usr/bin/flock --shared --nonblock "$source_lock_fd"; then
     aoa_die "Configs sync or runtime provisioning holds the abyss-stack MCP source projection lock"
   fi
-  exec {runtime_lock_fd}<> "$abyss_stack_mcp_runtime_lock"
+  exec {runtime_lock_fd}< "$abyss_stack_mcp_runtime_lock"
   if ! /usr/bin/flock --shared --nonblock "$runtime_lock_fd"; then
     aoa_die "runtime provisioning holds the abyss-stack MCP runtime lock"
   fi

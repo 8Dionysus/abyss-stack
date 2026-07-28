@@ -142,7 +142,9 @@ deployed source and hash lock. The verifier recomputes the measured runtime,
 including resolved interpreter bytes, before every launch. The final
 `ExecStart` then holds the shared source-projection and runtime locks, repeats
 the verification under both, and executes the installed server without a
-verify-to-launch gap. Runtime provisioning, applying MCP Configs sync,
+verify-to-launch gap. The verifier opens both lock files read-only so
+`ProtectSystem=strict` does not turn the safety check into a write request.
+Runtime provisioning, applying MCP Configs sync,
 credential provisioning, unit linking, start, and client registration remain
 separate actions.
 That runtime provision action also creates the persistent policy journals at
