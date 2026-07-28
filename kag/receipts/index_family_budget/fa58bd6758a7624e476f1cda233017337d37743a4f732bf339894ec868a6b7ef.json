@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 22296240,
+  "allowed_tracked_bytes": 27375597,
+  "approved_by": "repository-owner",
+  "base_ref": "8bcfe0edf7ad499d666207ca2087d8db9df4d7a9",
+  "changed_generated_bytes": 22296240,
+  "changed_generated_files": 329,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "fa58bd6758a7624e476f1cda233017337d37743a4f732bf339894ec868a6b7ef",
+  "reason": "Bind the reviewed Agent OS runtime adapter, stale-state guards, exact landed SDK revision, current stats owner contract, and plan-contour identities to one content-addressed abyss-stack family delta without raising standing budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 27375597,
+  "tracked_bytes_max": 24117248
+}
