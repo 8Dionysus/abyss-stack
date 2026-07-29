@@ -1104,10 +1104,16 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             source_file.write_text("VALUE = 1\n", encoding="utf-8")
             pip_log = root / "pip.log"
             server_log = root / "server.log"
+            entrypoint_log = root / "entrypoint.log"
             bootstrap = root / "fake-python"
             bootstrap.write_text(
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
+                'if [[ "${1:-}" == "-B" && -f "${2:-}" ]]; then\n'
+                "  printf 'bytecode-disabled\\n' > "
+                '"$ABYSS_STACK_MCP_TEST_ENTRYPOINT_LOG"\n'
+                "  exit 0\n"
+                "fi\n"
                 'if [[ -n "${PYTHONHOME+x}" || '
                 '-n "${PYTHONPATH+x}" ]]; then\n'
                 "  exit 65\n"
@@ -1256,6 +1262,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                     "ABYSS_STACK_MCP_BOOTSTRAP_PYTHON": str(bootstrap_link),
                     "ABYSS_STACK_MCP_TEST_PIP_LOG": str(pip_log),
                     "ABYSS_STACK_MCP_TEST_SERVER_LOG": str(server_log),
+                    "ABYSS_STACK_MCP_TEST_ENTRYPOINT_LOG": str(entrypoint_log),
                     "HOME": str(root / "home"),
                     "XDG_CONFIG_HOME": str(root / "xdg-config"),
                     "PATH": f"{fake_bin}:{env['PATH']}",
@@ -1369,11 +1376,31 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             entrypoint = venv / "bin" / "abyss-stack-mcp"
             self.assertEqual(
                 entrypoint.read_text(encoding="utf-8").splitlines()[0],
-                f"#!{venv}/bin/python",
+                f"#!{venv}/bin/python -B",
             )
             self.assertNotIn(
                 "/.venv.",
                 entrypoint.read_text(encoding="utf-8").splitlines()[0],
+            )
+            direct_entrypoint_env = dict(env)
+            direct_entrypoint_env.pop("PYTHONHOME")
+            direct_entrypoint_env.pop("PYTHONPATH")
+            direct_entrypoint = subprocess.run(
+                [str(entrypoint)],
+                cwd=REPO_ROOT,
+                env=direct_entrypoint_env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                direct_entrypoint.returncode,
+                0,
+                direct_entrypoint.stderr,
+            )
+            self.assertEqual(
+                entrypoint_log.read_text(encoding="utf-8"),
+                "bytecode-disabled\n",
             )
             self.assertTrue(runtime_lock.is_file())
             self.assertEqual(runtime_lock.stat().st_mode & 0o777, 0o600)
