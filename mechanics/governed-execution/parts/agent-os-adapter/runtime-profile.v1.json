@@ -71,6 +71,13 @@
           "closeout"
         ]
       },
+      "step_effect_map": {
+        "orient": "read_only",
+        "preview": "read_only",
+        "mutate": "repo_mutation",
+        "verify": "read_only",
+        "closeout": "read_only"
+      },
       "approval_operations": {
         "plan_freeze": "abyss-stack:governed-execution:plan-freeze",
         "landing": "abyss-stack:governed-execution:landing"
@@ -190,6 +197,14 @@
           "closeout-dry-run"
         ]
       },
+      "step_effect_map": {
+        "inspect-parent-anchor": "read_only",
+        "inspect-child-target": "read_only",
+        "review-return": "read_only",
+        "checkpoint-return": "read_only",
+        "evaluate-return": "read_only",
+        "closeout-dry-run": "read_only"
+      },
       "approval_operations": {},
       "runtime_approval_requirements": [],
       "admitted_input_evidence_requirements": [
@@ -297,6 +312,12 @@
         "runtime_recovery_closeout": [
           "closeout-recovery"
         ]
+      },
+      "step_effect_map": {
+        "inspect-runtime-receipt": "read_only",
+        "validate-degraded-lane": "read_only",
+        "evaluate-reentry": "read_only",
+        "closeout-recovery": "read_only"
       },
       "approval_operations": {},
       "runtime_approval_requirements": [],

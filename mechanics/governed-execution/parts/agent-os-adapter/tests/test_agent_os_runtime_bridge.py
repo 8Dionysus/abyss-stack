@@ -2954,6 +2954,64 @@ def test_runtime_rejects_caller_added_stack_evidence_claim(
     assert harness.backend.resume_calls == 0
 
 
+def test_runtime_rejects_mutating_step_labeled_read_only(
+    harness: Harness,
+) -> None:
+    steps = list(harness.plan.steps)
+    mutate_index = next(
+        index for index, step in enumerate(steps) if step.step_id == "mutate"
+    )
+    steps[mutate_index] = steps[mutate_index].model_copy(
+        update={"effect_class": "read_only"}
+    )
+    spoofed_plan = harness.plan.model_copy(
+        update={
+            "steps": tuple(steps),
+            "plan_digest": ZERO_DIGEST,
+        }
+    )
+    spoofed_plan = spoofed_plan.model_copy(
+        update={
+            "plan_digest": canonical_digest(
+                spoofed_plan,
+                exclude={"plan_digest"},
+            )
+        }
+    )
+    binding = harness.binding.model_copy(
+        update={"plan_digest": spoofed_plan.plan_digest}
+    )
+    bridge = BRIDGE.AgentOSRuntimeBridge(
+        harness.state_root,
+        backend=harness.backend,
+        clock=lambda: NOW,
+    )
+    runner = AoARunner(
+        clock=lambda: NOW,
+        id_factory=lambda: "spoofed-step-effect",
+    )
+    session = runner.prepare(spoofed_plan)
+
+    with pytest.raises(
+        BRIDGE.AgentOSBridgeError,
+        match="step effects differ",
+    ) as caught:
+        bridge.invoke(
+            "observe_snapshot",
+            {
+                "operation": "observe_snapshot",
+                "profile": spoofed_plan.runtime_profile.model_dump(mode="json"),
+                "binding": binding.model_dump(mode="json"),
+                "plan": spoofed_plan.model_dump(mode="json"),
+                "session": session.model_dump(mode="json"),
+            },
+        )
+
+    assert caught.value.code == "unsupported_plan_effect"
+    assert harness.backend.prepare_calls == 0
+    assert harness.backend.resume_calls == 0
+
+
 def test_runtime_rejects_caller_added_external_step_output_claim(
     harness: Harness,
 ) -> None:

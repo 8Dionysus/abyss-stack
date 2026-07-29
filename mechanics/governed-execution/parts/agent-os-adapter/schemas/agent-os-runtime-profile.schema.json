@@ -200,6 +200,7 @@
         "owner_contour",
         "accepted_step_sets",
         "phase_step_map",
+        "step_effect_map",
         "approval_operations",
         "runtime_approval_requirements",
         "admitted_input_evidence_requirements",
@@ -259,6 +260,16 @@
               "type": "string",
               "minLength": 1
             }
+          }
+        },
+        "step_effect_map": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "enum": [
+              "read_only",
+              "repo_mutation"
+            ]
           }
         },
         "approval_operations": {

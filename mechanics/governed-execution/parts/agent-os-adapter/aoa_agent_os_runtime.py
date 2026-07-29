@@ -592,15 +592,33 @@ class AgentOSRuntimeBridge:
                 "unsupported_plan_effect",
                 "plan contains an effect outside the runtime profile",
             )
+        admitted_steps = {
+            step_id
+            for step_ids in compatibility["accepted_step_sets"]
+            for step_id in step_ids
+        }
         mapped_steps = {
             step_id
             for step_ids in compatibility["phase_step_map"].values()
             for step_id in step_ids
         }
-        if not set(active_steps).issubset(mapped_steps):
+        expected_effects = compatibility["step_effect_map"]
+        if (
+            mapped_steps != admitted_steps
+            or set(expected_effects) != admitted_steps
+        ):
             raise AgentOSBridgeError(
-                "incomplete_phase_mapping",
-                "runtime phase map does not cover every active plan step",
+                "runtime_profile_invalid",
+                "runtime phase and effect maps must cover the exact admitted steps",
+            )
+        if {
+            step.step_id: step.effect_class for step in plan.steps
+        } != {
+            step_id: expected_effects[step_id] for step_id in active_steps
+        }:
+            raise AgentOSBridgeError(
+                "unsupported_plan_effect",
+                "plan step effects differ from the admitted runtime contour",
             )
         contour = compatibility["owner_contour"]
         abi_matches = [
