@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 10325491,
+  "allowed_tracked_bytes": 28260696,
+  "approved_by": "repository-owner",
+  "base_ref": "bf33676b80c992bb3f9a1cd6c3479a2799008a5d",
+  "changed_generated_bytes": 10325491,
+  "changed_generated_files": 128,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "20a59b9ff8750f023facde857aa1c669d440f8e664ac47f42e04275ffd3ad4bb",
+  "reason": "Refresh the repository-local portable KAG family for the reviewed session-memory HTTP validator fix and accepted long-lived GET review correction; the receipt binds the exact regenerated family to the PR base.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 28260696,
+  "tracked_bytes_max": 24117248
+}

@@ -4116,6 +4116,48 @@ def test_validator_configured_transport_accepts_loopback_http(
     }
 
 
+def test_validator_configured_transport_http_client_bounds_ordinary_reads_only() -> None:
+    import httpx
+
+    validator = load_validator_module()
+    handshake_read_timeouts: dict[str, float | None] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        handshake_read_timeouts[request.method] = request.extensions["timeout"]["read"]
+        headers = {"Content-Type": "text/event-stream"} if request.method == "GET" else {}
+        return httpx.Response(200, headers=headers, json={})
+
+    client = validator._configured_transport_http_client(
+        MCP_HTTP_TEST_TOKEN,
+        transport=httpx.MockTransport(handler),
+    )
+
+    try:
+        assert client.follow_redirects is True
+        assert client.timeout.connect == validator.CONFIGURED_HTTP_TIMEOUT_SECONDS
+        assert client.timeout.write == validator.CONFIGURED_HTTP_TIMEOUT_SECONDS
+        assert client.timeout.pool == validator.CONFIGURED_HTTP_TIMEOUT_SECONDS
+        assert client.timeout.read == validator.CONFIGURED_HTTP_RESPONSE_TIMEOUT_SECONDS
+
+        async def probe_timeout_policy() -> tuple[httpx.Response, httpx.Response]:
+            get_response = await client.get(
+                "http://127.0.0.1:5422/mcp",
+                headers={"Accept": "application/json, text/event-stream"},
+            )
+            post_response = await client.post("http://127.0.0.1:5422/mcp", json={})
+            return get_response, post_response
+
+        get_response, post_response = asyncio.run(probe_timeout_policy())
+        assert handshake_read_timeouts == {
+            "GET": validator.CONFIGURED_HTTP_RESPONSE_TIMEOUT_SECONDS,
+            "POST": validator.CONFIGURED_HTTP_RESPONSE_TIMEOUT_SECONDS,
+        }
+        assert get_response.request.extensions["timeout"]["read"] is None
+        assert post_response.request.extensions["timeout"]["read"] == validator.CONFIGURED_HTTP_RESPONSE_TIMEOUT_SECONDS
+    finally:
+        asyncio.run(client.aclose())
+
+
 def test_transport_preflight_accepts_manual_http_owner_environment_credential(
     tmp_path: Path,
     monkeypatch: Any,

@@ -70,6 +70,9 @@ ACCEPTABLE_FRESHNESS_SMOKE_STATUSES = {
     "current_with_global_stale",
 }
 
+CONFIGURED_HTTP_TIMEOUT_SECONDS = 30.0
+CONFIGURED_HTTP_RESPONSE_TIMEOUT_SECONDS = 120.0
+
 
 def _search_alias_smoke_arguments(limit: int = 3) -> dict:
     return {
@@ -1214,6 +1217,40 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
     return summary
 
 
+async def _configured_transport_response_timeout_policy(response) -> None:
+    request = response.request
+    content_type = response.headers.get("content-type", "").lower()
+    if request.method == "GET" and response.status_code == 200 and content_type.startswith("text/event-stream"):
+        timeout = request.extensions.get("timeout")
+        if isinstance(timeout, dict):
+            timeout["read"] = None
+
+
+def _configured_transport_http_client(bearer_token: str, *, transport=None):
+    import httpx
+
+    # The configured smoke keeps one GET stream open while tool calls have
+    # explicit 20-90 second ClientSession budgets. Keep ordinary HTTP response
+    # reads and the SSE handshake bounded beyond the largest call budget, then
+    # remove the read deadline only after a successful SSE GET response.
+    kwargs = {
+        "headers": {"Authorization": f"Bearer {bearer_token}"},
+        "follow_redirects": True,
+        "timeout": httpx.Timeout(
+            CONFIGURED_HTTP_RESPONSE_TIMEOUT_SECONDS,
+            connect=CONFIGURED_HTTP_TIMEOUT_SECONDS,
+            write=CONFIGURED_HTTP_TIMEOUT_SECONDS,
+            pool=CONFIGURED_HTTP_TIMEOUT_SECONDS,
+        ),
+        "event_hooks": {"response": [_configured_transport_response_timeout_policy]},
+    }
+    if transport is not None:
+        kwargs["transport"] = transport
+    return httpx.AsyncClient(
+        **kwargs,
+    )
+
+
 async def _configured_transport_smoke(state: AoASessionMemoryMCPState) -> dict:
     transport_spec, meta = _configured_transport_spec(state)
     if transport_spec is None:
@@ -1221,14 +1258,12 @@ async def _configured_transport_smoke(state: AoASessionMemoryMCPState) -> dict:
 
     async with AsyncExitStack() as stack:
         if transport_spec["transport"] == "streamable-http":
-            import httpx
-
             bearer_token_env_var = str(transport_spec["bearer_token_env_var"])
             bearer_token = os.environ.get(bearer_token_env_var)
             if not bearer_token:
                 raise SystemExit("configured Codex MCP bearer credential became unavailable during smoke")
             http_client = await stack.enter_async_context(
-                httpx.AsyncClient(headers={"Authorization": f"Bearer {bearer_token}"})
+                _configured_transport_http_client(bearer_token)
             )
             read_stream, write_stream, _ = await stack.enter_async_context(
                 streamable_http_client(
