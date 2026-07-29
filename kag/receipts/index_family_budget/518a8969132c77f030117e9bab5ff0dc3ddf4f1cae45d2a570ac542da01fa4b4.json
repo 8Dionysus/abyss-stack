@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 20005418,
+  "allowed_tracked_bytes": 28144216,
+  "approved_by": "repository-owner",
+  "base_ref": "dae05c69992e9dbca0ed1eab97bf16745fe6f3af",
+  "changed_generated_bytes": 20005418,
+  "changed_generated_files": 259,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "518a8969132c77f030117e9bab5ff0dc3ddf4f1cae45d2a570ac542da01fa4b4",
+  "reason": "Refresh the portable family after binding every MCP server identity to its application package and preserving compact session-memory evidence refs.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 28144216,
+  "tracked_bytes_max": 24117248
+}
