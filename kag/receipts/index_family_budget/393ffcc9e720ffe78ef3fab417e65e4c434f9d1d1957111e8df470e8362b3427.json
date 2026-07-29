@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 10472267,
+  "allowed_tracked_bytes": 28264503,
+  "approved_by": "repository-owner",
+  "base_ref": "bf33676b80c992bb3f9a1cd6c3479a2799008a5d",
+  "changed_generated_bytes": 10472267,
+  "changed_generated_files": 130,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "393ffcc9e720ffe78ef3fab417e65e4c434f9d1d1957111e8df470e8362b3427",
+  "reason": "Refresh the repository-local portable KAG family after bounding ordinary configured session-memory HTTP responses while leaving only the authenticated long-lived SSE GET unbounded; the receipt binds the final reviewed source history to the PR base.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 28264503,
+  "tracked_bytes_max": 24117248
+}
