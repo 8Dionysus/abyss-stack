@@ -33,7 +33,7 @@ jobs:
         run: |
           git init "$RUNNER_TEMP/aoa-stats-validator"
           git -C "$RUNNER_TEMP/aoa-stats-validator" remote add origin https://github.com/8Dionysus/aoa-stats
-          git -C "$RUNNER_TEMP/aoa-stats-validator" fetch --depth 1 origin 6951a1db4056cfc26d2f0e8de7356461aa96f5fa
+          git -C "$RUNNER_TEMP/aoa-stats-validator" fetch --depth 1 origin 740c57d6ab2fe78d6a8440c19c2637431e039c6b
           git -C "$RUNNER_TEMP/aoa-stats-validator" checkout --detach FETCH_HEAD
 
       - name: Set up Python
