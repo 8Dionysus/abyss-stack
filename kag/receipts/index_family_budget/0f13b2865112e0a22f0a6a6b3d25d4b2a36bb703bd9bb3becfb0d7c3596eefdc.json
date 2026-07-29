@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 22474047,
+  "allowed_tracked_bytes": 27442033,
+  "approved_by": "repository-owner",
+  "base_ref": "8bcfe0edf7ad499d666207ca2087d8db9df4d7a9",
+  "changed_generated_bytes": 22474047,
+  "changed_generated_files": 336,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "0f13b2865112e0a22f0a6a6b3d25d4b2a36bb703bd9bb3becfb0d7c3596eefdc",
+  "reason": "Refresh the portable family after making governed preparation failures event-derived terminal outcomes.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 27442033,
+  "tracked_bytes_max": 24117248
+}
