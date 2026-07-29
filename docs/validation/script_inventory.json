@@ -202,6 +202,7 @@
         "scripts/validators/inference_pilot_compatibility.py",
         "scripts/validators/machine_fit.py",
         "scripts/validators/mechanics_topology.py",
+        "scripts/validators/mcp_application_identity.py",
         "scripts/validators/profile_topology.py",
         "scripts/validators/questbook_surface.py",
         "scripts/validators/return_policy.py",
