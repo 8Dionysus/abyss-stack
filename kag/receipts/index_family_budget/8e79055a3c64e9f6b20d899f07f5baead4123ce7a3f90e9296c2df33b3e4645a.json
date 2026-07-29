@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 10494757,
+  "allowed_tracked_bytes": 28264735,
+  "approved_by": "repository-owner",
+  "base_ref": "bf33676b80c992bb3f9a1cd6c3479a2799008a5d",
+  "changed_generated_bytes": 10494757,
+  "changed_generated_files": 130,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "8e79055a3c64e9f6b20d899f07f5baead4123ce7a3f90e9296c2df33b3e4645a",
+  "reason": "Refresh the repository-local portable KAG family after keeping the configured session-memory SSE handshake bounded and removing the read deadline only after a successful authenticated text/event-stream response; the receipt binds the final reviewed source history to the PR base.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 28264735,
+  "tracked_bytes_max": 24117248
+}
