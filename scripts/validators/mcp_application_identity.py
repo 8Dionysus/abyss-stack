@@ -44,6 +44,52 @@ def _returns_embedded_version(tree: ast.Module) -> bool:
     return False
 
 
+def _binds_embedded_version(tree: ast.Module) -> bool:
+    for node in tree.body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if node.name != "_bind_server_info_version":
+            continue
+        for descendant in ast.walk(node):
+            if not isinstance(descendant, ast.Assign):
+                continue
+            if not any(
+                isinstance(target, ast.Attribute) and target.attr == "version"
+                for target in descendant.targets
+            ):
+                continue
+            value = descendant.value
+            if (
+                isinstance(value, ast.Call)
+                and isinstance(value.func, ast.Name)
+                and value.func.id == "_application_version"
+            ):
+                return True
+    return False
+
+
+def _build_calls_version_binding(tree: ast.Module) -> bool:
+    for node in tree.body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if node.name != "build_server":
+            continue
+        for descendant in ast.walk(node):
+            if not isinstance(descendant, ast.Call):
+                continue
+            if not (
+                isinstance(descendant.func, ast.Name)
+                and descendant.func.id == "_bind_server_info_version"
+            ):
+                continue
+            if any(
+                isinstance(argument, ast.Name) and argument.id == "mcp"
+                for argument in descendant.args
+            ):
+                return True
+    return False
+
+
 def validate(errors: list[str], *, root: Path) -> None:
     services_root = root / "mcp" / "services"
     for pyproject_path in sorted(services_root.glob("*/pyproject.toml")):
@@ -91,4 +137,14 @@ def validate(errors: list[str], *, root: Path) -> None:
             errors.append(
                 f"{relative_server} _application_version must return "
                 "APPLICATION_VERSION directly"
+            )
+        if not _binds_embedded_version(tree):
+            errors.append(
+                f"{relative_server} _bind_server_info_version must assign "
+                "server version from _application_version()"
+            )
+        if not _build_calls_version_binding(tree):
+            errors.append(
+                f"{relative_server} build_server must call "
+                "_bind_server_info_version(mcp)"
             )

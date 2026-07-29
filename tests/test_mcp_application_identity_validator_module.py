@@ -26,7 +26,13 @@ def _write_service(
         f"{import_line}"
         f'APPLICATION_VERSION = "{server_version}"\n\n'
         "def _application_version() -> str:\n"
-        f"    {application_body}\n",
+        f"    {application_body}\n\n"
+        "def _bind_server_info_version(mcp) -> None:\n"
+        "    mcp._mcp_server.version = _application_version()\n\n"
+        "def build_server():\n"
+        "    mcp = object()\n"
+        "    _bind_server_info_version(mcp)\n"
+        "    return mcp\n",
         encoding="utf-8",
     )
 
@@ -61,3 +67,31 @@ def test_rejects_ambient_distribution_metadata(tmp_path: Path) -> None:
 
     assert any("ambient importlib.metadata" in error for error in errors)
     assert any("must return APPLICATION_VERSION directly" in error for error in errors)
+
+
+def test_rejects_server_builder_without_version_binding(tmp_path: Path) -> None:
+    _write_service(tmp_path)
+    server_path = (
+        tmp_path
+        / "mcp"
+        / "services"
+        / "example-mcp"
+        / "src"
+        / "example_mcp"
+        / "server.py"
+    )
+    server_path.write_text(
+        server_path.read_text(encoding="utf-8").replace(
+            "    _bind_server_info_version(mcp)\n",
+            "",
+        ),
+        encoding="utf-8",
+    )
+
+    errors: list[str] = []
+    mcp_application_identity.validate(errors, root=tmp_path)
+
+    assert any(
+        "build_server must call _bind_server_info_version(mcp)" in error
+        for error in errors
+    )
