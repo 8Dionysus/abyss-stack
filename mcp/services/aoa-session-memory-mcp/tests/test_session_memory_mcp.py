@@ -4116,6 +4116,21 @@ def test_validator_configured_transport_accepts_loopback_http(
     }
 
 
+def test_validator_configured_transport_http_client_outlives_tool_budgets() -> None:
+    validator = load_validator_module()
+    client = validator._configured_transport_http_client(MCP_HTTP_TEST_TOKEN)
+
+    try:
+        assert client.follow_redirects is True
+        assert client.timeout.connect == validator.CONFIGURED_HTTP_TIMEOUT_SECONDS
+        assert client.timeout.write == validator.CONFIGURED_HTTP_TIMEOUT_SECONDS
+        assert client.timeout.pool == validator.CONFIGURED_HTTP_TIMEOUT_SECONDS
+        assert client.timeout.read == validator.CONFIGURED_HTTP_READ_TIMEOUT_SECONDS
+        assert client.timeout.read > 90
+    finally:
+        asyncio.run(client.aclose())
+
+
 def test_transport_preflight_accepts_manual_http_owner_environment_credential(
     tmp_path: Path,
     monkeypatch: Any,

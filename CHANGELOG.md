@@ -230,6 +230,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- The configured session-memory HTTP smoke now uses MCP-sized transport
+  timeouts instead of httpx's five-second default, so its authenticated
+  long-lived stream and explicitly bounded 60-90 second tool calls no longer
+  race a transport-level `ReadTimeout`.
 - Agent OS start/resume/recovery dispatch now compares its refreshed
   source/ABI observation with the immutable `RunPlan` before backend
   execution. Approval decisions must target the single current undecided
