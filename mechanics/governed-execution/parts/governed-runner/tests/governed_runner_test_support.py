@@ -38,11 +38,14 @@ def write_json(path: Path, payload: dict) -> None:
 
 
 def init_minimal_repo(root: Path) -> None:
-    (root / "docs").mkdir(parents=True, exist_ok=True)
+    (root / "docs" / "install").mkdir(parents=True, exist_ok=True)
     (root / "scripts").mkdir(parents=True, exist_ok=True)
     (root / "tests").mkdir(parents=True, exist_ok=True)
     (root / "CONTRIBUTING.md").write_text("contrib\n", encoding="utf-8")
-    (root / "docs" / "DEPLOYMENT.md").write_text("deploy\n", encoding="utf-8")
+    (root / "docs" / "install" / "DEPLOYMENT.md").write_text(
+        "deploy\n",
+        encoding="utf-8",
+    )
     (root / "docs" / "target.md").write_text("alpha\nbeta\n", encoding="utf-8")
     (root / "scripts" / "validate_stack.py").write_text("print('ok')\n", encoding="utf-8")
     subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
@@ -533,4 +536,3 @@ class GovernedRunnerTestCase(unittest.TestCase):
             },
         )
         return stack_root
-

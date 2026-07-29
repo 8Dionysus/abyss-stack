@@ -50,6 +50,10 @@ The request contract is runtime-owned and JSON-shaped:
 - optional `canary_id`
 - optional `task_class`
 
+An `abyss-stack` checkout is admitted only when its canonical owner markers are
+present, including `docs/install/DEPLOYMENT.md`; the retired
+`docs/DEPLOYMENT.md` path is not a valid checkout marker.
+
 The green repo-scope expansion gate serves as evidence for later review only; it does not widen governed repo scope implicitly during the current governed run. The default governed target remains mutation-only and `abyss-stack`-owned, while any external target still requires explicit policy coverage and evidence-backed scope promotion.
 
 For canary preparation, use:
