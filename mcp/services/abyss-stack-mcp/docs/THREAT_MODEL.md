@@ -7,6 +7,8 @@
 - stale or replaced evidence cannot silently authorize a plan;
 - a compromised owner adapter cannot self-assert stack provenance;
 - one credential cannot cross owner or policy contours.
+- a host receipt cannot be confused with an owner result or SDK transition
+  verdict.
 
 ## Controls
 
@@ -37,6 +39,22 @@
   partial-tail state; each hardened unit receives an exact write path only for
   its own journal and cannot access the other contour's file;
 - explicit regular observation file with symlink rejection and a 2 MiB limit;
+- an atomic observation producer with regular-file and symlink checks for every
+  input and output, content-address verification of both the latest deployment
+  receipt and its immutable record, a committed unique target catalog, a
+  private output directory, and no credential or endpoint-probe access;
+- owner-issued overlay checks for every usable source, endpoint, freshness, and
+  canary claim, while Pydantic subject validation retains proof, acceptance,
+  and rollback issuer checks;
+- a separate authenticated read canary that selects only a committed target,
+  derives one exact owner credential filename, refuses symlinked or
+  group/world-readable credentials, never serializes result values, and emits
+  only a content-addressed mode-`0600` receipt and typed one-subject overlay;
+- canary call success remains distinct from owner-specific grounding, while
+  its claim ceiling excludes owner freshness, central proof, acceptance,
+  admission, rollback, unit effects, and consumer configuration;
+- transitional shared-bearer processes are excluded rather than assigned fake
+  per-owner credential classes;
 - strict input and output models with unknown fields denied;
 - secret-like material rejected before validation or response;
 - URI-like references, including scheme-relative forms, reject
@@ -136,6 +154,19 @@
   `PYTHONPATH`/`PYTHONHOME` from shadowing the measured venv closure; managed
   launches also pass `-B` explicitly so isolated-mode environment filtering
   cannot re-enable bytecode writes into that measured closure.
+- successful canary payloads are secret-screened, size-bounded, written only
+  to private content-addressed result artifacts, and explicitly marked
+  untrusted with no instruction authority; an artifact is never treated as
+  owner grounding without a separately issued owner review.
+- cross-organ host inputs, snapshots, receipts, and current records are bounded,
+  secret-screened, non-symlink private files; writes are serialized by a
+  mode-`0600` host lock, snapshots and receipts are immutable, and the read
+  contour rechecks record plus snapshot digests before returning a bounded
+  inspection;
+- every cross-organ advance delegates the full transition to one explicit
+  `aoa-sdk` command and requires SDK validation stop-lines. The stack issues
+  the host receipt but never calls an owner tool. The candidate MCP process is
+  denied the orchestration tree entirely.
 
 ## Confused deputy
 

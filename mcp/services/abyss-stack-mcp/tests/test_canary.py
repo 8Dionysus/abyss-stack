@@ -1,0 +1,532 @@
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import json
+import os
+import socket
+import stat
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+import pytest
+
+from abyss_stack_mcp.canary import (
+    CanaryInventoryCounts,
+    CanaryProbeResult,
+    CanaryRunnerError,
+    build_overlay,
+    build_receipt,
+    build_result_artifact,
+    live_probe,
+    run_canary,
+    validate_result_contract,
+)
+from abyss_stack_mcp.observation import (
+    RuntimeCanaryContract,
+    RuntimeTarget,
+    RuntimeTargetCatalog,
+)
+
+
+NOW = datetime(2026, 7, 28, 15, 0, tzinfo=timezone.utc)
+DIGEST_A = "sha256:" + ("a" * 64)
+DIGEST_B = "sha256:" + ("b" * 64)
+
+
+def canonical_digest(value: object) -> str:
+    raw = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def canary_contract() -> RuntimeCanaryContract:
+    return RuntimeCanaryContract(
+        tool_name="kag_discover",
+        arguments={"owner": "aoa-kag", "detail": "compact"},
+        schema_pointer="/schema_version",
+        schema_value="aoa-kag-mcp-capabilities-v1",
+        required_pointers=(
+            "/projection/digest",
+            "/projection/updated_at",
+        ),
+        exact_values={"/projection/distribution/state": "active"},
+        array_contains=(
+            {
+                "pointer": "/owners",
+                "subset": {
+                    "repo": "aoa-kag",
+                    "manifest_uri": "aoa-kag://owners/aoa-kag/manifest",
+                },
+            },
+        ),
+    )
+
+
+def target() -> RuntimeTarget:
+    return RuntimeTarget(
+        organ_id="aoa-kag",
+        registry_organ_id="aoa-kag",
+        service_id="aoa-kag-mcp",
+        unit_name="aoa-organ-mcp-read@aoa-kag.service",
+        executable_ref="/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py",
+        endpoint_ref="http://127.0.0.1:5425/mcp",
+        protocol_versions=("2025-11-25",),
+        effect_classes=("observe",),
+        canary_route="runbook://mcp-canary/aoa-kag/read",
+        canary_contract=canary_contract(),
+        rollback_route="runbook://mcp-rollback/aoa-kag/read",
+    )
+
+
+def grounded_result() -> dict:
+    return {
+        "schema_version": "aoa-kag-mcp-capabilities-v1",
+        "owners": [
+            {
+                "repo": "aoa-kag",
+                "manifest_uri": "aoa-kag://owners/aoa-kag/manifest",
+            }
+        ],
+        "projection": {
+            "digest": DIGEST_A,
+            "updated_at": "2026-07-28T14:59:00Z",
+            "distribution": {"state": "active"},
+        },
+    }
+
+
+def successful_probe() -> CanaryProbeResult:
+    return CanaryProbeResult(
+        protocol_version="2025-11-25",
+        server_name="aoa-kag-mcp",
+        server_version="0.1.0",
+        server_schema_digest=DIGEST_A,
+        selected_tool_schema_digest=DIGEST_B,
+        inventory_counts=CanaryInventoryCounts(
+            tools=5,
+            resources=1,
+            resource_templates=8,
+            prompts=0,
+        ),
+        call_succeeded=True,
+        result=grounded_result(),
+        call_latency_ms=12,
+        total_latency_ms=28,
+    )
+
+
+def write_json(path: Path, payload: object, *, mode: int = 0o640) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    path.chmod(mode)
+    return path
+
+
+def test_result_contract_requires_each_independent_owner_anchor() -> None:
+    matched, reasons, identity = validate_result_contract(
+        grounded_result(),
+        canary_contract(),
+    )
+    assert matched is True
+    assert reasons == ()
+    assert identity == "aoa-kag-mcp-capabilities-v1"
+
+    missing_owner = grounded_result()
+    missing_owner["owners"] = []
+    matched, reasons, identity = validate_result_contract(
+        missing_owner,
+        canary_contract(),
+    )
+    assert matched is False
+    assert reasons == ("canary-owner-result-evidence-missing",)
+    assert identity == "aoa-kag-mcp-capabilities-v1"
+
+    wrong_schema = grounded_result()
+    wrong_schema["schema_version"] = "foreign-v1"
+    matched, reasons, identity = validate_result_contract(
+        wrong_schema,
+        canary_contract(),
+    )
+    assert matched is False
+    assert reasons == ("canary-result-schema-mismatch",)
+    assert identity == "foreign-v1"
+
+
+def test_receipt_is_content_addressed_and_preserves_claim_limit() -> None:
+    receipt = build_receipt(
+        target=target(),
+        contract=canary_contract(),
+        probe=successful_probe(),
+        observed_at=NOW,
+        ttl_seconds=600,
+    )
+    payload = receipt.model_dump(mode="json")
+    receipt_id = payload.pop("receipt_id")
+
+    assert receipt_id == canonical_digest(payload)
+    assert receipt.call_succeeded is True
+    assert receipt.result_contract_matched is True
+    assert receipt.result_schema_identity == "aoa-kag-mcp-capabilities-v1"
+    assert receipt.result_digest == canonical_digest(grounded_result())
+    assert receipt.result_artifact_ref == (
+        "results/aoa-kag/" + receipt.result_digest.removeprefix("sha256:") + ".json"
+    )
+    assert receipt.reason_codes == ()
+    assert "owner freshness" in receipt.claim_limit
+    assert receipt.server_version == "0.1.0"
+
+
+def test_private_result_artifact_is_independently_content_addressed() -> None:
+    receipt = build_receipt(
+        target=target(),
+        contract=canary_contract(),
+        probe=successful_probe(),
+        observed_at=NOW,
+        ttl_seconds=600,
+    )
+    artifact = build_result_artifact(
+        receipt=receipt,
+        owner_payload=grounded_result(),
+    )
+    payload = artifact.model_dump(mode="json")
+    artifact_id = payload.pop("artifact_id")
+
+    assert artifact_id == canonical_digest(payload)
+    assert artifact.result_digest == receipt.result_digest
+    assert artifact.owner_payload == grounded_result()
+    assert artifact.content_trust == "untrusted_data"
+    assert artifact.instruction_authority == "none"
+    assert "independent owner review" in artifact.claim_limit
+
+
+def test_overlay_does_not_infer_grounding_consumer_freshness_or_proof() -> None:
+    receipt = build_receipt(
+        target=target(),
+        contract=canary_contract(),
+        probe=successful_probe(),
+        observed_at=NOW,
+        ttl_seconds=600,
+    )
+    receipt_ref = (
+        "/srv/AbyssOS/abyss-stack/Logs/mcp/canaries/records/"
+        f"aoa-kag/{receipt.receipt_id.removeprefix('sha256:')}.json"
+    )
+    overlay = build_overlay(receipt, receipt_ref=receipt_ref)
+    subject = overlay.subjects[0]
+
+    assert subject.endpoint is not None
+    assert subject.endpoint.ready is True
+    assert subject.endpoint.server_schema_digest == DIGEST_A
+    assert subject.canary is not None
+    assert subject.canary.succeeded is False
+    assert subject.canary.result_grounded is False
+    assert subject.canary.canary_ref is None
+    assert subject.canary.evidence.state == "blocked"
+    assert subject.canary.evidence.reason_codes == ("owner-grounding-review-required",)
+    assert subject.consumers is None
+    assert subject.freshness is None
+    assert subject.proof is None
+    assert subject.acceptance is None
+    assert subject.rollback is None
+
+
+def test_contract_mismatch_remains_visible_without_positive_canary() -> None:
+    probe = successful_probe().model_copy(
+        update={
+            "result": {
+                **grounded_result(),
+                "owners": [],
+            }
+        }
+    )
+    receipt = build_receipt(
+        target=target(),
+        contract=canary_contract(),
+        probe=probe,
+        observed_at=NOW,
+        ttl_seconds=600,
+    )
+    overlay = build_overlay(
+        receipt,
+        receipt_ref="/private/canary/receipt.json",
+    )
+    canary = overlay.subjects[0].canary
+
+    assert receipt.call_succeeded is True
+    assert receipt.result_contract_matched is False
+    assert receipt.reason_codes == ("canary-owner-result-evidence-missing",)
+    assert canary is not None
+    assert canary.succeeded is False
+    assert canary.result_grounded is False
+    assert canary.canary_ref is None
+    assert canary.evidence.state == "blocked"
+
+
+def test_run_canary_reads_one_owner_credential_and_writes_private_outputs(
+    tmp_path: Path,
+) -> None:
+    targets_path = write_json(
+        tmp_path / "targets.json",
+        RuntimeTargetCatalog(targets=(target(),)).model_dump(mode="json"),
+    )
+    secret_dir = tmp_path / "secrets"
+    secret_dir.mkdir(mode=0o700)
+    credential_value = "wave1-private-value"
+    credential_path = secret_dir / "aoa-kag-mcp-read-bearer-token"
+    credential_path.write_text(credential_value + "\n", encoding="utf-8")
+    credential_path.chmod(0o600)
+    observed_credentials: list[str] = []
+
+    async def fake_probe(
+        selected_target: RuntimeTarget,
+        contract: RuntimeCanaryContract,
+        credential: str,
+        timeout_seconds: int,
+    ) -> CanaryProbeResult:
+        assert selected_target.organ_id == "aoa-kag"
+        assert contract.tool_name == "kag_discover"
+        assert timeout_seconds == 17
+        observed_credentials.append(credential)
+        return successful_probe()
+
+    receipt, record_path, overlay_path, result_path = asyncio.run(
+        run_canary(
+            organ_id="aoa-kag",
+            targets_path=targets_path,
+            secret_dir=secret_dir,
+            output_root=tmp_path / "private-output",
+            timeout_seconds=17,
+            clock=lambda: NOW,
+            probe_runner=fake_probe,
+        )
+    )
+
+    assert observed_credentials == [credential_value]
+    assert receipt.result_contract_matched is True
+    assert record_path.is_file()
+    assert overlay_path.is_file()
+    assert result_path is not None
+    assert result_path.is_file()
+    assert stat.S_IMODE(record_path.stat().st_mode) == 0o600
+    assert stat.S_IMODE(overlay_path.stat().st_mode) == 0o600
+    assert stat.S_IMODE(result_path.stat().st_mode) == 0o600
+    assert credential_value not in record_path.read_text(encoding="utf-8")
+    assert credential_value not in overlay_path.read_text(encoding="utf-8")
+    assert credential_value not in result_path.read_text(encoding="utf-8")
+    assert (
+        json.loads(record_path.read_text(encoding="utf-8"))["receipt_id"]
+        == receipt.receipt_id
+    )
+    result_artifact = json.loads(result_path.read_text(encoding="utf-8"))
+    assert result_artifact["result_digest"] == receipt.result_digest
+    assert result_artifact["owner_payload"] == grounded_result()
+
+
+def test_canary_rejects_broad_or_symlinked_credential(tmp_path: Path) -> None:
+    targets_path = write_json(
+        tmp_path / "targets.json",
+        RuntimeTargetCatalog(targets=(target(),)).model_dump(mode="json"),
+    )
+    secret_dir = tmp_path / "secrets"
+    secret_dir.mkdir(mode=0o700)
+    credential = secret_dir / "aoa-kag-mcp-read-bearer-token"
+    credential.write_text("private-value\n", encoding="utf-8")
+    credential.chmod(0o644)
+
+    with pytest.raises(CanaryRunnerError, match="group/world"):
+        asyncio.run(
+            run_canary(
+                organ_id="aoa-kag",
+                targets_path=targets_path,
+                secret_dir=secret_dir,
+                output_root=tmp_path / "output",
+            )
+        )
+
+    credential.unlink()
+    source = tmp_path / "source-value"
+    source.write_text("private-value\n", encoding="utf-8")
+    source.chmod(0o600)
+    credential.symlink_to(source)
+    with pytest.raises(CanaryRunnerError, match="symlink"):
+        asyncio.run(
+            run_canary(
+                organ_id="aoa-kag",
+                targets_path=targets_path,
+                secret_dir=secret_dir,
+                output_root=tmp_path / "output",
+            )
+        )
+
+
+def test_live_probe_uses_authenticated_http_and_observes_application_version(
+    tmp_path: Path,
+) -> None:
+    with socket.socket() as reservation:
+        reservation.bind(("127.0.0.1", 0))
+        port = reservation.getsockname()[1]
+    test_value = "v" * 64
+    script = tmp_path / "canary_server.py"
+    script.write_text(
+        f"""
+from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
+from typing import Any
+from abyss_stack_mcp._http_auth import http_auth_kwargs
+
+server = FastMCP(
+    "aoa-kag-mcp",
+    json_response=True,
+    **http_auth_kwargs(
+        {port},
+        token_env_var="CANARY_TEST_READ_VALUE",
+        credential_name="unused-canary-value",
+        auth_scope="mcp:test:read",
+        client_id="abyss-stack-mcp-canary:test",
+    ),
+)
+server._mcp_server.version = "9.8.7"
+read_only = server.tool(
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+    structured_output=True,
+)
+
+@read_only
+def kag_discover(owner: str, detail: str = "compact") -> dict[str, Any]:
+    return {{
+        "schema_version": "aoa-kag-mcp-capabilities-v1",
+        "owners": [{{
+            "repo": owner,
+            "manifest_uri": "aoa-kag://owners/aoa-kag/manifest",
+        }}],
+        "projection": {{
+            "digest": "{DIGEST_A}",
+            "updated_at": "2026-07-28T14:59:00Z",
+            "distribution": {{"state": "active"}},
+        }},
+    }}
+
+server.settings.host = "127.0.0.1"
+server.settings.port = {port}
+server.run(transport="streamable-http")
+""",
+        encoding="utf-8",
+    )
+    environment = {
+        **os.environ,
+        "AOA_MCP_TRANSPORT": "streamable-http",
+        "AOA_MCP_HOST": "127.0.0.1",
+        "AOA_MCP_PORT": str(port),
+        "CANARY_TEST_READ_VALUE": test_value,
+        "PYTHONPATH": os.pathsep.join(
+            filter(
+                None,
+                (
+                    str(Path(__file__).resolve().parents[1] / "src"),
+                    os.environ.get("PYTHONPATH"),
+                ),
+            )
+        ),
+    }
+    process = subprocess.Popen(
+        [sys.executable, str(script)],
+        cwd=tmp_path,
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            with socket.socket() as probe_socket:
+                if probe_socket.connect_ex(("127.0.0.1", port)) == 0:
+                    break
+            time.sleep(0.05)
+        else:
+            raise AssertionError("fixture MCP server did not become ready")
+        selected = target().model_copy(
+            update={"endpoint_ref": f"http://127.0.0.1:{port}/mcp"}
+        )
+        probe = asyncio.run(
+            live_probe(
+                selected,
+                canary_contract(),
+                test_value,
+                10,
+            )
+        )
+
+        assert probe.call_succeeded is True
+        assert probe.server_name == "aoa-kag-mcp"
+        assert probe.server_version == "9.8.7"
+        assert probe.protocol_version == "2025-11-25"
+        assert probe.inventory_counts.tools == 1
+        assert probe.result == grounded_result()
+
+        with pytest.raises(CanaryRunnerError) as denied:
+            asyncio.run(
+                live_probe(
+                    selected,
+                    canary_contract(),
+                    "x" * 64,
+                    10,
+                )
+            )
+        assert test_value not in str(denied.value)
+    finally:
+        process.terminate()
+        try:
+            stdout, stderr = process.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            stdout, stderr = process.communicate(timeout=5)
+    assert test_value not in stdout + stderr
+
+
+def test_committed_catalog_covers_every_migration_wave_target() -> None:
+    catalog = RuntimeTargetCatalog.model_validate_json(
+        (
+            Path(__file__).resolve().parents[1]
+            / "src"
+            / "abyss_stack_mcp"
+            / "runtime-targets.v1.json"
+        ).read_text(encoding="utf-8")
+    )
+    reviewed = {
+        item.organ_id for item in catalog.targets if item.canary_contract is not None
+    }
+
+    assert reviewed == {
+        "aoa-kag",
+        "aoa-stats",
+        "aoa-decisions",
+        "abyss-stack",
+        "abyss-machine",
+        "tree-of-sophia",
+        "aoa-session-memory",
+        "aoa-memo",
+        "aoa-evals",
+        "aoa-4pda-connector",
+        "aoa-telegram-connector",
+        "aoa-discord-connector",
+        "aoa-course-connector",
+        "aoa-stackoverflow-connector",
+        "aoa-xda-connector",
+    }

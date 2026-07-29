@@ -6,50 +6,50 @@
     "Official conformance does not prove Abyss owner, freshness, effect, or rollback behavior.",
     "A read canary does not admit candidate or effect organs.",
     "A registered alias does not prove schema observation or a grounded call.",
-    "RC compatibility never authorizes production migration."
+    "Final publication and stable SDKs never authorize production migration without exact pair receipts."
   ],
   "effectful_migration_allowed": false,
-  "evaluated_at": "2026-07-26T23:41:49Z",
+  "evaluated_at": "2026-07-29T02:08:11Z",
   "gate_counts": {
     "blocked": 4,
-    "passed": 2,
-    "pending": 8
+    "passed": 10,
+    "pending": 0
   },
-  "matrix_digest": "sha256:c1d7a8d9743aa90f316d9140bf22f91db52f4b151689b96ac74c346b4dee0e6f",
+  "matrix_digest": "sha256:9f951bf49b306ae496453aa4c231277264fba78cf5c1a5d68c50085e7688c386",
   "migration_allowed": false,
-  "next_action": "Refresh exact spec, SDK, conformance, and Codex evidence after the final release; do not enable the next registration.",
+  "next_action": "Keep the next registration disabled; refresh Codex and repeat the isolated wire probe when consumer support changes.",
   "next_protocol": "2026-07-28",
-  "next_release_status": "release_candidate",
-  "observation_digest": "sha256:7c14e864c8fddcfb7df8f28650e0f928ccec179a9aa5aa8d842e19cab84d5024",
+  "next_release_status": "final",
+  "observation_digest": "sha256:90bdfda16537328d0eb51dbb4f64cc7df431ae098e143d1137fb48f4b86c83c8",
   "passed_gate_ids": [
-    "P1-06",
-    "P1-12"
-  ],
-  "production_protocol": "2025-11-25",
-  "read_only_pilot_allowed": false,
-  "reason_codes": [
-    "next_spec_not_final",
-    "next_sdks_prerelease",
-    "codex_next_pair_unobserved",
-    "official_conformance_not_run",
-    "read_canary_not_run"
-  ],
-  "remaining_gate_ids": [
     "P1-01",
     "P1-02",
-    "P1-03",
     "P1-04",
     "P1-05",
+    "P1-06",
     "P1-07",
     "P1-08",
     "P1-09",
     "P1-10",
+    "P1-12"
+  ],
+  "production_protocol": "2025-06-18",
+  "read_only_pilot_allowed": false,
+  "reason_codes": [
+    "codex_negotiated_2025-06-18",
+    "codex_next_pair_blocked",
+    "tasks_extension_unavailable",
+    "dual_support_consumer_blocked",
+    "read_canary_not_run"
+  ],
+  "remaining_gate_ids": [
+    "P1-03",
     "P1-11",
     "P1-13",
     "P1-14"
   ],
   "schema_version": "abyss_mcp_protocol_lab_status_v1",
   "stable_registration_retained": true,
-  "status_digest": "sha256:bd4203c98324fe1d1a40db351bafedc20e0e8c5210ec0dec801c849a56cf0ff3",
+  "status_digest": "sha256:f0eb4898d4fa501dc87d98a519a31446c750fe8a015ebd7666eff8d20eba07ab",
   "tasks_extension_allowed": false
 }

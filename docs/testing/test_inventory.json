@@ -149,6 +149,9 @@
     {
       "family": "mcp-service-tests",
       "paths": [
+        "mcp/services/abyss-stack-mcp/tests/test_canary.py",
+        "mcp/services/abyss-stack-mcp/tests/test_observation_producer.py",
+        "mcp/services/abyss-stack-mcp/tests/test_orchestration_host.py",
         "mcp/services/abyss-stack-mcp/tests/test_stack_mcp.py",
         "mcp/services/abyss-machine-mcp/tests/test_machine_mcp.py",
         "mcp/services/aoa-decisions-mcp/tests/test_decisions_mcp.py",

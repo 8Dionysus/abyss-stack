@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os-abyss.dev/schemas/kag-handle-pair-observation.schema.json",
+  "title": "OS Abyss KAG handle pair observation",
+  "additionalProperties": false,
+  "properties": {
+    "claim_limits": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 6,
+      "type": "array"
+    },
+    "finished_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "handle_checks": {
+      "additionalProperties": false,
+      "properties": {
+        "cross_request_replay": {
+          "const": "denied"
+        },
+        "expiry": {
+          "const": "denied"
+        },
+        "key_retirement_revocation": {
+          "const": "denied"
+        },
+        "principal_isolation": {
+          "const": "denied"
+        },
+        "same_request_replay": {
+          "const": "allowed_read_only_idempotent"
+        },
+        "same_request_result_unchanged": {
+          "const": true
+        },
+        "tamper": {
+          "const": "denied"
+        },
+        "valid_round_trip": {
+          "const": "passed"
+        }
+      },
+      "required": [
+        "valid_round_trip",
+        "principal_isolation",
+        "expiry",
+        "cross_request_replay",
+        "same_request_replay",
+        "same_request_result_unchanged",
+        "key_retirement_revocation",
+        "tamper"
+      ],
+      "type": "object"
+    },
+    "handle_contract": {
+      "additionalProperties": false,
+      "properties": {
+        "bearer_verified_each_request": {
+          "const": true
+        },
+        "opaque": {
+          "const": true
+        },
+        "plaintext_observed_on_wire": {
+          "const": false
+        },
+        "principal_binding": {
+          "const": [
+            "client_id",
+            "issuer",
+            "subject"
+          ]
+        },
+        "raw_tokens_recorded": {
+          "const": false
+        },
+        "ttl_seconds": {
+          "const": 5.0
+        }
+      },
+      "required": [
+        "opaque",
+        "plaintext_observed_on_wire",
+        "ttl_seconds",
+        "bearer_verified_each_request",
+        "principal_binding",
+        "raw_tokens_recorded"
+      ],
+      "type": "object"
+    },
+    "observation_id": {
+      "pattern": "^[a-z0-9][a-z0-9._-]+$",
+      "type": "string"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "owner_canary": {
+      "additionalProperties": false,
+      "properties": {
+        "freshness_state": {
+          "const": "source_unavailable"
+        },
+        "owner": {
+          "const": "abyss-stack"
+        },
+        "projection_exact_state": {
+          "const": "current"
+        },
+        "schema_version": {
+          "const": "aoa-kag-mcp-capabilities-v1"
+        }
+      },
+      "required": [
+        "owner",
+        "schema_version",
+        "projection_exact_state",
+        "freshness_state"
+      ],
+      "type": "object"
+    },
+    "python_sdk": {
+      "additionalProperties": false,
+      "properties": {
+        "commit": {
+          "const": "6f69a3758ebf2ee55ce050f58b470ce11af71133"
+        },
+        "version": {
+          "const": "2.0.0"
+        }
+      },
+      "required": [
+        "version",
+        "commit"
+      ],
+      "type": "object"
+    },
+    "raw_receipt": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "0600"
+        },
+        "ref": {
+          "pattern": "^local://",
+          "type": "string"
+        },
+        "sha256": {
+          "const": "bd9b41027aff3c71b87b223c8d08ba54649d23b443eee40104033601654323a1"
+        }
+      },
+      "required": [
+        "ref",
+        "sha256",
+        "mode"
+      ],
+      "type": "object"
+    },
+    "rejection_shape": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": -32602
+        },
+        "data": {
+          "const": {
+            "reason": "invalid_request_state"
+          }
+        },
+        "message": {
+          "const": "Invalid or expired requestState"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "abyss_mcp_kag_handle_pair_observation_v1"
+    },
+    "source_revisions": {
+      "additionalProperties": false,
+      "properties": {
+        "aoa_kag": {
+          "const": "0ff913279868735b41a17aab84c0c89341d7cb77"
+        },
+        "abyss_stack": {
+          "const": "8bcfe0edf7ad499d666207ca2087d8db9df4d7a9"
+        }
+      },
+      "required": [
+        "abyss_stack",
+        "aoa_kag"
+      ],
+      "type": "object"
+    },
+    "stable_registration_unchanged": {
+      "const": true
+    },
+    "verdict": {
+      "const": "handle_pair_passed"
+    },
+    "wire_version": {
+      "const": "2026-07-28"
+    }
+  },
+  "required": [
+    "schema_version",
+    "observation_id",
+    "observed_at",
+    "finished_at",
+    "wire_version",
+    "python_sdk",
+    "source_revisions",
+    "handle_contract",
+    "handle_checks",
+    "rejection_shape",
+    "owner_canary",
+    "stable_registration_unchanged",
+    "raw_receipt",
+    "verdict",
+    "claim_limits"
+  ],
+  "type": "object"
+}

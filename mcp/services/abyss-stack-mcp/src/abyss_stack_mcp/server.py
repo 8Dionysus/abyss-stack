@@ -22,6 +22,7 @@ from .audit import (
     PolicyAuditJournal,
 )
 from .core import ObservationStore, StackMCPApplication
+from .orchestration import CrossOrganRunStore
 from .policy import PolicyIdentity, StackPolicySeam, ToolPolicy
 
 
@@ -31,7 +32,7 @@ CANDIDATE_PORT = 5433
 AUTH_MANIFEST_CREDENTIAL = "abyss-stack-mcp-auth-manifest.json"
 AUTH_MANIFEST_SCHEMA = "abyss_stack_mcp_auth_manifest_v1"
 PACKAGE_NAME = "abyss-stack-mcp"
-SOURCE_FALLBACK_VERSION = "0.1.0"
+SOURCE_FALLBACK_VERSION = "0.2.0"
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 PolicyMode = Literal["read", "candidate"]
 CatalogLimit = Annotated[int, Field(ge=1, le=64)]
@@ -271,6 +272,20 @@ def _build_policy_seam(policy_family: PolicyMode) -> StackPolicySeam:
                 network_access="none",
                 source_to_sink="runtime_observation_to_typed_result",
             ),
+            ToolPolicy(
+                tool_id="stack_orchestration_inspect",
+                effect_class="observe",
+                max_input_bytes=4096,
+                max_output_bytes=262_144,
+                timeout_seconds=3.0,
+                filesystem_access=(
+                    "configured_observation_and_orchestration_record_read"
+                ),
+                network_access="none",
+                source_to_sink=(
+                    "sdk_validated_runtime_record_to_bounded_inspection"
+                ),
+            ),
         )
         max_in_flight = 8
         rate_limit = 120
@@ -321,6 +336,7 @@ def build_server(
     observation_path: str | Path | None = None,
     *,
     policy_family: PolicyMode | None = None,
+    orchestration_root: str | Path | None = None,
 ) -> Any:
     try:
         from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
@@ -335,6 +351,7 @@ def build_server(
     application = StackMCPApplication(
         ObservationStore(observation_path),
         policy_family=mode,
+        orchestration_store=CrossOrganRunStore(orchestration_root),
     )
     policy = _build_policy_seam(mode)
     read_annotations = ToolAnnotations(
@@ -422,6 +439,20 @@ def build_server(
                     policy_family,
                     view=view,
                 ),
+            )
+
+        @mcp.tool(annotations=read_annotations, structured_output=True)
+        async def stack_orchestration_inspect(
+            run_id: str | None = None,
+        ) -> dict[str, Any]:
+            """Inspect one host-persisted SDK orchestration snapshot."""
+            arguments = {"run_id": run_id}
+            return await policy.invoke(
+                request_id=uuid.uuid4().hex,
+                identity=_policy_identity(mode),
+                tool_id="stack_orchestration_inspect",
+                arguments=arguments,
+                dispatch=lambda: application.inspect_orchestration(run_id),
             )
     else:
 

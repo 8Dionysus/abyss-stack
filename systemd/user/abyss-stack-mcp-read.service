@@ -5,6 +5,7 @@ ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/p
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.source-projection.lock
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/audit/policy-read.jsonl
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json
 StartLimitIntervalSec=60
 StartLimitBurst=3
 
@@ -12,7 +13,8 @@ StartLimitBurst=3
 Type=simple
 WorkingDirectory=/srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp
 Environment=ABYSS_STACK_MCP_POLICY_FAMILY=read
-Environment=ABYSS_STACK_MCP_OBSERVATION_PATH=/srv/AbyssOS/abyss-stack/Logs/mcp/organ-runtime-observation.json
+Environment=ABYSS_STACK_MCP_OBSERVATION_PATH=/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json
+Environment=ABYSS_STACK_ORCHESTRATION_ROOT=/srv/AbyssOS/abyss-stack/Logs/mcp/cross-organ-orchestrations
 Environment=AOA_MCP_TRANSPORT=streamable-http
 Environment=AOA_MCP_HOST=127.0.0.1
 Environment=AOA_MCP_PORT=5431

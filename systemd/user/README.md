@@ -16,6 +16,9 @@ This directory stores user-unit skeletons for the deployed runtime.
 - `abyss-stack-mcp-read.service`, the stack-owned runtime-observation plane
 - `abyss-stack-mcp-candidate.service`, the separate non-executing plan-candidate
   plane
+- `abyss-stack-mcp-observation.service` and
+  `abyss-stack-mcp-observation.timer`, the bounded five-minute observation
+  producer and two-minute refresh schedule
 - `managed-units.txt` allowlists the host-local user units that can be linked
   from the deployed Configs mirror.
 
@@ -88,6 +91,10 @@ The current allowlist covers the local working surface:
   owner bundle, and each has a disjoint tool catalog, port, scope, client
   identity, and systemd credential; their explicit ports are `5431` and `5433`
   because the storage module owns PostgreSQL on `5432`
+- the credential-free `abyss-stack-mcp-observation.service`, which composes
+  only the exact deployment record, private registry projection, committed
+  target catalog, named unit state, and an optional typed evidence overlay;
+  its timer is linked but never enabled by the installer
 - warm dictation and TTS services, plus the `gemma4.spark` stack endpoint
   bridge
 - TTS keep-warm timer that periodically exercises the protected warm server
@@ -156,6 +163,13 @@ an inaccessible path for the opposite contour; the contour-explicit unit
 verifier checks only the visible journal and rejects a policy-family mismatch,
 while provisioning and unsuffixed manual verification check both journals.
 Startup validates the complete bounded hash chain before bind.
+The same provision action creates the private
+`${AOA_STACK_ROOT}/Logs/mcp/observations` directory. It does not create a live
+claim. Start `abyss-stack-mcp-observation.service` once to atomically produce
+`current.json`; the stack read and candidate units refuse to start without it.
+Enable `abyss-stack-mcp-observation.timer` only as a separate reviewed rollout
+step. Its process has no bearer credential, no network address family, and no
+writable path outside that observation directory.
 Provisioning installs the exact artifact-hashed lock, binds the bytes behind
 the resolved venv interpreter into the runtime-content digest, and refuses to
 replace a changed environment while either stack MCP unit is active or its

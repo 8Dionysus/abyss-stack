@@ -1,0 +1,50 @@
+{
+  "claim_limits": [
+    "This receipt proves the exact Python MCP 2.0.0 client and server fixtures against the pinned official conformance harness at wire 2026-07-28.",
+    "The official harness is still 0.2.0-alpha.10; its suite composition may change.",
+    "Eight client checks for legacy-only method headers were skipped as inapplicable on the modern wire.",
+    "This SDK-level result does not prove that Codex supports 2026-07-28, that an Abyss adapter conforms, or that any production registration is safe to migrate.",
+    "Tasks is an extension and is outside this spec-version-filtered receipt."
+  ],
+  "conformance_harness": {
+    "npm_git_head": "a9896553900a2ef61787b57adfcbbe936a8ab1f9",
+    "npm_integrity": "sha512-0V/HZDdWHcg6j0zVBzBsXcPZ571IVi6umKgTpnBhtTx/jm/LONmGF6cIWL2k4Xjyps0OiHV6B37nj2s0pUg0nQ==",
+    "release_status": "alpha",
+    "version": "0.2.0-alpha.10"
+  },
+  "directions": {
+    "client": {
+      "expected_failure_baseline_entries": 0,
+      "failed_checks": 0,
+      "info_checks": 412,
+      "manifest_sha256": "aac85de8d21427a941317db1d9ad209d208ecf67242eb0d772c90394affc4a95",
+      "raw_result_ref": "local://mcp-protocol-final-lab-20260728/conformance/client-2026-07-28",
+      "scenario_count": 32,
+      "skipped_checks": 8,
+      "success_checks": 371,
+      "suite": "all"
+    },
+    "server": {
+      "expected_failure_baseline_entries": 0,
+      "failed_checks": 0,
+      "info_checks": 1,
+      "manifest_sha256": "531b28daa7a2bbc740dfdc3f21de92b69235360ffdd16c8dc9f1284a14968a5d",
+      "raw_result_ref": "local://mcp-protocol-final-lab-20260728/conformance/server-2026-07-28",
+      "scenario_count": 40,
+      "skipped_checks": 0,
+      "success_checks": 114,
+      "suite": "all"
+    }
+  },
+  "finished_at": "2026-07-29T01:36:26.199Z",
+  "observation_id": "python-mcp-2.0.0-official-conformance-20260729",
+  "observed_at": "2026-07-29T01:35:23.664Z",
+  "python_sdk": {
+    "commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
+    "source_checkout_clean": true,
+    "version": "2.0.0"
+  },
+  "schema_version": "abyss_mcp_protocol_conformance_observation_v1",
+  "spec_version": "2026-07-28",
+  "verdict": "sdk_pair_passed"
+}

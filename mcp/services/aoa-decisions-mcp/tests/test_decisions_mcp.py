@@ -234,12 +234,22 @@ def test_read_and_internal_effect_servers_have_disjoint_tools(tmp_path: Path) ->
         tool.name: tool for tool in asyncio.run(internal_effect.list_tools())
     }
 
+    assert read._mcp_server.version == "0.2.0"
+    assert internal_effect._mcp_server.version == "0.2.0"
     assert "aoa_decisions_refresh" not in read_tools
     assert (
         "force_refresh"
         not in read_tools["aoa_decisions_status"].inputSchema["properties"]
     )
     assert set(effect_tools) == {"aoa_decisions_status", "aoa_decisions_refresh"}
+    for tool in read_tools.values():
+        assert tool.annotations is not None
+        assert tool.annotations.readOnlyHint is True
+        assert tool.annotations.destructiveHint is False
+        assert tool.annotations.idempotentHint is True
+        assert tool.annotations.openWorldHint is False
+    assert effect_tools["aoa_decisions_status"].annotations.readOnlyHint is True
+    assert effect_tools["aoa_decisions_refresh"].annotations is None
 
 
 def test_read_server_status_never_materializes_cache(tmp_path: Path) -> None:

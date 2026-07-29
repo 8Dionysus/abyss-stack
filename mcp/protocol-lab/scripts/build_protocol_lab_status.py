@@ -137,10 +137,15 @@ def build_status(
         "remaining_gate_ids": remaining_gate_ids,
         "reason_codes": observation["reason_codes"],
         "next_action": (
-            "Refresh exact spec, SDK, conformance, and Codex evidence after "
-            "the final release; do not enable the next registration."
-            if not migration_allowed
-            else "Keep stable support while the read-only pilot advances."
+            "Keep the next registration disabled; refresh Codex and repeat "
+            "the isolated wire probe when consumer support changes."
+            if not consumer["next_wire_pair_observed"]
+            else (
+                "Complete exact-pair conformance, Abyss behavior, canary, and "
+                "rollback receipts before migration."
+                if not migration_allowed
+                else "Keep stable support while the read-only pilot advances."
+            )
         ),
         "claim_limits": matrix["claim_limits"],
     }

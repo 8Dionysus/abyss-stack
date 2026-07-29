@@ -9,6 +9,21 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Added
 
+- A separate credential-bearing, content-addressed Wave 1 read-canary contour
+  for KAG, stats, and decisions. It observes one exact loopback schema and
+  owner-specific result-contract match, and preserves a successful structured
+  response in a private content-addressed artifact for independent owner
+  review, without inferring grounding, freshness, proof, acceptance,
+  admission, or rollback. Those three adapters now report their
+  application package version rather than the MCP SDK version; decisions read
+  annotations are explicit.
+- `abyss-stack-mcp-observe` now atomically composes a five-minute production
+  runtime observation from an immutable deployment receipt, the private
+  deny-by-default organ registry, a committed fifteen-target owner-specific
+  catalog, exact named user-systemd facts, and an optional owner-issued
+  evidence overlay. It reads no credentials, performs no endpoint probes,
+  excludes shared-bearer legacy contours, preserves every unsupported claim as
+  unknown, and has a separately enabled two-minute user timer.
 - A standalone `abyss-stack-mcp` source candidate now exposes a compact
   stack-owned runtime-evidence read plane and a credential-disjoint,
   non-executing plan-candidate plane. Typed contracts keep source, package,

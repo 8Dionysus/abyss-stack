@@ -11,7 +11,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema"
 
 EXPECTED_ACTIVE_SCHEMA_PATHS = {
+    Path("mcp/protocol-lab/schemas/kag-cache-pair-observation.schema.json"),
+    Path("mcp/protocol-lab/schemas/kag-handle-pair-observation.schema.json"),
+    Path("mcp/protocol-lab/schemas/kag-next-pair-observation.schema.json"),
     Path("mcp/protocol-lab/schemas/protocol-compatibility-matrix.schema.json"),
+    Path("mcp/protocol-lab/schemas/protocol-conformance-observation.schema.json"),
+    Path("mcp/protocol-lab/schemas/protocol-consumer-wire-observation.schema.json"),
     Path("mcp/protocol-lab/schemas/protocol-lab-status.schema.json"),
     Path("mcp/protocol-lab/schemas/protocol-pair-observation.schema.json"),
     Path("mcp/services/abyss-stack-mcp/schemas/policy-audit-summary.schema.json"),

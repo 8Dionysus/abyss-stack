@@ -55,6 +55,15 @@ owner. Neo4j uses immutable owner-node slices plus directional owner-pair
 relation and external-reference slices. Current state maps select the admitted
 slices, and unchanged owners are reused without rebuild.
 
+The retrieval-bundle `canonical_inputs` ABI remains the semantic source ABI
+published by `aoa-kag`: owner-qualified repository identity,
+`source_index_digest`, and the complete set of family digests. Corpus and
+distribution identities belong to the separately admitted tiered owner state;
+they are joined at runtime and are not required fields of a source retrieval
+bundle. A paired legacy extension carrying both identities remains readable,
+but an unpaired extension or any disagreement between a canonical input and
+its owner record fails closed.
+
 Vector fan-out embeds a query once and merges bounded per-owner results. Graph
 traversal is constrained to the current owner and relation slice digests.
 Coordinated rollback is allowed only when exact, vector, and graph last-good

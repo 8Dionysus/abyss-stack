@@ -86,6 +86,20 @@ Read and candidate bearer contours are distinct values as well as distinct
 credential names: provisioning rejects a pre-existing or generated equality
 before either contour is considered usable.
 
+Cross-organ host persistence is a separate path:
+
+```text
+direct owner result
+  -> stack host receipt
+  -> exact aoa-sdk transition validation
+  -> private immutable snapshot
+  -> bounded stack_orchestration_inspect read
+```
+
+The stack owns persistence, receipt issuance, and restart-visible state. The
+SDK owns transition semantics. Owner calls remain outside both stack MCP
+planes, and the read surface never expands the captured owner artifacts.
+
 ## Authority
 
 `abyss-stack` owns the observation and runtime-plan shape. Owner repositories
@@ -145,3 +159,49 @@ freshness plus exact rollback evidence are still mandatory.
 Published JSON Schema carries all structurally expressible conditional model
 invariants. Runtime Pydantic validation additionally owns cross-field time
 ordering, uniqueness, and content-address verification.
+
+## Production observation composition
+
+The live observation is assembled by one stack-owned producer from an explicit
+target catalog, the immutable stack deployment receipt, the private `aoa-sdk`
+registry projection, named user-systemd fields, and an optional typed evidence
+overlay. This is bounded composition, not workspace discovery. The producer
+does not read credentials or call owner servers.
+
+The deployment receipt can prove adapter package and deployed bytes. The
+private registry can prove only the exact declared registry record. User
+systemd can prove the named process state and identity. Every other axis stays
+unknown until an issuing owner contributes a typed overlay. In particular, an
+owner revision without an owner source-tree digest cannot become an exact
+source link, and a listening process cannot become a ready endpoint without an
+observed schema.
+
+The committed targets point at the owner-specific read template. Transitional
+shared-bearer processes are deliberately outside this observation because the
+runtime contract forbids shared credential classes. Migration therefore moves
+an observed target from inactive to active; it does not relabel the legacy
+process.
+
+## Canary evidence contour
+
+Authenticated canary execution is outside the observation producer and the
+agent-facing MCP processes. The operator runner selects one exact committed
+target, derives its owner-specific read credential filename from the deployed
+service identity, and has no endpoint or tool override. Its schema digest
+covers the complete paginated MCP inventory; its result digest covers the
+secret-screened structured owner response. Only a reviewed owner-specific
+result contract can turn HTTP success into a result-contract match. A separate
+source/acceptance-owner grounding review is still required before
+`result_grounded` or successful canary evidence exists.
+
+The runner issues stack runtime evidence, not owner freshness or acceptance.
+It writes an immutable receipt, a private content-addressed copy of a
+successful structured result, and a one-subject overlay whose canary remains
+blocked on owner grounding. The result artifact is an untrusted capture for
+the owner reviewer, not stack semantic evidence. This leaves aggregation,
+central pair-specific proof, consumer registration evidence, owner review,
+registry admission, and lifecycle effects as explicit later transactions.
+Reviewed contracts cover every declared migration-wave target. Contract
+presence proves only that an exact bounded read shape has been selected; an
+inactive endpoint, failed call, schema drift, ungrounded result, missing owner
+review, or absent central proof remains explicitly unproved.

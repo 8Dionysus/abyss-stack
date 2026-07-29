@@ -107,15 +107,54 @@ class CanonicalRepoKag:
         if path is None or not path.is_file():
             return None
         payload = json.loads(path.read_text(encoding="utf-8"))
-        identity = (
-            payload.get("index_identity") or payload.get("family_identity")
-            if isinstance(payload, dict)
+        if not isinstance(payload, dict):
+            return None
+        index_identity = payload.get("index_identity")
+        if isinstance(index_identity, dict):
+            value = index_identity.get("content_digest")
+            return str(value) if value else None
+
+        family_identity = payload.get("family_identity")
+        source_snapshot = (
+            family_identity.get("source_snapshot")
+            if isinstance(family_identity, dict)
             else None
         )
-        if not isinstance(identity, dict):
-            return None
-        value = identity.get("content_digest")
-        return str(value) if value else None
+        source_header = payload.get("source_index_header")
+        header_identity = (
+            source_header.get("index_identity")
+            if isinstance(source_header, dict)
+            else None
+        )
+        header_digest = (
+            header_identity.get("content_digest")
+            if isinstance(header_identity, dict)
+            else None
+        )
+        compatibility = payload.get("compatibility")
+        files = compatibility.get("files") if isinstance(compatibility, dict) else None
+        source_file_digests = (
+            {
+                str(item.get("content_digest"))
+                for item in files
+                if isinstance(item, dict)
+                and item.get("kind") == "source"
+                and item.get("content_digest")
+            }
+            if isinstance(files, list)
+            else set()
+        )
+        digests = {
+            str(source_snapshot).removeprefix("sha256:") if source_snapshot else "",
+            str(header_digest or ""),
+            *source_file_digests,
+        }
+        digests.discard("")
+        if len(digests) > 1:
+            raise RuntimeError(
+                f"canonical KAG source-index identities disagree for {repo}"
+            )
+        return next(iter(digests), None)
 
     def resolve_owner(self, record_id: str) -> str | None:
         parts = record_id.split(":", 3)

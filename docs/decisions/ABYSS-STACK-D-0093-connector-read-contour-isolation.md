@@ -70,9 +70,15 @@ Course calls the owner MCP dispatcher directly so owner retrieval semantics
 are not reimplemented, but publishes only nine explicitly reviewed read
 tools. The wrapper verifies that the loaded owner module belongs to the
 selected owner root, uses owner `StorageRoots`, forces source references off
-where supported, recursively denies a result reporting network use, and
+where supported, verifies the exact owner result/tool identity, and requires
+the current invocation's direct `network_touched=false` and `read_only=true`
+attestation where the owner contract supplies one. Historical connected-run
+receipts and unexecuted future plans may truthfully retain
+`network_touched=true` as result data; they are not treated as effects of the
+current read. Owner read tools that do not yet publish a direct invocation
+attestation retain recursive denial of any network-use report. The adapter
 excludes `connected_run` plus live, plan, auth, browser, refresh, and
-fixture-effect surfaces.
+fixture-effect tool surfaces.
 
 StackOverflow and XDA do not publish `query-hybrid` until the executable owner
 CLI implements it. Owner documentation alone cannot create an OS capability.

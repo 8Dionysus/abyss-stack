@@ -12,23 +12,33 @@
 - Stack lanes: MCP services, organ access fabric, validation
 - Mechanic parents: runtime-lifecycle
 - Guard families: exact pin, fail closed, dual support, read-only canary, rollback
-- Posture: accepted pre-final migration block
+- Posture: accepted post-final pair-evidence block
 
 ## Context
 
-The MCP `2026-07-28` release candidate changes core wire assumptions: the
+Final MCP `2026-07-28` changes core wire assumptions: the
 protocol session handshake is removed, server discovery becomes explicit,
 application state moves behind explicit handles, cache and trace metadata
 expand, and Tasks remains a separately negotiated extension. OS Abyss cannot
 infer compatibility from a date literal, SDK type, schema listing, successful
 process start, or one client call.
 
-As observed on 2026-07-26, the final specification is not published. The exact
-next Python and TypeScript SDK lines are prereleases. Local Codex 0.145.0
-contains next-version and Tasks literals, but also stable session lifecycle
-paths; no actual `2026-07-28` exchange or `server/discover` receipt exists.
-The stable Python SDK is 1.28.1 while stack services retain the compatible
-`mcp>=1.27.2,<2` constraint and `abyss-stack-mcp` exact lock 1.27.2.
+On 2026-07-28 the final specification was published at exact commit
+`5f5440bb26a62e2cf3440b92da5a667efa03b267`. Python MCP `2.0.0` and
+TypeScript client/server `2.0.0` are stable. This closes publication gates but
+not pair compatibility. An isolated stdio exchange between Codex `0.145.0` and
+Python MCP `2.0.0` showed Codex offering and selecting `2025-06-18`, then
+calling legacy list methods; it never sent `server/discover`. The current
+next-protocol conformance package is still `0.2.0-alpha.10`. Against the exact
+Python MCP `2.0.0` fixtures, its 2026 wire suite passes `114` server and `371`
+client checks with zero failures, but that does not turn Codex into a modern
+client. The isolated KAG next-protocol adapter subsequently passed the Abyss
+pair, stateless, `server/discover`, explicit-handle, trace, and cache gates.
+Those receipts prove only the exact isolated read adapter: the owner projection
+was current, but owner freshness remained `source_unavailable`; no Codex
+registration or consumer canary was enabled. Python MCP `2.0.0` explicitly
+does not implement the final Tasks extension. Stack services intentionally
+retain `mcp>=1.27.2,<2` and the `abyss-stack-mcp` exact lock `1.27.2`.
 
 ## Options considered
 
@@ -42,7 +52,8 @@ The stable Python SDK is 1.28.1 while stack services retain the compatible
 
 Choose option 3.
 
-Production remains on MCP `2025-11-25`. `mcp/protocol-lab/` owns fourteen
+The current Codex-compatible wire remains MCP `2025-06-18`.
+`mcp/protocol-lab/` owns fourteen
 explicit P1 gates covering exact final spec and stable SDK pins, Codex
 capabilities, official and Abyss conformance, stable/next comparison,
 stateless behavior, explicit handles, `server/discover`, trace/cache behavior,
@@ -73,7 +84,12 @@ changing source, or emitting external effects.
 
 ## Consequences
 
-- The current source verdict is blocked; only P1-06 and P1-12 pass.
+- The current source verdict is blocked; P1-01, P1-02, P1-04 through P1-10,
+  and P1-12 pass. P1-03, P1-11, P1-13, and P1-14 are blocked.
+- Final publication and stable SDK availability are now proven, while Codex
+  next-wire support is negatively resolved for version `0.145.0`.
+- Official SDK conformance and the isolated Abyss adapter, handle, and cache
+  receipts are proven without changing the stable Codex registration.
 - Final publication alone cannot authorize migration.
 - Every spec, SDK, conformance, Codex, transport, auth, or registration drift
   requires a refreshed observation.
@@ -84,9 +100,12 @@ changing source, or emitting external effects.
 ## Claim limits
 
 This decision and its green validators prove a deterministic, fail-closed
-source gate. They do not prove final publication, stable next SDK readiness,
-Codex pair support, official or Abyss conformance, a deployed next server,
-consumer registration, live canary, benefit, or rollback.
+source gate, exact final/SDK pins, exact official SDK conformance, a bounded
+legacy Codex wire observation, and isolated Abyss adapter, handle, and
+single-process cache behavior. They do not prove modern Codex pair support, a
+deployed or registered next server, a separately credentialed consumer canary,
+multi-replica cache invalidation, owner freshness or acceptance, benefit, or
+runtime rollback.
 
 ## Source surfaces
 
@@ -97,7 +116,10 @@ consumer registration, live canary, benefit, or rollback.
 
 ## Follow-up route
 
-Refresh exact evidence after the final release and stable SDK/client support
-exist. Run official conformance and the Abyss pair suite before enabling the
-isolated KAG lab registration. Do not touch the stable registration and do not
-migrate an effectful organ in this phase.
+Refresh exact evidence when Codex changes or documents final-protocol support,
+then repeat the isolated wire probe. Do not enable the isolated KAG lab
+registration while Codex next-wire support or KAG owner freshness is blocked.
+Wait for an exact SDK implementation before reopening the separate Tasks gate.
+Only after those prerequisites pass, run a separately credentialed registered
+consumer canary and exercise start/stop rollback without touching the stable
+registration. Do not migrate an effectful organ in this phase.

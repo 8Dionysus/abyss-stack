@@ -14,13 +14,16 @@ SRC_ROOT = SERVICE_ROOT / "src"
 sys.path.insert(0, str(SRC_ROOT))
 
 from abyss_stack_mcp.audit import PolicyAuditJournal  # noqa: E402
+from abyss_stack_mcp.canary import (  # noqa: E402
+    CanaryReceipt,
+    CanaryResultArtifact,
+)
 from abyss_stack_mcp.contracts import RuntimeObservation  # noqa: E402
+from abyss_stack_mcp.observation import RuntimeTargetCatalog  # noqa: E402
 from abyss_stack_mcp.policy import StackPolicySeam  # noqa: E402
 
 
-PIN_RE = re.compile(
-    r"^(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==(?P<version>[^\s\\]+)$"
-)
+PIN_RE = re.compile(r"^(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==(?P<version>[^\s\\]+)$")
 LOCK_PIN_RE = re.compile(
     r"^(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==(?P<version>[^\s\\]+)\s+\\$"
 )
@@ -77,8 +80,10 @@ def validate_runtime_lock() -> None:
             raise SystemExit(f"duplicate lock pin: {name}")
         hashes: list[str] = []
         for following in lock_lines[index + 1 :]:
-            if following and not following[0].isspace() and not following.startswith(
-                "#"
+            if (
+                following
+                and not following[0].isspace()
+                and not following.startswith("#")
             ):
                 break
             stripped = following.strip().removesuffix("\\").strip()
@@ -143,14 +148,49 @@ def main() -> int:
         != "abyss_stack_mcp.audit:main"
     ):
         raise SystemExit("policy audit summary entry point is unavailable")
+    if (
+        pyproject["project"]["scripts"].get("abyss-stack-mcp-canary")
+        != "abyss_stack_mcp.canary:main"
+    ):
+        raise SystemExit("authenticated read canary entry point is unavailable")
+    if (
+        pyproject["project"]["scripts"].get("abyss-stack-mcp-observe")
+        != "abyss_stack_mcp.observation:main"
+    ):
+        raise SystemExit("runtime observation producer entry point is unavailable")
+    if (
+        pyproject["project"]["scripts"].get(
+            "abyss-stack-mcp-orchestration"
+        )
+        != "abyss_stack_mcp.orchestration:main"
+    ):
+        raise SystemExit("cross-organ host entry point is unavailable")
+    targets_path = SERVICE_ROOT / "src" / "abyss_stack_mcp" / "runtime-targets.v1.json"
+    targets = RuntimeTargetCatalog.model_validate(
+        json.loads(targets_path.read_text(encoding="utf-8"))
+    )
+    if len(targets.targets) != 15:
+        raise SystemExit("runtime observation target catalog must name 15 contours")
+    reviewed_canaries = {
+        target.organ_id
+        for target in targets.targets
+        if target.canary_contract is not None
+    }
+    if reviewed_canaries != {target.organ_id for target in targets.targets}:
+        raise SystemExit(
+            "every migration-wave runtime target must have a reviewed canary contract"
+        )
+    if CanaryReceipt.__module__ != "abyss_stack_mcp.canary":
+        raise SystemExit("authenticated read canary receipt is unavailable")
+    if CanaryResultArtifact.__module__ != "abyss_stack_mcp.canary":
+        raise SystemExit("private canary result artifact is unavailable")
     audit_schema = json.loads(
-        (
-            SERVICE_ROOT / "schemas" / "policy-audit-summary.schema.json"
-        ).read_text(encoding="utf-8")
+        (SERVICE_ROOT / "schemas" / "policy-audit-summary.schema.json").read_text(
+            encoding="utf-8"
+        )
     )
     if (
-        audit_schema.get("$schema")
-        != "https://json-schema.org/draft/2020-12/schema"
+        audit_schema.get("$schema") != "https://json-schema.org/draft/2020-12/schema"
         or "claim_limit" not in audit_schema.get("properties", {})
     ):
         raise SystemExit("policy audit summary schema is unavailable")
@@ -163,6 +203,9 @@ def main() -> int:
             "execution_authorized=false",
             "policy seam",
             "hash chain",
+            "legacy process",
+            "authenticated read canary",
+            "host-visible orchestration",
         ),
         "DESIGN.md": (
             "source",
@@ -172,12 +215,16 @@ def main() -> int:
             "endpoint",
             "consumer",
             "journal continuity",
+            "production observation",
+            "cross-organ",
         ),
         "docs/BOUNDARIES.md": (
             "does not own",
             "aoa-evals",
             "owner acceptance",
             "audit summary",
+            "shared-bearer",
+            "host persistence",
         ),
         "docs/CODEX_CONSUMER_HANDOFF.md": (
             "consumer-schema evidence",
@@ -192,6 +239,8 @@ def main() -> int:
             "symlink",
             "untrusted data",
             "tamper-evident",
+            "observation producer",
+            "host receipt",
         ),
     }
     for relative, needles in required.items():

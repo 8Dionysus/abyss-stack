@@ -18,7 +18,10 @@ def owner_call(name: str, args: dict[str, object]) -> dict[str, object]:
         "schema": "aoa_course_mcp_result_v1",
         "tool": name,
         "arguments": args,
-        "network_touched": False,
+        "catalog": {
+            "network_touched": False,
+            "read_only": True,
+        },
     }
 
 

@@ -37,6 +37,13 @@ EXCLUDED_OWNER_TOOLS = frozenset(
     }
 )
 OwnerCall = Callable[[str, dict[str, object]], dict[str, object]]
+OWNER_RESULT_SCHEMA = "aoa_course_mcp_result_v1"
+CURRENT_READ_ATTESTATION_KEYS = {
+    "connector_readiness": None,
+    "list_sources": "catalog",
+    "source_answer": "source_answer",
+    "sources_answer": "sources_answer",
+}
 
 
 @dataclass
@@ -180,8 +187,7 @@ class AoACourseConnectorMCPState:
         result = (self.owner_call or self._owner_call())(tool_name, cleaned)
         if not isinstance(result, dict):
             raise TypeError("owner course MCP result must be an object")
-        if _contains_true(result, "network_touched"):
-            raise PermissionError("owner result reported network_touched=true")
+        _require_owner_read_contract(tool_name, result)
         return {
             "schema": "aoa_course_connector_mcp_read_result_v1",
             "service_name": SERVICE_NAME,
@@ -207,7 +213,12 @@ class AoACourseConnectorMCPState:
         roots = config.StorageRoots.from_env(self.connector_repo)
 
         def call(name: str, args: dict[str, object]) -> dict[str, object]:
-            return module.call_tool(name, args, roots=roots)
+            return module.call_tool(
+                name,
+                args,
+                roots=roots,
+                repo_root=self.connector_repo,
+            )
 
         return call
 
@@ -234,3 +245,44 @@ def _contains_true(value: object, key: str) -> bool:
     if isinstance(value, list):
         return any(_contains_true(item, key) for item in value)
     return False
+
+
+def _require_owner_read_contract(
+    tool_name: str,
+    result: dict[str, object],
+) -> None:
+    if result.get("tool") != tool_name:
+        raise RuntimeError("owner result tool identity mismatch")
+
+    attestation_key = CURRENT_READ_ATTESTATION_KEYS.get(tool_name)
+    if tool_name == "connector_readiness":
+        if result.get("schema") != "aoa_course_connector_readiness_v1":
+            raise RuntimeError("owner readiness result schema mismatch")
+        _require_current_read_attestation(result)
+        return
+
+    if result.get("schema") != OWNER_RESULT_SCHEMA:
+        raise RuntimeError("owner result schema mismatch")
+    if attestation_key is not None:
+        attestation = result.get(attestation_key)
+        if not isinstance(attestation, dict):
+            raise RuntimeError(
+                f"owner result missing {attestation_key} read attestation"
+            )
+        _require_current_read_attestation(attestation)
+        return
+
+    # These owner tools have no current-call attestation envelope. Their exact
+    # source-reviewed allowlist remains authoritative, so retain the stricter
+    # recursive denial until the owner publishes a direct invocation posture.
+    if _contains_true(result, "network_touched"):
+        raise PermissionError("owner result reported current network use")
+
+
+def _require_current_read_attestation(
+    attestation: dict[str, object],
+) -> None:
+    if attestation.get("network_touched") is not False:
+        raise PermissionError("owner result did not prove network_touched=false")
+    if attestation.get("read_only") is not True:
+        raise PermissionError("owner result did not prove read_only=true")

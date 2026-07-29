@@ -68,8 +68,9 @@ cross-stage contract. `abyss-stack` owns:
 - operator-visible stop, denial, and rollback routing;
 - consumer-facing observation of the current stage and next owner.
 
-`abyss-stack-mcp` may later expose bounded read inspection of orchestration
-runs and candidate-only handoff preparation. It must not invoke owner tools,
+`abyss-stack-mcp` exposes bounded read inspection of orchestration runs, while
+a separate operator CLI owns host receipts and private persistence. It must
+not invoke owner tools,
 accept a source or memory change, compute an eval verdict, promote a memo
 candidate, or hide a server-to-server chain. Any future MCP write surface
 requires its own effect, approval, persistence, replay, concurrency, threat,
@@ -100,8 +101,11 @@ This also permits an operator to connect to stack state through
 - A valid eval result cannot imply memo-owner acceptance.
 - Schema, source, freshness, receipt, or previous-snapshot drift stops the
   chain.
-- Host persistence and any stack-MCP run inspection are not implemented by
-  this decision.
+- The source implementation now persists immutable private snapshots, issues
+  one content-addressed host receipt per advance, delegates complete-chain
+  validation to an explicit SDK CLI, and exposes bounded read inspection. This
+  remains an unlanded source candidate until its owner workflow and runtime
+  rollout finish.
 - The current SDK source candidate must land, package, and pass exact
   stack-consumer compatibility before implementation.
 - Live owner calls, accepted memory, benefit, cancellation recovery, restart
@@ -126,8 +130,8 @@ benefit, replay recovery, or rollback.
 
 ## Follow-up route
 
-Land and package the SDK contract first. Then define the stack persistence,
-read inspection, candidate handoff, cancellation, restart replay, concurrency,
-and rollback contract before adding any `abyss-stack-mcp` surface. Validate
-exact SDK schema and package compatibility and keep owner invocation outside
-the stack MCP server.
+Land and package the SDK contract first, then land the stack host persistence
+and read inspection. Run exact SDK/stack pair-conformance, restart replay, and
+private-store tamper tests before deployment. Keep owner invocation outside
+the stack MCP server; cancellation recovery and owner-effect rollback remain
+separate follow-up evidence rather than claims of the persistence layer.

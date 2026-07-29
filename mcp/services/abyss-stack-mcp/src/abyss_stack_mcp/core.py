@@ -30,10 +30,11 @@ from .contracts import (
     RuntimePlanCandidate,
     RuntimeSubject,
 )
+from .orchestration import CrossOrganRunStore
 
 
 DEFAULT_OBSERVATION_PATH = Path(
-    "/srv/AbyssOS/abyss-stack/Logs/mcp/organ-runtime-observation.json"
+    "/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json"
 )
 MAX_OBSERVATION_BYTES = 2 * 1024 * 1024
 MAX_PLAN_FUTURE_SKEW = timedelta(seconds=30)
@@ -511,6 +512,7 @@ class StackMCPApplication:
         store: ObservationStore,
         *,
         policy_family: str = "read",
+        orchestration_store: CrossOrganRunStore | None = None,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
         if policy_family not in {"read", "candidate"}:
@@ -519,6 +521,7 @@ class StackMCPApplication:
             )
         self.store = store
         self.policy_family = policy_family
+        self.orchestration_store = orchestration_store or CrossOrganRunStore()
         self._clock = clock or (lambda: datetime.now(timezone.utc))
 
     def catalog(
@@ -647,6 +650,36 @@ class StackMCPApplication:
             now=now,
             freshness_state=self._worst_state(freshness_states),
             freshness_scope=f"{organ_id}/{policy_family}",
+        )
+
+    def inspect_orchestration(
+        self,
+        run_id: str | None = None,
+    ) -> dict[str, Any]:
+        if self.policy_family != "read":
+            raise StackMCPError(
+                "cross-organ orchestration inspection is absent from this process"
+            )
+        observation, digest = self.store.load()
+        now = self._now()
+        payload = self.orchestration_store.inspect(run_id)
+        request_expires_at = datetime.fromisoformat(
+            str(payload["request_expires_at"]).replace("Z", "+00:00")
+        )
+        freshness_state = (
+            "exact" if request_expires_at > now else "stale_readable"
+        )
+        return self._result(
+            observation,
+            digest,
+            primitive_id="cross-organ-orchestration-inspect",
+            effect_class="observe",
+            payload=payload,
+            now=now,
+            freshness_state=freshness_state,
+            freshness_scope=(
+                f"cross-organ-orchestration/{payload['run_id']}"
+            ),
         )
 
     def prepare_plan(

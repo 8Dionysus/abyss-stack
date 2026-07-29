@@ -12532,7 +12532,7 @@
       "id": "decision:ABYSS-STACK-D-0096",
       "label": "ABYSS-STACK-D-0096",
       "path": "docs/decisions/ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md",
-      "posture": "accepted pre-final migration block",
+      "posture": "accepted post-final pair-evidence block",
       "status": "accepted",
       "title": "ABYSS-STACK-D-0096 Fail-Closed MCP Protocol Migration Lab",
       "type": "decision"

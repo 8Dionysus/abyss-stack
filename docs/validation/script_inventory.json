@@ -352,6 +352,9 @@
       "family": "mcp-protocol-lab-scripts",
       "paths": [
         "mcp/protocol-lab/scripts/build_protocol_lab_status.py",
+        "mcp/protocol-lab/scripts/run_kag_cache_pair.py",
+        "mcp/protocol-lab/scripts/run_kag_handle_pair.py",
+        "mcp/protocol-lab/scripts/run_kag_next_pair.py",
         "mcp/protocol-lab/scripts/validate_protocol_lab.py"
       ],
       "organ_lane": "MCP protocol compatibility gate",
@@ -362,12 +365,14 @@
       ],
       "reads": [
         "protocol lab source contracts",
-        "stack MCP package constraints and exact lock"
+        "stack MCP package constraints and exact lock",
+        "bounded aoa-kag MCP package and selected owner roots"
       ],
       "writes": [
-        "deterministic generated protocol-lab status when the builder runs without --check"
+        "deterministic generated protocol-lab status when the builder runs without --check",
+        "explicit private pair-observation output selected by the operator"
       ],
-      "side_effects": "source-local generation and validation only; no registration, process, credential, or runtime mutation",
+      "side_effects": "source-local generation and validation, plus bounded loopback client/server pair runs; no registration, global credential, service, or owner-truth mutation",
       "validation_lane": "mcp-services/release",
       "ci_inclusion": "mcp-services lane and default pytest collection",
       "test_target": "mcp/protocol-lab/tests/test_protocol_lab.py",

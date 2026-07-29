@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,8 @@ from ._http_auth import transport_settings as _transport_settings
 from .core import AoADecisionsMCPState
 
 LOGGER = logging.getLogger(__name__)
+PACKAGE_NAME = "aoa-decisions-mcp"
+SOURCE_FALLBACK_VERSION = "0.2.0"
 DEFAULT_HTTP_PORT = 5420
 SUPPORTED_CONTOURS = frozenset({"read", "internal_effect"})
 CONTOUR_AUTH = {
@@ -27,6 +30,27 @@ CONTOUR_AUTH = {
         "client_id": "aoa-loopback-codex:aoa-decisions:internal-effect",
     },
 }
+
+
+def _application_version() -> str:
+    try:
+        discovered = distribution(PACKAGE_NAME).metadata.get("Version")
+    except PackageNotFoundError:
+        return SOURCE_FALLBACK_VERSION
+    return (
+        discovered.strip()
+        if isinstance(discovered, str) and discovered.strip()
+        else SOURCE_FALLBACK_VERSION
+    )
+
+
+def _bind_server_info_version(mcp: Any) -> None:
+    low_level_server = getattr(mcp, "_mcp_server", None)
+    if low_level_server is None or not hasattr(low_level_server, "version"):
+        raise RuntimeError(
+            "the pinned MCP SDK no longer exposes the server identity seam"
+        )
+    low_level_server.version = _application_version()
 
 
 def _contour_http_auth_kwargs(contour: str) -> dict[str, Any]:
@@ -61,6 +85,7 @@ def build_server(
 ) -> Any:
     try:
         from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
+        from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
         raise SystemExit(
             "Missing dependency 'mcp'. Install with: python -m pip install -e ."
@@ -77,6 +102,15 @@ def build_server(
         json_response=True,
         **_contour_http_auth_kwargs(contour),
     )
+    _bind_server_info_version(mcp)
+    read_only_tool = mcp.tool(
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        )
+    )
 
     def current_state() -> AoADecisionsMCPState:
         return AoADecisionsMCPState.discover(
@@ -86,7 +120,7 @@ def build_server(
             cache_write_allowed=contour == "internal_effect",
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_decisions_status() -> dict[str, Any]:
         """Inspect local cache readiness without creating or refreshing files."""
         return current_state().cache_posture()
@@ -100,19 +134,19 @@ def build_server(
 
     if contour == "read":
 
-        @mcp.tool()
+        @read_only_tool
         def aoa_decisions_summary() -> dict[str, Any]:
             """Return the existing locally fresh workspace decision graph summary."""
             return current_state().summary()
 
-        @mcp.tool()
+        @read_only_tool
         def aoa_decisions_search(
             query: str, repo: str | None = None, limit: int = 20
         ) -> dict[str, Any]:
             """Search the existing locally fresh graph and carry source warnings."""
             return current_state().search(query=query, repo=repo, limit=limit)
 
-        @mcp.tool()
+        @read_only_tool
         def aoa_decisions_packet(
             query: str = "",
             repo: str | None = None,
@@ -129,19 +163,19 @@ def build_server(
                 limit=limit,
             )
 
-        @mcp.tool()
+        @read_only_tool
         def aoa_decisions_repo(repo: str) -> dict[str, Any]:
             """Return a repo graph slice plus the checkout's local source posture."""
             return current_state().repo(repo)
 
-        @mcp.tool()
+        @read_only_tool
         def aoa_decisions_decision(
             decision_id: str, repo: str | None = None
         ) -> dict[str, Any]:
             """Return a locally fresh decision neighborhood."""
             return current_state().decision(decision_id=decision_id, repo=repo)
 
-        @mcp.tool()
+        @read_only_tool
         def aoa_decisions_source_surface(
             source_surface: str,
             repo: str | None = None,
@@ -152,7 +186,7 @@ def build_server(
                 source_surface=source_surface, repo=repo, limit=limit
             )
 
-        @mcp.tool()
+        @read_only_tool
         def aoa_decisions_owner_surface(
             owner_surface: str,
             repo: str | None = None,
@@ -163,7 +197,7 @@ def build_server(
                 owner_surface=owner_surface, repo=repo, limit=limit
             )
 
-        @mcp.tool()
+        @read_only_tool
         def aoa_decisions_changed_path(
             path: str,
             repo: str | None = None,
@@ -172,12 +206,12 @@ def build_server(
             """Return locally fresh decisions likely impacted by a changed path."""
             return current_state().changed_path(path=path, repo=repo, limit=limit)
 
-        @mcp.tool()
+        @read_only_tool
         def aoa_decisions_repo_symmetry(repo: str | None = None) -> dict[str, Any]:
             """Return locally fresh decision-lane coverage without forced symmetry."""
             return current_state().repo_symmetry(repo=repo)
 
-        @mcp.tool()
+        @read_only_tool
         def aoa_decisions_issues(
             repo: str | None = None, limit: int = 100
         ) -> dict[str, Any]:

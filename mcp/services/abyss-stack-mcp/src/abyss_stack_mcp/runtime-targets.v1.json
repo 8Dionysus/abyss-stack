@@ -1,0 +1,536 @@
+{
+  "schema_version": "abyss_stack_runtime_targets_v1",
+  "targets": [
+    {
+      "canary_contract": {
+        "arguments": {
+          "detail": "compact",
+          "owner": "aoa-kag"
+        },
+        "array_contains": [
+          {
+            "pointer": "/owners",
+            "subset": {
+              "manifest_uri": "aoa-kag://owners/aoa-kag/manifest",
+              "repo": "aoa-kag"
+            }
+          }
+        ],
+        "exact_values": {},
+        "required_pointers": [
+          "/owners",
+          "/projection/distribution/state",
+          "/resource_templates"
+        ],
+        "schema_pointer": "/schema_version",
+        "schema_value": "aoa-kag-mcp-capabilities-v1",
+        "tool_name": "kag_discover"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-kag/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "endpoint_ref": "http://127.0.0.1:5425/mcp",
+      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py",
+      "organ_id": "aoa-kag",
+      "policy_family": "read",
+      "protocol_versions": [
+        "2025-11-25"
+      ],
+      "registry_organ_id": "aoa-kag",
+      "rollback_route": "runbook://mcp-rollback/aoa-kag/read",
+      "service_id": "aoa-kag-mcp",
+      "unit_name": "aoa-organ-mcp-read@aoa-kag.service"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/artifact_identity/owner_repo": "aoa-stats",
+          "/owner_repo": "aoa-stats"
+        },
+        "required_pointers": [
+          "/artifact_identity/content_identity",
+          "/generated_from/latest_observed_at",
+          "/surfaces"
+        ],
+        "schema_pointer": "/schema_version",
+        "schema_value": "aoa_stats_summary_surface_catalog_v2",
+        "tool_name": "stats_catalog"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-stats/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "endpoint_ref": "http://127.0.0.1:5430/mcp",
+      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-stats-mcp-server.py",
+      "organ_id": "aoa-stats",
+      "policy_family": "read",
+      "protocol_versions": [
+        "2025-11-25"
+      ],
+      "registry_organ_id": "aoa-stats",
+      "rollback_route": "runbook://mcp-rollback/aoa-stats/read",
+      "service_id": "aoa-stats-mcp",
+      "unit_name": "aoa-organ-mcp-read@aoa-stats.service"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/cache_write_allowed": false,
+          "/freshness_scope": "local_workspace_filesystem",
+          "/remote_freshness_checked": false
+        },
+        "required_pointers": [
+          "/status",
+          "/current_input_fingerprint",
+          "/claim_limits"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_decisions_graph_cache_posture_v1",
+        "tool_name": "aoa_decisions_status"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-decisions/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "endpoint_ref": "http://127.0.0.1:5420/mcp",
+      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-decisions-mcp-server.py",
+      "organ_id": "aoa-decisions",
+      "policy_family": "read",
+      "protocol_versions": [
+        "2025-11-25"
+      ],
+      "registry_organ_id": "aoa-decisions",
+      "rollback_route": "runbook://mcp-rollback/aoa-decisions/read",
+      "service_id": "aoa-decisions-mcp",
+      "unit_name": "aoa-organ-mcp-read@aoa-decisions.service"
+    },
+    {
+      "canary_contract": {
+        "arguments": {
+          "byte_budget": 8192,
+          "max_results": 1,
+          "organ_id": "abyss-stack",
+          "policy_family": "read"
+        },
+        "array_contains": [
+          {
+            "pointer": "/owner_payload/entries",
+            "subset": {
+              "organ_id": "abyss-stack",
+              "policy_family": "read"
+            }
+          }
+        ],
+        "exact_values": {
+          "/metadata/applied_state": "not_applied",
+          "/metadata/authority_ceiling": "read",
+          "/metadata/effect_class": "observe",
+          "/metadata/execution_authorized": false,
+          "/owner_payload/schema_bytes_loaded": 0
+        },
+        "required_pointers": [
+          "/metadata/observation_digest",
+          "/metadata/provider_watermark",
+          "/owner_payload/entries"
+        ],
+        "schema_pointer": "/metadata/contract_version",
+        "schema_value": "abyss_stack_mcp_result_v1",
+        "tool_name": "stack_runtime_catalog"
+      },
+      "canary_route": "runbook://mcp-canary/abyss-stack/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "endpoint_ref": "http://127.0.0.1:5431/mcp",
+      "executable_ref": "/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python",
+      "organ_id": "abyss-stack",
+      "policy_family": "read",
+      "protocol_versions": [
+        "2025-11-25"
+      ],
+      "registry_organ_id": "abyss-stack",
+      "rollback_route": "runbook://mcp-rollback/abyss-stack/read",
+      "service_id": "abyss-stack-mcp",
+      "unit_name": "abyss-stack-mcp-read.service"
+    },
+    {
+      "canary_contract": {
+        "arguments": {
+          "evidence_limit": 8,
+          "profile": "fast"
+        },
+        "array_contains": [],
+        "exact_values": {
+          "/authority_boundary/schema": "abyss_machine_mcp_authority_boundary_v1",
+          "/profile": "fast"
+        },
+        "required_pointers": [
+          "/generated_at",
+          "/authority_boundary",
+          "/owner_layers",
+          "/safe_next_route"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "abyss_machine_mcp_brief_v1",
+        "tool_name": "abyss_machine_brief"
+      },
+      "canary_route": "runbook://mcp-canary/abyss-machine/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "endpoint_ref": "http://127.0.0.1:5423/mcp",
+      "executable_ref": "/srv/AbyssOS/.codex/bin/abyss-machine-mcp-server.py",
+      "organ_id": "abyss-machine",
+      "policy_family": "read",
+      "protocol_versions": [
+        "2025-11-25"
+      ],
+      "registry_organ_id": "abyss-machine",
+      "rollback_route": "runbook://mcp-rollback/abyss-machine/read",
+      "service_id": "abyss-machine-mcp",
+      "unit_name": "aoa-organ-mcp-read@abyss-machine.service"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/owner_repo": "Tree-of-Sophia"
+        },
+        "required_pointers": [
+          "/index_path",
+          "/authority_order",
+          "/runtime_projection_boundary"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "tos_corpus_mcp_status_v1",
+        "tool_name": "tos_corpus_status"
+      },
+      "canary_route": "runbook://mcp-canary/tree-of-sophia/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "endpoint_ref": "http://127.0.0.1:5429/mcp",
+      "executable_ref": "/srv/AbyssOS/.codex/bin/tos-corpus-mcp-server.py",
+      "organ_id": "tree-of-sophia",
+      "policy_family": "read",
+      "protocol_versions": [
+        "2025-11-25"
+      ],
+      "registry_organ_id": "tree-of-sophia",
+      "rollback_route": "runbook://mcp-rollback/tree-of-sophia/read",
+      "service_id": "tos-corpus-mcp",
+      "unit_name": "aoa-organ-mcp-read@tos-corpus.service"
+    },
+    {
+      "canary_contract": {
+        "arguments": {
+          "include_live": false
+        },
+        "array_contains": [],
+        "exact_values": {
+          "/authority_boundary/schema": "aoa_session_memory_mcp_authority_boundary_v1",
+          "/mutates": false
+        },
+        "required_pointers": [
+          "/runtime",
+          "/provider",
+          "/readiness_policy",
+          "/authority_boundary"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_session_memory_status_v1",
+        "tool_name": "aoa_session_memory_status"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-session-memory/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "endpoint_ref": "http://127.0.0.1:5422/mcp",
+      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-session-memory-mcp-server.py",
+      "organ_id": "aoa-session-memory",
+      "policy_family": "read",
+      "protocol_versions": [
+        "2025-11-25"
+      ],
+      "registry_organ_id": "aoa-session-memory",
+      "rollback_route": "runbook://mcp-rollback/aoa-session-memory/read",
+      "service_id": "aoa-session-memory-mcp",
+      "unit_name": "aoa-organ-mcp-read@aoa-session-memory.service"
+    },
+    {
+      "canary_contract": {
+        "arguments": {
+          "intent": "",
+          "repo": "aoa-memo"
+        },
+        "array_contains": [],
+        "exact_values": {
+          "/repo": "aoa-memo"
+        },
+        "required_pointers": [
+          "/source_hierarchy",
+          "/memory_route",
+          "/local_port",
+          "/validation"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_memo_brief_v1",
+        "tool_name": "aoa_memo_brief"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-memo/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "endpoint_ref": "http://127.0.0.1:5421/mcp",
+      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-memo-mcp-server.py",
+      "organ_id": "aoa-memo",
+      "policy_family": "read",
+      "protocol_versions": [
+        "2025-11-25"
+      ],
+      "registry_organ_id": "aoa-memo",
+      "rollback_route": "runbook://mcp-rollback/aoa-memo/read",
+      "service_id": "aoa-memo-mcp",
+      "unit_name": "aoa-organ-mcp-read@aoa-memo.service"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/freshness/mirror_is_authority": false
+        },
+        "required_pointers": [
+          "/source",
+          "/freshness",
+          "/authority_boundary"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_evals_runtime_status_v1",
+        "tool_name": "aoa_evals_runtime_status"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-evals/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "endpoint_ref": "http://127.0.0.1:5424/mcp",
+      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-evals-mcp-server.py",
+      "organ_id": "aoa-evals",
+      "policy_family": "read",
+      "protocol_versions": [
+        "2025-11-25"
+      ],
+      "registry_organ_id": "aoa-evals",
+      "rollback_route": "runbook://mcp-rollback/aoa-evals/read",
+      "service_id": "aoa-evals-mcp",
+      "unit_name": "aoa-organ-mcp-read@aoa-evals.service"
+    },
+    {
+      "canary_contract": {
+        "arguments": {
+          "run": "latest"
+        },
+        "array_contains": [],
+        "exact_values": {
+          "/network_touched": false,
+          "/read_only": true
+        },
+        "required_pointers": [
+          "/source_route",
+          "/doctor",
+          "/storage",
+          "/ready"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_4pda_connector_mcp_status_v1",
+        "tool_name": "aoa_4pda_connector_status"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-4pda-connector/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "endpoint_ref": "http://127.0.0.1:5426/mcp",
+      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-4pda-connector-mcp-server.py",
+      "organ_id": "aoa-4pda-connector",
+      "policy_family": "read",
+      "protocol_versions": [
+        "2025-11-25"
+      ],
+      "registry_organ_id": "aoa-4pda-connector",
+      "rollback_route": "runbook://mcp-rollback/aoa-4pda-connector/read",
+      "service_id": "aoa-4pda-connector-mcp",
+      "unit_name": "aoa-organ-mcp-read@aoa-4pda-connector.service"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/network_touched": false,
+          "/read_only": true
+        },
+        "required_pointers": [
+          "/source_route",
+          "/doctor",
+          "/storage",
+          "/policy"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_telegram_connector_mcp_status_v1",
+        "tool_name": "aoa_telegram_connector_status"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-telegram-connector/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "endpoint_ref": "http://127.0.0.1:5427/mcp",
+      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-telegram-connector-mcp-server.py",
+      "organ_id": "aoa-telegram-connector",
+      "policy_family": "read",
+      "protocol_versions": [
+        "2025-11-25"
+      ],
+      "registry_organ_id": "aoa-telegram-connector",
+      "rollback_route": "runbook://mcp-rollback/aoa-telegram-connector/read",
+      "service_id": "aoa-telegram-connector-mcp",
+      "unit_name": "aoa-organ-mcp-read@aoa-telegram-connector.service"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/network_touched": false,
+          "/read_only": true
+        },
+        "required_pointers": [
+          "/source_route",
+          "/doctor",
+          "/storage",
+          "/policy"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_discord_connector_mcp_status_v1",
+        "tool_name": "aoa_discord_connector_status"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-discord-connector/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "endpoint_ref": "http://127.0.0.1:5428/mcp",
+      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-discord-connector-mcp-server.py",
+      "organ_id": "aoa-discord-connector",
+      "policy_family": "read",
+      "protocol_versions": [
+        "2025-11-25"
+      ],
+      "registry_organ_id": "aoa-discord-connector",
+      "rollback_route": "runbook://mcp-rollback/aoa-discord-connector/read",
+      "service_id": "aoa-discord-connector-mcp",
+      "unit_name": "aoa-organ-mcp-read@aoa-discord-connector.service"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/authority": "owner-result-preserved",
+          "/network_touched": false,
+          "/owner_tool": "connector_readiness",
+          "/read_only": true
+        },
+        "required_pointers": [
+          "/owner_result"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_course_connector_mcp_read_result_v1",
+        "tool_name": "aoa_course_connector_status"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-course-connector/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "endpoint_ref": "http://127.0.0.1:5436/mcp",
+      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-course-connector-mcp-server.py",
+      "organ_id": "aoa-course-connector",
+      "policy_family": "read",
+      "protocol_versions": [
+        "2025-11-25"
+      ],
+      "registry_organ_id": "aoa-course-connector",
+      "rollback_route": "runbook://mcp-rollback/aoa-course-connector/read",
+      "service_id": "aoa-course-connector-mcp",
+      "unit_name": "aoa-organ-mcp-read@aoa-course-connector.service"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/network_touched": false,
+          "/read_only": true
+        },
+        "required_pointers": [
+          "/source_route",
+          "/commands"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_stackoverflow_connector_mcp_status_v1",
+        "tool_name": "aoa_stackoverflow_connector_status"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-stackoverflow-connector/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "endpoint_ref": "http://127.0.0.1:5437/mcp",
+      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-stackoverflow-connector-mcp-server.py",
+      "organ_id": "aoa-stackoverflow-connector",
+      "policy_family": "read",
+      "protocol_versions": [
+        "2025-11-25"
+      ],
+      "registry_organ_id": "aoa-stackoverflow-connector",
+      "rollback_route": "runbook://mcp-rollback/aoa-stackoverflow-connector/read",
+      "service_id": "aoa-stackoverflow-connector-mcp",
+      "unit_name": "aoa-organ-mcp-read@aoa-stackoverflow-connector.service"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/network_touched": false,
+          "/read_only": true
+        },
+        "required_pointers": [
+          "/source_route",
+          "/commands"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_xda_connector_mcp_status_v1",
+        "tool_name": "aoa_xda_connector_status"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-xda-connector/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "endpoint_ref": "http://127.0.0.1:5438/mcp",
+      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-xda-connector-mcp-server.py",
+      "organ_id": "aoa-xda-connector",
+      "policy_family": "read",
+      "protocol_versions": [
+        "2025-11-25"
+      ],
+      "registry_organ_id": "aoa-xda-connector",
+      "rollback_route": "runbook://mcp-rollback/aoa-xda-connector/read",
+      "service_id": "aoa-xda-connector-mcp",
+      "unit_name": "aoa-organ-mcp-read@aoa-xda-connector.service"
+    }
+  ]
+}

@@ -14,7 +14,7 @@ import unittest
 from dataclasses import replace
 from http.client import RemoteDisconnected
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from unittest import mock
 
 
@@ -64,7 +64,17 @@ def write_bundle(root: Path) -> RetrievalBundle:
                 "git_ref": "INDEX",
             },
             "source_index_digest": _digest("source"),
-            "family_digests": {"artifact": _digest("artifact")},
+            "family_digests": {
+                kind: _digest(kind)
+                for kind in (
+                    "anchor",
+                    "artifact",
+                    "assertion",
+                    "entity",
+                    "event",
+                    "relation",
+                )
+            },
             "node_counts": {
                 "artifact": 1,
                 "anchor": 1,
@@ -276,18 +286,6 @@ def write_bundle(root: Path) -> RetrievalBundle:
                 "repo": owners[0]["repo"],
                 "source_index_digest": owners[0]["source_index_digest"],
                 "family_digests": owners[0]["family_digests"],
-                "corpus_identity": {
-                    "content_digest": "sha256:" + _digest("corpus")
-                },
-                "distribution_identity": {
-                    "content_digest": "sha256:" + _digest("distribution"),
-                    "delivery_state": "complete",
-                    "complete": True,
-                    "manifest_schema": (
-                        "aoa-repo-local-kag-distribution-manifest-v1"
-                    ),
-                    "routes": {"local_cas": 1},
-                },
             }
         ],
         "projection_lanes": ["exact", "lexical", "vector", "hybrid", "graph"],
@@ -337,14 +335,13 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 def _replace_fixture(value: Any, replacement: str) -> Any:
     if isinstance(value, str):
-        return value.replace("fixture", replacement).replace("Fixture", replacement.title())
+        return value.replace("fixture", replacement).replace(
+            "Fixture", replacement.title()
+        )
     if isinstance(value, list):
         return [_replace_fixture(item, replacement) for item in value]
     if isinstance(value, dict):
-        return {
-            key: _replace_fixture(item, replacement)
-            for key, item in value.items()
-        }
+        return {key: _replace_fixture(item, replacement) for key, item in value.items()}
     return value
 
 
@@ -389,34 +386,16 @@ def write_two_owner_bundle(root: Path) -> RetrievalBundle:
         for key in ("owners", "nodes", "relations", "external_references", "documents")
     }
     for key in records:
-        records[key].extend(
-            _replace_fixture(copy.deepcopy(records[key]), "fixture-b")
-        )
+        records[key].extend(_replace_fixture(copy.deepcopy(records[key]), "fixture-b"))
     second_owner = records["owners"][1]
     second_owner["source_index_digest"] = _digest("source-b")
     second_owner["repo"]["git_ref"] = "INDEX-B"
-    records["documents"][1][
-        "vector_point_id"
-    ] = "00000000-0000-0000-0000-000000000002"
+    records["documents"][1]["vector_point_id"] = "00000000-0000-0000-0000-000000000002"
     manifest["canonical_inputs"] = [
         {
             "repo": copy.deepcopy(item["repo"]),
             "source_index_digest": item["source_index_digest"],
             "family_digests": copy.deepcopy(item["family_digests"]),
-            "corpus_identity": {
-                "content_digest": "sha256:"
-                + _digest(f"corpus:{item['repo']['name']}")
-            },
-            "distribution_identity": {
-                "content_digest": "sha256:"
-                + _digest(f"distribution:{item['repo']['name']}"),
-                "delivery_state": "complete",
-                "complete": True,
-                "manifest_schema": (
-                    "aoa-repo-local-kag-distribution-manifest-v1"
-                ),
-                "routes": {"local_cas": 1},
-            },
         }
         for item in records["owners"]
     ]
@@ -460,18 +439,40 @@ def write_changed_owner_bundle(
     for item in manifest["canonical_inputs"]:
         if item["repo"]["name"] == owner:
             item["source_index_digest"] = _digest(f"{owner}:{marker}")
-            item["corpus_identity"]["content_digest"] = (
-                "sha256:" + _digest(f"corpus:{owner}:{marker}")
-            )
-            item["distribution_identity"]["content_digest"] = (
-                "sha256:" + _digest(f"distribution:{owner}:{marker}")
-            )
+            if "corpus_identity" in item:
+                item["corpus_identity"]["content_digest"] = "sha256:" + _digest(
+                    f"corpus:{owner}:{marker}"
+                )
+                item["distribution_identity"]["content_digest"] = "sha256:" + _digest(
+                    f"distribution:{owner}:{marker}"
+                )
     manifest["projection_identity"]["content_digest"] = _digest(
         f"projection:{owner}:{marker}"
     )
     manifest["federation_identity"]["content_digest"] = _digest(
         f"federation:{owner}:{marker}"
     )
+    return _finalize_bundle(root, manifest, records)
+
+
+def write_mutated_bundle(
+    source: RetrievalBundle,
+    root: Path,
+    mutate: Callable[[dict[str, Any], dict[str, list[dict[str, Any]]]], None],
+) -> RetrievalBundle:
+    shutil.copytree(source.root, root)
+    manifest = copy.deepcopy(source.manifest)
+    records = {
+        key: _read_jsonl(root / f"{key}.jsonl")
+        for key in (
+            "owners",
+            "nodes",
+            "relations",
+            "external_references",
+            "documents",
+        )
+    }
+    mutate(manifest, records)
     return _finalize_bundle(root, manifest, records)
 
 
@@ -733,6 +734,82 @@ class KagRuntimeProjectionTests(unittest.TestCase):
             handle.write(original)
         with self.assertRaisesRegex(RuntimeError, "digest mismatch"):
             self.bundle.verify()
+
+    def test_bundle_verification_accepts_paired_legacy_tiered_identities(
+        self,
+    ) -> None:
+        def add_tiered_identities(
+            manifest: dict[str, Any],
+            _records: dict[str, list[dict[str, Any]]],
+        ) -> None:
+            canonical_input = manifest["canonical_inputs"][0]
+            canonical_input["corpus_identity"] = {
+                "content_digest": "sha256:" + _digest("corpus")
+            }
+            canonical_input["distribution_identity"] = {
+                "content_digest": "sha256:" + _digest("distribution"),
+                "delivery_state": "complete",
+                "complete": True,
+                "manifest_schema": ("aoa-repo-local-kag-distribution-manifest-v1"),
+                "routes": {"local_cas": 1},
+            }
+
+        legacy = write_mutated_bundle(
+            self.bundle,
+            self.root / "legacy-tiered-bundle",
+            add_tiered_identities,
+        )
+        self.assertEqual(legacy.verify()["owners"], ["fixture"])
+
+    def test_bundle_verification_rejects_unpaired_tiered_identity(self) -> None:
+        def add_only_corpus(
+            manifest: dict[str, Any],
+            _records: dict[str, list[dict[str, Any]]],
+        ) -> None:
+            manifest["canonical_inputs"][0]["corpus_identity"] = {
+                "content_digest": "sha256:" + _digest("corpus")
+            }
+
+        broken = write_mutated_bundle(
+            self.bundle,
+            self.root / "unpaired-tiered-bundle",
+            add_only_corpus,
+        )
+        with self.assertRaisesRegex(RuntimeError, "tiered identities must be paired"):
+            broken.verify()
+
+    def test_bundle_verification_rejects_canonical_owner_disagreement(self) -> None:
+        def change_only_canonical_input(
+            manifest: dict[str, Any],
+            _records: dict[str, list[dict[str, Any]]],
+        ) -> None:
+            manifest["canonical_inputs"][0]["source_index_digest"] = _digest(
+                "unbound-source"
+            )
+
+        broken = write_mutated_bundle(
+            self.bundle,
+            self.root / "unbound-canonical-input",
+            change_only_canonical_input,
+        )
+        with self.assertRaisesRegex(RuntimeError, "disagrees with its owner record"):
+            broken.verify()
+
+    def test_bundle_verification_rejects_incomplete_family_identity(self) -> None:
+        def remove_family(
+            manifest: dict[str, Any],
+            records: dict[str, list[dict[str, Any]]],
+        ) -> None:
+            manifest["canonical_inputs"][0]["family_digests"].pop("relation")
+            records["owners"][0]["family_digests"].pop("relation")
+
+        broken = write_mutated_bundle(
+            self.bundle,
+            self.root / "incomplete-family-identity",
+            remove_family,
+        )
+        with self.assertRaisesRegex(RuntimeError, "family digests are invalid"):
+            broken.verify()
 
     def test_sqlite_projection_supports_exact_and_fts_reads(self) -> None:
         destination = self.root / "runtime" / "repo-self.sqlite3"
@@ -1041,9 +1118,7 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         write_json_atomic(
             config.distribution_path,
             {
-                "schema_version": (
-                    "abyss-stack-kag-tiered-distribution-current-v1"
-                ),
+                "schema_version": ("abyss-stack-kag-tiered-distribution-current-v1"),
                 "updated_at": "2026-07-18T00:00:00Z",
                 "state": "hot_only",
                 "composition_identity": None,
@@ -1083,9 +1158,7 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         )
 
         self.assertEqual(discovered["distribution"]["state"], "hot_only")
-        self.assertEqual(
-            discovered["degradation"][0]["target"], "tiered-distribution"
-        )
+        self.assertEqual(discovered["degradation"][0]["target"], "tiered-distribution")
         self.assertEqual(result["status"], "degraded")
         self.assertIn(
             {
@@ -1100,9 +1173,7 @@ class KagRuntimeProjectionTests(unittest.TestCase):
             "sha256:" + ("c" * 64),
         )
         self.assertEqual(
-            result["results"][0]["distribution_identity"][
-                "content_digest"
-            ],
+            result["results"][0]["distribution_identity"]["content_digest"],
             "sha256:" + ("d" * 64),
         )
 
@@ -1663,7 +1734,9 @@ class KagRuntimeProjectionTests(unittest.TestCase):
             advanced["owner_collections"]["fixture"],
             affected_collection,
         )
-        self.assertEqual(changed_embeddings.texts, ["# Changed owner\nvector-owner-marker\n"])
+        self.assertEqual(
+            changed_embeddings.texts, ["# Changed owner\nvector-owner-marker\n"]
+        )
         self.assertEqual(len(qdrant.points), initial_point_writes + 1)
         self.assertEqual(checked["point_count"], 2)
         self.assertEqual(
@@ -1697,8 +1770,7 @@ class KagRuntimeProjectionTests(unittest.TestCase):
             embeddings=embeddings,
             profile=state["embedding_profile"],
             owner_collections={
-                owner: packet["collection"]
-                for owner, packet in state["owners"].items()
+                owner: packet["collection"] for owner, packet in state["owners"].items()
             },
             limit=10,
         )
@@ -1951,12 +2023,7 @@ class KagRuntimeProjectionTests(unittest.TestCase):
             1,
         )
         self.assertEqual(checked["counts"]["nodes"], 10)
-        self.assertTrue(
-            (
-                state_path.parent
-                / "owner-slices.last-good.json"
-            ).is_file()
-        )
+        self.assertTrue((state_path.parent / "owner-slices.last-good.json").is_file())
         self.assertEqual(
             rolled_back["projection_digest"],
             first.projection_digest,
@@ -1995,9 +2062,7 @@ class KagRuntimeProjectionTests(unittest.TestCase):
                         [
                             {
                                 "id": "aoa:fixture:relation:contains",
-                                "evidence_anchor_ids": [
-                                    "aoa:fixture:anchor:intro"
-                                ],
+                                "evidence_anchor_ids": ["aoa:fixture:anchor:intro"],
                             }
                         ],
                     ]
@@ -2101,9 +2166,9 @@ class KagRuntimeProjectionTests(unittest.TestCase):
             "owner_incremental",
         )
         current = json.loads(
-            (
-                stack_root / "Knowledge" / "kag" / "repo-self" / "current.json"
-            ).read_text(encoding="utf-8")
+            (stack_root / "Knowledge" / "kag" / "repo-self" / "current.json").read_text(
+                encoding="utf-8"
+            )
         )
         self.assertEqual(
             current["targets"]["exact"]["result"]["affected_owners"],
@@ -2187,9 +2252,9 @@ class KagRuntimeProjectionTests(unittest.TestCase):
             "abyss-stack-repo-self-kag-projection-rollback-receipt-v1",
         )
         current = json.loads(
-            (
-                stack_root / "Knowledge" / "kag" / "repo-self" / "current.json"
-            ).read_text(encoding="utf-8")
+            (stack_root / "Knowledge" / "kag" / "repo-self" / "current.json").read_text(
+                encoding="utf-8"
+            )
         )
         self.assertEqual(
             current["projection_identity"]["content_digest"],

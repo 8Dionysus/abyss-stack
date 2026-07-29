@@ -42,6 +42,12 @@ STACK_MCP_READ_UNIT = REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-read.ser
 STACK_MCP_CANDIDATE_UNIT = (
     REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-candidate.service"
 )
+STACK_MCP_OBSERVATION_UNIT = (
+    REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-observation.service"
+)
+STACK_MCP_OBSERVATION_TIMER = (
+    REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-observation.timer"
+)
 STACK_RUNTIME_UNIT = REPO_ROOT / "systemd" / "user" / "podman-compose-abyss.service"
 STACK_RUNTIME_DROPIN = (
     REPO_ROOT
@@ -1346,6 +1352,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             audit_root = stack_root / "Logs" / "mcp" / "audit"
             read_audit_journal = audit_root / "policy-read.jsonl"
             candidate_audit_journal = audit_root / "policy-candidate.jsonl"
+            observation_root = stack_root / "Logs" / "mcp" / "observations"
             first_identity = marker.read_text(encoding="utf-8").strip()
             self.assertRegex(first_identity, r"\A[0-9a-f]{64}:[0-9a-f]{64}\Z")
             first_content_digest = content_marker.read_text(encoding="utf-8").strip()
@@ -1385,6 +1392,10 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 0o600,
             )
             self.assertNotEqual(read_audit_journal, candidate_audit_journal)
+            self.assertEqual(
+                observation_root.stat().st_mode & 0o777,
+                0o700,
+            )
             self.assertIn("provisioned abyss-stack MCP runtime", first.stdout)
             self.assertNotIn("unit linked", first.stdout)
             pip_calls = pip_log.read_text(encoding="utf-8").splitlines()
@@ -2148,16 +2159,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             env.pop("ZDOTDIR", None)
             for environment_name in (
                 "AOA_MCP_HTTP_BEARER_TOKEN",
-                "AOA_DECISIONS_MCP_READ_BEARER_TOKEN",
-                "AOA_MEMO_MCP_READ_BEARER_TOKEN",
+                *(auth["env"] for auth in ORGAN_MCP_READ_AUTH.values()),
                 "AOA_MEMO_MCP_CANDIDATE_BEARER_TOKEN",
-                "AOA_EVALS_MCP_READ_BEARER_TOKEN",
                 "AOA_EVALS_MCP_CANDIDATE_BEARER_TOKEN",
-                "AOA_KAG_MCP_READ_BEARER_TOKEN",
-                "AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN",
-                "AOA_STATS_MCP_READ_BEARER_TOKEN",
-                "ABYSS_MACHINE_MCP_READ_BEARER_TOKEN",
-                "TOS_CORPUS_MCP_READ_BEARER_TOKEN",
             ):
                 env.pop(environment_name, None)
 
@@ -2294,6 +2298,8 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertIn("aoa-memo-mcp-candidate.service", managed_units)
         self.assertIn("aoa-evals-mcp-candidate.service", managed_units)
         self.assertIn("aoa-mcp-http.service", managed_units)
+        self.assertIn("abyss-stack-mcp-observation.service", managed_units)
+        self.assertIn("abyss-stack-mcp-observation.timer", managed_units)
 
         memo_candidate = MEMO_MCP_CANDIDATE_UNIT.read_text(
             encoding="utf-8"
@@ -2340,7 +2346,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         candidate_unit = STACK_MCP_CANDIDATE_UNIT.read_text(encoding="utf-8")
         observation_path = (
             "Environment=ABYSS_STACK_MCP_OBSERVATION_PATH="
-            "/srv/AbyssOS/abyss-stack/Logs/mcp/organ-runtime-observation.json"
+            "/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json"
         )
         deployed_entrypoint_prefix = (
             "ExecStart=/usr/bin/flock --shared --no-fork "
@@ -2405,6 +2411,12 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         )
         self.assertIn(observation_path, read_unit)
         self.assertIn(observation_path, candidate_unit)
+        for unit in (read_unit, candidate_unit):
+            self.assertIn(
+                "ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/"
+                "observations/current.json",
+                unit,
+            )
         self.assertIn("Environment=AOA_MCP_PORT=5431", read_unit)
         self.assertNotIn("Environment=AOA_MCP_PORT=5433", read_unit)
         self.assertIn("Environment=AOA_MCP_PORT=5433", candidate_unit)
@@ -2501,6 +2513,44 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         }
         self.assertIn(STACK_MCP_READ_UNIT.name, managed_units)
         self.assertIn(STACK_MCP_CANDIDATE_UNIT.name, managed_units)
+
+    def test_stack_mcp_observation_producer_is_bounded_and_separately_timed(
+        self,
+    ) -> None:
+        unit = STACK_MCP_OBSERVATION_UNIT.read_text(encoding="utf-8")
+        timer = STACK_MCP_OBSERVATION_TIMER.read_text(encoding="utf-8")
+
+        self.assertIn("Type=oneshot", unit)
+        self.assertIn("-m abyss_stack_mcp.observation", unit)
+        self.assertIn(
+            "--deployment-manifest "
+            "/srv/AbyssOS/abyss-stack/Logs/mcp/deployments/latest.json",
+            unit,
+        )
+        self.assertIn(
+            "--registry "
+            "/srv/AbyssOS/.aoa/organ-access/organ-registry.source.json",
+            unit,
+        )
+        self.assertIn(
+            "--output "
+            "/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json",
+            unit,
+        )
+        self.assertIn(
+            "ReadWritePaths=/srv/AbyssOS/abyss-stack/Logs/mcp/observations",
+            unit,
+        )
+        self.assertIn("ProtectSystem=strict", unit)
+        self.assertIn("ProtectHome=read-only", unit)
+        self.assertIn("RestrictAddressFamilies=AF_UNIX", unit)
+        self.assertNotIn("LoadCredential=", unit)
+        self.assertNotIn("AF_INET", unit)
+        self.assertNotIn(str(REPO_ROOT), unit)
+
+        self.assertIn("OnUnitActiveSec=2min", timer)
+        self.assertIn("Persistent=false", timer)
+        self.assertIn("Unit=abyss-stack-mcp-observation.service", timer)
 
 
 class McpLoopbackLifecycleTests(unittest.TestCase):

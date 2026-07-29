@@ -53,8 +53,19 @@ def test_current_status_is_deterministic_and_blocks_migration(
     second = builder.build_status(copy.deepcopy(matrix), copy.deepcopy(observation))
 
     assert first == second
-    assert first["gate_counts"] == {"passed": 2, "blocked": 4, "pending": 8}
-    assert first["passed_gate_ids"] == ["P1-06", "P1-12"]
+    assert first["gate_counts"] == {"passed": 10, "blocked": 4, "pending": 0}
+    assert first["passed_gate_ids"] == [
+        "P1-01",
+        "P1-02",
+        "P1-04",
+        "P1-05",
+        "P1-06",
+        "P1-07",
+        "P1-08",
+        "P1-09",
+        "P1-10",
+        "P1-12",
+    ]
     assert first["migration_allowed"] is False
     assert first["read_only_pilot_allowed"] is False
     assert first["tasks_extension_allowed"] is False
@@ -62,17 +73,12 @@ def test_current_status_is_deterministic_and_blocks_migration(
     assert first["stable_registration_retained"] is True
 
 
-def test_final_label_alone_cannot_enable_migration(
+def test_final_spec_and_stable_sdks_cannot_enable_migration(
     builder: Any,
     matrix: dict[str, Any],
     observation: dict[str, Any],
 ) -> None:
-    candidate = copy.deepcopy(matrix)
-    candidate["next_spec"]["final_published"] = True
-    candidate["next_spec"]["production_allowed"] = True
-    candidate["next_spec"]["release_status"] = "final"
-
-    status = builder.build_status(candidate, observation)
+    status = builder.build_status(copy.deepcopy(matrix), observation)
 
     assert status["migration_allowed"] is False
     assert status["read_only_pilot_allowed"] is False
@@ -87,9 +93,130 @@ def test_consumer_literals_are_not_wire_pair_evidence(
 
     status = builder.build_status(matrix, observation)
 
-    assert matrix["consumer_pairs"][0]["capability_posture"] == "unknown"
-    assert "codex_next_pair_unobserved" in status["reason_codes"]
+    assert matrix["consumer_pairs"][0]["capability_posture"] == "blocked"
+    assert "codex_next_pair_blocked" in status["reason_codes"]
     assert status["migration_allowed"] is False
+
+
+def test_codex_wire_receipt_proves_legacy_pair_only(builder: Any) -> None:
+    wire_observation_path = (
+        LAB_ROOT / "fixtures" / "codex-0.145.0-wire-observation.json"
+    )
+    wire_schema_path = (
+        LAB_ROOT / "schemas" / "protocol-consumer-wire-observation.schema.json"
+    )
+    wire_observation = _load(wire_observation_path)
+
+    builder.validate_payload(wire_observation, wire_schema_path)
+
+    assert wire_observation["wire_protocol_offered"] == "2025-06-18"
+    assert wire_observation["wire_protocol_selected"] == "2025-06-18"
+    assert wire_observation["method_sequence"][0] == "initialize"
+    assert wire_observation["server_discover_observed"] is False
+    assert wire_observation["next_wire_pair_observed"] is False
+    assert wire_observation["global_codex_config_mutated"] is False
+
+
+def test_official_conformance_receipt_is_sdk_scoped(builder: Any) -> None:
+    conformance_path = (
+        LAB_ROOT / "fixtures" / "python-mcp-2.0.0-conformance-observation.json"
+    )
+    conformance_schema_path = (
+        LAB_ROOT / "schemas" / "protocol-conformance-observation.schema.json"
+    )
+    conformance = _load(conformance_path)
+
+    builder.validate_payload(conformance, conformance_schema_path)
+
+    assert conformance["spec_version"] == "2026-07-28"
+    assert conformance["directions"]["server"]["success_checks"] == 114
+    assert conformance["directions"]["client"]["success_checks"] == 371
+    assert conformance["directions"]["server"]["failed_checks"] == 0
+    assert conformance["directions"]["client"]["failed_checks"] == 0
+    assert "Codex" in " ".join(conformance["claim_limits"])
+
+
+def test_kag_next_pair_is_adapter_scoped(builder: Any) -> None:
+    pair_path = LAB_ROOT / "fixtures" / "kag-next-pair-observation.json"
+    pair_schema_path = (
+        LAB_ROOT / "schemas" / "kag-next-pair-observation.schema.json"
+    )
+    pair = _load(pair_path)
+
+    builder.validate_payload(pair, pair_schema_path)
+
+    assert pair["pair"]["wire_version"] == "2026-07-28"
+    assert pair["pair"]["server_discover_observed"] is True
+    assert pair["pair"]["session_header_observed"] is False
+    assert pair["pair"]["server_request_backchannel_observed"] is False
+    assert pair["pair"]["cache"]["repeat_tools_list_wire_fetches"] == 1
+    assert pair["pair"]["trace_sent"] == pair["pair"]["trace_observed"]
+    assert pair["stable_registration"]["unchanged"] is True
+    assert pair["owner_canary"]["projection_exact_state"] == "current"
+    assert pair["owner_canary"]["freshness_state"] == "source_unavailable"
+    assert "Codex" in " ".join(pair["claim_limits"])
+
+
+def test_kag_request_state_handles_are_read_scoped(builder: Any) -> None:
+    handle_path = (
+        LAB_ROOT / "fixtures" / "kag-handle-pair-observation.json"
+    )
+    handle_schema_path = (
+        LAB_ROOT / "schemas" / "kag-handle-pair-observation.schema.json"
+    )
+    handle = _load(handle_path)
+
+    builder.validate_payload(handle, handle_schema_path)
+
+    assert handle["handle_contract"]["opaque"] is True
+    assert handle["handle_contract"]["plaintext_observed_on_wire"] is False
+    assert handle["handle_contract"]["principal_binding"] == [
+        "client_id",
+        "issuer",
+        "subject",
+    ]
+    assert handle["handle_checks"]["principal_isolation"] == "denied"
+    assert handle["handle_checks"]["expiry"] == "denied"
+    assert handle["handle_checks"]["cross_request_replay"] == "denied"
+    assert (
+        handle["handle_checks"]["same_request_replay"]
+        == "allowed_read_only_idempotent"
+    )
+    assert handle["handle_checks"]["key_retirement_revocation"] == "denied"
+    assert "Effectful" in " ".join(handle["claim_limits"])
+
+
+def test_kag_catalog_cache_is_bounded_and_non_authoritative(
+    builder: Any,
+) -> None:
+    cache_path = LAB_ROOT / "fixtures" / "kag-cache-pair-observation.json"
+    cache_schema_path = (
+        LAB_ROOT / "schemas" / "kag-cache-pair-observation.schema.json"
+    )
+    cache = _load(cache_path)
+
+    builder.validate_payload(cache, cache_schema_path)
+
+    assert cache["cache"] == {
+        "scope": "private",
+        "ttl_ms": 30000,
+        "within_ttl_repeat_server_fetches": 1,
+    }
+    assert cache["checks"]["subscription_addition_invalidation"] is True
+    assert cache["checks"]["subscription_removal_revocation"] is True
+    assert cache["checks"]["ttl_expiry_refetch"] is True
+    assert cache["checks"]["no_subscription_no_replay"] is True
+    assert cache["checks"]["stale_catalog_cannot_authorize_removed_tool"]
+    assert cache["inventories"]["stale_after_removal"] == [
+        "kag_discover",
+        "kag_stale_probe",
+    ]
+    assert cache["inventories"]["after_explicit_refresh"] == [
+        "kag_discover"
+    ]
+    assert "never grants tool authorization" in " ".join(
+        cache["claim_limits"]
+    )
 
 
 def test_effectful_first_pilot_is_schema_rejected(

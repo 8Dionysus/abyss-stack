@@ -217,3 +217,24 @@ def test_active_source_rejects_retired_routing_checkout_consumer(
         f"{runtime_route_contracts.RETIRED_ROUTING_CHECKOUT}"
         in errors
     )
+
+
+def test_derived_decision_graph_may_preserve_retired_checkout_provenance(
+    tmp_path: Path,
+) -> None:
+    write_valid_surface(tmp_path)
+    graph = (
+        tmp_path
+        / "Logs"
+        / "decision-graph"
+        / "latest"
+        / "workspace_decision_graph.json"
+    )
+    write_text(
+        graph,
+        '{"source_root":"'
+        + runtime_route_contracts.RETIRED_ROUTING_CHECKOUT
+        + '"}\n',
+    )
+
+    assert run_runtime_route_validator(tmp_path) == []

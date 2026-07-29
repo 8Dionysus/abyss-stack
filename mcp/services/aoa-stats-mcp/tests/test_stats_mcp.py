@@ -355,6 +355,7 @@ def test_server_exposes_only_proven_read_only_tools(tmp_path: Path) -> None:
     )
 
     tools = asyncio.run(server.list_tools())
+    assert server._mcp_server.version == "0.1.0"
     assert {tool.name for tool in tools} == {
         "stats_catalog",
         "stats_surface_read",
