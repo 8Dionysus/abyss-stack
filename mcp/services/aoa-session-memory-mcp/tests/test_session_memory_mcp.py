@@ -4125,8 +4125,7 @@ def test_validator_configured_transport_http_client_outlives_tool_budgets() -> N
         assert client.timeout.connect == validator.CONFIGURED_HTTP_TIMEOUT_SECONDS
         assert client.timeout.write == validator.CONFIGURED_HTTP_TIMEOUT_SECONDS
         assert client.timeout.pool == validator.CONFIGURED_HTTP_TIMEOUT_SECONDS
-        assert client.timeout.read == validator.CONFIGURED_HTTP_READ_TIMEOUT_SECONDS
-        assert client.timeout.read > 90
+        assert client.timeout.read is None
     finally:
         asyncio.run(client.aclose())
 

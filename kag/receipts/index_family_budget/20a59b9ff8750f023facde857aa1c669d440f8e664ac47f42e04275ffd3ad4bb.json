@@ -8,7 +8,7 @@
   "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
   "default_limit_bytes": 1048576,
   "head_family_digest": "20a59b9ff8750f023facde857aa1c669d440f8e664ac47f42e04275ffd3ad4bb",
-  "reason": "Refresh the repository-local portable KAG family for the reviewed session-memory HTTP validator fix; the standing tracked-size threshold was already exceeded and this receipt binds the exact regenerated family to the PR base.",
+  "reason": "Refresh the repository-local portable KAG family for the reviewed session-memory HTTP validator fix and accepted long-lived GET review correction; the receipt binds the exact regenerated family to the PR base.",
   "repo": "abyss-stack",
   "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
   "scope": "generated_delta_and_tracked_size",

@@ -71,7 +71,6 @@ ACCEPTABLE_FRESHNESS_SMOKE_STATUSES = {
 }
 
 CONFIGURED_HTTP_TIMEOUT_SECONDS = 30.0
-CONFIGURED_HTTP_READ_TIMEOUT_SECONDS = 300.0
 
 
 def _search_alias_smoke_arguments(limit: int = 3) -> dict:
@@ -1221,14 +1220,14 @@ def _configured_transport_http_client(bearer_token: str):
     import httpx
 
     # The configured smoke keeps one GET stream open while tool calls have
-    # explicit 60-90 second ClientSession budgets. httpx's five-second default
+    # explicit 20-90 second ClientSession budgets. httpx's five-second default
     # races both valid tool work and the long-lived stream.
     return httpx.AsyncClient(
         headers={"Authorization": f"Bearer {bearer_token}"},
         follow_redirects=True,
         timeout=httpx.Timeout(
             CONFIGURED_HTTP_TIMEOUT_SECONDS,
-            read=CONFIGURED_HTTP_READ_TIMEOUT_SECONDS,
+            read=None,
         ),
     )
 
