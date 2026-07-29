@@ -1369,7 +1369,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             entrypoint = venv / "bin" / "abyss-stack-mcp"
             self.assertEqual(
                 entrypoint.read_text(encoding="utf-8").splitlines()[0],
-                f"#!{venv}/bin/python",
+                f"#!{venv}/bin/python -B",
             )
             self.assertNotIn(
                 "/.venv.",

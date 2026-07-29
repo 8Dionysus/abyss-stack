@@ -1253,8 +1253,13 @@ aoa_rewrite_abyss_stack_mcp_entrypoint_shebangs() {
     IFS= read -r first_line < "$entry" || continue
     [[ "$first_line" == "#!${staged_root}/bin/python"* ]] || continue
     interpreter_suffix="${first_line#\#!"${staged_root}"}"
-    [[ "$interpreter_suffix" =~ ^/bin/python([0-9]+([.][0-9]+)*)?([[:space:]].*)?$ ]] || \
+    [[ "$interpreter_suffix" =~ ^/bin/python([0-9]+([.][0-9]+)*)?$ ]] || \
       return 1
+    # Direct console entry points bypass the systemd launcher, so bind Python's
+    # no-bytecode mode into their published shebang. Otherwise a documented
+    # canary invocation creates __pycache__ inside the content-addressed venv
+    # and invalidates the other contour before its verifier can start.
+    interpreter_suffix="${interpreter_suffix} -B"
     rewrite_path="$(mktemp "${entry}.rewrite.XXXXXX")" || return 1
     if ! {
       printf '#!%s%s\n' "$published_root" "$interpreter_suffix"
