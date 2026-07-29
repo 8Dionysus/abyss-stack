@@ -368,6 +368,46 @@ def rollback_args(
     ]
 
 
+def refresh_args(
+    fixture: dict[str, str],
+    *,
+    target: Path,
+    sdk_rollback_root: Path,
+) -> list[str]:
+    return [
+        "refresh-materialized",
+        *exact_args(fixture, target),
+        "--authorized-live-cutover",
+        "--sdk-rollback-root",
+        str(sdk_rollback_root),
+        "--operator-change-ref",
+        "test-sdk-refresh",
+    ]
+
+
+def sdk_rollback_args(
+    fixture: dict[str, str],
+    *,
+    target: Path,
+    sdk_rollback_root: Path,
+    retain_root: Path,
+) -> list[str]:
+    return [
+        "rollback-sdk",
+        "--authorized-live-cutover",
+        "--target-root",
+        str(target),
+        "--sdk-rollback-root",
+        str(sdk_rollback_root),
+        "--replaced-target-retain-root",
+        str(retain_root),
+        "--operator-change-ref",
+        "test-sdk-rollback",
+        "--routing-config",
+        fixture["config"],
+    ]
+
+
 def test_isolated_canonical_materialization_is_receipt_bound(
     tmp_path: Path,
 ) -> None:
@@ -474,6 +514,315 @@ def test_materialized_inspection_rejects_file_and_manifest_hash_tampering(
     )
     assert rejected.returncode == 1
     assert "subject-store ledger" in json.loads(rejected.stdout)["error"]
+
+
+def test_live_refresh_upgrades_legacy_manifest_and_seals_sdk_rollback(
+    tmp_path: Path,
+) -> None:
+    fixture = make_fixture(tmp_path)
+    target = tmp_path / "runtime/Knowledge/federation/aoa-routing"
+    make_predecessor_root(target, fixture)
+    predecessor_root = target.parent / "aoa-routing.pre-g5"
+    activated = run_cutover(
+        [
+            "materialize",
+            *exact_args(fixture, target),
+            "--authorized-live-cutover",
+            "--rollback-root",
+            str(predecessor_root),
+            "--operator-change-ref",
+            "test-g5-change",
+        ]
+    )
+    assert activated.returncode == 0, activated.stderr + activated.stdout
+    manifest_path = target / "manifest/federation_mirror_manifest.json"
+    legacy_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    legacy_manifest.pop("artifact_subject_ledger")
+    write_json(manifest_path, legacy_manifest)
+    sdk_rollback_root = target.parent / "aoa-routing.sdk-rollback-v0.8.0"
+
+    refreshed = run_cutover(
+        refresh_args(
+            fixture,
+            target=target,
+            sdk_rollback_root=sdk_rollback_root,
+        )
+    )
+
+    assert refreshed.returncode == 0, refreshed.stderr + refreshed.stdout
+    result = json.loads(refreshed.stdout)
+    assert result["legacy_manifest_upgraded"] is True
+    assert result["sdk_rollback_created"] is True
+    assert result["predecessor_implementation_required"] is False
+    assert result["predecessor_tree_mutated"] is False
+    assert predecessor_root.joinpath("predecessor.txt").is_file()
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["artifact_subject_ledger"]
+    assert manifest["predecessor_rollback"]["operationally_required"] is False
+    assert manifest["sdk_runtime_rollback"] == {
+        "schema": "abyss_stack_routing_sdk_runtime_rollback_binding_v1",
+        "owner_repo": "aoa-sdk",
+        "source_ref": SDK_REF,
+        "artifact_subject_digest": fixture["subject_digest"],
+        "root_name": sdk_rollback_root.name,
+        "posture": "primary_operational_rollback",
+        "predecessor_implementation_required": False,
+        "archive_authorized": False,
+    }
+    inspected = run_cutover(
+        [
+            "inspect-materialized",
+            "--target-root",
+            str(target),
+            "--routing-config",
+            fixture["config"],
+        ]
+    )
+    assert inspected.returncode == 0, inspected.stderr + inspected.stdout
+    rollback_inspected = run_cutover(
+        [
+            "inspect-materialized",
+            "--target-root",
+            str(sdk_rollback_root),
+            "--routing-config",
+            fixture["config"],
+        ]
+    )
+    assert (
+        rollback_inspected.returncode == 0
+    ), rollback_inspected.stderr + rollback_inspected.stdout
+
+    retried = run_cutover(
+        refresh_args(
+            fixture,
+            target=target,
+            sdk_rollback_root=sdk_rollback_root,
+        )
+    )
+    assert retried.returncode == 0, retried.stderr + retried.stdout
+    assert json.loads(retried.stdout)["idempotent_retry"] is True
+
+
+def test_live_refresh_rejects_runtime_byte_drift_before_writing(
+    tmp_path: Path,
+) -> None:
+    fixture = make_fixture(tmp_path)
+    target = tmp_path / "runtime/Knowledge/federation/aoa-routing"
+    make_predecessor_root(target, fixture)
+    predecessor_root = target.parent / "aoa-routing.pre-g5"
+    activated = run_cutover(
+        [
+            "materialize",
+            *exact_args(fixture, target),
+            "--authorized-live-cutover",
+            "--rollback-root",
+            str(predecessor_root),
+            "--operator-change-ref",
+            "test-g5-change",
+        ]
+    )
+    assert activated.returncode == 0, activated.stderr + activated.stdout
+    manifest_path = target / "manifest/federation_mirror_manifest.json"
+    manifest_before = manifest_path.read_bytes()
+    write_json(
+        target / "generated/task_to_surface_hints.json",
+        {"tampered": True},
+    )
+    sdk_rollback_root = target.parent / "aoa-routing.sdk-rollback-v0.8.0"
+
+    rejected = run_cutover(
+        refresh_args(
+            fixture,
+            target=target,
+            sdk_rollback_root=sdk_rollback_root,
+        )
+    )
+
+    assert rejected.returncode == 1
+    assert "file digest drifted" in json.loads(rejected.stdout)["error"]
+    assert manifest_path.read_bytes() == manifest_before
+    assert not sdk_rollback_root.exists()
+
+
+def test_sdk_rollback_restores_without_predecessor_implementation(
+    tmp_path: Path,
+) -> None:
+    fixture = make_fixture(tmp_path)
+    target = tmp_path / "runtime/Knowledge/federation/aoa-routing"
+    make_predecessor_root(target, fixture)
+    predecessor_root = target.parent / "aoa-routing.pre-g5"
+    activated = run_cutover(
+        [
+            "materialize",
+            *exact_args(fixture, target),
+            "--authorized-live-cutover",
+            "--rollback-root",
+            str(predecessor_root),
+            "--operator-change-ref",
+            "test-g5-change",
+        ]
+    )
+    assert activated.returncode == 0, activated.stderr + activated.stdout
+    sdk_rollback_root = target.parent / "aoa-routing.sdk-rollback-v0.8.0"
+    refreshed = run_cutover(
+        refresh_args(
+            fixture,
+            target=target,
+            sdk_rollback_root=sdk_rollback_root,
+        )
+    )
+    assert refreshed.returncode == 0, refreshed.stderr + refreshed.stdout
+    predecessor_manifest_before = predecessor_root.joinpath(
+        "manifest/federation_mirror_manifest.json"
+    ).read_bytes()
+    write_json(
+        target / "generated/task_to_surface_hints.json",
+        {"runtime_failure": True},
+    )
+    retain_root = target.parent / "aoa-routing.failed-sdk-retained"
+
+    restored = run_cutover(
+        sdk_rollback_args(
+            fixture,
+            target=target,
+            sdk_rollback_root=sdk_rollback_root,
+            retain_root=retain_root,
+        )
+    )
+
+    assert restored.returncode == 0, restored.stderr + restored.stdout
+    result = json.loads(restored.stdout)
+    assert result["runtime_owner_state"] == "sdk_runtime_rollback_active"
+    assert result["source_owner_state"] == "sdk_canonical_unchanged"
+    assert result["predecessor_implementation_required"] is False
+    assert result["predecessor_tree_used"] is False
+    assert result["replaced_target_inspection"]["verified"] is False
+    assert predecessor_root.joinpath(
+        "manifest/federation_mirror_manifest.json"
+    ).read_bytes() == predecessor_manifest_before
+    assert target.joinpath(
+        "manifest/routing_sdk_runtime_rollback.json"
+    ).is_file()
+    inspected = run_cutover(
+        [
+            "inspect-materialized",
+            "--target-root",
+            str(target),
+            "--routing-config",
+            fixture["config"],
+        ]
+    )
+    assert inspected.returncode == 0, inspected.stderr + inspected.stdout
+
+    retried = run_cutover(
+        sdk_rollback_args(
+            fixture,
+            target=target,
+            sdk_rollback_root=sdk_rollback_root,
+            retain_root=retain_root,
+        )
+    )
+    assert retried.returncode == 0, retried.stderr + retried.stdout
+    assert json.loads(retried.stdout)["idempotent_retry"] is True
+
+
+@pytest.mark.parametrize(
+    "termination_point",
+    ["before_first_swap", "between_swaps", "after_second_swap"],
+)
+def test_sdk_rollback_retry_recovers_each_rename_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    termination_point: str,
+) -> None:
+    fixture = make_fixture(tmp_path)
+    target = tmp_path / "runtime/Knowledge/federation/aoa-routing"
+    make_predecessor_root(target, fixture)
+    predecessor_root = target.parent / "aoa-routing.pre-g5"
+    activated = run_cutover(
+        [
+            "materialize",
+            *exact_args(fixture, target),
+            "--authorized-live-cutover",
+            "--rollback-root",
+            str(predecessor_root),
+            "--operator-change-ref",
+            "test-g5-change",
+        ]
+    )
+    assert activated.returncode == 0, activated.stderr + activated.stdout
+    sdk_rollback_root = target.parent / "aoa-routing.sdk-rollback-v0.8.0"
+    refreshed = run_cutover(
+        refresh_args(
+            fixture,
+            target=target,
+            sdk_rollback_root=sdk_rollback_root,
+        )
+    )
+    assert refreshed.returncode == 0, refreshed.stderr + refreshed.stdout
+    retain_root = target.parent / "aoa-routing.replaced-sdk-retained"
+    parsed = CUTOVER_BACKEND.build_parser().parse_args(
+        sdk_rollback_args(
+            fixture,
+            target=target,
+            sdk_rollback_root=sdk_rollback_root,
+            retain_root=retain_root,
+        )
+    )
+    real_replace = os.replace
+
+    def terminate_at_selected_boundary(
+        source: Path,
+        destination: Path,
+    ) -> None:
+        pair = (Path(source), Path(destination))
+        if (
+            termination_point == "before_first_swap"
+            and pair == (target, retain_root)
+        ):
+            raise KeyboardInterrupt("injected SDK rollback termination")
+        real_replace(source, destination)
+        if (
+            termination_point == "between_swaps"
+            and pair == (target, retain_root)
+        ):
+            raise KeyboardInterrupt("injected SDK rollback termination")
+        if (
+            termination_point == "after_second_swap"
+            and pair == (sdk_rollback_root, target)
+        ):
+            raise KeyboardInterrupt("injected SDK rollback termination")
+
+    monkeypatch.setattr(
+        CUTOVER_BACKEND.os,
+        "replace",
+        terminate_at_selected_boundary,
+    )
+    with pytest.raises(
+        KeyboardInterrupt,
+        match="injected SDK rollback termination",
+    ):
+        CUTOVER_BACKEND.rollback_sdk(parsed)
+
+    monkeypatch.setattr(CUTOVER_BACKEND.os, "replace", real_replace)
+    recovered = CUTOVER_BACKEND.rollback_sdk(parsed)
+
+    assert recovered["restored"] is True
+    assert recovered["retry_state"] in {
+        "fresh_restore",
+        "continued_after_first_swap",
+        "already_restored",
+    }
+    assert recovered["idempotent_retry"] is (
+        termination_point == "after_second_swap"
+    )
+    assert recovered["predecessor_implementation_required"] is False
+    assert recovered["predecessor_tree_used"] is False
+    assert target.joinpath(
+        "manifest/routing_sdk_runtime_rollback.json"
+    ).is_file()
+    assert retain_root.is_dir()
+    assert predecessor_root.joinpath("predecessor.txt").is_file()
 
 
 def test_isolated_cutover_rejects_live_target_shape(tmp_path: Path) -> None:

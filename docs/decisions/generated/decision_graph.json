@@ -1,14 +1,14 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 101,
-  "edge_count": 2281,
+  "edge_count": 2282,
   "edge_type_counts": {
     "CITES_SOURCE_SURFACE": 884,
     "DATED": 101,
     "GUARDED_BY": 293,
     "HAS_STATUS": 101,
     "HAS_SURFACE_CLASS": 262,
-    "IN_STACK_LANE": 223,
+    "IN_STACK_LANE": 224,
     "NEXT_DECISION": 100,
     "OWNED_BY_SURFACE": 107,
     "OWNS_DECISION": 101,
@@ -9148,6 +9148,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0086",
+      "target": "stack_lane:SDK-only%20operational%20rollback",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
       "target": "stack_lane:compatibility%20rollback",
       "type": "IN_STACK_LANE"
     },
@@ -11423,7 +11428,7 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1002,
+  "node_count": 1003,
   "node_type_counts": {
     "date": 28,
     "decision": 101,
@@ -11432,7 +11437,7 @@
     "owner_surface": 54,
     "repo": 1,
     "source_surface": 522,
-    "stack_lane": 39,
+    "stack_lane": 40,
     "status": 3,
     "surface_class": 102
   },
@@ -16241,6 +16246,11 @@
     {
       "id": "stack_lane:MCP%20services",
       "label": "MCP services",
+      "type": "stack_lane"
+    },
+    {
+      "id": "stack_lane:SDK-only%20operational%20rollback",
+      "label": "SDK-only operational rollback",
       "type": "stack_lane"
     },
     {

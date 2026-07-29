@@ -10,7 +10,6 @@ root, and operator change record agree.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import shutil
@@ -55,7 +54,17 @@ COMPATIBILITY_ROLLBACK_SCHEMA = (
 COMPATIBILITY_ROLLBACK_REL = (
     "manifest/routing_g5_compatibility_rollback.json"
 )
+SDK_RUNTIME_ROLLBACK_BINDING_SCHEMA = (
+    "abyss_stack_routing_sdk_runtime_rollback_binding_v1"
+)
+SDK_RUNTIME_ROLLBACK_RECEIPT_SCHEMA = (
+    "abyss_stack_routing_sdk_runtime_rollback_receipt_v1"
+)
+SDK_RUNTIME_ROLLBACK_REL = (
+    "manifest/routing_sdk_runtime_rollback.json"
+)
 CANONICAL_PREPARED_SUFFIX = ".sdk-canonical-prepared"
+SDK_ROLLBACK_PREPARED_SUFFIX = ".sdk-rollback-prepared"
 CANONICAL_AUTHORITY = {
     "archive_authorized": False,
     "canonical_producer_switch_authorized": True,
@@ -187,6 +196,60 @@ def validate_embedded_subject_ledger(
             )
         entries[relative] = raw_entry
     return entries
+
+
+def sdk_runtime_rollback_binding(
+    *,
+    rollback_root: Path,
+    sdk_source_ref: str,
+    subject_digest: str,
+) -> dict[str, Any]:
+    return {
+        "schema": SDK_RUNTIME_ROLLBACK_BINDING_SCHEMA,
+        "owner_repo": "aoa-sdk",
+        "source_ref": sdk_source_ref,
+        "artifact_subject_digest": subject_digest,
+        "root_name": rollback_root.name,
+        "posture": "primary_operational_rollback",
+        "predecessor_implementation_required": False,
+        "archive_authorized": False,
+    }
+
+
+def validate_sdk_runtime_rollback_binding(
+    value: Any,
+    *,
+    sdk_source_ref: str,
+    subject_digest: str,
+    rollback_root_name: str | None = None,
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise CutoverError("SDK runtime rollback binding is missing")
+    expected = {
+        "schema": SDK_RUNTIME_ROLLBACK_BINDING_SCHEMA,
+        "owner_repo": "aoa-sdk",
+        "source_ref": sdk_source_ref,
+        "artifact_subject_digest": subject_digest,
+        "posture": "primary_operational_rollback",
+        "predecessor_implementation_required": False,
+        "archive_authorized": False,
+    }
+    if rollback_root_name is not None:
+        expected["root_name"] = rollback_root_name
+    for key, expected_value in expected.items():
+        if value.get(key) != expected_value:
+            raise CutoverError(
+                f"SDK runtime rollback binding drifted: {key}"
+            )
+    root_name = value.get("root_name")
+    if (
+        not isinstance(root_name, str)
+        or not root_name
+        or Path(root_name).name != root_name
+        or root_name in {".", ".."}
+    ):
+        raise CutoverError("SDK runtime rollback root name is invalid")
+    return dict(value)
 
 
 def fsync_file(path: Path) -> None:
@@ -821,6 +884,13 @@ def validate_canonical_root(
         != "compatibility_security_rollback_deprecation_only"
     ):
         raise CutoverError("canonical routing predecessor rollback binding drifted")
+    sdk_rollback = manifest.get("sdk_runtime_rollback")
+    if sdk_rollback is not None:
+        validate_sdk_runtime_rollback_binding(
+            sdk_rollback,
+            sdk_source_ref=sdk_source_ref,
+            subject_digest=subject_digest,
+        )
     authority = require_canonical_authority(
         manifest.get("g5_authority"),
         "canonical routing manifest g5_authority",
@@ -891,6 +961,10 @@ def validate_canonical_root(
         "closure_authorized": True,
         "activation_mode": activation,
         "operator_change_ref_present": isinstance(operator_change, str),
+        "sdk_runtime_rollback_ready": sdk_rollback is not None,
+        "predecessor_implementation_required": (
+            False if sdk_rollback is not None else None
+        ),
     }
 
 
@@ -1044,6 +1118,332 @@ def prepare_canonical_stage(
     finally:
         if build.exists():
             shutil.rmtree(build)
+
+
+def validate_sdk_refresh_source_root(
+    target_root: Path,
+    *,
+    required_files: list[str],
+    sdk_source_ref: str,
+    predecessor_source_ref: str,
+    subject_digest: str,
+    subject_entries: dict[str, dict[str, Any]],
+    receipt: dict[str, Any],
+    trust_verdict: dict[str, Any],
+) -> dict[str, Any]:
+    """Validate an older SDK-canonical mirror before metadata refresh.
+
+    The first live SDK cutover predates the self-contained subject ledger.
+    This validator permits that one missing field, but it still binds every
+    runtime byte, owner receipt, authority flag, and durable trust record to
+    the exact current inputs before the manifest can be replaced.
+    """
+
+    manifest = read_json(
+        target_root / "manifest" / "federation_mirror_manifest.json",
+        "SDK refresh source manifest",
+    )
+    expected = {
+        "schema": "abyss_stack_federation_mirror_manifest_v1",
+        "layer": "aoa-routing",
+        "routing_producer_posture": CANONICAL_POSTURE,
+        "cutover_activation_mode": "authorized_live_cutover",
+        "source_git_commit": sdk_source_ref,
+        "artifact_subject_digest": subject_digest,
+        "mirror_is_authority": False,
+        "required_file_count": len(required_files),
+        "required_files": required_files,
+        "canonical_producer": {
+            "owner_repo": "aoa-sdk",
+            "source_ref": sdk_source_ref,
+        },
+    }
+    for key, expected_value in expected.items():
+        if manifest.get(key) != expected_value:
+            raise CutoverError(
+                f"SDK refresh source manifest field drifted: {key}"
+            )
+    predecessor = manifest.get("predecessor_rollback")
+    if (
+        not isinstance(predecessor, dict)
+        or predecessor.get("owner_repo") != "aoa-routing"
+        or predecessor.get("source_ref") != predecessor_source_ref
+        or predecessor.get("posture")
+        != "compatibility_security_rollback_deprecation_only"
+        or predecessor.get("operationally_required") not in {None, False}
+    ):
+        raise CutoverError(
+            "SDK refresh source predecessor binding drifted"
+        )
+    require_operator_change_ref(manifest.get("operator_change_ref"))
+    require_canonical_authority(
+        manifest.get("g5_authority"),
+        "SDK refresh source g5_authority",
+    )
+    if manifest.get("owner_switch_receipt") != receipt:
+        raise CutoverError("SDK refresh source owner-switch receipt drifted")
+    if manifest.get("owner_switch_receipt_digest") != owner_switch_receipt_digest(
+        receipt
+    ):
+        raise CutoverError(
+            "SDK refresh source owner-switch receipt digest drifted"
+        )
+    existing_verdict = manifest.get("trust_verdict")
+    if not isinstance(existing_verdict, dict):
+        raise CutoverError("SDK refresh source trust verdict is missing")
+    validate_canonical_trust_verdict(
+        existing_verdict,
+        sdk_source_ref=sdk_source_ref,
+        predecessor_source_ref=predecessor_source_ref,
+        subject_digest=subject_digest,
+        receipt=receipt,
+    )
+    if existing_verdict.get("record_id") != trust_verdict.get("record_id"):
+        raise CutoverError(
+            "SDK refresh source and supplied trust records disagree"
+        )
+    hashes = manifest.get("file_sha256")
+    if not isinstance(hashes, dict) or set(hashes) != set(required_files):
+        raise CutoverError("SDK refresh source hash set drifted")
+    for relative in required_files:
+        materialized = resolved_subject_file(target_root, relative)
+        actual = file_digest_hex(materialized)
+        if hashes.get(relative) != actual:
+            raise CutoverError(
+                f"SDK refresh source file digest drifted: {relative}"
+            )
+        if actual != subject_entries[relative].get("sha256_hex"):
+            raise CutoverError(
+                "SDK refresh source no longer matches the admitted "
+                f"subject ledger: {relative}"
+            )
+    embedded = manifest.get("artifact_subject_ledger")
+    legacy_manifest = embedded is None
+    if not legacy_manifest:
+        embedded_entries = validate_embedded_subject_ledger(
+            embedded,
+            subject_digest=subject_digest,
+        )
+        if embedded_entries != subject_entries:
+            raise CutoverError(
+                "SDK refresh source embedded ledger differs from admission"
+            )
+    router = read_json(
+        target_root / "generated" / "aoa_router.min.json",
+        "SDK refresh source router",
+    )
+    identity = router.get("artifact_identity")
+    if (
+        not isinstance(identity, dict)
+        or identity.get("owner_repo") != "aoa-sdk"
+        or identity.get("artifact_class") != ARTIFACT_CLASS
+        or identity.get("abi_epoch") != ABI_EPOCH
+    ):
+        raise CutoverError("SDK refresh source is not the SDK stable ABI")
+    return {
+        "verified": True,
+        "legacy_manifest_without_subject_ledger": legacy_manifest,
+        "previous_manifest_digest": stable_digest(manifest),
+        "trust_record_id": existing_verdict.get("record_id"),
+    }
+
+
+def write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.stage-",
+        dir=path.parent,
+    )
+    os.close(descriptor)
+    temporary_path = Path(temporary_name)
+    try:
+        write_json(temporary_path, payload)
+        fsync_file(temporary_path)
+        os.replace(temporary_path, path)
+        fsync_directory(path.parent)
+    finally:
+        if temporary_path.exists():
+            temporary_path.unlink()
+
+
+def refresh_materialized(args: argparse.Namespace) -> dict[str, Any]:
+    """Refresh a live SDK mirror and establish SDK-only rollback bytes."""
+
+    required, authority, entries, receipt, verdict = validate_inputs(args)
+    target = absolute_existing_directory(args.target_root, "target root")
+    ensure_live_target_shape(target)
+    if not args.authorized_live_cutover:
+        raise CutoverError(
+            "SDK materialized refresh requires --authorized-live-cutover"
+        )
+    operator_change = require_operator_change_ref(args.operator_change_ref)
+    rollback_root = absolute_runtime_path(
+        args.sdk_rollback_root,
+        "SDK rollback root",
+    )
+    if (
+        rollback_root == target
+        or rollback_root in target.parents
+        or target in rollback_root.parents
+    ):
+        raise CutoverError("target and SDK rollback roots must be disjoint")
+    if rollback_root.parent != target.parent:
+        raise CutoverError(
+            "SDK rollback root must share the target parent"
+        )
+    source_inspection = validate_sdk_refresh_source_root(
+        target,
+        required_files=required,
+        sdk_source_ref=args.sdk_source_ref,
+        predecessor_source_ref=args.predecessor_source_ref,
+        subject_digest=args.subject_digest,
+        subject_entries=entries,
+        receipt=receipt,
+        trust_verdict=verdict,
+    )
+
+    prepared = (
+        rollback_root.parent
+        / f".{rollback_root.name}{SDK_ROLLBACK_PREPARED_SUFFIX}"
+    )
+    rollback_created = False
+    if rollback_root.exists():
+        rollback_validation = validate_live_canonical_root(
+            rollback_root,
+            required_files=required,
+            sdk_source_ref=args.sdk_source_ref,
+            predecessor_source_ref=args.predecessor_source_ref,
+            subject_digest=args.subject_digest,
+            subject_entries=entries,
+            receipt=receipt,
+            operator_change_ref=operator_change,
+        )
+    else:
+        prepare_canonical_stage(
+            prepared=prepared,
+            target=rollback_root,
+            store=absolute_existing_directory(
+                args.subject_store,
+                "subject store",
+            ),
+            required_files=required,
+            entries=entries,
+            verdict=verdict,
+            receipt=receipt,
+            sdk_source_ref=args.sdk_source_ref,
+            predecessor_source_ref=args.predecessor_source_ref,
+            subject_digest=args.subject_digest,
+            authority=authority,
+            observed_at=args.observed_at,
+            live=True,
+            operator_change_ref=operator_change,
+        )
+        rollback_manifest_path = (
+            prepared / "manifest" / "federation_mirror_manifest.json"
+        )
+        rollback_manifest = read_json(
+            rollback_manifest_path,
+            "prepared SDK rollback manifest",
+        )
+        rollback_manifest["refresh_command"] = (
+            "scripts/aoa-routing-cutover refresh-materialized "
+            "--seal-sdk-rollback"
+        )
+        rollback_manifest["predecessor_rollback"][
+            "operationally_required"
+        ] = False
+        write_json_atomic(rollback_manifest_path, rollback_manifest)
+        validate_live_canonical_root(
+            prepared,
+            required_files=required,
+            sdk_source_ref=args.sdk_source_ref,
+            predecessor_source_ref=args.predecessor_source_ref,
+            subject_digest=args.subject_digest,
+            subject_entries=entries,
+            receipt=receipt,
+            operator_change_ref=operator_change,
+        )
+        os.replace(prepared, rollback_root)
+        fsync_directory(rollback_root.parent)
+        rollback_created = True
+        rollback_validation = validate_live_canonical_root(
+            rollback_root,
+            required_files=required,
+            sdk_source_ref=args.sdk_source_ref,
+            predecessor_source_ref=args.predecessor_source_ref,
+            subject_digest=args.subject_digest,
+            subject_entries=entries,
+            receipt=receipt,
+            operator_change_ref=operator_change,
+        )
+
+    manifest = canonical_manifest(
+        target_root=target,
+        required_files=required,
+        subject_entries=entries,
+        trust_verdict=verdict,
+        receipt=receipt,
+        sdk_source_ref=args.sdk_source_ref,
+        predecessor_source_ref=args.predecessor_source_ref,
+        subject_digest=args.subject_digest,
+        authority=authority,
+        observed_at=args.observed_at or datetime.now(timezone.utc).isoformat(),
+        activation_mode="authorized_live_cutover",
+        operator_change_ref=operator_change,
+    )
+    manifest["refresh_command"] = (
+        "scripts/aoa-routing-cutover refresh-materialized "
+        "--explicit-exact-inputs"
+    )
+    manifest["sdk_runtime_rollback"] = sdk_runtime_rollback_binding(
+        rollback_root=rollback_root,
+        sdk_source_ref=args.sdk_source_ref,
+        subject_digest=args.subject_digest,
+    )
+    manifest["predecessor_rollback"]["operationally_required"] = False
+    write_json_atomic(
+        target / "manifest" / "federation_mirror_manifest.json",
+        manifest,
+    )
+    result = validate_live_canonical_root(
+        target,
+        required_files=required,
+        sdk_source_ref=args.sdk_source_ref,
+        predecessor_source_ref=args.predecessor_source_ref,
+        subject_digest=args.subject_digest,
+        subject_entries=entries,
+        receipt=receipt,
+        operator_change_ref=operator_change,
+    )
+    validate_sdk_runtime_rollback_binding(
+        manifest.get("sdk_runtime_rollback"),
+        sdk_source_ref=args.sdk_source_ref,
+        subject_digest=args.subject_digest,
+        rollback_root_name=rollback_root.name,
+    )
+    result.update(
+        {
+            "operation": "refresh-materialized",
+            "refreshed": True,
+            "idempotent_retry": not rollback_created
+            and not source_inspection[
+                "legacy_manifest_without_subject_ledger"
+            ],
+            "legacy_manifest_upgraded": source_inspection[
+                "legacy_manifest_without_subject_ledger"
+            ],
+            "previous_manifest_digest": source_inspection[
+                "previous_manifest_digest"
+            ],
+            "sdk_rollback_root": str(rollback_root),
+            "sdk_rollback_created": rollback_created,
+            "sdk_rollback_validation": rollback_validation,
+            "predecessor_implementation_required": False,
+            "predecessor_tree_mutated": False,
+            "archive_authorized": False,
+        }
+    )
+    return result
 
 
 def materialize(args: argparse.Namespace) -> dict[str, Any]:
@@ -1293,26 +1693,11 @@ def check(args: argparse.Namespace) -> dict[str, Any]:
     return result
 
 
-def inspect_materialized(args: argparse.Namespace) -> dict[str, Any]:
-    """Verify current SDK-canonical bytes without reopening release admission.
-
-    The exact-input ``check`` operation remains the authority for proving that
-    a materialization matches its external subject store and trust inputs.
-    This operation verifies only the integrity and embedded provenance of the
-    already admitted runtime mirror so ordinary stack health checks never need
-    an SDK or predecessor source checkout.
-    """
-
-    target = absolute_existing_directory(
-        args.target_root,
-        "materialized routing target root",
-    )
-    required = routing_required_files(
-        absolute_existing_file(
-            args.routing_config,
-            "routing federation config",
-        )
-    )
+def validate_embedded_canonical_root(
+    target: Path,
+    *,
+    required_files: list[str],
+) -> tuple[dict[str, Any], dict[str, Any]]:
     manifest = read_json(
         target / "manifest" / "federation_mirror_manifest.json",
         "materialized routing manifest",
@@ -1350,12 +1735,39 @@ def inspect_materialized(args: argparse.Namespace) -> dict[str, Any]:
     )
     result = validate_canonical_root(
         target,
-        required_files=required,
+        required_files=required_files,
         sdk_source_ref=sdk_source_ref,
         predecessor_source_ref=predecessor_source_ref,
         subject_digest=subject_digest,
         subject_entries=subject_entries,
         receipt=receipt,
+    )
+    return result, manifest
+
+
+def inspect_materialized(args: argparse.Namespace) -> dict[str, Any]:
+    """Verify current SDK-canonical bytes without reopening release admission.
+
+    The exact-input ``check`` operation remains the authority for proving that
+    a materialization matches its external subject store and trust inputs.
+    This operation verifies only the integrity and embedded provenance of the
+    already admitted runtime mirror so ordinary stack health checks never need
+    an SDK or predecessor source checkout.
+    """
+
+    target = absolute_existing_directory(
+        args.target_root,
+        "materialized routing target root",
+    )
+    required = routing_required_files(
+        absolute_existing_file(
+            args.routing_config,
+            "routing federation config",
+        )
+    )
+    result, _manifest = validate_embedded_canonical_root(
+        target,
+        required_files=required,
     )
     result.update(
         {
@@ -1406,6 +1818,353 @@ def inspect_active_canonical(
     except CutoverError as exc:
         reasons.append(str(exc))
     return {"verified": not reasons, "reasons": reasons}
+
+
+def sdk_runtime_rollback_receipt(
+    *,
+    sdk_source_ref: str,
+    subject_digest: str,
+    operator_change_ref: str,
+    replaced_target_inspection: dict[str, Any],
+    restored_at: str,
+) -> dict[str, Any]:
+    return {
+        "schema": SDK_RUNTIME_ROLLBACK_RECEIPT_SCHEMA,
+        "state": "sdk_runtime_rollback_active",
+        "sdk_source_ref": sdk_source_ref,
+        "artifact_subject_digest": subject_digest,
+        "operator_change_ref": operator_change_ref,
+        "restored_at": restored_at,
+        "source_owner_state": "sdk_canonical_unchanged",
+        "predecessor_implementation_required": False,
+        "archive_authorized": False,
+        "replaced_target_inspection": replaced_target_inspection,
+    }
+
+
+def validate_sdk_runtime_rollback_receipt(
+    value: Any,
+    *,
+    sdk_source_ref: str,
+    subject_digest: str,
+    operator_change_ref: str,
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise CutoverError("SDK runtime rollback receipt is missing")
+    expected = {
+        "schema": SDK_RUNTIME_ROLLBACK_RECEIPT_SCHEMA,
+        "state": "sdk_runtime_rollback_active",
+        "sdk_source_ref": sdk_source_ref,
+        "artifact_subject_digest": subject_digest,
+        "operator_change_ref": operator_change_ref,
+        "source_owner_state": "sdk_canonical_unchanged",
+        "predecessor_implementation_required": False,
+        "archive_authorized": False,
+    }
+    for key, expected_value in expected.items():
+        if value.get(key) != expected_value:
+            raise CutoverError(
+                f"SDK runtime rollback receipt drifted: {key}"
+            )
+    if not isinstance(value.get("restored_at"), str) or not value["restored_at"]:
+        raise CutoverError("SDK runtime rollback receipt time is missing")
+    if not isinstance(value.get("replaced_target_inspection"), dict):
+        raise CutoverError(
+            "SDK runtime rollback replaced-target inspection is missing"
+        )
+    return dict(value)
+
+
+def load_sdk_runtime_rollback_receipt(
+    root: Path,
+) -> dict[str, Any] | None:
+    receipt_path = root / SDK_RUNTIME_ROLLBACK_REL
+    if receipt_path.is_symlink():
+        raise CutoverError(
+            "SDK runtime rollback receipt must not be a symlink"
+        )
+    if not receipt_path.exists():
+        return None
+    return read_json(receipt_path, "SDK runtime rollback receipt")
+
+
+def remove_exact_sdk_runtime_rollback_receipt(
+    root: Path,
+    *,
+    expected_receipt: dict[str, Any],
+) -> None:
+    receipt_path = root / SDK_RUNTIME_ROLLBACK_REL
+    if not receipt_path.exists():
+        return
+    persisted = read_json(receipt_path, "failed SDK runtime rollback receipt")
+    if stable_digest(persisted) != stable_digest(expected_receipt):
+        raise CutoverError(
+            "failed SDK rollback receipt changed before cleanup"
+        )
+    receipt_path.unlink()
+    fsync_directory(receipt_path.parent)
+
+
+def inspect_embedded_canonical_for_rollback(
+    root: Path,
+    *,
+    required_files: list[str],
+) -> dict[str, Any]:
+    try:
+        result, manifest = validate_embedded_canonical_root(
+            root,
+            required_files=required_files,
+        )
+    except (CanaryError, OSError) as exc:
+        return {"verified": False, "reasons": [str(exc)]}
+    return {
+        "verified": True,
+        "reasons": [],
+        "sdk_source_ref": result["sdk_source_ref"],
+        "artifact_subject_digest": result["artifact_subject_digest"],
+        "manifest_digest": stable_digest(manifest),
+    }
+
+
+def sdk_rollback_result(
+    *,
+    target: Path,
+    retain_root: Path,
+    operator_change_ref: str,
+    restored_validation: dict[str, Any],
+    replaced_target_inspection: dict[str, Any],
+    receipt: dict[str, Any],
+    retry_state: str,
+) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "schema": "abyss_stack_routing_sdk_runtime_rollback_v1",
+        "operation": "rollback-sdk",
+        "restored": True,
+        "idempotent_retry": retry_state == "already_restored",
+        "retry_state": retry_state,
+        "runtime_owner_state": "sdk_runtime_rollback_active",
+        "source_owner_state": "sdk_canonical_unchanged",
+        "target_root": str(target),
+        "replaced_target_retain_root": str(retain_root),
+        "sdk_source_ref": restored_validation["sdk_source_ref"],
+        "artifact_subject_digest": restored_validation[
+            "artifact_subject_digest"
+        ],
+        "operator_change_ref": operator_change_ref,
+        "restored_validation": restored_validation,
+        "replaced_target_inspection": replaced_target_inspection,
+        "rollback_receipt": SDK_RUNTIME_ROLLBACK_REL,
+        "rollback_receipt_digest": stable_digest(receipt),
+        "predecessor_implementation_required": False,
+        "predecessor_tree_used": False,
+        "archive_authorized": False,
+    }
+
+
+def rollback_sdk(args: argparse.Namespace) -> dict[str, Any]:
+    if not args.authorized_live_cutover:
+        raise CutoverError("SDK rollback requires --authorized-live-cutover")
+    operator_change = require_operator_change_ref(args.operator_change_ref)
+    config = absolute_existing_file(args.routing_config, "routing config")
+    required = routing_required_files(config)
+    target = absolute_runtime_path(args.target_root, "target root")
+    ensure_live_target_shape(target)
+    rollback_root = absolute_runtime_path(
+        args.sdk_rollback_root,
+        "SDK rollback root",
+    )
+    retain_root = absolute_runtime_path(
+        args.replaced_target_retain_root,
+        "replaced target retain root",
+    )
+    roots = {target, rollback_root, retain_root}
+    if len(roots) != 3 or any(
+        left in right.parents or right in left.parents
+        for left in roots
+        for right in roots
+        if left != right
+    ):
+        raise CutoverError(
+            "target, SDK rollback, and retain roots must be disjoint"
+        )
+    if not (target.parent == rollback_root.parent == retain_root.parent):
+        raise CutoverError(
+            "SDK rollback roots must share one parent for atomic restore"
+        )
+
+    initial_state = (
+        target.is_dir()
+        and rollback_root.is_dir()
+        and not retain_root.exists()
+    )
+    interrupted_between_swaps = (
+        not target.exists()
+        and rollback_root.is_dir()
+        and retain_root.is_dir()
+    )
+    already_restored = (
+        target.is_dir()
+        and not rollback_root.exists()
+        and retain_root.is_dir()
+    )
+    if not (
+        initial_state
+        or interrupted_between_swaps
+        or already_restored
+    ):
+        raise CutoverError(
+            "SDK rollback roots do not match an initial, interrupted, or "
+            "already-restored transaction state"
+        )
+
+    if already_restored:
+        restored_validation, _manifest = validate_embedded_canonical_root(
+            target,
+            required_files=required,
+        )
+        completed_receipt = load_sdk_runtime_rollback_receipt(target)
+        validate_sdk_runtime_rollback_receipt(
+            completed_receipt,
+            sdk_source_ref=restored_validation["sdk_source_ref"],
+            subject_digest=restored_validation["artifact_subject_digest"],
+            operator_change_ref=operator_change,
+        )
+        replaced_inspection = inspect_embedded_canonical_for_rollback(
+            retain_root,
+            required_files=required,
+        )
+        assert completed_receipt is not None
+        return sdk_rollback_result(
+            target=target,
+            retain_root=retain_root,
+            operator_change_ref=operator_change,
+            restored_validation=restored_validation,
+            replaced_target_inspection=replaced_inspection,
+            receipt=completed_receipt,
+            retry_state="already_restored",
+        )
+
+    restored_validation, _manifest = validate_embedded_canonical_root(
+        rollback_root,
+        required_files=required,
+    )
+    staged_receipt = load_sdk_runtime_rollback_receipt(rollback_root)
+    if interrupted_between_swaps:
+        staged_receipt = validate_sdk_runtime_rollback_receipt(
+            staged_receipt,
+            sdk_source_ref=restored_validation["sdk_source_ref"],
+            subject_digest=restored_validation["artifact_subject_digest"],
+            operator_change_ref=operator_change,
+        )
+        replaced_inspection = inspect_embedded_canonical_for_rollback(
+            retain_root,
+            required_files=required,
+        )
+        try:
+            os.replace(rollback_root, target)
+            fsync_directory(target.parent)
+        except Exception:
+            if not target.exists():
+                os.replace(retain_root, target)
+                fsync_directory(target.parent)
+                remove_exact_sdk_runtime_rollback_receipt(
+                    rollback_root,
+                    expected_receipt=staged_receipt,
+                )
+            raise
+        return sdk_rollback_result(
+            target=target,
+            retain_root=retain_root,
+            operator_change_ref=operator_change,
+            restored_validation=restored_validation,
+            replaced_target_inspection=replaced_inspection,
+            receipt=staged_receipt,
+            retry_state="continued_after_first_swap",
+        )
+
+    active_manifest = read_json(
+        target / "manifest" / "federation_mirror_manifest.json",
+        "active SDK routing manifest",
+    )
+    validate_sdk_runtime_rollback_binding(
+        active_manifest.get("sdk_runtime_rollback"),
+        sdk_source_ref=restored_validation["sdk_source_ref"],
+        subject_digest=restored_validation["artifact_subject_digest"],
+        rollback_root_name=rollback_root.name,
+    )
+    replaced_inspection = inspect_embedded_canonical_for_rollback(
+        target,
+        required_files=required,
+    )
+    if staged_receipt is not None:
+        persisted_receipt = validate_sdk_runtime_rollback_receipt(
+            staged_receipt,
+            sdk_source_ref=restored_validation["sdk_source_ref"],
+            subject_digest=restored_validation["artifact_subject_digest"],
+            operator_change_ref=operator_change,
+        )
+        if persisted_receipt["replaced_target_inspection"] != (
+            replaced_inspection
+        ):
+            raise CutoverError(
+                "staged SDK rollback receipt no longer matches active target"
+            )
+    else:
+        receipt = sdk_runtime_rollback_receipt(
+            sdk_source_ref=restored_validation["sdk_source_ref"],
+            subject_digest=restored_validation["artifact_subject_digest"],
+            operator_change_ref=operator_change,
+            replaced_target_inspection=replaced_inspection,
+            restored_at=datetime.now(timezone.utc).isoformat(),
+        )
+        write_json_atomic(
+            rollback_root / SDK_RUNTIME_ROLLBACK_REL,
+            receipt,
+        )
+        persisted_receipt = load_sdk_runtime_rollback_receipt(rollback_root)
+        persisted_receipt = validate_sdk_runtime_rollback_receipt(
+            persisted_receipt,
+            sdk_source_ref=restored_validation["sdk_source_ref"],
+            subject_digest=restored_validation["artifact_subject_digest"],
+            operator_change_ref=operator_change,
+        )
+    target_moved = False
+    try:
+        os.replace(target, retain_root)
+        target_moved = True
+        fsync_directory(target.parent)
+        try:
+            os.replace(rollback_root, target)
+            fsync_directory(target.parent)
+        except Exception:
+            if not target.exists():
+                os.replace(retain_root, target)
+                target_moved = False
+                fsync_directory(target.parent)
+            raise
+    except Exception:
+        if target_moved and not target.exists() and retain_root.is_dir():
+            os.replace(retain_root, target)
+            fsync_directory(target.parent)
+        remove_exact_sdk_runtime_rollback_receipt(
+            rollback_root,
+            expected_receipt=persisted_receipt,
+        )
+        raise
+    restored_validation, _manifest = validate_embedded_canonical_root(
+        target,
+        required_files=required,
+    )
+    return sdk_rollback_result(
+        target=target,
+        retain_root=retain_root,
+        operator_change_ref=operator_change,
+        restored_validation=restored_validation,
+        replaced_target_inspection=replaced_inspection,
+        receipt=persisted_receipt,
+        retry_state="fresh_restore",
+    )
 
 
 def remove_exact_compatibility_marker(
@@ -1802,6 +2561,18 @@ def build_parser() -> argparse.ArgumentParser:
     materialize_parser.add_argument("--operator-change-ref")
     materialize_parser.set_defaults(handler=materialize)
 
+    refresh_parser = subparsers.add_parser("refresh-materialized")
+    add_exact_input_args(refresh_parser)
+    refresh_parser.add_argument(
+        "--authorized-live-cutover",
+        action="store_true",
+        required=True,
+    )
+    refresh_parser.add_argument("--sdk-rollback-root", required=True)
+    refresh_parser.add_argument("--observed-at")
+    refresh_parser.add_argument("--operator-change-ref", required=True)
+    refresh_parser.set_defaults(handler=refresh_materialized)
+
     check_parser = subparsers.add_parser("check")
     add_exact_input_args(check_parser)
     check_parser.set_defaults(handler=check)
@@ -1832,6 +2603,25 @@ def build_parser() -> argparse.ArgumentParser:
         default=str(DEFAULT_ROUTING_CONFIG),
     )
     rollback_parser.set_defaults(handler=rollback)
+
+    sdk_rollback_parser = subparsers.add_parser("rollback-sdk")
+    sdk_rollback_parser.add_argument(
+        "--authorized-live-cutover",
+        action="store_true",
+        required=True,
+    )
+    sdk_rollback_parser.add_argument("--target-root", required=True)
+    sdk_rollback_parser.add_argument("--sdk-rollback-root", required=True)
+    sdk_rollback_parser.add_argument(
+        "--replaced-target-retain-root",
+        required=True,
+    )
+    sdk_rollback_parser.add_argument("--operator-change-ref", required=True)
+    sdk_rollback_parser.add_argument(
+        "--routing-config",
+        default=str(DEFAULT_ROUTING_CONFIG),
+    )
+    sdk_rollback_parser.set_defaults(handler=rollback_sdk)
     return parser
 
 

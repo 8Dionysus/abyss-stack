@@ -15,6 +15,9 @@
   subject store and `runtime_canary` trust verdict pass
 - keep canonical SDK routing intake inert until one exact owner-switch receipt,
   public-release `runtime` verdict, rollback root, and operator change agree
+- keep the activated SDK mirror self-contained, refresh it only from exact
+  admitted SDK subjects, and use a sealed SDK tree as the primary operational
+  rollback rather than depending on predecessor execution
 
 ## Next candidates
 
@@ -26,6 +29,8 @@
   independent from sync checks
 - execute a distinct G5 authority switch only through the receipt-bound
   cutover route; record live evidence without widening archive authority
+- finish compatibility exit only after the SDK-only rollback route, real
+  execution cycles, and consumer-zero evidence remain green
 - add stronger contract tests for owner mirror inputs only when a downstream
   runtime consumer requires them
 
