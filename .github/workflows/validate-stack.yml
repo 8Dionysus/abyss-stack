@@ -19,12 +19,12 @@ jobs:
           history-ref: ${{ github.event.pull_request.base.sha || (github.ref == 'refs/heads/main' && github.event.before) || '' }}
           event-history-ref: ${{ github.event.pull_request.base.sha || (github.ref == 'refs/heads/main' && github.event.before) || '' }}
 
-      - name: Checkout canonical aoa-sdk
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-        with:
-          repository: 8Dionysus/aoa-sdk
-          ref: ac6c1e5f7dd824ebaa6a583c4bb8965e3ca194a0
-          path: .deps/aoa-sdk
+      - name: Checkout canonical aoa-sdk outside the source tree
+        run: |
+          git init "$RUNNER_TEMP/aoa-sdk-source"
+          git -C "$RUNNER_TEMP/aoa-sdk-source" remote add origin https://github.com/8Dionysus/aoa-sdk
+          git -C "$RUNNER_TEMP/aoa-sdk-source" fetch --depth 1 origin ac6c1e5f7dd824ebaa6a583c4bb8965e3ca194a0
+          git -C "$RUNNER_TEMP/aoa-sdk-source" checkout --detach FETCH_HEAD
 
       - name: Clone abyss-machine verifier
         run: git clone --depth 1 https://github.com/8Dionysus/abyss-machine "$RUNNER_TEMP/abyss-machine-verifier"
@@ -44,7 +44,7 @@ jobs:
       - name: Install test dependencies
         run: |
           python -m pip install -r requirements-dev.txt
-          python -m pip install ./.deps/aoa-sdk
+          python -m pip install "$RUNNER_TEMP/aoa-sdk-source"
 
       - name: Install shellcheck, rsync, zsh, podman and podman-compose
         run: |
@@ -54,7 +54,7 @@ jobs:
       - name: Run release audit including routing canary contract
         env:
           ABYSS_MACHINE_REPO_ROOT: ${{ runner.temp }}/abyss-machine-verifier
-          AOA_SDK_SOURCE_ROOT: ${{ github.workspace }}/.deps/aoa-sdk
+          AOA_SDK_SOURCE_ROOT: ${{ runner.temp }}/aoa-sdk-source
           AOA_STATS_ROOT: ${{ runner.temp }}/aoa-stats-validator
         run: python scripts/ci_gate.py --mode release
 
