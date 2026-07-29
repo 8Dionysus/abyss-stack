@@ -1885,6 +1885,48 @@ def test_failed_governed_run_claims_no_unproduced_terminal_evidence(
     assert evidence["satisfies_requirement_ids"] == []
 
 
+def test_preflight_failure_is_a_typed_event_derived_outcome(
+    harness: Harness,
+) -> None:
+    target = harness.repo_root / "docs" / "target.md"
+    target.write_text(
+        target.read_text(encoding="utf-8") + "dirty before preflight\n",
+        encoding="utf-8",
+    )
+    adapter = harness.adapter()
+    runner = AoARunner(
+        clock=lambda: NOW,
+        id_factory=lambda: "typed-preflight-failure",
+    )
+    session = runner.prepare(harness.plan)
+    start = StartCommand(
+        command_id="command:typed-preflight-failure:start",
+        idempotency_key="idempotency:typed-preflight-failure:start",
+        session_id=session.session_id,
+        correlation_id=session.correlation_id,
+        plan_digest=harness.plan.plan_digest,
+        expected_revision=0,
+        issued_at=NOW + timedelta(seconds=1),
+        issued_by=session.prepared_by,
+        reason="prove preflight failure advances through the event stream",
+    )
+
+    status = runner.start(session, adapter, start)
+
+    assert status.state == "failed"
+    assert status.failure_code == "policy_denied"
+    assert status.last_event_sequence == runner.events(session)[-1].sequence
+    outcome = runner.outcome(session)
+    assert outcome is not None
+    assert outcome.execution_status == "failed"
+    assert outcome.failure_codes == ("policy_denied",)
+    assert len(outcome.evidence_bundle_refs) == 1
+    assert outcome.evidence_bundle_refs[0].satisfies_requirement_ids == ()
+    receipts = runner.command_receipts(session)
+    assert len(receipts) == 1
+    assert receipts[0].status == "applied"
+
+
 @pytest.mark.skipif(
     LIVE_ROUTING_BUNDLE_ENV not in os.environ,
     reason="live public compiler proof requires an explicit routing bundle",

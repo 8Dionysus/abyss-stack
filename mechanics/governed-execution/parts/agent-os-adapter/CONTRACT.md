@@ -131,6 +131,10 @@ the Agent OS session. Exact command replay is effect-free; idempotency-key
 payload drift is rejected. Applied command receipts bind the entire emitted
 event slice and are persisted with runtime state.
 
+A governed preparation or preflight failure is a typed terminal runtime
+outcome with a state-transition event and an applied start receipt. It is not
+misreported as a command rejection or exposed as an eventless status change.
+
 ## Evidence stop line
 
 The bridge may emit a runtime evidence bundle containing governed-run or

@@ -1301,7 +1301,32 @@ class AgentOSRuntimeBridge:
                 **kwargs,
             )
         except Exception:
-            return "governed_prepare_unavailable"
+            failure_code = "governed_prepare_unavailable"
+            self._transition(
+                state,
+                profile,
+                state_after="running",
+                trigger="start",
+                at=command.issued_at,
+            )
+            self._transition(
+                state,
+                profile,
+                state_after="failed",
+                trigger="runtime_failed",
+                at=self.clock(),
+                failure_code=failure_code,
+            )
+            self._record_outcome(
+                state,
+                plan,
+                session,
+                profile,
+                execution_status="failed",
+                failure_codes=(failure_code,),
+                governed_summary=None,
+            )
+            return None
         run_id = summary.get("run_id")
         if (
             summary.get("status") != "paused"
@@ -1309,8 +1334,34 @@ class AgentOSRuntimeBridge:
             or not isinstance(run_id, str)
             or not run_id
         ):
-            state["failed_start_summary"] = summary
-            return str(summary.get("failure_class") or "governed_prepare_failed")
+            failure_code = str(
+                summary.get("failure_class") or "governed_prepare_failed"
+            )
+            self._transition(
+                state,
+                profile,
+                state_after="running",
+                trigger="start",
+                at=command.issued_at,
+            )
+            self._transition(
+                state,
+                profile,
+                state_after="failed",
+                trigger="runtime_failed",
+                at=self._summary_time(summary),
+                failure_code=failure_code,
+            )
+            self._record_outcome(
+                state,
+                plan,
+                session,
+                profile,
+                execution_status="failed",
+                failure_codes=(failure_code,),
+                governed_summary=summary,
+            )
+            return None
         requirement = self._approval_requirement(
             plan,
             compatibility,
