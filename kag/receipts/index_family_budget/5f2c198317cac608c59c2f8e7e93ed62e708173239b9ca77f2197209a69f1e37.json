@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 19105598,
+  "allowed_tracked_bytes": 28195723,
+  "approved_by": "repository-owner",
+  "base_ref": "dae05c69992e9dbca0ed1eab97bf16745fe6f3af",
+  "changed_generated_bytes": 19105598,
+  "changed_generated_files": 239,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "5f2c198317cac608c59c2f8e7e93ed62e708173239b9ca77f2197209a69f1e37",
+  "reason": "Refresh the exact SDK runtime rollback status and route-api receipt projection.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 28195723,
+  "tracked_bytes_max": 24117248
+}

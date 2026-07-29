@@ -61,3 +61,13 @@ refs, latest durable record, producer admission, and all-false G5 authority
 posture. Existing targets move to an explicit rollback root; rollback restores
 the predecessor and retains the candidate. Route-api can now expose
 `canary_ready` while deliberately keeping canonical `closure_ready` false.
+
+## 2026-07-29 - SDK-canonical refresh and operational rollback
+
+Added a fail-closed post-cutover refresh for the exact SDK-canonical runtime
+mirror. The route upgrades the earlier manifest to an embedded subject ledger,
+seals a separately validated SDK rollback tree, and marks predecessor
+implementation bytes non-required for operational recovery. The SDK-only
+rollback retains the displaced target and survives all three atomic rename
+boundaries without reading or mutating the predecessor tree. Compatibility
+history and the archival stop-line remain intact.

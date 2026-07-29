@@ -105,3 +105,28 @@ Live activation fsyncs a validated prepared stage before moving the
 predecessor and fsyncs the common parent after each rename. Retry recognizes
 the durable prepared-before-swap, between-swaps, and already-activated states.
 Rollback applies the same durability law to its marker and tree renames.
+
+## Post-cutover SDK refresh and rollback
+
+Once the live mirror is SDK-canonical, `refresh-materialized` is the only
+route that may upgrade an older materialized manifest to the self-contained
+subject-ledger contract. It first rechecks every live byte, the exact durable
+trust record, owner-switch receipt, SDK and predecessor refs, and G5 authority
+against explicit current inputs. It then seals a disjoint sibling
+SDK-canonical rollback tree from the admitted subject store before atomically
+replacing only the live manifest. The predecessor tree is neither read nor
+mutated by this refresh and remains compatibility history.
+
+The refreshed manifest binds `sdk_runtime_rollback` as the primary operational
+rollback and marks the predecessor implementation non-required. The
+`rollback-sdk --authorized-live-cutover` operation restores that fully embedded
+SDK tree using only the live target, SDK rollback tree, routing config, and an
+operator change ref. It retains the displaced target, persists
+`manifest/routing_sdk_runtime_rollback.json`, fsyncs every transaction
+boundary, and resumes safely from pre-swap, between-swap, or already-restored
+states. After restart, route-api validates the receipt, reports
+`sdk_runtime_rollback_active`, keeps source ownership SDK-canonical, and does
+not misreport the restored runtime as a fresh live cutover. Neither route
+widens archive authority: `aoa-routing` remains
+preserved until consumer-zero, compatibility exit, and separate operator
+approval.
