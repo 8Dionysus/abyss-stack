@@ -3,13 +3,14 @@
 - Decision ID: ABYSS-STACK-D-0086
 - Status: accepted
 - Date: 2026-07-25
+- Amended: 2026-07-29
 - Owner surface: `mechanics/federation-seams/parts/sync-wrapper/`
 
 ## Index Metadata
 
 - Original date: 2026-07-25
 - Surface classes: runtime route contract, owner succession, artifact consumer admission
-- Stack lanes: runtime mirror, operator cutover, compatibility rollback
+- Stack lanes: runtime mirror, operator cutover, compatibility rollback, SDK-only operational rollback
 - Mechanic parents: federation-seams
 - Guard families: artifact trust, routing G5, runtime closure, rollback
 - Posture: accepted inert canonical-intake capability
@@ -27,6 +28,12 @@ stronger artifact owner, runtime owner, and predecessor. Requiring each owner
 to report the other owners' completed future state would create a circular
 proof dependency. Reusing the canary adapter would instead collapse evidence
 preparation and authority execution into one ambiguous posture.
+
+The first live switch preceded the self-contained embedded subject ledger.
+That mirror remained byte-exact but could not satisfy the strengthened
+checkout-free runtime inspection. Compatibility rollback also still consumed
+the predecessor implementation, which is not an acceptable operational
+dependency at consumer-zero.
 
 ## Options considered
 
@@ -74,6 +81,20 @@ The transition is two-phase:
 The authorization phase cannot claim that live execution already happened.
 The execution phase cannot change the receipt's owner or ABI decision.
 
+After the switch, refresh an already SDK-canonical live mirror only through
+`refresh-materialized`. The route must verify the existing live bytes, durable
+public-release trust record, receipt, refs, and authority against explicit
+current inputs before it may replace the manifest. Before that replacement it
+must seal and validate a disjoint self-contained SDK rollback tree from the
+same admitted subject store.
+
+The refreshed manifest binds that SDK tree as
+`primary_operational_rollback`, records that predecessor implementation bytes
+are not required, and keeps the predecessor binding as compatibility history.
+`rollback-sdk` may then restore the SDK tree atomically without reading or
+mutating the predecessor tree. It retains the displaced target, records a
+durable SDK rollback receipt, and preserves SDK source ownership.
+
 ## Rationale
 
 A distinct adapter makes the authority change visible and testable instead of
@@ -106,6 +127,14 @@ only compatibility and rollback.
 - Positive: file and directory `fsync` barriers precede transaction-state
   advancement and follow every tree rename, preserving recovery after reboot.
 - Positive: route-api exposes only allowlisted receipt and trust summaries.
+- Positive: the live mirror becomes self-contained for ordinary integrity
+  inspection without reopening release admission or requiring a source
+  checkout.
+- Positive: operational recovery can restore an exact SDK-produced tree
+  without the `aoa-routing` implementation; the predecessor tree remains
+  untouched compatibility evidence.
+- Positive: SDK-only rollback has the same fsync and retry law at pre-swap,
+  between-swap, and already-restored boundaries.
 - Tradeoff: G5 requires a new canonical registry record and subject store; the
   earlier candidate record cannot be silently promoted.
 - Tradeoff: runtime rollback may temporarily serve predecessor bytes after
@@ -114,6 +143,9 @@ only compatibility and rollback.
 - Tradeoff: live cutover now requires the predecessor mirror to carry an exact
   manifest, stable ABI identity, and configured file hashes before it can
   become the rollback tree.
+- Tradeoff: post-cutover refresh stores a second exact SDK runtime tree. This
+  bounded storage cost removes the operational dependency on predecessor code
+  and is explicit in the live manifest.
 
 ## Boundaries
 
@@ -123,6 +155,8 @@ only compatibility and rollback.
 - It does not authorize `aoa-routing` archival.
 - It does not add Agent OS Runner behavior to the owner switch.
 - Runtime rollback does not create a second canonical source owner.
+- SDK-only rollback changes runtime bytes, not source authority, release
+  authority, compatibility-exit evidence, or the archival stop-line.
 
 ## Source surfaces
 
@@ -135,7 +169,8 @@ only compatibility and rollback.
 
 ## Follow-up route
 
-Land the SDK authorization receipt and exact canonical release artifact. Then
-update `abyss-machine` canonical producer policy to admit only that receipt.
-Run an isolated cutover check before the separately recorded live mutation,
-and preserve the predecessor tree until compatibility exit and consumer-zero.
+Use the exact canonical release and current `abyss-machine` admission to
+refresh the live mirror, seal the SDK rollback tree, and prove SDK-only
+recovery in a disposable live-shaped environment. Preserve the predecessor
+tree as compatibility history until compatibility exit and consumer-zero;
+archive authority remains a separate operator gate.
