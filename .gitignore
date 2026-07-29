@@ -6,6 +6,7 @@ __pycache__/
 .ruff_cache/
 .coverage
 htmlcov/
+/.deps/
 
 # Local runtime state. The GitHub mirror is source/install material only.
 /Secrets/

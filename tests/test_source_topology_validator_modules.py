@@ -157,6 +157,32 @@ class SourceTopologyValidatorModulesTests(unittest.TestCase):
         self.assertNotIn(dependency_evidence, paths)
         self.assertIn(authored_doc, paths)
 
+    def test_tracked_ci_dependency_checkouts_fail_git_mirror_hygiene(self) -> None:
+        errors: list[str] = []
+        source_hygiene.validate_git_mirror_hygiene(
+            errors,
+            tracked_file_iter_func=lambda: [
+                ".deps/aoa-sdk/mechanics/boundary-bridge/evidence/routing-succession.json"
+            ],
+            runtime_top_level_dirs=source_hygiene.GIT_MIRROR_RUNTIME_TOP_LEVEL_DIRS,
+            cache_parts=source_hygiene.GIT_MIRROR_CACHE_PARTS,
+            live_env_names=source_hygiene.GIT_MIRROR_LIVE_ENV_NAMES,
+            private_suffixes=source_hygiene.GIT_MIRROR_PRIVATE_SUFFIXES,
+            rendered_suffixes=source_hygiene.GIT_MIRROR_RENDERED_SUFFIXES,
+            database_suffixes=source_hygiene.GIT_MIRROR_DATABASE_SUFFIXES,
+            heavy_suffixes=source_hygiene.GIT_MIRROR_HEAVY_SUFFIXES,
+            fixture_prefixes=source_hygiene.GIT_MIRROR_FIXTURE_PREFIXES,
+        )
+
+        self.assertEqual(
+            errors,
+            [
+                "tracked file is not GitHub mirror safe: "
+                ".deps/aoa-sdk/mechanics/boundary-bridge/evidence/"
+                "routing-succession.json (local cache or dependency directory)"
+            ],
+        )
+
     def test_required_operator_scripts_have_backend_routes(self) -> None:
         self.assertEqual(
             script_surface.REQUIRED_SCRIPTS,

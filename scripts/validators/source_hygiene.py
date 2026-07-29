@@ -21,6 +21,7 @@ SOURCE_HYGIENE_VALIDATOR_PATH = Path("scripts") / "validators" / "source_hygiene
 GIT_MIRROR_RUNTIME_TOP_LEVEL_DIRS = {"Secrets", "Logs", "Models"}
 GIT_MIRROR_CACHE_PARTS = {
     "__pycache__",
+    ".deps",
     ".pytest_cache",
     ".mypy_cache",
     ".ruff_cache",
