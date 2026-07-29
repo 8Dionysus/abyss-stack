@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 22397512,
+  "allowed_tracked_bytes": 27412508,
+  "approved_by": "repository-owner",
+  "base_ref": "8bcfe0edf7ad499d666207ca2087d8db9df4d7a9",
+  "changed_generated_bytes": 22397512,
+  "changed_generated_files": 334,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "7d628ef03dc493760dc6717fd7aea2ad0f8c8293700f27547900f913da4bd8de",
+  "reason": "Refresh the portable family after closing reviewed Agent OS snapshot, replay, and policy-provenance gaps.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 27412508,
+  "tracked_bytes_max": 24117248
+}
