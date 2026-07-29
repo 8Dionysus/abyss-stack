@@ -1072,6 +1072,8 @@ class AgentOSRuntimeBridge:
         state = self._load_state(session.session_id)
         if state is not None:
             self._assert_state_binding(state, plan, session, profile, binding)
+            state.setdefault("approval_effects", [])
+            state.setdefault("last_governed_interruption", None)
             return state
         status = RunStatus(
             session_id=session.session_id,
@@ -1093,10 +1095,12 @@ class AgentOSRuntimeBridge:
             "rejected_commands": [],
             "approval_requests": [],
             "approval_decisions": [],
+            "approval_effects": [],
             "outcome": None,
             "execution_lane": None,
             "governed_run_id": None,
             "governed_start_command": None,
+            "last_governed_interruption": None,
             "last_observation": None,
             "runtime_artifact_refs": [],
         }
@@ -1115,6 +1119,8 @@ class AgentOSRuntimeBridge:
                 "observe_snapshot must initialize the runtime session first",
             )
         self._assert_state_binding(state, plan, session, profile, binding)
+        state.setdefault("approval_effects", [])
+        state.setdefault("last_governed_interruption", None)
         return state
 
     @staticmethod
@@ -1321,6 +1327,11 @@ class AgentOSRuntimeBridge:
         if isinstance(command, ResumeCommand):
             if status.state != "paused":
                 return "resume_state_invalid"
+            if any(
+                item.get("phase") != "completed"
+                for item in state.get("approval_effects", [])
+            ):
+                return "approval_effect_replay_required"
             if command.resume_after_sequence != status.last_event_sequence:
                 return "resume_cursor_mismatch"
             return None
@@ -1738,19 +1749,20 @@ class AgentOSRuntimeBridge:
                 proposal_provider=self.proposal_provider,
             )
         except Exception:
+            state["last_governed_interruption"] = {
+                "code": "governed_runtime_unavailable",
+                "observed_at": self.clock().isoformat(),
+            }
             self._transition(
                 state,
                 profile,
-                state_after="recoverable_failure",
-                trigger="runtime_interrupted",
+                state_after="paused",
+                trigger="pause",
                 at=self.clock(),
-                failure_code="governed_runtime_unavailable",
-                recover_from_event_sequence=RunStatus.model_validate(
-                    state["status"]
-                ).last_event_sequence,
             )
             return
         if summary.get("status") == "pass":
+            state["last_governed_interruption"] = None
             self._transition(
                 state,
                 profile,
@@ -1769,6 +1781,7 @@ class AgentOSRuntimeBridge:
             )
             return
         if summary.get("status") == "fail":
+            state["last_governed_interruption"] = None
             failure_code = str(
                 summary.get("failure_class") or "governed_runtime_failed"
             )
@@ -1790,16 +1803,16 @@ class AgentOSRuntimeBridge:
                 governed_summary=summary,
             )
             return
+        state["last_governed_interruption"] = {
+            "code": "unexpected_governed_pause",
+            "observed_at": self._summary_time(summary).isoformat(),
+        }
         self._transition(
             state,
             profile,
-            state_after="recoverable_failure",
-            trigger="runtime_interrupted",
+            state_after="paused",
+            trigger="pause",
             at=self._summary_time(summary),
-            failure_code="unexpected_governed_pause",
-            recover_from_event_sequence=RunStatus.model_validate(
-                state["status"]
-            ).last_event_sequence,
         )
 
     def _resume_runtime_degradation_recovery(
@@ -1899,7 +1912,29 @@ class AgentOSRuntimeBridge:
                     "approval_decision_conflict",
                     "approval decision ID was reused with different content",
                 )
-            return RunStatus.model_validate(state["status"])
+            effects = [
+                item
+                for item in state["approval_effects"]
+                if item.get("decision_id") == decision.decision_id
+            ]
+            if not effects:
+                return RunStatus.model_validate(state["status"])
+            if len(effects) != 1:
+                raise AgentOSBridgeError(
+                    "approval_effect_journal_invalid",
+                    "approval decision has an ambiguous durable effect journal",
+                )
+            if effects[0].get("phase") == "completed":
+                return RunStatus.model_validate(state["status"])
+            return self._continue_approval_effect(
+                state,
+                plan,
+                session,
+                profile,
+                compatibility,
+                decision,
+                effects[0],
+            )
         requests = {
             item["requirement_id"]: ApprovalRequest.model_validate(item)
             for item in state["approval_requests"]
@@ -1971,32 +2006,92 @@ class AgentOSRuntimeBridge:
             at=decision.decided_at,
             approval_decision_ref=_approval_decision_ref(decision),
         )
-        self._write_governed_approval(
+        effect = {
+            "decision_id": decision.decision_id,
+            "milestone": milestone,
+            "verdict": decision.verdict,
+            "phase": "decision_recorded",
+        }
+        state["approval_effects"].append(effect)
+        self._save_state(session.session_id, state)
+        return self._continue_approval_effect(
             state,
-            milestone=milestone,
-            status=("approved" if decision.verdict == "approved" else "rejected"),
-            notes=decision.reason,
+            plan,
+            session,
+            profile,
+            compatibility,
+            decision,
+            effect,
         )
+
+    def _continue_approval_effect(
+        self,
+        state: dict[str, Any],
+        plan: RunPlan,
+        session: SessionHandle,
+        profile: RuntimeProfile,
+        compatibility: dict[str, Any],
+        decision: ApprovalDecision,
+        effect: dict[str, Any],
+    ) -> RunStatus:
+        milestone = str(effect.get("milestone") or "")
+        phase = str(effect.get("phase") or "")
+        if (
+            effect.get("decision_id") != decision.decision_id
+            or effect.get("verdict") != decision.verdict
+            or milestone not in {"plan_freeze", "landing"}
+        ):
+            raise AgentOSBridgeError(
+                "approval_effect_journal_invalid",
+                "durable approval effect differs from its retained decision",
+            )
+        if phase == "decision_recorded":
+            self._write_governed_approval(
+                state,
+                milestone=milestone,
+                status=(
+                    "approved"
+                    if decision.verdict == "approved"
+                    else "rejected"
+                ),
+                notes=decision.reason,
+            )
+            effect["phase"] = "governed_approval_written"
+            self._save_state(session.session_id, state)
+            phase = "governed_approval_written"
         if decision.verdict == "rejected":
-            self._transition(
-                state,
-                profile,
-                state_after="cancelled",
-                trigger="approval_rejected",
-                at=decision.decided_at,
-            )
-            self._record_outcome(
-                state,
-                plan,
-                session,
-                profile,
-                execution_status="cancelled",
-                failure_codes=(),
-                governed_summary=None,
-            )
+            if phase != "governed_approval_written":
+                raise AgentOSBridgeError(
+                    "approval_effect_journal_invalid",
+                    "rejected approval has an invalid durable effect phase",
+                )
+            if RunStatus.model_validate(state["status"]).state != "cancelled":
+                self._transition(
+                    state,
+                    profile,
+                    state_after="cancelled",
+                    trigger="approval_rejected",
+                    at=decision.decided_at,
+                )
+                self._record_outcome(
+                    state,
+                    plan,
+                    session,
+                    profile,
+                    execution_status="cancelled",
+                    failure_codes=(),
+                    governed_summary=None,
+                )
+            effect["phase"] = "completed"
+            self._save_state(session.session_id, state)
             return RunStatus.model_validate(state["status"])
         if decision.verdict == "expired":
-            if status.state == "awaiting_approval":
+            if phase != "governed_approval_written":
+                raise AgentOSBridgeError(
+                    "approval_effect_journal_invalid",
+                    "expired approval has an invalid durable effect phase",
+                )
+            if RunStatus.model_validate(state["status"]).state == "awaiting_approval":
                 self._transition(
                     state,
                     profile,
@@ -2004,16 +2099,49 @@ class AgentOSRuntimeBridge:
                     trigger="approval_expired",
                     at=decision.decided_at,
                 )
+            effect["phase"] = "completed"
+            self._save_state(session.session_id, state)
             return RunStatus.model_validate(state["status"])
         if milestone == "landing":
+            if phase != "governed_approval_written":
+                raise AgentOSBridgeError(
+                    "approval_effect_journal_invalid",
+                    "landing approval has an invalid durable effect phase",
+                )
+            effect["phase"] = "completed"
+            self._save_state(session.session_id, state)
             return RunStatus.model_validate(state["status"])
-        self._transition(
-            state,
-            profile,
-            state_after="running",
-            trigger="approval_granted",
-            at=decision.decided_at,
-        )
+        if phase == "governed_approval_written":
+            self._transition(
+                state,
+                profile,
+                state_after="running",
+                trigger="approval_granted",
+                at=decision.decided_at,
+            )
+            effect["phase"] = "backend_pending"
+            self._save_state(session.session_id, state)
+            phase = "backend_pending"
+        if phase != "backend_pending":
+            raise AgentOSBridgeError(
+                "approval_effect_journal_invalid",
+                "plan-freeze approval has an invalid durable effect phase",
+            )
+        current = RunStatus.model_validate(state["status"])
+        if current.state == "paused":
+            self._transition(
+                state,
+                profile,
+                state_after="running",
+                trigger="resume",
+                at=self.clock(),
+            )
+            self._save_state(session.session_id, state)
+        elif current.state != "running":
+            raise AgentOSBridgeError(
+                "approval_effect_journal_invalid",
+                "pending plan-freeze effect is outside a replayable state",
+            )
         try:
             summary = self.backend.resume_run(
                 self._governed_run_id(state),
@@ -2023,18 +2151,20 @@ class AgentOSRuntimeBridge:
                 proposal_provider=self.proposal_provider,
             )
         except Exception:
+            state["last_governed_interruption"] = {
+                "code": "governed_preview_unavailable",
+                "observed_at": self.clock().isoformat(),
+            }
             self._transition(
                 state,
                 profile,
-                state_after="recoverable_failure",
-                trigger="runtime_interrupted",
+                state_after="paused",
+                trigger="pause",
                 at=self.clock(),
-                failure_code="governed_preview_unavailable",
-                recover_from_event_sequence=RunStatus.model_validate(
-                    state["status"]
-                ).last_event_sequence,
             )
+            self._save_state(session.session_id, state)
             return RunStatus.model_validate(state["status"])
+        state["last_governed_interruption"] = None
         if (
             summary.get("status") == "paused"
             and summary.get("current_milestone") == "landing"
@@ -2059,6 +2189,8 @@ class AgentOSRuntimeBridge:
                 at=request.requested_at,
             )
             self._store_approval_request(state, profile, request)
+            effect["phase"] = "completed"
+            self._save_state(session.session_id, state)
             return RunStatus.model_validate(state["status"])
         failure_code = str(summary.get("failure_class") or "governed_preview_failed")
         self._transition(
@@ -2078,6 +2210,8 @@ class AgentOSRuntimeBridge:
             failure_codes=(failure_code,),
             governed_summary=summary,
         )
+        effect["phase"] = "completed"
+        self._save_state(session.session_id, state)
         return RunStatus.model_validate(state["status"])
 
     def _refresh_and_assert_snapshot(
@@ -2142,6 +2276,14 @@ class AgentOSRuntimeBridge:
             raise AgentOSBridgeError(
                 "approval_request_missing",
                 "runtime has no approval request to renew",
+            )
+        if any(
+            item["request_id"] == current["request_id"]
+            for item in state["approval_decisions"]
+        ):
+            raise AgentOSBridgeError(
+                "approval_request_already_decided",
+                "a decided approval request cannot be renewed",
             )
         requirement_id = str(current["requirement_id"])
         requirement = next(

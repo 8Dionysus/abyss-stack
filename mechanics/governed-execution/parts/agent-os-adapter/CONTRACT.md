@@ -64,6 +64,10 @@ Before execution the bridge verifies:
 - each decision targets the single current approval request and may be
   recorded only once. Stale or second decisions fail before durable approval,
   governed-runner, status, or outcome state changes;
+- the decision event and pending effect phase are atomically persisted before
+  the governed approval file or preview backend advances. After interruption,
+  only replay of the exact same decision may finish that effect; replay cannot
+  append a second decision event;
 - governed policy supplied through the profile constraint ref, with the full
   descriptor-declared owner, artifact, source, schema, and schema-version
   provenance plus the exact plan-snapshot digest;
@@ -135,11 +139,16 @@ resume
   -> completed
 ```
 
-The contour's retry policy admits no hidden retry, so the lane uses explicit
-durable pause/resume rather than forging a `RecoverCommand`. Rejection cancels
-the Agent OS session. Exact command replay is effect-free; idempotency-key
-payload drift is rejected. Applied command receipts bind the entire emitted
-event slice and are persisted with runtime state.
+The contours' retry policies admit no hidden retry. A governed preview
+interruption stays durably paused until the exact retained approval decision
+continues its journaled effect. A final governed continuation interruption
+stays durably paused until a new explicit `ResumeCommand`; it is not exposed
+as an unrecoverable `recoverable_failure`. The degradation lane likewise uses
+its explicit durable pause/resume contour rather than forging a
+`RecoverCommand`. Rejection cancels the Agent OS session. Exact command replay
+is effect-free; idempotency-key payload drift is rejected. Applied command
+receipts bind the entire emitted event slice and are persisted with runtime
+state.
 
 A governed preparation or preflight failure is a typed terminal runtime
 outcome with a state-transition event and an applied start receipt. It is not

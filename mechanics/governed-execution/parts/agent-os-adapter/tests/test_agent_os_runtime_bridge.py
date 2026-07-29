@@ -1226,6 +1226,81 @@ class CrashAfterPrepareBackend(CountingBackend):
         return summary
 
 
+class CrashAfterApprovalWriteBackend(CountingBackend):
+    def __init__(self, backend: ModuleType) -> None:
+        super().__init__(backend)
+        self.crashed = False
+
+    def write_json(self, path: Path, payload: dict[str, Any]) -> None:
+        super().write_json(path, payload)
+        if (
+            not self.crashed
+            and path.name == "approval.status.json"
+            and payload.get("current_milestone") == "plan_freeze"
+            and payload.get("status") == "approved"
+        ):
+            self.crashed = True
+            raise KeyboardInterrupt("simulate termination after approval write")
+
+
+class CrashAfterPreviewBackend(CountingBackend):
+    def __init__(self, backend: ModuleType) -> None:
+        super().__init__(backend)
+        self.crashed = False
+
+    def resume_run(
+        self,
+        run_id: str,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        summary = super().resume_run(run_id, **kwargs)
+        if not self.crashed and kwargs.get("until") == "milestone":
+            self.crashed = True
+            raise KeyboardInterrupt("simulate termination after governed preview")
+        return summary
+
+
+class InterruptPreviewBackend(CountingBackend):
+    def __init__(self, backend: ModuleType) -> None:
+        super().__init__(backend)
+        self.interrupted = False
+
+    def resume_run(
+        self,
+        run_id: str,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        if not self.interrupted and kwargs.get("until") == "milestone":
+            self.interrupted = True
+            self.resume_calls += 1
+            raise RuntimeError("temporary governed preview interruption")
+        return super().resume_run(run_id, **kwargs)
+
+
+class InterruptFinalResumeBackend(CountingBackend):
+    def __init__(self, backend: ModuleType, *, mode: str) -> None:
+        super().__init__(backend)
+        self.mode = mode
+        self.interrupted = False
+
+    def resume_run(
+        self,
+        run_id: str,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        if not self.interrupted and kwargs.get("until") == "done":
+            self.interrupted = True
+            self.resume_calls += 1
+            if self.mode == "raise":
+                raise RuntimeError("temporary governed backend interruption")
+            return {
+                "status": "paused",
+                "phase": "unexpected_backend_pause",
+                "updated_at": NOW.isoformat(),
+            }
+        return super().resume_run(run_id, **kwargs)
+
+
 class MutatingBeforePrepareBackend(CountingBackend):
     def __init__(
         self,
@@ -1438,6 +1513,34 @@ def _decision(
     )
 
 
+def _start_governed_to_plan_freeze(
+    harness: Harness,
+    *,
+    token: str,
+) -> tuple[AbyssStackRuntimeAdapter, AoARunner, Any, Any]:
+    adapter = harness.adapter()
+    runner = AoARunner(clock=lambda: NOW, id_factory=lambda: token)
+    session = runner.prepare(harness.plan)
+    start = StartCommand(
+        command_id=f"command:{token}:start",
+        idempotency_key=f"idempotency:{token}:start",
+        session_id=session.session_id,
+        correlation_id=session.correlation_id,
+        plan_digest=harness.plan.plan_digest,
+        expected_revision=0,
+        issued_at=NOW + timedelta(seconds=1),
+        issued_by=session.prepared_by,
+        reason="reach the governed plan-freeze approval",
+    )
+    assert runner.start(session, adapter, start).state == "awaiting_approval"
+    freeze_request = next(
+        request
+        for request in runner.approval_requests(session)
+        if request.requirement_id == "approval:abyss-stack:plan-freeze"
+    )
+    return adapter, runner, session, freeze_request
+
+
 def _close_c5_chain(
     *,
     runner: AoARunner,
@@ -1520,6 +1623,179 @@ def _close_c5_chain(
     assert assert_evidence_chain_complete(chain) == closeout_ref
     assert runner.closeout(session, outcome, chain).state == "closed"
     assert adapter.status(session).closeout_ref == closeout_ref
+
+
+@pytest.mark.parametrize(
+    ("backend_type", "resume_calls"),
+    (
+        (CrashAfterApprovalWriteBackend, 1),
+        (CrashAfterPreviewBackend, 2),
+    ),
+)
+def test_plan_freeze_approval_replay_finishes_one_durable_effect(
+    harness: Harness,
+    backend_type: type[CountingBackend],
+    resume_calls: int,
+) -> None:
+    harness.backend = backend_type(BRIDGE.load_governed_backend())
+    adapter, runner, session, freeze_request = _start_governed_to_plan_freeze(
+        harness,
+        token=f"approval-replay-{backend_type.__name__}",
+    )
+    decision = _decision(
+        freeze_request,
+        decision_id=f"decision:approval-replay:{backend_type.__name__}",
+    )
+
+    with pytest.raises(KeyboardInterrupt, match="simulate termination"):
+        runner.approve(session, decision)
+
+    assert tuple(adapter.approval_decisions(session)) == (decision,)
+    assert (
+        runner.approve(session, decision).state
+        == "paused"
+    )
+    assert tuple(adapter.approval_decisions(session)) == (decision,)
+    assert len(
+        [
+            event
+            for event in runner.events(session)
+            if event.event_kind == "approval_decision"
+        ]
+    ) == 1
+    landing_requests = [
+        request
+        for request in runner.approval_requests(session)
+        if request.requirement_id == "approval:abyss-stack:landing"
+    ]
+    assert len(landing_requests) == 1
+    state_path = next((harness.state_root / "sessions").glob("*.json"))
+    durable_state = json.loads(state_path.read_text(encoding="utf-8"))
+    effect = next(
+        item
+        for item in durable_state["approval_effects"]
+        if item["decision_id"] == decision.decision_id
+    )
+    assert effect["phase"] == "completed"
+    assert harness.backend.resume_calls == resume_calls
+
+
+def test_interrupted_preview_requires_exact_approval_effect_replay(
+    harness: Harness,
+) -> None:
+    harness.backend = InterruptPreviewBackend(BRIDGE.load_governed_backend())
+    adapter, runner, session, freeze_request = _start_governed_to_plan_freeze(
+        harness,
+        token="interrupted-preview",
+    )
+    decision = _decision(
+        freeze_request,
+        decision_id="decision:interrupted-preview:freeze",
+    )
+
+    interrupted = runner.approve(session, decision)
+
+    assert interrupted.state == "paused"
+    assert tuple(adapter.approval_decisions(session)) == (decision,)
+    premature_resume = ResumeCommand(
+        command_id="command:interrupted-preview:premature-resume",
+        idempotency_key="idempotency:interrupted-preview:premature-resume",
+        session_id=session.session_id,
+        correlation_id=session.correlation_id,
+        plan_digest=harness.plan.plan_digest,
+        expected_revision=interrupted.revision,
+        issued_at=interrupted.updated_at + timedelta(seconds=1),
+        issued_by=session.prepared_by,
+        reason="prove pending approval effects cannot bypass exact replay",
+        resume_after_sequence=interrupted.last_event_sequence,
+    )
+    rejected = adapter.dispatch(harness.plan, session, premature_resume)
+    assert rejected.status == "rejected"
+    assert rejected.rejection_code == "approval_effect_replay_required"
+    assert runner.approve(session, decision).state == "paused"
+    assert len(
+        [
+            request
+            for request in runner.approval_requests(session)
+            if request.requirement_id == "approval:abyss-stack:landing"
+        ]
+    ) == 1
+    assert harness.backend.resume_calls == 2
+
+
+@pytest.mark.parametrize("interruption_mode", ("raise", "pause"))
+def test_governed_resume_interruption_stays_explicitly_resumable(
+    harness: Harness,
+    interruption_mode: str,
+) -> None:
+    harness.backend = InterruptFinalResumeBackend(
+        BRIDGE.load_governed_backend(),
+        mode=interruption_mode,
+    )
+    adapter, runner, session, freeze_request = _start_governed_to_plan_freeze(
+        harness,
+        token=f"resumable-{interruption_mode}",
+    )
+    assert (
+        runner.approve(
+            session,
+            _decision(
+                freeze_request,
+                decision_id=f"decision:resumable:{interruption_mode}:freeze",
+            ),
+        ).state
+        == "paused"
+    )
+    landing_request = next(
+        request
+        for request in runner.approval_requests(session)
+        if request.requirement_id == "approval:abyss-stack:landing"
+    )
+    assert (
+        runner.approve(
+            session,
+            _decision(
+                landing_request,
+                decision_id=f"decision:resumable:{interruption_mode}:landing",
+            ),
+        ).state
+        == "paused"
+    )
+    paused = runner.status(session)
+    first_resume = ResumeCommand(
+        command_id=f"command:resumable:{interruption_mode}:resume-1",
+        idempotency_key=f"idempotency:resumable:{interruption_mode}:resume-1",
+        session_id=session.session_id,
+        correlation_id=session.correlation_id,
+        plan_digest=harness.plan.plan_digest,
+        expected_revision=paused.revision,
+        issued_at=paused.updated_at + timedelta(seconds=1),
+        issued_by=session.prepared_by,
+        reason="attempt the explicit governed continuation",
+        resume_after_sequence=paused.last_event_sequence,
+    )
+
+    interrupted = runner.resume(session, adapter, first_resume)
+
+    assert interrupted.state == "paused"
+    assert interrupted.failure_code is None
+    second_resume = ResumeCommand(
+        command_id=f"command:resumable:{interruption_mode}:resume-2",
+        idempotency_key=f"idempotency:resumable:{interruption_mode}:resume-2",
+        session_id=session.session_id,
+        correlation_id=session.correlation_id,
+        plan_digest=harness.plan.plan_digest,
+        expected_revision=interrupted.revision,
+        issued_at=interrupted.updated_at + timedelta(seconds=1),
+        issued_by=session.prepared_by,
+        reason="continue after the visible backend interruption",
+        resume_after_sequence=interrupted.last_event_sequence,
+    )
+    assert runner.resume(session, adapter, second_resume).state == "completed"
+    assert harness.backend.resume_calls == 3
+    state_path = next((harness.state_root / "sessions").glob("*.json"))
+    durable_state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert durable_state["last_governed_interruption"] is None
 
 
 def test_runner_drives_real_governed_execution_and_restores_exactly(

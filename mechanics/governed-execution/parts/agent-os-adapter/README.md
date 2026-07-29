@@ -25,9 +25,18 @@ coordinates after admission. Approval decisions are admitted only for the
 single current request and only before that request has a durable decision,
 so an old rejection cannot rewrite an advanced or completed run. An approved
 plan-freeze decision repeats the same snapshot gate before the preview backend
-can run. The governed start command and its deterministic run identity are
-journaled before preparation, so an exact replay can recover the existing
-result without creating another run or repeating provider work.
+can run. The decision and a pending effect journal are persisted before the
+governed approval file or preview backend changes. Exact decision replay
+continues only the unfinished journal phase; it does not append another
+decision or event. The governed start command and its deterministic run
+identity are journaled before preparation, so an exact replay can recover the
+existing result without creating another run or repeating provider work.
+
+The admitted contours carry no retry attempts. A transient governed preview
+interruption therefore stays paused behind exact decision replay, while a
+transient final continuation stays paused behind a new explicit resume
+command. Neither condition is mislabeled as a recoverable failure that the
+plan could never recover.
 
 Constraint admission compares the descriptor-declared owner, artifact,
 source, schema, and schema version. The plan snapshot separately binds the
