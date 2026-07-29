@@ -593,7 +593,6 @@ datasources:
         manifest = store.routing.payloads["mirror_manifest"]
         sdk_source_ref = manifest["source_git_commit"]
         predecessor_ref = manifest["canonical_producer"]["source_ref"]
-        subject_digest = manifest["artifact_subject_digest"]
         authority = {
             "archive_authorized": False,
             "canonical_producer_switch_authorized": True,
@@ -740,6 +739,73 @@ datasources:
         }
         return store
 
+    def make_sdk_runtime_rollback_store(self):
+        store = self.make_sdk_canonical_store()
+        manifest = store.routing.payloads["mirror_manifest"]
+        store.routing.payloads["sdk_runtime_rollback"] = {
+            "schema": (
+                "abyss_stack_routing_sdk_runtime_rollback_receipt_v1"
+            ),
+            "state": "sdk_runtime_rollback_active",
+            "sdk_source_ref": manifest["source_git_commit"],
+            "artifact_subject_digest": manifest[
+                "artifact_subject_digest"
+            ],
+            "operator_change_ref": "private-test-sdk-rollback-change",
+            "restored_at": "2026-07-29T00:00:00+00:00",
+            "source_owner_state": "sdk_canonical_unchanged",
+            "predecessor_implementation_required": False,
+            "archive_authorized": False,
+            "replaced_target_inspection": {
+                "verified": False,
+                "reasons": ["failed target was not internally coherent"],
+            },
+        }
+        return store
+
+    def test_routing_layer_loads_sdk_runtime_rollback_receipt(self) -> None:
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        root = Path(temp_dir.name)
+        generated_files = (
+            "aoa_router.min.json",
+            "cross_repo_registry.min.json",
+            "task_to_surface_hints.json",
+            "task_to_tier_hints.json",
+            "recommended_paths.min.json",
+            "pairing_hints.min.json",
+            "kag_source_lift_relation_hints.min.json",
+            "federation_entrypoints.min.json",
+            "return_navigation_hints.min.json",
+            "tiny_model_entrypoints.json",
+        )
+        required_files = []
+        for filename in generated_files:
+            rel_path = f"generated/{filename}"
+            required_files.append(rel_path)
+            self.write_json(root, rel_path, {})
+        self.write_json(
+            root,
+            "manifest/routing_sdk_runtime_rollback.json",
+            {
+                "schema": (
+                    "abyss_stack_routing_sdk_runtime_rollback_receipt_v1"
+                ),
+                "state": "sdk_runtime_rollback_active",
+            },
+        )
+
+        layer = self.module.load_routing_layer(
+            root / "aoa-routing.yaml",
+            {"required_files": required_files},
+            root,
+        )
+
+        self.assertEqual(
+            layer.payloads["sdk_runtime_rollback"]["state"],
+            "sdk_runtime_rollback_active",
+        )
+
     def test_health_reports_closure_summary_when_all_layers_are_ready(self) -> None:
         self.module.STORE = self.make_store()
 
@@ -830,6 +896,68 @@ datasources:
         self.assertTrue(closure["closure_ready"])
         self.assertTrue(closure["canonical_ready"])
         self.assertEqual(closure["canonical_reasons"], [])
+
+    def test_sdk_runtime_rollback_is_visible_without_predecessor_runtime(
+        self,
+    ) -> None:
+        store = self.make_sdk_runtime_rollback_store()
+        self.module.STORE = store
+
+        health = self.module.health()
+        closure = self.module.layer_status(store.routing)["closure_status"]
+
+        self.assertTrue(health["ok"])
+        self.assertTrue(closure["sdk_runtime_rollback_posture"])
+        self.assertTrue(closure["sdk_runtime_rollback_valid"])
+        self.assertEqual(closure["sdk_runtime_rollback_reasons"], [])
+        self.assertTrue(
+            health["routing_switch"]["sdk_runtime_rollback_active"]
+        )
+        self.assertFalse(
+            health["routing_switch"]["live_cutover_active"]
+        )
+        self.assertEqual(
+            health["routing_switch"]["runtime_owner_state"],
+            "sdk_runtime_rollback_active",
+        )
+        self.assertEqual(
+            health["routing_switch"]["source_owner_state"],
+            "sdk_canonical_unchanged",
+        )
+        self.assertTrue(
+            health["routing_switch"]["canonical_switch_authorized"]
+        )
+        self.assertNotIn(
+            "private-test-sdk-rollback-change",
+            json.dumps(health),
+        )
+
+    def test_invalid_sdk_runtime_rollback_receipt_stays_non_closing(
+        self,
+    ) -> None:
+        store = self.make_sdk_runtime_rollback_store()
+        store.routing.payloads["sdk_runtime_rollback"][
+            "archive_authorized"
+        ] = True
+        self.module.STORE = store
+
+        health = self.module.health()
+        closure = self.module.layer_status(store.routing)["closure_status"]
+
+        self.assertFalse(health["ok"])
+        self.assertFalse(closure["sdk_runtime_rollback_valid"])
+        self.assertFalse(closure["closure_ready"])
+        self.assertFalse(
+            health["routing_switch"]["sdk_runtime_rollback_active"]
+        )
+        self.assertEqual(
+            health["routing_switch"]["runtime_owner_state"],
+            "sdk_runtime_rollback_marker_invalid",
+        )
+        self.assertIn(
+            "routing SDK runtime rollback must deny archive authority",
+            closure["sdk_runtime_rollback_reasons"],
+        )
 
     def test_sdk_isolated_canonical_rehearsal_cannot_close_live_runtime(
         self,

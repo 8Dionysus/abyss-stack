@@ -93,7 +93,10 @@ The refreshed manifest binds that SDK tree as
 are not required, and keeps the predecessor binding as compatibility history.
 `rollback-sdk` may then restore the SDK tree atomically without reading or
 mutating the predecessor tree. It retains the displaced target, records a
-durable SDK rollback receipt, and preserves SDK source ownership.
+durable SDK rollback receipt, and preserves SDK source ownership. Route-api
+must load and validate that receipt after restart, expose
+`sdk_runtime_rollback_active`, and keep `live_cutover_active` false while the
+restored SDK runtime is active.
 
 ## Rationale
 

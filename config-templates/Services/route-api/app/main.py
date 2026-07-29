@@ -42,6 +42,9 @@ ROUTING_SDK_CANONICAL_POSTURE = "sdk_canonical"
 ROUTING_COMPATIBILITY_ROLLBACK_SCHEMA = (
     "abyss_stack_routing_g5_compatibility_rollback_v1"
 )
+ROUTING_SDK_RUNTIME_ROLLBACK_SCHEMA = (
+    "abyss_stack_routing_sdk_runtime_rollback_receipt_v1"
+)
 ROUTING_G5_AUTHORITY_FLAGS = {
     "archive_authorized",
     "canonical_producer_switch_authorized",
@@ -416,6 +419,10 @@ def load_routing_layer(config_path: Path, config: dict[str, Any], mirror_root: P
         "compatibility_rollback": load_optional_json(
             mirror_root
             / "manifest/routing_g5_compatibility_rollback.json"
+        ),
+        "sdk_runtime_rollback": load_optional_json(
+            mirror_root
+            / "manifest/routing_sdk_runtime_rollback.json"
         ),
     }
 
@@ -836,6 +843,7 @@ def routing_mirror_provenance_summary(layer: LayerStore) -> dict[str, Any]:
     hashes = manifest.get("file_sha256")
     trust_verdict = manifest.get("trust_verdict")
     compatibility_rollback = layer.payloads.get("compatibility_rollback")
+    sdk_runtime_rollback = layer.payloads.get("sdk_runtime_rollback")
     return {
         "manifest_present": True,
         "manifest_schema": manifest.get("schema"),
@@ -914,6 +922,51 @@ def routing_mirror_provenance_summary(layer: LayerStore) -> dict[str, Any]:
                 ),
             }
             if isinstance(compatibility_rollback, dict)
+            else None
+        ),
+        "sdk_runtime_rollback": (
+            {
+                "schema": sdk_runtime_rollback.get("schema"),
+                "state": sdk_runtime_rollback.get("state"),
+                "source_owner_state": sdk_runtime_rollback.get(
+                    "source_owner_state"
+                ),
+                "sdk_source_ref": sdk_runtime_rollback.get(
+                    "sdk_source_ref"
+                ),
+                "artifact_subject_digest": sdk_runtime_rollback.get(
+                    "artifact_subject_digest"
+                ),
+                "restored_at": sdk_runtime_rollback.get("restored_at"),
+                "operator_change_ref_present": bool(
+                    sdk_runtime_rollback.get("operator_change_ref")
+                ),
+                "predecessor_implementation_required": (
+                    sdk_runtime_rollback.get(
+                        "predecessor_implementation_required"
+                    )
+                ),
+                "archive_authorized": sdk_runtime_rollback.get(
+                    "archive_authorized"
+                ),
+                "replaced_target_verified": (
+                    sdk_runtime_rollback.get(
+                        "replaced_target_inspection",
+                        {},
+                    ).get("verified")
+                    if isinstance(
+                        sdk_runtime_rollback.get(
+                            "replaced_target_inspection"
+                        ),
+                        dict,
+                    )
+                    else None
+                ),
+                "marker_digest": routing_receipt_digest(
+                    sdk_runtime_rollback
+                ),
+            }
+            if isinstance(sdk_runtime_rollback, dict)
             else None
         ),
         "trust_verdict": routing_trust_verdict_summary(trust_verdict),
@@ -1307,6 +1360,10 @@ def routing_has_compatibility_rollback(layer: LayerStore) -> bool:
     return isinstance(layer.payloads.get("compatibility_rollback"), dict)
 
 
+def routing_has_sdk_runtime_rollback(layer: LayerStore) -> bool:
+    return isinstance(layer.payloads.get("sdk_runtime_rollback"), dict)
+
+
 def routing_compatibility_rollback_reasons(
     layer: LayerStore,
 ) -> list[str]:
@@ -1416,6 +1473,100 @@ def routing_compatibility_rollback_reasons(
         reasons.append(
             "routing compatibility rollback identity binding drifted"
         )
+    return reasons
+
+
+def routing_sdk_runtime_rollback_reasons(
+    layer: LayerStore,
+) -> list[str]:
+    reasons = routing_sdk_canonical_provenance_reasons(layer)
+    marker = layer.payloads.get("sdk_runtime_rollback")
+    manifest = layer.payloads.get("mirror_manifest")
+    if not isinstance(marker, dict):
+        return [
+            *reasons,
+            "routing SDK runtime rollback receipt is missing",
+        ]
+    if marker.get("schema") != ROUTING_SDK_RUNTIME_ROLLBACK_SCHEMA:
+        reasons.append("routing SDK runtime rollback schema is invalid")
+    if marker.get("state") != "sdk_runtime_rollback_active":
+        reasons.append("routing SDK runtime rollback state is invalid")
+    if marker.get("source_owner_state") != "sdk_canonical_unchanged":
+        reasons.append(
+            "routing SDK runtime rollback source-owner state is invalid"
+        )
+    sdk_source_ref = marker.get("sdk_source_ref")
+    if (
+        not isinstance(sdk_source_ref, str)
+        or not GIT_OBJECT_ID_PATTERN.fullmatch(sdk_source_ref)
+    ):
+        reasons.append("routing SDK runtime rollback source ref is invalid")
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("source_git_commit") != sdk_source_ref
+    ):
+        reasons.append("routing SDK runtime rollback manifest ref drifted")
+    subject_digest = marker.get("artifact_subject_digest")
+    if (
+        not isinstance(subject_digest, str)
+        or not SHA256_DIGEST_PATTERN.fullmatch(subject_digest)
+    ):
+        reasons.append(
+            "routing SDK runtime rollback artifact subject is invalid"
+        )
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("artifact_subject_digest") != subject_digest
+    ):
+        reasons.append(
+            "routing SDK runtime rollback artifact subject drifted"
+        )
+    if (
+        not isinstance(marker.get("operator_change_ref"), str)
+        or not marker.get("operator_change_ref")
+    ):
+        reasons.append(
+            "routing SDK runtime rollback operator change ref is missing"
+        )
+    restored_at = marker.get("restored_at")
+    valid_restored_at = False
+    if isinstance(restored_at, str) and restored_at:
+        try:
+            valid_restored_at = (
+                datetime.fromisoformat(restored_at).tzinfo is not None
+            )
+        except ValueError:
+            valid_restored_at = False
+    if not valid_restored_at:
+        reasons.append("routing SDK runtime rollback timestamp is invalid")
+    if marker.get("predecessor_implementation_required") is not False:
+        reasons.append(
+            "routing SDK runtime rollback must not require predecessor "
+            "implementation"
+        )
+    if marker.get("archive_authorized") is not False:
+        reasons.append(
+            "routing SDK runtime rollback must deny archive authority"
+        )
+    replaced_inspection = marker.get("replaced_target_inspection")
+    if not isinstance(replaced_inspection, dict):
+        reasons.append(
+            "routing SDK runtime rollback replaced-target inspection is missing"
+        )
+    else:
+        if not isinstance(replaced_inspection.get("verified"), bool):
+            reasons.append(
+                "routing SDK runtime rollback replaced-target verification "
+                "state is invalid"
+            )
+        replaced_reasons = replaced_inspection.get("reasons")
+        if (
+            not isinstance(replaced_reasons, list)
+            or not all(isinstance(item, str) for item in replaced_reasons)
+        ):
+            reasons.append(
+                "routing SDK runtime rollback replaced-target reasons are invalid"
+            )
     return reasons
 
 
@@ -1790,6 +1941,8 @@ def routing_mirror_provenance_reasons(layer: LayerStore) -> list[str]:
             "routing compatibility rollback is degraded runtime posture "
             "and cannot satisfy ordinary closure",
         ]
+    if routing_has_sdk_runtime_rollback(layer):
+        return routing_sdk_runtime_rollback_reasons(layer)
     if routing_is_sdk_canary(layer):
         return [
             *routing_sdk_canary_provenance_reasons(layer),
@@ -2137,6 +2290,22 @@ def layer_closure_status(
         and consumer_ready
         and len(compatibility_rollback_reasons) == 0
     )
+    sdk_runtime_rollback_posture = (
+        routing_has_sdk_runtime_rollback(layer)
+        if layer.layer == "aoa-routing"
+        else False
+    )
+    sdk_runtime_rollback_reasons = (
+        routing_sdk_runtime_rollback_reasons(layer)
+        if sdk_runtime_rollback_posture
+        else []
+    )
+    sdk_runtime_rollback_valid = (
+        sdk_runtime_rollback_posture
+        and mirror_ready
+        and consumer_ready
+        and len(sdk_runtime_rollback_reasons) == 0
+    )
     provenance_ready = len(provenance_reasons) == 0
     canary_ready = (
         canary_posture
@@ -2169,6 +2338,9 @@ def layer_closure_status(
         "compatibility_rollback_reasons": (
             compatibility_rollback_reasons
         ),
+        "sdk_runtime_rollback_posture": sdk_runtime_rollback_posture,
+        "sdk_runtime_rollback_valid": sdk_runtime_rollback_valid,
+        "sdk_runtime_rollback_reasons": sdk_runtime_rollback_reasons,
         "consumer_reasons": consumer_reasons,
         "provenance_reasons": provenance_reasons,
         "reasons": reasons,
@@ -2222,6 +2394,7 @@ def routing_switch_status_summary(
     provenance = routing_status["surface_metadata"]["mirror_provenance"]
     authority = provenance.get("g5_authority")
     compatibility_rollback = provenance.get("compatibility_rollback")
+    sdk_runtime_rollback = provenance.get("sdk_runtime_rollback")
     return {
         "posture": provenance.get("routing_producer_posture"),
         "activation_mode": provenance.get("cutover_activation_mode"),
@@ -2233,6 +2406,7 @@ def routing_switch_status_summary(
             provenance.get("cutover_activation_mode")
             == "authorized_live_cutover"
             and closure["closure_ready"]
+            and not closure["sdk_runtime_rollback_posture"]
         ),
         "compatibility_rollback_active": (
             closure["compatibility_rollback_posture"]
@@ -2240,6 +2414,13 @@ def routing_switch_status_summary(
             and isinstance(compatibility_rollback, dict)
             and compatibility_rollback.get("state")
             == "compatibility_rollback_active"
+        ),
+        "sdk_runtime_rollback_active": (
+            closure["sdk_runtime_rollback_posture"]
+            and closure["sdk_runtime_rollback_valid"]
+            and isinstance(sdk_runtime_rollback, dict)
+            and sdk_runtime_rollback.get("state")
+            == "sdk_runtime_rollback_active"
         ),
         "runtime_owner_state": (
             compatibility_rollback.get("state")
@@ -2250,7 +2431,18 @@ def routing_switch_status_summary(
             else (
                 "compatibility_rollback_marker_invalid"
                 if closure["compatibility_rollback_posture"]
-                else None
+                else (
+                    sdk_runtime_rollback.get("state")
+                    if (
+                        closure["sdk_runtime_rollback_valid"]
+                        and isinstance(sdk_runtime_rollback, dict)
+                    )
+                    else (
+                        "sdk_runtime_rollback_marker_invalid"
+                        if closure["sdk_runtime_rollback_posture"]
+                        else None
+                    )
+                )
             )
         ),
         "source_owner_state": (
@@ -2259,10 +2451,18 @@ def routing_switch_status_summary(
                 closure["compatibility_rollback_valid"]
                 and isinstance(compatibility_rollback, dict)
             )
-            else None
+            else (
+                sdk_runtime_rollback.get("source_owner_state")
+                if (
+                    closure["sdk_runtime_rollback_valid"]
+                    and isinstance(sdk_runtime_rollback, dict)
+                )
+                else None
+            )
         ),
         "canonical_switch_authorized": (
             closure["canonical_ready"]
+            and closure["closure_ready"]
             and isinstance(authority, dict)
             and authority.get("canonical_producer_switch_authorized") is True
             and authority.get("sdk_canonical") is True

@@ -124,6 +124,9 @@ SDK tree using only the live target, SDK rollback tree, routing config, and an
 operator change ref. It retains the displaced target, persists
 `manifest/routing_sdk_runtime_rollback.json`, fsyncs every transaction
 boundary, and resumes safely from pre-swap, between-swap, or already-restored
-states. Neither route widens archive authority: `aoa-routing` remains
+states. After restart, route-api validates the receipt, reports
+`sdk_runtime_rollback_active`, keeps source ownership SDK-canonical, and does
+not misreport the restored runtime as a fresh live cutover. Neither route
+widens archive authority: `aoa-routing` remains
 preserved until consumer-zero, compatibility exit, and separate operator
 approval.
