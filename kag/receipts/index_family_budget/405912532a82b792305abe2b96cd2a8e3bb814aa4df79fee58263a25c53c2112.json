@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 22405624,
+  "allowed_tracked_bytes": 27419988,
+  "approved_by": "repository-owner",
+  "base_ref": "8bcfe0edf7ad499d666207ca2087d8db9df4d7a9",
+  "changed_generated_bytes": 22405624,
+  "changed_generated_files": 334,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "405912532a82b792305abe2b96cd2a8e3bb814aa4df79fee58263a25c53c2112",
+  "reason": "Refresh the portable family after rejecting unadmitted evidence and untyped A2A return artifacts.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 27419988,
+  "tracked_bytes_max": 24117248
+}
