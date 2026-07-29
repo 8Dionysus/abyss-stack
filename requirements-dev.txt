@@ -4,5 +4,5 @@ pytest
 fastapi
 httpx
 jsonschema
-mcp
+mcp>=1.27.2,<2
 playwright

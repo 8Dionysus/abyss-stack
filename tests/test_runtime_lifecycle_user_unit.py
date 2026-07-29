@@ -2504,6 +2504,12 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
 
 
 class McpLoopbackLifecycleTests(unittest.TestCase):
+    def test_release_dependencies_retain_the_tested_mcp_auth_api(self) -> None:
+        requirements = (REPO_ROOT / "requirements-dev.txt").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("mcp>=1.27.2,<2", requirements.splitlines())
+
     def test_all_standalone_packages_require_the_tested_mcp_auth_api(self) -> None:
         for directory, _ in MCP_SERVER_PACKAGES.values():
             with self.subTest(directory=directory):
