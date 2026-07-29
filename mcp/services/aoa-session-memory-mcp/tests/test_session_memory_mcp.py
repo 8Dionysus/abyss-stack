@@ -4116,16 +4116,40 @@ def test_validator_configured_transport_accepts_loopback_http(
     }
 
 
-def test_validator_configured_transport_http_client_outlives_tool_budgets() -> None:
+def test_validator_configured_transport_http_client_bounds_ordinary_reads_only() -> None:
+    import httpx
+
     validator = load_validator_module()
-    client = validator._configured_transport_http_client(MCP_HTTP_TEST_TOKEN)
+    observed_read_timeouts: dict[str, float | None] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        observed_read_timeouts[request.method] = request.extensions["timeout"]["read"]
+        return httpx.Response(200, json={})
+
+    client = validator._configured_transport_http_client(
+        MCP_HTTP_TEST_TOKEN,
+        transport=httpx.MockTransport(handler),
+    )
 
     try:
         assert client.follow_redirects is True
         assert client.timeout.connect == validator.CONFIGURED_HTTP_TIMEOUT_SECONDS
         assert client.timeout.write == validator.CONFIGURED_HTTP_TIMEOUT_SECONDS
         assert client.timeout.pool == validator.CONFIGURED_HTTP_TIMEOUT_SECONDS
-        assert client.timeout.read is None
+        assert client.timeout.read == validator.CONFIGURED_HTTP_RESPONSE_TIMEOUT_SECONDS
+
+        async def probe_timeout_policy() -> None:
+            await client.get(
+                "http://127.0.0.1:5422/mcp",
+                headers={"Accept": "application/json, text/event-stream"},
+            )
+            await client.post("http://127.0.0.1:5422/mcp", json={})
+
+        asyncio.run(probe_timeout_policy())
+        assert observed_read_timeouts == {
+            "GET": None,
+            "POST": validator.CONFIGURED_HTTP_RESPONSE_TIMEOUT_SECONDS,
+        }
     finally:
         asyncio.run(client.aclose())
 

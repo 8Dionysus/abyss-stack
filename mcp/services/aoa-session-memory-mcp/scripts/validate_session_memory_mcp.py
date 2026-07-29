@@ -71,6 +71,7 @@ ACCEPTABLE_FRESHNESS_SMOKE_STATUSES = {
 }
 
 CONFIGURED_HTTP_TIMEOUT_SECONDS = 30.0
+CONFIGURED_HTTP_RESPONSE_TIMEOUT_SECONDS = 120.0
 
 
 def _search_alias_smoke_arguments(limit: int = 3) -> dict:
@@ -1216,19 +1217,36 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
     return summary
 
 
-def _configured_transport_http_client(bearer_token: str):
+async def _configured_transport_timeout_policy(request) -> None:
+    accept = request.headers.get("accept", "").lower()
+    if request.method == "GET" and "text/event-stream" in accept:
+        timeout = request.extensions.get("timeout")
+        if isinstance(timeout, dict):
+            timeout["read"] = None
+
+
+def _configured_transport_http_client(bearer_token: str, *, transport=None):
     import httpx
 
     # The configured smoke keeps one GET stream open while tool calls have
-    # explicit 20-90 second ClientSession budgets. httpx's five-second default
-    # races both valid tool work and the long-lived stream.
-    return httpx.AsyncClient(
-        headers={"Authorization": f"Bearer {bearer_token}"},
-        follow_redirects=True,
-        timeout=httpx.Timeout(
-            CONFIGURED_HTTP_TIMEOUT_SECONDS,
-            read=None,
+    # explicit 20-90 second ClientSession budgets. Keep ordinary HTTP response
+    # reads bounded beyond the largest call budget, and remove the read
+    # deadline only from the authenticated SSE GET stream.
+    kwargs = {
+        "headers": {"Authorization": f"Bearer {bearer_token}"},
+        "follow_redirects": True,
+        "timeout": httpx.Timeout(
+            CONFIGURED_HTTP_RESPONSE_TIMEOUT_SECONDS,
+            connect=CONFIGURED_HTTP_TIMEOUT_SECONDS,
+            write=CONFIGURED_HTTP_TIMEOUT_SECONDS,
+            pool=CONFIGURED_HTTP_TIMEOUT_SECONDS,
         ),
+        "event_hooks": {"request": [_configured_transport_timeout_policy]},
+    }
+    if transport is not None:
+        kwargs["transport"] = transport
+    return httpx.AsyncClient(
+        **kwargs,
     )
 
 

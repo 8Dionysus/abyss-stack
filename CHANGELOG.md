@@ -230,11 +230,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
-- The configured session-memory HTTP smoke now keeps connect/write/pool
-  transport phases bounded, leaves its authenticated long-lived read stream
-  without a transport deadline, and preserves explicit 20-90 second per-tool
-  MCP budgets, so valid calls no longer race httpx's five-second
-  `ReadTimeout`.
+- The configured session-memory HTTP smoke now keeps connect/write/pool and
+  ordinary response reads bounded, removes the read deadline only from its
+  authenticated long-lived SSE GET stream, and preserves explicit 20-90
+  second per-tool MCP budgets, so valid calls no longer race httpx's
+  five-second `ReadTimeout` without making ordinary requests unbounded.
 - Agent OS start/resume/recovery dispatch now compares its refreshed
   source/ABI observation with the immutable `RunPlan` before backend
   execution. Approval decisions must target the single current undecided
