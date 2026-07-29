@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os-abyss.dev/schemas/protocol-consumer-wire-observation.schema.json",
+  "title": "OS Abyss MCP consumer wire observation",
+  "additionalProperties": false,
+  "properties": {
+    "claim_limits": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "consumer": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "codex-cli"
+        },
+        "version": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ],
+      "type": "object"
+    },
+    "finished_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "global_codex_config_mutated": {
+      "const": false
+    },
+    "isolated_codex_home": {
+      "const": true
+    },
+    "method_sequence": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "next_wire_pair_observed": {
+      "type": "boolean"
+    },
+    "observation_id": {
+      "pattern": "^[a-z0-9][a-z0-9._-]+$",
+      "type": "string"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "probe": {
+      "additionalProperties": false,
+      "properties": {
+        "mcp_python_sdk_commit": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "mcp_python_sdk_version": {
+          "const": "2.0.0"
+        },
+        "mcp_python_wheel_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "read_only": {
+          "const": true
+        },
+        "transport": {
+          "const": "stdio"
+        }
+      },
+      "required": [
+        "mcp_python_sdk_commit",
+        "mcp_python_sdk_version",
+        "mcp_python_wheel_sha256",
+        "read_only",
+        "transport"
+      ],
+      "type": "object"
+    },
+    "raw_transcript": {
+      "additionalProperties": false,
+      "properties": {
+        "record_count": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "ref": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "record_count",
+        "ref",
+        "sha256"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "abyss_mcp_consumer_wire_observation_v1"
+    },
+    "server_discover_observed": {
+      "type": "boolean"
+    },
+    "wire_protocol_offered": {
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "type": "string"
+    },
+    "wire_protocol_selected": {
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "type": "string"
+    },
+    "verdict": {
+      "enum": [
+        "legacy_pair_observed",
+        "next_pair_observed",
+        "inconclusive"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "observation_id",
+    "observed_at",
+    "finished_at",
+    "consumer",
+    "probe",
+    "isolated_codex_home",
+    "global_codex_config_mutated",
+    "wire_protocol_offered",
+    "wire_protocol_selected",
+    "server_discover_observed",
+    "next_wire_pair_observed",
+    "method_sequence",
+    "raw_transcript",
+    "verdict",
+    "claim_limits"
+  ],
+  "type": "object"
+}

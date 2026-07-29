@@ -1,0 +1,69 @@
+{
+  "claim_limits": [
+    "This receipt proves one isolated Python MCP 2.0.0 KAG adapter pair, not Codex next-wire support.",
+    "The adapter was not registered, deployed, credentialed, or admitted.",
+    "KAG output remains navigation and evidence; owner sources retain authority.",
+    "The exact projection is current, but owner freshness is source_unavailable.",
+    "No candidate, memory, proof acceptance, source mutation, or external effect was performed."
+  ],
+  "denials": {
+    "effect_like_tool_code": -32601,
+    "legacy_client_code": -32022
+  },
+  "finished_at": "2026-07-29T01:51:46.629607Z",
+  "observation_id": "aoa-kag-next-pair-20260729",
+  "observed_at": "2026-07-29T01:51:45.761462Z",
+  "owner_canary": {
+    "degradation": [],
+    "freshness_state": "source_unavailable",
+    "owner": "abyss-stack",
+    "projection_exact_state": "current",
+    "runtime_source_digest": "b31cea08319c67238866a1ded77577ad49dfa366f290e0a109c5a01e25275c38",
+    "schema_version": "aoa-kag-mcp-capabilities-v1"
+  },
+  "pair": {
+    "cache": {
+      "repeat_tools_list_wire_fetches": 1,
+      "scope": "private",
+      "ttl_ms": 30000
+    },
+    "independent_clients": 2,
+    "resource_inventory": [
+      "aoa-kag-next://capabilities"
+    ],
+    "self_describing_dispatches": 11,
+    "server_discover_observed": true,
+    "server_request_backchannel_observed": false,
+    "session_header_observed": false,
+    "supported_versions": [
+      "2026-07-28"
+    ],
+    "tool_inventory": [
+      "kag_discover"
+    ],
+    "trace_observed": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+    "trace_sent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+    "wire_version": "2026-07-28"
+  },
+  "python_sdk": {
+    "commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
+    "version": "2.0.0"
+  },
+  "raw_receipt": {
+    "mode": "0600",
+    "ref": "local://mcp-protocol-final-lab-20260728/proof/kag-next-pair.json",
+    "sha256": "0883381024bf6416e659c395f6acacce9f9dc6546c8101dd6b141f1b2376fb6d"
+  },
+  "schema_version": "abyss_mcp_kag_next_pair_observation_v1",
+  "source_revisions": {
+    "abyss_stack": "8bcfe0edf7ad499d666207ca2087d8db9df4d7a9",
+    "aoa_kag": "0ff913279868735b41a17aab84c0c89341d7cb77",
+    "stack_runtime_current_digest": "sha256:0326859c123700a349e11cd86b523de2b12d98e584e573dd7d9334ef660fb0a1"
+  },
+  "stable_registration": {
+    "config_digest_after": "sha256:8332b07a01dba35e7550332f0f36c047041132509137167ab9e2457a4a900780",
+    "config_digest_before": "sha256:8332b07a01dba35e7550332f0f36c047041132509137167ab9e2457a4a900780",
+    "unchanged": true
+  },
+  "verdict": "adapter_pair_passed"
+}

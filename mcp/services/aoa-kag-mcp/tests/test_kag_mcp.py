@@ -95,7 +95,23 @@ def _use_portable_family(state: AoAKagMCPState) -> Path:
         manifest,
         {
             "schema_version": "aoa-repo-local-kag-family-v3",
-            "family_identity": {"content_digest": "portable-fixture-digest"},
+            "family_identity": {
+                "content_digest": "portable-family-fixture-digest",
+                "source_snapshot": "sha256:portable-source-fixture-digest",
+            },
+            "source_index_header": {
+                "index_identity": {
+                    "content_digest": "portable-source-fixture-digest",
+                }
+            },
+            "compatibility": {
+                "files": [
+                    {
+                        "kind": "source",
+                        "content_digest": "portable-source-fixture-digest",
+                    }
+                ]
+            },
         },
     )
     return manifest
@@ -184,8 +200,21 @@ def test_state_resolves_portable_family_identity(tmp_path: Path) -> None:
 
     assert state.canonical_family_path("repo-a") == manifest.resolve()
     assert CanonicalRepoKag(state).owner_digest("repo-a") == (
-        "portable-fixture-digest"
+        "portable-source-fixture-digest"
     )
+
+
+def test_state_rejects_disagreeing_portable_source_identities(tmp_path: Path) -> None:
+    state = _state(tmp_path)
+    manifest = _use_portable_family(state)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["source_index_header"]["index_identity"]["content_digest"] = (
+        "different-source-fixture-digest"
+    )
+    _write_json(manifest, payload)
+
+    with pytest.raises(RuntimeError, match="source-index identities disagree"):
+        CanonicalRepoKag(state).owner_digest("repo-a")
 
 
 def test_state_keeps_reads_inside_provider_root(tmp_path: Path) -> None:
@@ -279,6 +308,7 @@ def test_server_exposes_compact_read_only_kag_surface(tmp_path: Path) -> None:
         for resource in asyncio.run(server.list_resource_templates())
     }
 
+    assert server._mcp_server.version == "0.1.0"
     assert set(tools) == {
         "kag_discover",
         "kag_search",

@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os-abyss.dev/schemas/kag-next-pair-observation.schema.json",
+  "title": "OS Abyss KAG next pair observation",
+  "additionalProperties": false,
+  "properties": {
+    "claim_limits": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 5,
+      "type": "array"
+    },
+    "denials": {
+      "additionalProperties": false,
+      "properties": {
+        "effect_like_tool_code": {
+          "const": -32601
+        },
+        "legacy_client_code": {
+          "const": -32022
+        }
+      },
+      "required": [
+        "effect_like_tool_code",
+        "legacy_client_code"
+      ],
+      "type": "object"
+    },
+    "finished_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "observation_id": {
+      "pattern": "^[a-z0-9][a-z0-9._-]+$",
+      "type": "string"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "owner_canary": {
+      "additionalProperties": false,
+      "properties": {
+        "degradation": {
+          "maxItems": 0,
+          "type": "array"
+        },
+        "freshness_state": {
+          "const": "source_unavailable"
+        },
+        "owner": {
+          "const": "abyss-stack"
+        },
+        "projection_exact_state": {
+          "const": "current"
+        },
+        "runtime_source_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "aoa-kag-mcp-capabilities-v1"
+        }
+      },
+      "required": [
+        "owner",
+        "schema_version",
+        "runtime_source_digest",
+        "projection_exact_state",
+        "freshness_state",
+        "degradation"
+      ],
+      "type": "object"
+    },
+    "pair": {
+      "additionalProperties": false,
+      "properties": {
+        "cache": {
+          "additionalProperties": false,
+          "properties": {
+            "repeat_tools_list_wire_fetches": {
+              "const": 1
+            },
+            "scope": {
+              "const": "private"
+            },
+            "ttl_ms": {
+              "const": 30000
+            }
+          },
+          "required": [
+            "repeat_tools_list_wire_fetches",
+            "ttl_ms",
+            "scope"
+          ],
+          "type": "object"
+        },
+        "independent_clients": {
+          "minimum": 2,
+          "type": "integer"
+        },
+        "resource_inventory": {
+          "const": [
+            "aoa-kag-next://capabilities"
+          ]
+        },
+        "self_describing_dispatches": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "server_discover_observed": {
+          "const": true
+        },
+        "server_request_backchannel_observed": {
+          "const": false
+        },
+        "session_header_observed": {
+          "const": false
+        },
+        "supported_versions": {
+          "contains": {
+            "const": "2026-07-28"
+          },
+          "items": {
+            "type": "string"
+          },
+          "minContains": 1,
+          "type": "array"
+        },
+        "tool_inventory": {
+          "const": [
+            "kag_discover"
+          ]
+        },
+        "trace_observed": {
+          "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$",
+          "type": "string"
+        },
+        "trace_sent": {
+          "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$",
+          "type": "string"
+        },
+        "wire_version": {
+          "const": "2026-07-28"
+        }
+      },
+      "required": [
+        "wire_version",
+        "server_discover_observed",
+        "supported_versions",
+        "tool_inventory",
+        "resource_inventory",
+        "cache",
+        "independent_clients",
+        "self_describing_dispatches",
+        "session_header_observed",
+        "server_request_backchannel_observed",
+        "trace_sent",
+        "trace_observed"
+      ],
+      "type": "object"
+    },
+    "python_sdk": {
+      "additionalProperties": false,
+      "properties": {
+        "commit": {
+          "const": "6f69a3758ebf2ee55ce050f58b470ce11af71133"
+        },
+        "version": {
+          "const": "2.0.0"
+        }
+      },
+      "required": [
+        "version",
+        "commit"
+      ],
+      "type": "object"
+    },
+    "raw_receipt": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "0600"
+        },
+        "ref": {
+          "pattern": "^local://",
+          "type": "string"
+        },
+        "sha256": {
+          "const": "0883381024bf6416e659c395f6acacce9f9dc6546c8101dd6b141f1b2376fb6d"
+        }
+      },
+      "required": [
+        "ref",
+        "sha256",
+        "mode"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "abyss_mcp_kag_next_pair_observation_v1"
+    },
+    "source_revisions": {
+      "additionalProperties": false,
+      "properties": {
+        "aoa_kag": {
+          "const": "0ff913279868735b41a17aab84c0c89341d7cb77"
+        },
+        "abyss_stack": {
+          "const": "8bcfe0edf7ad499d666207ca2087d8db9df4d7a9"
+        },
+        "stack_runtime_current_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "abyss_stack",
+        "aoa_kag",
+        "stack_runtime_current_digest"
+      ],
+      "type": "object"
+    },
+    "stable_registration": {
+      "additionalProperties": false,
+      "properties": {
+        "config_digest_after": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "config_digest_before": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "unchanged": {
+          "const": true
+        }
+      },
+      "required": [
+        "config_digest_before",
+        "config_digest_after",
+        "unchanged"
+      ],
+      "type": "object"
+    },
+    "verdict": {
+      "const": "adapter_pair_passed"
+    }
+  },
+  "required": [
+    "schema_version",
+    "observation_id",
+    "observed_at",
+    "finished_at",
+    "python_sdk",
+    "source_revisions",
+    "stable_registration",
+    "pair",
+    "denials",
+    "owner_canary",
+    "raw_receipt",
+    "verdict",
+    "claim_limits"
+  ],
+  "type": "object"
+}

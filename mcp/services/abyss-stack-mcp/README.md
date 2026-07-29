@@ -20,7 +20,9 @@ The read process exposes only:
 
 - `stack_runtime_catalog`: compact discovery with zero detail-schema bytes;
 - `stack_runtime_inspect`: one exact owner/policy target and one selected
-  evidence view.
+  evidence view;
+- `stack_orchestration_inspect`: one bounded private host-persistence record
+  for an SDK-validated cross-organ snapshot, without owner payload expansion.
 
 Both read tools are server-filtered to `policy_family=read`; omitting the
 catalog filter cannot enumerate candidate or effect subjects, and inspection
@@ -150,14 +152,119 @@ comparison step uses this future target rather than the pre-action deployed
 digest. Rollback denies discovery for the exact registry ID and registry digest
 observed by the candidate, not for a mutable registry name alone.
 
+## Host-visible orchestration
+
+`abyss-stack-mcp-orchestration` is a separate operator process for the explicit
+KAG evidence → Memo candidate → Eval request/result → owner decision chain. It
+never calls an owner MCP. For `start` and each `advance`, it invokes one exact
+operator-supplied `aoa-sdk` CLI command, requires the SDK to validate the
+complete chain, issues a content-addressed stack host receipt around the
+already-produced owner stage packet, and atomically persists immutable
+mode-`0600` snapshots under a mode-`0700` run root.
+
+The stack record binds the SDK snapshot digest, canonical file digest, current
+stage, next owner, request expiry, validation result, and latest host receipt.
+The read MCP exposes only that bounded record through
+`stack_orchestration_inspect`. It rechecks the record and snapshot digests on
+every read. The candidate MCP process cannot access the orchestration root.
+
+This is host-visible orchestration persistence, not hidden chaining. The
+operator must invoke KAG, Memo, Evals, and the final acceptance owner directly
+and supply the resulting typed packet. Stack does not compute proof, write
+durable memory, infer acceptance, or authorize execution. A stored terminal
+state retains the SDK/owner claim and receipt; persistence alone is not
+grounding, benefit, admission, or rollback proof.
+
 ## Observation input
 
 Set `ABYSS_STACK_MCP_OBSERVATION_PATH` to one explicit secret-free
 `abyss_stack_runtime_observation_v1` file. The default live route is:
 
 ```text
-/srv/AbyssOS/abyss-stack/Logs/mcp/organ-runtime-observation.json
+/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json
 ```
+
+`abyss-stack-mcp-observe` is the source-owned producer for that file. It reads
+only five bounded inputs:
+
+- the content-addressed stack MCP deployment manifest and its immutable record;
+- the deny-by-default private `aoa-sdk` registry source;
+- the committed `abyss_stack_runtime_targets_v1` catalog;
+- exact `systemctl --user show` fields for those named unit targets;
+- an optional typed, secret-free evidence overlay.
+
+It does not scan sibling workspaces, read a bearer, call an owner MCP endpoint,
+or infer a consumer schema, owner-result freshness, central proof, owner
+acceptance, grounded canary, or rollback readiness. Unknown owner source tree
+digests use the all-zero structural digest only while their source link remains
+explicitly `unknown`; that sentinel is never usable by candidate planning.
+Package and deploy identity come only from exact stack deployment receipts.
+
+The catalog names all fifteen current read targets, but it intentionally
+observes `aoa-organ-mcp-read@...` rather than the transitional
+`aoa-mcp-http@...` processes. The latter share one compatibility bearer and
+cannot be represented as owner-isolated contours. Until an owner is migrated,
+its new process is therefore reported as exactly inactive instead of laundering
+the legacy process into a false owner credential class.
+
+The optional
+`${AOA_STACK_ROOT}/Logs/mcp/observations/evidence-overlay.json` is a typed
+handoff for independently issued source, endpoint/schema, consumer, freshness,
+proof, acceptance, canary, and rollback observations. The producer rejects
+unknown targets, expired overlays, future-dated overlays, secrets, and usable
+source/endpoint/freshness/canary claims that lack the corresponding issuing
+owner. It never edits the overlay. Missing or expired overlay evidence falls
+back to explicit unknown states.
+
+## Authenticated read canary
+
+`abyss-stack-mcp-canary` is a separate credential-bearing operator process.
+It is not called by the observation producer or either MCP server plane. For
+one exact catalog target it reads only that service's read credential, connects
+only to the committed loopback endpoint, observes the complete paginated MCP
+Tool/Resource/Resource-Template/Prompt schema inventory, calls one committed
+read primitive, and writes a content-addressed mode-`0600` receipt plus a
+one-subject typed overlay. A successful call also writes the secret-screened
+structured response as a separate content-addressed mode-`0600` result
+artifact so the source/acceptance owner can review the exact captured payload.
+
+Reviewed contracts cover all declared migration-wave targets. Each contract
+binds an exact tool and arguments, owner-specific result schema identity, and
+the minimum result anchors needed to distinguish a contract match from a
+merely successful HTTP call. The connector contracts assert read-only and
+`network_touched=false` boundaries without flattening owner readiness into the
+top-level status. Contract presence does not create endpoint readiness,
+grounding, freshness, owner acceptance, central proof, rollback proof, or
+admission; any missing evidence axis still fails closed.
+
+The receipt records digests, bounded counts, application-reported server
+identity, protocol, latency, reason codes, and the deterministic private
+result-artifact ref, never the bearer or inline owner payload. The separate
+artifact marks the payload as untrusted data with no instruction authority;
+its existence and content address are capture evidence, not owner grounding.
+The overlay proves endpoint/schema observation but keeps the canary
+blocked pending a separate owner grounding review. It intentionally contains
+no Codex registration, owner grounding, owner freshness, central proof, owner
+acceptance, admission, or rollback claim. A successful call and result-contract
+match therefore remain only inputs to the later pair-specific eval and owner
+review.
+
+After an explicit one-owner process switch, run:
+
+```bash
+abyss-stack-mcp-canary --organ aoa-kag
+```
+
+The command never starts or stops a unit, changes consumer configuration,
+merges the overlay into the production observation, invokes the owner
+reviewer, or admits the registry entry.
+
+Production refresh uses `abyss-stack-mcp-observation.service` and its two-minute
+timer. Runtime provisioning creates the private mode-`0700` observation
+directory but neither starts nor enables the producer. Run the oneshot once
+before starting a stack MCP plane; enable the timer only as an explicit
+rollout action. Both stack MCP planes have a `ConditionPathExists` guard for
+the produced file.
 
 The loader rejects symlinks, non-files, payloads above 2 MiB, unknown contract
 fields, secret-like keys or values, shared credential classes, non-loopback
@@ -198,6 +305,13 @@ runtime capture nor admission evidence.
 
 ```bash
 python -m pip install -e mcp/services/abyss-stack-mcp
+abyss-stack-mcp-observe \
+  --deployment-manifest /path/to/deployments/latest.json \
+  --registry /path/to/organ-registry.source.json \
+  --output /path/to/observations/current.json
+abyss-stack-mcp-canary --organ aoa-kag \
+  --secret-dir /path/to/private/secrets \
+  --output-root /path/to/private/canaries
 abyss-stack-mcp --observation-path /path/to/observation.json catalog
 abyss-stack-mcp --observation-path /path/to/observation.json \
   inspect aoa-kag read --view proof
@@ -285,6 +399,10 @@ contour-specific audit journals at
 can write only its own journal under `ProtectSystem=strict` and makes the other
 contour's journal inaccessible. Managed startup requires the configured
 journal and validates its complete chain before listening.
+Provisioning also creates the mode-`0700`
+`${AOA_STACK_ROOT}/Logs/mcp/observations` root without creating or rewriting
+evidence. The producer receives that directory as its only writable stack path
+and atomically publishes mode-`0600` `current.json`.
 
 Runtime dependencies and the build backend are exact pins in
 `requirements.constraints`; the committed `requirements.lock` carries the

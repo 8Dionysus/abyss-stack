@@ -2,49 +2,49 @@
   "capability_matrix": [
     {
       "capability": "connection_lifecycle",
-      "notes": "Stable uses initialize plus session state; next removes the handshake and protocol session.",
+      "notes": "The observed Codex pair uses initialize plus session state; the final next protocol removes the handshake and protocol session.",
       "production_use": "stable_only",
       "stable": "supported",
-      "next": "rc_defined"
+      "next": "final_defined"
     },
     {
       "capability": "server_discover",
-      "notes": "Next capability discovery is a new method and has not been observed in the Codex pair.",
+      "notes": "The isolated Python MCP 2.0.0 KAG adapter served server/discover; Codex 0.145.0 was still observed sending initialize instead.",
       "production_use": "forbidden",
       "stable": "not_applicable",
-      "next": "rc_defined"
+      "next": "final_defined"
     },
     {
       "capability": "explicit_state_handles",
-      "notes": "Next replaces implicit protocol session state with explicit application handles.",
+      "notes": "The isolated read-only KAG requestState handle passed bearer principal isolation, expiry, cross-request replay denial, tamper denial, and key-retirement revocation; same-request replay is allowed only for the idempotent read pilot.",
       "production_use": "forbidden",
       "stable": "not_applicable",
-      "next": "rc_defined"
+      "next": "final_defined"
     },
     {
       "capability": "stateless_http",
-      "notes": "Next requests are self-describing; application state may still exist behind explicit handles.",
+      "notes": "The isolated KAG adapter proved self-describing requests across two clients with no session header or server-request backchannel; explicit application handles remain unproved.",
       "production_use": "forbidden",
       "stable": "not_applicable",
-      "next": "rc_defined"
+      "next": "final_defined"
     },
     {
       "capability": "trace_context",
-      "notes": "Trace metadata needs pair-level preservation tests and must not become owner authority.",
+      "notes": "The isolated KAG adapter preserved traceparent at pair level; trace metadata remains observation only and never becomes owner authority.",
       "production_use": "separate_gate",
       "stable": "unknown",
-      "next": "rc_defined"
+      "next": "final_defined"
     },
     {
       "capability": "list_cache_ttl",
-      "notes": "Next list responses may carry cache metadata; revocation and stale-catalog behavior need Abyss tests.",
+      "notes": "The isolated KAG pair proved private TTL hits, exact-expiry refetch, subscription addition invalidation, removal revocation, no-listener staleness, explicit refresh, and that stale discovery cannot authorize a removed tool.",
       "production_use": "forbidden",
       "stable": "not_applicable",
-      "next": "rc_defined"
+      "next": "final_defined"
     },
     {
       "capability": "tasks",
-      "notes": "Tasks is a separate extension and cannot be inferred from core protocol support.",
+      "notes": "Tasks is a separate extension and cannot be inferred from core support; Python MCP 2.0.0 explicitly does not implement the 2026-07-28 Tasks extension.",
       "production_use": "separate_gate",
       "stable": "supported",
       "next": "extension"
@@ -61,7 +61,7 @@
       "notes": "Next widens tool schemas and output values; depth, external refs, and validator budgets need pair tests.",
       "production_use": "forbidden",
       "stable": "supported",
-      "next": "rc_defined"
+      "next": "final_defined"
     }
   ],
   "claim_limits": [
@@ -70,17 +70,18 @@
     "Official conformance does not prove Abyss owner, freshness, effect, or rollback behavior.",
     "A read canary does not admit candidate or effect organs.",
     "A registered alias does not prove schema observation or a grounded call.",
-    "RC compatibility never authorizes production migration."
+    "Final publication and stable SDKs never authorize production migration without exact pair receipts."
   ],
   "consumer_pairs": [
     {
-      "capability_posture": "unknown",
+      "capability_posture": "blocked",
       "consumer_id": "codex-cli",
       "evidence": [
         "local command: codex --version -> codex-cli 0.145.0",
         "local binary contains 2026-07-28 and Tasks type literals",
-        "local binary also contains initialize, Mcp-Session-Id, and session lifecycle paths",
-        "no observed server/discover exchange or 2026-07-28 read canary"
+        "isolated stdio pair with Python MCP 2.0.0 offered and selected 2025-06-18",
+        "observed method sequence begins initialize, notifications/initialized, and tools/list",
+        "mcp/protocol-lab/fixtures/codex-0.145.0-wire-observation.json"
       ],
       "next_protocol_literal_present": true,
       "next_wire_pair_observed": false,
@@ -97,53 +98,53 @@
     "shared_credential_forbidden": true,
     "stable_registration_retained": true
   },
-  "expires_at": "2026-07-28T12:00:00Z",
+  "expires_at": "2026-07-31T12:00:00Z",
   "migration_gates": [
     {
       "evidence_refs": [
-        "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28-RC"
+        "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28"
       ],
       "gate_id": "P1-01",
-      "reason": "Only the release-candidate tag exists; final publication is scheduled for 2026-07-28.",
+      "reason": "The final 2026-07-28 specification tag is pinned to exact commit 5f5440bb26a62e2cf3440b92da5a667efa03b267.",
       "requirement": "Pin an exact final specification.",
-      "status": "blocked"
+      "status": "passed"
     },
     {
       "evidence_refs": [
-        "https://github.com/modelcontextprotocol/python-sdk/tree/v2.0.0b2",
-        "https://github.com/modelcontextprotocol/typescript-sdk/tree/main"
+        "https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.0.0",
+        "https://github.com/modelcontextprotocol/typescript-sdk/releases"
       ],
       "gate_id": "P1-02",
-      "reason": "Python v2.0.0b2 and TypeScript v2 beta.5 remain prerelease lines.",
+      "reason": "Python MCP 2.0.0 and TypeScript client/server 2.0.0 are stable, exact-commit pinned next-protocol SDK lines.",
       "requirement": "Observe a stable next-protocol SDK release.",
-      "status": "blocked"
+      "status": "passed"
     },
     {
       "evidence_refs": [
-        "local://codex-cli/0.145.0"
+        "mcp/protocol-lab/fixtures/codex-0.145.0-wire-observation.json"
       ],
       "gate_id": "P1-03",
-      "reason": "Modern literals exist, but an actual next-era Codex wire pair is unobserved.",
+      "reason": "An isolated wire probe proved that Codex 0.145.0 negotiates legacy 2025-06-18 with Python MCP 2.0.0 and does not send server/discover.",
       "requirement": "Prove Codex next-protocol capabilities.",
       "status": "blocked"
     },
     {
       "evidence_refs": [
-        "https://github.com/modelcontextprotocol/conformance/releases/tag/v0.1.15"
+        "mcp/protocol-lab/fixtures/python-mcp-2.0.0-conformance-observation.json"
       ],
       "gate_id": "P1-04",
-      "reason": "The next-protocol suite is intentionally not run before the final and stable pair exist.",
+      "reason": "The exact Python MCP 2.0.0 server and client fixtures passed the spec-version-filtered official 0.2.0-alpha.10 suite at wire 2026-07-28; this SDK gate does not imply Codex support.",
       "requirement": "Run official conformance against the exact pair.",
-      "status": "pending"
+      "status": "passed"
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/"
+        "mcp/protocol-lab/fixtures/kag-next-pair-observation.json"
       ],
       "gate_id": "P1-05",
-      "reason": "The fail-closed Abyss harness exists; a next pair receipt does not.",
+      "reason": "The isolated KAG next adapter passed the Abyss pair harness with exact SDK and source pins, read-only denials, and stable-registration non-mutation.",
       "requirement": "Run Abyss pair-conformance.",
-      "status": "pending"
+      "status": "passed"
     },
     {
       "evidence_refs": [
@@ -155,39 +156,51 @@
       "status": "passed"
     },
     {
-      "evidence_refs": [],
+      "evidence_refs": [
+        "mcp/protocol-lab/fixtures/kag-next-pair-observation.json"
+      ],
       "gate_id": "P1-07",
-      "reason": "No next-era pair has demonstrated request independence and bounded application state.",
+      "reason": "The isolated KAG pair used two independent clients with self-describing requests, no protocol session header, and no server-request backchannel.",
       "requirement": "Verify stateless behavior.",
-      "status": "pending"
+      "status": "passed"
     },
     {
-      "evidence_refs": [],
+      "evidence_refs": [
+        "mcp/protocol-lab/fixtures/kag-handle-pair-observation.json"
+      ],
       "gate_id": "P1-08",
-      "reason": "No next-era pair has demonstrated explicit handle isolation, expiry, replay, and revocation.",
+      "reason": "The isolated read-only KAG pair proved opaque requestState round trips, bearer principal isolation, expiry, cross-request replay denial, tamper denial, and key-retirement revocation; same-request replay remained safe and idempotent.",
       "requirement": "Verify explicit handles.",
-      "status": "pending"
+      "status": "passed"
     },
     {
-      "evidence_refs": [],
+      "evidence_refs": [
+        "mcp/protocol-lab/fixtures/kag-next-pair-observation.json",
+        "mcp/protocol-lab/fixtures/kag-handle-pair-observation.json"
+      ],
       "gate_id": "P1-09",
-      "reason": "No Codex exchange has observed server/discover request and response bytes.",
+      "reason": "The isolated Python MCP 2.0.0 KAG adapter served server/discover at 2026-07-28; Codex consumer support remains independently blocked by P1-03.",
       "requirement": "Verify server/discover.",
-      "status": "pending"
+      "status": "passed"
     },
     {
-      "evidence_refs": [],
+      "evidence_refs": [
+        "mcp/protocol-lab/fixtures/kag-next-pair-observation.json",
+        "mcp/protocol-lab/fixtures/kag-cache-pair-observation.json"
+      ],
       "gate_id": "P1-10",
-      "reason": "Trace propagation, TTL, cache invalidation, and revocation are unobserved for the pair.",
+      "reason": "The isolated KAG pair preserved trace context and proved private TTL hits, exact-expiry refetch, subscription invalidation, removal revocation, bounded stale-catalog behavior, and explicit refresh.",
       "requirement": "Verify trace and cache metadata.",
-      "status": "pending"
+      "status": "passed"
     },
     {
-      "evidence_refs": [],
+      "evidence_refs": [
+        "https://github.com/modelcontextprotocol/python-sdk/blob/6f69a3758ebf2ee55ce050f58b470ce11af71133/docs/migration.md#experimental-tasks-support-removed"
+      ],
       "gate_id": "P1-11",
-      "reason": "Tasks remains a separately gated extension and has no Abyss pair receipt.",
+      "reason": "Python MCP 2.0.0 documents the 2026-07-28 Tasks extension but does not implement it; no exact Abyss Tasks pair can be formed on this SDK line.",
       "requirement": "Verify the Tasks extension separately.",
-      "status": "pending"
+      "status": "blocked"
     },
     {
       "evidence_refs": [
@@ -199,39 +212,45 @@
       "status": "passed"
     },
     {
-      "evidence_refs": [],
+      "evidence_refs": [
+        "mcp/protocol-lab/fixtures/kag-next-pair-observation.json"
+      ],
       "gate_id": "P1-13",
-      "reason": "The read-only pilot cannot run until final, SDK, consumer, and conformance gates pass.",
+      "reason": "An isolated adapter read succeeded, but it is not a Codex consumer canary and KAG owner freshness remains source_unavailable; the registered pilot stays blocked.",
       "requirement": "Run one compact read-only canary.",
       "status": "blocked"
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/protocol-compatibility-matrix.v1.json"
+        "mcp/protocol-lab/protocol-compatibility-matrix.v1.json",
+        "mcp/protocol-lab/fixtures/codex-0.145.0-wire-observation.json",
+        "mcp/protocol-lab/fixtures/kag-next-pair-observation.json"
       ],
       "gate_id": "P1-14",
-      "reason": "Dual registration and stable-preserving rollback law are source-defined; runtime proof is pending.",
+      "reason": "Stable-preserving dual-registration and rollback law are source-defined, but the separately credentialed consumer exercise is blocked because Codex 0.145.0 cannot form the next-protocol pair and the registered read canary remains inadmissible.",
       "requirement": "Retain dual support and rollback.",
-      "status": "pending"
+      "status": "blocked"
     }
   ],
   "next_spec": {
-    "commit": "9d700ed62dcf86cb77475c9b81930611a9182f46",
-    "final_published": false,
-    "production_allowed": false,
-    "release_label": "2026-07-28-RC",
-    "release_status": "release_candidate",
-    "source": "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28-RC",
-    "tag": "2026-07-28-RC",
+    "commit": "5f5440bb26a62e2cf3440b92da5a667efa03b267",
+    "final_published": true,
+    "production_allowed": true,
+    "release_label": "2026-07-28",
+    "release_status": "final",
+    "source": "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28",
+    "tag": "2026-07-28",
     "wire_version": "2026-07-28"
   },
-  "observed_at": "2026-07-26T23:41:49Z",
+  "observed_at": "2026-07-29T02:08:11Z",
   "official_conformance": {
-    "commit": "a2855b03582a6c0b31065ad4d9af248316ce61a3",
-    "next_suite_executed": false,
-    "receipt_refs": [],
+    "commit": "a9896553900a2ef61787b57adfcbbe936a8ab1f9",
+    "next_suite_executed": true,
+    "receipt_refs": [
+      "mcp/protocol-lab/fixtures/python-mcp-2.0.0-conformance-observation.json"
+    ],
     "repository": "https://github.com/modelcontextprotocol/conformance",
-    "version": "v0.1.15"
+    "version": "0.2.0-alpha.10"
   },
   "pilot": {
     "effectful": false,
@@ -247,10 +266,10 @@
     "stable_registration": "aoa_kag",
     "state": "blocked"
   },
-  "production_protocol": "2025-11-25",
+  "production_protocol": "2025-06-18",
   "refresh_triggers": [
-    "The final 2026-07-28 specification tag appears.",
-    "Python or TypeScript v2 reaches stable.",
+    "The final 2026-07-28 specification tag or exact commit changes.",
+    "Python or TypeScript v2 publishes a new stable release.",
     "Codex changes version or documents next-era client support.",
     "The official conformance suite changes version or scenarios.",
     "Any server SDK pin, schema, transport, auth, or registration changes.",
@@ -275,51 +294,54 @@
       "version": "1.28.1"
     },
     {
-      "commit": "2713b53b127afc094dc97d6067df9f69b647661c",
+      "commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
       "ecosystem": "python",
-      "production_allowed": false,
+      "production_allowed": true,
       "protocol_versions": [
+        "2024-11-05",
+        "2025-03-26",
+        "2025-06-18",
         "2025-11-25",
         "2026-07-28"
       ],
-      "release_status": "beta",
+      "release_status": "stable",
       "sdk_id": "python-next",
       "stack_pin": null,
       "stack_pin_status": "not_used",
-      "version": "2.0.0b2"
+      "version": "2.0.0"
     },
     {
-      "commit": "1e1392e3f91583884fe82a0b4b91335875c3fba6",
+      "commit": "cc4b41617ce3601b1290d67216ea0b194a3cd9ac",
       "ecosystem": "typescript",
-      "production_allowed": false,
+      "production_allowed": true,
       "protocol_versions": [
         "2025-11-25",
         "2026-07-28"
       ],
-      "release_status": "beta",
+      "release_status": "stable",
       "sdk_id": "typescript-next",
       "stack_pin": null,
       "stack_pin_status": "not_used",
-      "version": "2.0.0-beta.5"
+      "version": "2.0.0"
     }
   ],
   "sources": [
-    "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2025-11-25",
-    "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28-RC",
-    "https://blog.modelcontextprotocol.io/posts/2026-07-28-release-candidate/",
-    "https://github.com/modelcontextprotocol/python-sdk/tree/v2.0.0b2",
+    "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2025-06-18",
+    "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28",
+    "https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.0.0",
+    "https://github.com/modelcontextprotocol/typescript-sdk/releases",
     "https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/migration/support-2026-07-28.md",
     "https://github.com/modelcontextprotocol/conformance",
     "https://github.com/openai/codex"
   ],
   "stable_spec": {
-    "commit": "38c84e9f93ad191d9eb26d92b945d17bd0efcaf3",
+    "commit": "f5ccad944fdf2b7d9cc70cf817f66ca5a8aa03a4",
     "final_published": true,
     "production_allowed": true,
-    "release_label": "2025-11-25",
+    "release_label": "2025-06-18",
     "release_status": "final",
-    "source": "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2025-11-25",
-    "tag": "2025-11-25",
-    "wire_version": "2025-11-25"
+    "source": "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2025-06-18",
+    "tag": "2025-06-18",
+    "wire_version": "2025-06-18"
   }
 }

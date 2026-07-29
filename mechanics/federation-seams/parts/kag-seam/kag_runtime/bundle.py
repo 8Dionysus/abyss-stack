@@ -20,6 +20,10 @@ EXPECTED_FILES = {
     "documents": "documents.jsonl",
 }
 _DIGEST_URI_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+_DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
+_CANONICAL_FAMILY_KINDS = frozenset(
+    {"anchor", "artifact", "assertion", "entity", "event", "relation"}
+)
 
 
 class BundleError(RuntimeError):
@@ -80,7 +84,9 @@ class RetrievalBundle:
                 "retrieval bundle manifest",
             )
         except FileNotFoundError as exc:
-            raise BundleError(f"missing retrieval bundle manifest: {manifest_path}") from exc
+            raise BundleError(
+                f"missing retrieval bundle manifest: {manifest_path}"
+            ) from exc
         except json.JSONDecodeError as exc:
             raise BundleError(f"invalid retrieval bundle manifest: {exc}") from exc
         return cls(resolved, manifest)
@@ -123,7 +129,9 @@ class RetrievalBundle:
 
     def verify(self) -> dict[str, Any]:
         if self.manifest.get("schema_version") != BUNDLE_SCHEMA_VERSION:
-            raise BundleError(f"unsupported retrieval bundle schema: {self.manifest.get('schema_version')}")
+            raise BundleError(
+                f"unsupported retrieval bundle schema: {self.manifest.get('schema_version')}"
+            )
         if set(_object(self.manifest.get("files"), "files")) != set(EXPECTED_FILES):
             raise BundleError("retrieval bundle file set is incomplete")
         if self.manifest.get("projection_lanes") != [
@@ -156,6 +164,7 @@ class RetrievalBundle:
             else None
         )
         files: dict[str, dict[str, Any]] = {}
+        owner_records: dict[str, dict[str, Any]] = {}
         for key, expected_path in EXPECTED_FILES.items():
             metadata = _object(self.manifest["files"].get(key), f"files.{key}")
             if metadata.get("path") != expected_path:
@@ -178,18 +187,39 @@ class RetrievalBundle:
                             )
                         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
                             raise BundleError(f"{path}:{line_number}: {exc}") from exc
-                        if key == "documents":
+                        if key == "owners":
+                            repo = _object(
+                                record.get("repo"),
+                                f"{path}:{line_number}.repo",
+                            )
+                            owner = repo.get("name")
+                            if (
+                                not isinstance(owner, str)
+                                or not owner
+                                or owner in owner_records
+                            ):
+                                raise BundleError(
+                                    "owner records must name unique non-empty owners"
+                                )
+                            owner_records[owner] = record
+                        elif key == "documents":
                             text = record.get("text")
                             if not isinstance(text, str) or not text:
                                 raise BundleError(
                                     f"{path}:{line_number}: document text must be non-empty"
                                 )
-                            if max_chunk_chars is not None and len(text) > max_chunk_chars:
+                            if (
+                                max_chunk_chars is not None
+                                and len(text) > max_chunk_chars
+                            ):
                                 raise BundleError(
                                     f"{path}:{line_number}: document text exceeds max_chunk_chars"
                                 )
                             for field in ("document_role", "surface_state"):
-                                if not isinstance(record.get(field), str) or not record[field]:
+                                if (
+                                    not isinstance(record.get(field), str)
+                                    or not record[field]
+                                ):
                                     raise BundleError(
                                         f"{path}:{line_number}: {field} must be non-empty"
                                     )
@@ -212,7 +242,10 @@ class RetrievalBundle:
                                 "temporal_ref",
                                 "trust_ref",
                             ):
-                                if not isinstance(record.get(field), str) or not record[field]:
+                                if (
+                                    not isinstance(record.get(field), str)
+                                    or not record[field]
+                                ):
                                     raise BundleError(
                                         f"{path}:{line_number}: {field} must be non-empty"
                                     )
@@ -252,7 +285,10 @@ class RetrievalBundle:
                 raise BundleError(f"{key} count disagrees with bundle summary")
         if federation_summary.get("unresolved_reference_count") != 0:
             raise BundleError("retrieval bundle contains unresolved references")
-        if len(self.manifest.get("canonical_inputs", [])) != files["owners"]["record_count"]:
+        if (
+            len(self.manifest.get("canonical_inputs", []))
+            != files["owners"]["record_count"]
+        ):
             raise BundleError("canonical input count disagrees with owner count")
         owners: set[str] = set()
         for index, raw_input in enumerate(self.manifest.get("canonical_inputs", [])):
@@ -265,43 +301,82 @@ class RetrievalBundle:
             if not isinstance(owner, str) or not owner or owner in owners:
                 raise BundleError("canonical input owners must be unique and non-empty")
             owners.add(owner)
-            corpus = _object(
-                canonical_input.get("corpus_identity"),
-                f"canonical_inputs[{index}].corpus_identity",
+            source_index_digest = canonical_input.get("source_index_digest")
+            if _DIGEST_RE.fullmatch(str(source_index_digest or "")) is None:
+                raise BundleError(
+                    f"canonical input {owner} source index digest is invalid"
+                )
+            family_digests = _object(
+                canonical_input.get("family_digests"),
+                f"canonical_inputs[{index}].family_digests",
             )
-            distribution = _object(
-                canonical_input.get("distribution_identity"),
-                f"canonical_inputs[{index}].distribution_identity",
-            )
-            for label, identity in (
-                ("corpus", corpus),
-                ("distribution", distribution),
+            if set(family_digests) != _CANONICAL_FAMILY_KINDS or any(
+                _DIGEST_RE.fullmatch(str(digest or "")) is None
+                for digest in family_digests.values()
             ):
-                if _DIGEST_URI_RE.fullmatch(
-                    str(identity.get("content_digest") or "")
-                ) is None:
+                raise BundleError(f"canonical input {owner} family digests are invalid")
+            owner_record = owner_records.get(owner)
+            if owner_record is None:
+                raise BundleError(
+                    f"canonical input {owner} has no matching owner record"
+                )
+            if (
+                owner_record.get("repo") != repo
+                or owner_record.get("source_index_digest") != source_index_digest
+                or owner_record.get("family_digests") != family_digests
+            ):
+                raise BundleError(
+                    f"canonical input {owner} disagrees with its owner record"
+                )
+
+            has_corpus = "corpus_identity" in canonical_input
+            has_distribution = "distribution_identity" in canonical_input
+            if has_corpus != has_distribution:
+                raise BundleError(
+                    f"canonical input {owner} tiered identities must be paired"
+                )
+            if has_corpus:
+                corpus = _object(
+                    canonical_input.get("corpus_identity"),
+                    f"canonical_inputs[{index}].corpus_identity",
+                )
+                distribution = _object(
+                    canonical_input.get("distribution_identity"),
+                    f"canonical_inputs[{index}].distribution_identity",
+                )
+                for label, identity in (
+                    ("corpus", corpus),
+                    ("distribution", distribution),
+                ):
+                    if (
+                        _DIGEST_URI_RE.fullmatch(
+                            str(identity.get("content_digest") or "")
+                        )
+                        is None
+                    ):
+                        raise BundleError(
+                            f"canonical input {owner} {label} identity is invalid"
+                        )
+                state = distribution.get("delivery_state")
+                if not isinstance(state, str) or not state:
                     raise BundleError(
-                        f"canonical input {owner} {label} identity is invalid"
+                        f"canonical input {owner} delivery state is missing"
                     )
-            state = distribution.get("delivery_state")
-            if not isinstance(state, str) or not state:
-                raise BundleError(
-                    f"canonical input {owner} delivery state is missing"
-                )
-            if not isinstance(distribution.get("complete"), bool):
-                raise BundleError(
-                    f"canonical input {owner} completeness is missing"
-                )
-            routes = distribution.get("routes")
-            if not isinstance(routes, dict) or any(
-                not isinstance(value, int)
-                or isinstance(value, bool)
-                or value < 0
-                for value in routes.values()
-            ):
-                raise BundleError(
-                    f"canonical input {owner} delivery routes are invalid"
-                )
+                if not isinstance(distribution.get("complete"), bool):
+                    raise BundleError(
+                        f"canonical input {owner} completeness is missing"
+                    )
+                routes = distribution.get("routes")
+                if not isinstance(routes, dict) or any(
+                    not isinstance(value, int) or isinstance(value, bool) or value < 0
+                    for value in routes.values()
+                ):
+                    raise BundleError(
+                        f"canonical input {owner} delivery routes are invalid"
+                    )
+
+        if owners != set(owner_records):
+            raise BundleError("canonical input owners disagree with owner records")
 
         return {
             "schema_version": BUNDLE_SCHEMA_VERSION,

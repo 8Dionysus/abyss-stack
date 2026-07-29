@@ -32,6 +32,7 @@ STALE_ABYSS_PATH_ALLOWED = {
 }
 RETIRED_ROUTING_CONSUMER_SCAN_ALLOWED_PREFIXES = (
     Path("docs") / "decisions",
+    Path("Logs") / "decision-graph",
     Path("tests"),
 )
 DERIVED_KAG_INDEX_ROOT = Path("kag") / "indexes"

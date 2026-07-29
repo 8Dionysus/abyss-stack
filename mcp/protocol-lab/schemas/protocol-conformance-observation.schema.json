@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os-abyss.dev/schemas/protocol-conformance-observation.schema.json",
+  "title": "OS Abyss MCP protocol conformance observation",
+  "additionalProperties": false,
+  "properties": {
+    "claim_limits": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "conformance_harness": {
+      "additionalProperties": false,
+      "properties": {
+        "npm_git_head": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "npm_integrity": {
+          "pattern": "^sha512-[A-Za-z0-9+/=]+$",
+          "type": "string"
+        },
+        "release_status": {
+          "const": "alpha"
+        },
+        "version": {
+          "const": "0.2.0-alpha.10"
+        }
+      },
+      "required": [
+        "version",
+        "release_status",
+        "npm_git_head",
+        "npm_integrity"
+      ],
+      "type": "object"
+    },
+    "directions": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_failure_baseline_entries": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "failed_checks": {
+            "const": 0
+          },
+          "info_checks": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "manifest_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "raw_result_ref": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "scenario_count": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "skipped_checks": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "success_checks": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "suite": {
+            "const": "all"
+          }
+        },
+        "required": [
+          "suite",
+          "scenario_count",
+          "success_checks",
+          "failed_checks",
+          "info_checks",
+          "skipped_checks",
+          "expected_failure_baseline_entries",
+          "raw_result_ref",
+          "manifest_sha256"
+        ],
+        "type": "object"
+      },
+      "maxProperties": 2,
+      "minProperties": 2,
+      "propertyNames": {
+        "enum": [
+          "client",
+          "server"
+        ]
+      },
+      "required": [
+        "client",
+        "server"
+      ],
+      "type": "object"
+    },
+    "finished_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "observation_id": {
+      "pattern": "^[a-z0-9][a-z0-9._-]+$",
+      "type": "string"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "python_sdk": {
+      "additionalProperties": false,
+      "properties": {
+        "commit": {
+          "const": "6f69a3758ebf2ee55ce050f58b470ce11af71133"
+        },
+        "source_checkout_clean": {
+          "const": true
+        },
+        "version": {
+          "const": "2.0.0"
+        }
+      },
+      "required": [
+        "version",
+        "commit",
+        "source_checkout_clean"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "abyss_mcp_protocol_conformance_observation_v1"
+    },
+    "spec_version": {
+      "const": "2026-07-28"
+    },
+    "verdict": {
+      "const": "sdk_pair_passed"
+    }
+  },
+  "required": [
+    "schema_version",
+    "observation_id",
+    "observed_at",
+    "finished_at",
+    "spec_version",
+    "conformance_harness",
+    "python_sdk",
+    "directions",
+    "verdict",
+    "claim_limits"
+  ],
+  "type": "object"
+}

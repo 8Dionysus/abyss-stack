@@ -18,6 +18,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from pydantic import ValidationError
 
+from abyss_stack_mcp.canary import validate_result_contract
 from abyss_stack_mcp.contracts import RuntimeObservation
 from abyss_stack_mcp.cli import main as cli_main
 from abyss_stack_mcp.audit import (
@@ -44,6 +45,7 @@ from abyss_stack_mcp.policy import (
     StackPolicySeam,
     ToolPolicy,
 )
+from abyss_stack_mcp.observation import DEFAULT_TARGETS_PATH, _load_targets
 
 
 NOW = datetime(2026, 7, 26, 5, 0, tzinfo=timezone.utc)
@@ -1724,6 +1726,37 @@ def test_catalog_is_compact_and_does_not_flatten_health(tmp_path: Path) -> None:
     assert result["metadata"]["applied_state"] == "not_applied"
 
 
+def test_stack_catalog_matches_its_committed_canary_contract(
+    tmp_path: Path,
+) -> None:
+    app = application(
+        tmp_path,
+        payload=observation(
+            subject(
+                "abyss-stack",
+                credential_class="abyss-stack-mcp-read",
+            )
+        ),
+    )
+    catalog, _ = _load_targets(DEFAULT_TARGETS_PATH)
+    target = next(
+        item for item in catalog.targets if item.organ_id == "abyss-stack"
+    )
+
+    result = app.catalog(
+        organ_id="abyss-stack",
+        policy_family="read",
+        max_results=1,
+        byte_budget=8192,
+    )
+
+    assert target.canary_contract is not None
+    assert validate_result_contract(
+        result,
+        target.canary_contract,
+    ) == (True, (), "abyss_stack_mcp_result_v1")
+
+
 def test_read_plane_cannot_enumerate_or_inspect_higher_policy_subjects(
     tmp_path: Path,
 ) -> None:
@@ -3072,14 +3105,18 @@ def test_read_and_candidate_servers_expose_disjoint_tools(tmp_path: Path) -> Non
     path = write_observation(tmp_path / "observation.json")
     read = build_server(path, policy_family="read")
     candidate = build_server(path, policy_family="candidate")
-    assert read._mcp_server.create_initialization_options().server_version == "0.1.0"
+    assert read._mcp_server.create_initialization_options().server_version == "0.2.0"
     assert (
         candidate._mcp_server.create_initialization_options().server_version
-        == "0.1.0"
+        == "0.2.0"
     )
     read_tools = {tool.name for tool in asyncio.run(read.list_tools())}
     candidate_tools = {tool.name for tool in asyncio.run(candidate.list_tools())}
-    assert read_tools == {"stack_runtime_catalog", "stack_runtime_inspect"}
+    assert read_tools == {
+        "stack_orchestration_inspect",
+        "stack_runtime_catalog",
+        "stack_runtime_inspect",
+    }
     assert candidate_tools == {"stack_prepare_runtime_plan"}
     read_tool_contracts = {
         tool.name: tool.inputSchema for tool in asyncio.run(read.list_tools())

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 from typing import Annotated, Any, Literal
 from urllib.parse import quote, unquote
@@ -15,6 +16,8 @@ from .runtime import build_application
 
 
 LOGGER = logging.getLogger(__name__)
+PACKAGE_NAME = "aoa-kag-mcp"
+SOURCE_FALLBACK_VERSION = "0.1.0"
 DEFAULT_HTTP_PORT = 5425
 READ_TOKEN_ENV_VAR = "AOA_KAG_MCP_READ_BEARER_TOKEN"
 READ_CREDENTIAL_NAME = "aoa-kag-mcp-read-bearer-token"
@@ -25,6 +28,27 @@ Strategy = Literal["auto", "exact", "lexical", "semantic", "hybrid", "graph"]
 Direction = Literal["outgoing", "incoming", "both"]
 PageLimit = Annotated[int, Field(ge=1, le=10)]
 TraversalDepth = Annotated[int, Field(ge=1, le=4)]
+
+
+def _application_version() -> str:
+    try:
+        discovered = distribution(PACKAGE_NAME).metadata.get("Version")
+    except PackageNotFoundError:
+        return SOURCE_FALLBACK_VERSION
+    return (
+        discovered.strip()
+        if isinstance(discovered, str) and discovered.strip()
+        else SOURCE_FALLBACK_VERSION
+    )
+
+
+def _bind_server_info_version(mcp: Any) -> None:
+    low_level_server = getattr(mcp, "_mcp_server", None)
+    if low_level_server is None or not hasattr(low_level_server, "version"):
+        raise RuntimeError(
+            "the pinned MCP SDK no longer exposes the server identity seam"
+        )
+    low_level_server.version = _application_version()
 
 
 def _run_server(server: Any) -> None:
@@ -102,6 +126,7 @@ def build_server(
         json_response=True,
         **_read_http_auth_kwargs(),
     )
+    _bind_server_info_version(mcp)
 
     @mcp.tool(annotations=annotations, structured_output=True)
     def kag_discover(

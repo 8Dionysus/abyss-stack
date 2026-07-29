@@ -5,8 +5,10 @@
 The KAG runtime seam turns machine-admitted content-addressed owner families
 and the verified repo-self projection bundle from `aoa-kag` into local search
 and graph stores. Every result remains traceable to the owner-qualified
-records, exact source ref, corpus identity, distribution identity, and source
-anchors carried by those inputs.
+records, source-index and family digests, and source anchors carried by the
+bundle. When a tiered owner state is admitted, the runtime joins its exact
+source ref, corpus identity, and distribution identity without treating those
+delivery coordinates as source-bundle authority.
 
 ## Input
 
@@ -25,11 +27,18 @@ The tiered distribution input consists of:
 
 The projection bundle contains:
 
-- `manifest.json`, binding canonical owner inputs, projection identities,
-  embedding profile, counts, and file digests;
+- `manifest.json`, binding canonical owner inputs through repository identity,
+  source-index digest, and the complete family-digest set, plus projection
+  identities, embedding profile, counts, and file digests;
 - JSONL streams for owners, nodes, relations, external references, and
   retrieval documents;
 - stable vector point identities prepared by `aoa-kag`.
+
+The verifier requires each canonical input to agree with its corresponding
+owner record. It accepts the current semantic source ABI and a paired legacy
+extension containing both corpus and distribution identities. Missing
+semantic digests, incomplete family identity, unpaired tiered identity, or
+owner-record disagreement fails closed.
 
 The promoted embedding profile is stored at
 `config-templates/Configs/rag/repo-self-kag-embedding-profile.json`. Its model,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -10,11 +11,34 @@ from .core import AoAStatsMCPState
 
 
 LOGGER = logging.getLogger(__name__)
+PACKAGE_NAME = "aoa-stats-mcp"
+SOURCE_FALLBACK_VERSION = "0.1.0"
 DEFAULT_HTTP_PORT = 5430
 READ_TOKEN_ENV_VAR = "AOA_STATS_MCP_READ_BEARER_TOKEN"
 READ_CREDENTIAL_NAME = "aoa-stats-mcp-read-bearer-token"
 READ_AUTH_SCOPE = "mcp:aoa-stats:read"
 READ_CLIENT_ID = "aoa-loopback-codex:aoa-stats:read"
+
+
+def _application_version() -> str:
+    try:
+        discovered = distribution(PACKAGE_NAME).metadata.get("Version")
+    except PackageNotFoundError:
+        return SOURCE_FALLBACK_VERSION
+    return (
+        discovered.strip()
+        if isinstance(discovered, str) and discovered.strip()
+        else SOURCE_FALLBACK_VERSION
+    )
+
+
+def _bind_server_info_version(mcp: Any) -> None:
+    low_level_server = getattr(mcp, "_mcp_server", None)
+    if low_level_server is None or not hasattr(low_level_server, "version"):
+        raise RuntimeError(
+            "the pinned MCP SDK no longer exposes the server identity seam"
+        )
+    low_level_server.version = _application_version()
 
 
 def _run_server(server: Any) -> None:
@@ -58,6 +82,7 @@ def build_server(
         json_response=True,
         **_read_http_auth_kwargs(),
     )
+    _bind_server_info_version(mcp)
     read_only_tool = mcp.tool(
         annotations=ToolAnnotations(
             readOnlyHint=True,

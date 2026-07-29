@@ -285,6 +285,10 @@ abyss_stack_mcp_runtime_lock="${abyss_stack_mcp_runtime_root}/.runtime-provision
 abyss_stack_mcp_audit_root="${AOA_STACK_ROOT}/Logs/mcp/audit"
 abyss_stack_mcp_read_audit_journal="${abyss_stack_mcp_audit_root}/policy-read.jsonl"
 abyss_stack_mcp_candidate_audit_journal="${abyss_stack_mcp_audit_root}/policy-candidate.jsonl"
+abyss_stack_mcp_observation_root="${AOA_STACK_ROOT}/Logs/mcp/observations"
+abyss_stack_mcp_observation_path="${abyss_stack_mcp_observation_root}/current.json"
+abyss_stack_mcp_observation_overlay_path="${abyss_stack_mcp_observation_root}/evidence-overlay.json"
+abyss_stack_mcp_orchestration_root="${AOA_STACK_ROOT}/Logs/mcp/cross-organ-orchestrations"
 abyss_stack_mcp_source_lock_root="$(
   dirname -- "${AOA_CONFIGS_ROOT%/}"
 )/Services/abyss-stack-mcp"
@@ -799,6 +803,66 @@ aoa_provision_abyss_stack_mcp_audit_journals() {
     chmod 0600 "$journal_path"
   done
   aoa_verify_abyss_stack_mcp_audit_journals
+}
+
+aoa_provision_abyss_stack_mcp_observation_root() {
+  local parent=""
+
+  [[ -d "$AOA_STACK_ROOT" && ! -L "$AOA_STACK_ROOT" ]] || \
+    aoa_die "abyss-stack runtime root must be a non-symlink directory"
+  for parent in \
+    "${AOA_STACK_ROOT}/Logs" \
+    "${AOA_STACK_ROOT}/Logs/mcp"; do
+    if [[ -e "$parent" || -L "$parent" ]]; then
+      [[ -d "$parent" && ! -L "$parent" ]] || \
+        aoa_die "abyss-stack MCP observation parent must be a non-symlink directory"
+    else
+      install -d -m 0750 "$parent"
+    fi
+  done
+  if [[ -e "$abyss_stack_mcp_observation_root" || \
+        -L "$abyss_stack_mcp_observation_root" ]]; then
+    [[ -d "$abyss_stack_mcp_observation_root" && \
+       ! -L "$abyss_stack_mcp_observation_root" ]] || \
+      aoa_die "abyss-stack MCP observation root must be a non-symlink directory"
+  else
+    install -d -m 0700 "$abyss_stack_mcp_observation_root"
+  fi
+  chmod 0700 "$abyss_stack_mcp_observation_root"
+  for parent in \
+    "$abyss_stack_mcp_observation_path" \
+    "$abyss_stack_mcp_observation_overlay_path"; do
+    if [[ -e "$parent" || -L "$parent" ]]; then
+      [[ -f "$parent" && ! -L "$parent" ]] || \
+        aoa_die "abyss-stack MCP observation files must be regular non-symlink files"
+    fi
+  done
+}
+
+aoa_provision_abyss_stack_mcp_orchestration_root() {
+  local parent=""
+
+  [[ -d "$AOA_STACK_ROOT" && ! -L "$AOA_STACK_ROOT" ]] || \
+    aoa_die "abyss-stack runtime root must be a non-symlink directory"
+  for parent in \
+    "${AOA_STACK_ROOT}/Logs" \
+    "${AOA_STACK_ROOT}/Logs/mcp"; do
+    if [[ -e "$parent" || -L "$parent" ]]; then
+      [[ -d "$parent" && ! -L "$parent" ]] || \
+        aoa_die "cross-organ orchestration parent must be a non-symlink directory"
+    else
+      install -d -m 0750 "$parent"
+    fi
+  done
+  if [[ -e "$abyss_stack_mcp_orchestration_root" || \
+        -L "$abyss_stack_mcp_orchestration_root" ]]; then
+    [[ -d "$abyss_stack_mcp_orchestration_root" && \
+       ! -L "$abyss_stack_mcp_orchestration_root" ]] || \
+      aoa_die "cross-organ orchestration root must be a non-symlink directory"
+  else
+    install -d -m 0700 "$abyss_stack_mcp_orchestration_root"
+  fi
+  chmod 0700 "$abyss_stack_mcp_orchestration_root"
 }
 
 aoa_require_abyss_stack_mcp_units_stopped_for_rotation() {
@@ -1338,6 +1402,8 @@ aoa_provision_abyss_stack_mcp_runtime() {
   fi
   chmod 0600 "$abyss_stack_mcp_runtime_lock"
   aoa_provision_abyss_stack_mcp_audit_journals
+  aoa_provision_abyss_stack_mcp_observation_root
+  aoa_provision_abyss_stack_mcp_orchestration_root
 
   if [[ -e "$abyss_stack_mcp_venv" || -L "$abyss_stack_mcp_venv" ]]; then
     [[ -d "$abyss_stack_mcp_venv" && ! -L "$abyss_stack_mcp_venv" ]] || \

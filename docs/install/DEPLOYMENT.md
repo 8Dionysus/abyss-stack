@@ -164,6 +164,14 @@ scripts/aoa-install-systemd --provision-mcp-http-auth
 scripts/aoa-install-systemd --provision-organ-mcp-read-auth
 scripts/aoa-install-systemd --provision-organ-mcp-candidate-auth
 scripts/aoa-install-systemd --provision-abyss-stack-mcp-auth
+# Produce one bounded live observation before starting either stack MCP plane:
+systemctl --user start abyss-stack-mcp-observation.service
+# Enable recurrence only after reviewing that first observation:
+systemctl --user enable --now abyss-stack-mcp-observation.timer
+# After an explicit one-owner legacy/new-unit switch, run only that reviewed
+# read canary; it does not start a unit or change/admit a consumer:
+/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/abyss-stack-mcp-canary \
+  --organ aoa-kag
 # Later standalone rotation, only with both stack MCP planes stopped:
 scripts/aoa-install-systemd --rotate-abyss-stack-mcp-auth
 scripts/aoa-install-systemd --install-mcp-http-codex-client
@@ -200,6 +208,13 @@ Memo and Evals candidate services use ports `5434` and `5435`, distinct
 candidate variables, disjoint tool catalogs, and source-enumerated application
 plus systemd write allowlists. Provisioning, linking, package deployment,
 starting, and client registration remain separate actions.
+The authenticated canary is likewise separate: it reads one owner-specific
+credential, observes the exact loopback MCP schema and structured read result,
+checks the committed result contract, then emits a private secret-free receipt
+and a separate private content-addressed result artifact for owner review.
+It does not stop or start services,
+rewrite Codex registration, merge production evidence, infer freshness or
+grounding/acceptance, run an owner reviewer, or change registry admission.
 Course, StackOverflow, and XDA use `5436`, `5437`, and `5438`, preserving the
 stack MCP ports `5431`/`5433` and PostgreSQL reservation `5432`.
 
@@ -253,6 +268,16 @@ the environment. It holds a source-projection lock from before its first
 deployed-source read through the swap; an applying MCP Configs sync holds the
 same exclusive lock for its full rsync transaction. Either command fails
 closed rather than crossing the other's publication boundary.
+Provisioning also creates a private observation directory. The distinct
+credential-free observation oneshot verifies the immutable deployment record,
+private registry source, committed owner-specific target catalog, and exact
+named user-unit fields before atomically writing a five-minute observation.
+It does not scan sibling workspaces, read a bearer, call an owner endpoint, or
+infer the missing source digest, consumer schema, freshness, proof, acceptance,
+canary, or rollback axes. Its two-minute timer is linked but remains disabled
+until the operator explicitly enables it after reviewing the first result.
+Shared-bearer compatibility units are excluded instead of being relabelled as
+owner-isolated processes.
 The Codex client install adds a removable Zsh launch function that delegates
 to the deployed launcher without replacing the managed Codex executable or
 exporting the bearer into the parent shell. It affects only new interactive

@@ -82,6 +82,11 @@ Managed launch acquires shared source-projection and runtime locks, repeats the
 verification under both, and retains them across `exec`; an applying MCP
 Configs sync or runtime replacement therefore requires both stack MCP planes
 to be stopped.
+Provisioning additionally creates the private stack MCP observation directory.
+The separately linked observation oneshot and timer use the provisioned venv
+to compose current runtime evidence from explicit inputs. They are not enabled
+or started by provisioning, and the read/candidate planes require the
+atomically produced `current.json` before launch.
 The same user-unit mechanic owns the Memo/Evals read/candidate lifecycle split:
 read instances are filesystem-read-only, candidate services use distinct
 credentials and finite write allowlists, and credential provisioning, unit

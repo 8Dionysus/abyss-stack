@@ -10,11 +10,14 @@ python -m pytest -q mcp/protocol-lab/tests
 python -m ruff check mcp/protocol-lab
 ```
 
-The validator checks exact P1 gate order, the pre-final block, stable
-registration retention, read-only pilot isolation, current SDK and stack pins,
-Codex evidence limits, runtime-receipt absence, and generated-status
-freshness.
+The validator checks exact P1 gate order, final spec and stable next-SDK pins,
+stable registration retention, read-only pilot isolation, unchanged production
+stack pins, the normalized Codex wire receipt, exact SDK conformance, the
+bounded isolated KAG adapter, requestState-handle, and catalog-cache receipts,
+Tasks non-support, unproved residuals, and generated-status freshness.
 
 Passing these commands proves only that the source gate is internally
-consistent and fail-closed. It is not a runtime conformance, canary, consumer,
-or rollback receipt.
+consistent and fail-closed. The normalized KAG fixture refers to a private raw
+runtime receipt, but even the isolated adapter and read-handle proofs are not
+a registered canary, Codex consumer, Tasks, effectful-handle, cross-replica
+cache-invalidation, or registration rollback receipt.

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "abyss-stack-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Owner-bounded runtime observation and plan-candidate MCP for abyss-stack"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -16,7 +16,13 @@ dependencies = [
 [project.scripts]
 abyss-stack-mcp = "abyss_stack_mcp.cli:main"
 abyss-stack-mcp-audit = "abyss_stack_mcp.audit:main"
+abyss-stack-mcp-canary = "abyss_stack_mcp.canary:main"
+abyss-stack-mcp-observe = "abyss_stack_mcp.observation:main"
+abyss-stack-mcp-orchestration = "abyss_stack_mcp.orchestration:main"
 abyss-stack-mcp-server = "abyss_stack_mcp.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+abyss_stack_mcp = ["runtime-targets.v1.json"]

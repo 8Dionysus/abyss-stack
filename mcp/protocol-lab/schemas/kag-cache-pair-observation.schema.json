@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os-abyss.dev/schemas/kag-cache-pair-observation.schema.json",
+  "title": "OS Abyss KAG cache pair observation",
+  "additionalProperties": false,
+  "properties": {
+    "cache": {
+      "additionalProperties": false,
+      "properties": {
+        "scope": {
+          "const": "private"
+        },
+        "ttl_ms": {
+          "const": 30000
+        },
+        "within_ttl_repeat_server_fetches": {
+          "const": 1
+        }
+      },
+      "required": [
+        "scope",
+        "ttl_ms",
+        "within_ttl_repeat_server_fetches"
+      ],
+      "type": "object"
+    },
+    "checks": {
+      "additionalProperties": false,
+      "properties": {
+        "explicit_refresh_replaces_stale_entry": {
+          "const": true
+        },
+        "no_subscription_no_replay": {
+          "const": true
+        },
+        "stale_catalog_cannot_authorize_removed_tool": {
+          "const": true
+        },
+        "subscription_addition_invalidation": {
+          "const": true
+        },
+        "subscription_removal_revocation": {
+          "const": true
+        },
+        "ttl_expiry_refetch": {
+          "const": true
+        }
+      },
+      "required": [
+        "subscription_addition_invalidation",
+        "subscription_removal_revocation",
+        "ttl_expiry_refetch",
+        "no_subscription_no_replay",
+        "stale_catalog_cannot_authorize_removed_tool",
+        "explicit_refresh_replaces_stale_entry"
+      ],
+      "type": "object"
+    },
+    "claim_limits": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 6,
+      "type": "array"
+    },
+    "finished_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "inventories": {
+      "additionalProperties": false,
+      "properties": {
+        "after_explicit_refresh": {
+          "const": [
+            "kag_discover"
+          ]
+        },
+        "after_subscription_add": {
+          "const": [
+            "kag_discover",
+            "kag_transient_probe"
+          ]
+        },
+        "after_subscription_remove": {
+          "const": [
+            "kag_discover"
+          ]
+        },
+        "after_ttl_expiry": {
+          "const": [
+            "kag_discover",
+            "kag_stale_probe"
+          ]
+        },
+        "initial": {
+          "const": [
+            "kag_discover"
+          ]
+        },
+        "stale_after_removal": {
+          "const": [
+            "kag_discover",
+            "kag_stale_probe"
+          ]
+        },
+        "stale_before_expiry": {
+          "const": [
+            "kag_discover"
+          ]
+        }
+      },
+      "required": [
+        "initial",
+        "after_subscription_add",
+        "after_subscription_remove",
+        "stale_before_expiry",
+        "after_ttl_expiry",
+        "stale_after_removal",
+        "after_explicit_refresh"
+      ],
+      "type": "object"
+    },
+    "observation_id": {
+      "pattern": "^[a-z0-9][a-z0-9._-]+$",
+      "type": "string"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "python_sdk": {
+      "additionalProperties": false,
+      "properties": {
+        "commit": {
+          "const": "6f69a3758ebf2ee55ce050f58b470ce11af71133"
+        },
+        "version": {
+          "const": "2.0.0"
+        }
+      },
+      "required": [
+        "version",
+        "commit"
+      ],
+      "type": "object"
+    },
+    "raw_receipt": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "0600"
+        },
+        "ref": {
+          "pattern": "^local://",
+          "type": "string"
+        },
+        "sha256": {
+          "const": "2fe15b0413b0167fb74297575ebe677fa8881db63afa1933581807ece05ec346"
+        }
+      },
+      "required": [
+        "ref",
+        "sha256",
+        "mode"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "abyss_mcp_kag_cache_pair_observation_v1"
+    },
+    "source_revisions": {
+      "additionalProperties": false,
+      "properties": {
+        "aoa_kag": {
+          "const": "0ff913279868735b41a17aab84c0c89341d7cb77"
+        },
+        "abyss_stack": {
+          "const": "8bcfe0edf7ad499d666207ca2087d8db9df4d7a9"
+        }
+      },
+      "required": [
+        "abyss_stack",
+        "aoa_kag"
+      ],
+      "type": "object"
+    },
+    "stable_registration_unchanged": {
+      "const": true
+    },
+    "subscription": {
+      "additionalProperties": false,
+      "properties": {
+        "events_consumed": {
+          "const": 2
+        },
+        "tools_list_changed_honored": {
+          "const": true
+        }
+      },
+      "required": [
+        "tools_list_changed_honored",
+        "events_consumed"
+      ],
+      "type": "object"
+    },
+    "verdict": {
+      "const": "cache_pair_passed"
+    },
+    "wire_version": {
+      "const": "2026-07-28"
+    }
+  },
+  "required": [
+    "schema_version",
+    "observation_id",
+    "observed_at",
+    "finished_at",
+    "wire_version",
+    "python_sdk",
+    "source_revisions",
+    "cache",
+    "subscription",
+    "checks",
+    "inventories",
+    "stable_registration_unchanged",
+    "raw_receipt",
+    "verdict",
+    "claim_limits"
+  ],
+  "type": "object"
+}

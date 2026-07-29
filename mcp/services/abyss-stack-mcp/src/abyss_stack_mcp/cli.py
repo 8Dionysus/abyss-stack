@@ -4,11 +4,13 @@ import argparse
 import json
 
 from .core import ObservationStore, StackMCPApplication
+from .orchestration import CrossOrganRunStore
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="abyss-stack-mcp")
     parser.add_argument("--observation-path")
+    parser.add_argument("--orchestration-root")
     parser.add_argument(
         "--policy-family",
         choices=("read", "candidate"),
@@ -64,6 +66,9 @@ def main() -> None:
     )
     plan.add_argument("--expected-observation-digest", required=True)
 
+    orchestration = sub.add_parser("orchestration-inspect")
+    orchestration.add_argument("--run-id")
+
     args = parser.parse_args()
     expected_contour = "candidate" if args.command == "plan" else "read"
     if args.policy_family != expected_contour:
@@ -73,6 +78,7 @@ def main() -> None:
     application = StackMCPApplication(
         ObservationStore(args.observation_path),
         policy_family=args.policy_family,
+        orchestration_store=CrossOrganRunStore(args.orchestration_root),
     )
     if args.command == "catalog":
         result = application.catalog(
@@ -87,6 +93,8 @@ def main() -> None:
             args.target_policy_family,
             view=args.view,
         )
+    elif args.command == "orchestration-inspect":
+        result = application.inspect_orchestration(args.run_id)
     else:
         result = application.prepare_plan(
             args.organ_id,

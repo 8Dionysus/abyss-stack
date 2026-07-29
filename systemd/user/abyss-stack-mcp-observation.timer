@@ -1,0 +1,14 @@
+[Unit]
+Description=Refresh the bounded abyss-stack MCP runtime observation
+Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/README.md
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=2min
+AccuracySec=15s
+RandomizedDelaySec=10s
+Persistent=false
+Unit=abyss-stack-mcp-observation.service
+
+[Install]
+WantedBy=timers.target
