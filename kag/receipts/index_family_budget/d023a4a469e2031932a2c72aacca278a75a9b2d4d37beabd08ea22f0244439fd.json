@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 2313838,
+  "allowed_tracked_bytes": 28105007,
+  "approved_by": "repository-owner",
+  "base_ref": "3d48c492614ff9ec5aadeff8afcf5bb814c40ef7",
+  "changed_generated_bytes": 2313838,
+  "changed_generated_files": 30,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "d023a4a469e2031932a2c72aacca278a75a9b2d4d37beabd08ea22f0244439fd",
+  "reason": "Refresh portable family after the executable no-bytecode regression proof.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 28105007,
+  "tracked_bytes_max": 24117248
+}
