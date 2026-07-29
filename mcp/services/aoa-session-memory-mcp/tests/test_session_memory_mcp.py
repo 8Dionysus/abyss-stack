@@ -4120,11 +4120,12 @@ def test_validator_configured_transport_http_client_bounds_ordinary_reads_only()
     import httpx
 
     validator = load_validator_module()
-    observed_read_timeouts: dict[str, float | None] = {}
+    handshake_read_timeouts: dict[str, float | None] = {}
 
     async def handler(request: httpx.Request) -> httpx.Response:
-        observed_read_timeouts[request.method] = request.extensions["timeout"]["read"]
-        return httpx.Response(200, json={})
+        handshake_read_timeouts[request.method] = request.extensions["timeout"]["read"]
+        headers = {"Content-Type": "text/event-stream"} if request.method == "GET" else {}
+        return httpx.Response(200, headers=headers, json={})
 
     client = validator._configured_transport_http_client(
         MCP_HTTP_TEST_TOKEN,
@@ -4138,18 +4139,21 @@ def test_validator_configured_transport_http_client_bounds_ordinary_reads_only()
         assert client.timeout.pool == validator.CONFIGURED_HTTP_TIMEOUT_SECONDS
         assert client.timeout.read == validator.CONFIGURED_HTTP_RESPONSE_TIMEOUT_SECONDS
 
-        async def probe_timeout_policy() -> None:
-            await client.get(
+        async def probe_timeout_policy() -> tuple[httpx.Response, httpx.Response]:
+            get_response = await client.get(
                 "http://127.0.0.1:5422/mcp",
                 headers={"Accept": "application/json, text/event-stream"},
             )
-            await client.post("http://127.0.0.1:5422/mcp", json={})
+            post_response = await client.post("http://127.0.0.1:5422/mcp", json={})
+            return get_response, post_response
 
-        asyncio.run(probe_timeout_policy())
-        assert observed_read_timeouts == {
-            "GET": None,
+        get_response, post_response = asyncio.run(probe_timeout_policy())
+        assert handshake_read_timeouts == {
+            "GET": validator.CONFIGURED_HTTP_RESPONSE_TIMEOUT_SECONDS,
             "POST": validator.CONFIGURED_HTTP_RESPONSE_TIMEOUT_SECONDS,
         }
+        assert get_response.request.extensions["timeout"]["read"] is None
+        assert post_response.request.extensions["timeout"]["read"] == validator.CONFIGURED_HTTP_RESPONSE_TIMEOUT_SECONDS
     finally:
         asyncio.run(client.aclose())
 
