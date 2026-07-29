@@ -13,11 +13,26 @@ from aoa_telegram_connector_mcp._http_auth import transport_settings as _transpo
 from aoa_telegram_connector_mcp.core import AoATelegramConnectorMCPState
 
 LOGGER = logging.getLogger(__name__)
+PACKAGE_NAME = "aoa-telegram-connector-mcp"
+APPLICATION_VERSION = "0.2.0"
 DEFAULT_HTTP_PORT = 5427
 READ_TOKEN_ENV = "AOA_TELEGRAM_CONNECTOR_MCP_READ_BEARER_TOKEN"
 READ_CREDENTIAL = "aoa-telegram-connector-mcp-read-bearer-token"
 READ_SCOPE = "mcp:aoa-telegram-connector:read"
 READ_CLIENT_ID = "aoa-loopback-codex:aoa-telegram-connector:read"
+
+
+def _application_version() -> str:
+    return APPLICATION_VERSION
+
+
+def _bind_server_info_version(mcp: Any) -> None:
+    low_level_server = getattr(mcp, "_mcp_server", None)
+    if low_level_server is None or not hasattr(low_level_server, "version"):
+        raise RuntimeError(
+            "the pinned MCP SDK no longer exposes the server identity seam"
+        )
+    low_level_server.version = _application_version()
 
 
 def _read_http_auth_kwargs() -> dict[str, Any]:
@@ -50,6 +65,7 @@ def build_server(state: AoATelegramConnectorMCPState | None = None) -> FastMCP:
         json_response=True,
         **_read_http_auth_kwargs(),
     )
+    _bind_server_info_version(mcp)
     read_only_tool = mcp.tool(
         annotations=ToolAnnotations(
             readOnlyHint=True,

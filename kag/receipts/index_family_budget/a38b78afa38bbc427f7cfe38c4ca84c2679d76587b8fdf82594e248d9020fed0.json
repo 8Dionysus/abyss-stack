@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 20837674,
+  "allowed_tracked_bytes": 28247257,
+  "approved_by": "repository-owner",
+  "base_ref": "c779d1413690ec11b5df7b6fc638e2a8b95510a5",
+  "changed_generated_bytes": 20837674,
+  "changed_generated_files": 277,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "a38b78afa38bbc427f7cfe38c4ca84c2679d76587b8fdf82594e248d9020fed0",
+  "reason": "Refresh the portable family after completing validation inventory coverage for source-bound MCP application identity.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 28247257,
+  "tracked_bytes_max": 24117248
+}

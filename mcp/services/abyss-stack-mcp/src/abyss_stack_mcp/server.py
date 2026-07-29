@@ -9,7 +9,6 @@ import logging
 import os
 import re
 import uuid
-from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -32,7 +31,7 @@ CANDIDATE_PORT = 5433
 AUTH_MANIFEST_CREDENTIAL = "abyss-stack-mcp-auth-manifest.json"
 AUTH_MANIFEST_SCHEMA = "abyss_stack_mcp_auth_manifest_v1"
 PACKAGE_NAME = "abyss-stack-mcp"
-SOURCE_FALLBACK_VERSION = "0.2.0"
+APPLICATION_VERSION = "0.2.0"
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 PolicyMode = Literal["read", "candidate"]
 CatalogLimit = Annotated[int, Field(ge=1, le=64)]
@@ -40,15 +39,7 @@ CatalogBudget = Annotated[int, Field(ge=512, le=131_072)]
 
 
 def _application_version() -> str:
-    try:
-        discovered = distribution(PACKAGE_NAME).metadata.get("Version")
-    except PackageNotFoundError:
-        return SOURCE_FALLBACK_VERSION
-    return (
-        discovered.strip()
-        if isinstance(discovered, str) and discovered.strip()
-        else SOURCE_FALLBACK_VERSION
-    )
+    return APPLICATION_VERSION
 
 
 def _bind_server_info_version(mcp: Any) -> None:

@@ -14,9 +14,12 @@ Tracking starts with the community-docs baseline for this repository.
   owner-specific result-contract match, and preserves a successful structured
   response in a private content-addressed artifact for independent owner
   review, without inferring grounding, freshness, proof, acceptance,
-  admission, or rollback. Those three adapters now report their
-  application package version rather than the MCP SDK version; decisions read
-  annotations are explicit.
+  admission, or rollback. Every standalone stack-owned MCP package now reports
+  its embedded application package version rather than the MCP SDK or stale
+  ambient distribution metadata. A blocking source validator keeps each
+  embedded version equal to its package manifest and requires the server
+  constructor to invoke the version binding; decisions read annotations are
+  explicit.
 - `abyss-stack-mcp-observe` now atomically composes a five-minute production
   runtime observation from an immutable deployment receipt, the private
   deny-by-default organ registry, a committed fifteen-target owner-specific

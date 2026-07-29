@@ -11,6 +11,8 @@ from ._http_auth import transport_settings as _transport_settings
 from .core import AoAMemoMCPState
 
 LOGGER = logging.getLogger(__name__)
+PACKAGE_NAME = "aoa-memo-mcp"
+APPLICATION_VERSION = "0.2.0"
 READ_HTTP_PORT = 5421
 CANDIDATE_HTTP_PORT = 5434
 DEFAULT_HTTP_PORT = READ_HTTP_PORT
@@ -25,6 +27,19 @@ CANDIDATE_TOKEN_ENV_VAR = "AOA_MEMO_MCP_CANDIDATE_BEARER_TOKEN"
 CANDIDATE_CREDENTIAL_NAME = "aoa-memo-mcp-candidate-bearer-token"
 CANDIDATE_AUTH_SCOPE = "mcp:aoa-memo:candidate"
 CANDIDATE_CLIENT_ID = "aoa-loopback-codex:aoa-memo:candidate"
+
+
+def _application_version() -> str:
+    return APPLICATION_VERSION
+
+
+def _bind_server_info_version(mcp: Any) -> None:
+    low_level_server = getattr(mcp, "_mcp_server", None)
+    if low_level_server is None or not hasattr(low_level_server, "version"):
+        raise RuntimeError(
+            "the pinned MCP SDK no longer exposes the server identity seam"
+        )
+    low_level_server.version = _application_version()
 
 
 def configured_policy_family() -> PolicyFamily:
@@ -107,6 +122,7 @@ def build_server(
         json_response=True,
         **_contour_http_auth_kwargs(contour),
     )
+    _bind_server_info_version(mcp)
     read_only_tool = mcp.tool(
         annotations=ToolAnnotations(
             readOnlyHint=True,

@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +12,7 @@ from .core import AoADecisionsMCPState
 
 LOGGER = logging.getLogger(__name__)
 PACKAGE_NAME = "aoa-decisions-mcp"
-SOURCE_FALLBACK_VERSION = "0.2.0"
+APPLICATION_VERSION = "0.2.0"
 DEFAULT_HTTP_PORT = 5420
 SUPPORTED_CONTOURS = frozenset({"read", "internal_effect"})
 CONTOUR_AUTH = {
@@ -33,15 +32,7 @@ CONTOUR_AUTH = {
 
 
 def _application_version() -> str:
-    try:
-        discovered = distribution(PACKAGE_NAME).metadata.get("Version")
-    except PackageNotFoundError:
-        return SOURCE_FALLBACK_VERSION
-    return (
-        discovered.strip()
-        if isinstance(discovered, str) and discovered.strip()
-        else SOURCE_FALLBACK_VERSION
-    )
+    return APPLICATION_VERSION
 
 
 def _bind_server_info_version(mcp: Any) -> None:

@@ -119,7 +119,9 @@ def test_owner_tool_identity_mismatch_fails_closed() -> None:
 
 def test_server_catalog_is_read_only() -> None:
     state = AoACourseConnectorMCPState(Path("/fixture"), owner_call=call)
-    tools = asyncio.run(build_server(state).list_tools())
+    server = build_server(state)
+    tools = asyncio.run(server.list_tools())
+    assert server._mcp_server.version == "0.1.0"
     assert len(tools) == 9
     assert all(tool.annotations.readOnlyHint is True for tool in tools)
     assert all(tool.annotations.openWorldHint is False for tool in tools)
