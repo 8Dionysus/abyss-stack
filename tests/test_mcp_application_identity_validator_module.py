@@ -95,3 +95,31 @@ def test_rejects_server_builder_without_version_binding(tmp_path: Path) -> None:
         "build_server must call _bind_server_info_version(mcp)" in error
         for error in errors
     )
+
+
+def test_rejects_version_assignment_to_unproven_receiver(tmp_path: Path) -> None:
+    _write_service(tmp_path)
+    server_path = (
+        tmp_path
+        / "mcp"
+        / "services"
+        / "example-mcp"
+        / "src"
+        / "example_mcp"
+        / "server.py"
+    )
+    server_path.write_text(
+        server_path.read_text(encoding="utf-8").replace(
+            "mcp._mcp_server.version = _application_version()",
+            "telemetry.version = _application_version()",
+        ),
+        encoding="utf-8",
+    )
+
+    errors: list[str] = []
+    mcp_application_identity.validate(errors, root=tmp_path)
+
+    assert any(
+        "_bind_server_info_version must assign server version" in error
+        for error in errors
+    )

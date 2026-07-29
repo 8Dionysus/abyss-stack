@@ -50,13 +50,46 @@ def _binds_embedded_version(tree: ast.Module) -> bool:
             continue
         if node.name != "_bind_server_info_version":
             continue
+        server_receiver_names: set[str] = set()
         for descendant in ast.walk(node):
             if not isinstance(descendant, ast.Assign):
                 continue
-            if not any(
-                isinstance(target, ast.Attribute) and target.attr == "version"
-                for target in descendant.targets
+            if not (
+                len(descendant.targets) == 1
+                and isinstance(descendant.targets[0], ast.Name)
+                and isinstance(descendant.value, ast.Call)
+                and isinstance(descendant.value.func, ast.Name)
+                and descendant.value.func.id == "getattr"
+                and len(descendant.value.args) >= 2
+                and isinstance(descendant.value.args[0], ast.Name)
+                and descendant.value.args[0].id == "mcp"
+                and isinstance(descendant.value.args[1], ast.Constant)
+                and descendant.value.args[1].value == "_mcp_server"
             ):
+                continue
+            server_receiver_names.add(descendant.targets[0].id)
+
+        for descendant in ast.walk(node):
+            if not isinstance(descendant, ast.Assign):
+                continue
+            if len(descendant.targets) != 1:
+                continue
+            target = descendant.targets[0]
+            exact_direct_target = (
+                isinstance(target, ast.Attribute)
+                and target.attr == "version"
+                and isinstance(target.value, ast.Attribute)
+                and target.value.attr == "_mcp_server"
+                and isinstance(target.value.value, ast.Name)
+                and target.value.value.id == "mcp"
+            )
+            proven_local_target = (
+                isinstance(target, ast.Attribute)
+                and target.attr == "version"
+                and isinstance(target.value, ast.Name)
+                and target.value.id in server_receiver_names
+            )
+            if not (exact_direct_target or proven_local_target):
                 continue
             value = descendant.value
             if (
