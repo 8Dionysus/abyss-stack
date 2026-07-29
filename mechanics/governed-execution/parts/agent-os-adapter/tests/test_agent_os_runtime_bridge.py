@@ -903,16 +903,18 @@ def _build_read_only_harness(
     complete_return: bool = True,
     conflicting_return: bool = False,
     conflicting_decision: bool = False,
+    invalid_return_artifact: bool = False,
 ) -> Harness:
     if sum(
         (
             not complete_return,
             conflicting_return,
             conflicting_decision,
+            invalid_return_artifact,
         )
     ) > 1:
         raise AssertionError(
-            "an A2A return trial must select one conflicting input"
+            "an A2A return trial must select one malformed input"
         )
     sdk_root = _sdk_source_root()
     policy_path = root / "policy.yaml"
@@ -980,6 +982,11 @@ def _build_read_only_harness(
             child_result["remote_task"]["parent_task_id"] = (
                 "parent:conflicting-a2a-return"
             )
+        if invalid_return_artifact:
+            child_result["remote_task"]["returned_artifacts"] = [
+                fixture["summon_request"]["expected_outputs"][0],
+                {"artifact_ref": "untyped:a2a-return"},
+            ]
         for artifact_kind, artifact_payload in (
             ("summon_request", summon_request),
             ("summon_decision", summon_decision),
@@ -1913,6 +1920,43 @@ def test_a2a_return_lane_rejects_a_decision_for_another_request(
     assert harness.backend.resume_calls == 0
 
 
+def test_a2a_return_lane_rejects_an_untyped_returned_artifact(
+    tmp_path: Path,
+) -> None:
+    harness = _build_read_only_harness(
+        tmp_path,
+        scenario_id="a2a_summon_return_checkpoint",
+        invalid_return_artifact=True,
+    )
+    bridge = BRIDGE.AgentOSRuntimeBridge(
+        harness.state_root,
+        backend=harness.backend,
+        clock=lambda: NOW,
+    )
+    runner = AoARunner(
+        clock=lambda: NOW,
+        id_factory=lambda: "a2a-untyped-artifact",
+    )
+    session = runner.prepare(harness.plan)
+
+    with pytest.raises(
+        BRIDGE.AgentOSBridgeError,
+        match="do not form one reviewed parent/decision/return chain",
+    ):
+        bridge.invoke(
+            "observe_snapshot",
+            {
+                "operation": "observe_snapshot",
+                "profile": harness.plan.runtime_profile.model_dump(mode="json"),
+                "binding": harness.binding.model_dump(mode="json"),
+                "plan": harness.plan.model_dump(mode="json"),
+                "session": session.model_dump(mode="json"),
+            },
+        )
+    assert harness.backend.prepare_calls == 0
+    assert harness.backend.resume_calls == 0
+
+
 @pytest.mark.skipif(
     LIVE_ROUTING_BUNDLE_ENV not in os.environ,
     reason="live public compiler proof requires an explicit routing bundle",
@@ -2240,6 +2284,66 @@ def test_runtime_rejects_caller_added_stack_evidence_claim(
                 "session": session.model_dump(mode="json"),
             },
         )
+    assert harness.backend.prepare_calls == 0
+    assert harness.backend.resume_calls == 0
+
+
+def test_runtime_rejects_caller_added_external_step_output_claim(
+    harness: Harness,
+) -> None:
+    extra_requirement = harness.plan.evidence_requirements[0].model_copy(
+        update={
+            "requirement_id": "evidence:caller-added:external-step-output",
+            "producer_owner": "aoa-evals",
+        }
+    )
+    spoofed_plan = harness.plan.model_copy(
+        update={
+            "evidence_requirements": (
+                *harness.plan.evidence_requirements,
+                extra_requirement,
+            ),
+            "plan_digest": ZERO_DIGEST,
+        }
+    )
+    spoofed_plan = spoofed_plan.model_copy(
+        update={
+            "plan_digest": canonical_digest(
+                spoofed_plan,
+                exclude={"plan_digest"},
+            )
+        }
+    )
+    binding = harness.binding.model_copy(
+        update={"plan_digest": spoofed_plan.plan_digest}
+    )
+    bridge = BRIDGE.AgentOSRuntimeBridge(
+        harness.state_root,
+        backend=harness.backend,
+        clock=lambda: NOW,
+    )
+    runner = AoARunner(
+        clock=lambda: NOW,
+        id_factory=lambda: "external-step-output",
+    )
+    session = runner.prepare(spoofed_plan)
+
+    with pytest.raises(
+        BRIDGE.AgentOSBridgeError,
+        match="complete plan evidence requirements differ",
+    ) as caught:
+        bridge.invoke(
+            "observe_snapshot",
+            {
+                "operation": "observe_snapshot",
+                "profile": spoofed_plan.runtime_profile.model_dump(mode="json"),
+                "binding": binding.model_dump(mode="json"),
+                "plan": spoofed_plan.model_dump(mode="json"),
+                "session": session.model_dump(mode="json"),
+            },
+        )
+
+    assert caught.value.code == "runtime_evidence_contract_mismatch"
     assert harness.backend.prepare_calls == 0
     assert harness.backend.resume_calls == 0
 

@@ -29,6 +29,11 @@ source, schema, and schema version. The plan snapshot separately binds the
 runtime policy bytes, so a caller cannot substitute a weakened policy while
 retaining only the expected owner/artifact key.
 
+Evidence admission compares the complete requirement set, including producer
+and binding class, and A2A return review accepts only non-empty string artifact
+identifiers. Unadmitted evidence cannot be hidden by a filter or reach a
+generic runtime error.
+
 The Python bridge must be paired with an explicit installed-SDK interpreter
 and isolated mode; the executable shebang is an operator convenience, not the
 package-binding contract.

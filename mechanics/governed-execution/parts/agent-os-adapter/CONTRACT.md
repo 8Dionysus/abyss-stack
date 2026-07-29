@@ -62,6 +62,10 @@ Before execution the bridge verifies:
 - governed policy supplied through the profile constraint ref, with the full
   descriptor-declared owner, artifact, source, schema, and schema-version
   provenance plus the exact plan-snapshot digest;
+- the complete evidence-requirement set equals the admitted runtime and
+  scenario-input requirements; unknown producers or binding classes are not
+  filtered away;
+- every returned A2A artifact is a non-empty typed string before return review;
 - an approved plan-freeze decision refreshes that same source/ABI snapshot
   before the governed preview backend can run;
 - the start command and deterministic governed-run identity are atomically

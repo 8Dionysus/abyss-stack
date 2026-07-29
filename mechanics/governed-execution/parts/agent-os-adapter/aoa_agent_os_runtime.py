@@ -681,6 +681,27 @@ class AgentOSRuntimeBridge:
                 "runtime_input_evidence_contract_mismatch",
                 "plan input evidence requirements differ from the admitted contour",
             )
+        actual_evidence_requirements = [
+            item.model_dump(mode="json") for item in plan.evidence_requirements
+        ]
+        admitted_evidence_requirements = [
+            *compatibility["runtime_evidence_requirements"],
+            *compatibility["admitted_input_evidence_requirements"],
+        ]
+        if sorted(
+            json.dumps(item, sort_keys=True, separators=(",", ":"))
+            for item in actual_evidence_requirements
+        ) != sorted(
+            json.dumps(item, sort_keys=True, separators=(",", ":"))
+            for item in admitted_evidence_requirements
+        ):
+            raise AgentOSBridgeError(
+                "runtime_evidence_contract_mismatch",
+                (
+                    "complete plan evidence requirements differ from the "
+                    "admitted contour"
+                ),
+            )
         actual_input_kinds = [
             item.artifact_kind
             for item in plan.scenario_binding.input_artifact_bindings
@@ -820,6 +841,10 @@ class AgentOSRuntimeBridge:
             or remote_task.get("state")
             not in {"completed", "failed", "cancelled"}
             or not isinstance(remote_task.get("returned_artifacts"), list)
+            or not all(
+                isinstance(item, str) and bool(item.strip())
+                for item in remote_task.get("returned_artifacts", [])
+            )
         ):
             raise AgentOSBridgeError(
                 "runtime_request_mismatch",
