@@ -1201,6 +1201,23 @@ class CountingBackend:
         return self.backend.approval_artifact(run_dir)
 
 
+class CrashAfterPrepareBackend(CountingBackend):
+    def __init__(self, backend: ModuleType) -> None:
+        super().__init__(backend)
+        self.crashed = False
+
+    def prepare_run(
+        self,
+        request_file: str | Path,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        summary = super().prepare_run(request_file, **kwargs)
+        if not self.crashed:
+            self.crashed = True
+            raise KeyboardInterrupt("simulate termination after governed preparation")
+        return summary
+
+
 class BridgeTransport:
     def __init__(self, bridge: Any) -> None:
         self.bridge = bridge
@@ -2067,6 +2084,112 @@ def test_snapshot_drift_between_observation_and_dispatch_fails_closed(
     assert harness.backend.resume_calls == 0
 
 
+def test_snapshot_drift_before_plan_freeze_approval_blocks_preview(
+    harness: Harness,
+) -> None:
+    adapter = harness.adapter()
+    runner = AoARunner(
+        clock=lambda: NOW,
+        id_factory=lambda: "approval-snapshot-drift-run",
+    )
+    session = runner.prepare(harness.plan)
+    start = StartCommand(
+        command_id="command:start-before-approval-drift",
+        idempotency_key="idempotency:start-before-approval-drift",
+        session_id=session.session_id,
+        correlation_id=session.correlation_id,
+        plan_digest=harness.plan.plan_digest,
+        expected_revision=0,
+        issued_at=NOW + timedelta(seconds=1),
+        issued_by=session.prepared_by,
+        reason="reach the plan-freeze approval before source drift",
+    )
+    assert runner.start(session, adapter, start).state == "awaiting_approval"
+    freeze_request = next(
+        request
+        for request in runner.approval_requests(session)
+        if request.requirement_id == "approval:abyss-stack:plan-freeze"
+    )
+    drift_key = next(key for key in harness.source_paths if key[0] == "aoa-agents")
+    harness.source_paths[drift_key].write_text(
+        '{"drift":"before-plan-freeze-approval"}\n',
+        encoding="utf-8",
+    )
+    bridge = BRIDGE.AgentOSRuntimeBridge(
+        harness.state_root,
+        backend=harness.backend,
+        clock=lambda: NOW,
+    )
+
+    with pytest.raises(
+        BRIDGE.AgentOSBridgeError,
+        match="refreshed runtime snapshot differs from the exact plan",
+    ) as caught:
+        bridge.invoke(
+            "apply_approval",
+            {
+                "operation": "apply_approval",
+                "profile": harness.plan.runtime_profile.model_dump(mode="json"),
+                "binding": harness.binding.model_dump(mode="json"),
+                "plan": harness.plan.model_dump(mode="json"),
+                "session": session.model_dump(mode="json"),
+                "approval": _decision(
+                    freeze_request,
+                    decision_id="decision:drifted-plan-freeze",
+                ).model_dump(mode="json"),
+            },
+        )
+
+    assert caught.value.code == "runtime_snapshot_drift"
+    assert adapter.status(session).state == "awaiting_approval"
+    assert tuple(adapter.approval_decisions(session)) == ()
+    assert harness.backend.prepare_calls == 1
+    assert harness.backend.resume_calls == 0
+
+
+def test_start_replay_recovers_one_journaled_governed_run_after_crash(
+    harness: Harness,
+) -> None:
+    harness.backend = CrashAfterPrepareBackend(BRIDGE.load_governed_backend())
+    adapter = harness.adapter()
+    runner = AoARunner(
+        clock=lambda: NOW,
+        id_factory=lambda: "journaled-start-replay-run",
+    )
+    session = runner.prepare(harness.plan)
+    start = StartCommand(
+        command_id="command:journaled-start",
+        idempotency_key="idempotency:journaled-start",
+        session_id=session.session_id,
+        correlation_id=session.correlation_id,
+        plan_digest=harness.plan.plan_digest,
+        expected_revision=0,
+        issued_at=NOW + timedelta(seconds=1),
+        issued_by=session.prepared_by,
+        reason="prove a crash cannot duplicate governed preparation",
+    )
+
+    with pytest.raises(KeyboardInterrupt, match="after governed preparation"):
+        runner.start(session, adapter, start)
+
+    run_dirs = tuple((harness.state_root / "governed-runs").iterdir())
+    assert len(run_dirs) == 1
+    summary_path = run_dirs[0] / "result.summary.json"
+    proposal_path = run_dirs[0] / "artifacts" / "proposal.summary.json"
+    summary_before = summary_path.read_bytes()
+    proposal_before = proposal_path.read_bytes()
+    assert adapter.status(session).state == "prepared"
+
+    receipt = adapter.dispatch(harness.plan, session, start)
+
+    assert receipt.status == "applied"
+    assert adapter.status(session).state == "awaiting_approval"
+    assert harness.backend.prepare_calls == 2
+    assert tuple((harness.state_root / "governed-runs").iterdir()) == run_dirs
+    assert summary_path.read_bytes() == summary_before
+    assert proposal_path.read_bytes() == proposal_before
+
+
 def test_runtime_rejects_caller_added_stack_evidence_claim(
     harness: Harness,
 ) -> None:
@@ -2117,6 +2240,68 @@ def test_runtime_rejects_caller_added_stack_evidence_claim(
                 "session": session.model_dump(mode="json"),
             },
         )
+    assert harness.backend.prepare_calls == 0
+    assert harness.backend.resume_calls == 0
+
+
+def test_runtime_rejects_constraint_with_spoofed_descriptor_provenance(
+    harness: Harness,
+) -> None:
+    original = harness.plan.runtime_profile.constraint_refs[0]
+    spoofed_constraint = original.model_copy(
+        update={
+            "source_ref": "caller-weakened-policy-v1",
+            "schema_ref": "caller-weakened-policy-schema",
+            "schema_version": "caller-v1",
+        }
+    )
+    spoofed_profile = harness.plan.runtime_profile.model_copy(
+        update={"constraint_refs": (spoofed_constraint,)}
+    )
+    spoofed_plan = harness.plan.model_copy(
+        update={
+            "runtime_profile": spoofed_profile,
+            "plan_digest": ZERO_DIGEST,
+        }
+    )
+    spoofed_plan = spoofed_plan.model_copy(
+        update={
+            "plan_digest": canonical_digest(
+                spoofed_plan,
+                exclude={"plan_digest"},
+            )
+        }
+    )
+    binding = harness.binding.model_copy(
+        update={"plan_digest": spoofed_plan.plan_digest}
+    )
+    runner = AoARunner(
+        clock=lambda: NOW,
+        id_factory=lambda: "spoofed-policy-provenance",
+    )
+    session = runner.prepare(spoofed_plan)
+    bridge = BRIDGE.AgentOSRuntimeBridge(
+        harness.state_root,
+        backend=harness.backend,
+        clock=lambda: NOW,
+    )
+
+    with pytest.raises(
+        BRIDGE.AgentOSBridgeError,
+        match="constraint provenance does not match",
+    ) as caught:
+        bridge.invoke(
+            "observe_snapshot",
+            {
+                "operation": "observe_snapshot",
+                "profile": spoofed_profile.model_dump(mode="json"),
+                "binding": binding.model_dump(mode="json"),
+                "plan": spoofed_plan.model_dump(mode="json"),
+                "session": session.model_dump(mode="json"),
+            },
+        )
+
+    assert caught.value.code == "runtime_constraints_mismatch"
     assert harness.backend.prepare_calls == 0
     assert harness.backend.resume_calls == 0
 

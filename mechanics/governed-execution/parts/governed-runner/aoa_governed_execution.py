@@ -3710,6 +3710,7 @@ def prepare_run(
     until: str = "done",
     policy_path: str | Path | None = None,
     log_root: str | Path | None = None,
+    run_id: str | None = None,
     gate_provider: Callable[[], dict[str, Any]] | None = None,
     advisory_provider: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     proposal_provider: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
@@ -3717,9 +3718,25 @@ def prepare_run(
     request, request_path = load_request(request_file)
     request_path_text = str(request_path)
     target_id = str(request.get("target_id") or "")
-    run_id = make_run_id()
+    run_id = run_id or make_run_id()
+    if Path(run_id).name != run_id or run_id in {".", ".."}:
+        raise RuntimeError("governed run_id must be one bounded path component")
     run_dir = Path(log_root or LOG_ROOT_DEFAULT) / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
+    if run_dir.exists():
+        stored_request_path = run_dir / "request.json"
+        summary_path = result_artifact(run_dir)
+        if not stored_request_path.is_file() or not summary_path.is_file():
+            raise RuntimeError(
+                f"governed run {run_id} exists without a replayable result"
+            )
+        stored_request = json.loads(stored_request_path.read_text(encoding="utf-8"))
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        if stored_request != request or summary.get("run_id") != run_id:
+            raise RuntimeError(
+                f"governed run {run_id} does not match the replayed request"
+            )
+        return summary
+    run_dir.mkdir(parents=True, exist_ok=False)
     try:
         canary_context = resolve_request_canary_context(request)
         policy, resolved_policy_path = load_policy(policy_path)

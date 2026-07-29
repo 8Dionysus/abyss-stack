@@ -397,17 +397,31 @@ class AgentOSRuntimeBridge:
                 "runtime_profile_mismatch",
                 "runtime profile is not the exact owner descriptor",
             )
-        required_keys = {
-            (str(item["owner_repo"]), str(item["artifact_ref"]))
+        expected_constraints = {
+            (str(item["owner_repo"]), str(item["artifact_ref"])): {
+                "owner_repo": str(item["owner_repo"]),
+                "artifact_ref": str(item["artifact_ref"]),
+                "source_ref": str(item["source_ref"]),
+                "schema_ref": str(item["schema_ref"]),
+                "schema_version": str(item["schema_version"]),
+            }
             for item in descriptor["required_constraint_artifacts"]
         }
-        actual_keys = {
-            (item.owner_repo, item.artifact_ref) for item in profile.constraint_refs
+        actual_constraints = {
+            (item.owner_repo, item.artifact_ref): {
+                "owner_repo": item.owner_repo,
+                "artifact_ref": item.artifact_ref,
+                "source_ref": item.source_ref,
+                "schema_ref": item.schema_ref,
+                "schema_version": item.schema_version,
+            }
+            for item in profile.constraint_refs
         }
-        if actual_keys != required_keys:
+        if actual_constraints != expected_constraints:
             raise AgentOSBridgeError(
                 "runtime_constraints_mismatch",
-                "runtime profile constraints do not match the owner descriptor",
+                "runtime profile constraint provenance does not match the owner "
+                "descriptor",
             )
 
     def _assert_binding(
@@ -942,6 +956,7 @@ class AgentOSRuntimeBridge:
             "outcome": None,
             "execution_lane": None,
             "governed_run_id": None,
+            "governed_start_command": None,
             "last_observation": None,
             "runtime_artifact_refs": [],
         }
@@ -1034,28 +1049,13 @@ class AgentOSRuntimeBridge:
                 rejection,
             )
         if isinstance(command, (StartCommand, ResumeCommand, RecoverCommand)):
-            observation = self._observe_snapshot(
+            self._refresh_and_assert_snapshot(
+                state,
                 plan,
                 session,
                 profile,
                 binding,
-                observed_not_before=RunStatus.model_validate(
-                    state["status"]
-                ).updated_at,
             )
-            try:
-                assert_runtime_snapshot_observation(
-                    plan,
-                    session,
-                    observation,
-                )
-            except ControlPlaneContractError as exc:
-                raise AgentOSBridgeError(
-                    "runtime_snapshot_drift",
-                    "refreshed runtime snapshot differs from the exact plan: "
-                    f"{exc}",
-                ) from exc
-            state["last_observation"] = observation.model_dump(mode="json")
 
         first_event = len(state["events"])
         if isinstance(command, StartCommand):
@@ -1236,11 +1236,33 @@ class AgentOSRuntimeBridge:
             )
         if lane != "governed_repository_change":
             return "execution_lane_unsupported"
+        start_binding = {
+            "command_id": command.command_id,
+            "idempotency_key": command.idempotency_key,
+            "command_digest": command_digest(command),
+        }
+        existing_start = state.get("governed_start_command")
+        if existing_start is not None and existing_start != start_binding:
+            return "governed_start_command_conflict"
+        run_id = state.get("governed_run_id")
+        if not isinstance(run_id, str) or not run_id:
+            token = hashlib.sha256(
+                (
+                    f"{session.session_id}\0{command.idempotency_key}"
+                ).encode("utf-8")
+            ).hexdigest()
+            run_id = f"agent-os-{token[:32]}"
+            state["governed_run_id"] = run_id
+            state["governed_start_command"] = start_binding
+            self._save_state(session.session_id, state)
+        elif existing_start is None:
+            return "governed_start_binding_missing"
         policy_path = self._policy_path(plan, binding)
         kwargs: dict[str, Any] = {
             "until": "milestone",
             "policy_path": policy_path,
             "log_root": self._governed_root(),
+            "run_id": run_id,
         }
         if self.gate_provider is not None:
             kwargs["gate_provider"] = self.gate_provider
@@ -1264,7 +1286,6 @@ class AgentOSRuntimeBridge:
         ):
             state["failed_start_summary"] = summary
             return str(summary.get("failure_class") or "governed_prepare_failed")
-        state["governed_run_id"] = run_id
         requirement = self._approval_requirement(
             plan,
             compatibility,
@@ -1735,6 +1756,15 @@ class AgentOSRuntimeBridge:
                 "plan-freeze approval requires the current pending requirement",
             )
 
+        if decision.verdict == "approved" and milestone == "plan_freeze":
+            self._refresh_and_assert_snapshot(
+                state,
+                plan,
+                session,
+                profile,
+                state["binding"],
+            )
+
         state["approval_decisions"].append(decision.model_dump(mode="json"))
         self._emit(
             state,
@@ -1851,6 +1881,38 @@ class AgentOSRuntimeBridge:
             governed_summary=summary,
         )
         return RunStatus.model_validate(state["status"])
+
+    def _refresh_and_assert_snapshot(
+        self,
+        state: dict[str, Any],
+        plan: RunPlan,
+        session: SessionHandle,
+        profile: RuntimeProfile,
+        binding: dict[str, Any],
+    ) -> RuntimeSnapshotObservation:
+        observation = self._observe_snapshot(
+            plan,
+            session,
+            profile,
+            binding,
+            observed_not_before=RunStatus.model_validate(
+                state["status"]
+            ).updated_at,
+        )
+        try:
+            assert_runtime_snapshot_observation(
+                plan,
+                session,
+                observation,
+            )
+        except ControlPlaneContractError as exc:
+            raise AgentOSBridgeError(
+                "runtime_snapshot_drift",
+                "refreshed runtime snapshot differs from the exact plan: "
+                f"{exc}",
+            ) from exc
+        state["last_observation"] = observation.model_dump(mode="json")
+        return observation
 
     def _renew_approvals(
         self,

@@ -59,7 +59,14 @@ Before execution the bridge verifies:
 - each decision targets the single current approval request and may be
   recorded only once. Stale or second decisions fail before durable approval,
   governed-runner, status, or outcome state changes;
-- governed policy supplied through the profile constraint ref.
+- governed policy supplied through the profile constraint ref, with the full
+  descriptor-declared owner, artifact, source, schema, and schema-version
+  provenance plus the exact plan-snapshot digest;
+- an approved plan-freeze decision refreshes that same source/ABI snapshot
+  before the governed preview backend can run;
+- the start command and deterministic governed-run identity are atomically
+  journaled before preparation. Exact replay reuses a matching durable result
+  and fails closed on an incomplete or mismatched prior preparation.
 
 The bridge never derives a request from a goal or playbook ID and never
 searches for source paths.
