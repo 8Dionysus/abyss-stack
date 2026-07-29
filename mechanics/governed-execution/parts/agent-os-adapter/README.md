@@ -16,13 +16,18 @@ projection. The bridge compares descriptor, profile, and plan instead of
 accepting approvals inserted after compilation.
 
 Every mutating dispatch refreshes and validates the pinned source/ABI
-observation before backend execution. Approval decisions are admitted only
-for the single current request and only before that request has a durable
-decision, so an old rejection cannot rewrite an advanced or completed run.
-An approved plan-freeze decision repeats the same snapshot gate before the
-preview backend can run. The governed start command and its deterministic run
-identity are journaled before preparation, so an exact replay can recover the
-existing result without creating another run or repeating provider work.
+observation before backend execution. That observation reads each bounded
+artifact once, hashes those exact bytes, and retains a private read-only
+materialization under the runtime state root. Runtime semantics, typed-lane
+inputs, governed request/policy preparation, and emitted input evidence all
+consume the captured bytes rather than reopening the caller-controlled
+coordinates after admission. Approval decisions are admitted only for the
+single current request and only before that request has a durable decision,
+so an old rejection cannot rewrite an advanced or completed run. An approved
+plan-freeze decision repeats the same snapshot gate before the preview backend
+can run. The governed start command and its deterministic run identity are
+journaled before preparation, so an exact replay can recover the existing
+result without creating another run or repeating provider work.
 
 Constraint admission compares the descriptor-declared owner, artifact,
 source, schema, and schema version. The plan snapshot separately binds the

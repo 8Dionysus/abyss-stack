@@ -3711,11 +3711,20 @@ def prepare_run(
     policy_path: str | Path | None = None,
     log_root: str | Path | None = None,
     run_id: str | None = None,
+    request_bytes: bytes | None = None,
+    policy_bytes: bytes | None = None,
     gate_provider: Callable[[], dict[str, Any]] | None = None,
     advisory_provider: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     proposal_provider: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    request, request_path = load_request(request_file)
+    if request_bytes is None:
+        request, request_path = load_request(request_file)
+    else:
+        request = json.loads(request_bytes.decode("utf-8"))
+        if not isinstance(request, dict):
+            raise RuntimeError("captured request bytes must contain a JSON object")
+        validate_request_shape(request)
+        request_path = Path(request_file).expanduser()
     request_path_text = str(request_path)
     target_id = str(request.get("target_id") or "")
     run_id = run_id or make_run_id()
@@ -3739,7 +3748,14 @@ def prepare_run(
     run_dir.mkdir(parents=True, exist_ok=False)
     try:
         canary_context = resolve_request_canary_context(request)
-        policy, resolved_policy_path = load_policy(policy_path)
+        if policy_bytes is None:
+            policy, resolved_policy_path = load_policy(policy_path)
+        else:
+            policy = parse_yaml_or_json(policy_bytes.decode("utf-8"))
+            validate_policy(policy)
+            resolved_policy_path = Path(
+                policy_path if policy_path is not None else SOURCE_POLICY_FALLBACK
+            ).expanduser()
         advisory = resolve_playbook_id(request, policy, advisory_provider=advisory_provider)
         playbook_policy = advisory["policy"]
         repo_root = normalize_repo_root(request["repo_root"], target_id=target_id)

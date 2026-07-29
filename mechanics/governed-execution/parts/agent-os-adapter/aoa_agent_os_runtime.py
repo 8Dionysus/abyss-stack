@@ -137,6 +137,27 @@ def sha256_file(path: Path) -> str:
     return f"sha256:{digest.hexdigest()}"
 
 
+def sha256_bytes(payload: bytes) -> str:
+    return f"sha256:{hashlib.sha256(payload).hexdigest()}"
+
+
+def read_artifact_bytes(path: Path) -> bytes:
+    try:
+        with path.open("rb") as handle:
+            payload = handle.read(MAX_INPUT_BYTES + 1)
+    except OSError as exc:
+        raise AgentOSBridgeError(
+            "artifact_unavailable",
+            f"cannot read runtime artifact coordinate: {path}",
+        ) from exc
+    if len(payload) > MAX_INPUT_BYTES:
+        raise AgentOSBridgeError(
+            "artifact_too_large",
+            f"runtime artifact exceeds {MAX_INPUT_BYTES} bytes: {path}",
+        )
+    return payload
+
+
 def canonical_json_digest(value: Mapping[str, Any]) -> str:
     encoded = json.dumps(
         value,
@@ -189,6 +210,10 @@ class AgentOSRuntimeBridge:
         self.gate_provider = gate_provider
         self.advisory_provider = advisory_provider
         self.proposal_provider = proposal_provider
+        self._admitted_source_bytes: dict[tuple[str, str], bytes] = {}
+        self._admitted_source_paths: dict[tuple[str, str], Path] = {}
+        self._admitted_abi_bytes: dict[tuple[str, str], bytes] = {}
+        self._admitted_abi_paths: dict[tuple[str, str], Path] = {}
 
     def invoke(self, operation: Operation, payload: Mapping[str, Any]) -> Any:
         if payload.get("operation") != operation:
@@ -196,6 +221,7 @@ class AgentOSRuntimeBridge:
                 "operation_mismatch",
                 "payload operation differs from the invoked operation",
             )
+        self._clear_admitted_material()
         plan, session, profile, binding, compatibility = self._validate_envelope(
             payload
         )
@@ -215,6 +241,11 @@ class AgentOSRuntimeBridge:
                     observed_not_before=RunStatus.model_validate(
                         state["status"]
                     ).updated_at,
+                )
+                self._assert_runtime_inputs(
+                    plan,
+                    binding,
+                    compatibility,
                 )
                 state["last_observation"] = observation.model_dump(mode="json")
                 self._save_state(session.session_id, state)
@@ -720,10 +751,13 @@ class AgentOSRuntimeBridge:
         compatibility: dict[str, Any],
     ) -> None:
         lane = str(compatibility["execution_lane"])
-        request_path = Path(str(binding["request_path"]))
+        request_ref = ProvenanceRef.model_validate(binding["request_ref"])
+        request_key = (request_ref.owner_repo, request_ref.artifact_ref)
         try:
-            request = json.loads(request_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+            request = json.loads(
+                self._bound_source_bytes(binding, request_key).decode("utf-8")
+            )
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise AgentOSBridgeError(
                 "runtime_request_unavailable",
                 "cannot load the runtime request artifact",
@@ -788,10 +822,15 @@ class AgentOSRuntimeBridge:
         loaded: dict[str, dict[str, Any]] = {}
         for item in plan.scenario_binding.input_artifact_bindings:
             key = (item.artifact_ref.owner_repo, item.artifact_ref.artifact_ref)
-            path = Path(source_locations[key])
             try:
-                payload = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError) as exc:
+                payload = json.loads(
+                    self._bound_source_bytes(
+                        binding,
+                        key,
+                        source_locations=source_locations,
+                    ).decode("utf-8")
+                )
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
                 raise AgentOSBridgeError(
                     "runtime_request_unavailable",
                     f"cannot load typed scenario input {item.artifact_kind}",
@@ -896,27 +935,55 @@ class AgentOSRuntimeBridge:
             id_field="abi_id",
             label="ABI",
         )
-        observed_sources = tuple(
-            ObservedSourceRef(
-                owner_repo=item.owner_repo,
-                artifact_ref=item.artifact_ref,
-                artifact_digest=sha256_file(
-                    Path(source_locations[(item.owner_repo, item.artifact_ref)])
-                ),
+        admitted_sources: dict[tuple[str, str], bytes] = {}
+        admitted_source_paths: dict[tuple[str, str], Path] = {}
+        observed_sources: list[ObservedSourceRef] = []
+        for item in plan.snapshot.source_refs:
+            key = (item.owner_repo, item.artifact_ref)
+            payload = read_artifact_bytes(Path(source_locations[key]))
+            digest = sha256_bytes(payload)
+            admitted_sources[key] = payload
+            admitted_source_paths[key] = self._materialize_bound_bytes(
+                session,
+                material_class="source",
+                key=key,
+                payload=payload,
+                digest=digest,
             )
-            for item in plan.snapshot.source_refs
-        )
-        observed_abis = tuple(
-            ObservedABIRef(
-                owner_repo=item.owner_repo,
-                abi_id=item.abi_id,
-                abi_version=item.abi_version,
-                artifact_digest=sha256_file(
-                    Path(abi_locations[(item.owner_repo, item.abi_id)])
-                ),
+            observed_sources.append(
+                ObservedSourceRef(
+                    owner_repo=item.owner_repo,
+                    artifact_ref=item.artifact_ref,
+                    artifact_digest=digest,
+                )
             )
-            for item in plan.snapshot.abi_refs
-        )
+        admitted_abis: dict[tuple[str, str], bytes] = {}
+        admitted_abi_paths: dict[tuple[str, str], Path] = {}
+        observed_abis: list[ObservedABIRef] = []
+        for item in plan.snapshot.abi_refs:
+            key = (item.owner_repo, item.abi_id)
+            payload = read_artifact_bytes(Path(abi_locations[key]))
+            digest = sha256_bytes(payload)
+            admitted_abis[key] = payload
+            admitted_abi_paths[key] = self._materialize_bound_bytes(
+                session,
+                material_class="abi",
+                key=key,
+                payload=payload,
+                digest=digest,
+            )
+            observed_abis.append(
+                ObservedABIRef(
+                    owner_repo=item.owner_repo,
+                    abi_id=item.abi_id,
+                    abi_version=item.abi_version,
+                    artifact_digest=digest,
+                )
+            )
+        self._admitted_source_bytes = admitted_sources
+        self._admitted_source_paths = admitted_source_paths
+        self._admitted_abi_bytes = admitted_abis
+        self._admitted_abi_paths = admitted_abi_paths
         observed_at = max(
             _aware(self.clock(), "runtime clock"),
             session.prepared_at,
@@ -941,11 +1008,59 @@ class AgentOSRuntimeBridge:
             session_id=session.session_id,
             correlation_id=session.correlation_id,
             plan_digest=plan.plan_digest,
-            source_refs=observed_sources,
-            abi_refs=observed_abis,
+            source_refs=tuple(observed_sources),
+            abi_refs=tuple(observed_abis),
             observed_at=observed_at,
             observed_by=profile.provenance,
         )
+
+    def _clear_admitted_material(self) -> None:
+        self._admitted_source_bytes = {}
+        self._admitted_source_paths = {}
+        self._admitted_abi_bytes = {}
+        self._admitted_abi_paths = {}
+
+    def _materialize_bound_bytes(
+        self,
+        session: SessionHandle,
+        *,
+        material_class: Literal["source", "abi"],
+        key: tuple[str, str],
+        payload: bytes,
+        digest: str,
+    ) -> Path:
+        token = canonical_json_digest(
+            {
+                "material_class": material_class,
+                "owner_repo": key[0],
+                "identity": key[1],
+                "artifact_digest": digest,
+            }
+        ).removeprefix("sha256:")
+        path = (
+            self.state_root
+            / "materialized-snapshots"
+            / _session_token(session.session_id)
+            / material_class
+            / f"{token}.bin"
+        )
+        if path.exists():
+            if sha256_file(path) != digest:
+                raise AgentOSBridgeError(
+                    "materialized_snapshot_mismatch",
+                    "existing private runtime materialization differs from "
+                    "captured bytes",
+                )
+            path.chmod(0o400)
+            return path
+        _atomic_write_bytes(path, payload)
+        if sha256_file(path) != digest:
+            raise AgentOSBridgeError(
+                "materialized_snapshot_mismatch",
+                "private runtime materialization differs from captured bytes",
+            )
+        path.chmod(0o400)
+        return path
 
     def _load_or_initialize(
         self,
@@ -1080,6 +1195,7 @@ class AgentOSRuntimeBridge:
                 session,
                 profile,
                 binding,
+                compatibility,
             )
 
         first_event = len(state["events"])
@@ -1282,12 +1398,17 @@ class AgentOSRuntimeBridge:
             self._save_state(session.session_id, state)
         elif existing_start is None:
             return "governed_start_binding_missing"
+        request_ref = ProvenanceRef.model_validate(binding["request_ref"])
+        request_key = (request_ref.owner_repo, request_ref.artifact_ref)
+        policy_key = self._policy_coordinate()
         policy_path = self._policy_path(plan, binding)
         kwargs: dict[str, Any] = {
             "until": "milestone",
             "policy_path": policy_path,
             "log_root": self._governed_root(),
             "run_id": run_id,
+            "request_bytes": self._captured_source_bytes(request_key),
+            "policy_bytes": self._captured_source_bytes(policy_key),
         }
         if self.gate_provider is not None:
             kwargs["gate_provider"] = self.gate_provider
@@ -1402,7 +1523,7 @@ class AgentOSRuntimeBridge:
             at=command.issued_at,
         )
         inputs = self._load_typed_scenario_inputs(plan, binding)
-        self._retain_scenario_input_artifacts(state, plan, session, binding)
+        self._retain_scenario_input_artifacts(state, plan, session)
         request = inputs["summon_request"]
         decision = inputs["summon_decision"]
         child_result = inputs["child_task_result"]
@@ -1541,7 +1662,7 @@ class AgentOSRuntimeBridge:
             plan,
             binding,
         )["owner_runtime_receipt"]
-        self._retain_scenario_input_artifacts(state, plan, session, binding)
+        self._retain_scenario_input_artifacts(state, plan, session)
         stress_lane = {
             "artifact_kind": "runtime_stress_lane",
             "schema_version": "abyss_stack_agent_os_lane_artifact_v1",
@@ -1839,6 +1960,7 @@ class AgentOSRuntimeBridge:
                 session,
                 profile,
                 state["binding"],
+                compatibility,
             )
 
         state["approval_decisions"].append(decision.model_dump(mode="json"))
@@ -1965,6 +2087,7 @@ class AgentOSRuntimeBridge:
         session: SessionHandle,
         profile: RuntimeProfile,
         binding: dict[str, Any],
+        compatibility: dict[str, Any],
     ) -> RuntimeSnapshotObservation:
         observation = self._observe_snapshot(
             plan,
@@ -1975,6 +2098,17 @@ class AgentOSRuntimeBridge:
                 state["status"]
             ).updated_at,
         )
+        self._assert_snapshot_observation(plan, session, observation)
+        self._assert_runtime_inputs(plan, binding, compatibility)
+        state["last_observation"] = observation.model_dump(mode="json")
+        return observation
+
+    @staticmethod
+    def _assert_snapshot_observation(
+        plan: RunPlan,
+        session: SessionHandle,
+        observation: RuntimeSnapshotObservation,
+    ) -> None:
         try:
             assert_runtime_snapshot_observation(
                 plan,
@@ -1984,11 +2118,9 @@ class AgentOSRuntimeBridge:
         except ControlPlaneContractError as exc:
             raise AgentOSBridgeError(
                 "runtime_snapshot_drift",
-                "refreshed runtime snapshot differs from the exact plan: "
-                f"{exc}",
+                "refreshed runtime snapshot differs from the exact plan; "
+                f"stale or spoofed source artifact or ABI: {exc}",
             ) from exc
-        state["last_observation"] = observation.model_dump(mode="json")
-        return observation
 
     def _renew_approvals(
         self,
@@ -2388,17 +2520,12 @@ class AgentOSRuntimeBridge:
         state: dict[str, Any],
         plan: RunPlan,
         session: SessionHandle,
-        binding: dict[str, Any],
     ) -> None:
-        source_locations = _location_map(
-            binding["source_locations"],
-            id_field="artifact_ref",
-            label="source",
-        )
         retained = list(state["runtime_artifact_refs"])
         for item in plan.scenario_binding.input_artifact_bindings:
             key = (item.artifact_ref.owner_repo, item.artifact_ref.artifact_ref)
-            path = Path(source_locations[key])
+            payload = self._captured_source_bytes(key)
+            path = self._captured_source_path(key)
             artifact_kind = f"scenario_input:{item.artifact_kind}"
             retained = [
                 existing
@@ -2411,7 +2538,7 @@ class AgentOSRuntimeBridge:
                     "owner_repo": item.artifact_ref.owner_repo,
                     "artifact_ref": item.artifact_ref.artifact_ref,
                     "path": str(path),
-                    "digest": sha256_file(path),
+                    "digest": sha256_bytes(payload),
                     "production_claimed": False,
                     "observed_by_runtime": True,
                     "session_id": session.session_id,
@@ -2663,16 +2790,7 @@ class AgentOSRuntimeBridge:
         plan: RunPlan,
         binding: dict[str, Any],
     ) -> Path:
-        required = self.profile_descriptor["required_constraint_artifacts"]
-        if len(required) != 1:
-            raise AgentOSBridgeError(
-                "runtime_profile_invalid",
-                "v1 requires one governed policy artifact",
-            )
-        key = (
-            str(required[0]["owner_repo"]),
-            str(required[0]["artifact_ref"]),
-        )
+        key = self._policy_coordinate()
         refs = {
             (item.owner_repo, item.artifact_ref): item
             for item in plan.runtime_profile.constraint_refs
@@ -2688,6 +2806,59 @@ class AgentOSRuntimeBridge:
                 "governed policy is absent from the exact plan snapshot",
             )
         return Path(source_locations[key])
+
+    def _policy_coordinate(self) -> tuple[str, str]:
+        required = self.profile_descriptor["required_constraint_artifacts"]
+        if len(required) != 1:
+            raise AgentOSBridgeError(
+                "runtime_profile_invalid",
+                "v1 requires one governed policy artifact",
+            )
+        return (
+            str(required[0]["owner_repo"]),
+            str(required[0]["artifact_ref"]),
+        )
+
+    def _bound_source_bytes(
+        self,
+        binding: dict[str, Any],
+        key: tuple[str, str],
+        *,
+        source_locations: dict[tuple[str, str], str] | None = None,
+    ) -> bytes:
+        if self._admitted_source_bytes:
+            return self._captured_source_bytes(key)
+        locations = source_locations or _location_map(
+            binding["source_locations"],
+            id_field="artifact_ref",
+            label="source",
+        )
+        try:
+            path = Path(locations[key])
+        except KeyError as exc:
+            raise AgentOSBridgeError(
+                "runtime_source_map_mismatch",
+                "bound source coordinate is absent from the runtime map",
+            ) from exc
+        return read_artifact_bytes(path)
+
+    def _captured_source_bytes(self, key: tuple[str, str]) -> bytes:
+        try:
+            return self._admitted_source_bytes[key]
+        except KeyError as exc:
+            raise AgentOSBridgeError(
+                "materialized_snapshot_missing",
+                "effectful runtime input lacks captured snapshot bytes",
+            ) from exc
+
+    def _captured_source_path(self, key: tuple[str, str]) -> Path:
+        try:
+            return self._admitted_source_paths[key]
+        except KeyError as exc:
+            raise AgentOSBridgeError(
+                "materialized_snapshot_missing",
+                "runtime evidence input lacks a private materialization",
+            ) from exc
 
     def _governed_root(self) -> Path:
         return self.state_root / "governed-runs"
@@ -2905,6 +3076,28 @@ def _outcome_ref(outcome: RunOutcome) -> ContentRef:
 
 def _session_token(session_id: str) -> str:
     return hashlib.sha256(session_id.encode()).hexdigest()
+
+
+def _atomic_write_bytes(path: Path, payload: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.chmod(0o700)
+    descriptor, temporary = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=path.parent,
+    )
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    except Exception:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+        raise
 
 
 def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:

@@ -43,6 +43,11 @@ Before execution the bridge verifies:
 - a refreshed source/ABI observation immediately before every start, resume,
   or recovery dispatch, compared to the exact immutable plan before the
   backend can run;
+- a single bounded read for each refreshed artifact. The bridge hashes and
+  validates those captured bytes, stores a private read-only materialization,
+  and uses the same in-memory bytes for runtime validation and effectful
+  backend inputs. Original source coordinates remain provenance only after
+  capture and are not reopened by the effect path;
 - exact admitted scenario, playbook, contour ABI, active step set, and effect
   classes from `runtime-profile.v1.json`;
 - exact typed scenario inputs and their original producer provenance;
@@ -74,6 +79,11 @@ Before execution the bridge verifies:
 
 The bridge never derives a request from a goal or playbook ID and never
 searches for source paths.
+
+Private snapshot materializations are runtime-owned evidence, not replacement
+owner sources. Their digest must equal the pinned plan entry, and retained
+scenario-input evidence points to that materialization while preserving the
+original owner provenance.
 
 ## Lifecycle mappings
 

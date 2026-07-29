@@ -1226,6 +1226,71 @@ class CrashAfterPrepareBackend(CountingBackend):
         return summary
 
 
+class MutatingBeforePrepareBackend(CountingBackend):
+    def __init__(
+        self,
+        backend: ModuleType,
+        *,
+        request_path: Path,
+        policy_path: Path,
+    ) -> None:
+        super().__init__(backend)
+        self.request_path = request_path
+        self.policy_path = policy_path
+        self.original_request = request_path.read_bytes()
+        self.original_policy = policy_path.read_bytes()
+        self.forwarded_request: bytes | None = None
+        self.forwarded_policy: bytes | None = None
+        self.mutated_during_prepare = False
+
+    def prepare_run(
+        self,
+        request_file: str | Path,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        self.forwarded_request = kwargs.get("request_bytes")
+        self.forwarded_policy = kwargs.get("policy_bytes")
+        self.request_path.write_text('{"playbook_id":"hostile"}\n', encoding="utf-8")
+        self.policy_path.write_text('{"surface_type":"hostile"}\n', encoding="utf-8")
+        self.mutated_during_prepare = True
+        try:
+            return super().prepare_run(request_file, **kwargs)
+        finally:
+            self.request_path.write_bytes(self.original_request)
+            self.policy_path.write_bytes(self.original_policy)
+
+
+class MutatingTypedInputBridge(BRIDGE.AgentOSRuntimeBridge):
+    def __init__(self, *args: Any, target_path: Path, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.target_path = target_path
+        self.original_payload = target_path.read_bytes()
+        self.mutated_during_start = False
+
+    def _start_a2a_return_review(
+        self,
+        state: dict[str, Any],
+        plan: RunPlan,
+        session: Any,
+        profile: RuntimeProfile,
+        binding: dict[str, Any],
+        command: StartCommand,
+    ) -> str | None:
+        self.target_path.write_text('{"hostile":true}\n', encoding="utf-8")
+        self.mutated_during_start = True
+        try:
+            return super()._start_a2a_return_review(
+                state,
+                plan,
+                session,
+                profile,
+                binding,
+                command,
+            )
+        finally:
+            self.target_path.write_bytes(self.original_payload)
+
+
 class BridgeTransport:
     def __init__(self, bridge: Any) -> None:
         self.bridge = bridge
@@ -2369,6 +2434,151 @@ def test_snapshot_drift_before_plan_freeze_approval_blocks_preview(
     assert tuple(adapter.approval_decisions(session)) == ()
     assert harness.backend.prepare_calls == 1
     assert harness.backend.resume_calls == 0
+
+
+def test_governed_start_executes_snapshot_captured_request_and_policy_bytes(
+    harness: Harness,
+) -> None:
+    request_path = Path(harness.binding.request_path)
+    policy_ref = harness.plan.runtime_profile.constraint_refs[0]
+    policy_path = harness.source_paths[
+        (policy_ref.owner_repo, policy_ref.artifact_ref)
+    ]
+    backend = MutatingBeforePrepareBackend(
+        BRIDGE.load_governed_backend(),
+        request_path=request_path,
+        policy_path=policy_path,
+    )
+    harness.backend = backend
+    adapter = harness.adapter()
+    runner = AoARunner(
+        clock=lambda: NOW,
+        id_factory=lambda: "captured-governed-inputs",
+    )
+    session = runner.prepare(harness.plan)
+    start = StartCommand(
+        command_id="command:captured-governed-inputs:start",
+        idempotency_key="idempotency:captured-governed-inputs:start",
+        session_id=session.session_id,
+        correlation_id=session.correlation_id,
+        plan_digest=harness.plan.plan_digest,
+        expected_revision=0,
+        issued_at=NOW + timedelta(seconds=1),
+        issued_by=session.prepared_by,
+        reason="prove governed execution consumes the snapshot-checked bytes",
+    )
+
+    assert runner.start(session, adapter, start).state == "awaiting_approval"
+    assert backend.mutated_during_prepare is True
+    assert backend.forwarded_request == backend.original_request
+    assert backend.forwarded_policy == backend.original_policy
+    run_dirs = tuple((harness.state_root / "governed-runs").iterdir())
+    assert len(run_dirs) == 1
+    assert json.loads((run_dirs[0] / "request.json").read_text(encoding="utf-8")) == (
+        json.loads(backend.original_request)
+    )
+    original_policy = json.loads(backend.original_policy)
+    policy_snapshot = json.loads(
+        (run_dirs[0] / "policy.snapshot.json").read_text(encoding="utf-8")
+    )
+    assert policy_snapshot["policy_id"] == original_policy["policy_id"]
+    assert policy_snapshot["global_rules"] == original_policy["global_rules"]
+    assert policy_snapshot["target_policy"] == original_policy["targets"][
+        "abyss-stack"
+    ]
+    assert policy_snapshot["playbook_policy"] == original_policy["targets"][
+        "abyss-stack"
+    ]["playbooks"]["AOA-P-0011"]
+    materialized = tuple(
+        (harness.state_root / "materialized-snapshots").rglob("*.bin")
+    )
+    assert len(materialized) == (
+        len(harness.plan.snapshot.source_refs)
+        + len(harness.plan.snapshot.abi_refs)
+    )
+    assert all(path.stat().st_mode & 0o777 == 0o400 for path in materialized)
+
+
+def test_a2a_start_retains_and_uses_snapshot_captured_typed_inputs(
+    tmp_path: Path,
+) -> None:
+    harness = _build_read_only_harness(
+        tmp_path,
+        scenario_id="a2a_summon_return_checkpoint",
+    )
+    target_binding = next(
+        item
+        for item in harness.plan.scenario_binding.input_artifact_bindings
+        if item.artifact_kind == "child_task_result"
+    )
+    target_key = (
+        target_binding.artifact_ref.owner_repo,
+        target_binding.artifact_ref.artifact_ref,
+    )
+    bridge = MutatingTypedInputBridge(
+        harness.state_root,
+        backend=harness.backend,
+        clock=lambda: NOW,
+        target_path=harness.source_paths[target_key],
+    )
+    adapter = AbyssStackRuntimeAdapter(
+        profile=harness.plan.runtime_profile,
+        binding=harness.binding,
+        transport=BridgeTransport(bridge),
+    )
+    runner = AoARunner(
+        clock=lambda: NOW,
+        id_factory=lambda: "captured-a2a-inputs",
+    )
+    session = runner.prepare(harness.plan)
+    start = StartCommand(
+        command_id="command:captured-a2a-inputs:start",
+        idempotency_key="idempotency:captured-a2a-inputs:start",
+        session_id=session.session_id,
+        correlation_id=session.correlation_id,
+        plan_digest=harness.plan.plan_digest,
+        expected_revision=0,
+        issued_at=NOW + timedelta(seconds=1),
+        issued_by=session.prepared_by,
+        reason="prove typed execution consumes the snapshot-checked bytes",
+    )
+
+    assert runner.start(session, adapter, start).state == "completed"
+    assert bridge.mutated_during_start is True
+    outcome = runner.outcome(session)
+    assert outcome is not None
+    runtime_evidence_ref = next(
+        item
+        for item in outcome.evidence_bundle_refs
+        if item.provenance.source_ref == BRIDGE.ADAPTER_VERSION
+    )
+    evidence_path = Path(
+        runtime_evidence_ref.provenance.artifact_ref.removeprefix("local:")
+    )
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    retained_inputs = [
+        item
+        for item in evidence["artifacts"]
+        if item["artifact_kind"].startswith("scenario_input:")
+    ]
+    assert len(retained_inputs) == len(
+        harness.plan.scenario_binding.input_artifact_bindings
+    )
+    original_paths = {path.resolve() for path in harness.source_paths.values()}
+    for item in retained_inputs:
+        path = Path(item["path"])
+        assert "materialized-snapshots" in path.parts
+        assert path.resolve() not in original_paths
+        assert item["digest"] == _sha256(path)
+        assert path.stat().st_mode & 0o777 == 0o400
+    retained_target = next(
+        item
+        for item in retained_inputs
+        if item["artifact_kind"] == "scenario_input:child_task_result"
+    )
+    assert json.loads(Path(retained_target["path"]).read_text(encoding="utf-8")) != {
+        "hostile": True
+    }
 
 
 def test_start_replay_recovers_one_journaled_governed_run_after_crash(
