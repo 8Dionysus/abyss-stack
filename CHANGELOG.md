@@ -87,6 +87,18 @@ Tracking starts with the community-docs baseline for this repository.
 - Rollback plans now admit fresh `rollback_required` failed-link evidence
   without weakening other blockers, while managed units execute only the
   digest-matched package installed in their provisioned venv.
+- A local no-listener `aoa-agent-os-runtime` bridge now lets the `aoa-sdk`
+  `AoARunner` drive three exact owner-pinned contours. `AOA-P-0011` retains
+  two approvals, isolated preview, landing, rollback, and the existing
+  governed runner; `AOA-P-0031` reviews a typed A2A return without executing a
+  child; and `AOA-P-0032` proves partial degradation progress, durable pause,
+  subprocess restore, and duplicate-safe resume. Original-owner input evidence
+  remains owner-qualified, while eval verdicts, memory receipts, checkpoint
+  acceptance, and final closeout remain with their stronger owners.
+- The runtime descriptor, scenario-scoped `RuntimeProfile` approval
+  projection, and compiled `RunPlan` must now agree exactly. All three golden
+  success cycles enter the adapter from the installed public compiler v3
+  chain without post-compilation plan mutation.
 - A distinct, inert `aoa-routing-cutover` path now admits only a
   receipt-bound `aoa-sdk` canonical routing release with exact public-release
   runtime trust, verified subject-store bytes, explicit G5 authority, atomic
@@ -164,6 +176,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Changed
 
+- Routing federation health is now check-only over the admitted SDK-canonical
+  materialization: ordinary sync cannot produce or repair routing bytes,
+  governed execution no longer exposes a predecessor mutation target, and the
+  active compatibility trial corpus routes current owner checks to `aoa-sdk`
+  while retaining old case IDs only for log compatibility.
 - Compact the diagnostic skill's global routing description while retaining
   capture, concrete target, evidence/freshness, bounded repair-handoff, and
   stored-packet review plus nearest-route distinctions in the host-visible
@@ -195,6 +212,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Agent OS start/resume/recovery dispatch now compares its refreshed
+  source/ABI observation with the immutable `RunPlan` before backend
+  execution. Approval decisions must target the single current undecided
+  request before any governed approval, event, status, or outcome mutation, so
+  stale or second decisions cannot cancel an advanced or completed run.
 - Federation routing health now accepts the stable current routing version
   fields, verifies exact mirror-manifest hashes, and reports source,
   artifact-identity, and subject-bound durable trust readiness instead of

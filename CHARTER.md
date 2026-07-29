@@ -21,8 +21,8 @@ Its job is to keep the runtime body explicit, modular, reviewable, and recoverab
 
 - ecosystem-level doctrine for AoA as a whole
 - shared or sibling-authored meaning from `aoa-techniques`, `aoa-skills`,
-  `aoa-evals`, `aoa-routing`, `aoa-memo`, `aoa-agents`, `aoa-playbooks`, or
-  `aoa-kag`
+  `aoa-evals`, `aoa-sdk` routing, `aoa-memo`, `aoa-agents`,
+  `aoa-playbooks`, or `aoa-kag`
 - the primary authored corpus of Tree of Sophia
 
 ## Core rule

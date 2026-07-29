@@ -144,21 +144,76 @@ def test_governed_policy_must_keep_surface_type(tmp_path: Path) -> None:
     )
 
 
-def test_governed_router_acceptance_commands_must_pin_sibling_roots(tmp_path: Path) -> None:
+def test_governed_policy_rejects_retired_routing_mutation_target(
+    tmp_path: Path,
+) -> None:
     write_valid_surface(tmp_path)
     policy_path = tmp_path / runtime_route_contracts.GOVERNED_POLICY_PATH
     write_text(
         policy_path,
         policy_path.read_text(encoding="utf-8").replace(
-            "--memo-root /srv/AbyssOS/aoa-memo",
-            "--memo-root /tmp/aoa-memo",
+            '"targets": {',
+            '"targets": {"aoa-routing": {},',
+            1,
         ),
     )
 
     errors = run_runtime_route_validator(tmp_path)
 
     assert (
-        "aoa-routing AOA-P-0011 governed policy python scripts/validate_router.py "
-        "must pin --memo-root /srv/AbyssOS/aoa-memo"
+        "governed execution policy must declare only the active abyss-stack "
+        "mutation target"
+        in errors
+    )
+
+
+def test_runtime_paths_doc_rejects_retired_routing_checkout_root(
+    tmp_path: Path,
+) -> None:
+    write_valid_surface(tmp_path)
+    paths_doc = tmp_path / runtime_route_contracts.PATHS_DOC_PATH
+    write_text(
+        paths_doc,
+        paths_doc.read_text(encoding="utf-8")
+        + "\nretired root accidentally restored: "
+        + runtime_route_contracts.RETIRED_ROUTING_ENV
+        + "\n",
+    )
+
+    errors = run_runtime_route_validator(tmp_path)
+
+    assert (
+        "docs/runtime/PATHS.md must not advertise retired routing checkout "
+        f"dependency {runtime_route_contracts.RETIRED_ROUTING_ENV}"
+        in errors
+    )
+
+
+def test_active_source_rejects_retired_routing_checkout_consumer(
+    tmp_path: Path,
+) -> None:
+    write_valid_surface(tmp_path)
+    service = tmp_path / "systemd" / "user" / "retired-routing-consumer.service"
+    write_text(
+        service,
+        "Environment="
+        + runtime_route_contracts.RETIRED_ROUTING_ENV
+        + "="
+        + runtime_route_contracts.RETIRED_ROUTING_CHECKOUT
+        + "\n",
+    )
+
+    errors = run_runtime_route_validator(tmp_path)
+
+    assert (
+        "retired routing checkout consumer found in "
+        "systemd/user/retired-routing-consumer.service: "
+        f"{runtime_route_contracts.RETIRED_ROUTING_ENV}"
+        in errors
+    )
+    assert (
+        "retired routing checkout consumer found in "
+        "systemd/user/retired-routing-consumer.service: "
+        f"{runtime_route_contracts.RETIRED_ROUTING_CHECKOUT}"
         in errors
     )

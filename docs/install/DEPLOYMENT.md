@@ -41,13 +41,19 @@ If you want the optional `federation` profile, sync the public-safe `aoa-agents`
 
 ```bash
 scripts/aoa-sync-federation-surfaces --layer aoa-agents
-scripts/aoa-sync-federation-surfaces --layer aoa-routing
+scripts/aoa-sync-federation-surfaces --check --layer aoa-routing
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
 scripts/aoa-sync-federation-surfaces --layer aoa-evals
 scripts/aoa-sync-federation-surfaces --layer aoa-playbooks
 scripts/aoa-sync-federation-surfaces --layer aoa-kag
 scripts/aoa-sync-federation-surfaces --layer tos-source
 ```
+
+The routing line is deliberately check-only. The stable
+`Knowledge/federation/aoa-routing/` namespace is materialized from an admitted
+`aoa-sdk` release only through receipt-bound
+`scripts/aoa-routing-cutover materialize`; ordinary federation sync has no
+routing source checkout and cannot repair that mirror.
 
 See [MEMO_RUNTIME_SEAM](../../mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md) for the runtime-facing memo mirror, `/memo/*` inspection surfaces, and filesystem-first memo export candidates.
 See [EVAL_RUNTIME_SEAM](../../mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md) for the runtime-facing eval mirror, `/evals/*` inspection surfaces, and filesystem-first eval export candidates.
@@ -70,7 +76,7 @@ scripts/aoa-sync-configs
 scripts/aoa-bootstrap-configs
 scripts/aoa-check-layout --ignore-secrets --strict
 scripts/aoa-sync-federation-surfaces --layer aoa-agents   # optional federation contract mirror
-scripts/aoa-sync-federation-surfaces --layer aoa-routing  # optional federation advisory mirror
+scripts/aoa-sync-federation-surfaces --check --layer aoa-routing  # optional federation advisory mirror
 scripts/aoa-sync-federation-surfaces --layer aoa-memo     # optional federation memo mirror
 scripts/aoa-sync-federation-surfaces --layer aoa-evals    # optional federation eval mirror
 scripts/aoa-sync-federation-surfaces --layer aoa-playbooks  # optional federation playbook mirror
@@ -613,7 +619,7 @@ scripts/aoa-check-layout --ignore-secrets --strict
 python scripts/validate_stack.py --parity-check
 scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 scripts/aoa-sync-federation-surfaces --layer aoa-agents   # optional
-scripts/aoa-sync-federation-surfaces --layer aoa-routing  # optional
+scripts/aoa-sync-federation-surfaces --check --layer aoa-routing  # optional
 scripts/aoa-sync-federation-surfaces --layer aoa-memo     # optional
 scripts/aoa-sync-federation-surfaces --layer aoa-evals    # optional
 scripts/aoa-sync-federation-surfaces --layer aoa-playbooks  # optional
@@ -671,7 +677,7 @@ Bring up an agent runtime plus the optional federation seam:
 
 ```bash
 scripts/aoa-sync-federation-surfaces --layer aoa-agents
-scripts/aoa-sync-federation-surfaces --layer aoa-routing
+scripts/aoa-sync-federation-surfaces --check --layer aoa-routing
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
 scripts/aoa-sync-federation-surfaces --layer aoa-evals
 scripts/aoa-sync-federation-surfaces --layer aoa-playbooks

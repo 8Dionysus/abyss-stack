@@ -2,7 +2,7 @@
   "surface_type": "runtime_governed_execution_canary_catalog",
   "schema_version": "v1",
   "catalog_id": "governed-canaries-v2",
-  "description": "Public-safe canary request catalog for bounded governed execution across abyss-stack and the first explicit external target.",
+  "description": "Public-safe canary request catalog for bounded abyss-stack governed execution.",
   "canaries": [
     {
       "canary_id": "docs-truth-wording-alignment",
@@ -41,26 +41,6 @@
       "goal": "Improve governed execution status and operator triage surfaces while preserving fail-closed behavior.",
       "playbook_id": "AOA-P-0018",
       "task_class": "governed_lane",
-      "profile_class": "workhorse",
-      "memo": null
-    },
-    {
-      "canary_id": "routing-boundary-wording-alignment",
-      "target_id": "aoa-routing",
-      "title": "Routing boundary wording alignment",
-      "goal": "Clarify aoa-routing thin-router boundary wording without widening routing authority or changing owned meaning.",
-      "playbook_id": "AOA-P-0011",
-      "task_class": "docs_only",
-      "profile_class": "workhorse",
-      "memo": null
-    },
-    {
-      "canary_id": "routing-generated-surface-refresh",
-      "target_id": "aoa-routing",
-      "title": "Routing generated surface refresh",
-      "goal": "Make one bounded aoa-routing generated-surface or parity refresh that remains source-owned, validator-backed, and thin-router-safe.",
-      "playbook_id": "AOA-P-0011",
-      "task_class": "generated_surface",
       "profile_class": "workhorse",
       "memo": null
     }

@@ -131,6 +131,58 @@ class SourceTopologyValidatorModulesTests(unittest.TestCase):
         self.assertIn(owner_index, paths)
         self.assertIn(authored_doc, paths)
 
+    def test_ci_dependency_checkouts_are_outside_authored_text_surface(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            dependency_evidence = (
+                repo_root
+                / ".deps"
+                / "aoa-sdk"
+                / "mechanics"
+                / "boundary-bridge"
+                / "evidence"
+                / "routing-succession.json"
+            )
+            authored_doc = repo_root / "docs" / "ROUTE.md"
+            dependency_evidence.parent.mkdir(parents=True)
+            authored_doc.parent.mkdir(parents=True)
+            dependency_evidence.write_text(
+                "Preserved owner evidence: AOA_ROUTING_ROOT=/srv/AbyssOS/aoa-routing\n",
+                encoding="utf-8",
+            )
+            authored_doc.write_text("Current stack-owned route\n", encoding="utf-8")
+
+            paths = self.iter_text_files(repo_root)
+
+        self.assertNotIn(dependency_evidence, paths)
+        self.assertIn(authored_doc, paths)
+
+    def test_tracked_ci_dependency_checkouts_fail_git_mirror_hygiene(self) -> None:
+        errors: list[str] = []
+        source_hygiene.validate_git_mirror_hygiene(
+            errors,
+            tracked_file_iter_func=lambda: [
+                ".deps/aoa-sdk/mechanics/boundary-bridge/evidence/routing-succession.json"
+            ],
+            runtime_top_level_dirs=source_hygiene.GIT_MIRROR_RUNTIME_TOP_LEVEL_DIRS,
+            cache_parts=source_hygiene.GIT_MIRROR_CACHE_PARTS,
+            live_env_names=source_hygiene.GIT_MIRROR_LIVE_ENV_NAMES,
+            private_suffixes=source_hygiene.GIT_MIRROR_PRIVATE_SUFFIXES,
+            rendered_suffixes=source_hygiene.GIT_MIRROR_RENDERED_SUFFIXES,
+            database_suffixes=source_hygiene.GIT_MIRROR_DATABASE_SUFFIXES,
+            heavy_suffixes=source_hygiene.GIT_MIRROR_HEAVY_SUFFIXES,
+            fixture_prefixes=source_hygiene.GIT_MIRROR_FIXTURE_PREFIXES,
+        )
+
+        self.assertEqual(
+            errors,
+            [
+                "tracked file is not GitHub mirror safe: "
+                ".deps/aoa-sdk/mechanics/boundary-bridge/evidence/"
+                "routing-succession.json (local cache or dependency directory)"
+            ],
+        )
+
     def test_required_operator_scripts_have_backend_routes(self) -> None:
         self.assertEqual(
             script_surface.REQUIRED_SCRIPTS,

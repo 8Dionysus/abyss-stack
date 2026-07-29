@@ -6,34 +6,27 @@ Routes `scripts/aoa-sync-federation-surfaces` and
 The wrapper mirrors selected sibling surfaces for runtime consumption; it does
 not make abyss-stack the owner of those surfaces.
 
-`--check --json` verifies both required mirrored files and the mirror manifest
-freshness when the sibling source checkout exposes a Git commit. A mismatch
-between the source checkout `HEAD` and
-`manifest/federation_mirror_manifest.json.source_git_commit` is reported as
-`status:"stale"` with exit code `1`.
+For ordinary sibling-owned layers, `--check --json` verifies both required
+mirrored files and manifest freshness when the source checkout exposes a Git
+commit. A mismatch between checkout `HEAD` and the manifest source commit is
+reported as `status:"stale"` with exit code `1`.
 
 The check also validates the manifest schema, layer, authority denial, exact
 required-file list, and SHA-256 of every required mirrored file. A byte change
 behind an unchanged source ref is `status:"invalid_manifest"`, not healthy.
-Stable `aoa-routing` mirror paths are resolved from the owner's current
-source-home topology: core schemas come from `routing/core/`, while
-federation-entry, recurrence, and ToS-KAG boundary surfaces stay in their
-owning mechanic parts. The runtime mirror keeps its compatibility paths; it
-does not require the owner repository to restore retired flat source paths.
+
+`aoa-routing` is intentionally different after G5. Its stable runtime
+namespace is produced only by receipt-bound `scripts/aoa-routing-cutover`
+from an admitted `aoa-sdk` release. Ordinary federation sync has no routing
+source checkout. `--check --layer aoa-routing` performs a read-only
+materialized-integrity inspection; sync and `--sync-if-stale` fail closed and
+route repair to the cutover workflow.
 
 Use `--check --sync-if-stale --json --layer <layer>` for explicit maintenance
-automation. The command performs the same check first, refreshes the mirror only
-when the check is degraded, and then emits one final JSON check payload with
-`synced:true` when a repair happened.
-
-The routing candidate used during SDK succession may have no native Git source
-ref. In that isolated case the sync check reports
-`freshness_status:"source_commit_unavailable"` while still checking every
-content hash. That is content evidence only; route-api provenance and trust
-closure remain degraded until an admitted runtime manifest supplies both.
-The admission field is a full `abyss_machine_artifact_trust_gate_v1` runtime
-result bound to an artifact subject digest and latest durable record; a bare
-`allow` value is not sufficient.
+automation of the remaining checkout-backed layers. The command performs the
+same check first, refreshes only a degraded mirror, and emits one final JSON
+payload with `synced:true` when repair happened. This mode is forbidden for
+`aoa-routing`.
 
 ## SDK routing canary intake
 
@@ -80,6 +73,14 @@ reuse canary authority. It requires:
   predecessor maintenance-only, and compatibility-window start true, while
   archive authority remains false;
 - an explicit rollback root and operator change record for live activation.
+
+Its `inspect-materialized` operation is narrower and read-only: it verifies
+the current mirror bytes against the exact subject ledger retained from
+external admission, recomputes that ledger's aggregate digest, and verifies
+SDK identity, receipt, G5 authority, and embedded trust provenance without
+reopening release admission or reading a source checkout. Updating a mirror
+file and its manifest hash together cannot replace the retained subject
+ledger. Exact-input `check` remains the stronger admission proof.
 
 The mirror posture is `sdk_canonical`. Route-api permits ordinary closure only
 for `authorized_live_cutover` when the receipt, producer admission with its

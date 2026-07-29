@@ -50,6 +50,10 @@ The request contract is runtime-owned and JSON-shaped:
 - optional `canary_id`
 - optional `task_class`
 
+An `abyss-stack` checkout is admitted only when its canonical owner markers are
+present, including `docs/install/DEPLOYMENT.md`; the retired
+`docs/DEPLOYMENT.md` path is not a valid checkout marker.
+
 The green repo-scope expansion gate serves as evidence for later review only; it does not widen governed repo scope implicitly during the current governed run. The default governed target remains mutation-only and `abyss-stack`-owned, while any external target still requires explicit policy coverage and evidence-backed scope promotion.
 
 For canary preparation, use:
@@ -89,6 +93,12 @@ The flow is:
 8. landing diff apply back to the main checkout
 9. post-apply validation and automatic rollback on failure
 10. bounded review-packet materialization under `${AOA_STACK_ROOT}/Logs/governed-runs/<run-id>/artifacts/`
+
+When the Agent OS bridge invokes the in-process preparation seam, it may
+supply already captured request and policy bytes. Those bytes, rather than a
+second read of the provenance paths, become `request.json` and
+`policy.snapshot.json`. The standalone CLI continues to load its explicit
+paths directly.
 
 The main checkout is never repaired autonomously after landing.
 Only the isolated worktree may use the bounded repair budget.

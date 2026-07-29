@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 22466721,
+  "allowed_tracked_bytes": 27393943,
+  "approved_by": "repository-owner",
+  "base_ref": "8bcfe0edf7ad499d666207ca2087d8db9df4d7a9",
+  "changed_generated_bytes": 22466721,
+  "changed_generated_files": 332,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "8e2f481bd9b77e1d2408ec020b33f31b103698e73d48004975639d18a30bd0f8",
+  "reason": "Bind the landed aoa-stats consumer, exact Agent OS summon-decision identity, retained routing subject ledger, and clean-CI dependency checkout posture to one reviewed abyss-stack family delta without raising standing budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 27393943,
+  "tracked_bytes_max": 24117248
+}

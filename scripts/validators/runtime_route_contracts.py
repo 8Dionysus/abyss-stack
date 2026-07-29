@@ -13,6 +13,8 @@ STALE_ABYSS_PATH = "/srv/" + "abyss"
 STALE_ABYSS_PATTERN = re.compile(re.escape(STALE_ABYSS_PATH) + r"(?!-)")
 STALE_STACK_ROOT = "/srv/" + "abyss-stack"
 WORKSPACE_ROOT_DEFAULT = "/srv/AbyssOS"
+RETIRED_ROUTING_ENV = "AOA_" + "ROUTING_ROOT"
+RETIRED_ROUTING_CHECKOUT = f"{WORKSPACE_ROOT_DEFAULT}/" + "aoa-routing"
 WORKSPACE_SIBLING_ROOTS = {
     "aoa-techniques": f"{WORKSPACE_ROOT_DEFAULT}/aoa-techniques",
     "aoa-skills": f"{WORKSPACE_ROOT_DEFAULT}/aoa-skills",
@@ -23,12 +25,15 @@ WORKSPACE_SIBLING_ROOTS = {
     "aoa-playbooks": f"{WORKSPACE_ROOT_DEFAULT}/aoa-playbooks",
     "aoa-kag": f"{WORKSPACE_ROOT_DEFAULT}/aoa-kag",
     "Tree-of-Sophia": f"{WORKSPACE_ROOT_DEFAULT}/Tree-of-Sophia",
-    "aoa-routing": f"{WORKSPACE_ROOT_DEFAULT}/aoa-routing",
     "aoa-sdk": f"{WORKSPACE_ROOT_DEFAULT}/aoa-sdk",
 }
 STALE_ABYSS_PATH_ALLOWED = {
     Path("docs") / "legacy" / "MIGRATION_FROM_OLD.md",
 }
+RETIRED_ROUTING_CONSUMER_SCAN_ALLOWED_PREFIXES = (
+    Path("docs") / "decisions",
+    Path("tests"),
+)
 DERIVED_KAG_INDEX_ROOT = Path("kag") / "indexes"
 LOCAL_AI_TRIALS_PATH = (
     Path("mechanics")
@@ -257,6 +262,38 @@ def validate_stale_path_hygiene(
             )
 
 
+def validate_retired_routing_consumer_hygiene(
+    errors: list[str],
+    *,
+    root: Path,
+    text_file_iter_func: TextFileIterator,
+    read_text_func: TextReader,
+) -> None:
+    for path in text_file_iter_func():
+        text = read_text_func(path)
+        if text is None:
+            continue
+        relative_path = path.relative_to(root)
+        if (
+            relative_path.is_relative_to(DERIVED_KAG_INDEX_ROOT)
+            or "legacy" in relative_path.parts
+            or any(
+                relative_path.is_relative_to(prefix)
+                for prefix in RETIRED_ROUTING_CONSUMER_SCAN_ALLOWED_PREFIXES
+            )
+        ):
+            continue
+        for retired_surface in (
+            RETIRED_ROUTING_ENV,
+            RETIRED_ROUTING_CHECKOUT,
+        ):
+            if retired_surface in text:
+                errors.append(
+                    "retired routing checkout consumer found in "
+                    f"{relative_path}: {retired_surface}"
+                )
+
+
 def validate_readme_route_focus(errors: list[str], *, root: Path) -> None:
     readme = read_required(root, Path("README.md"), errors)
     for snippet, message in README_REQUIRED_MESSAGES:
@@ -414,7 +451,6 @@ def validate_runtime_and_federation_route_docs(errors: list[str], *, root: Path)
     paths_doc = read_required(root, PATHS_DOC_PATH, errors)
     for required_snippet in (
         "/srv/AbyssOS/abyss-stack",
-        "AOA_ROUTING_ROOT",
         "AOA_SOURCE_ROOT",
         "AOA_MEMO_ROOT",
         "AOA_EVALS_ROOT",
@@ -424,6 +460,25 @@ def validate_runtime_and_federation_route_docs(errors: list[str], *, root: Path)
     ):
         if required_snippet not in paths_doc:
             errors.append(f"docs/runtime/PATHS.md must mention {required_snippet}")
+    for forbidden_snippet in (
+        RETIRED_ROUTING_ENV,
+        RETIRED_ROUTING_CHECKOUT,
+    ):
+        if forbidden_snippet in paths_doc:
+            errors.append(
+                "docs/runtime/PATHS.md must not advertise retired routing "
+                f"checkout dependency {forbidden_snippet}"
+            )
+    require_snippets(
+        paths_doc,
+        relative_path=PATHS_DOC_PATH,
+        snippets=(
+            "Knowledge/federation/aoa-routing/",
+            "scripts/aoa-routing-cutover",
+            "admitted `aoa-sdk` release",
+        ),
+        errors=errors,
+    )
     if "WSL2" not in paths_doc:
         errors.append(
             "docs/runtime/PATHS.md should mention WSL2 in the Windows-usable model"
@@ -445,8 +500,25 @@ def validate_runtime_and_federation_route_docs(errors: list[str], *, root: Path)
         ),
         errors=errors,
     )
+    if (
+        "scripts/aoa-sync-federation-surfaces --check --layer aoa-routing"
+        not in deployment_doc
+    ):
+        errors.append(
+            "docs/install/DEPLOYMENT.md must mention check-only aoa-routing "
+            "federation validation"
+        )
+    if "scripts/aoa-routing-cutover" not in deployment_doc:
+        errors.append(
+            "docs/install/DEPLOYMENT.md must route aoa-routing materialization "
+            "through the cutover command"
+        )
+    if "scripts/aoa-sync-federation-surfaces --layer aoa-routing" in deployment_doc:
+        errors.append(
+            "docs/install/DEPLOYMENT.md must not advertise checkout-backed "
+            "aoa-routing sync"
+        )
     for layer in (
-        "aoa-routing",
         "aoa-memo",
         "aoa-evals",
         "aoa-playbooks",
@@ -583,26 +655,32 @@ def validate_governed_policy(errors: list[str], *, root: Path) -> None:
             errors.append("governed execution policy must define repo_scope_expansion_gate")
 
     targets = governed_policy.get("targets")
-    if not isinstance(targets, dict) or "abyss-stack" not in targets or "aoa-routing" not in targets:
-        errors.append("governed execution policy must declare explicit abyss-stack and aoa-routing targets")
+    if not isinstance(targets, dict) or set(targets) != {"abyss-stack"}:
+        errors.append(
+            "governed execution policy must declare only the active "
+            "abyss-stack mutation target"
+        )
         return
 
     abyss_stack_target = targets.get("abyss-stack") or {}
-    routing_target = targets.get("aoa-routing") or {}
-    if not isinstance(abyss_stack_target, dict) or not isinstance(routing_target, dict):
-        errors.append("governed execution policy must declare explicit abyss-stack and aoa-routing targets")
+    if not isinstance(abyss_stack_target, dict):
+        errors.append(
+            "governed execution policy must declare an explicit abyss-stack target"
+        )
         return
 
     abyss_stack_playbooks = abyss_stack_target.get("playbooks") or {}
-    routing_playbooks = routing_target.get("playbooks") or {}
-    if not isinstance(abyss_stack_playbooks, dict) or not isinstance(routing_playbooks, dict):
-        errors.append("governed execution policy must declare explicit abyss-stack and aoa-routing targets")
+    if not isinstance(abyss_stack_playbooks, dict):
+        errors.append(
+            "governed execution policy must declare abyss-stack playbooks"
+        )
         return
 
     abyss_stack_playbook = abyss_stack_playbooks.get("AOA-P-0011") or {}
-    routing_playbook = routing_playbooks.get("AOA-P-0011") or {}
-    if not isinstance(abyss_stack_playbook, dict) or not isinstance(routing_playbook, dict):
-        errors.append("governed execution policy must declare explicit abyss-stack and aoa-routing targets")
+    if not isinstance(abyss_stack_playbook, dict):
+        errors.append(
+            "governed execution policy must declare abyss-stack AOA-P-0011"
+        )
         return
 
     if abyss_stack_target.get("default_repo_root") != "~/src/abyss-stack":
@@ -611,55 +689,8 @@ def validate_governed_policy(errors: list[str], *, root: Path) -> None:
         )
     if abyss_stack_playbook.get("trust_state") not in {"experimental", "canary_proven", "trusted"}:
         errors.append("abyss-stack AOA-P-0011 governed policy entry must declare a valid trust_state")
-    if routing_playbook.get("trust_state") not in {"experimental", "canary_proven", "trusted"}:
-        errors.append("aoa-routing AOA-P-0011 governed policy entry must declare a valid trust_state")
     if not isinstance(abyss_stack_playbook.get("task_class"), str):
         errors.append("abyss-stack AOA-P-0011 governed policy entry must declare task_class")
-    if not isinstance(routing_playbook.get("task_class"), str):
-        errors.append("aoa-routing AOA-P-0011 governed policy entry must declare task_class")
-    if routing_playbook.get("evidence_since_run_id") is not None and not isinstance(
-        routing_playbook.get("evidence_since_run_id"), str
-    ):
-        errors.append("aoa-routing AOA-P-0011 governed policy evidence_since_run_id must be a string when set")
-
-    routing_acceptance = routing_playbook.get("acceptance_commands")
-    if not isinstance(routing_acceptance, list) or len(routing_acceptance) < 2:
-        errors.append("aoa-routing AOA-P-0011 governed policy entry must declare explicit acceptance commands")
-        return
-
-    required_root_flags = (
-        f"--techniques-root {WORKSPACE_SIBLING_ROOTS['aoa-techniques']}",
-        f"--skills-root {WORKSPACE_SIBLING_ROOTS['aoa-skills']}",
-        f"--evals-root {WORKSPACE_SIBLING_ROOTS['aoa-evals']}",
-        f"--memo-root {WORKSPACE_SIBLING_ROOTS['aoa-memo']}",
-        f"--agents-root {WORKSPACE_SIBLING_ROOTS['aoa-agents']}",
-        f"--aoa-root {WORKSPACE_SIBLING_ROOTS['Agents-of-Abyss']}",
-        f"--playbooks-root {WORKSPACE_SIBLING_ROOTS['aoa-playbooks']}",
-        f"--kag-root {WORKSPACE_SIBLING_ROOTS['aoa-kag']}",
-        f"--tos-root {WORKSPACE_SIBLING_ROOTS['Tree-of-Sophia']}",
-    )
-    for required_command in (
-        "python scripts/validate_router.py",
-        "python scripts/build_router.py --check",
-    ):
-        command = next(
-            (
-                item
-                for item in routing_acceptance
-                if isinstance(item, str) and item.startswith(required_command)
-            ),
-            None,
-        )
-        if command is None:
-            errors.append(
-                f"aoa-routing AOA-P-0011 governed policy entry must include {required_command}"
-            )
-            continue
-        for flag in required_root_flags:
-            if flag not in command:
-                errors.append(
-                    f"aoa-routing AOA-P-0011 governed policy {required_command} must pin {flag}"
-                )
 
 
 def validate_governed_canary_catalog(errors: list[str], *, root: Path) -> None:
@@ -677,8 +708,10 @@ def validate_governed_canary_catalog(errors: list[str], *, root: Path) -> None:
         return
 
     target_ids = {item.get("target_id") for item in canaries if isinstance(item, dict)}
-    if "abyss-stack" not in target_ids or "aoa-routing" not in target_ids:
-        errors.append("governed canary catalog must include abyss-stack and aoa-routing canaries")
+    if target_ids != {"abyss-stack"}:
+        errors.append(
+            "governed canary catalog must contain only abyss-stack canaries"
+        )
 
 
 def validate_paths(
@@ -689,6 +722,12 @@ def validate_paths(
     read_text_func: TextReader,
 ) -> None:
     validate_stale_path_hygiene(
+        errors,
+        root=root,
+        text_file_iter_func=text_file_iter_func,
+        read_text_func=read_text_func,
+    )
+    validate_retired_routing_consumer_hygiene(
         errors,
         root=root,
         text_file_iter_func=text_file_iter_func,

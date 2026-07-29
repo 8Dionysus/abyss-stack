@@ -59,12 +59,10 @@ COMPARISON_MEMO_NAME = "LANGGRAPH_COMPARISON.md"
 PILOT_INDEX_NAME = EDIT_GATE_INDEX_NAME
 
 DEFAULT_DOCS_CASE_ID = "8dionysus-profile-routing-clarity"
-GENERATED_CASE_ID = "aoa-routing-generated-surface-refresh"
 FIXTURE_DOCS_CASE_ID = "fixture-docs-wording-alignment"
 FIXTURE_VERSION = "v2"
 DOCS_CASE_ID = DEFAULT_DOCS_CASE_ID
 DOC_CASE_IDS = {DOCS_CASE_ID}
-GENERATED_CASE_IDS = {GENERATED_CASE_ID}
 
 
 class PilotState(TypedDict, total=False):
@@ -168,7 +166,7 @@ def available_cases(log_root: Path | None = None) -> list[dict[str, Any]]:
         return [fixture_case_from_template(log_root)]
     selected = []
     for case in TRIAL_ADAPTER.edit_gate_catalog(catalog):
-        if case["case_id"] not in {DEFAULT_DOCS_CASE_ID, GENERATED_CASE_ID}:
+        if case["case_id"] != DEFAULT_DOCS_CASE_ID:
             continue
         item = copy.deepcopy(case)
         item["program_id"] = PROGRAM_ID
@@ -177,7 +175,7 @@ def available_cases(log_root: Path | None = None) -> list[dict[str, Any]]:
         ]
         selected.append(item)
     by_id = {case["case_id"]: case for case in selected}
-    return [by_id[DEFAULT_DOCS_CASE_ID], by_id[GENERATED_CASE_ID]]
+    return [by_id[DEFAULT_DOCS_CASE_ID]]
 
 
 def pilot_catalog(log_root: Path | None = None) -> dict[str, list[dict[str, Any]]]:
@@ -327,8 +325,6 @@ def comparison_memo(log_root: Path) -> str:
     pause_seen = any(item.get("node") == "await_approval" and item.get("status") == "paused" for item in docs_history)
     resumed = (docs_state or {}).get("resume_count", 0) > 0
     docs_pass = docs_result is not None and docs_result.get("status") == "pass"
-    generated_result = load_result_summary(log_root, GENERATED_CASE_ID) if not is_fixture_program() else None
-    generated_pass = generated_result is not None and generated_result.get("status") == "pass"
 
     if is_fixture_program():
         recommendation = (
@@ -336,7 +332,7 @@ def comparison_memo(log_root: Path) -> str:
             if docs_pass
             else "This fixture pilot is not yet suitable as a promotion gate because the disposable docs case has not passed."
         )
-    elif docs_pass and generated_pass and pause_seen and resumed:
+    elif docs_pass and pause_seen and resumed:
         recommendation = (
             "LangGraph sidecar is recommended as the next bounded long-horizon execution substrate, "
             "while keeping `aoa-local-ai-trials` as the baseline comparator."
@@ -344,7 +340,7 @@ def comparison_memo(log_root: Path) -> str:
     else:
         recommendation = (
             "LangGraph sidecar is not yet the recommended long-horizon substrate. Keep the current runner as the execution baseline "
-            "until both pilot cases pass and pause/resume is proven end-to-end."
+            "until the bounded docs case passes and pause/resume is proven end-to-end."
         )
 
     return "\n".join(
@@ -356,7 +352,6 @@ def comparison_memo(log_root: Path) -> str:
             "",
             "## Current Evidence",
             f"- Docs case pass: `{docs_pass}`",
-            f"- Generated case pass: `{generated_pass}`",
             f"- Pause observed: `{pause_seen}`",
             f"- Resume observed: `{resumed}`",
             "",
@@ -750,9 +745,9 @@ def patched_trials_context(*, active_log_root: Path | None = None, active_mirror
     TRIALS.LOG_ROOT_DEFAULT = active_log_root
     TRIALS.MIRROR_ROOT_DEFAULT = active_mirror_root
     TRIALS.W4_DOC_CASE_IDS = set(DOC_CASE_IDS)
-    TRIALS.W4_GENERATED_CASE_IDS = set() if is_fixture_program() else set(GENERATED_CASE_IDS)
+    TRIALS.W4_GENERATED_CASE_IDS = set()
     TRIALS.W4_DOC_PREPARE_ORDER = [DOCS_CASE_ID]
-    TRIALS.W4_GENERATED_PREPARE_ORDER = [] if is_fixture_program() else [GENERATED_CASE_ID]
+    TRIALS.W4_GENERATED_PREPARE_ORDER = []
     target_fallbacks = dict(TRIALS.W4_DOC_TARGET_FALLBACKS)
     if is_fixture_program():
         target_fallbacks[FIXTURE_DOCS_CASE_ID] = "README.md"

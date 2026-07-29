@@ -135,6 +135,9 @@ The bridge does not:
 - introduce a new serving API
 - upgrade runtime success into portable proof wording
 - make old family names acceptable for new active trial topology
+- treat an old routing case ID as current predecessor ownership
+- validate or mutate an `aoa-routing` checkout; current routing owner checks
+  use `aoa-sdk`, and predecessor W4 mutation cases remain legacy provenance
 
 ## LangGraph sidecar origin and promoted role
 

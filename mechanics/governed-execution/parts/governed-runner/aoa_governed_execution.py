@@ -108,20 +108,6 @@ FOCUS_TERM_STOPWORDS = {
     "wording",
 }
 REQUEST_RETRY_SUFFIX_RE = re.compile(r"-retry(?:\d+)?(?=(?:\.[^.]+)+$|$)")
-BUILD_ROUTER_NOOP_GOAL_MARKERS = (
-    "no-op rebuild",
-    "git-stable",
-    "semantically unchanged",
-    "on-disk json or jsonl",
-    "editing generated files directly",
-)
-ROUTING_ROADMAP_GENERATED_SURFACE_GOAL_MARKERS = (
-    "generated-surface refresh lane",
-    "parity maintenance",
-    "sibling source repos",
-)
-BUILD_ROUTER_WRITE_LOOP_START = "for filename, payload in outputs.items():"
-BUILD_ROUTER_WRITE_LOOP_END = 'print(f"[ok] wrote {relative_posix(path)}")'
 PLAYBOOK_REVIEW_PACKET_CONTRACTS_PATH = Path(
     "Knowledge/federation/aoa-playbooks/generated/playbook_review_packet_contracts.min.json"
 )
@@ -391,23 +377,13 @@ def is_abyss_stack_checkout(path: Path) -> bool:
     return (
         (path / "CONTRIBUTING.md").exists()
         and (path / "scripts" / "validate_stack.py").exists()
-        and (path / "docs" / "DEPLOYMENT.md").exists()
-    )
-
-
-def is_aoa_routing_checkout(path: Path) -> bool:
-    return (
-        (path / "README.md").exists()
-        and (path / "scripts" / "build_router.py").exists()
-        and (path / "scripts" / "validate_router.py").exists()
-        and (path / "docs" / "FEDERATION_ENTRY_ABI.md").exists()
+        and (path / "docs" / "install" / "DEPLOYMENT.md").exists()
     )
 
 
 def target_checkout_detector(target_id: str) -> Callable[[Path], bool]:
     detectors: dict[str, Callable[[Path], bool]] = {
         "abyss-stack": is_abyss_stack_checkout,
-        "aoa-routing": is_aoa_routing_checkout,
     }
     detector = detectors.get(target_id)
     if detector is None:
@@ -422,7 +398,7 @@ def infer_target_id_from_repo_root(repo_root: str | Path | None) -> str | None:
         resolved = Path(repo_root).expanduser().resolve()
     except Exception:
         return None
-    for target_id in ("abyss-stack", "aoa-routing"):
+    for target_id in ("abyss-stack",):
         if target_checkout_detector(target_id)(resolved):
             return target_id
     return None
@@ -458,12 +434,6 @@ def candidate_repo_roots_for_target(
             candidates.append(SCRIPT_ROOT)
         candidates.append(Path.home() / "src" / "abyss-stack")
         candidates.append(STACK_ROOT)
-    elif target_id == "aoa-routing":
-        env_root = os.environ.get("AOA_ROUTING_ROOT")
-        if env_root:
-            candidates.append(Path(env_root).expanduser())
-        candidates.append(Path("/srv/AbyssOS/aoa-routing"))
-        candidates.append(Path.home() / "src" / "aoa-routing")
     else:
         raise RuntimeError(f"unsupported governed target_id: {target_id}")
     return candidates
@@ -1261,78 +1231,9 @@ def build_edit_spec_prompt(
     request_lineage_goal = any(
         marker in goal_lower for marker in ("latest_operator_action", "request lineage", "request_path")
     )
-    build_router_noop_goal = target_file.endswith("build_router.py") and any(
-        marker in goal_lower
-        for marker in (
-            "no-op rebuild",
-            "git-stable",
-            "semantically unchanged",
-            "on-disk json or jsonl",
-            "editing generated files directly",
-        )
-    )
     extra_requirements: list[str] = []
     if target_file.endswith(".py"):
         logic_focus_terms = focus_terms_from_goal(request["goal"], target_file=target_file)
-        if build_router_noop_goal:
-            extra_requirements.append(
-                "- for `build_router.py` no-op rebuild goals, change the existing `main()` write loop instead of the import block, comments, or docstrings"
-            )
-            extra_requirements.append(
-                "- prefer changing the `for filename, payload in outputs.items():` write loop after the `if args.check` branch; do not return a proposal that only rewrites the verification branch"
-            )
-            extra_requirements.append(
-                "- the edit must add real write-loop logic such as reading existing file content, comparing parsed payloads, or skipping a write when semantic content already matches"
-            )
-            extra_requirements.append(
-                "- prefer one `exact_replace` that replaces the whole current write loop block from `for filename, payload in outputs.items():` through `print(f\"[ok] wrote ...\")`; do not use `anchored_replace` when that block is already unique"
-            )
-            extra_requirements.append(
-                "- preserve the existing on-disk JSON or JSONL text when parsing that file yields the same payload as the freshly built output"
-            )
-            extra_requirements.append(
-                "- do not edit generated files directly; keep the fix inside `scripts/build_router.py`"
-            )
-            extra_requirements.append(
-                "- do not change `--check` semantics or generated payload meaning; only avoid formatting-only rewrites on semantic no-op rebuilds"
-            )
-            extra_requirements.append(
-                "- do not add explanatory comments; return only executable write-loop logic"
-            )
-            main_block = extract_python_named_block(target_text, symbol="main")
-            if main_block is not None:
-                excerpt = compact_python_block(
-                    main_block,
-                    char_limit=min(excerpt_char_limit, 700),
-                    focus_terms=[
-                        "for filename, payload",
-                        "path.write_text",
-                        "render_output_text",
-                        "args.check",
-                        "generated_dir",
-                    ],
-                )
-            render_output_block = extract_python_named_block(target_text, symbol="render_output_text")
-            if render_output_block is not None:
-                related_excerpts.append(
-                    compact_python_block(
-                        render_output_block,
-                        char_limit=320,
-                        focus_terms=["jsonl", "json.dumps", "sort_keys"],
-                    )
-                )
-            validate_generated_block = extract_python_named_block(
-                target_text,
-                symbol="validate_generated_dir_matches_outputs",
-            )
-            if validate_generated_block is not None:
-                related_excerpts.append(
-                    compact_python_block(
-                        validate_generated_block,
-                        char_limit=420,
-                        focus_terms=["actual_payload", "payload", "mismatches", "stale generated output"],
-                    )
-                )
         if request_lineage_goal or "recommended_action" in goal_lower:
             logic_focus_terms = [
                 "blocked_runs",
@@ -1448,46 +1349,6 @@ def build_edit_spec_prompt(
     extra_requirements_block = ""
     if extra_requirements:
         extra_requirements_block = "\n" + "\n".join(extra_requirements)
-    if build_router_noop_goal:
-        failure_block_compact = failure_block if failure_block != "- none" else "none"
-        helper_excerpt_block = ""
-        if related_excerpts:
-            helper_excerpt_text = "\n\n---\n\n".join(related_excerpts)
-            helper_excerpt_block = (
-                "\n\nHelper excerpts:\n"
-                "```text\n"
-                f"{helper_excerpt_text}\n"
-                "```"
-            )
-        return textwrap.dedent(
-            f"""\
-            Governed execution bounded edit proposal.
-            Return JSON only. Work on exactly one existing file: `{target_file}`.
-
-            Allowed response shapes:
-            {{"mode":"exact_replace","target_file":"{target_file}","old_text":"...","new_text":"..."}}
-            {{"mode":"anchored_replace","target_file":"{target_file}","anchor_before":"...","old_text":"...","new_text":"...","anchor_after":"..."}}
-
-            Requirements:
-            - prefer one compact edit inside `main()`
-            - do not touch imports, comments, docstrings, or generated files
-            - preserve the existing on-disk JSON or JSONL text when parsing that file yields the same payload as the freshly built output
-            - keep `--check` behavior and generated payload meaning unchanged
-            - if the existing parsed payload differs, keep writing the freshly built canonical text
-            - no comment-only or placeholder changes
-
-            Goal:
-            {request["goal"]}
-
-            Recent failure context:
-            {failure_block_compact}
-
-            Current `main()` excerpt:
-            ```text
-            {excerpt}
-            ```{helper_excerpt_block}
-            """
-        ).rstrip() + "\n"
     return textwrap.dedent(
         f"""\
         Governed execution bounded edit proposal.
@@ -1625,208 +1486,6 @@ def coerce_text_like_field(value: Any, *, field_name: str) -> str:
     raise RuntimeError(f"proposal {field_name} must be a string")
 
 
-def is_build_router_noop_goal(
-    *,
-    target_id: str | None,
-    selected_target_file: str,
-    goal: str,
-) -> bool:
-    if target_id is not None and target_id != "aoa-routing":
-        return False
-    if not selected_target_file.endswith("build_router.py"):
-        return False
-    goal_lower = goal.lower()
-    return any(marker in goal_lower for marker in BUILD_ROUTER_NOOP_GOAL_MARKERS)
-
-
-def is_routing_roadmap_generated_surface_goal(
-    *,
-    target_id: str | None,
-    selected_target_file: str,
-    goal: str,
-) -> bool:
-    if target_id is not None and target_id != "aoa-routing":
-        return False
-    if selected_target_file != "ROADMAP.md":
-        return False
-    goal_lower = goal.lower()
-    return all(marker in goal_lower for marker in ROUTING_ROADMAP_GENERATED_SURFACE_GOAL_MARKERS)
-
-
-def normalize_block_shape(text: str) -> str:
-    return "\n".join(line.lstrip().rstrip() for line in text.strip().splitlines() if line.strip())
-
-
-def extract_build_router_write_loop_block(target_text: str) -> str | None:
-    lines = target_text.splitlines()
-    start_indexes = [
-        index for index, line in enumerate(lines) if line.lstrip() == BUILD_ROUTER_WRITE_LOOP_START
-    ]
-    if not start_indexes:
-        return None
-    end_indexes = [index for index, line in enumerate(lines) if line.lstrip() == BUILD_ROUTER_WRITE_LOOP_END]
-    if len(end_indexes) != 1:
-        return None
-    end_index = end_indexes[0]
-    candidate_starts = [index for index in start_indexes if index < end_index]
-    if not candidate_starts:
-        return None
-    start_index = candidate_starts[-1]
-    block = "\n".join(lines[start_index : end_index + 1])
-    if "path.write_text(" not in block:
-        return None
-    return block
-
-
-def strip_full_line_comments(text: str) -> str:
-    lines = [line for line in text.splitlines() if not line.lstrip().startswith("#")]
-    return "\n".join(lines).strip("\n")
-
-
-def normalize_build_router_new_text(new_text: str, *, loop_block: str) -> str:
-    comment_stripped = strip_full_line_comments(new_text)
-    if not comment_stripped:
-        return comment_stripped
-    lines = comment_stripped.splitlines()
-    loop_lines = loop_block.splitlines()
-    first_line_indent = loop_lines[0][: len(loop_lines[0]) - len(loop_lines[0].lstrip())]
-    if lines and lines[0] and not lines[0].startswith((" ", "\t")) and first_line_indent:
-        lines[0] = first_line_indent + lines[0]
-    return "\n".join(lines)
-
-
-def normalize_build_router_noop_raw_spec(
-    spec: dict[str, Any],
-    *,
-    target_id: str,
-    selected_target_file: str,
-    goal: str,
-    target_text: str,
-) -> dict[str, Any]:
-    if not is_build_router_noop_goal(
-        target_id=target_id,
-        selected_target_file=selected_target_file,
-        goal=goal,
-    ):
-        return spec
-    if not isinstance(spec, dict):
-        return spec
-    if str(spec.get("target_file") or "") != selected_target_file:
-        return spec
-    loop_block = extract_build_router_write_loop_block(target_text)
-    if loop_block is None:
-        return spec
-    try:
-        old_text = coerce_text_like_field(spec.get("old_text"), field_name="old_text")
-        new_text = coerce_text_like_field(spec.get("new_text"), field_name="new_text")
-    except RuntimeError:
-        return spec
-    normalized_new_text = normalize_build_router_new_text(new_text, loop_block=loop_block)
-    mode = str(spec.get("mode") or "")
-    if mode == "anchored_replace":
-        anchor_before = spec.get("anchor_before")
-        if isinstance(anchor_before, str) and anchor_before.strip():
-            if (
-                normalize_block_shape(old_text) == normalize_block_shape(anchor_before)
-                == normalize_block_shape(loop_block)
-            ):
-                return {
-                    "mode": "exact_replace",
-                    "target_file": selected_target_file,
-                    "old_text": loop_block,
-                    "new_text": normalized_new_text,
-                }
-    if mode == "exact_replace" and normalize_block_shape(old_text) == normalize_block_shape(loop_block):
-        return {
-            "mode": "exact_replace",
-            "target_file": selected_target_file,
-            "old_text": loop_block,
-            "new_text": normalized_new_text,
-        }
-    normalized = dict(spec)
-    normalized["old_text"] = old_text
-    normalized["new_text"] = normalized_new_text
-    return normalized
-
-
-def synthesize_build_router_noop_spec(
-    *,
-    selected_target_file: str,
-    target_text: str,
-) -> dict[str, Any]:
-    loop_block = extract_build_router_write_loop_block(target_text)
-    if loop_block is None:
-        raise RuntimeError("could not locate the unique build_router write loop block")
-    loop_lines = loop_block.splitlines()
-    if len(loop_lines) < 4:
-        raise RuntimeError("build_router write loop block is unexpectedly short")
-    loop_indent = loop_lines[0][: len(loop_lines[0]) - len(loop_lines[0].lstrip())]
-    body_indent = loop_lines[1][: len(loop_lines[1]) - len(loop_lines[1].lstrip())]
-    nested_indent = body_indent + "    "
-    deeper_indent = nested_indent + "    "
-    new_text = "\n".join(
-        [
-            f"{loop_indent}for filename, payload in outputs.items():",
-            f"{body_indent}path = generated_dir / filename",
-            f"{body_indent}rendered_text = render_output_text(filename, payload)",
-            f"{body_indent}if path.exists():",
-            f"{nested_indent}try:",
-            f"{deeper_indent}actual_text = path.read_text(encoding=\"utf-8\")",
-            f"{deeper_indent}if filename.endswith(\".jsonl\"):",
-            f"{deeper_indent}    actual_payload = [",
-            f"{deeper_indent}        json.loads(line)",
-            f"{deeper_indent}        for line in actual_text.splitlines()",
-            f"{deeper_indent}        if line.strip()",
-            f"{deeper_indent}    ]",
-            f"{deeper_indent}else:",
-            f"{deeper_indent}    actual_payload = json.loads(actual_text)",
-            f"{deeper_indent}if actual_payload == payload:",
-            f"{deeper_indent}    continue",
-            f"{nested_indent}except json.JSONDecodeError:",
-            f"{deeper_indent}pass",
-            f"{body_indent}path.write_text(rendered_text, encoding=\"utf-8\", newline=\"\\n\")",
-            f"{body_indent}print(f\"[ok] wrote {{relative_posix(path)}}\")",
-        ]
-    )
-    spec = {
-        "mode": "exact_replace",
-        "target_file": selected_target_file,
-        "old_text": loop_block,
-        "new_text": new_text,
-    }
-    validate_build_router_noop_spec(spec)
-    validate_edit_spec_candidate(
-        target_text,
-        selected_target_file=selected_target_file,
-        spec=spec,
-    )
-    return spec
-
-
-def synthesize_routing_roadmap_generated_surface_spec(
-    *,
-    selected_target_file: str,
-    target_text: str,
-) -> dict[str, Any]:
-    old_text = "- schema-backed validation that orientation never points authority at route-owned generated surfaces"
-    new_text = (
-        old_text
-        + "\n- router-owned generated-surface refresh stays a parity-maintenance lane for routing-owned outputs and must not transfer source authority from sibling repos"
-    )
-    spec = {
-        "mode": "exact_replace",
-        "target_file": selected_target_file,
-        "old_text": old_text,
-        "new_text": new_text,
-    }
-    validate_edit_spec_candidate(
-        target_text,
-        selected_target_file=selected_target_file,
-        spec=spec,
-    )
-    return spec
-
-
 def normalize_edit_spec(spec: dict[str, Any], *, selected_target_file: str) -> dict[str, Any]:
     if not isinstance(spec, dict):
         raise RuntimeError("proposal spec must be an object")
@@ -1927,30 +1586,6 @@ def validate_edit_spec_candidate(target_text: str, *, selected_target_file: str,
     return candidate_text
 
 
-def validate_build_router_noop_spec(spec: dict[str, Any]) -> None:
-    old_text = str(spec.get("old_text") or "")
-    new_text = str(spec.get("new_text") or "")
-    combined = old_text + "\n" + new_text
-    if any(line.lstrip().startswith("#") for line in new_text.splitlines()):
-        raise RuntimeError("proposal must not add explanatory comments to the build_router write loop")
-    if "if args.check" in combined and BUILD_ROUTER_WRITE_LOOP_START not in combined:
-        raise RuntimeError("proposal must change the build_router write loop")
-    if BUILD_ROUTER_WRITE_LOOP_START not in combined or "path.write_text(" not in combined:
-        raise RuntimeError("proposal must change the build_router write loop")
-    if "path.exists()" not in new_text or "path.read_text(" not in new_text:
-        raise RuntimeError("proposal must read existing output only when the file already exists")
-    if 'filename.endswith(".jsonl")' not in new_text or "splitlines()" not in new_text or "json.loads(" not in new_text:
-        raise RuntimeError("proposal must parse both JSON and JSONL output payloads before comparing")
-    if not re.search(r"\b[A-Za-z_][A-Za-z0-9_]*_payload\s*==\s*payload\b", new_text):
-        raise RuntimeError("proposal must compare parsed on-disk payloads against the freshly built payload")
-    if "continue" not in new_text:
-        raise RuntimeError("proposal must skip the write only for semantic no-op payload matches")
-    if "json.JSONDecodeError" not in new_text:
-        raise RuntimeError("proposal must preserve canonical writes when existing output is invalid")
-    if "path.write_text(" not in new_text or "render_output_text(" not in new_text:
-        raise RuntimeError("proposal must preserve the canonical write path")
-
-
 def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
     run_dir = context.get("run_dir")
     fixture_path = os.environ.get("AOA_GOVERNED_EXECUTION_PROPOSAL_PATH")
@@ -1959,29 +1594,11 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(payload, dict):
             raise RuntimeError("fixture proposal payload must be an object")
         selected_target_file = str(payload.get("selected_target_file") or payload.get("target_file") or "")
-        target_text = ""
-        if selected_target_file:
-            candidate_path = context["repo_root"] / selected_target_file
-            if candidate_path.exists():
-                target_text = candidate_path.read_text(encoding="utf-8")
         raw_spec = payload.get("spec") or payload
-        raw_spec = normalize_build_router_noop_raw_spec(
-            raw_spec,
-            target_id=str(context["request"].get("target_id") or ""),
-            selected_target_file=selected_target_file,
-            goal=str(context["request"].get("goal") or ""),
-            target_text=target_text,
-        )
         spec = normalize_edit_spec(
             raw_spec,
             selected_target_file=selected_target_file,
         )
-        if is_build_router_noop_goal(
-            target_id=str(context["request"].get("target_id") or ""),
-            selected_target_file=selected_target_file,
-            goal=str(context["request"].get("goal") or ""),
-        ):
-            validate_build_router_noop_spec(spec)
         return {
             "provider": "fixture",
             "selected_target_file": selected_target_file,
@@ -2028,58 +1645,6 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
             raise RuntimeError("target selection chose a file outside the governed allowlist")
 
     target_text = (context["repo_root"] / selected_target_file).read_text(encoding="utf-8")
-    build_router_noop_goal = is_build_router_noop_goal(
-        target_id=str(context["request"].get("target_id") or ""),
-        selected_target_file=selected_target_file,
-        goal=str(context["request"].get("goal") or ""),
-    )
-    routing_roadmap_generated_surface_goal = is_routing_roadmap_generated_surface_goal(
-        target_id=str(context["request"].get("target_id") or ""),
-        selected_target_file=selected_target_file,
-        goal=str(context["request"].get("goal") or ""),
-    )
-    if build_router_noop_goal:
-        spec = synthesize_build_router_noop_spec(
-            selected_target_file=selected_target_file,
-            target_text=target_text,
-        )
-        return {
-            "provider": "deterministic-build-router-noop",
-            "selected_target_file": selected_target_file,
-            "spec": spec,
-            "candidate_files": prompt_candidates,
-            "target_prompt": target_prompt,
-            "edit_prompt": "",
-            "target_answer": target_answer,
-            "edit_answer": json.dumps(spec, ensure_ascii=True),
-            "notes": [
-                "Target candidate count: "
-                + str(len(prompt_candidates))
-                + ".",
-                "Synthesized deterministic build_router no-op write-loop patch.",
-            ],
-        }
-    if routing_roadmap_generated_surface_goal:
-        spec = synthesize_routing_roadmap_generated_surface_spec(
-            selected_target_file=selected_target_file,
-            target_text=target_text,
-        )
-        return {
-            "provider": "deterministic-routing-roadmap-generated-surface",
-            "selected_target_file": selected_target_file,
-            "spec": spec,
-            "candidate_files": prompt_candidates,
-            "target_prompt": target_prompt,
-            "edit_prompt": "",
-            "target_answer": target_answer,
-            "edit_answer": json.dumps(spec, ensure_ascii=True),
-            "notes": [
-                "Target candidate count: "
-                + str(len(prompt_candidates))
-                + ".",
-                "Synthesized deterministic aoa-routing ROADMAP generated-surface boundary wording patch.",
-            ],
-        }
     edit_failure_context = list(context.get("failure_context") or [])
     edit_prompt = ""
     edit_answer = ""
@@ -2106,8 +1671,6 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
             marker in request_goal_lower for marker in ("latest_operator_action", "request lineage", "request_path")
         )
         edit_max_tokens = 180 if selected_target_file.endswith(".py") else 220
-        if build_router_noop_goal:
-            edit_max_tokens = 320
         if selected_target_file.endswith(".py") and request_lineage_goal:
             edit_max_tokens = 260
         edit_response = run_federated_prompt(edit_prompt, context["request"], max_tokens=edit_max_tokens)
@@ -2121,16 +1684,7 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
         )
         try:
             parsed_spec = parse_json_answer_block(edit_answer)
-            parsed_spec = normalize_build_router_noop_raw_spec(
-                parsed_spec,
-                target_id=str(context["request"].get("target_id") or ""),
-                selected_target_file=selected_target_file,
-                goal=str(context["request"].get("goal") or ""),
-                target_text=target_text,
-            )
             spec = normalize_edit_spec(parsed_spec, selected_target_file=selected_target_file)
-            if build_router_noop_goal:
-                validate_build_router_noop_spec(spec)
             validate_edit_spec_candidate(
                 target_text,
                 selected_target_file=selected_target_file,
@@ -4156,19 +3710,52 @@ def prepare_run(
     until: str = "done",
     policy_path: str | Path | None = None,
     log_root: str | Path | None = None,
+    run_id: str | None = None,
+    request_bytes: bytes | None = None,
+    policy_bytes: bytes | None = None,
     gate_provider: Callable[[], dict[str, Any]] | None = None,
     advisory_provider: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     proposal_provider: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    request, request_path = load_request(request_file)
+    if request_bytes is None:
+        request, request_path = load_request(request_file)
+    else:
+        request = json.loads(request_bytes.decode("utf-8"))
+        if not isinstance(request, dict):
+            raise RuntimeError("captured request bytes must contain a JSON object")
+        validate_request_shape(request)
+        request_path = Path(request_file).expanduser()
     request_path_text = str(request_path)
     target_id = str(request.get("target_id") or "")
-    run_id = make_run_id()
+    run_id = run_id or make_run_id()
+    if Path(run_id).name != run_id or run_id in {".", ".."}:
+        raise RuntimeError("governed run_id must be one bounded path component")
     run_dir = Path(log_root or LOG_ROOT_DEFAULT) / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
+    if run_dir.exists():
+        stored_request_path = run_dir / "request.json"
+        summary_path = result_artifact(run_dir)
+        if not stored_request_path.is_file() or not summary_path.is_file():
+            raise RuntimeError(
+                f"governed run {run_id} exists without a replayable result"
+            )
+        stored_request = json.loads(stored_request_path.read_text(encoding="utf-8"))
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        if stored_request != request or summary.get("run_id") != run_id:
+            raise RuntimeError(
+                f"governed run {run_id} does not match the replayed request"
+            )
+        return summary
+    run_dir.mkdir(parents=True, exist_ok=False)
     try:
         canary_context = resolve_request_canary_context(request)
-        policy, resolved_policy_path = load_policy(policy_path)
+        if policy_bytes is None:
+            policy, resolved_policy_path = load_policy(policy_path)
+        else:
+            policy = parse_yaml_or_json(policy_bytes.decode("utf-8"))
+            validate_policy(policy)
+            resolved_policy_path = Path(
+                policy_path if policy_path is not None else SOURCE_POLICY_FALLBACK
+            ).expanduser()
         advisory = resolve_playbook_id(request, policy, advisory_provider=advisory_provider)
         playbook_policy = advisory["policy"]
         repo_root = normalize_repo_root(request["repo_root"], target_id=target_id)

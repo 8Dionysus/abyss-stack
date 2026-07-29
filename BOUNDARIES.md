@@ -34,7 +34,8 @@ This file names what belongs in `abyss-stack` and what must stay elsewhere.
 - shared bounded execution workflows and skill-system doctrine in `aoa-skills`
 - proof surfaces in `aoa-evals`
 - portable verdict logic for runtime benchmark meaning in `aoa-evals`
-- routing truth in `aoa-routing`
+- routing truth and the stable routing producer in `aoa-sdk`; the literal
+  `aoa-routing` runtime namespace remains a compatibility ABI
 - memory objects and recall contracts in `aoa-memo`
 - role contracts in `aoa-agents`
 - scenario compositions in `aoa-playbooks`

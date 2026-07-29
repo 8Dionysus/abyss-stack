@@ -63,6 +63,9 @@ The runtime body has these organs:
   platform adaptation, and bounded local tuning
 - **inference pilots**: local trials, promotion loops, and model-route evidence
   that stay runtime-owned rather than proof-owned
+- **governed agent execution**: an explicit local subprocess bridge that
+  consumes exact `aoa-sdk` plans while keeping session state, approvals,
+  effects, rollback, runtime evidence, and outcomes owned by this runtime
 - **federation seams**: opt-in runtime bridges to sibling repositories that
   consume or mirror surfaces without stealing their authority
 - **runtime knowledge projections**: manifest-bound exact, lexical, vector,
@@ -134,6 +137,9 @@ what was not checked, and what surface owns the next decision.
   sibling's deployed command, but they should not duplicate that sibling's
   internal registry or source-selection policy when the command owns a stable
   default.
+- **Control plans do not transfer execution authority.** An SDK may own the
+  generic plan and lifecycle protocol while this runtime independently admits
+  exact source, ABI, policy, and approval bindings before any effect.
 - **Generated companions stay companions.** Catalogs, indexes, diagnostics, and
   reports help navigation; source surfaces remain authoritative.
 - **Recovery is part of design.** A runtime surface is incomplete if it cannot

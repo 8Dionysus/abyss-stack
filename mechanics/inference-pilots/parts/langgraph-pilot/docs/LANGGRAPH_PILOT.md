@@ -20,7 +20,6 @@ Current origin runtime path:
 
 Current cases:
 - `8dionysus-profile-routing-clarity`
-- `aoa-routing-generated-surface-refresh`
 - `fixture-docs-wording-alignment` only when the program id is `langgraph-sidecar-llamacpp-v1`
 
 The docs case is also used for the explicit pause/resume scenario.
@@ -39,7 +38,6 @@ Use:
 scripts/aoa-langgraph-pilot materialize
 scripts/aoa-langgraph-pilot run-case 8dionysus-profile-routing-clarity --until approval
 scripts/aoa-langgraph-pilot resume-case 8dionysus-profile-routing-clarity
-scripts/aoa-langgraph-pilot run-case aoa-routing-generated-surface-refresh --until done
 scripts/aoa-langgraph-pilot status 8dionysus-profile-routing-clarity
 ```
 

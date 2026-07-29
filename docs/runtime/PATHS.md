@@ -17,7 +17,6 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 - `AOA_WORKSPACE_ROOT` — optional shared AbyssOS workspace root for sibling repository checkouts, usually `/srv/AbyssOS`
 - `AOA_AGENTS_ROOT` — optional source root used to mirror public-safe `aoa-agents` surfaces into the runtime tree
 - `AOA_SKILLS_ROOT` — optional source root used by repo-local skill projection surfaces
-- `AOA_ROUTING_ROOT` — optional source root used to mirror public-safe `aoa-routing` advisory surfaces into the runtime tree
 - `AOA_MEMO_ROOT` — optional source root used to mirror public-safe `aoa-memo` recall and writeback-seam surfaces into the runtime tree
 - `AOA_EVALS_ROOT` — optional source root used to mirror public-safe `aoa-evals` eval-selection and export-contract surfaces into the runtime tree
 - `AOA_PLAYBOOKS_ROOT` — optional source root used to mirror public-safe `aoa-playbooks` activation and composition advisory surfaces into the runtime tree
@@ -53,7 +52,6 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 | optional `Agents-of-Abyss` source root | `/srv/AbyssOS/Agents-of-Abyss` |
 | optional `Tree-of-Sophia` source root | `/srv/AbyssOS/Tree-of-Sophia` |
 | optional `aoa-agents` source root | `/srv/AbyssOS/aoa-agents` |
-| optional `aoa-routing` source root | `/srv/AbyssOS/aoa-routing` |
 | optional `aoa-memo` source root | `/srv/AbyssOS/aoa-memo` |
 | optional `aoa-evals` source root | `/srv/AbyssOS/aoa-evals` |
 | optional `aoa-playbooks` source root | `/srv/AbyssOS/aoa-playbooks` |
@@ -71,6 +69,12 @@ Sibling repository defaults live under the same `/srv/AbyssOS` workspace root.
 The older `/srv/<repo>` shape is historical compatibility only; active source
 docs, examples, symlinks, and helper defaults should use `/srv/AbyssOS/<repo>`
 unless a user explicitly overrides the matching environment variable.
+
+The stable runtime namespace
+`Knowledge/federation/aoa-routing/` is not a source checkout. It is
+materialized only from a receipt-bound, admitted `aoa-sdk` release through
+`scripts/aoa-routing-cutover`. Ordinary federation sync may inspect that
+materialization but cannot produce or repair it.
 
 ## Windows-usable path model
 

@@ -43,6 +43,7 @@
       "family": "root-operator-command-surface",
       "paths": [
         "scripts/aoa-a2a-return-closeout-dry-run",
+        "scripts/aoa-agent-os-runtime",
         "scripts/aoa-apply-resource-guards",
         "scripts/aoa-bootstrap-configs",
         "scripts/aoa-bootstrap-wsl.ps1",

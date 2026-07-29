@@ -1,0 +1,379 @@
+{
+  "schema_version": "abyss_stack_agent_os_runtime_profile_v1",
+  "profile_id": "runtime-profile:abyss-stack-governed-execution-v1",
+  "runtime_owner": "abyss-stack",
+  "adapter_id": "abyss_stack_agent_os_adapter_v1",
+  "adapter_protocol_version": "aoa_runtime_adapter_v1",
+  "source_ref": "abyss_stack_agent_os_adapter_v1",
+  "schema_ref": "mechanics/governed-execution/parts/agent-os-adapter/schemas/agent-os-runtime-profile.schema.json",
+  "supported_plan_schema_versions": [
+    "aoa_control_plane_v1"
+  ],
+  "supported_event_schema_versions": [
+    "aoa_control_plane_v1"
+  ],
+  "supported_effect_classes": [
+    "read_only",
+    "repo_mutation"
+  ],
+  "required_constraint_artifacts": [
+    {
+      "owner_repo": "abyss-stack",
+      "artifact_ref": "config-templates/Configs/agent-api/governed-execution-policy.yaml",
+      "source_ref": "abyss_stack_governed_execution_policy_v1",
+      "schema_ref": "mechanics/governed-execution/parts/governed-runner/docs/GOVERNED_EXECUTION.md#policy",
+      "schema_version": "v1"
+    }
+  ],
+  "compatibility": [
+    {
+      "scenario_id": "bounded_change_safe",
+      "playbook_id": "AOA-P-0011",
+      "execution_lane": "governed_repository_change",
+      "primary_input_artifact_kind": null,
+      "required_input_artifact_kinds": [],
+      "owner_contour": {
+        "owner_repo": "aoa-playbooks",
+        "source_ref": "f9e638395e86be8556e3579ab4ad5bf358e9499e",
+        "abi_id": "aoa_playbook_plan_contour_v1",
+        "abi_version": "aoa_playbook_plan_contour_v1",
+        "artifact_digest": "sha256:58145fb4fe85aaba0168904550722e188055539b10963013966293f430e5be25"
+      },
+      "accepted_step_sets": [
+        [
+          "orient",
+          "preview",
+          "mutate",
+          "verify",
+          "closeout"
+        ],
+        [
+          "orient",
+          "mutate",
+          "verify",
+          "closeout"
+        ]
+      ],
+      "phase_step_map": {
+        "prepare_proposal": [
+          "orient"
+        ],
+        "worktree_preview": [
+          "preview"
+        ],
+        "landing_apply": [
+          "mutate"
+        ],
+        "post_apply_validation": [
+          "verify"
+        ],
+        "review_packet_materialization": [
+          "closeout"
+        ]
+      },
+      "step_effect_map": {
+        "orient": "read_only",
+        "preview": "read_only",
+        "mutate": "repo_mutation",
+        "verify": "read_only",
+        "closeout": "read_only"
+      },
+      "approval_operations": {
+        "plan_freeze": "abyss-stack:governed-execution:plan-freeze",
+        "landing": "abyss-stack:governed-execution:landing"
+      },
+      "runtime_approval_requirements": [
+        {
+          "requirement_id": "approval:abyss-stack:plan-freeze",
+          "operation": "abyss-stack:governed-execution:plan-freeze",
+          "risk_class": "repo_mutation",
+          "applies_to_step_ids": [
+            "mutate"
+          ],
+          "required_evidence_refs": [],
+          "expires_after_seconds": null,
+          "renewable": false
+        },
+        {
+          "requirement_id": "approval:abyss-stack:landing",
+          "operation": "abyss-stack:governed-execution:landing",
+          "risk_class": "repo_mutation",
+          "applies_to_step_ids": [
+            "mutate"
+          ],
+          "required_evidence_refs": [],
+          "expires_after_seconds": null,
+          "renewable": false
+        }
+      ],
+      "admitted_input_evidence_requirements": [],
+      "runtime_evidence_requirements": [
+        {
+          "requirement_id": "evidence:bounded-change:approval",
+          "artifact_kind": "approval_record",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "orient",
+          "terminal_required": false,
+          "artifact_binding": "step_output"
+        },
+        {
+          "requirement_id": "evidence:bounded-change:source-map",
+          "artifact_kind": "source_map",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "orient",
+          "terminal_required": false,
+          "artifact_binding": "step_output"
+        },
+        {
+          "requirement_id": "evidence:bounded-change:change-set",
+          "artifact_kind": "scoped_change_set",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "mutate",
+          "terminal_required": true,
+          "artifact_binding": "step_output"
+        },
+        {
+          "requirement_id": "evidence:bounded-change:verification",
+          "artifact_kind": "verification_pack",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "verify",
+          "terminal_required": true,
+          "artifact_binding": "step_output"
+        },
+        {
+          "requirement_id": "evidence:bounded-change:summary",
+          "artifact_kind": "shareable_summary",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "closeout",
+          "terminal_required": true,
+          "artifact_binding": "step_output"
+        }
+      ]
+    },
+    {
+      "scenario_id": "a2a_summon_return_checkpoint",
+      "playbook_id": "AOA-P-0031",
+      "execution_lane": "a2a_return_review",
+      "primary_input_artifact_kind": "summon_request",
+      "required_input_artifact_kinds": [
+        "summon_request",
+        "summon_decision",
+        "child_task_result"
+      ],
+      "owner_contour": {
+        "owner_repo": "aoa-playbooks",
+        "source_ref": "f9e638395e86be8556e3579ab4ad5bf358e9499e",
+        "abi_id": "aoa_playbook_plan_contour_v1",
+        "abi_version": "aoa_playbook_plan_contour_v1",
+        "artifact_digest": "sha256:58145fb4fe85aaba0168904550722e188055539b10963013966293f430e5be25"
+      },
+      "accepted_step_sets": [
+        [
+          "inspect-parent-anchor",
+          "inspect-child-target",
+          "review-return",
+          "checkpoint-return",
+          "evaluate-return",
+          "closeout-dry-run"
+        ]
+      ],
+      "phase_step_map": {
+        "parent_anchor_inspection": [
+          "inspect-parent-anchor"
+        ],
+        "child_target_inspection": [
+          "inspect-child-target"
+        ],
+        "reviewed_return": [
+          "review-return"
+        ],
+        "checkpoint_candidate": [
+          "checkpoint-return"
+        ],
+        "eval_candidate": [
+          "evaluate-return"
+        ],
+        "runtime_dry_run_closeout": [
+          "closeout-dry-run"
+        ]
+      },
+      "step_effect_map": {
+        "inspect-parent-anchor": "read_only",
+        "inspect-child-target": "read_only",
+        "review-return": "read_only",
+        "checkpoint-return": "read_only",
+        "evaluate-return": "read_only",
+        "closeout-dry-run": "read_only"
+      },
+      "approval_operations": {},
+      "runtime_approval_requirements": [],
+      "admitted_input_evidence_requirements": [
+        {
+          "requirement_id": "evidence:a2a:summon-request",
+          "artifact_kind": "summon_request",
+          "producer_owner": "aoa-summon",
+          "required_after_step_id": "inspect-parent-anchor",
+          "terminal_required": true,
+          "artifact_binding": "scenario_input"
+        },
+        {
+          "requirement_id": "evidence:a2a:summon-decision",
+          "artifact_kind": "summon_decision",
+          "producer_owner": "aoa-summon",
+          "required_after_step_id": "inspect-parent-anchor",
+          "terminal_required": true,
+          "artifact_binding": "scenario_input"
+        },
+        {
+          "requirement_id": "evidence:a2a:child-result",
+          "artifact_kind": "child_task_result",
+          "producer_owner": "aoa-summon",
+          "required_after_step_id": "review-return",
+          "terminal_required": true,
+          "artifact_binding": "scenario_input"
+        }
+      ],
+      "runtime_evidence_requirements": [
+        {
+          "requirement_id": "evidence:a2a:target",
+          "artifact_kind": "codex_local_target",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "inspect-child-target",
+          "terminal_required": true,
+          "artifact_binding": "step_output"
+        },
+        {
+          "requirement_id": "evidence:a2a:return-plan",
+          "artifact_kind": "return_plan",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "review-return",
+          "terminal_required": true,
+          "artifact_binding": "step_output"
+        },
+        {
+          "requirement_id": "evidence:a2a:checkpoint",
+          "artifact_kind": "checkpoint_bridge_plan",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "checkpoint-return",
+          "terminal_required": true,
+          "artifact_binding": "step_output"
+        },
+        {
+          "requirement_id": "evidence:a2a:eval-packet",
+          "artifact_kind": "a2a_return_eval_packet",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "evaluate-return",
+          "terminal_required": false,
+          "artifact_binding": "step_output"
+        },
+        {
+          "requirement_id": "evidence:a2a:dry-run-receipt",
+          "artifact_kind": "runtime_closeout_dry_run_receipt",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "closeout-dry-run",
+          "terminal_required": true,
+          "artifact_binding": "step_output"
+        }
+      ]
+    },
+    {
+      "scenario_id": "runtime_chaos_recovery",
+      "playbook_id": "AOA-P-0032",
+      "execution_lane": "runtime_degradation_recovery",
+      "primary_input_artifact_kind": "owner_runtime_receipt",
+      "required_input_artifact_kinds": [
+        "owner_runtime_receipt"
+      ],
+      "owner_contour": {
+        "owner_repo": "aoa-playbooks",
+        "source_ref": "f9e638395e86be8556e3579ab4ad5bf358e9499e",
+        "abi_id": "aoa_playbook_plan_contour_v1",
+        "abi_version": "aoa_playbook_plan_contour_v1",
+        "artifact_digest": "sha256:58145fb4fe85aaba0168904550722e188055539b10963013966293f430e5be25"
+      },
+      "accepted_step_sets": [
+        [
+          "inspect-runtime-receipt",
+          "validate-degraded-lane",
+          "evaluate-reentry",
+          "closeout-recovery"
+        ]
+      ],
+      "phase_step_map": {
+        "owner_receipt_inspection": [
+          "inspect-runtime-receipt"
+        ],
+        "degraded_lane_validation": [
+          "validate-degraded-lane"
+        ],
+        "reentry_candidate": [
+          "evaluate-reentry"
+        ],
+        "runtime_recovery_closeout": [
+          "closeout-recovery"
+        ]
+      },
+      "step_effect_map": {
+        "inspect-runtime-receipt": "read_only",
+        "validate-degraded-lane": "read_only",
+        "evaluate-reentry": "read_only",
+        "closeout-recovery": "read_only"
+      },
+      "approval_operations": {},
+      "runtime_approval_requirements": [],
+      "admitted_input_evidence_requirements": [
+        {
+          "requirement_id": "evidence:runtime-chaos:owner-receipt",
+          "artifact_kind": "owner_runtime_receipt",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "inspect-runtime-receipt",
+          "terminal_required": true,
+          "artifact_binding": "scenario_input"
+        }
+      ],
+      "runtime_evidence_requirements": [
+        {
+          "requirement_id": "evidence:runtime-chaos:stress-lane",
+          "artifact_kind": "runtime_stress_lane",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "validate-degraded-lane",
+          "terminal_required": true,
+          "artifact_binding": "step_output"
+        },
+        {
+          "requirement_id": "evidence:runtime-chaos:reentry-gate",
+          "artifact_kind": "runtime_reentry_gate",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "validate-degraded-lane",
+          "terminal_required": true,
+          "artifact_binding": "step_output"
+        },
+        {
+          "requirement_id": "evidence:runtime-chaos:proof-handoff",
+          "artifact_kind": "proof_handoff_candidate",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "evaluate-reentry",
+          "terminal_required": false,
+          "artifact_binding": "step_output"
+        },
+        {
+          "requirement_id": "evidence:runtime-chaos:closeout",
+          "artifact_kind": "runtime_closeout_receipt",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "closeout-recovery",
+          "terminal_required": true,
+          "artifact_binding": "step_output"
+        }
+      ]
+    }
+  ],
+  "boundaries": {
+    "repository_mutation_through_governed_runner_only": true,
+    "read_only_lanes_are_artifact_bound": true,
+    "selects_adapter": false,
+    "authors_playbook_meaning": false,
+    "produces_eval_verdict": false,
+    "retains_durable_memory": false,
+    "opens_network_listener": false
+  }
+}

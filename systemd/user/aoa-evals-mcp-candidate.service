@@ -15,7 +15,7 @@ Environment=AOA_MCP_TRANSPORT=streamable-http
 Environment=AOA_MCP_HOST=127.0.0.1
 Environment=AOA_MCP_PORT=5435
 Environment=AOA_MCP_POLICY_FAMILY=candidate
-Environment="AOA_EVALS_MCP_CANDIDATE_ROOTS=/srv/AbyssOS/8Dionysus/evals:/srv/AbyssOS/Agents-of-Abyss/evals:/srv/AbyssOS/Tree-of-Sophia/evals:/srv/AbyssOS/aoa-agents/evals:/srv/AbyssOS/aoa-kag/evals:/srv/AbyssOS/aoa-memo/evals:/srv/AbyssOS/aoa-playbooks/evals:/srv/AbyssOS/aoa-routing/evals:/srv/AbyssOS/aoa-sdk/evals:/srv/AbyssOS/aoa-skills/evals:/srv/AbyssOS/aoa-stats/evals:/srv/AbyssOS/aoa-techniques/evals:/srv/AbyssOS/connectors/aoa-4pda-connector/evals:/srv/AbyssOS/connectors/aoa-course-connector/evals:/srv/AbyssOS/connectors/aoa-discord-connector/evals:/srv/AbyssOS/connectors/aoa-stackoverflow-connector/evals:/srv/AbyssOS/connectors/aoa-telegram-connector/evals:/srv/AbyssOS/connectors/aoa-xda-connector/evals"
+Environment="AOA_EVALS_MCP_CANDIDATE_ROOTS=/srv/AbyssOS/8Dionysus/evals:/srv/AbyssOS/Agents-of-Abyss/evals:/srv/AbyssOS/Tree-of-Sophia/evals:/srv/AbyssOS/aoa-agents/evals:/srv/AbyssOS/aoa-kag/evals:/srv/AbyssOS/aoa-memo/evals:/srv/AbyssOS/aoa-playbooks/evals:/srv/AbyssOS/aoa-sdk/evals:/srv/AbyssOS/aoa-skills/evals:/srv/AbyssOS/aoa-stats/evals:/srv/AbyssOS/aoa-techniques/evals:/srv/AbyssOS/connectors/aoa-4pda-connector/evals:/srv/AbyssOS/connectors/aoa-course-connector/evals:/srv/AbyssOS/connectors/aoa-discord-connector/evals:/srv/AbyssOS/connectors/aoa-stackoverflow-connector/evals:/srv/AbyssOS/connectors/aoa-telegram-connector/evals:/srv/AbyssOS/connectors/aoa-xda-connector/evals"
 Environment=PYTHONDONTWRITEBYTECODE=1
 LoadCredential=aoa-evals-mcp-candidate-bearer-token:/srv/AbyssOS/abyss-stack/Secrets/Configs/aoa-evals-mcp-candidate-bearer-token
 ExecStart=/usr/bin/env python3 /srv/AbyssOS/.codex/bin/aoa-evals-mcp-server.py
@@ -54,10 +54,6 @@ ReadWritePaths=-/srv/AbyssOS/aoa-playbooks/evals/intake
 ReadWritePaths=-/srv/AbyssOS/aoa-playbooks/evals/suites
 ReadWritePaths=-/srv/AbyssOS/aoa-playbooks/evals/reports
 ReadWritePaths=-/srv/AbyssOS/aoa-playbooks/evals/PORT.yaml
-ReadWritePaths=-/srv/AbyssOS/aoa-routing/evals/intake
-ReadWritePaths=-/srv/AbyssOS/aoa-routing/evals/suites
-ReadWritePaths=-/srv/AbyssOS/aoa-routing/evals/reports
-ReadWritePaths=-/srv/AbyssOS/aoa-routing/evals/PORT.yaml
 ReadWritePaths=-/srv/AbyssOS/aoa-sdk/evals/intake
 ReadWritePaths=-/srv/AbyssOS/aoa-sdk/evals/suites
 ReadWritePaths=-/srv/AbyssOS/aoa-sdk/evals/reports

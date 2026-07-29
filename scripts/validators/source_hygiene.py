@@ -10,6 +10,7 @@ TextFileIterator = Callable[[], list[Path]]
 GitFileIterator = Callable[[], list[str]]
 
 BINARY_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".zip", ".pyc"}
+AUTHORED_TEXT_SCAN_EXCLUDED_PARTS = {".git", ".deps"}
 REPO_SELF_INDEX_SCHEMA_VERSIONS = {
     "aoa-repo-local-kag-index-v2",
     "aoa-repo-local-kag-repository-index-v2",
@@ -20,6 +21,7 @@ SOURCE_HYGIENE_VALIDATOR_PATH = Path("scripts") / "validators" / "source_hygiene
 GIT_MIRROR_RUNTIME_TOP_LEVEL_DIRS = {"Secrets", "Logs", "Models"}
 GIT_MIRROR_CACHE_PARTS = {
     "__pycache__",
+    ".deps",
     ".pytest_cache",
     ".mypy_cache",
     ".ruff_cache",
@@ -109,7 +111,7 @@ def iter_text_files(root: Path, *, binary_suffixes: Set[str]) -> list[Path]:
     for path in root.rglob("*"):
         if not path.is_file():
             continue
-        if ".git" in path.parts:
+        if AUTHORED_TEXT_SCAN_EXCLUDED_PARTS.intersection(path.parts):
             continue
         if path.suffix.lower() in binary_suffixes:
             continue

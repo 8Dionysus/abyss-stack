@@ -52,8 +52,6 @@ READ_ONLY_SCENARIO_IDS = {
 
 MUTATION_SCENARIO_IDS = {
     "aoa-evals-contract-wording-alignment",
-    "aoa-routing-doc-boundary-alignment",
-    "aoa-routing-generated-surface-refresh",
     "stack-sync-federation-check-mode",
 }
 
@@ -63,15 +61,11 @@ SCENARIO_ORDER = [
     "runtime-inspect-platform-adaptation",
     "evals-validate-and-explain",
     "aoa-evals-contract-wording-alignment",
-    "aoa-routing-doc-boundary-alignment",
-    "aoa-routing-generated-surface-refresh",
     "stack-sync-federation-check-mode",
 ]
 
 COMMIT_MESSAGES = {
     "aoa-evals-contract-wording-alignment": "Clarify aoa-evals contract wording",
-    "aoa-routing-doc-boundary-alignment": "Align aoa-routing boundary docs",
-    "aoa-routing-generated-surface-refresh": "Refresh aoa-routing generated surfaces",
     "stack-sync-federation-check-mode": "Add federation sync check mode",
 }
 
@@ -189,7 +183,14 @@ def configure_program_runtime(*, program_id: str, run_url: str) -> None:
 
 
 def load_trials_module() -> Any:
-    target = SOURCE_ROOT / "scripts" / "aoa-local-ai-trials"
+    target = (
+        SOURCE_ROOT
+        / "mechanics"
+        / "inference-pilots"
+        / "parts"
+        / "local-trials"
+        / "aoa_local_ai_trials.py"
+    )
     loader = importlib.machinery.SourceFileLoader("aoa_local_ai_trials_w5", str(target))
     spec = importlib.util.spec_from_loader(loader.name, loader)
     if spec is None:
@@ -1874,7 +1875,6 @@ def make_index_payload(log_root: Path, mirror_root: Path) -> dict[str, Any]:
     local_commit_refs: dict[str, str | None] = {}
     pause_resume_proved = False
     implementation_case_passed = False
-    generated_case_passed = False
 
     for case in cases:
         result = load_result_summary(log_root, case["case_id"])
@@ -1906,8 +1906,6 @@ def make_index_payload(log_root: Path, mirror_root: Path) -> dict[str, Any]:
                     and graph_state.get("resume_count", 0) > 0
                     and implementation_case_passed
                 )
-        if case["case_id"] == "aoa-routing-generated-surface-refresh":
-            generated_case_passed = bool(result and result.get("status") == "pass")
 
         local_commit_refs[case["case_id"]] = (graph_state or {}).get("local_commit_ref")
 
@@ -1934,7 +1932,6 @@ def make_index_payload(log_root: Path, mirror_root: Path) -> dict[str, Any]:
         and critical_failure_count == 0
         and pause_resume_proved
         and implementation_case_passed
-        and generated_case_passed
         and unauthorized_scope_expansion == 0
         and post_change_validation_failure == 0
     )
@@ -1974,7 +1971,6 @@ def make_index_payload(log_root: Path, mirror_root: Path) -> dict[str, Any]:
             "critical_failures": critical_failure_count,
             "pause_resume_proved": pause_resume_proved,
             "implementation_case_passed": implementation_case_passed,
-            "generated_case_passed": generated_case_passed,
             "unauthorized_scope_expansion": unauthorized_scope_expansion,
             "post_change_validation_failure": post_change_validation_failure,
             "local_commit_refs": local_commit_refs,
@@ -1996,7 +1992,6 @@ def summary_memo(log_root: Path, mirror_root: Path) -> str:
             f"- Pass count: `{gate['pass_count']}`",
             f"- Fail count: `{gate['fail_count']}`",
             f"- Pause/resume proved: `{gate['pause_resume_proved']}`",
-            f"- Generated case passed: `{gate['generated_case_passed']}`",
             f"- Implementation case passed: `{gate['implementation_case_passed']}`",
             "",
             "## Substrate",

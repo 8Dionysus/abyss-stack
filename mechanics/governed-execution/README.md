@@ -3,12 +3,14 @@
 ## Mechanic card
 
 Governed execution is the mechanic for bounded local-worker runs that can use
-runtime tools while preserving review, gates, return policy, and owner handoff.
+runtime tools while preserving review, gates, return policy, Agent OS
+lifecycle bindings, and owner handoff.
 
 ### Trigger
 
-Use this package when changing `aoa-governed-run`, autonomy status, return
-policy, candidate export, review packets, or local-worker execution records.
+Use this package when changing `aoa-governed-run`, the `aoa-sdk` Agent OS
+runtime adapter, autonomy status, return policy, candidate export, review
+packets, or local-worker execution records.
 
 ### abyss-stack owns
 
@@ -17,6 +19,8 @@ policy, candidate export, review packets, or local-worker execution records.
 - return policy config shape
 - candidate export plumbing
 - runtime evidence refs for local-worker activity
+- explicit Agent OS runtime admission, durable runtime state, and execution
+  receipts
 
 ### Stronger owner split
 
@@ -56,7 +60,9 @@ Use [diagnostic-spine](../diagnostic-spine/README.md) for truth-goal status,
 
 Current source surfaces stay in `mechanics/governed-execution/parts/governed-runner/docs/GOVERNED_EXECUTION.md`,
 `mechanics/governed-execution/parts/governed-runner/aoa_governed_run.py`,
-`mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py`, `mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py`,
+`mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py`,
+`mechanics/governed-execution/parts/agent-os-adapter/`,
+`mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py`,
 `scripts/aoa-governed-run`, `scripts/aoa-status`, candidate export wrappers,
 config templates, and
 package-local parts under `mechanics/governed-execution/parts/`.
