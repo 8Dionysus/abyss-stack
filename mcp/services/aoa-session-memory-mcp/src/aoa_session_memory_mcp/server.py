@@ -4,7 +4,6 @@ import json
 import logging
 import os
 import importlib
-from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 from typing import Any, Literal
 
@@ -15,7 +14,7 @@ from ._http_auth import transport_settings as _transport_settings
 
 LOGGER = logging.getLogger(__name__)
 PACKAGE_NAME = "aoa-session-memory-mcp"
-SOURCE_FALLBACK_VERSION = "0.2.0"
+APPLICATION_VERSION = "0.2.0"
 DEFAULT_HTTP_PORT = 5422
 READ_TOKEN_ENV_VAR = "AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN"
 READ_CREDENTIAL_NAME = "aoa-session-memory-mcp-read-bearer-token"
@@ -24,15 +23,7 @@ READ_CLIENT_ID = "aoa-loopback-codex:aoa-session-memory:read"
 
 
 def _application_version() -> str:
-    try:
-        discovered = distribution(PACKAGE_NAME).metadata.get("Version")
-    except PackageNotFoundError:
-        return SOURCE_FALLBACK_VERSION
-    return (
-        discovered.strip()
-        if isinstance(discovered, str) and discovered.strip()
-        else SOURCE_FALLBACK_VERSION
-    )
+    return APPLICATION_VERSION
 
 
 def _bind_server_info_version(mcp: Any) -> None:

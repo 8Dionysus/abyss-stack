@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +12,7 @@ from .core import AbyssMachineMCPState, CommandRunner
 
 LOGGER = logging.getLogger(__name__)
 PACKAGE_NAME = "abyss-machine-mcp"
-SOURCE_FALLBACK_VERSION = "0.2.0"
+APPLICATION_VERSION = "0.2.0"
 DEFAULT_HTTP_PORT = 5423
 READ_AUTH = {
     "token_env_var": "ABYSS_MACHINE_MCP_READ_BEARER_TOKEN",
@@ -24,15 +23,7 @@ READ_AUTH = {
 
 
 def _application_version() -> str:
-    try:
-        discovered = distribution(PACKAGE_NAME).metadata.get("Version")
-    except PackageNotFoundError:
-        return SOURCE_FALLBACK_VERSION
-    return (
-        discovered.strip()
-        if isinstance(discovered, str) and discovered.strip()
-        else SOURCE_FALLBACK_VERSION
-    )
+    return APPLICATION_VERSION
 
 
 def _bind_server_info_version(mcp: Any) -> None:

@@ -423,6 +423,23 @@
       "status": "active"
     },
     {
+      "family": "mcp-application-identity-validator-module",
+      "paths": [
+        "scripts/validators/mcp_application_identity.py"
+      ],
+      "protects": "MCP serverInfo application identity parity with each executed source package and immunity to stale ambient distribution metadata",
+      "owner_surface": "mcp/services/",
+      "layer": "mcp/application-identity",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_mcp_application_identity_validator_module.py"
+      ],
+      "failure_route": "Fix the service-local APPLICATION_VERSION, pyproject version, direct identity binding, or ambient metadata dependency.",
+      "status": "active"
+    },
+    {
       "family": "agent-route-validator",
       "paths": [
         "scripts/validate_nested_agents.py"

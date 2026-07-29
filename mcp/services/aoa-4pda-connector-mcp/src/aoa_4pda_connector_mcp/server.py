@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +12,7 @@ from .core import AoA4PDAConnectorMCPState
 
 LOGGER = logging.getLogger(__name__)
 PACKAGE_NAME = "aoa-4pda-connector-mcp"
-SOURCE_FALLBACK_VERSION = "0.2.0"
+APPLICATION_VERSION = "0.2.0"
 DEFAULT_HTTP_PORT = 5426
 READ_TOKEN_ENV = "AOA_4PDA_CONNECTOR_MCP_READ_BEARER_TOKEN"
 READ_CREDENTIAL = "aoa-4pda-connector-mcp-read-bearer-token"
@@ -22,15 +21,7 @@ READ_CLIENT_ID = "aoa-loopback-codex:aoa-4pda-connector:read"
 
 
 def _application_version() -> str:
-    try:
-        discovered = distribution(PACKAGE_NAME).metadata.get("Version")
-    except PackageNotFoundError:
-        return SOURCE_FALLBACK_VERSION
-    return (
-        discovered.strip()
-        if isinstance(discovered, str) and discovered.strip()
-        else SOURCE_FALLBACK_VERSION
-    )
+    return APPLICATION_VERSION
 
 
 def _bind_server_info_version(mcp: Any) -> None:

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +12,7 @@ from .core import ToSCorpusMCPState
 
 LOGGER = logging.getLogger(__name__)
 PACKAGE_NAME = "tos-corpus-mcp"
-SOURCE_FALLBACK_VERSION = "0.2.0"
+APPLICATION_VERSION = "0.2.0"
 DEFAULT_HTTP_PORT = 5429
 READ_TOKEN_ENV_VAR = "TOS_CORPUS_MCP_READ_BEARER_TOKEN"
 READ_CREDENTIAL_NAME = "tos-corpus-mcp-read-bearer-token"
@@ -22,15 +21,7 @@ READ_CLIENT_ID = "aoa-loopback-codex:tos-corpus:read"
 
 
 def _application_version() -> str:
-    try:
-        discovered = distribution(PACKAGE_NAME).metadata.get("Version")
-    except PackageNotFoundError:
-        return SOURCE_FALLBACK_VERSION
-    return (
-        discovered.strip()
-        if isinstance(discovered, str) and discovered.strip()
-        else SOURCE_FALLBACK_VERSION
-    )
+    return APPLICATION_VERSION
 
 
 def _bind_server_info_version(mcp: Any) -> None:

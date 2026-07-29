@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from importlib.metadata import PackageNotFoundError, distribution
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -15,7 +14,7 @@ from aoa_discord_connector_mcp.core import AoADiscordConnectorMCPState
 
 LOGGER = logging.getLogger(__name__)
 PACKAGE_NAME = "aoa-discord-connector-mcp"
-SOURCE_FALLBACK_VERSION = "0.2.0"
+APPLICATION_VERSION = "0.2.0"
 DEFAULT_HTTP_PORT = 5428
 READ_TOKEN_ENV = "AOA_DISCORD_CONNECTOR_MCP_READ_BEARER_TOKEN"
 READ_CREDENTIAL = "aoa-discord-connector-mcp-read-bearer-token"
@@ -24,15 +23,7 @@ READ_CLIENT_ID = "aoa-loopback-codex:aoa-discord-connector:read"
 
 
 def _application_version() -> str:
-    try:
-        discovered = distribution(PACKAGE_NAME).metadata.get("Version")
-    except PackageNotFoundError:
-        return SOURCE_FALLBACK_VERSION
-    return (
-        discovered.strip()
-        if isinstance(discovered, str) and discovered.strip()
-        else SOURCE_FALLBACK_VERSION
-    )
+    return APPLICATION_VERSION
 
 
 def _bind_server_info_version(mcp: Any) -> None:

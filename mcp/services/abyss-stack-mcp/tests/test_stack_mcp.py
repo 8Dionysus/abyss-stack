@@ -32,7 +32,7 @@ from abyss_stack_mcp.core import (
     StackMCPError,
 )
 from abyss_stack_mcp.server import (
-    SOURCE_FALLBACK_VERSION,
+    APPLICATION_VERSION,
     _auth_kwargs,
     _configured_audit_journal,
     _contour,
@@ -3184,7 +3184,7 @@ def test_server_info_fallback_version_matches_package_metadata() -> None:
         (package_root / "pyproject.toml").read_text(encoding="utf-8")
     )
 
-    assert project["project"]["version"] == SOURCE_FALLBACK_VERSION
+    assert project["project"]["version"] == APPLICATION_VERSION
 
 
 @pytest.mark.parametrize("view", ("proof", "acceptance"))

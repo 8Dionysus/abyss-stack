@@ -24,6 +24,7 @@ try:
         inference_pilot_compatibility,
         machine_fit,
         mechanics_topology,
+        mcp_application_identity,
         profile_topology,
         questbook_surface,
         return_policy,
@@ -47,6 +48,7 @@ except ImportError:  # pragma: no cover - direct script execution fallback
     from validators import inference_pilot_compatibility  # type: ignore
     from validators import machine_fit  # type: ignore
     from validators import mechanics_topology  # type: ignore
+    from validators import mcp_application_identity  # type: ignore
     from validators import profile_topology  # type: ignore
     from validators import questbook_surface  # type: ignore
     from validators import return_policy  # type: ignore
@@ -144,6 +146,7 @@ def _is_executable_source_path(path: Path) -> bool:
 
 
 def _run_source_validators(errors: list[str]) -> None:
+    mcp_application_identity.validate(errors, root=ROOT)
     profile_topology.validate_profiles(errors, root=ROOT)
     profile_topology.validate_presets(errors, root=ROOT)
     source_hygiene.validate_git_mirror_hygiene(
