@@ -60,7 +60,19 @@ DEFAULT_OUTPUT_PATH = Path(
 DEFAULT_OVERLAY_PATH = Path(
     "/srv/AbyssOS/abyss-stack/Logs/mcp/observations/evidence-overlay.json"
 )
-DEFAULT_TARGETS_PATH = Path(__file__).with_name("runtime-targets.v1.json")
+def _packaged_targets_path(module_path: Path) -> Path:
+    """Bind the packaged catalog to the physical installed package directory.
+
+    Python virtual environments commonly expose ``site-packages`` through a
+    ``lib64 -> lib`` compatibility symlink.  Resolve only the trusted module
+    location used to derive the built-in default; explicit operator-supplied
+    paths still pass through the fail-closed component checks unchanged.
+    """
+
+    return module_path.resolve(strict=True).with_name("runtime-targets.v1.json")
+
+
+DEFAULT_TARGETS_PATH = _packaged_targets_path(Path(__file__))
 MAX_INPUT_BYTES = 2 * 1024 * 1024
 MAX_OVERLAY_FUTURE_SKEW = timedelta(seconds=30)
 UNKNOWN_DIGEST = "sha256:" + ("0" * 64)

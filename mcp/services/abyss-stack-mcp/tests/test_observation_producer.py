@@ -13,6 +13,8 @@ from abyss_stack_mcp.core import ObservationStore
 from abyss_stack_mcp.observation import (
     ObservationProducerError,
     RuntimeTargetCatalog,
+    _load_targets,
+    _packaged_targets_path,
     produce_observation,
 )
 
@@ -42,6 +44,32 @@ def write_json(path: Path, value: object, *, mode: int = 0o640) -> Path:
     )
     path.chmod(mode)
     return path
+
+
+def test_packaged_target_catalog_uses_physical_venv_path(tmp_path: Path) -> None:
+    package = tmp_path / "lib" / "python3.14" / "site-packages" / "abyss_stack_mcp"
+    module = package / "observation.py"
+    module.parent.mkdir(parents=True)
+    module.write_text("# installed module\n", encoding="utf-8")
+    catalog = write_json(package / "runtime-targets.v1.json", target_catalog())
+    (tmp_path / "lib64").symlink_to("lib", target_is_directory=True)
+
+    derived = _packaged_targets_path(
+        tmp_path
+        / "lib64"
+        / "python3.14"
+        / "site-packages"
+        / "abyss_stack_mcp"
+        / "observation.py"
+    )
+
+    assert derived == catalog
+    assert not any(
+        component.is_symlink()
+        for component in tuple(reversed(derived.parents)) + (derived,)
+    )
+    loaded, _ = _load_targets(derived)
+    assert loaded.targets[0].organ_id == "aoa-kag"
 
 
 def target_catalog() -> dict:
