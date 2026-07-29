@@ -195,4 +195,6 @@ def test_read_resources_and_server_build(tmp_path: Path) -> None:
     state = _state(tmp_path)
     assert state.read_resource("aoa-telegram://source-route")["service_name"] == "aoa-telegram-connector-mcp"
     assert state.read_resource("aoa-telegram://status")["status"] == "ok"
-    assert build_server(state) is not None
+    server = build_server(state)
+    assert server is not None
+    assert server._mcp_server.version == "0.2.0"

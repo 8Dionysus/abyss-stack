@@ -333,7 +333,9 @@ def test_resources_and_server_build(tmp_path: Path) -> None:
 
     assert json.loads(state.render_resource("tos-corpus://status"))["counts"]["nodes"] == 1
     assert state.read_resource("tos-corpus://graph-view/corpus-topology")["item_count"] == 1
-    assert build_server(tos_root=tmp_path) is not None
+    server = build_server(tos_root=tmp_path)
+    assert server is not None
+    assert server._mcp_server.version == "0.2.0"
 
 
 def test_published_tools_advertise_closed_world_read_only_contract(

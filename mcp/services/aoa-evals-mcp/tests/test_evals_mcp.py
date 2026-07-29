@@ -2012,6 +2012,8 @@ def test_server_contours_have_disjoint_annotated_tool_catalogs(
         workspace_root=tmp_path,
         policy_family="candidate",
     )
+    assert read_server._mcp_server.version == "0.2.0"
+    assert candidate_server._mcp_server.version == "0.2.0"
 
     async def inspect(server):
         return (

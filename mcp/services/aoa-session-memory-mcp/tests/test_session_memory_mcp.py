@@ -5229,6 +5229,46 @@ def test_entity_dossier_composes_first_route_packet(tmp_path: Path) -> None:
     assert "graph-neighborhood" not in commands
 
 
+def test_entity_dossier_evidence_collection_prioritizes_refs_over_large_quality_metadata() -> None:
+    from aoa_session_memory_mcp import core as core_module
+
+    audit = core_module._compact_entity_usage_audit_payload(
+        {
+            "schema_version": 1,
+            "artifact_type": "session_memory_entity_usage_audit",
+            "ok": True,
+            "quality": {
+                "large_nested_diagnostics": [
+                    {"index": index, "detail": {"status": "stale"}}
+                    for index in range(700)
+                ]
+            },
+            "usage_events": [
+                {
+                    "event_id": "000007",
+                    "refs": {
+                        "raw": "raw:line:7",
+                        "segment": "segments/000.md#event-000007",
+                    },
+                }
+            ],
+            "document_refs": [
+                {
+                    "kind": "raw_line",
+                    "value": "raw:line:8",
+                }
+            ],
+        },
+        full_route="python3 scripts/aoa_session_memory.py entity-usage-audit aoa-session-memory-mcp --full",
+    )
+
+    evidence = core_module._collect_evidence_refs([("entity_usage_audit", audit)])
+
+    assert evidence["raw_or_segment_ref_present"] is True
+    assert any(ref.get("raw") == "raw:line:7" for ref in evidence["refs"])
+    assert any(ref.get("raw") == "raw:line:8" for ref in evidence["refs"])
+
+
 def test_entity_dossier_keeps_usage_neighborhood_fallback_expansion_command(tmp_path: Path) -> None:
     class TimeoutUsageNeighborhoodRunner(FakeRunner):
         def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
@@ -7048,7 +7088,13 @@ def test_read_resource_and_server_build(tmp_path: Path) -> None:
     assert resource["match_count"] == 1
     assert graph_resource["artifact_type"] == "session_memory_graph_neighborhood"
     assert projection_resource["schema"] == "aoa_session_memory_projection_status_v1"
-    assert build_server(workspace_root=tmp_path, aoa_root=tmp_path / ".aoa", script_path=tmp_path / ".aoa/scripts/aoa_session_memory.py") is not None
+    server = build_server(
+        workspace_root=tmp_path,
+        aoa_root=tmp_path / ".aoa",
+        script_path=tmp_path / ".aoa/scripts/aoa_session_memory.py",
+    )
+    assert server is not None
+    assert server._mcp_server.version == "0.2.0"
 
 
 def test_server_auto_reloads_stale_core_implementation(monkeypatch: Any) -> None:

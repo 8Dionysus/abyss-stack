@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from importlib.metadata import PackageNotFoundError, distribution
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -13,11 +14,34 @@ from ._http_auth import http_auth_kwargs, transport_settings
 from .core import AoACourseConnectorMCPState
 
 LOGGER = logging.getLogger(__name__)
+PACKAGE_NAME = "aoa-course-connector-mcp"
+SOURCE_FALLBACK_VERSION = "0.1.0"
 DEFAULT_HTTP_PORT = 5436
 READ_TOKEN_ENV = "AOA_COURSE_CONNECTOR_MCP_READ_BEARER_TOKEN"
 READ_CREDENTIAL = "aoa-course-connector-mcp-read-bearer-token"
 READ_SCOPE = "mcp:aoa-course-connector:read"
 READ_CLIENT_ID = "aoa-loopback-codex:aoa-course-connector:read"
+
+
+def _application_version() -> str:
+    try:
+        discovered = distribution(PACKAGE_NAME).metadata.get("Version")
+    except PackageNotFoundError:
+        return SOURCE_FALLBACK_VERSION
+    return (
+        discovered.strip()
+        if isinstance(discovered, str) and discovered.strip()
+        else SOURCE_FALLBACK_VERSION
+    )
+
+
+def _bind_server_info_version(mcp: Any) -> None:
+    low_level_server = getattr(mcp, "_mcp_server", None)
+    if low_level_server is None or not hasattr(low_level_server, "version"):
+        raise RuntimeError(
+            "the pinned MCP SDK no longer exposes the server identity seam"
+        )
+    low_level_server.version = _application_version()
 
 
 def _read_http_auth_kwargs() -> dict[str, Any]:
@@ -39,6 +63,7 @@ def build_server(
         json_response=True,
         **_read_http_auth_kwargs(),
     )
+    _bind_server_info_version(mcp)
     read_tool = mcp.tool(
         annotations=ToolAnnotations(
             readOnlyHint=True,

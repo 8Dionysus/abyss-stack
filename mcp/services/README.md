@@ -28,6 +28,9 @@ route card, and validation path.
 Every package keeps stdio as its portable default. A host may explicitly set
 `AOA_MCP_TRANSPORT=streamable-http` to run one owner process, but the server
 rejects any `AOA_MCP_HOST` outside `127.0.0.1`, `localhost`, or `::1`.
+Every standalone package also binds `serverInfo.version` to its own
+application package version. The MCP SDK version is dependency evidence, not
+the deployed service identity used by canary and provenance checks.
 The legacy template still accepts `AOA_MCP_HTTP_BEARER_TOKEN` and
 `aoa-mcp-http-bearer-token` only as compatibility transport. Current organ
 read contours use exact owner-and-policy token variables, credential names,

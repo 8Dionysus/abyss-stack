@@ -783,7 +783,9 @@ def test_session_rehydrate_missing_archive_target_is_not_found(tmp_path: Path) -
 
 def test_server_builds(tmp_path: Path) -> None:
     seed_workspace(tmp_path)
-    assert build_server(tmp_path) is not None
+    server = build_server(tmp_path)
+    assert server is not None
+    assert server._mcp_server.version == "0.2.0"
 
 
 def test_pilot_port_topology(tmp_path: Path, monkeypatch) -> None:

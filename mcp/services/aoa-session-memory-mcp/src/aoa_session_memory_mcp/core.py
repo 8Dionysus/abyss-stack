@@ -2563,6 +2563,22 @@ def _direct_ref_bundle(item: dict[str, Any]) -> dict[str, Any]:
     refs = _compact_usage_refs(item.get("refs"))
     if refs:
         bundle.update(refs)
+    document_ref_targets = {
+        "raw_line": "raw",
+        "raw_block": "raw",
+        "segment_markdown": "segment",
+        "segment_index": "segment",
+        "session_manifest": "session",
+    }
+    document_ref_target = document_ref_targets.get(str(item.get("kind") or ""))
+    document_ref_value = item.get("value")
+    if (
+        document_ref_target
+        and isinstance(document_ref_value, str)
+        and document_ref_value
+        and document_ref_target not in bundle
+    ):
+        bundle[document_ref_target] = document_ref_value
     aliases = (
         ("raw", "raw_ref"),
         ("raw", "raw"),
@@ -2587,7 +2603,20 @@ def _direct_ref_bundle(item: dict[str, Any]) -> dict[str, Any]:
 def _collect_evidence_refs(payloads: list[tuple[str, Any]], *, limit: int = ENTITY_DOSSIER_EVIDENCE_REF_LIMIT) -> dict[str, Any]:
     refs: list[dict[str, Any]] = []
     seen: set[str] = set()
-    visited = 0
+    evidence_first_keys = (
+        "refs",
+        "first_ref",
+        "document_refs",
+        "evidence_refs",
+        "usage_events",
+        "entrypoint_events",
+        "result_events",
+        "outcome_events",
+        "consequence_events",
+        "neighborhoods",
+        "source_usage_event",
+        "local_events",
+    )
 
     def add_ref(source_packet: str, bundle: dict[str, Any]) -> None:
         if len(refs) >= limit:
@@ -2602,21 +2631,28 @@ def _collect_evidence_refs(payloads: list[tuple[str, Any]], *, limit: int = ENTI
         seen.add(key)
         refs.append({"source_packet": source_packet, **bundle})
 
-    def walk(source_packet: str, value: Any) -> None:
-        nonlocal visited
-        if len(refs) >= limit or visited > 600:
-            return
-        visited += 1
-        if isinstance(value, dict):
-            add_ref(source_packet, _direct_ref_bundle(value))
-            for child in value.values():
-                walk(source_packet, child)
-        elif isinstance(value, list):
-            for child in value:
-                walk(source_packet, child)
-
     for source_packet, payload in payloads:
-        walk(source_packet, payload)
+        queue: deque[Any] = deque([payload])
+        visited = 0
+        while queue and len(refs) < limit and visited < 600:
+            value = queue.popleft()
+            visited += 1
+            if isinstance(value, dict):
+                add_ref(source_packet, _direct_ref_bundle(value))
+                prioritized = [
+                    value[key]
+                    for key in evidence_first_keys
+                    if key in value
+                ]
+                remaining = [
+                    child
+                    for key, child in value.items()
+                    if key not in evidence_first_keys
+                ]
+                queue.extendleft(reversed(remaining))
+                queue.extendleft(reversed(prioritized))
+            elif isinstance(value, list):
+                queue.extendleft(reversed(value))
     return {
         "refs": refs,
         "ref_count": len(refs),

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,8 @@ from .core import AbyssMachineMCPState, CommandRunner
 
 
 LOGGER = logging.getLogger(__name__)
+PACKAGE_NAME = "abyss-machine-mcp"
+SOURCE_FALLBACK_VERSION = "0.2.0"
 DEFAULT_HTTP_PORT = 5423
 READ_AUTH = {
     "token_env_var": "ABYSS_MACHINE_MCP_READ_BEARER_TOKEN",
@@ -18,6 +21,27 @@ READ_AUTH = {
     "auth_scope": "mcp:abyss-machine:read",
     "client_id": "aoa-loopback-codex:abyss-machine:read",
 }
+
+
+def _application_version() -> str:
+    try:
+        discovered = distribution(PACKAGE_NAME).metadata.get("Version")
+    except PackageNotFoundError:
+        return SOURCE_FALLBACK_VERSION
+    return (
+        discovered.strip()
+        if isinstance(discovered, str) and discovered.strip()
+        else SOURCE_FALLBACK_VERSION
+    )
+
+
+def _bind_server_info_version(mcp: Any) -> None:
+    low_level_server = getattr(mcp, "_mcp_server", None)
+    if low_level_server is None or not hasattr(low_level_server, "version"):
+        raise RuntimeError(
+            "the pinned MCP SDK no longer exposes the server identity seam"
+        )
+    low_level_server.version = _application_version()
 
 
 def _read_http_auth_kwargs() -> dict[str, Any]:
@@ -53,6 +77,7 @@ def build_server(
         json_response=True,
         **_read_http_auth_kwargs(),
     )
+    _bind_server_info_version(mcp)
 
     def current_state() -> AbyssMachineMCPState:
         return AbyssMachineMCPState.discover(

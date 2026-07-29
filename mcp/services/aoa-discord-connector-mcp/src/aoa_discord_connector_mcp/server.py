@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from importlib.metadata import PackageNotFoundError, distribution
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -13,11 +14,34 @@ from aoa_discord_connector_mcp._http_auth import transport_settings as _transpor
 from aoa_discord_connector_mcp.core import AoADiscordConnectorMCPState
 
 LOGGER = logging.getLogger(__name__)
+PACKAGE_NAME = "aoa-discord-connector-mcp"
+SOURCE_FALLBACK_VERSION = "0.2.0"
 DEFAULT_HTTP_PORT = 5428
 READ_TOKEN_ENV = "AOA_DISCORD_CONNECTOR_MCP_READ_BEARER_TOKEN"
 READ_CREDENTIAL = "aoa-discord-connector-mcp-read-bearer-token"
 READ_SCOPE = "mcp:aoa-discord-connector:read"
 READ_CLIENT_ID = "aoa-loopback-codex:aoa-discord-connector:read"
+
+
+def _application_version() -> str:
+    try:
+        discovered = distribution(PACKAGE_NAME).metadata.get("Version")
+    except PackageNotFoundError:
+        return SOURCE_FALLBACK_VERSION
+    return (
+        discovered.strip()
+        if isinstance(discovered, str) and discovered.strip()
+        else SOURCE_FALLBACK_VERSION
+    )
+
+
+def _bind_server_info_version(mcp: Any) -> None:
+    low_level_server = getattr(mcp, "_mcp_server", None)
+    if low_level_server is None or not hasattr(low_level_server, "version"):
+        raise RuntimeError(
+            "the pinned MCP SDK no longer exposes the server identity seam"
+        )
+    low_level_server.version = _application_version()
 
 
 def _read_http_auth_kwargs() -> dict[str, Any]:
@@ -50,6 +74,7 @@ def build_server(state: AoADiscordConnectorMCPState | None = None) -> FastMCP:
         json_response=True,
         **_read_http_auth_kwargs(),
     )
+    _bind_server_info_version(mcp)
     read_only_tool = mcp.tool(
         annotations=ToolAnnotations(
             readOnlyHint=True,
