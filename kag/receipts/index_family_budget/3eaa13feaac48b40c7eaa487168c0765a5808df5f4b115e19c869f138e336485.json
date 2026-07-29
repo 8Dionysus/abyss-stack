@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 22602622,
+  "allowed_tracked_bytes": 28097346,
+  "approved_by": "repository-owner",
+  "base_ref": "f1851bf07d6025ff8da21afe33c5ed79b37451fe",
+  "changed_generated_bytes": 22602622,
+  "changed_generated_files": 330,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "3eaa13feaac48b40c7eaa487168c0765a5808df5f4b115e19c869f138e336485",
+  "reason": "Managed organ-access runtime, observation producer, orchestration host, protocol lab, and lifecycle integration",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 28097346,
+  "tracked_bytes_max": 24117248
+}
