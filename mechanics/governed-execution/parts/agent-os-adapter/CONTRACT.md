@@ -89,7 +89,7 @@ approve(plan_freeze)
   -> paused + approval request(landing)
 
 approve(landing)
-  -> remains paused
+  -> remains paused and returns the post-decision event cursor
 
 resume
   -> governed landing + validation + rollback discipline
@@ -135,9 +135,12 @@ event slice and are persisted with runtime state.
 
 The bridge may emit a runtime evidence bundle containing governed-run or
 lane-local artifacts. Scenario inputs cross the chain as original-owner refs;
-the bridge does not re-sign them. It never turns a review-packet or proof
-candidate into an eval verdict, memory receipt, checkpoint acceptance, or
-final closeout receipt.
+the bridge does not re-sign them. A requirement is listed as satisfied only
+when its lane artifact exists; governed mutation requirements additionally
+require a completed passing run and the exact approval, source-map, change-set,
+verification, and summary files. A failed governed run claims no later-phase
+coverage. The bridge never turns a review-packet or proof candidate into an
+eval verdict, memory receipt, checkpoint acceptance, or final closeout receipt.
 
 For C5 closeout, the SDK must first validate a complete immutable
 `EvidenceChain`. Only its exact `CloseoutBundleRef` crosses this transport

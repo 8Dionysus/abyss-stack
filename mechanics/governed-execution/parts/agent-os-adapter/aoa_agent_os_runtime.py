@@ -1833,7 +1833,7 @@ class AgentOSRuntimeBridge:
                 )
             return RunStatus.model_validate(state["status"])
         if milestone == "landing":
-            return status
+            return RunStatus.model_validate(state["status"])
         self._transition(
             state,
             profile,
@@ -2161,14 +2161,6 @@ class AgentOSRuntimeBridge:
         session: SessionHandle,
         governed_summary: dict[str, Any],
     ) -> EvidenceBundleRef:
-        requirement_ids = [
-            item.requirement_id
-            for item in plan.evidence_requirements
-            if (
-                item.producer_owner == "abyss-stack"
-                and item.artifact_binding == "step_output"
-            )
-        ]
         artifacts = list(state["runtime_artifact_refs"])
         governed_run_id = state.get("governed_run_id")
         if isinstance(governed_run_id, str) and governed_run_id:
@@ -2183,6 +2175,12 @@ class AgentOSRuntimeBridge:
                                 "digest": sha256_file(path),
                             }
                         )
+        requirement_ids = self._satisfied_runtime_requirement_ids(
+            state,
+            plan,
+            governed_summary,
+            artifacts,
+        )
         payload = {
             "schema_version": "abyss_stack_agent_os_evidence_bundle_v1",
             "session_id": session.session_id,
@@ -2216,6 +2214,86 @@ class AgentOSRuntimeBridge:
                 schema_version="abyss_stack_agent_os_evidence_bundle_v1",
             ),
             satisfies_requirement_ids=tuple(requirement_ids),
+        )
+
+    @staticmethod
+    def _satisfied_runtime_requirement_ids(
+        state: dict[str, Any],
+        plan: RunPlan,
+        governed_summary: dict[str, Any],
+        artifacts: list[dict[str, Any]],
+    ) -> tuple[str, ...]:
+        requirements = [
+            item
+            for item in plan.evidence_requirements
+            if (
+                item.producer_owner == "abyss-stack"
+                and item.artifact_binding == "step_output"
+            )
+        ]
+        if state.get("execution_lane") != "governed_repository_change":
+            produced_kinds = {
+                str(item["artifact_kind"])
+                for item in artifacts
+                if isinstance(item.get("artifact_kind"), str)
+            }
+            return tuple(
+                item.requirement_id
+                for item in requirements
+                if item.artifact_kind in produced_kinds
+            )
+
+        if (
+            governed_summary.get("status") != "pass"
+            or governed_summary.get("phase") != "completed"
+        ):
+            return ()
+        governed_paths = {
+            str(item["path"])
+            for item in artifacts
+            if (
+                item.get("artifact_kind") == "governed_run_artifact"
+                and isinstance(item.get("path"), str)
+            )
+        }
+        exact_proofs = {
+            "approval_record": {"approval.status.json"},
+            "source_map": {
+                "policy.snapshot.json",
+                "preflight.summary.json",
+            },
+            "scoped_change_set": {
+                "landing.diff",
+                "worktree.manifest.json",
+            },
+            "shareable_summary": {
+                "report.md",
+                "result.summary.json",
+            },
+        }
+
+        def produced(artifact_kind: str) -> bool:
+            expected = exact_proofs.get(artifact_kind)
+            if expected is not None:
+                return expected.issubset(governed_paths)
+            if artifact_kind == "verification_pack":
+                command_seen = any(
+                    path.startswith("artifacts/landing-acceptance-")
+                    and path.endswith(".command.json")
+                    for path in governed_paths
+                )
+                output_seen = any(
+                    path.startswith("artifacts/landing-acceptance-")
+                    and path.endswith(".stdout.txt")
+                    for path in governed_paths
+                )
+                return command_seen and output_seen
+            return False
+
+        return tuple(
+            item.requirement_id
+            for item in requirements
+            if produced(item.artifact_kind)
         )
 
     def _write_lane_artifact(

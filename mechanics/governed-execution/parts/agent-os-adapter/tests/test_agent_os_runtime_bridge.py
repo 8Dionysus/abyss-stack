@@ -30,6 +30,7 @@ from aoa_sdk.contracts.control_plane import (
     RouteExplanation,
     RouteIntent,
     RunPlan,
+    RunStatus,
     RuntimeProfile,
     ScenarioArtifactBinding,
     ScenarioConditionBinding,
@@ -1745,6 +1746,143 @@ def test_public_compiler_v3_c5_chain_closes_real_governed_runtime(
     assert "gamma" in (harness.repo_root / "docs" / "target.md").read_text(
         encoding="utf-8"
     )
+
+
+def test_landing_approval_returns_the_post_decision_resume_cursor(
+    harness: Harness,
+) -> None:
+    adapter = harness.adapter()
+    runner = AoARunner(
+        clock=lambda: NOW,
+        id_factory=lambda: "landing-approval-cursor",
+    )
+    session = runner.prepare(harness.plan)
+    start = StartCommand(
+        command_id="command:landing-cursor:start",
+        idempotency_key="idempotency:landing-cursor:start",
+        session_id=session.session_id,
+        correlation_id=session.correlation_id,
+        plan_digest=harness.plan.plan_digest,
+        expected_revision=0,
+        issued_at=NOW + timedelta(seconds=1),
+        issued_by=session.prepared_by,
+        reason="reach both governed approval milestones",
+    )
+    assert runner.start(session, adapter, start).state == "awaiting_approval"
+    freeze_request = next(
+        request
+        for request in runner.approval_requests(session)
+        if request.requirement_id == "approval:abyss-stack:plan-freeze"
+    )
+    assert (
+        runner.approve(
+            session,
+            _decision(
+                freeze_request,
+                decision_id="decision:landing-cursor:plan-freeze",
+            ),
+        ).state
+        == "paused"
+    )
+    landing_request = next(
+        request
+        for request in runner.approval_requests(session)
+        if request.requirement_id == "approval:abyss-stack:landing"
+    )
+    bridge = BRIDGE.AgentOSRuntimeBridge(
+        harness.state_root,
+        backend=harness.backend,
+        clock=lambda: NOW,
+    )
+    returned = RunStatus.model_validate(
+        bridge.invoke(
+            "apply_approval",
+            {
+                "operation": "apply_approval",
+                "profile": harness.plan.runtime_profile.model_dump(mode="json"),
+                "binding": harness.binding.model_dump(mode="json"),
+                "plan": harness.plan.model_dump(mode="json"),
+                "session": session.model_dump(mode="json"),
+                "approval": _decision(
+                    landing_request,
+                    decision_id="decision:landing-cursor:landing",
+                ).model_dump(mode="json"),
+            },
+        )
+    )
+
+    assert returned == adapter.status(session)
+    resume = ResumeCommand(
+        command_id="command:landing-cursor:resume",
+        idempotency_key="idempotency:landing-cursor:resume",
+        session_id=session.session_id,
+        correlation_id=session.correlation_id,
+        plan_digest=harness.plan.plan_digest,
+        expected_revision=returned.revision,
+        issued_at=returned.updated_at + timedelta(seconds=1),
+        issued_by=session.prepared_by,
+        reason="resume from the exact status returned by landing approval",
+        resume_after_sequence=returned.last_event_sequence,
+    )
+    assert adapter.dispatch(harness.plan, session, resume).status == "applied"
+    assert adapter.status(session).state == "completed"
+
+
+def test_failed_governed_run_claims_no_unproduced_terminal_evidence(
+    harness: Harness,
+) -> None:
+    adapter = harness.adapter()
+    runner = AoARunner(
+        clock=lambda: NOW,
+        id_factory=lambda: "failed-evidence-coverage",
+    )
+    session = runner.prepare(harness.plan)
+    start = StartCommand(
+        command_id="command:failed-evidence:start",
+        idempotency_key="idempotency:failed-evidence:start",
+        session_id=session.session_id,
+        correlation_id=session.correlation_id,
+        plan_digest=harness.plan.plan_digest,
+        expected_revision=0,
+        issued_at=NOW + timedelta(seconds=1),
+        issued_by=session.prepared_by,
+        reason="prove preflight failure cannot claim later phase evidence",
+    )
+
+    assert runner.start(session, adapter, start).state == "awaiting_approval"
+    freeze_request = next(
+        request
+        for request in runner.approval_requests(session)
+        if request.requirement_id == "approval:abyss-stack:plan-freeze"
+    )
+    target = harness.repo_root / "docs" / "target.md"
+    target.write_text(
+        target.read_text(encoding="utf-8") + "dirty before preview\n",
+        encoding="utf-8",
+    )
+    assert (
+        runner.approve(
+            session,
+            _decision(
+                freeze_request,
+                decision_id="decision:failed-evidence:plan-freeze",
+            ),
+        ).state
+        == "failed"
+    )
+    outcome = runner.outcome(session)
+    assert outcome is not None
+    assert outcome.execution_status == "failed"
+    assert len(outcome.evidence_bundle_refs) == 1
+    evidence_ref = outcome.evidence_bundle_refs[0]
+    assert evidence_ref.satisfies_requirement_ids == ()
+    evidence_path = Path(
+        evidence_ref.provenance.artifact_ref.removeprefix("local:")
+    )
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    assert evidence["runtime_summary"]["status"] == "fail"
+    assert evidence["runtime_summary"]["phase"] == "worktree_preview"
+    assert evidence["satisfies_requirement_ids"] == []
 
 
 @pytest.mark.skipif(

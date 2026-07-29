@@ -32,7 +32,8 @@ retaining only the expected owner/artifact key.
 Evidence admission compares the complete requirement set, including producer
 and binding class, and A2A return review accepts only non-empty string artifact
 identifiers. Unadmitted evidence cannot be hidden by a filter or reach a
-generic runtime error.
+generic runtime error. Emitted evidence claims are derived from present
+lane artifacts; governed failure never inherits unproduced terminal coverage.
 
 The Python bridge must be paired with an explicit installed-SDK interpreter
 and isolated mode; the executable shebang is an operator convenience, not the
