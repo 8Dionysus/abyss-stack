@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 257534,
+  "allowed_tracked_bytes": 28103041,
+  "approved_by": "repository-owner",
+  "base_ref": "3d48c492614ff9ec5aadeff8afcf5bb814c40ef7",
+  "changed_generated_bytes": 257534,
+  "changed_generated_files": 6,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "d07896f7d2a0dd0b717cf5c50fca94ff2d7e8de1bece60cc377cd168d8f0c4bc",
+  "reason": "Refresh portable family after keeping published MCP console entrypoints bytecode-free.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "tracked_size",
+  "tracked_bytes": 28103041,
+  "tracked_bytes_max": 24117248
+}
