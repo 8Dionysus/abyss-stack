@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import json
 import os
@@ -13,8 +14,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from abyss_stack_mcp.canary import (
+    CANARY_SIGNING_KEY_NAME,
     CanaryInventoryCounts,
     CanaryProbeResult,
     CanaryRunnerError,
@@ -35,6 +40,7 @@ from abyss_stack_mcp.observation import (
 NOW = datetime(2026, 7, 28, 15, 0, tzinfo=timezone.utc)
 DIGEST_A = "sha256:" + ("a" * 64)
 DIGEST_B = "sha256:" + ("b" * 64)
+SIGNING_KEY = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
 
 
 def canonical_digest(value: object) -> str:
@@ -45,6 +51,36 @@ def canonical_digest(value: object) -> str:
         separators=(",", ":"),
     ).encode("utf-8")
     return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def write_signing_key(secret_dir: Path) -> Path:
+    path = secret_dir / CANARY_SIGNING_KEY_NAME
+    path.write_bytes(
+        SIGNING_KEY.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    )
+    path.chmod(0o600)
+    return path
+
+
+def verify_signature(payload: dict, id_field: str) -> None:
+    signature = payload.pop("attestation")
+    assert payload[id_field].startswith("sha256:")
+    try:
+        SIGNING_KEY.public_key().verify(
+            base64.urlsafe_b64decode(signature + "=="),
+            json.dumps(
+                payload,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8"),
+        )
+    except InvalidSignature as exc:
+        raise AssertionError("capture signature did not verify") from exc
 
 
 def canary_contract() -> RuntimeCanaryContract:
@@ -170,8 +206,10 @@ def test_receipt_is_content_addressed_and_preserves_claim_limit() -> None:
         probe=successful_probe(),
         observed_at=NOW,
         ttl_seconds=600,
+        signing_key=SIGNING_KEY,
     )
     payload = receipt.model_dump(mode="json")
+    verify_signature(payload, "receipt_id")
     receipt_id = payload.pop("receipt_id")
 
     assert receipt_id == canonical_digest(payload)
@@ -194,12 +232,15 @@ def test_private_result_artifact_is_independently_content_addressed() -> None:
         probe=successful_probe(),
         observed_at=NOW,
         ttl_seconds=600,
+        signing_key=SIGNING_KEY,
     )
     artifact = build_result_artifact(
         receipt=receipt,
         owner_payload=grounded_result(),
+        signing_key=SIGNING_KEY,
     )
     payload = artifact.model_dump(mode="json")
+    verify_signature(payload, "artifact_id")
     artifact_id = payload.pop("artifact_id")
 
     assert artifact_id == canonical_digest(payload)
@@ -217,6 +258,7 @@ def test_overlay_does_not_infer_grounding_consumer_freshness_or_proof() -> None:
         probe=successful_probe(),
         observed_at=NOW,
         ttl_seconds=600,
+        signing_key=SIGNING_KEY,
     )
     receipt_ref = (
         "/srv/AbyssOS/abyss-stack/Logs/mcp/canaries/records/"
@@ -256,6 +298,7 @@ def test_contract_mismatch_remains_visible_without_positive_canary() -> None:
         probe=probe,
         observed_at=NOW,
         ttl_seconds=600,
+        signing_key=SIGNING_KEY,
     )
     overlay = build_overlay(
         receipt,
@@ -286,6 +329,7 @@ def test_run_canary_reads_one_owner_credential_and_writes_private_outputs(
     credential_path = secret_dir / "aoa-kag-mcp-read-bearer-token"
     credential_path.write_text(credential_value + "\n", encoding="utf-8")
     credential_path.chmod(0o600)
+    write_signing_key(secret_dir)
     observed_credentials: list[str] = []
 
     async def fake_probe(
@@ -359,6 +403,51 @@ def test_canary_rejects_broad_or_symlinked_credential(tmp_path: Path) -> None:
     source.write_text("private-value\n", encoding="utf-8")
     source.chmod(0o600)
     credential.symlink_to(source)
+    with pytest.raises(CanaryRunnerError, match="symlink"):
+        asyncio.run(
+            run_canary(
+                organ_id="aoa-kag",
+                targets_path=targets_path,
+                secret_dir=secret_dir,
+                output_root=tmp_path / "output",
+            )
+        )
+
+
+def test_canary_rejects_broad_or_symlinked_signing_key(tmp_path: Path) -> None:
+    targets_path = write_json(
+        tmp_path / "targets.json",
+        RuntimeTargetCatalog(targets=(target(),)).model_dump(mode="json"),
+    )
+    secret_dir = tmp_path / "secrets"
+    secret_dir.mkdir(mode=0o700)
+    credential = secret_dir / "aoa-kag-mcp-read-bearer-token"
+    credential.write_text("private-value\n", encoding="utf-8")
+    credential.chmod(0o600)
+    signing_key = write_signing_key(secret_dir)
+    signing_key.chmod(0o640)
+
+    with pytest.raises(CanaryRunnerError, match="mode 0600"):
+        asyncio.run(
+            run_canary(
+                organ_id="aoa-kag",
+                targets_path=targets_path,
+                secret_dir=secret_dir,
+                output_root=tmp_path / "output",
+            )
+        )
+
+    signing_key.unlink()
+    outside_key = tmp_path / "outside-signing-key.pem"
+    outside_key.write_bytes(
+        SIGNING_KEY.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    )
+    outside_key.chmod(0o600)
+    signing_key.symlink_to(outside_key)
     with pytest.raises(CanaryRunnerError, match="symlink"):
         asyncio.run(
             run_canary(

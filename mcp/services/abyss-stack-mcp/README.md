@@ -220,13 +220,19 @@ back to explicit unknown states.
 
 `abyss-stack-mcp-canary` is a separate credential-bearing operator process.
 It is not called by the observation producer or either MCP server plane. For
-one exact catalog target it reads only that service's read credential, connects
+one exact catalog target it reads only that service's read credential and the
+stack canary Ed25519 private key, connects
 only to the committed loopback endpoint, observes the complete paginated MCP
 Tool/Resource/Resource-Template/Prompt schema inventory, calls one committed
 read primitive, and writes a content-addressed mode-`0600` receipt plus a
 one-subject typed overlay. A successful call also writes the secret-screened
 structured response as a separate content-addressed mode-`0600` result
 artifact so the source/acceptance owner can review the exact captured payload.
+The receipt and result artifact independently carry an Ed25519 attestation over
+their complete content-addressed statement. Their public `signer_id` is the
+SHA-256 digest of the raw public key. A downstream owner must verify both
+attestations against an independently pinned public key before attributing the
+capture to `abyss-stack`; a caller-supplied key is not an authentication root.
 
 Reviewed contracts cover all declared migration-wave targets. Each contract
 binds an exact tool and arguments, owner-specific result schema identity, and
@@ -237,7 +243,8 @@ top-level status. Contract presence does not create endpoint readiness,
 grounding, freshness, owner acceptance, central proof, rollback proof, or
 admission; any missing evidence axis still fails closed.
 
-The receipt records digests, bounded counts, application-reported server
+The receipt records the signer identity, attestation algorithm, attestation,
+digests, bounded counts, application-reported server
 identity, protocol, latency, reason codes, and the deterministic private
 result-artifact ref, never the bearer or inline owner payload. The separate
 artifact marks the payload as untrusted data with no instruction authority;
@@ -254,6 +261,12 @@ After an explicit one-owner process switch, run:
 ```bash
 abyss-stack-mcp-canary --organ aoa-kag
 ```
+
+The stack auth provisioner creates the canary signing key once as a regular
+current-user-owned mode-`0600` Ed25519 private key alongside the contour bearer
+files. Reprovisioning validates and preserves that key; bearer rotation does
+not silently rotate the capture trust root. Public-key pinning and any later
+signer rotation require a separately reviewed consumer-owner update.
 
 The command never starts or stops a unit, changes consumer configuration,
 merges the overlay into the production observation, invokes the owner

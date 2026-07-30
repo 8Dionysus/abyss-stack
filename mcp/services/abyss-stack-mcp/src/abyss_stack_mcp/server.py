@@ -31,7 +31,7 @@ CANDIDATE_PORT = 5433
 AUTH_MANIFEST_CREDENTIAL = "abyss-stack-mcp-auth-manifest.json"
 AUTH_MANIFEST_SCHEMA = "abyss_stack_mcp_auth_manifest_v1"
 PACKAGE_NAME = "abyss-stack-mcp"
-APPLICATION_VERSION = "0.2.0"
+APPLICATION_VERSION = "0.3.0"
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 PolicyMode = Literal["read", "candidate"]
 CatalogLimit = Annotated[int, Field(ge=1, le=64)]

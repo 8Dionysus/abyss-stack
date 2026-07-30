@@ -48,8 +48,14 @@
   and rollback issuer checks;
 - a separate authenticated read canary that selects only a committed target,
   derives one exact owner credential filename, refuses symlinked or
-  group/world-readable credentials, never serializes result values, and emits
-  only a content-addressed mode-`0600` receipt and typed one-subject overlay;
+  group/world-readable credentials, requires a current-user-owned mode-`0600`
+  non-symlink Ed25519 private key, never serializes result values, and emits
+  only an independently attested content-addressed mode-`0600` receipt,
+  result artifact, and typed one-subject overlay;
+- downstream attribution of a capture to `abyss-stack` requires verification
+  of both receipt and result attestations against an independently pinned
+  public key; content addresses, caller-supplied keys, issuer strings, and
+  matching hashes are not issuer authentication;
 - canary call success remains distinct from owner-specific grounding, while
   its claim ceiling excludes owner freshness, central proof, acceptance,
   admission, rollback, unit effects, and consumer configuration;
