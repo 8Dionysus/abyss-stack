@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 3254727,
+  "allowed_tracked_bytes": 28790735,
+  "approved_by": "repository-owner",
+  "base_ref": "ae8f1f54dc8417a6dcfa6225b6196df4d2ac1819",
+  "changed_generated_bytes": 3254727,
+  "changed_generated_files": 42,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "35f2f3c3168903a9c8ae0f46ad9bff0746e4dc9e261e8d3dca4f2ce8ec886fb8",
+  "reason": "Refresh the portable KAG family for the bounded owner-slice bootstrap migration and preserve CI parity.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 28790735,
+  "tracked_bytes_max": 24117248
+}
