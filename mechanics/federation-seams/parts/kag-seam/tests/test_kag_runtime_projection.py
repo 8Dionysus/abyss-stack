@@ -1748,6 +1748,47 @@ class KagRuntimeProjectionTests(unittest.TestCase):
             affected_collection,
         )
 
+    def test_qdrant_owner_slice_bootstrap_reuses_current_legacy_collection(
+        self,
+    ) -> None:
+        bundle = write_two_owner_bundle(self.root / "vector-owner-bootstrap")
+        state_path = self.root / "runtime" / "vector" / "owner-slices.json"
+        qdrant = FakeQdrant()
+        vector.materialize(
+            bundle,
+            qdrant=qdrant,
+            embeddings=AdaptiveEmbeddings(max_batch_size=2),
+            batch_size=2,
+        )
+        legacy_collection = qdrant.aliases[vector.DEFAULT_ALIAS]
+        bootstrap_embeddings = AdaptiveEmbeddings(max_batch_size=2)
+
+        result = vector.materialize_owner_slices(
+            bundle,
+            qdrant=qdrant,
+            embeddings=bootstrap_embeddings,
+            state_path=state_path,
+            bootstrap_alias=vector.DEFAULT_ALIAS,
+            batch_size=2,
+        )
+
+        self.assertEqual(result["bootstrap_collection"], legacy_collection)
+        self.assertEqual(bootstrap_embeddings.texts, [])
+        self.assertEqual(
+            sum(
+                update["reused_point_count"]
+                for update in result["updates"].values()
+            ),
+            2,
+        )
+        self.assertEqual(
+            sum(
+                update["embedded_point_count"]
+                for update in result["updates"].values()
+            ),
+            0,
+        )
+
     def test_qdrant_owner_slice_search_embeds_once_across_owner_fanout(
         self,
     ) -> None:

@@ -398,6 +398,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         embeddings=embeddings,
                         state_path=owner_state_path,
                         affected_owners=affected_owners,
+                        bootstrap_alias=args.qdrant_alias,
                         batch_size=args.vector_batch_size,
                         progress=_vector_progress,
                     )

@@ -632,6 +632,7 @@ def materialize_owner_slices(
     embeddings: JsonHttpClient,
     state_path: Path,
     affected_owners: Iterable[str] = (),
+    bootstrap_alias: str | None = None,
     batch_size: int = DEFAULT_EMBEDDING_BATCH_SIZE,
     progress: Callable[[int, int], None] | None = None,
 ) -> dict[str, Any]:
@@ -642,6 +643,11 @@ def materialize_owner_slices(
     previous = _read_owner_slice_state(state_path)
     previous_owners = (
         previous.get("owners") if isinstance(previous.get("owners"), dict) else {}
+    )
+    bootstrap_collection = (
+        _alias_collection(qdrant, bootstrap_alias)
+        if not previous and bootstrap_alias
+        else None
     )
     selected = {str(item) for item in affected_owners if str(item)}
     if not selected:
@@ -697,10 +703,13 @@ def materialize_owner_slices(
             else {}
         )
         if owner in selected:
+            previous_collection = (
+                str(previous_entry.get("collection") or "") or bootstrap_collection
+            )
             update = _materialize_owner_collection(
                 documents[owner],
                 collection=collection,
-                previous=str(previous_entry.get("collection") or "") or None,
+                previous=previous_collection,
                 profile=profile,
                 qdrant=qdrant,
                 embeddings=embeddings,
@@ -764,6 +773,7 @@ def materialize_owner_slices(
         "changed_owners": sorted(changed),
         "reused_owner_slices": sorted(set(inputs) - selected),
         "owner_collections": owner_collections,
+        "bootstrap_collection": bootstrap_collection,
         "updates": updated_results,
         "embedding_profile": profile,
     }
