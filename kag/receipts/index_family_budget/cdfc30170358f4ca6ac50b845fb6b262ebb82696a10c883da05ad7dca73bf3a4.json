@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 23296890,
+  "allowed_tracked_bytes": 28785239,
+  "approved_by": "repository-owner",
+  "base_ref": "017210fa2b9b4ba10fe7c3c00ee8d3e63b926298",
+  "changed_generated_bytes": 23296890,
+  "changed_generated_files": 320,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "cdfc30170358f4ca6ac50b845fb6b262ebb82696a10c883da05ad7dca73bf3a4",
+  "reason": "Active-organ runtime and hook-composition owner source adds reviewed contracts, validators, tests, and decisions; this receipt admits only the measured portable-family growth for PR #340.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 28785239,
+  "tracked_bytes_max": 24117248
+}

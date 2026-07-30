@@ -1,0 +1,81 @@
+{
+  "schema_version": "active_organ_runtime_delivery_receipt_v1",
+  "contract_id": "C20",
+  "receipt_id": "abyss-stack:active-organ-delivery:attempt-0001:attempted",
+  "attempt_id": "active-organ-attempt:attempt-0001",
+  "attempt_no": 1,
+  "recorded_at": "2026-07-28T20:00:01Z",
+  "expires_at": "2026-07-28T20:00:30Z",
+  "runtime_owner": "abyss-stack",
+  "runtime_surface": "agent-os-runtime/memo-delivery",
+  "delivery_state": "attempted",
+  "recall_intent_ref": "aoa-sdk:recall-intent:intent-0001",
+  "admitted_run_plan_ref": "aoa-sdk:run-plan:plan-0001",
+  "recall_packet_ref": "aoa-memo:recall-packet:packet-0001",
+  "intervention_decision": {
+    "ref": "aoa-memo:intervention-decision:decision-0001",
+    "decision": "bounded_observation"
+  },
+  "trigger_binding": {
+    "trigger_id": "explicit-task-recall",
+    "trigger_policy_version": "trigger-policy-v1"
+  },
+  "anchor_binding": {
+    "anchor_id": "task-anchor-0001",
+    "anchor_ref": "task:current-source:anchor-0001",
+    "freshness": "current",
+    "checked_at": "2026-07-28T20:00:00Z"
+  },
+  "policy_binding": {
+    "policy_id": "active-organ-observation",
+    "policy_version": "policy-v1",
+    "consumer_id": "consumer:agent-os-runtime",
+    "tenant_id": "operator-local",
+    "data_class": "private-local",
+    "risk_class": "bounded-observation",
+    "model_prompt_provider_hardware_pin_ref": "aoa-evals:model-prompt-provider-hardware-pin:lab-pin-0001"
+  },
+  "admission": {
+    "state": "admitted",
+    "ref": "aoa-sdk:admission:admission-0001",
+    "checked_at": "2026-07-28T20:00:00Z"
+  },
+  "delivery_target": {
+    "consumer_id": "consumer:agent-os-runtime",
+    "adapter_id": "abyss-stack:active-organ-delivery:v1",
+    "transport": "local_subprocess",
+    "target_ref": "runtime-target:agent-os-session-0001"
+  },
+  "result": {
+    "delivered": false,
+    "reason_code": "dispatch_started",
+    "observed_at": "2026-07-28T20:00:01Z",
+    "failure_ref": null
+  },
+  "retry": {
+    "implicit_retry_allowed": false,
+    "new_attempt_requires_admission_recheck": true
+  },
+  "content_minimization": {
+    "persistence_mode": "refs_only",
+    "packet_content_persisted": false,
+    "prompt_content_persisted": false,
+    "memory_content_persisted": false,
+    "payload_digest_persisted": false,
+    "error_detail_persisted": false
+  },
+  "authority": {
+    "delivery_authority": "already_admitted_packet_only",
+    "effect_authority": "none",
+    "memory_semantic_authority": false,
+    "policy_widening_authority": false
+  },
+  "receipt_retention": {
+    "retention_class": "runtime-delivery-minimal",
+    "minimization_policy_ref": "aoa-memo:policy:runtime-delivery-minimization-v1",
+    "erase_scope_ref": "aoa-memo:erase-scope:delivery-attempt-0001"
+  },
+  "evidence_refs": [
+    "abyss-stack:runtime-evidence:dispatch-0001"
+  ]
+}

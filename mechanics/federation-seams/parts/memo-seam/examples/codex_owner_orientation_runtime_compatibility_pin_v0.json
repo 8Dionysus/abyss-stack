@@ -1,0 +1,40 @@
+{
+  "schema_version": "codex_owner_orientation_runtime_compatibility_pin_v0",
+  "pin_id": "abyss-stack.codex-owner-orientation.runtime.v0",
+  "runtime_owner": "abyss-stack",
+  "control_plane_owner": "aoa-sdk",
+  "semantic_owner": "aoa-memo",
+  "sdk_plan_schema": {
+    "artifact_ref": "repo:aoa-sdk/mechanics/boundary-bridge/parts/consumed-surface-posture-gate/schemas/codex-owner-orientation-plan-v0.schema.json",
+    "sha256": "sha256:b371f6c3216418a9ff5794dbd352e8bbc50d64713b842a9a4fe5f20722e70c45"
+  },
+  "memo_contract_schema": {
+    "artifact_ref": "repo:aoa-memo/schemas/support-objects/active_organ_memo_contracts_v1.schema.json",
+    "sha256": "sha256:ecb9b6fb8abe8633d1505b12c396d8e4cfaee6d560ec20617268ce02574ff99d"
+  },
+  "memo_consumer_profile": {
+    "artifact_ref": "repo:aoa-memo/mechanics/consumer-handoff/parts/orchestrator-recall-alignment/examples/codex_owner_orientation_v0.consumer-profile.json",
+    "sha256": "sha256:62f3a911b5ea7ca87e629a7bd65b6556dd7b8122189b3cd9664169e05562374f",
+    "semantic_digest": "sha256:10ca6d8e7beab801995cfdb12b63192a32f2a8e59781cdaf883b369f9162fd8e"
+  },
+  "memo_influence_policy": {
+    "artifact_ref": "repo:aoa-memo/mechanics/consumer-handoff/parts/orchestrator-recall-alignment/examples/codex_owner_orientation_v0.influence-policy.json",
+    "sha256": "sha256:75d25070faa435a7094d29c8313d9e487a48600034cc62d2f9674015e0f5a537"
+  },
+  "memo_bundle_schema": {
+    "artifact_ref": "repo:aoa-memo/mechanics/consumer-handoff/parts/orchestrator-recall-alignment/schemas/codex_owner_orientation_memo_bundle_v0.schema.json",
+    "sha256": "sha256:e7a451c38db6630171d6b7034f9e141c25a5413f767d8c0498c5bea505f5954d"
+  },
+  "runtime_receipt_schema": {
+    "artifact_ref": "mechanics/federation-seams/parts/memo-seam/schemas/active-organ-runtime-delivery-receipt.schema.json",
+    "sha256": "sha256:b65bdf9486166ff61d81e630adecad86ace6501d33d841f70a58988e9fe22058"
+  },
+  "accepted_plan_version": "codex_owner_orientation_plan_v0",
+  "accepted_bundle_version": "codex_owner_orientation_memo_bundle_v0",
+  "transport": "in_process_read_response",
+  "reranking": "forbidden",
+  "reselection": "forbidden",
+  "persistence": "forbidden",
+  "effect_authority": "none",
+  "unknown_version_posture": "fail_closed"
+}

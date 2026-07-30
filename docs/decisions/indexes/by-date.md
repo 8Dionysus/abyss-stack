@@ -186,3 +186,8 @@
 ## 2026-07-27
 
 - [ABYSS-STACK-D-0101 Retire Routing Predecessor Checkout Consumers](../ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md) (`docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md`)
+
+## 2026-07-29
+
+- [ABYSS-STACK-D-0102 R1 Memory Runtime Is Exact Pull Delivery](../ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md) (`docs/decisions/ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md`)
+- [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)

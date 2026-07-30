@@ -193,6 +193,10 @@
 - [ABYSS-STACK-D-0011 Legacy-Heavy Runtime Package Distillation](../ABYSS-STACK-D-0011-legacy-heavy-runtime-package-distillation.md) (`docs/decisions/ABYSS-STACK-D-0011-legacy-heavy-runtime-package-distillation.md`)
 - [ABYSS-STACK-D-0031 AoA Memo MCP Under Stack MCP](../ABYSS-STACK-D-0031-aoa-memo-mcp-under-stack-mcp.md) (`docs/decisions/ABYSS-STACK-D-0031-aoa-memo-mcp-under-stack-mcp.md`)
 
+## Codex hooks
+
+- [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
+
 ## Codex plane
 
 - [ABYSS-STACK-D-0097 Codex Consumer Handoff Remains Owner-Composed](../ABYSS-STACK-D-0097-codex-consumer-handoff-remains-owner-composed.md) (`docs/decisions/ABYSS-STACK-D-0097-codex-consumer-handoff-remains-owner-composed.md`)
@@ -272,6 +276,10 @@
 
 - [ABYSS-STACK-D-0058 Profile Topology Validator Module](../ABYSS-STACK-D-0058-profile-topology-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0058-profile-topology-validator-module.md`)
 
+## config projection
+
+- [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
+
 ## connector adapter
 
 - [ABYSS-STACK-D-0093 Connector Read Contour Isolation](../ABYSS-STACK-D-0093-connector-read-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0093-connector-read-contour-isolation.md`)
@@ -329,6 +337,7 @@
 - [ABYSS-STACK-D-0047 Federation Upstream Compatibility Language Split](../ABYSS-STACK-D-0047-federation-upstream-compatibility-language-split.md) (`docs/decisions/ABYSS-STACK-D-0047-federation-upstream-compatibility-language-split.md`)
 - [ABYSS-STACK-D-0048 Federation Landing Validator Split](../ABYSS-STACK-D-0048-federation-landing-validator-split.md) (`docs/decisions/ABYSS-STACK-D-0048-federation-landing-validator-split.md`)
 - [ABYSS-STACK-D-0049 Federation Runtime Seams Validator Module](../ABYSS-STACK-D-0049-federation-runtime-seams-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0049-federation-runtime-seams-validator-module.md`)
+- [ABYSS-STACK-D-0102 R1 Memory Runtime Is Exact Pull Delivery](../ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md) (`docs/decisions/ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md`)
 
 ## generated read-model
 
@@ -478,6 +487,7 @@
 - [ABYSS-STACK-D-0098 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md`)
 - [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
 - [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
+- [ABYSS-STACK-D-0102 R1 Memory Runtime Is Exact Pull Delivery](../ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md) (`docs/decisions/ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md`)
 
 ## runtime docs
 
@@ -543,6 +553,10 @@
 ## session evidence
 
 - [ABYSS-STACK-D-0091 Session Memory and ToS Read Contour Isolation](../ABYSS-STACK-D-0091-session-and-tos-read-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0091-session-and-tos-read-contour-isolation.md`)
+
+## sibling owner seam
+
+- [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
 
 ## source topology
 

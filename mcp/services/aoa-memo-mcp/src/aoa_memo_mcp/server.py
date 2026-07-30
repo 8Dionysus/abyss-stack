@@ -163,6 +163,23 @@ def build_server(
             return current_state().search(query=query, scope=scope, mode=mode)
 
         @read_only_tool
+        def aoa_memo_owner_orientation(
+            plan: dict[str, Any],
+            memo_bundle: dict[str, Any],
+            observed_at: str | None = None,
+            target_ref: str = "codex:current-request",
+            attempt_no: int = 1,
+        ) -> dict[str, Any]:
+            """Deliver one pre-admitted owner-orientation bundle without writes."""
+            return current_state().deliver_owner_orientation(
+                plan=plan,
+                memo_bundle=memo_bundle,
+                observed_at=observed_at,
+                target_ref=target_ref,
+                attempt_no=attempt_no,
+            )
+
+        @read_only_tool
         def aoa_memo_validate_candidate(path: str) -> dict[str, Any]:
             """Validate a local memory candidate before reviewed intake."""
             return current_state().validate_candidate(path)

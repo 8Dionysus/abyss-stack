@@ -1,0 +1,53 @@
+{
+  "schema_version": "active_organ_runtime_delivery_receipt_negative_examples_v1",
+  "cases": [
+    {
+      "case_id": "delivered_without_admission",
+      "base_example": "active_organ_runtime_delivery_receipt.delivered.example.json",
+      "set": {
+        "/admission/state": "denied"
+      },
+      "expected_error": "admission/state"
+    },
+    {
+      "case_id": "delivered_without_packet_ref",
+      "base_example": "active_organ_runtime_delivery_receipt.delivered.example.json",
+      "set": {
+        "/recall_packet_ref": null
+      },
+      "expected_error": "recall_packet_ref"
+    },
+    {
+      "case_id": "private_packet_content_persisted",
+      "base_example": "active_organ_runtime_delivery_receipt.delivered.example.json",
+      "set": {
+        "/content_minimization/packet_content_persisted": true
+      },
+      "expected_error": "content_minimization/packet_content_persisted"
+    },
+    {
+      "case_id": "suppressed_but_marked_delivered",
+      "base_example": "active_organ_runtime_delivery_receipt.suppressed.example.json",
+      "set": {
+        "/result/delivered": true
+      },
+      "expected_error": "result/delivered"
+    },
+    {
+      "case_id": "expired_before_deadline",
+      "base_example": "active_organ_runtime_delivery_receipt.expired.example.json",
+      "set": {
+        "/recorded_at": "2026-07-28T20:02:29Z"
+      },
+      "expected_error": "recorded_at"
+    },
+    {
+      "case_id": "consumer_binding_mismatch",
+      "base_example": "active_organ_runtime_delivery_receipt.delivered.example.json",
+      "set": {
+        "/delivery_target/consumer_id": "consumer:other"
+      },
+      "expected_error": "consumer_id"
+    }
+  ]
+}

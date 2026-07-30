@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 101,
-  "edge_count": 2282,
+  "decision_count": 103,
+  "edge_count": 2321,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 884,
-    "DATED": 101,
-    "GUARDED_BY": 293,
-    "HAS_STATUS": 101,
-    "HAS_SURFACE_CLASS": 262,
-    "IN_STACK_LANE": 224,
-    "NEXT_DECISION": 100,
-    "OWNED_BY_SURFACE": 107,
-    "OWNS_DECISION": 101,
+    "CITES_SOURCE_SURFACE": 893,
+    "DATED": 103,
+    "GUARDED_BY": 300,
+    "HAS_STATUS": 103,
+    "HAS_SURFACE_CLASS": 267,
+    "IN_STACK_LANE": 230,
+    "NEXT_DECISION": 102,
+    "OWNED_BY_SURFACE": 109,
+    "OWNS_DECISION": 103,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 107
+    "UNDER_MECHANIC_PARENT": 109
   },
   "edges": [
     {
@@ -10903,6 +10903,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0101",
+      "target": "decision:ABYSS-STACK-D-0102",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0101",
       "target": "owner_surface:mechanics/federation-seams/parts/sync-wrapper/",
       "type": "OWNED_BY_SURFACE"
     },
@@ -10919,6 +10924,186 @@
     {
       "source": "decision:ABYSS-STACK-D-0101",
       "target": "mechanic_parent:inference-pilots",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0102",
+      "target": "source_surface:docs/BOUNDARIES.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0102",
+      "target": "source_surface:docs/decisions/ABYSS-STACK-D-0097-codex-consumer-handoff-remains-owner-composed.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0102",
+      "target": "source_surface:docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0102",
+      "target": "source_surface:mechanics/federation-seams/parts/memo-seam/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0102",
+      "target": "date:2026-07-29",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0102",
+      "target": "guard_family:exact%20delivery",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0102",
+      "target": "guard_family:no%20hidden%20persistence",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0102",
+      "target": "guard_family:owner%20boundary",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0102",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0102",
+      "target": "surface_class:federation%20seam",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0102",
+      "target": "surface_class:runtime%20contract",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0102",
+      "target": "stack_lane:MCP",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0102",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0102",
+      "target": "stack_lane:source",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0102",
+      "target": "decision:ABYSS-STACK-D-0103",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0102",
+      "target": "owner_surface:mechanics/federation-seams/parts/memo-seam/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0102",
+      "target": "mechanic_parent:federation-seams",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "source_surface:aoa-memo",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "source_surface:docs/decisions/AOA-MEM-D-0083",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "source_surface:mechanics/config-projection/PARTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "source_surface:mechanics/config-projection/PROVENANCE.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "source_surface:mechanics/config-projection/parts/codex-hooks/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "date:2026-07-29",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "guard_family:atomic%20projection",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "guard_family:content%20minimization",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "guard_family:owner%20boundary",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "guard_family:rollback",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "surface_class:Codex%20hooks",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "surface_class:config%20projection",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "surface_class:sibling%20owner%20seam",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "stack_lane:operator",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "stack_lane:source",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "owner_surface:mechanics/config-projection/parts/codex-hooks/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0103",
+      "target": "mechanic_parent:config-projection",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -11425,21 +11610,31 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0101",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0102",
+      "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0103",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1003,
+  "node_count": 1027,
   "node_type_counts": {
-    "date": 28,
-    "decision": 101,
-    "guard_family": 142,
+    "date": 29,
+    "decision": 103,
+    "guard_family": 146,
     "mechanic_parent": 10,
-    "owner_surface": 54,
+    "owner_surface": 56,
     "repo": 1,
-    "source_surface": 522,
-    "stack_lane": 40,
+    "source_surface": 530,
+    "stack_lane": 44,
     "status": 3,
-    "surface_class": 102
+    "surface_class": 105
   },
   "nodes": [
     {
@@ -11580,6 +11775,11 @@
     {
       "id": "date:2026-07-27",
       "label": "2026-07-27",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-07-29",
+      "label": "2026-07-29",
       "type": "date"
     },
     {
@@ -12593,6 +12793,26 @@
       "type": "decision"
     },
     {
+      "date": "2026-07-29",
+      "id": "decision:ABYSS-STACK-D-0102",
+      "label": "ABYSS-STACK-D-0102",
+      "path": "docs/decisions/ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md",
+      "posture": "accepted reduced-organ rationale, unlanded",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0102 R1 Memory Runtime Is Exact Pull Delivery",
+      "type": "decision"
+    },
+    {
+      "date": "2026-07-29",
+      "id": "decision:ABYSS-STACK-D-0103",
+      "label": "ABYSS-STACK-D-0103",
+      "path": "docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md",
+      "posture": "accepted source-local composition rationale, unlanded and inactive",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -12653,6 +12873,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:atomic%20projection",
+      "label": "atomic projection",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:authenticated%20loopback%20exposure",
       "label": "authenticated loopback exposure",
       "type": "guard_family"
@@ -12705,6 +12930,11 @@
     {
       "id": "guard_family:consumer-zero",
       "label": "consumer-zero",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:content%20minimization",
+      "label": "content minimization",
       "type": "guard_family"
     },
     {
@@ -12785,6 +13015,11 @@
     {
       "id": "guard_family:exact%20admission",
       "label": "exact admission",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:exact%20delivery",
+      "label": "exact delivery",
       "type": "guard_family"
     },
     {
@@ -12950,6 +13185,11 @@
     {
       "id": "guard_family:no%20hidden%20execution",
       "label": "no hidden execution",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:no%20hidden%20persistence",
+      "label": "no hidden persistence",
       "type": "guard_family"
     },
     {
@@ -13458,6 +13698,11 @@
       "type": "owner_surface"
     },
     {
+      "id": "owner_surface:mechanics/config-projection/parts/codex-hooks/",
+      "label": "mechanics/config-projection/parts/codex-hooks/",
+      "type": "owner_surface"
+    },
+    {
       "id": "owner_surface:mechanics/federation-seams/",
       "label": "mechanics/federation-seams/",
       "type": "owner_surface"
@@ -13465,6 +13710,11 @@
     {
       "id": "owner_surface:mechanics/federation-seams/parts/kag-seam/",
       "label": "mechanics/federation-seams/parts/kag-seam/",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:mechanics/federation-seams/parts/memo-seam/",
+      "label": "mechanics/federation-seams/parts/memo-seam/",
       "type": "owner_surface"
     },
     {
@@ -14219,6 +14469,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:docs/BOUNDARIES.md",
+      "label": "docs/BOUNDARIES.md",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:docs/README.md",
       "label": "docs/README.md",
       "type": "source_surface"
@@ -14239,8 +14494,23 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:docs/decisions/ABYSS-STACK-D-0097-codex-consumer-handoff-remains-owner-composed.md",
+      "label": "docs/decisions/ABYSS-STACK-D-0097-codex-consumer-handoff-remains-owner-composed.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md",
+      "label": "docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:docs/decisions/AGENTS.md",
       "label": "docs/decisions/AGENTS.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:docs/decisions/AOA-MEM-D-0083",
+      "label": "docs/decisions/AOA-MEM-D-0083",
       "type": "source_surface"
     },
     {
@@ -15039,6 +15309,21 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/config-projection/PARTS.md",
+      "label": "mechanics/config-projection/PARTS.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/config-projection/PROVENANCE.md",
+      "label": "mechanics/config-projection/PROVENANCE.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/config-projection/parts/codex-hooks/",
+      "label": "mechanics/config-projection/parts/codex-hooks/",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md",
       "label": "mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md",
       "type": "source_surface"
@@ -15206,6 +15491,11 @@
     {
       "id": "source_surface:mechanics/federation-seams/parts/kag-seam/tests/test_kag_runtime_projection.py",
       "label": "mechanics/federation-seams/parts/kag-seam/tests/test_kag_runtime_projection.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/federation-seams/parts/memo-seam/",
+      "label": "mechanics/federation-seams/parts/memo-seam/",
       "type": "source_surface"
     },
     {
@@ -16239,6 +16529,11 @@
       "type": "source_surface"
     },
     {
+      "id": "stack_lane:MCP",
+      "label": "MCP",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:MCP%20access%20plane",
       "label": "MCP access plane",
       "type": "stack_lane"
@@ -16334,6 +16629,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:operator",
+      "label": "operator",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:operator%20command",
       "label": "operator command",
       "type": "stack_lane"
@@ -16361,6 +16661,11 @@
     {
       "id": "stack_lane:release/tooling",
       "label": "release/tooling",
+      "type": "stack_lane"
+    },
+    {
+      "id": "stack_lane:runtime",
+      "label": "runtime",
       "type": "stack_lane"
     },
     {
@@ -16409,6 +16714,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:source",
+      "label": "source",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:source%20checkout",
       "label": "source checkout",
       "type": "stack_lane"
@@ -16452,6 +16762,11 @@
       "id": "status:superseded",
       "label": "superseded",
       "type": "status"
+    },
+    {
+      "id": "surface_class:Codex%20hooks",
+      "label": "Codex hooks",
+      "type": "surface_class"
     },
     {
       "id": "surface_class:Codex%20plane",
@@ -16556,6 +16871,11 @@
     {
       "id": "surface_class:compose%20topology",
       "label": "compose topology",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:config%20projection",
+      "label": "config projection",
       "type": "surface_class"
     },
     {
@@ -16921,6 +17241,11 @@
     {
       "id": "surface_class:session%20evidence",
       "label": "session evidence",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:sibling%20owner%20seam",
+      "label": "sibling owner seam",
       "type": "surface_class"
     },
     {

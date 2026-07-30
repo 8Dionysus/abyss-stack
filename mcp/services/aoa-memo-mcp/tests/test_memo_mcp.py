@@ -2,12 +2,249 @@ from __future__ import annotations
 
 import json
 import asyncio
+import hashlib
 from pathlib import Path
 
 import pytest
 
 from aoa_memo_mcp.core import AoAMemoMCPState
 from aoa_memo_mcp.server import build_server
+
+
+PROFILE_SHA = (
+    "sha256:62f3a911b5ea7ca87e629a7bd65b6556dd7b8122189b3cd9664169e05562374f"
+)
+PROFILE_SEMANTIC_DIGEST = (
+    "sha256:10ca6d8e7beab801995cfdb12b63192a32f2a8e59781cdaf883b369f9162fd8e"
+)
+POLICY_SHA = (
+    "sha256:75d25070faa435a7094d29c8313d9e487a48600034cc62d2f9674015e0f5a537"
+)
+
+
+def canonical_digest(
+    payload: dict,
+    *,
+    exclude: set[str] | None = None,
+    ensure_ascii: bool = True,
+) -> str:
+    value = {
+        key: item
+        for key, item in payload.items()
+        if key not in (exclude or set())
+    }
+    encoded = json.dumps(
+        value,
+        ensure_ascii=ensure_ascii,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
+def orientation_plan() -> dict:
+    host_ref = {
+        "owner_repo": "abyss-machine",
+        "artifact_ref": "C18:test",
+        "source_ref": "repo:abyss-machine/test#C18",
+        "artifact_digest": "sha256:" + ("1" * 64),
+        "schema_ref": "schemas/host-capability-snapshot-reference-C18.json",
+        "schema_version": "1.0.0",
+    }
+    resource_ref = {
+        **host_ref,
+        "artifact_ref": "C19:test",
+        "source_ref": "repo:abyss-machine/test#C19",
+        "artifact_digest": "sha256:" + ("2" * 64),
+        "schema_ref": "schemas/host-resource-storage-plan-reference-C19.json",
+    }
+    card = {
+        "id": "memo.decision.test",
+        "kind": "decision",
+        "title": "Reviewed owner route",
+        "summary": "Current reviewed owner route.",
+        "temperature": "cool",
+        "review_state": "confirmed",
+        "current_recall_status": "preferred",
+        "supersedes": [],
+        "superseded_by": None,
+        "replacement_ref": None,
+        "contradiction_refs": [],
+        "authority_kind": "human_reviewed",
+        "source_kind": "reviewed_corpus",
+        "scope_classes": ["repo", "workspace"],
+        "primary_recall_modes": ["semantic"],
+        "source_path": "memo/objects/decisions/test/object.json",
+        "inspect_key": "memo.decision.test",
+        "expand_key": "memo.decision.test",
+    }
+    capsule = {
+        "id": "memo.decision.test",
+        "kind": "decision",
+        "title": "Reviewed owner route",
+        "summary": "Current reviewed owner route.",
+        "source_kind": "reviewed_corpus",
+        "recall_posture_short": "preferred current recall",
+        "trust_posture_short": "reviewed",
+        "use_when_short": "owner orientation",
+        "do_not_use_short": "not action authority",
+        "strongest_next_source": "docs/owner-route.md",
+        "source_path": "memo/objects/decisions/test/object.json",
+    }
+    content = {
+        "card": card,
+        "capsule": capsule,
+        "expanded": None,
+        "source_route": "docs/owner-route.md",
+    }
+    item = {
+        "ordinal": 1,
+        "selection_score": 120,
+        **content,
+        "estimated_tokens": 200,
+        "content_digest": canonical_digest(content),
+    }
+    profile_ref = {
+        "owner_repo": "aoa-memo",
+        "artifact_ref": (
+            "mechanics/consumer-handoff/parts/orchestrator-recall-alignment/"
+            "examples/codex_owner_orientation_v0.consumer-profile.json"
+        ),
+        "source_ref": "repo:aoa-memo/profile",
+        "artifact_digest": PROFILE_SHA,
+        "schema_ref": "schemas/codex_owner_orientation_profile_v0.schema.json",
+        "schema_version": "codex_owner_orientation_profile_v0",
+    }
+    surface_ref = {
+        "owner_repo": "aoa-memo",
+        "artifact_ref": "generated/memory-objects/test.json",
+        "source_ref": "repo:aoa-memo/generated/memory-objects/test.json",
+        "artifact_digest": "sha256:" + ("3" * 64),
+        "schema_ref": "schemas/generated-surfaces/test.schema.json",
+        "schema_version": "aoa_memo_memory_object_surfaces_v2",
+    }
+    plan = {
+        "schema_version": "codex_owner_orientation_plan_v0",
+        "plan_id": "orientation:test",
+        "consumer_id": "codex_owner_orientation_v0",
+        "consumer_mode": "bounded",
+        "status": "bounded_memory",
+        "recall_intent": {
+            "contract_id": "C07",
+            "intent_id": "intent:test",
+            "consumer_id": "codex_owner_orientation_v0",
+            "trigger_id": "operator-explicit-pull",
+            "mode": "explicit_public_pull",
+            "data_class": "D0",
+            "risk_class": "R1",
+            "effect_ceiling": "none",
+            "action_use": "forbidden",
+            "tenant_id": "owner-local",
+            "anchor_id": "anchor:test",
+            "anchor_ref": {"source_ref": "repo:aoa-memo/MEMORY_INDEX.md"},
+            "anchor_freshness": {
+                "expires_at": "2026-07-29T12:00:00Z"
+            },
+            "policy_pin": {
+                "policy_id": "policy:aoa-memo:codex-owner-orientation:v0",
+                "policy_version": "0",
+                "policy_digest": POLICY_SHA,
+            },
+            "model_prompt_provider_pin": {
+                "provider": "none",
+                "model_id": "deterministic-lexical",
+                "model_version": "1",
+                "prompt_digest": "sha256:" + ("0" * 64),
+            },
+            "source_refs": [host_ref, resource_ref],
+        },
+        "profile_ref": profile_ref,
+        "profile_digest": PROFILE_SEMANTIC_DIGEST,
+        "query_digest": "sha256:" + ("4" * 64),
+        "memory_object_catalog_version": 1,
+        "memory_object_catalog_ref": surface_ref,
+        "memory_object_capsules_ref": surface_ref,
+        "memory_object_sections_ref": surface_ref,
+        "selection_algorithm": "current-source-plus-deterministic-lexical-v1",
+        "budget": {
+            "max_items": 3,
+            "max_estimated_tokens": 900,
+            "expand": False,
+        },
+        "items": [item],
+        "omissions": [],
+        "host_capability_ref": host_ref,
+        "host_resource_plan_ref": resource_ref,
+        "planned_at": "2026-07-29T09:00:00Z",
+        "expires_at": "2026-07-29T12:00:00Z",
+        "no_memory_fallback": True,
+        "memory_write_performed": False,
+        "policy_promotion_performed": False,
+        "effect_authority": "none",
+        "action_use": "forbidden",
+        "plan_digest": "sha256:" + ("0" * 64),
+    }
+    plan["plan_digest"] = canonical_digest(plan, exclude={"plan_digest"})
+    return plan
+
+
+def orientation_bundle(plan: dict) -> dict:
+    result_refs = ["memory-result:memo.decision.test:1234567890abcdef"]
+    packet = {
+        "contract_id": "C08",
+        "instance_id": "recall-packet:test",
+        "owner": "aoa-memo",
+        "validation_status": "valid",
+        "result_mode": (
+            "bounded_memory" if plan["status"] == "bounded_memory" else "silence"
+        ),
+        "result_refs": result_refs if plan["items"] else [],
+        "object_pins": [{"object_ref": item["card"]["id"]} for item in plan["items"]],
+        "action_use": "forbidden",
+    }
+    packet["content_digest"] = canonical_digest(
+        packet,
+        exclude={"content_digest"},
+        ensure_ascii=False,
+    )
+    decision = {
+        "contract_id": "C09",
+        "instance_id": "intervention-decision:test",
+        "decision_id": "intervention-decision:test",
+        "owner": "aoa-memo",
+        "validation_status": "valid",
+        "recall_packet_ref": packet["instance_id"],
+        "decision": (
+            "bounded_observation" if plan["items"] else "silence"
+        ),
+        "effect_authority": "none",
+        "observation_refs": packet["result_refs"],
+    }
+    decision["content_digest"] = canonical_digest(
+        decision,
+        exclude={"content_digest"},
+        ensure_ascii=False,
+    )
+    bundle = {
+        "schema_version": "codex_owner_orientation_memo_bundle_v0",
+        "semantic_owner": "aoa-memo",
+        "control_plane_owner": "aoa-sdk",
+        "runtime_delivery_owner": "abyss-stack",
+        "plan_ref": f"aoa-sdk:owner-orientation-plan:{plan['plan_id']}",
+        "plan_digest": plan["plan_digest"],
+        "recall_packet": packet,
+        "intervention_decision": decision,
+        "delivery_eligible": True,
+        "effect_authority": "none",
+        "action_use": "forbidden",
+        "memory_write_performed": False,
+        "bundle_digest": "sha256:" + ("0" * 64),
+    }
+    bundle["bundle_digest"] = canonical_digest(
+        bundle,
+        exclude={"bundle_digest"},
+    )
+    return bundle
 
 
 def seed_workspace(root: Path) -> None:
@@ -1105,6 +1342,7 @@ def test_mcp_surface_contracts(tmp_path: Path) -> None:
     assert set(read_tools) == {
         "aoa_memo_build_port_index",
         "aoa_memo_brief",
+        "aoa_memo_owner_orientation",
         "aoa_memo_search",
         "aoa_memo_landing_plan",
         "aoa_memo_pending_exports",
@@ -1184,3 +1422,105 @@ def test_mcp_policy_family_and_candidate_root_gate_writes(
     result = state.create_candidate(*args)
     assert Path(result["path"]).is_file()
     assert Path(result["path"]).is_relative_to(allowed_root)
+
+
+def test_owner_orientation_delivers_without_reselection_or_persistence(
+    tmp_path: Path,
+) -> None:
+    state = AoAMemoMCPState.discover(tmp_path)
+    plan = orientation_plan()
+    bundle = orientation_bundle(plan)
+
+    result = state.deliver_owner_orientation(
+        plan=plan,
+        memo_bundle=bundle,
+        observed_at="2026-07-29T09:30:00Z",
+    )
+
+    assert result["delivery_state"] == "delivered"
+    assert [item["object_id"] for item in result["memory_payload"]] == [
+        "memo.decision.test"
+    ]
+    assert result["reranking_performed"] is False
+    assert result["reselection_performed"] is False
+    assert result["persistence_performed"] is False
+    assert result["effect_authority"] == "none"
+    receipt = result["runtime_receipt"]
+    assert receipt["contract_id"] == "C20"
+    assert receipt["result"]["reason_code"] == "delivery_confirmed"
+    assert receipt["content_minimization"]["memory_content_persisted"] is False
+    assert receipt["authority"]["memory_semantic_authority"] is False
+
+
+def test_owner_orientation_no_memory_mode_and_expiry_walk_back_cleanly(
+    tmp_path: Path,
+) -> None:
+    state = AoAMemoMCPState.discover(tmp_path)
+    plan = orientation_plan()
+    plan.update(
+        {
+            "consumer_mode": "off",
+            "status": "off",
+            "budget": None,
+            "items": [],
+        }
+    )
+    plan["plan_digest"] = canonical_digest(plan, exclude={"plan_digest"})
+    bundle = orientation_bundle(plan)
+
+    suppressed = state.deliver_owner_orientation(
+        plan=plan,
+        memo_bundle=bundle,
+        observed_at="2026-07-29T09:30:00Z",
+    )
+    bounded_plan = orientation_plan()
+    expired = state.deliver_owner_orientation(
+        plan=bounded_plan,
+        memo_bundle=orientation_bundle(bounded_plan),
+        observed_at="2026-07-29T12:00:00Z",
+        attempt_no=2,
+    )
+
+    assert suppressed["delivery_state"] == "suppressed"
+    assert suppressed["memory_payload"] == []
+    assert suppressed["runtime_receipt"]["result"]["reason_code"] == (
+        "policy_silence"
+    )
+    assert expired["delivery_state"] == "expired"
+    assert expired["memory_payload"] == []
+    assert expired["runtime_receipt"]["admission"]["state"] == "expired"
+
+
+def test_owner_orientation_fails_closed_on_content_or_host_drift(
+    tmp_path: Path,
+) -> None:
+    state = AoAMemoMCPState.discover(tmp_path)
+    plan = orientation_plan()
+    bundle = orientation_bundle(plan)
+    plan["items"][0]["card"]["summary"] = "tampered"
+    plan["plan_digest"] = canonical_digest(plan, exclude={"plan_digest"})
+    bundle["plan_digest"] = plan["plan_digest"]
+    bundle["bundle_digest"] = canonical_digest(
+        bundle,
+        exclude={"bundle_digest"},
+    )
+
+    with pytest.raises(ValueError, match="item content digest"):
+        state.deliver_owner_orientation(
+            plan=plan,
+            memo_bundle=bundle,
+            observed_at="2026-07-29T09:30:00Z",
+        )
+
+    plan = orientation_plan()
+    plan["host_resource_plan_ref"]["artifact_ref"] = "host:test"
+    plan["host_resource_plan_ref"]["source_ref"] = "repo:abyss-machine/test"
+    plan["host_resource_plan_ref"]["schema_ref"] = "schemas/host.json"
+    plan["plan_digest"] = canonical_digest(plan, exclude={"plan_digest"})
+    bundle = orientation_bundle(plan)
+    with pytest.raises(ValueError, match="C19"):
+        state.deliver_owner_orientation(
+            plan=plan,
+            memo_bundle=bundle,
+            observed_at="2026-07-29T09:30:00Z",
+        )

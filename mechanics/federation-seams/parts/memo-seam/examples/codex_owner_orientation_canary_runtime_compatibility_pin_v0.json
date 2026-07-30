@@ -1,0 +1,56 @@
+{
+  "schema_version": "codex_owner_orientation_canary_runtime_compatibility_pin_v0",
+  "pin_id": "abyss-stack.codex-owner-orientation-canary.runtime.v0",
+  "runtime_owner": "abyss-stack",
+  "control_plane_owner": "aoa-sdk",
+  "semantic_owner": "aoa-memo",
+  "host_owner": "abyss-machine",
+  "outcome_owner": "aoa-stats",
+  "proof_owner": "aoa-evals",
+  "sdk_release_plan_schema": {
+    "artifact_ref": "repo:aoa-sdk/mechanics/boundary-bridge/parts/consumed-surface-posture-gate/schemas/codex-owner-orientation-canary-release-plan-v0.schema.json",
+    "sha256": "sha256:595983a6c1b034467cc217263f56d730a370c03bde629eddd1710facb3821696"
+  },
+  "sdk_shadow_plan_schema": {
+    "artifact_ref": "repo:aoa-sdk/mechanics/boundary-bridge/parts/consumed-surface-posture-gate/schemas/codex-owner-orientation-shadow-plan-v0.schema.json",
+    "sha256": "sha256:394cecfbccdb6865e2b8a73df98c7117348b7109b395c4fd040d4a039ed37820"
+  },
+  "memo_consumer_profile": {
+    "artifact_ref": "repo:aoa-memo/mechanics/consumer-handoff/parts/orchestrator-recall-alignment/examples/codex_owner_orientation_canary_v0.consumer-profile.json",
+    "sha256": "sha256:c26b4d7481bd82aabe9912736bf538cb5f3f01233f79f4ec555efd68d9d3090d",
+    "semantic_digest": "sha256:94c00d7f62982df9a10b3ae5a3593d5dcfcc5bcc72b11b9e9f6b0110679bc4d2"
+  },
+  "memo_influence_policy": {
+    "artifact_ref": "repo:aoa-memo/mechanics/consumer-handoff/parts/orchestrator-recall-alignment/examples/codex_owner_orientation_canary_v0.influence-policy.json",
+    "sha256": "sha256:d0ba7078a7dcc2d4bdaa3c90a59ec371bddce967cdf14abb8c23ab012ecaac7e"
+  },
+  "memo_shadow_bundle_schema": {
+    "artifact_ref": "repo:aoa-memo/mechanics/consumer-handoff/parts/orchestrator-recall-alignment/schemas/codex_owner_orientation_shadow_bundle_v0.schema.json",
+    "sha256": "sha256:1c56162bd9dd4110fe84afc6425234821f5895d129af031e8aeb1e063de049bf"
+  },
+  "memo_canary_bundle_schema": {
+    "artifact_ref": "repo:aoa-memo/mechanics/consumer-handoff/parts/orchestrator-recall-alignment/schemas/codex_owner_orientation_canary_bundle_v0.schema.json",
+    "sha256": "sha256:fb39b442f8eaf10078d1f079631f1bda50e17df5125528d5c453502daefc69bf"
+  },
+  "runtime_receipt_schema": {
+    "artifact_ref": "mechanics/federation-seams/parts/memo-seam/schemas/active-organ-canary-runtime-receipt.schema.json",
+    "sha256": "sha256:06650c35b3d064d142d5a5f20954d10405c7c0d9eb826455a9560f98b8fe13c3"
+  },
+  "accepted_release_plan_version": "codex_owner_orientation_canary_release_plan_v0",
+  "accepted_shadow_plan_version": "codex_owner_orientation_shadow_plan_v0",
+  "accepted_shadow_bundle_version": "codex_owner_orientation_shadow_bundle_v0",
+  "accepted_canary_bundle_version": "codex_owner_orientation_canary_bundle_v0",
+  "consumer_id": "codex_owner_orientation_canary_v0",
+  "tenant_id": "owner-local",
+  "data_class": "D0",
+  "risk_class": "R2",
+  "max_reminders_per_window": 1,
+  "delivery": "one_source_visible_observation",
+  "directive_authority": "forbidden",
+  "reranking": "forbidden",
+  "reselection": "forbidden",
+  "persistence": "forbidden",
+  "effect_authority": "none",
+  "rollback_target": "codex_owner_orientation_v0",
+  "unknown_version_posture": "fail_closed"
+}

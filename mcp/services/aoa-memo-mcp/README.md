@@ -50,6 +50,9 @@ Read-contour tools:
 
 - `aoa_memo_brief(repo, intent)`
 - `aoa_memo_search(query, scope, mode)`
+- `aoa_memo_owner_orientation(plan, memo_bundle, observed_at, target_ref,
+  attempt_no)` for exact, already-admitted C08/C09 delivery plus C20; no
+  reranking, reselection, persistence, effects, or hidden fallback
 - `aoa_memo_validate_candidate(path)`
 - `aoa_memo_build_port_index(repo, check)` without a write parameter
 - `aoa_memo_validate_port(repo)`
@@ -92,6 +95,12 @@ field filters such as `repo:abyss-stack`, `kind:decision`,
 `recall:allowed`, `source_kind:reviewed_corpus`, or `source:PORT.yaml` to keep
 retrieval bounded. File hits remain supporting retrieval; source truth stays in
 the reviewed object or owning repository.
+
+The owner-orientation tool is different from generic search. `aoa-sdk` selects
+the plan, `aoa-memo` authors the C08/C09 bundle, and this service only returns
+the exact admitted items to the explicit caller. `off`, `fresh-start`,
+silence, stale/expired admission, and rollback return an empty memory payload.
+This source surface is not a deployed automatic Codex hook.
 
 In the shared AoA Codex plane this service is registered as `aoa_memo` through
 `8Dionysus:config/codex_plane/runtime_manifest.v1.json`. The workspace launcher

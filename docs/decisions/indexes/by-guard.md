@@ -220,6 +220,10 @@
 
 - [ABYSS-STACK-D-0076 Repo-Self KAG Runtime Projections](../ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md) (`docs/decisions/ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md`)
 
+## atomic projection
+
+- [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
+
 ## authenticated loopback exposure
 
 - [ABYSS-STACK-D-0077 Loopback MCP Owner Lifecycle](../ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md`)
@@ -265,6 +269,10 @@
 ## consumer-zero
 
 - [ABYSS-STACK-D-0094 Wave 6 Access-Form and Retirement Classification](../ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md) (`docs/decisions/ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md`)
+
+## content minimization
+
+- [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
 
 ## decision graph coverage
 
@@ -329,6 +337,10 @@
 
 - [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
 - [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
+
+## exact delivery
+
+- [ABYSS-STACK-D-0102 R1 Memory Runtime Is Exact Pull Delivery](../ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md) (`docs/decisions/ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md`)
 
 ## exact pin
 
@@ -457,6 +469,10 @@
 - [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
 - [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
 
+## no hidden persistence
+
+- [ABYSS-STACK-D-0102 R1 Memory Runtime Is Exact Pull Delivery](../ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md) (`docs/decisions/ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md`)
+
 ## no semantic proxy
 
 - [ABYSS-STACK-D-0095 Cross-Organ Orchestration Host Boundary](../ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md) (`docs/decisions/ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md`)
@@ -474,6 +490,8 @@
 - [ABYSS-STACK-D-0094 Wave 6 Access-Form and Retirement Classification](../ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md) (`docs/decisions/ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md`)
 - [ABYSS-STACK-D-0095 Cross-Organ Orchestration Host Boundary](../ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md) (`docs/decisions/ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md`)
 - [ABYSS-STACK-D-0097 Codex Consumer Handoff Remains Owner-Composed](../ABYSS-STACK-D-0097-codex-consumer-handoff-remains-owner-composed.md) (`docs/decisions/ABYSS-STACK-D-0097-codex-consumer-handoff-remains-owner-composed.md`)
+- [ABYSS-STACK-D-0102 R1 Memory Runtime Is Exact Pull Delivery](../ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md) (`docs/decisions/ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md`)
+- [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
 
 ## owner cache
 
@@ -585,6 +603,7 @@
 - [ABYSS-STACK-D-0095 Cross-Organ Orchestration Host Boundary](../ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md) (`docs/decisions/ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md`)
 - [ABYSS-STACK-D-0096 Fail-Closed MCP Protocol Migration Lab](../ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md) (`docs/decisions/ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md`)
 - [ABYSS-STACK-D-0101 Retire Routing Predecessor Checkout Consumers](../ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md) (`docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md`)
+- [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
 
 ## root route
 

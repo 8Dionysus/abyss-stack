@@ -2202,7 +2202,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 encoding="utf-8",
             )
             fake_codex.chmod(0o755)
-            env = os.environ.copy()
+            env = mcp_environment()
             env.update(
                 {
                     "AOA_STACK_ROOT": str(stack_root),

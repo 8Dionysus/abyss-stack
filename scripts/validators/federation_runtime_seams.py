@@ -1,12 +1,238 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from copy import deepcopy
+from datetime import datetime
 import json
 from pathlib import Path
 from typing import Any
 
+from jsonschema import Draft202012Validator, FormatChecker
+
 BridgeConfigLoader = Callable[[list[str]], dict[str, Any]]
 BridgeStringIterator = Callable[[Any], list[str]]
+
+
+ACTIVE_ORGAN_DELIVERY_SCHEMA = (
+    "mechanics/federation-seams/parts/memo-seam/schemas/"
+    "active-organ-runtime-delivery-receipt.schema.json"
+)
+ACTIVE_ORGAN_DELIVERY_EXAMPLES = (
+    "mechanics/federation-seams/parts/memo-seam/examples"
+)
+ACTIVE_ORGAN_DELIVERY_NEGATIVE_EXAMPLES = (
+    "active_organ_runtime_delivery_receipt.negative-examples.json"
+)
+
+
+def _json_path(error_path: Any) -> str:
+    return "/".join(str(item) for item in error_path) or "<root>"
+
+
+def _parse_datetime(value: object) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def validate_active_organ_runtime_delivery_payload(
+    payload: object,
+    *,
+    schema: object,
+) -> list[str]:
+    errors = [
+        f"{_json_path(error.absolute_path)}: {error.message}"
+        for error in sorted(
+            Draft202012Validator(
+                schema,
+                format_checker=FormatChecker(),
+            ).iter_errors(payload),
+            key=lambda item: list(item.absolute_path),
+        )
+    ]
+    if not isinstance(payload, dict):
+        return errors
+
+    policy = payload.get("policy_binding")
+    target = payload.get("delivery_target")
+    if isinstance(policy, dict) and isinstance(target, dict):
+        if policy.get("consumer_id") != target.get("consumer_id"):
+            errors.append(
+                "consumer_id: policy_binding and delivery_target must match exactly"
+            )
+
+    recorded_at = _parse_datetime(payload.get("recorded_at"))
+    expires_at = _parse_datetime(payload.get("expires_at"))
+    state = payload.get("delivery_state")
+    if recorded_at is not None and expires_at is not None:
+        if state == "expired" and recorded_at < expires_at:
+            errors.append(
+                "recorded_at: expired receipt cannot precede expires_at"
+            )
+        if state != "expired" and recorded_at > expires_at:
+            errors.append(
+                "recorded_at: non-expired receipt cannot outlive expires_at"
+            )
+
+    anchor = payload.get("anchor_binding")
+    result = payload.get("result")
+    admission = payload.get("admission")
+    if (
+        state == "suppressed"
+        and isinstance(result, dict)
+        and result.get("reason_code") == "anchor_not_current"
+        and isinstance(anchor, dict)
+        and anchor.get("freshness") == "current"
+    ):
+        errors.append(
+            "anchor_binding/freshness: anchor_not_current requires non-current freshness"
+        )
+    if (
+        state == "suppressed"
+        and isinstance(result, dict)
+        and result.get("reason_code") == "policy_silence"
+        and isinstance(admission, dict)
+        and admission.get("state") != "admitted"
+    ):
+        errors.append(
+            "admission/state: policy_silence requires an admitted packet"
+        )
+
+    return errors
+
+
+def apply_active_organ_delivery_negative_mutations(
+    payload: dict[str, Any],
+    mutations: object,
+) -> dict[str, Any]:
+    if not isinstance(mutations, dict):
+        raise ValueError("negative example set must be an object")
+    result = deepcopy(payload)
+    for pointer, value in mutations.items():
+        if not isinstance(pointer, str) or not pointer.startswith("/"):
+            raise ValueError(f"invalid JSON pointer: {pointer!r}")
+        parts = [
+            part.replace("~1", "/").replace("~0", "~")
+            for part in pointer[1:].split("/")
+        ]
+        current: Any = result
+        for part in parts[:-1]:
+            if not isinstance(current, dict) or part not in current:
+                raise ValueError(f"negative example pointer is unresolved: {pointer}")
+            current = current[part]
+        if not isinstance(current, dict) or parts[-1] not in current:
+            raise ValueError(f"negative example pointer is unresolved: {pointer}")
+        current[parts[-1]] = value
+    return result
+
+
+def validate_active_organ_runtime_delivery_contract(
+    errors: list[str],
+    *,
+    root: Path,
+) -> None:
+    schema_path = root / ACTIVE_ORGAN_DELIVERY_SCHEMA
+    examples_root = root / ACTIVE_ORGAN_DELIVERY_EXAMPLES
+    negative_path = examples_root / ACTIVE_ORGAN_DELIVERY_NEGATIVE_EXAMPLES
+    required_paths = [schema_path, negative_path]
+    missing = [path for path in required_paths if not path.is_file()]
+    if missing:
+        for path in missing:
+            errors.append(
+                f"{path.relative_to(root)} must exist for C20 RuntimeDeliveryReceipt"
+            )
+        return
+
+    try:
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        Draft202012Validator.check_schema(schema)
+    except Exception as exc:
+        errors.append(
+            f"{ACTIVE_ORGAN_DELIVERY_SCHEMA} must be a valid Draft 2020-12 schema: {exc}"
+        )
+        return
+
+    expected_states = {
+        "attempted",
+        "delivered",
+        "suppressed",
+        "expired",
+        "failed",
+    }
+    observed_states: set[str] = set()
+    positive_examples = sorted(examples_root.glob("*.example.json"))
+    for path in positive_examples:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(f"{path.relative_to(root)} must be valid JSON: {exc}")
+            continue
+        observed_states.add(str(payload.get("delivery_state")))
+        for error in validate_active_organ_runtime_delivery_payload(
+            payload,
+            schema=schema,
+        ):
+            errors.append(f"{path.relative_to(root)}: {error}")
+    if observed_states != expected_states:
+        errors.append(
+            "C20 positive examples must cover exactly attempted, delivered, "
+            "suppressed, expired, and failed"
+        )
+
+    try:
+        negative_corpus = json.loads(negative_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        errors.append(f"{negative_path.relative_to(root)} must be valid JSON: {exc}")
+        return
+    if not isinstance(negative_corpus, dict) or negative_corpus.get(
+        "schema_version"
+    ) != "active_organ_runtime_delivery_receipt_negative_examples_v1":
+        errors.append(
+            f"{negative_path.relative_to(root)} must use the versioned C20 negative corpus"
+        )
+        return
+    cases = negative_corpus.get("cases")
+    if not isinstance(cases, list) or not cases:
+        errors.append(
+            f"{negative_path.relative_to(root)} must contain executable negative cases"
+        )
+        return
+    for case in cases:
+        if not isinstance(case, dict):
+            errors.append("C20 negative case must be an object")
+            continue
+        base_path = examples_root / str(case.get("base_example", ""))
+        try:
+            base = json.loads(base_path.read_text(encoding="utf-8"))
+            mutated = apply_active_organ_delivery_negative_mutations(
+                base,
+                case.get("set"),
+            )
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            errors.append(
+                f"C20 negative case {case.get('case_id', '<unknown>')} is invalid: {exc}"
+            )
+            continue
+        negative_errors = validate_active_organ_runtime_delivery_payload(
+            mutated,
+            schema=schema,
+        )
+        if not negative_errors:
+            errors.append(
+                f"C20 negative case {case.get('case_id', '<unknown>')} must fail closed"
+            )
+            continue
+        expected = case.get("expected_error")
+        if not isinstance(expected, str) or not any(
+            expected in error for error in negative_errors
+        ):
+            errors.append(
+                f"C20 negative case {case.get('case_id', '<unknown>')} must expose "
+                f"expected error token {expected!r}"
+            )
 
 
 def validate_memo_runtime_seam(errors: list[str], *, root: Path) -> None:
@@ -28,6 +254,8 @@ def validate_memo_runtime_seam(errors: list[str], *, root: Path) -> None:
         "/memo/",
         "aoa-export-memo-candidate",
         "Logs/memo-exports/",
+        "RuntimeDeliveryReceipt",
+        "active-organ-runtime-delivery-receipt.schema.json",
     ):
         if snippet not in seam_doc:
             errors.append(f"mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md must mention {snippet}")
@@ -61,6 +289,8 @@ def validate_memo_runtime_seam(errors: list[str], *, root: Path) -> None:
         errors.append("runtime memo export example must use artifact_kind aoa.runtime-memo-export-candidate")
     if example.get("exported_by") != "scripts/aoa-export-memo-candidate":
         errors.append("runtime memo export example must use exported_by scripts/aoa-export-memo-candidate")
+
+    validate_active_organ_runtime_delivery_contract(errors, root=root)
 
 
 def validate_eval_runtime_seam(

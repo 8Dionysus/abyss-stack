@@ -1,0 +1,44 @@
+{
+  "schema_version": "codex_owner_orientation_shadow_runtime_compatibility_pin_v0",
+  "pin_id": "abyss-stack.codex-owner-orientation-shadow.runtime.v0",
+  "runtime_owner": "abyss-stack",
+  "control_plane_owner": "aoa-sdk",
+  "semantic_owner": "aoa-memo",
+  "host_owner": "abyss-machine",
+  "outcome_owner": "aoa-stats",
+  "proof_owner": "aoa-evals",
+  "sdk_plan_schema": {
+    "artifact_ref": "repo:aoa-sdk/mechanics/boundary-bridge/parts/consumed-surface-posture-gate/schemas/codex-owner-orientation-shadow-plan-v0.schema.json",
+    "sha256": "sha256:394cecfbccdb6865e2b8a73df98c7117348b7109b395c4fd040d4a039ed37820"
+  },
+  "memo_contract_schema": {
+    "artifact_ref": "repo:aoa-memo/schemas/support-objects/active_organ_memo_contracts_v1.schema.json",
+    "sha256": "sha256:ecb9b6fb8abe8633d1505b12c396d8e4cfaee6d560ec20617268ce02574ff99d"
+  },
+  "memo_consumer_profile": {
+    "artifact_ref": "repo:aoa-memo/mechanics/consumer-handoff/parts/orchestrator-recall-alignment/examples/codex_owner_orientation_shadow_v0.consumer-profile.json",
+    "sha256": "sha256:39a93b38863f6568e1282a6ad2aa1e575dcaff8ded84591f1f7108372601ac1f",
+    "semantic_digest": "sha256:5365919725bd186371a432e64b4dd095872d4df633894c772db3ba8ea8eb972a"
+  },
+  "memo_influence_policy": {
+    "artifact_ref": "repo:aoa-memo/mechanics/consumer-handoff/parts/orchestrator-recall-alignment/examples/codex_owner_orientation_shadow_v0.influence-policy.json",
+    "sha256": "sha256:2b66b38121e2c41bfd1d0b31b29429a5ac57c1d028aab15b9aeb4c9cc1e73847"
+  },
+  "memo_bundle_schema": {
+    "artifact_ref": "repo:aoa-memo/mechanics/consumer-handoff/parts/orchestrator-recall-alignment/schemas/codex_owner_orientation_shadow_bundle_v0.schema.json",
+    "sha256": "sha256:1c56162bd9dd4110fe84afc6425234821f5895d129af031e8aeb1e063de049bf"
+  },
+  "runtime_receipt_schema": {
+    "artifact_ref": "mechanics/federation-seams/parts/memo-seam/schemas/active-organ-shadow-runtime-receipt.schema.json",
+    "sha256": "sha256:19ebb59102d81add4e8696112280a0e7877f0d2295f843a2d615fc7608b04b83"
+  },
+  "accepted_plan_version": "codex_owner_orientation_shadow_plan_v0",
+  "accepted_bundle_version": "codex_owner_orientation_shadow_bundle_v0",
+  "consumer_visibility": "forbidden",
+  "delivery": "forbidden",
+  "reranking": "forbidden",
+  "reselection": "forbidden",
+  "persistence": "forbidden",
+  "effect_authority": "none",
+  "unknown_version_posture": "fail_closed"
+}

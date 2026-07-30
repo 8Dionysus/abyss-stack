@@ -4,6 +4,7 @@ import json
 import os
 import re
 import subprocess
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,6 +23,30 @@ DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
 DEFAULT_ABYSS_STACK_SOURCE = Path.home() / "src" / "abyss-stack"
 DEFAULT_ABYSS_MACHINE_PORT = Path("/var/lib/abyss-machine/memo")
 DEFAULT_ABYSS_MACHINE_POLICY = Path("/etc/abyss-machine")
+OWNER_ORIENTATION_PIN = (
+    "mechanics/federation-seams/parts/memo-seam/examples/"
+    "codex_owner_orientation_runtime_compatibility_pin_v0.json"
+)
+ACTIVE_ORGAN_DELIVERY_SCHEMA = (
+    "mechanics/federation-seams/parts/memo-seam/schemas/"
+    "active-organ-runtime-delivery-receipt.schema.json"
+)
+OWNER_ORIENTATION_SHADOW_PIN = (
+    "mechanics/federation-seams/parts/memo-seam/examples/"
+    "codex_owner_orientation_shadow_runtime_compatibility_pin_v0.json"
+)
+ACTIVE_ORGAN_SHADOW_RECEIPT_SCHEMA = (
+    "mechanics/federation-seams/parts/memo-seam/schemas/"
+    "active-organ-shadow-runtime-receipt.schema.json"
+)
+OWNER_ORIENTATION_CANARY_PIN = (
+    "mechanics/federation-seams/parts/memo-seam/examples/"
+    "codex_owner_orientation_canary_runtime_compatibility_pin_v0.json"
+)
+ACTIVE_ORGAN_CANARY_RECEIPT_SCHEMA = (
+    "mechanics/federation-seams/parts/memo-seam/schemas/"
+    "active-organ-canary-runtime-receipt.schema.json"
+)
 
 MEMORY_CONTRACTS = [
     "docs/memory/MEMORY_OPERATION_CYCLE.md",
@@ -158,6 +183,795 @@ def _render_json(payload: Any) -> str:
     return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
 
 
+def _canonical_digest(
+    payload: dict[str, Any],
+    *,
+    exclude: set[str] | None = None,
+    ensure_ascii: bool = True,
+) -> str:
+    filtered = {
+        key: value
+        for key, value in payload.items()
+        if key not in (exclude or set())
+    }
+    encoded = json.dumps(
+        filtered,
+        ensure_ascii=ensure_ascii,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
+def _artifact_digest(path: Path) -> str:
+    return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+
+
+def _parse_aware_timestamp(value: object, label: str) -> datetime:
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be an ISO-8601 timestamp")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"{label} must be an ISO-8601 timestamp") from exc
+    if parsed.tzinfo is None:
+        raise ValueError(f"{label} must be timezone-aware")
+    return parsed
+
+
+def _iso_timestamp(value: datetime) -> str:
+    return (
+        value.astimezone(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def _stack_source_root() -> Path:
+    configured = os.environ.get("AOA_ABYSS_STACK_ROOT")
+    candidates = []
+    if configured:
+        candidates.append(Path(configured).expanduser().resolve())
+    candidates.append(Path(__file__).resolve().parents[5])
+    for candidate in candidates:
+        if (candidate / OWNER_ORIENTATION_PIN).is_file():
+            return candidate
+    raise ValueError(
+        "owner-orientation runtime requires an explicit current abyss-stack source root"
+    )
+
+
+def _validate_owner_orientation_inputs(
+    *,
+    plan: dict[str, Any],
+    memo_bundle: dict[str, Any],
+    compatibility_pin: dict[str, Any],
+) -> None:
+    required_plan_keys = {
+        "schema_version",
+        "plan_id",
+        "consumer_id",
+        "consumer_mode",
+        "status",
+        "recall_intent",
+        "profile_ref",
+        "profile_digest",
+        "query_digest",
+        "memory_object_catalog_version",
+        "memory_object_catalog_ref",
+        "memory_object_capsules_ref",
+        "memory_object_sections_ref",
+        "selection_algorithm",
+        "budget",
+        "items",
+        "omissions",
+        "host_capability_ref",
+        "host_resource_plan_ref",
+        "planned_at",
+        "expires_at",
+        "no_memory_fallback",
+        "memory_write_performed",
+        "policy_promotion_performed",
+        "effect_authority",
+        "action_use",
+        "plan_digest",
+    }
+    if set(plan) != required_plan_keys:
+        raise ValueError("owner-orientation plan shape is unknown or incomplete")
+    if (
+        plan["schema_version"] != compatibility_pin["accepted_plan_version"]
+        or plan["consumer_id"] != "codex_owner_orientation_v0"
+        or plan["selection_algorithm"]
+        != "current-source-plus-deterministic-lexical-v1"
+    ):
+        raise ValueError("owner-orientation plan version or consumer is not admitted")
+    if plan["plan_digest"] != _canonical_digest(
+        plan,
+        exclude={"plan_digest"},
+    ):
+        raise ValueError("owner-orientation plan digest is invalid")
+    profile_pin = compatibility_pin["memo_consumer_profile"]
+    if (
+        plan["profile_ref"]["owner_repo"] != "aoa-memo"
+        or plan["profile_ref"]["artifact_digest"] != profile_pin["sha256"]
+        or plan["profile_digest"] != profile_pin["semantic_digest"]
+    ):
+        raise ValueError("owner-orientation profile pin drifted")
+    if (
+        plan["effect_authority"] != "none"
+        or plan["action_use"] != "forbidden"
+        or plan["memory_write_performed"]
+        or plan["policy_promotion_performed"]
+    ):
+        raise ValueError("owner-orientation plan attempted to widen authority")
+
+    intent = plan["recall_intent"]
+    policy_pin = compatibility_pin["memo_influence_policy"]
+    if (
+        intent.get("contract_id") != "C07"
+        or intent.get("consumer_id") != plan["consumer_id"]
+        or intent.get("trigger_id") != "operator-explicit-pull"
+        or intent.get("mode") != "explicit_public_pull"
+        or intent.get("data_class") != "D0"
+        or intent.get("risk_class") != "R1"
+        or intent.get("effect_ceiling") != "none"
+        or intent.get("action_use") != "forbidden"
+        or intent.get("policy_pin", {}).get("policy_digest")
+        != policy_pin["sha256"]
+    ):
+        raise ValueError("owner-orientation C07 admission tuple drifted")
+    if any(
+        ref.get("owner_repo") == ".aoa"
+        or str(ref.get("artifact_ref", "")).startswith(".aoa/")
+        or str(ref.get("source_ref", "")).startswith("repo:.aoa/")
+        for ref in intent.get("source_refs", [])
+    ):
+        raise ValueError("owner-orientation cannot deliver raw .aoa refs")
+    anchor_expires = intent.get("anchor_freshness", {}).get("expires_at")
+    if anchor_expires is not None and _parse_aware_timestamp(
+        intent.get("expires_at", plan["expires_at"]),
+        "recall intent expires_at",
+    ) > _parse_aware_timestamp(anchor_expires, "anchor expires_at"):
+        raise ValueError("recall intent cannot outlive its current anchor")
+    for contract_id, field_name in (
+        ("C18", "host_capability_ref"),
+        ("C19", "host_resource_plan_ref"),
+    ):
+        ref = plan[field_name]
+        searchable = " ".join(
+            str(ref.get(key, ""))
+            for key in ("artifact_ref", "source_ref", "schema_ref")
+        ).casefold()
+        if ref.get("owner_repo") != "abyss-machine" or (
+            contract_id.casefold() not in searchable
+        ):
+            raise ValueError(f"owner-orientation requires exact {contract_id} host evidence")
+
+    mode = plan["consumer_mode"]
+    status = plan["status"]
+    items = plan["items"]
+    budget = plan["budget"]
+    if mode == "off" and (status != "off" or items or budget is not None):
+        raise ValueError("off plan must remain a no-memory plan")
+    if mode == "fresh-start" and (
+        status != "no_memory" or items or budget is not None
+    ):
+        raise ValueError("fresh-start plan must remain a no-memory plan")
+    if mode in {"bounded", "high-fidelity"}:
+        if not isinstance(budget, dict):
+            raise ValueError("memory-bearing plan requires an exact budget")
+        if len(items) > budget.get("max_items", -1):
+            raise ValueError("owner-orientation plan exceeds item budget")
+        if sum(item.get("estimated_tokens", 0) for item in items) > budget.get(
+            "max_estimated_tokens",
+            -1,
+        ):
+            raise ValueError("owner-orientation plan exceeds token budget")
+        if status != ("bounded_memory" if items else "silence"):
+            raise ValueError("owner-orientation plan status and items disagree")
+    for ordinal, item in enumerate(items, start=1):
+        card = item.get("card", {})
+        capsule = item.get("capsule", {})
+        if (
+            item.get("ordinal") != ordinal
+            or card.get("source_kind") != "reviewed_corpus"
+            or card.get("review_state") != "confirmed"
+            or card.get("current_recall_status") not in {"preferred", "allowed"}
+            or capsule.get("source_kind") != "reviewed_corpus"
+        ):
+            raise ValueError("owner-orientation item is not current reviewed memory")
+        content = {
+            "card": card,
+            "capsule": capsule,
+            "expanded": item.get("expanded"),
+            "source_route": item.get("source_route"),
+        }
+        if item.get("content_digest") != _canonical_digest(content):
+            raise ValueError("owner-orientation item content digest is invalid")
+        if mode == "bounded" and item.get("expanded") is not None:
+            raise ValueError("bounded owner-orientation cannot carry expansion")
+        if mode == "high-fidelity" and item.get("expanded") is None:
+            raise ValueError("high-fidelity owner-orientation requires expansion")
+
+    required_bundle_keys = {
+        "schema_version",
+        "semantic_owner",
+        "control_plane_owner",
+        "runtime_delivery_owner",
+        "plan_ref",
+        "plan_digest",
+        "recall_packet",
+        "intervention_decision",
+        "delivery_eligible",
+        "effect_authority",
+        "action_use",
+        "memory_write_performed",
+        "bundle_digest",
+    }
+    if set(memo_bundle) != required_bundle_keys:
+        raise ValueError("memo owner-orientation bundle shape is unknown or incomplete")
+    if (
+        memo_bundle["schema_version"]
+        != compatibility_pin["accepted_bundle_version"]
+        or memo_bundle["semantic_owner"] != "aoa-memo"
+        or memo_bundle["control_plane_owner"] != "aoa-sdk"
+        or memo_bundle["runtime_delivery_owner"] != "abyss-stack"
+        or memo_bundle["plan_digest"] != plan["plan_digest"]
+        or memo_bundle["effect_authority"] != "none"
+        or memo_bundle["action_use"] != "forbidden"
+        or memo_bundle["memory_write_performed"]
+        or not memo_bundle["delivery_eligible"]
+    ):
+        raise ValueError("memo owner-orientation bundle authority or plan pin drifted")
+    if memo_bundle["bundle_digest"] != _canonical_digest(
+        memo_bundle,
+        exclude={"bundle_digest"},
+    ):
+        raise ValueError("memo owner-orientation bundle digest is invalid")
+
+    packet = memo_bundle["recall_packet"]
+    decision = memo_bundle["intervention_decision"]
+    for payload, contract_id in ((packet, "C08"), (decision, "C09")):
+        if (
+            payload.get("contract_id") != contract_id
+            or payload.get("owner") != "aoa-memo"
+            or payload.get("validation_status") != "valid"
+            or payload.get("content_digest")
+            != _canonical_digest(
+                payload,
+                exclude={"content_digest"},
+                ensure_ascii=False,
+            )
+        ):
+            raise ValueError(f"memo {contract_id} owner envelope is invalid")
+    expected_packet_mode = (
+        "bounded_memory" if status == "bounded_memory" else "silence"
+    )
+    expected_decision = (
+        "bounded_observation"
+        if expected_packet_mode == "bounded_memory"
+        else "silence"
+    )
+    if (
+        packet.get("result_mode") != expected_packet_mode
+        or packet.get("action_use") != "forbidden"
+        or decision.get("recall_packet_ref") != packet.get("instance_id")
+        or decision.get("decision") != expected_decision
+        or decision.get("effect_authority") != "none"
+        or decision.get("observation_refs") != packet.get("result_refs")
+        or len(packet.get("object_pins", [])) != len(items)
+    ):
+        raise ValueError("memo C08/C09 bundle disagrees with the admitted SDK plan")
+
+
+def _validate_shadow_orientation_inputs(
+    *,
+    plan: dict[str, Any],
+    memo_bundle: dict[str, Any],
+    host_admission: dict[str, Any],
+    plan_schema: dict[str, Any],
+    bundle_schema: dict[str, Any],
+    compatibility_pin: dict[str, Any],
+) -> None:
+    for label, schema, payload in (
+        ("SDK shadow plan", plan_schema, plan),
+        ("memo shadow bundle", bundle_schema, memo_bundle),
+    ):
+        errors = sorted(
+            Draft202012Validator(
+                schema,
+                format_checker=FORMAT_CHECKER,
+            ).iter_errors(payload),
+            key=lambda error: list(error.absolute_path),
+        )
+        if errors:
+            error = errors[0]
+            location = (
+                "/".join(str(item) for item in error.absolute_path)
+                or "<root>"
+            )
+            raise ValueError(f"{label} {location}: {error.message}")
+
+    if (
+        plan["schema_version"] != compatibility_pin["accepted_plan_version"]
+        or plan["consumer_id"] != "codex_owner_orientation_shadow_v0"
+        or plan["selection_algorithm"]
+        != "current-source-plus-deterministic-lexical-shadow-v1"
+        or plan["plan_digest"]
+        != _canonical_digest(plan, exclude={"plan_digest"})
+    ):
+        raise ValueError("shadow plan version, consumer, algorithm, or digest drifted")
+    profile_pin = compatibility_pin["memo_consumer_profile"]
+    policy_pin = compatibility_pin["memo_influence_policy"]
+    intent = plan["recall_intent"]
+    if (
+        plan["profile_ref"]["owner_repo"] != "aoa-memo"
+        or plan["profile_ref"]["artifact_digest"] != profile_pin["sha256"]
+        or plan["profile_digest"] != profile_pin["semantic_digest"]
+        or intent.get("contract_id") != "C07"
+        or intent.get("consumer_id") != plan["consumer_id"]
+        or intent.get("trigger_id") != "owner-task-pressure-shadow"
+        or intent.get("mode") != "shadow_observation"
+        or intent.get("data_class") != "D0"
+        or intent.get("risk_class") != "R4"
+        or intent.get("effect_ceiling") != "none"
+        or intent.get("action_use") != "forbidden"
+        or intent.get("policy_pin", {}).get("policy_digest")
+        != policy_pin["sha256"]
+    ):
+        raise ValueError("shadow plan profile or C07 admission tuple drifted")
+    denied_plan_flags = (
+        "consumer_visible",
+        "delivery_authorized",
+        "content_persisted",
+        "candidate_persisted",
+        "memory_write_performed",
+        "semantic_transition_performed",
+        "policy_promotion_performed",
+    )
+    if (
+        any(plan[field] for field in denied_plan_flags)
+        or plan["effect_authority"] != "none"
+        or plan["action_use"] != "forbidden"
+    ):
+        raise ValueError("shadow plan attempted delivery, persistence, or authority")
+    refs = [
+        *intent["source_refs"],
+        plan["pressure_evidence_ref"],
+        plan["currentness_probe_ref"],
+        plan["erase_reconciliation_ref"],
+        *plan["outcome_refs"],
+    ]
+    if any(
+        ref.get("owner_repo") == ".aoa"
+        or str(ref.get("artifact_ref", "")).startswith(".aoa/")
+        or str(ref.get("source_ref", "")).startswith("repo:.aoa/")
+        for ref in refs
+    ):
+        raise ValueError("shadow runtime cannot consume raw .aoa refs")
+    if (
+        plan["pressure_evidence_ref"]["owner_repo"] != "aoa-memo"
+        or plan["erase_reconciliation_ref"]["owner_repo"] != "aoa-memo"
+        or not plan["outcome_refs"]
+        or any(ref["owner_repo"] != "aoa-stats" for ref in plan["outcome_refs"])
+    ):
+        raise ValueError("shadow runtime owner refs drifted")
+    for item in plan["items"]:
+        content = {
+            "card": item["card"],
+            "capsule": item["capsule"],
+            "expanded": item["expanded"],
+            "source_route": item["source_route"],
+        }
+        if (
+            item["content_digest"] != _canonical_digest(content)
+            or item["card"]["source_kind"] != "reviewed_corpus"
+            or item["card"]["review_state"] != "confirmed"
+            or item["card"]["current_recall_status"]
+            not in {"preferred", "allowed"}
+            or item["expanded"] is not None
+        ):
+            raise ValueError("shadow runtime received invalid selected memory")
+
+    if (
+        memo_bundle["schema_version"]
+        != compatibility_pin["accepted_bundle_version"]
+        or memo_bundle["plan_digest"] != plan["plan_digest"]
+        or memo_bundle["bundle_digest"]
+        != _canonical_digest(memo_bundle, exclude={"bundle_digest"})
+    ):
+        raise ValueError("memo shadow bundle version, plan pin, or digest drifted")
+    denied_bundle_flags = (
+        "consumer_visible",
+        "delivery_eligible",
+        "runtime_delivery_requested",
+        "content_persisted",
+        "candidate_persisted",
+        "memory_write_performed",
+        "semantic_transition_performed",
+        "policy_promotion_performed",
+    )
+    if (
+        any(memo_bundle[field] for field in denied_bundle_flags)
+        or memo_bundle["effect_authority"] != "none"
+        or memo_bundle["action_use"] != "forbidden"
+    ):
+        raise ValueError("memo shadow bundle attempted delivery or mutation")
+    ingress = memo_bundle["pressure_ingress"]
+    expected_ingress = (
+        ("evidence_envelope", "C01"),
+        ("candidate_packet", "C02"),
+    )
+    for field, contract_id in expected_ingress:
+        if ingress[field].get("contract_id") != contract_id:
+            raise ValueError("memo shadow ingress contract sequence drifted")
+    quarantine = ingress["quarantine_packet"]
+    if (
+        plan["pressure_state"] == "quarantine_required"
+        and (not isinstance(quarantine, dict) or quarantine.get("contract_id") != "C03")
+    ):
+        raise ValueError("quarantined pressure requires exact C03")
+    if plan["pressure_state"] == "clean" and quarantine is not None:
+        raise ValueError("clean pressure must not fabricate C03")
+    for payload, contract_id in (
+        (memo_bundle["recall_packet"], "C08"),
+        (memo_bundle["intervention_decision"], "C09"),
+    ):
+        if (
+            payload.get("contract_id") != contract_id
+            or payload.get("owner") != "aoa-memo"
+            or payload.get("content_digest")
+            != _canonical_digest(
+                payload,
+                exclude={"content_digest"},
+                ensure_ascii=False,
+            )
+        ):
+            raise ValueError(f"memo shadow {contract_id} envelope is invalid")
+    expected_result = (
+        "bounded_memory" if plan["status"] == "bounded_memory" else "silence"
+    )
+    expected_decision = (
+        "bounded_observation"
+        if expected_result == "bounded_memory"
+        else "silence"
+    )
+    if (
+        memo_bundle["recall_packet"]["result_mode"] != expected_result
+        or memo_bundle["intervention_decision"]["decision"]
+        != expected_decision
+        or memo_bundle["host_disposition"] != plan["host_disposition"]
+        or memo_bundle["metabolism"]["policy_posture"]
+        != plan["policy_posture"]
+        or memo_bundle["metabolism"]["semantic_transition_performed"]
+        or memo_bundle["metabolism"]["proposal_accepted"]
+    ):
+        raise ValueError("memo shadow bundle disagrees with the SDK plan")
+
+    required_host_keys = {
+        "schema_version",
+        "owner",
+        "workload_id",
+        "consumer_id",
+        "capability_snapshot_ref",
+        "capability_snapshot_digest",
+        "resource_plan_ref",
+        "resource_plan_digest",
+        "host_disposition",
+        "softening_constraints",
+        "reason_codes",
+        "admitted_at",
+        "expires_at",
+        "launch_executed",
+        "project_root_mutation",
+        "stack_root_mutation",
+        "memory_semantic_authority",
+        "effect_authority",
+        "admission_digest",
+    }
+    if set(host_admission) != required_host_keys:
+        raise ValueError("host shadow admission shape is unknown or incomplete")
+    if (
+        host_admission["schema_version"]
+        != "abyss_machine_shadow_workload_admission_v0"
+        or host_admission["owner"] != "abyss-machine"
+        or host_admission["consumer_id"] != "abyss-stack"
+        or host_admission["host_disposition"] != plan["host_disposition"]
+        or host_admission["capability_snapshot_digest"]
+        != plan["host_capability_ref"]["artifact_digest"]
+        or host_admission["resource_plan_digest"]
+        != plan["host_resource_plan_ref"]["artifact_digest"]
+        or host_admission["launch_executed"]
+        or host_admission["project_root_mutation"] != "forbidden"
+        or host_admission["stack_root_mutation"] != "forbidden"
+        or host_admission["memory_semantic_authority"] != "none"
+        or host_admission["effect_authority"] != "host_admission_only"
+        or host_admission["admission_digest"]
+        != _canonical_digest(host_admission, exclude={"admission_digest"})
+    ):
+        raise ValueError("host shadow admission authority or digest drifted")
+
+
+def _validate_canary_orientation_inputs(
+    *,
+    release_plan: dict[str, Any],
+    shadow_plan: dict[str, Any],
+    shadow_bundle: dict[str, Any],
+    canary_bundle: dict[str, Any],
+    host_admission: dict[str, Any],
+    release_plan_schema: dict[str, Any],
+    shadow_plan_schema: dict[str, Any],
+    shadow_bundle_schema: dict[str, Any],
+    canary_bundle_schema: dict[str, Any],
+    compatibility_pin: dict[str, Any],
+) -> None:
+    for label, schema, payload in (
+        ("SDK canary release plan", release_plan_schema, release_plan),
+        ("SDK source shadow plan", shadow_plan_schema, shadow_plan),
+        ("memo source shadow bundle", shadow_bundle_schema, shadow_bundle),
+        ("memo canary bundle", canary_bundle_schema, canary_bundle),
+    ):
+        errors = sorted(
+            Draft202012Validator(
+                schema,
+                format_checker=FORMAT_CHECKER,
+            ).iter_errors(payload),
+            key=lambda error: list(error.absolute_path),
+        )
+        if errors:
+            error = errors[0]
+            location = (
+                "/".join(str(item) for item in error.absolute_path)
+                or "<root>"
+            )
+            raise ValueError(f"{label} {location}: {error.message}")
+
+    if (
+        release_plan["schema_version"]
+        != compatibility_pin["accepted_release_plan_version"]
+        or shadow_plan["schema_version"]
+        != compatibility_pin["accepted_shadow_plan_version"]
+        or shadow_bundle["schema_version"]
+        != compatibility_pin["accepted_shadow_bundle_version"]
+        or canary_bundle["schema_version"]
+        != compatibility_pin["accepted_canary_bundle_version"]
+    ):
+        raise ValueError("canary runtime received an unknown contract version")
+    if (
+        release_plan["plan_digest"]
+        != _canonical_digest(release_plan, exclude={"plan_digest"})
+        or shadow_plan["plan_digest"]
+        != _canonical_digest(shadow_plan, exclude={"plan_digest"})
+        or shadow_bundle["bundle_digest"]
+        != _canonical_digest(shadow_bundle, exclude={"bundle_digest"})
+        or canary_bundle["bundle_digest"]
+        != _canonical_digest(canary_bundle, exclude={"bundle_digest"})
+    ):
+        raise ValueError("canary runtime artifact self-digest is invalid")
+
+    profile_pin = compatibility_pin["memo_consumer_profile"]
+    policy_pin = compatibility_pin["memo_influence_policy"]
+    if (
+        release_plan["consumer_id"] != compatibility_pin["consumer_id"]
+        or release_plan["profile_ref"]["owner_repo"] != "aoa-memo"
+        or release_plan["profile_ref"]["artifact_digest"]
+        != profile_pin["sha256"]
+        or release_plan["profile_digest"] != profile_pin["semantic_digest"]
+        or release_plan["policy_ref"]["owner_repo"] != "aoa-memo"
+        or release_plan["policy_ref"]["artifact_digest"]
+        != policy_pin["sha256"]
+        or release_plan["policy_digest"] != policy_pin["sha256"]
+        or release_plan["assignment_ref"]["owner_repo"] != "aoa-evals"
+        or release_plan["always_shadow_counterfactual_ref"]["owner_repo"]
+        != "aoa-evals"
+        or not release_plan["outcome_refs"]
+        or any(
+            ref["owner_repo"] != "aoa-stats"
+            for ref in release_plan["outcome_refs"]
+        )
+    ):
+        raise ValueError("canary profile, policy, experiment, or outcome pin drifted")
+    if any(
+        ref.get("owner_repo") == ".aoa"
+        or str(ref.get("artifact_ref", "")).startswith(".aoa/")
+        or str(ref.get("source_ref", "")).startswith("repo:.aoa/")
+        for ref in (
+            release_plan["source_shadow_plan_ref"],
+            release_plan["source_shadow_bundle_ref"],
+            release_plan["profile_ref"],
+            release_plan["policy_ref"],
+            release_plan["assignment_ref"],
+            release_plan["always_shadow_counterfactual_ref"],
+            release_plan["currentness_probe_ref"],
+            *release_plan["outcome_refs"],
+        )
+    ):
+        raise ValueError("canary runtime cannot consume raw .aoa refs")
+    if (
+        release_plan["source_shadow_plan_ref"]["owner_repo"] != "aoa-sdk"
+        or release_plan["source_shadow_plan_digest"]
+        != shadow_plan["plan_digest"]
+        or release_plan["source_shadow_plan_ref"]["artifact_digest"]
+        != shadow_plan["plan_digest"]
+        or release_plan["source_shadow_bundle_ref"]["owner_repo"] != "aoa-memo"
+        or release_plan["source_shadow_bundle_digest"]
+        != shadow_bundle["bundle_digest"]
+        or release_plan["source_shadow_bundle_ref"]["artifact_digest"]
+        != shadow_bundle["bundle_digest"]
+        or shadow_plan["consumer_id"]
+        != "codex_owner_orientation_shadow_v0"
+        or shadow_plan["shadow_mode"] != "selective"
+        or shadow_plan["consumer_visible"]
+        or shadow_plan["delivery_authorized"]
+    ):
+        raise ValueError("canary release drifted from its frozen shadow source")
+
+    denied_plan_flags = (
+        "content_persisted",
+        "candidate_persisted",
+        "memory_write_performed",
+        "semantic_transition_performed",
+        "policy_promotion_performed",
+        "directive_authority",
+    )
+    if (
+        any(release_plan[field] for field in denied_plan_flags)
+        or release_plan["effect_authority"] != "none"
+        or release_plan["action_use"] != "forbidden"
+        or release_plan["rollback_target"]
+        != compatibility_pin["rollback_target"]
+        or release_plan["max_reminders"]
+        != compatibility_pin["max_reminders_per_window"]
+    ):
+        raise ValueError("canary release attempted mutation or authority widening")
+
+    if (
+        canary_bundle["semantic_owner"] != "aoa-memo"
+        or canary_bundle["control_plane_owner"] != "aoa-sdk"
+        or canary_bundle["runtime_owner"] != "abyss-stack"
+        or canary_bundle["host_owner"] != "abyss-machine"
+        or canary_bundle["outcome_owner"] != "aoa-stats"
+        or canary_bundle["proof_owner"] != "aoa-evals"
+        or canary_bundle["release_plan_digest"] != release_plan["plan_digest"]
+        or canary_bundle["source_shadow_plan_digest"]
+        != shadow_plan["plan_digest"]
+        or canary_bundle["source_shadow_bundle_digest"]
+        != shadow_bundle["bundle_digest"]
+        or canary_bundle["assigned_arm"] != release_plan["assigned_arm"]
+        or canary_bundle["assignment_ref"]
+        != release_plan["assignment_ref"]["source_ref"]
+        or canary_bundle["window_id"] != release_plan["window_id"]
+        or canary_bundle["rollback_target"]
+        != compatibility_pin["rollback_target"]
+    ):
+        raise ValueError("memo canary bundle owner or source binding drifted")
+    denied_bundle_flags = (
+        "directive_authority",
+        "content_persisted",
+        "candidate_persisted",
+        "memory_write_performed",
+        "semantic_transition_performed",
+        "policy_promotion_performed",
+    )
+    if (
+        any(canary_bundle[field] for field in denied_bundle_flags)
+        or canary_bundle["effect_authority"] != "none"
+        or canary_bundle["action_use"] != "forbidden"
+    ):
+        raise ValueError("memo canary bundle attempted mutation or authority widening")
+
+    packet = canary_bundle["recall_packet"]
+    decision = canary_bundle["intervention_decision"]
+    for payload, contract_id in ((packet, "C08"), (decision, "C09")):
+        if (
+            payload.get("contract_id") != contract_id
+            or payload.get("owner") != "aoa-memo"
+            or payload.get("content_digest")
+            != _canonical_digest(
+                payload,
+                exclude={"content_digest"},
+                ensure_ascii=False,
+            )
+        ):
+            raise ValueError(f"memo canary {contract_id} envelope is invalid")
+
+    bounded = release_plan["status"] == "bounded_observation"
+    observation = canary_bundle["observation"]
+    if bounded:
+        if (
+            len(release_plan["items"]) != 1
+            or not isinstance(observation, dict)
+            or not canary_bundle["consumer_visible"]
+            or not canary_bundle["delivery_eligible"]
+            or packet["result_mode"] != "bounded_memory"
+            or decision["decision"] != "bounded_observation"
+            or release_plan["assigned_arm"] != "canary"
+            or release_plan["secret_detected"]
+            or release_plan["currentness_state"] != "current"
+            or release_plan["eval_status"] != "available"
+            or release_plan["host_disposition"] != "start"
+        ):
+            raise ValueError("bounded canary bundle violates release admission")
+        source_item = shadow_plan["items"][0]
+        release_item = release_plan["items"][0]
+        if (
+            source_item["card"]["id"] != release_item["object_id"]
+            or source_item["content_digest"] != release_item["content_digest"]
+            or source_item["source_route"] != release_item["source_route"]
+            or observation["object_id"] != release_item["object_id"]
+            or observation["source_route"] != release_item["source_route"]
+            or observation["currentness"]
+            != source_item["card"]["current_recall_status"]
+            or observation["directive"]
+            or observation["suggested_action"] is not None
+            or not observation["source_visible"]
+            or not observation["currentness_visible"]
+            or observation["content_digest"]
+            != _canonical_digest(observation, exclude={"content_digest"})
+        ):
+            raise ValueError("canary observation drifted from the frozen shadow item")
+    elif (
+        release_plan["items"]
+        or observation is not None
+        or canary_bundle["consumer_visible"]
+        or canary_bundle["delivery_eligible"]
+        or packet["result_mode"] != "silence"
+        or decision["decision"] != "silence"
+    ):
+        raise ValueError("non-delivery canary bundle attempted consumer output")
+
+    required_host_keys = {
+        "schema_version",
+        "owner",
+        "workload_id",
+        "consumer_id",
+        "capability_snapshot_ref",
+        "capability_snapshot_digest",
+        "resource_plan_ref",
+        "resource_plan_digest",
+        "host_disposition",
+        "softening_constraints",
+        "reason_codes",
+        "admitted_at",
+        "expires_at",
+        "launch_executed",
+        "project_root_mutation",
+        "stack_root_mutation",
+        "memory_semantic_authority",
+        "effect_authority",
+        "memory_consumer_id",
+        "delivery_semantic_authority",
+        "canary_effect_authority",
+        "admission_digest",
+    }
+    if set(host_admission) != required_host_keys:
+        raise ValueError("host canary admission shape is unknown or incomplete")
+    if (
+        host_admission["schema_version"]
+        != "abyss_machine_canary_workload_admission_v0"
+        or host_admission["owner"] != "abyss-machine"
+        or host_admission["consumer_id"] != "abyss-stack"
+        or host_admission["memory_consumer_id"] != release_plan["consumer_id"]
+        or host_admission["host_disposition"]
+        != release_plan["host_disposition"]
+        or host_admission["capability_snapshot_digest"]
+        != release_plan["host_capability_ref"]["artifact_digest"]
+        or host_admission["resource_plan_digest"]
+        != release_plan["host_resource_plan_ref"]["artifact_digest"]
+        or host_admission["launch_executed"]
+        or host_admission["project_root_mutation"] != "forbidden"
+        or host_admission["stack_root_mutation"] != "forbidden"
+        or host_admission["memory_semantic_authority"] != "none"
+        or host_admission["delivery_semantic_authority"] != "none"
+        or host_admission["canary_effect_authority"] != "none"
+        or host_admission["effect_authority"] != "host_admission_only"
+        or host_admission["admission_digest"]
+        != _canonical_digest(host_admission, exclude={"admission_digest"})
+    ):
+        raise ValueError("host canary admission authority or digest drifted")
+
+
 def _utc_stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
@@ -284,6 +1098,725 @@ class AoAMemoMCPState:
                 "python -m pytest mcp/services/aoa-memo-mcp/tests -q",
                 "python /srv/AbyssOS/aoa-memo/scripts/memory/validate_memory_operations.py",
             ],
+        }
+
+    def deliver_owner_orientation(
+        self,
+        *,
+        plan: dict[str, Any],
+        memo_bundle: dict[str, Any],
+        observed_at: str | None = None,
+        target_ref: str = "codex:current-request",
+        attempt_no: int = 1,
+    ) -> dict[str, Any]:
+        """Return one already-admitted memo packet without reselecting or persisting."""
+
+        if attempt_no < 1:
+            raise ValueError("attempt_no must be positive")
+        stack_root = _stack_source_root()
+        pin_path = stack_root / OWNER_ORIENTATION_PIN
+        schema_path = stack_root / ACTIVE_ORGAN_DELIVERY_SCHEMA
+        compatibility_pin = _read_json(pin_path)
+        delivery_schema = _read_json(schema_path)
+        if not isinstance(compatibility_pin, dict):
+            raise ValueError("owner-orientation runtime compatibility pin is unavailable")
+        if not isinstance(delivery_schema, dict):
+            raise ValueError("C20 runtime delivery schema is unavailable")
+        if (
+            _artifact_digest(schema_path)
+            != compatibility_pin["runtime_receipt_schema"]["sha256"]
+        ):
+            raise ValueError("C20 runtime delivery schema digest drifted")
+        _validate_owner_orientation_inputs(
+            plan=plan,
+            memo_bundle=memo_bundle,
+            compatibility_pin=compatibility_pin,
+        )
+
+        observed = (
+            _parse_aware_timestamp(observed_at, "observed_at")
+            if observed_at is not None
+            else datetime.now(timezone.utc)
+        )
+        expires = _parse_aware_timestamp(plan["expires_at"], "plan expires_at")
+        anchor_expires_value = plan["recall_intent"]["anchor_freshness"].get(
+            "expires_at"
+        )
+        anchor_expires = (
+            _parse_aware_timestamp(anchor_expires_value, "anchor expires_at")
+            if anchor_expires_value is not None
+            else None
+        )
+        if plan["status"] != "bounded_memory":
+            delivery_state = "suppressed"
+            reason_code = "policy_silence"
+            delivered = False
+            admission_state = "admitted"
+            anchor_state = "current"
+        elif observed >= expires:
+            delivery_state = "expired"
+            reason_code = "delivery_window_expired"
+            delivered = False
+            admission_state = "expired"
+            anchor_state = (
+                "stale"
+                if anchor_expires is not None and observed >= anchor_expires
+                else "current"
+            )
+        elif anchor_expires is not None and observed >= anchor_expires:
+            delivery_state = "suppressed"
+            reason_code = "anchor_not_current"
+            delivered = False
+            admission_state = "admitted"
+            anchor_state = "stale"
+        else:
+            delivery_state = "delivered"
+            reason_code = "delivery_confirmed"
+            delivered = True
+            admission_state = "admitted"
+            anchor_state = "current"
+
+        plan_suffix = plan["plan_digest"].removeprefix("sha256:")[:20]
+        attempt_id = f"active-organ-attempt:{plan_suffix}:{attempt_no}"
+        packet = memo_bundle["recall_packet"]
+        decision = memo_bundle["intervention_decision"]
+        model_host_pin_ref = (
+            "aoa-sdk:model-prompt-provider-host-pin:"
+            + _canonical_digest(
+                {
+                    "model_prompt_provider_pin": plan["recall_intent"][
+                        "model_prompt_provider_pin"
+                    ],
+                    "host_capability_ref": plan["host_capability_ref"],
+                    "host_resource_plan_ref": plan["host_resource_plan_ref"],
+                }
+            ).removeprefix("sha256:")
+        )
+        receipt = {
+            "schema_version": "active_organ_runtime_delivery_receipt_v1",
+            "contract_id": "C20",
+            "receipt_id": (
+                f"abyss-stack:active-organ-delivery:{plan_suffix}:"
+                f"{attempt_no}:{delivery_state}"
+            ),
+            "attempt_id": attempt_id,
+            "attempt_no": attempt_no,
+            "recorded_at": _iso_timestamp(observed),
+            "expires_at": plan["expires_at"],
+            "runtime_owner": "abyss-stack",
+            "runtime_surface": "aoa-memo-mcp/codex-owner-orientation-v0",
+            "delivery_state": delivery_state,
+            "recall_intent_ref": (
+                "aoa-sdk:recall-intent:"
+                + plan["recall_intent"]["intent_id"]
+            ),
+            "admitted_run_plan_ref": (
+                f"aoa-sdk:owner-orientation-plan:{plan['plan_id']}"
+            ),
+            "recall_packet_ref": (
+                packet["instance_id"]
+                if delivery_state != "suppressed"
+                else None
+            ),
+            "intervention_decision": {
+                "ref": decision["decision_id"],
+                "decision": decision["decision"],
+            },
+            "trigger_binding": {
+                "trigger_id": plan["recall_intent"]["trigger_id"],
+                "trigger_policy_version": plan["recall_intent"]["policy_pin"][
+                    "policy_version"
+                ],
+            },
+            "anchor_binding": {
+                "anchor_id": plan["recall_intent"]["anchor_id"],
+                "anchor_ref": plan["recall_intent"]["anchor_ref"]["source_ref"],
+                "freshness": anchor_state,
+                "checked_at": _iso_timestamp(observed),
+            },
+            "policy_binding": {
+                "policy_id": plan["recall_intent"]["policy_pin"]["policy_id"],
+                "policy_version": plan["recall_intent"]["policy_pin"][
+                    "policy_version"
+                ],
+                "consumer_id": plan["consumer_id"],
+                "tenant_id": plan["recall_intent"]["tenant_id"],
+                "data_class": plan["recall_intent"]["data_class"],
+                "risk_class": plan["recall_intent"]["risk_class"],
+                "model_prompt_provider_hardware_pin_ref": model_host_pin_ref,
+            },
+            "admission": {
+                "state": admission_state,
+                "ref": (
+                    f"aoa-sdk:owner-orientation-admission:{plan_suffix}"
+                ),
+                "checked_at": _iso_timestamp(observed),
+            },
+            "delivery_target": {
+                "consumer_id": plan["consumer_id"],
+                "adapter_id": "abyss-stack:codex-owner-orientation:v0",
+                "transport": "internal_queue",
+                "target_ref": target_ref,
+            },
+            "result": {
+                "delivered": delivered,
+                "reason_code": reason_code,
+                "observed_at": _iso_timestamp(observed),
+                "failure_ref": None,
+            },
+            "retry": {
+                "implicit_retry_allowed": False,
+                "new_attempt_requires_admission_recheck": True,
+            },
+            "content_minimization": {
+                "persistence_mode": "refs_only",
+                "packet_content_persisted": False,
+                "prompt_content_persisted": False,
+                "memory_content_persisted": False,
+                "payload_digest_persisted": False,
+                "error_detail_persisted": False,
+            },
+            "authority": {
+                "delivery_authority": "already_admitted_packet_only",
+                "effect_authority": "none",
+                "memory_semantic_authority": False,
+                "policy_widening_authority": False,
+            },
+            "receipt_retention": {
+                "retention_class": "T5_content_minimized_receipt",
+                "minimization_policy_ref": (
+                    "aoa-memo:codex-owner-orientation:"
+                    "content-minimized-receipt-v0"
+                ),
+                "erase_scope_ref": f"aoa-memo:erase-scope:{attempt_id}",
+            },
+            "evidence_refs": [
+                f"aoa-sdk:owner-orientation-plan:{plan['plan_id']}",
+                packet["instance_id"],
+                decision["decision_id"],
+                plan["host_capability_ref"]["source_ref"],
+                plan["host_resource_plan_ref"]["source_ref"],
+            ],
+        }
+        errors = sorted(
+            Draft202012Validator(
+                delivery_schema,
+                format_checker=FORMAT_CHECKER,
+            ).iter_errors(receipt),
+            key=lambda error: list(error.absolute_path),
+        )
+        if errors:
+            error = errors[0]
+            location = (
+                "/".join(str(item) for item in error.absolute_path)
+                or "<root>"
+            )
+            raise ValueError(f"C20 delivery receipt {location}: {error.message}")
+
+        memory_payload = []
+        if delivered:
+            memory_payload = [
+                {
+                    "object_id": item["card"]["id"],
+                    "title": item["card"]["title"],
+                    "summary": item["card"]["summary"],
+                    "capsule": item["capsule"],
+                    "expanded": item["expanded"],
+                    "source_route": item["source_route"],
+                    "current_recall_status": item["card"][
+                        "current_recall_status"
+                    ],
+                    "contradiction_refs": item["card"]["contradiction_refs"],
+                    "superseded_by": item["card"]["superseded_by"],
+                }
+                for item in plan["items"]
+            ]
+        return {
+            "schema_version": "codex_owner_orientation_delivery_v0",
+            "delivery_state": delivery_state,
+            "memory_payload": memory_payload,
+            "recall_packet_ref": packet["instance_id"],
+            "intervention_decision_ref": decision["decision_id"],
+            "runtime_receipt": receipt,
+            "reranking_performed": False,
+            "reselection_performed": False,
+            "persistence_performed": False,
+            "effect_authority": "none",
+            "action_use": "forbidden",
+        }
+
+    def deliver_canary_orientation(
+        self,
+        *,
+        release_plan: dict[str, Any],
+        shadow_plan: dict[str, Any],
+        shadow_bundle: dict[str, Any],
+        canary_bundle: dict[str, Any],
+        host_admission: dict[str, Any],
+        release_plan_schema_path: str | Path,
+        shadow_plan_schema_path: str | Path,
+        shadow_bundle_schema_path: str | Path,
+        canary_bundle_schema_path: str | Path,
+        window_receipts: list[dict[str, Any]] | None = None,
+        observed_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Return at most one already-selected canary observation, refs-only."""
+
+        stack_root = _stack_source_root()
+        pin_path = stack_root / OWNER_ORIENTATION_CANARY_PIN
+        receipt_schema_path = stack_root / ACTIVE_ORGAN_CANARY_RECEIPT_SCHEMA
+        compatibility_pin = _read_json(pin_path)
+        receipt_schema = _read_json(receipt_schema_path)
+        schema_paths = {
+            "sdk_release_plan_schema": Path(
+                release_plan_schema_path
+            ).expanduser().resolve(),
+            "sdk_shadow_plan_schema": Path(
+                shadow_plan_schema_path
+            ).expanduser().resolve(),
+            "memo_shadow_bundle_schema": Path(
+                shadow_bundle_schema_path
+            ).expanduser().resolve(),
+            "memo_canary_bundle_schema": Path(
+                canary_bundle_schema_path
+            ).expanduser().resolve(),
+        }
+        schemas = {
+            key: _read_json(path)
+            for key, path in schema_paths.items()
+        }
+        if not isinstance(compatibility_pin, dict):
+            raise ValueError("canary runtime compatibility pin is unavailable")
+        if not isinstance(receipt_schema, dict):
+            raise ValueError("canary C20 runtime receipt schema is unavailable")
+        if any(not isinstance(schema, dict) for schema in schemas.values()):
+            raise ValueError("canary input schemas must be explicit")
+        if (
+            _artifact_digest(receipt_schema_path)
+            != compatibility_pin["runtime_receipt_schema"]["sha256"]
+        ):
+            raise ValueError("canary C20 receipt schema compatibility pin drifted")
+        for key, path in schema_paths.items():
+            if _artifact_digest(path) != compatibility_pin[key]["sha256"]:
+                raise ValueError(f"canary runtime {key} compatibility pin drifted")
+
+        _validate_canary_orientation_inputs(
+            release_plan=release_plan,
+            shadow_plan=shadow_plan,
+            shadow_bundle=shadow_bundle,
+            canary_bundle=canary_bundle,
+            host_admission=host_admission,
+            release_plan_schema=schemas["sdk_release_plan_schema"],
+            shadow_plan_schema=schemas["sdk_shadow_plan_schema"],
+            shadow_bundle_schema=schemas["memo_shadow_bundle_schema"],
+            canary_bundle_schema=schemas["memo_canary_bundle_schema"],
+            compatibility_pin=compatibility_pin,
+        )
+
+        observed = (
+            _parse_aware_timestamp(observed_at, "observed_at")
+            if observed_at is not None
+            else datetime.now(timezone.utc)
+        )
+        window_start = _parse_aware_timestamp(
+            release_plan["window_start"],
+            "canary window_start",
+        )
+        window_end = _parse_aware_timestamp(
+            release_plan["window_end"],
+            "canary window_end",
+        )
+        release_expires = _parse_aware_timestamp(
+            release_plan["expires_at"],
+            "canary release expires_at",
+        )
+        host_expires = _parse_aware_timestamp(
+            host_admission["expires_at"],
+            "host canary admission expires_at",
+        )
+
+        prior_receipts = window_receipts or []
+        receipt_ids: set[str] = set()
+        delivered_count = 0
+        for prior in prior_receipts:
+            errors = sorted(
+                Draft202012Validator(
+                    receipt_schema,
+                    format_checker=FORMAT_CHECKER,
+                ).iter_errors(prior),
+                key=lambda error: list(error.absolute_path),
+            )
+            if errors:
+                error = errors[0]
+                location = (
+                    "/".join(str(item) for item in error.absolute_path)
+                    or "<root>"
+                )
+                raise ValueError(
+                    f"prior canary C20 receipt {location}: {error.message}"
+                )
+            if prior["receipt_digest"] != _canonical_digest(
+                prior,
+                exclude={"receipt_digest"},
+            ):
+                raise ValueError("prior canary C20 receipt digest is invalid")
+            if (
+                prior["consumer_id"] != release_plan["consumer_id"]
+                or prior["window_id"] != release_plan["window_id"]
+                or prior["window_start"] != release_plan["window_start"]
+                or prior["window_end"] != release_plan["window_end"]
+            ):
+                raise ValueError("prior canary receipt escaped the exact policy window")
+            prior_recorded = _parse_aware_timestamp(
+                prior["recorded_at"],
+                "prior canary receipt recorded_at",
+            )
+            if not window_start <= prior_recorded < window_end:
+                raise ValueError("prior canary receipt is outside its policy window")
+            if prior["receipt_id"] in receipt_ids:
+                raise ValueError("duplicate prior canary receipt")
+            receipt_ids.add(prior["receipt_id"])
+            if prior["delivery_state"] == "delivered":
+                delivered_count += 1
+
+        status = release_plan["status"]
+        release_silence_reason = release_plan["silence_reason"]
+        if status == "off":
+            delivery_state = "off"
+            reason_code = "kill_switch"
+        elif status == "holdout":
+            delivery_state = "held_out"
+            reason_code = "randomized_holdout"
+        elif status == "silence":
+            delivery_state = "silenced"
+            reason_code = "release_plan_silence"
+        elif observed >= min(release_expires, host_expires, window_end):
+            delivery_state = "expired"
+            reason_code = "release_expired"
+            release_silence_reason = "window-inactive"
+        elif host_admission["host_disposition"] != "start":
+            delivery_state = "host_denied"
+            reason_code = "host_gate"
+            release_silence_reason = (
+                f"host-{host_admission['host_disposition']}"
+            )
+        elif delivered_count >= release_plan["max_reminders"]:
+            delivery_state = "rate_limited"
+            reason_code = "window_exhausted"
+            release_silence_reason = "window-exhausted"
+        elif release_plan["prior_reminder_count"] != delivered_count:
+            delivery_state = "silenced"
+            reason_code = "window_receipt_count_drift"
+            release_silence_reason = "window-receipt-count-drift"
+        else:
+            delivery_state = "delivered"
+            reason_code = "canary_observation_delivered"
+
+        delivered = delivery_state == "delivered"
+        observation = canary_bundle["observation"] if delivered else None
+        observation_ref = None
+        observation_digest = None
+        if observation is not None:
+            observation_digest = observation["content_digest"]
+            observation_ref = (
+                "aoa-memo:canary-observation:"
+                f"{observation['object_id']}:"
+                f"{observation_digest.removeprefix('sha256:')[:20]}"
+            )
+
+        plan_suffix = release_plan["plan_digest"].removeprefix("sha256:")[:20]
+        release_plan_ref = (
+            f"aoa-sdk:canary-release:{release_plan['plan_id']}"
+        )
+        shadow_plan_ref = (
+            f"aoa-sdk:shadow-orientation-plan:{shadow_plan['plan_id']}"
+        )
+        shadow_bundle_ref = (
+            "aoa-memo:shadow-bundle:"
+            f"{shadow_bundle['bundle_digest'].removeprefix('sha256:')[:20]}"
+        )
+        bundle_ref = (
+            "aoa-memo:canary-bundle:"
+            f"{canary_bundle['bundle_digest'].removeprefix('sha256:')[:20]}"
+        )
+        host_ref = (
+            "abyss-machine:canary-admission:"
+            f"{host_admission['admission_digest'].removeprefix('sha256:')[:20]}"
+        )
+        receipt = {
+            "schema_version": "active_organ_canary_runtime_receipt_v0",
+            "contract_id": "C20",
+            "receipt_id": (
+                f"abyss-stack:active-organ-canary:{plan_suffix}:"
+                f"{delivery_state}"
+            ),
+            "recorded_at": _iso_timestamp(observed),
+            "expires_at": _iso_timestamp(
+                min(release_expires, host_expires, window_end)
+            ),
+            "runtime_owner": "abyss-stack",
+            "runtime_surface": (
+                "aoa-memo-mcp/codex-owner-orientation-canary-v0"
+            ),
+            "release_plan_ref": release_plan_ref,
+            "release_plan_digest": release_plan["plan_digest"],
+            "shadow_plan_ref": shadow_plan_ref,
+            "shadow_plan_digest": shadow_plan["plan_digest"],
+            "bundle_ref": bundle_ref,
+            "bundle_digest": canary_bundle["bundle_digest"],
+            "host_admission_ref": host_ref,
+            "host_admission_digest": host_admission["admission_digest"],
+            "consumer_id": release_plan["consumer_id"],
+            "tenant_id": compatibility_pin["tenant_id"],
+            "assigned_arm": release_plan["assigned_arm"],
+            "assignment_ref": release_plan["assignment_ref"]["source_ref"],
+            "window_id": release_plan["window_id"],
+            "window_start": release_plan["window_start"],
+            "window_end": release_plan["window_end"],
+            "prior_window_delivery_count": delivered_count,
+            "max_reminders": release_plan["max_reminders"],
+            "delivery_state": delivery_state,
+            "reason_code": reason_code,
+            "release_silence_reason": (
+                None if delivered else release_silence_reason
+            ),
+            "observation_ref": observation_ref,
+            "observation_digest": observation_digest,
+            "consumer_visible": delivered,
+            "consumer_output_count": 1 if delivered else 0,
+            "source_visible": True,
+            "currentness_visible": True,
+            "directive_authority": False,
+            "content_persisted": False,
+            "candidate_persisted": False,
+            "reranking_performed": False,
+            "reselection_performed": False,
+            "memory_semantic_authority": False,
+            "policy_widening_authority": False,
+            "effect_authority": "none",
+            "action_use": "forbidden",
+            "rollback_target": compatibility_pin["rollback_target"],
+            "evidence_refs": list(
+                dict.fromkeys(
+                    [
+                        release_plan_ref,
+                        shadow_plan_ref,
+                        shadow_bundle_ref,
+                        bundle_ref,
+                        host_ref,
+                        release_plan["assignment_ref"]["source_ref"],
+                        release_plan[
+                            "always_shadow_counterfactual_ref"
+                        ]["source_ref"],
+                        release_plan["currentness_probe_ref"]["source_ref"],
+                        release_plan["outcome_refs"][0]["source_ref"],
+                        release_plan["profile_ref"]["source_ref"],
+                        release_plan["policy_ref"]["source_ref"],
+                    ]
+                )
+            ),
+            "receipt_digest": "sha256:" + ("0" * 64),
+        }
+        receipt["receipt_digest"] = _canonical_digest(
+            receipt,
+            exclude={"receipt_digest"},
+        )
+        errors = sorted(
+            Draft202012Validator(
+                receipt_schema,
+                format_checker=FORMAT_CHECKER,
+            ).iter_errors(receipt),
+            key=lambda error: list(error.absolute_path),
+        )
+        if errors:
+            error = errors[0]
+            location = (
+                "/".join(str(item) for item in error.absolute_path)
+                or "<root>"
+            )
+            raise ValueError(f"canary C20 receipt {location}: {error.message}")
+
+        return {
+            "schema_version": "codex_owner_orientation_canary_delivery_v0",
+            "delivery_state": delivery_state,
+            "consumer_output": [observation] if delivered else [],
+            "runtime_receipt": receipt,
+            "consumer_visible": delivered,
+            "source_visible": True,
+            "currentness_visible": True,
+            "directive_authority": False,
+            "persistence_performed": False,
+            "candidate_persisted": False,
+            "reranking_performed": False,
+            "reselection_performed": False,
+            "semantic_transition_performed": False,
+            "policy_promotion_performed": False,
+            "effect_authority": "none",
+            "action_use": "forbidden",
+            "rollback_target": compatibility_pin["rollback_target"],
+        }
+
+    def observe_shadow_orientation(
+        self,
+        *,
+        plan: dict[str, Any],
+        memo_bundle: dict[str, Any],
+        host_admission: dict[str, Any],
+        plan_schema_path: str | Path,
+        memo_bundle_schema_path: str | Path,
+        observed_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Record packet construction while returning nothing to the consumer."""
+
+        stack_root = _stack_source_root()
+        pin_path = stack_root / OWNER_ORIENTATION_SHADOW_PIN
+        receipt_schema_path = stack_root / ACTIVE_ORGAN_SHADOW_RECEIPT_SCHEMA
+        compatibility_pin = _read_json(pin_path)
+        receipt_schema = _read_json(receipt_schema_path)
+        resolved_plan_schema = Path(plan_schema_path).expanduser().resolve()
+        resolved_bundle_schema = Path(memo_bundle_schema_path).expanduser().resolve()
+        plan_schema = _read_json(resolved_plan_schema)
+        bundle_schema = _read_json(resolved_bundle_schema)
+        if not isinstance(compatibility_pin, dict):
+            raise ValueError("shadow runtime compatibility pin is unavailable")
+        if not isinstance(receipt_schema, dict):
+            raise ValueError("shadow C20 runtime receipt schema is unavailable")
+        if not isinstance(plan_schema, dict) or not isinstance(bundle_schema, dict):
+            raise ValueError("shadow plan and bundle schemas must be explicit")
+        if (
+            _artifact_digest(receipt_schema_path)
+            != compatibility_pin["runtime_receipt_schema"]["sha256"]
+            or _artifact_digest(resolved_plan_schema)
+            != compatibility_pin["sdk_plan_schema"]["sha256"]
+            or _artifact_digest(resolved_bundle_schema)
+            != compatibility_pin["memo_bundle_schema"]["sha256"]
+        ):
+            raise ValueError("shadow runtime schema compatibility pin drifted")
+        _validate_shadow_orientation_inputs(
+            plan=plan,
+            memo_bundle=memo_bundle,
+            host_admission=host_admission,
+            plan_schema=plan_schema,
+            bundle_schema=bundle_schema,
+            compatibility_pin=compatibility_pin,
+        )
+
+        observed = (
+            _parse_aware_timestamp(observed_at, "observed_at")
+            if observed_at is not None
+            else datetime.now(timezone.utc)
+        )
+        plan_expires = _parse_aware_timestamp(
+            plan["expires_at"],
+            "plan expires_at",
+        )
+        host_expires = _parse_aware_timestamp(
+            host_admission["expires_at"],
+            "host admission expires_at",
+        )
+        if observed >= min(plan_expires, host_expires):
+            observation_state = "expired"
+        elif host_admission["host_disposition"] in {"defer", "deny"}:
+            observation_state = "host_denied"
+        elif plan["status"] == "bounded_memory":
+            observation_state = "constructed"
+        else:
+            observation_state = "silence"
+
+        suffix = plan["plan_digest"].removeprefix("sha256:")[:20]
+        plan_ref = f"aoa-sdk:shadow-orientation-plan:{plan['plan_id']}"
+        bundle_ref = f"aoa-memo:shadow-bundle:{memo_bundle['bundle_digest'][7:27]}"
+        host_ref = (
+            "abyss-machine:shadow-admission:"
+            + host_admission["admission_digest"][7:27]
+        )
+        packet = memo_bundle["recall_packet"]
+        decision = memo_bundle["intervention_decision"]
+        ingress = memo_bundle["pressure_ingress"]
+        evidence_refs = [
+            plan_ref,
+            bundle_ref,
+            packet["instance_id"],
+            decision["decision_id"],
+            ingress["evidence_envelope"]["instance_id"],
+            ingress["candidate_packet"]["instance_id"],
+            host_ref,
+            plan["currentness_probe_ref"]["source_ref"],
+            plan["outcome_refs"][0]["source_ref"],
+        ]
+        receipt = {
+            "schema_version": "active_organ_shadow_runtime_receipt_v0",
+            "contract_id": "C20",
+            "receipt_id": (
+                f"abyss-stack:active-organ-shadow:{suffix}:{observation_state}"
+            ),
+            "recorded_at": _iso_timestamp(observed),
+            "expires_at": plan["expires_at"],
+            "runtime_owner": "abyss-stack",
+            "runtime_surface": (
+                "aoa-memo-mcp/codex-owner-orientation-shadow-v0"
+            ),
+            "plan_ref": plan_ref,
+            "plan_digest": plan["plan_digest"],
+            "bundle_ref": bundle_ref,
+            "bundle_digest": memo_bundle["bundle_digest"],
+            "host_admission_ref": host_ref,
+            "host_admission_digest": host_admission["admission_digest"],
+            "observation_state": observation_state,
+            "shadow_item_refs": (
+                [item["card"]["id"] for item in plan["items"]]
+                if observation_state == "constructed"
+                else []
+            ),
+            "consumer_visible": False,
+            "delivery_attempted": False,
+            "memory_payload_returned": False,
+            "content_persisted": False,
+            "candidate_persisted": False,
+            "reranking_performed": False,
+            "reselection_performed": False,
+            "memory_semantic_authority": False,
+            "policy_widening_authority": False,
+            "effect_authority": "none",
+            "action_use": "forbidden",
+            "evidence_refs": evidence_refs,
+        }
+        receipt["receipt_digest"] = _canonical_digest(
+            receipt,
+            exclude={"receipt_digest"},
+        )
+        errors = sorted(
+            Draft202012Validator(
+                receipt_schema,
+                format_checker=FORMAT_CHECKER,
+            ).iter_errors(receipt),
+            key=lambda error: list(error.absolute_path),
+        )
+        if errors:
+            error = errors[0]
+            location = (
+                "/".join(str(item) for item in error.absolute_path)
+                or "<root>"
+            )
+            raise ValueError(f"shadow C20 receipt {location}: {error.message}")
+
+        return {
+            "schema_version": "codex_owner_orientation_shadow_observation_v0",
+            "observation_state": observation_state,
+            "consumer_output": [],
+            "memory_payload": [],
+            "shadow_item_refs": receipt["shadow_item_refs"],
+            "runtime_receipt": receipt,
+            "consumer_visible": False,
+            "delivery_attempted": False,
+            "persistence_performed": False,
+            "candidate_persisted": False,
+            "reranking_performed": False,
+            "reselection_performed": False,
+            "semantic_transition_performed": False,
+            "policy_promotion_performed": False,
+            "effect_authority": "none",
+            "action_use": "forbidden",
         }
 
     def build_local_port_status(self, repo: str) -> dict[str, Any]:

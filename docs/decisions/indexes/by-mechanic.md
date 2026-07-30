@@ -21,6 +21,7 @@
 - [ABYSS-STACK-D-0070 Observability OTLP Tempo Trace Plane](../ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md) (`docs/decisions/ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md`)
 - [ABYSS-STACK-D-0077 Loopback MCP Owner Lifecycle](../ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md`)
 - [ABYSS-STACK-D-0087 Owner-Bounded MCP Access Fabric](../ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md) (`docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md`)
+- [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
 
 ## diagnostic-spine
 
@@ -61,6 +62,7 @@
 - [ABYSS-STACK-D-0085 SDK Routing Canary Intake](../ABYSS-STACK-D-0085-sdk-routing-canary-intake.md) (`docs/decisions/ABYSS-STACK-D-0085-sdk-routing-canary-intake.md`)
 - [ABYSS-STACK-D-0086 Receipt-Bound SDK Routing Cutover](../ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md) (`docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md`)
 - [ABYSS-STACK-D-0101 Retire Routing Predecessor Checkout Consumers](../ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md) (`docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md`)
+- [ABYSS-STACK-D-0102 R1 Memory Runtime Is Exact Pull Delivery](../ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md) (`docs/decisions/ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md`)
 
 ## governed-execution
 

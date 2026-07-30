@@ -31,6 +31,22 @@ Tracking starts with the community-docs baseline for this repository.
   evidence overlay. It reads no credentials, performs no endpoint probes,
   excludes shared-bearer legacy contours, preserves every unsupported claim as
   unknown, and has a separately enabled two-minute user timer.
+- Decision `ABYSS-STACK-D-0102` admits only exact read-only explicit-pull
+  memory delivery in R1; shadow, canary, and agent-local seams remain disabled
+  contracts without hidden persistence or effect authority.
+- The memo federation seam now carries the C20
+  `RuntimeDeliveryReceipt` source contract for content-minimized active-organ
+  delivery evidence. Exact intent, plan, trigger, anchor, policy, admission,
+  target, and evidence refs distinguish attempted, delivered, suppressed,
+  expired, and failed states while forbidding persisted packet, prompt,
+  memory, payload-digest, and error-detail content. Executable negative
+  examples fail closed on stale authority, content retention, expiry, and
+  consumer-binding drift; the contract grants no effect or memory authority
+  and does not claim a live deployed service.
+- Decision `ABYSS-STACK-D-0103` adds a neutral Codex hook-fragment compositor
+  for independently usable owners. Explicit bindings, atomic private writes,
+  composition receipts, backup, and exact rollback remain separate from
+  owner semantics and Codex trust; no live hook activation is implied.
 - A standalone `abyss-stack-mcp` source candidate now exposes a compact
   stack-owned runtime-evidence read plane and a credential-disjoint,
   non-executing plan-candidate plane. Typed contracts keep source, package,

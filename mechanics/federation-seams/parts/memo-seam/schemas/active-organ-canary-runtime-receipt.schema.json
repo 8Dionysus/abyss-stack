@@ -1,0 +1,319 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/federation-seams/parts/memo-seam/schemas/active-organ-canary-runtime-receipt.schema.json",
+  "title": "abyss-stack bounded active-organ canary runtime receipt",
+  "description": "A refs-only C20 receipt for one source-visible, non-directive D0/R2 canary observation or an explicit non-delivery result.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "receipt_id",
+    "recorded_at",
+    "expires_at",
+    "runtime_owner",
+    "runtime_surface",
+    "release_plan_ref",
+    "release_plan_digest",
+    "shadow_plan_ref",
+    "shadow_plan_digest",
+    "bundle_ref",
+    "bundle_digest",
+    "host_admission_ref",
+    "host_admission_digest",
+    "consumer_id",
+    "tenant_id",
+    "assigned_arm",
+    "assignment_ref",
+    "window_id",
+    "window_start",
+    "window_end",
+    "prior_window_delivery_count",
+    "max_reminders",
+    "delivery_state",
+    "reason_code",
+    "release_silence_reason",
+    "observation_ref",
+    "observation_digest",
+    "consumer_visible",
+    "consumer_output_count",
+    "source_visible",
+    "currentness_visible",
+    "directive_authority",
+    "content_persisted",
+    "candidate_persisted",
+    "reranking_performed",
+    "reselection_performed",
+    "memory_semantic_authority",
+    "policy_widening_authority",
+    "effect_authority",
+    "action_use",
+    "rollback_target",
+    "evidence_refs",
+    "receipt_digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "active_organ_canary_runtime_receipt_v0"
+    },
+    "contract_id": {
+      "const": "C20"
+    },
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^abyss-stack:active-organ-canary:[A-Za-z0-9._:-]+$"
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "runtime_owner": {
+      "const": "abyss-stack"
+    },
+    "runtime_surface": {
+      "const": "aoa-memo-mcp/codex-owner-orientation-canary-v0"
+    },
+    "release_plan_ref": {
+      "type": "string",
+      "pattern": "^aoa-sdk:canary-release:"
+    },
+    "release_plan_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "shadow_plan_ref": {
+      "type": "string",
+      "pattern": "^aoa-sdk:shadow-orientation-plan:"
+    },
+    "shadow_plan_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "bundle_ref": {
+      "type": "string",
+      "pattern": "^aoa-memo:canary-bundle:"
+    },
+    "bundle_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "host_admission_ref": {
+      "type": "string",
+      "pattern": "^abyss-machine:canary-admission:"
+    },
+    "host_admission_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "consumer_id": {
+      "const": "codex_owner_orientation_canary_v0"
+    },
+    "tenant_id": {
+      "const": "owner-local"
+    },
+    "assigned_arm": {
+      "enum": [
+        "holdout",
+        "canary"
+      ]
+    },
+    "assignment_ref": {
+      "type": "string",
+      "minLength": 3
+    },
+    "window_id": {
+      "type": "string",
+      "minLength": 3
+    },
+    "window_start": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "window_end": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "prior_window_delivery_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "max_reminders": {
+      "const": 1
+    },
+    "delivery_state": {
+      "enum": [
+        "delivered",
+        "held_out",
+        "silenced",
+        "off",
+        "expired",
+        "rate_limited",
+        "host_denied"
+      ]
+    },
+    "reason_code": {
+      "enum": [
+        "canary_observation_delivered",
+        "randomized_holdout",
+        "release_plan_silence",
+        "kill_switch",
+        "release_expired",
+        "window_exhausted",
+        "window_receipt_count_drift",
+        "host_gate"
+      ]
+    },
+    "release_silence_reason": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "minLength": 3
+        }
+      ]
+    },
+    "observation_ref": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^aoa-memo:canary-observation:"
+        }
+      ]
+    },
+    "observation_digest": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/sha256"
+        }
+      ]
+    },
+    "consumer_visible": {
+      "type": "boolean"
+    },
+    "consumer_output_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "source_visible": {
+      "const": true
+    },
+    "currentness_visible": {
+      "const": true
+    },
+    "directive_authority": {
+      "const": false
+    },
+    "content_persisted": {
+      "const": false
+    },
+    "candidate_persisted": {
+      "const": false
+    },
+    "reranking_performed": {
+      "const": false
+    },
+    "reselection_performed": {
+      "const": false
+    },
+    "memory_semantic_authority": {
+      "const": false
+    },
+    "policy_widening_authority": {
+      "const": false
+    },
+    "effect_authority": {
+      "const": "none"
+    },
+    "action_use": {
+      "const": "forbidden"
+    },
+    "rollback_target": {
+      "const": "codex_owner_orientation_v0"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 3
+      }
+    },
+    "receipt_digest": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "delivery_state": {
+            "const": "delivered"
+          }
+        },
+        "required": [
+          "delivery_state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "assigned_arm": {
+            "const": "canary"
+          },
+          "reason_code": {
+            "const": "canary_observation_delivered"
+          },
+          "release_silence_reason": {
+            "type": "null"
+          },
+          "observation_ref": {
+            "type": "string"
+          },
+          "observation_digest": {
+            "$ref": "#/$defs/sha256"
+          },
+          "consumer_visible": {
+            "const": true
+          },
+          "consumer_output_count": {
+            "const": 1
+          },
+          "prior_window_delivery_count": {
+            "const": 0
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "observation_ref": {
+            "type": "null"
+          },
+          "observation_digest": {
+            "type": "null"
+          },
+          "consumer_visible": {
+            "const": false
+          },
+          "consumer_output_count": {
+            "const": 0
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

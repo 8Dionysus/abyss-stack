@@ -17,7 +17,9 @@ The refactor pattern is:
 `abyss-stack` owns projection shape, template layout, wrapper behavior, and
 source/runtime parity contracts. Operators own real secrets and live rendered
 config. Sibling repositories own the meaning of any advisory surfaces mirrored
-into runtime config.
+into runtime config. They also own the meaning and authority of their Codex
+hook fragments; the stack may merge and install exact definitions but cannot
+reinterpret them.
 
 ## Current Bridges
 
@@ -27,6 +29,9 @@ into runtime config.
   describes source-safe bootstrap posture.
 - [parts/rendering/docs/RENDER_TRUTH.md](parts/rendering/docs/RENDER_TRUTH.md)
   describes render authority.
+- [parts/codex-hooks/README.md](parts/codex-hooks/README.md) composes native
+  and owner-envelope hook definitions while preserving independent
+  `aoa-memo` and `aoa-session-memory` ownership.
 - [docs/README.md](docs/README.md) keeps package docs as route surfaces rather
   than a second source tree.
 - [../federation-seams/README.md](../federation-seams/README.md) owns sibling

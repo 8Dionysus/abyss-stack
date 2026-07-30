@@ -11,6 +11,8 @@ Current posture:
 - keep stable root commands as wrappers while implementation bodies live under
   package parts
 - keep deployed `Configs` as a projection target, not source truth
+- compose independently owned Codex hook fragments without moving their
+  semantics or standalone lifecycle into the stack
 - issue an MCP deployment receipt only from a clean exact source revision and
   exact source/deployed byte parity; keep later runtime and owner evidence
   outside the config projection claim
@@ -21,5 +23,8 @@ Near direction:
 - keep source/runtime parity checks synthetic by default
 - update validators whenever a projection source, wrapper, or runtime mirror
   expectation moves
+- keep Codex-hook rendering read-only by default; require explicit atomic
+  write, private backup, content-minimized receipt, and exact trust review for
+  any live projection
 - route federation mirror material through federation-seams instead of making
   config projection own sibling meaning
