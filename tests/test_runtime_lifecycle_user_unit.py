@@ -72,6 +72,9 @@ STACK_MCP_CREDENTIAL_NAMES = (
     "abyss-stack-mcp-read-bearer-token",
     "abyss-stack-mcp-candidate-bearer-token",
 )
+STACK_MCP_CANARY_SIGNING_KEY_NAME = (
+    "abyss-stack-mcp-canary-ed25519-private-key.pem"
+)
 ORGAN_MCP_READ_CREDENTIAL_NAMES = (
     "aoa-decisions-mcp-read-bearer-token",
     "aoa-memo-mcp-read-bearer-token",
@@ -885,11 +888,37 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 },
             )
             self.assertEqual(manifest_path.stat().st_mode & 0o777, 0o600)
+            signing_key_path = secret_dir / STACK_MCP_CANARY_SIGNING_KEY_NAME
+            self.assertTrue(signing_key_path.is_file())
+            self.assertFalse(signing_key_path.is_symlink())
+            self.assertEqual(signing_key_path.stat().st_mode & 0o777, 0o600)
+            public_key = subprocess.run(
+                [
+                    "openssl",
+                    "pkey",
+                    "-in",
+                    str(signing_key_path),
+                    "-pubout",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(public_key.returncode, 0, public_key.stderr)
+            self.assertIn("BEGIN PUBLIC KEY", public_key.stdout)
+            self.assertNotIn(
+                signing_key_path.read_text(encoding="utf-8"),
+                first.stdout + first.stderr,
+            )
             self.assertIn(
                 "provisioned abyss-stack MCP read bearer credential", first.stdout
             )
             self.assertIn(
                 "provisioned abyss-stack MCP candidate bearer credential",
+                first.stdout,
+            )
+            self.assertIn(
+                "provisioned abyss-stack MCP canary signing key",
                 first.stdout,
             )
             self.assertNotIn("unit linked", first.stdout)
@@ -913,7 +942,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                         token,
                     )
                     self.assertNotIn(token, second.stdout + second.stderr)
-            self.assertEqual(second.stdout.count("already provisioned"), 2)
+            self.assertEqual(second.stdout.count("already provisioned"), 3)
             self.assertIn(
                 "refreshed abyss-stack MCP credential separation manifest",
                 second.stdout,

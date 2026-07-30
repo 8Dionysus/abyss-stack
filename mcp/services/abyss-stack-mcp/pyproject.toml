@@ -4,11 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "abyss-stack-mcp"
-version = "0.2.0"
+version = "0.3.0"
 description = "Owner-bounded runtime observation and plan-candidate MCP for abyss-stack"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+  "cryptography==48.0.0",
   "mcp==1.27.2",
   "pydantic==2.13.4",
 ]

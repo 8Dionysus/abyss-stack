@@ -14,7 +14,11 @@ Tracking starts with the community-docs baseline for this repository.
   owner-specific result-contract match, and preserves a successful structured
   response in a private content-addressed artifact for independent owner
   review, without inferring grounding, freshness, proof, acceptance,
-  admission, or rollback. Every standalone stack-owned MCP package now reports
+  admission, or rollback. Canary receipts and result artifacts are now
+  independently Ed25519-attested by a provisioned private stack signer so
+  downstream owners can authenticate captures against a separately pinned
+  public key instead of trusting caller-reproducible hashes and issuer fields.
+  Every standalone stack-owned MCP package now reports
   its embedded application package version rather than the MCP SDK or stale
   ambient distribution metadata. A blocking source validator keeps each
   embedded version equal to its package manifest and requires the server

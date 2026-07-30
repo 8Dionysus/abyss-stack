@@ -201,6 +201,12 @@ blocked on owner grounding. The result artifact is an untrusted capture for
 the owner reviewer, not stack semantic evidence. This leaves aggregation,
 central pair-specific proof, consumer registration evidence, owner review,
 registry admission, and lifecycle effects as explicit later transactions.
+The receipt and result artifact are independently attested by a stack canary
+Ed25519 key. Owner reviewers authenticate the issuer only against a public key
+pinned outside the capture and its caller-controlled paths. Content addressing
+alone remains integrity metadata and is never accepted as issuer
+authentication. Signer rotation is explicit and must update the downstream
+owner trust pin before new captures can be reviewed.
 Reviewed contracts cover every declared migration-wave target. Contract
 presence proves only that an exact bounded read shape has been selected; an
 inactive endpoint, failed call, schema drift, ungrounded result, missing owner

@@ -276,6 +276,7 @@ organ_mcp_candidate_auth_manifest_name="organ-mcp-candidate-auth-manifest.json"
 organ_mcp_candidate_auth_manifest_path="${mcp_http_secret_dir}/${organ_mcp_candidate_auth_manifest_name}"
 abyss_stack_mcp_read_credential_name="abyss-stack-mcp-read-bearer-token"
 abyss_stack_mcp_candidate_credential_name="abyss-stack-mcp-candidate-bearer-token"
+abyss_stack_mcp_canary_signing_key_name="abyss-stack-mcp-canary-ed25519-private-key.pem"
 abyss_stack_mcp_auth_manifest_name="abyss-stack-mcp-auth-manifest.json"
 abyss_stack_mcp_auth_manifest_path="${mcp_http_secret_dir}/${abyss_stack_mcp_auth_manifest_name}"
 abyss_stack_mcp_service_root="${AOA_CONFIGS_ROOT}/mcp/services/abyss-stack-mcp"
@@ -364,6 +365,52 @@ aoa_provision_mcp_bearer() {
   fi
   aoa_validate_mcp_bearer_file "$credential_path" "$credential_label"
   aoa_note "${credential_label} already provisioned under the deployed Secrets root"
+}
+
+aoa_validate_abyss_stack_mcp_canary_signing_key() {
+  local key_path="$1"
+
+  [[ -f "$key_path" && ! -L "$key_path" ]] || \
+    aoa_die "existing abyss-stack MCP canary signing key must be a regular non-symlink file"
+  [[ "$(stat -c '%a' "$key_path")" == "600" ]] || \
+    aoa_die "existing abyss-stack MCP canary signing key must have mode 0600"
+  [[ "$(stat -c '%u' "$key_path")" == "$(id -u)" ]] || \
+    aoa_die "existing abyss-stack MCP canary signing key must be owned by the current user"
+  if ! openssl pkey -in "$key_path" -check -noout >/dev/null 2>&1; then
+    aoa_die "existing abyss-stack MCP canary signing key must be a valid private key"
+  fi
+  if [[ "$(openssl pkey -in "$key_path" -text_pub -noout 2>/dev/null | head -n 1)" != "ED25519 Public-Key:" ]]; then
+    aoa_die "existing abyss-stack MCP canary signing key must be Ed25519"
+  fi
+}
+
+aoa_provision_abyss_stack_mcp_canary_signing_key() {
+  local key_path="${mcp_http_secret_dir}/${abyss_stack_mcp_canary_signing_key_name}"
+  local temp_path=""
+
+  if [[ -e "$key_path" || -L "$key_path" ]]; then
+    aoa_validate_abyss_stack_mcp_canary_signing_key "$key_path"
+    aoa_note "abyss-stack MCP canary signing key already provisioned under the deployed Secrets root"
+    return 0
+  fi
+  temp_path="$(mktemp "${mcp_http_secret_dir}/.${abyss_stack_mcp_canary_signing_key_name}.XXXXXX")"
+  chmod 0600 "$temp_path"
+  if ! openssl genpkey -algorithm ED25519 -out "$temp_path" >/dev/null 2>&1; then
+    rm -f -- "$temp_path"
+    aoa_die "failed to generate the abyss-stack MCP canary signing key"
+  fi
+  aoa_validate_abyss_stack_mcp_canary_signing_key "$temp_path"
+  if ln -- "$temp_path" "$key_path" 2>/dev/null; then
+    rm -f -- "$temp_path"
+    aoa_note "provisioned abyss-stack MCP canary signing key under the deployed Secrets root"
+    return 0
+  fi
+  rm -f -- "$temp_path"
+  if [[ ! -e "$key_path" && ! -L "$key_path" ]]; then
+    aoa_die "failed to atomically provision the abyss-stack MCP canary signing key"
+  fi
+  aoa_validate_abyss_stack_mcp_canary_signing_key "$key_path"
+  aoa_note "abyss-stack MCP canary signing key already provisioned under the deployed Secrets root"
 }
 
 aoa_provision_mcp_http_auth() {
@@ -672,6 +719,7 @@ aoa_provision_abyss_stack_mcp_auth() {
   aoa_provision_mcp_bearer \
     "$abyss_stack_mcp_candidate_credential_name" \
     "abyss-stack MCP candidate bearer credential"
+  aoa_provision_abyss_stack_mcp_canary_signing_key
   read_token="$(<"$read_path")"
   candidate_token="$(<"$candidate_path")"
   [[ "$read_token" != "$candidate_token" ]] || \

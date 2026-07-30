@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import base64
 import errno
 import hashlib
 import json
@@ -14,8 +15,10 @@ import time
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from pydantic import Field, ValidationError, field_validator, model_validator
 
 from .contracts import (
@@ -41,11 +44,17 @@ from .observation import (
 
 DEFAULT_SECRET_DIR = Path("/srv/AbyssOS/abyss-stack/Secrets/Configs")
 DEFAULT_OUTPUT_ROOT = Path("/srv/AbyssOS/abyss-stack/Logs/mcp/canaries")
+CANARY_SIGNING_KEY_NAME = "abyss-stack-mcp-canary-ed25519-private-key.pem"
 MAX_CREDENTIAL_BYTES = 8 * 1024
+MAX_SIGNING_KEY_BYTES = 4 * 1024
 MAX_SCHEMA_BYTES = 2 * 1024 * 1024
 MAX_RESULT_BYTES = 2 * 1024 * 1024
 MAX_CANARY_FUTURE_SKEW = timedelta(seconds=30)
 MAX_PAGES = 32
+Ed25519Signature = Annotated[
+    str,
+    Field(min_length=86, max_length=86, pattern=r"^[A-Za-z0-9_-]{86}$"),
+]
 
 
 class CanaryRunnerError(ValueError):
@@ -82,10 +91,13 @@ class CanaryProbeResult(StrictModel):
 
 
 class CanaryReceipt(StrictModel):
-    schema_version: Literal["abyss_stack_mcp_canary_receipt_v1"] = (
-        "abyss_stack_mcp_canary_receipt_v1"
+    schema_version: Literal["abyss_stack_mcp_canary_receipt_v2"] = (
+        "abyss_stack_mcp_canary_receipt_v2"
     )
     receipt_id: Digest
+    signer_id: Digest
+    attestation_algorithm: Literal["ed25519"] = "ed25519"
+    attestation: Ed25519Signature
     issuer: Literal["abyss-stack"] = "abyss-stack"
     consumer_id: Literal["abyss-stack-mcp-canary"] = "abyss-stack-mcp-canary"
     organ_id: Identifier
@@ -175,10 +187,13 @@ class CanaryReceipt(StrictModel):
 
 
 class CanaryResultArtifact(StrictModel):
-    schema_version: Literal["abyss_stack_mcp_canary_result_artifact_v1"] = (
-        "abyss_stack_mcp_canary_result_artifact_v1"
+    schema_version: Literal["abyss_stack_mcp_canary_result_artifact_v2"] = (
+        "abyss_stack_mcp_canary_result_artifact_v2"
     )
     artifact_id: Digest
+    signer_id: Digest
+    attestation_algorithm: Literal["ed25519"] = "ed25519"
+    attestation: Ed25519Signature
     issuer: Literal["abyss-stack"] = "abyss-stack"
     organ_id: Identifier
     policy_family: Literal["read"] = "read"
@@ -233,6 +248,31 @@ def _now() -> datetime:
 
 def _digest(value: Any) -> str:
     return "sha256:" + hashlib.sha256(canonical_json_bytes(value)).hexdigest()
+
+
+def _base64url(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+
+
+def _signer_id(signing_key: Ed25519PrivateKey) -> str:
+    public_key = signing_key.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    return "sha256:" + hashlib.sha256(public_key).hexdigest()
+
+
+def _signed_fields(
+    payload: dict[str, Any],
+    signing_key: Ed25519PrivateKey,
+) -> dict[str, str]:
+    return {
+        "signer_id": _signer_id(signing_key),
+        "attestation_algorithm": "ed25519",
+        "attestation": _base64url(
+            signing_key.sign(canonical_json_bytes(payload))
+        ),
+    }
 
 
 def _require_no_symlink_components(path: Path, label: str) -> Path:
@@ -346,6 +386,59 @@ def _read_credential(path: Path) -> str:
             "canary read credential must contain exactly one non-empty value"
         )
     return value
+
+
+def _read_signing_key(path: Path) -> Ed25519PrivateKey:
+    path = _require_no_symlink_components(path, "canary signing key")
+    try:
+        descriptor = os.open(
+            path,
+            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+        )
+        try:
+            metadata = os.fstat(descriptor)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise CanaryRunnerError(
+                    "canary signing key must be a regular non-symlink file"
+                )
+            if stat.S_IMODE(metadata.st_mode) != 0o600:
+                raise CanaryRunnerError("canary signing key must have mode 0600")
+            if metadata.st_uid != os.geteuid():
+                raise CanaryRunnerError(
+                    "canary signing key must be owned by the current user"
+                )
+            if not 1 <= metadata.st_size <= MAX_SIGNING_KEY_BYTES:
+                raise CanaryRunnerError(
+                    "canary signing key has an invalid bounded size"
+                )
+            chunks: list[bytes] = []
+            remaining = MAX_SIGNING_KEY_BYTES + 1
+            while remaining:
+                chunk = os.read(descriptor, min(4096, remaining))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            raw = b"".join(chunks)
+        finally:
+            os.close(descriptor)
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise CanaryRunnerError(
+                "canary signing key must be a regular non-symlink file"
+            ) from exc
+        raise CanaryRunnerError("canary signing key is unavailable") from exc
+    if len(raw) > MAX_SIGNING_KEY_BYTES:
+        raise CanaryRunnerError("canary signing key exceeds its size limit")
+    try:
+        signing_key = serialization.load_pem_private_key(raw, password=None)
+    except (TypeError, ValueError) as exc:
+        raise CanaryRunnerError(
+            "canary signing key is not a valid unencrypted private key"
+        ) from exc
+    if not isinstance(signing_key, Ed25519PrivateKey):
+        raise CanaryRunnerError("canary signing key must be Ed25519")
+    return signing_key
 
 
 def _model_json(value: Any) -> Any:
@@ -638,7 +731,7 @@ def _receipt_body(
     if probe.call_succeeded and not contract_matched and not reasons:
         reasons = ("mcp-canary-result-contract-mismatch",)
     return {
-        "schema_version": "abyss_stack_mcp_canary_receipt_v1",
+        "schema_version": "abyss_stack_mcp_canary_receipt_v2",
         "issuer": "abyss-stack",
         "consumer_id": "abyss-stack-mcp-canary",
         "organ_id": target.organ_id,
@@ -687,8 +780,13 @@ def build_result_artifact(
     *,
     receipt: CanaryReceipt,
     owner_payload: dict[str, Any],
+    signing_key: Ed25519PrivateKey,
 ) -> CanaryResultArtifact:
     _reject_secret_material(owner_payload)
+    if receipt.signer_id != _signer_id(signing_key):
+        raise CanaryRunnerError(
+            "canary result artifact signer does not match its receipt"
+        )
     result_digest = _bounded_digest(
         owner_payload,
         limit=MAX_RESULT_BYTES,
@@ -704,7 +802,7 @@ def build_result_artifact(
             "canary result artifact does not bind a successful receipt"
         )
     body = {
-        "schema_version": "abyss_stack_mcp_canary_result_artifact_v1",
+        "schema_version": "abyss_stack_mcp_canary_result_artifact_v2",
         "issuer": "abyss-stack",
         "organ_id": receipt.organ_id,
         "policy_family": receipt.policy_family,
@@ -730,15 +828,24 @@ def build_result_artifact(
         normalized = CanaryResultArtifact.model_validate(
             {
                 "artifact_id": "sha256:" + ("0" * 64),
+                "signer_id": _signer_id(signing_key),
+                "attestation_algorithm": "ed25519",
+                "attestation": "A" * 86,
                 **body,
             }
         )
         normalized_body = normalized.model_dump(mode="json")
         normalized_body.pop("artifact_id")
+        normalized_body.pop("attestation")
+        artifact_id = _digest(normalized_body)
+        signed_payload = {
+            "artifact_id": artifact_id,
+            **normalized_body,
+        }
         artifact = CanaryResultArtifact.model_validate(
             {
-                "artifact_id": _digest(normalized_body),
-                **normalized_body,
+                **signed_payload,
+                **_signed_fields(signed_payload, signing_key),
             }
         )
     except ValidationError as exc:
@@ -756,6 +863,7 @@ def build_receipt(
     probe: CanaryProbeResult,
     observed_at: datetime,
     ttl_seconds: int,
+    signing_key: Ed25519PrivateKey,
 ) -> CanaryReceipt:
     if not 30 <= ttl_seconds <= 3600:
         raise CanaryRunnerError("canary receipt TTL must be 30..3600 seconds")
@@ -772,15 +880,24 @@ def build_receipt(
         normalized = CanaryReceipt.model_validate(
             {
                 "receipt_id": "sha256:" + ("0" * 64),
+                "signer_id": _signer_id(signing_key),
+                "attestation_algorithm": "ed25519",
+                "attestation": "A" * 86,
                 **body,
             }
         )
         normalized_body = normalized.model_dump(mode="json")
         normalized_body.pop("receipt_id")
+        normalized_body.pop("attestation")
+        receipt_id = _digest(normalized_body)
+        signed_payload = {
+            "receipt_id": receipt_id,
+            **normalized_body,
+        }
         receipt = CanaryReceipt.model_validate(
             {
-                "receipt_id": _digest(normalized_body),
-                **normalized_body,
+                **signed_payload,
+                **_signed_fields(signed_payload, signing_key),
             }
         )
     except ValidationError as exc:
@@ -875,6 +992,7 @@ async def run_canary(
         / f"{target.service_id}-read-bearer-token"
     )
     credential = _read_credential(credential_path)
+    signing_key = _read_signing_key(secret_dir / CANARY_SIGNING_KEY_NAME)
     probe = await probe_runner(
         target,
         target.canary_contract,
@@ -888,6 +1006,7 @@ async def run_canary(
         probe=probe,
         observed_at=observed_at,
         ttl_seconds=ttl_seconds,
+        signing_key=signing_key,
     )
     root = _ensure_private_directory(output_root)
     result_path: Path | None = None
@@ -899,6 +1018,7 @@ async def run_canary(
         result_artifact = build_result_artifact(
             receipt=receipt,
             owner_payload=probe.result,
+            signing_key=signing_key,
         )
         result_path = root / receipt.result_artifact_ref
         _write_private_json(
