@@ -112,6 +112,12 @@ adapter writes only affected owner slices and directional owner-pair slices
 touching them; traversal admits only the owner, relation, and reference slice
 digests named by current state.
 
+During the one-time migration from the legacy global vector collection to owner
+collections, the bootstrap may reuse a point only when its stable point identity,
+text digest, and embedding-profile identity still match. Missing or changed points
+are embedded normally; the legacy alias remains intact until the owner-slice
+bootstrap and checks complete.
+
 Exact, vector, and graph each retain one last-good state. Coordinated rollback
 first verifies that all three last-good targets name the same projection,
 bundle, and federation identities. It refuses mixed generations, then switches
