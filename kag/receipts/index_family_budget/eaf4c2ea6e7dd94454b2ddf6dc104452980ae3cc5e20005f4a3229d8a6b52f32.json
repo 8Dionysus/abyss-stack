@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 9788666,
+  "allowed_tracked_bytes": 28286499,
+  "approved_by": "repository-owner",
+  "base_ref": "5fb7d6925ff502ac0b29f2213b42f27d22b6b083",
+  "changed_generated_bytes": 9788666,
+  "changed_generated_files": 126,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "eaf4c2ea6e7dd94454b2ddf6dc104452980ae3cc5e20005f4a3229d8a6b52f32",
+  "reason": "Regenerate the portable family for authenticated abyss-stack-mcp canary evidence; accept the exact measured tracked family for this source revision.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 28286499,
+  "tracked_bytes_max": 24117248
+}
