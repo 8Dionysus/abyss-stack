@@ -23,6 +23,12 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
     Path("mcp/services/abyss-stack-mcp/schemas/runtime-observation.schema.json"),
     Path("mcp/services/abyss-stack-mcp/schemas/runtime-plan-candidate.schema.json"),
     Path(
+        "mechanics/config-projection/parts/codex-hooks/schemas/codex-hooks-composition-receipt.schema.json"
+    ),
+    Path(
+        "mechanics/config-projection/parts/codex-hooks/schemas/codex-hooks-fragment.schema.json"
+    ),
+    Path(
         "mechanics/config-projection/parts/sync/schemas/mcp-deployment-manifest.schema.json"
     ),
     Path("schemas/workspace_decision_repo_source_posture.schema.json"),
@@ -87,6 +93,21 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
     ),
     Path(
         "mechanics/federation-seams/parts/rpg-runtime/schemas/reputation_ledger_collection.schema.json"
+    ),
+    Path(
+        "mechanics/federation-seams/parts/memo-seam/schemas/active-organ-agent-local-runtime-namespace-v0.schema.json"
+    ),
+    Path(
+        "mechanics/federation-seams/parts/memo-seam/schemas/active-organ-runtime-delivery-receipt.schema.json"
+    ),
+    Path(
+        "mechanics/federation-seams/parts/memo-seam/schemas/active-organ-runtime-erasure-owner-extension-v0.schema.json"
+    ),
+    Path(
+        "mechanics/federation-seams/parts/memo-seam/schemas/active-organ-shadow-runtime-receipt.schema.json"
+    ),
+    Path(
+        "mechanics/federation-seams/parts/memo-seam/schemas/active-organ-canary-runtime-receipt.schema.json"
     ),
     Path(
         "mechanics/governed-execution/parts/agent-os-adapter/schemas/agent-os-runtime-binding.schema.json"
@@ -336,6 +357,19 @@ EXAMPLE_SCHEMA_CASES: tuple[tuple[str, str, str], ...] = (
         "mechanics/federation-seams/parts/rpg-runtime/schemas/frontend_projection_bundle.schema.json",
         "object",
     ),
+    *(
+        (
+            str(path.relative_to(REPO_ROOT)),
+            "mechanics/federation-seams/parts/memo-seam/schemas/active-organ-runtime-delivery-receipt.schema.json",
+            "object",
+        )
+        for path in sorted(
+            (
+                REPO_ROOT
+                / "mechanics/federation-seams/parts/memo-seam/examples"
+            ).glob("*.example.json")
+        )
+    ),
     (
         "mechanics/governed-execution/parts/candidate-exports/examples/runtime_memo_export_candidate.checkpoint_export.example.json",
         "mechanics/governed-execution/parts/candidate-exports/schemas/runtime-memo-export-candidate.schema.json",
@@ -460,6 +494,25 @@ EXAMPLE_SCHEMA_CASES: tuple[tuple[str, str, str], ...] = (
 
 PROJECTION_ONLY_EXAMPLES = {
     Path("quests/examples/quest_catalog.min.example.json"),
+    Path(
+        "mechanics/federation-seams/parts/memo-seam/examples/"
+        "codex_owner_orientation_runtime_compatibility_pin_v0.json"
+    ),
+    Path(
+        "mechanics/federation-seams/parts/memo-seam/examples/"
+        "codex_owner_orientation_shadow_runtime_compatibility_pin_v0.json"
+    ),
+    Path(
+        "mechanics/federation-seams/parts/memo-seam/examples/"
+        "codex_owner_orientation_canary_runtime_compatibility_pin_v0.json"
+    ),
+}
+
+EXECUTABLE_NEGATIVE_EXAMPLES = {
+    Path(
+        "mechanics/federation-seams/parts/memo-seam/examples/"
+        "active_organ_runtime_delivery_receipt.negative-examples.json"
+    ),
 }
 
 GENERATED_SCHEMA_CASES: tuple[tuple[str, str, str], ...] = (
@@ -522,7 +575,12 @@ def test_active_schema_manifest_matches_discovery() -> None:
 
 def test_schema_example_mapping_covers_active_json_examples() -> None:
     mapped = {Path(payload) for payload, _, _ in EXAMPLE_SCHEMA_CASES}
-    uncovered = active_example_paths() - mapped - PROJECTION_ONLY_EXAMPLES
+    uncovered = (
+        active_example_paths()
+        - mapped
+        - PROJECTION_ONLY_EXAMPLES
+        - EXECUTABLE_NEGATIVE_EXAMPLES
+    )
     assert sorted(path.as_posix() for path in uncovered) == []
 
 

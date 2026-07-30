@@ -9,6 +9,7 @@
 | local `memo/` ports | candidates, receipts, exports, local notes | central promotion |
 | `aoa-memo-mcp` read contour | access, search, brief, validation, pending-export inspection, non-writing plans | persistent local or durable memory mutation |
 | `aoa-memo-mcp` candidate contour | allowlisted local candidate, generated-index, export, and forwarding-receipt writes | durable corpus mutation, acceptance, arbitrary local-port discovery-as-authority |
+| source-local canary adapter | exact one-observation delivery and refs-only C20 evidence under pinned holdout/window/host gates | MCP exposure, selection, semantic meaning, permission, effects, persistence, policy approval, or deployment |
 
 ## Interface
 

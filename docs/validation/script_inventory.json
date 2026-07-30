@@ -239,6 +239,33 @@
       "disposition": "keep"
     },
     {
+      "family": "config-projection-codex-hooks-compositor",
+      "paths": [
+        "mechanics/config-projection/parts/codex-hooks/scripts/render_codex_hooks.py"
+      ],
+      "organ_lane": "mechanic/package-local config projection",
+      "owner_surface": "mechanics/config-projection/parts/codex-hooks/README.md",
+      "source_truth": [
+        "mechanics/config-projection/parts/codex-hooks/CONTRACT.md",
+        "mechanics/config-projection/parts/codex-hooks/schemas/codex-hooks-fragment.schema.json",
+        "mechanics/config-projection/parts/codex-hooks/schemas/codex-hooks-composition-receipt.schema.json"
+      ],
+      "reads": [
+        "explicit independently owned native or owner-envelope Codex hook fragments",
+        "explicit safe absolute-path bindings",
+        "optional existing projection for exact comparison"
+      ],
+      "writes": [
+        "stdout by default",
+        "explicit atomic native hooks target, private backup, and content-minimized composition receipt only with --write"
+      ],
+      "side_effects": "read-only composition by default; explicit --write requires a receipt, preserves an existing regular target, and rolls back if receipt creation fails",
+      "validation_lane": "mechanics-part-local/tests/release",
+      "ci_inclusion": "focused mechanic test plus source-fast test-inventory and release pytest lanes",
+      "test_target": "mechanics/config-projection/parts/codex-hooks/tests/test_render_codex_hooks.py",
+      "disposition": "add"
+    },
+    {
       "family": "config-projection-rendering-artifact-validator",
       "paths": [
         "mechanics/config-projection/parts/rendering/scripts/validate_abyss_machine_runtime_config_bundle.py"

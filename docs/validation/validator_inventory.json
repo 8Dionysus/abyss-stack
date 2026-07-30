@@ -286,7 +286,7 @@
       "paths": [
         "scripts/validators/federation_runtime_seams.py"
       ],
-      "protects": "memo, eval, playbook, and KAG runtime seam docs plus bounded export candidate schemas/examples and A2A return dry-run handoff posture",
+      "protects": "memo, eval, playbook, and KAG runtime seam docs; C20 content-minimized active-organ runtime delivery receipt schema and executable positive/negative examples; bounded export candidate schemas/examples; and A2A return dry-run handoff posture",
       "owner_surface": "mechanics/federation-seams/",
       "layer": "federation/runtime seam exports",
       "lane": "source-fast/release",
@@ -295,7 +295,7 @@
         "scripts/validate_stack.py",
         "tests/test_federation_runtime_seams_validator_module.py"
       ],
-      "failure_route": "Fix federation runtime seam docs, candidate export examples, A2A handoff examples, or federation_runtime_seams module contract.",
+      "failure_route": "Fix federation runtime seam docs, C20 delivery receipt contracts/examples, candidate export examples, A2A handoff examples, or federation_runtime_seams module contract.",
       "status": "active"
     },
     {

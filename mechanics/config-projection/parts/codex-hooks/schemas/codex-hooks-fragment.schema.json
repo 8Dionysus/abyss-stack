@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agents-of-abyss.dev/schemas/abyss-stack/codex-hooks-fragment.schema.json",
+  "title": "Independent Codex hook fragment envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fragment_id",
+    "owner",
+    "mode",
+    "description",
+    "bindings",
+    "hooks"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "abyss_codex_hooks_fragment_v0"
+    },
+    "fragment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[A-Za-z0-9._:+/-]+$"
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 96,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "mode": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "bindings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9_]*$"
+      }
+    },
+    "hooks": {
+      "$ref": "#/$defs/hooks"
+    }
+  },
+  "$defs": {
+    "handler": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "command"
+      ],
+      "properties": {
+        "type": {
+          "const": "command"
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commandWindows": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "statusMessage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "additionalContextLimit": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hooks"
+      ],
+      "properties": {
+        "matcher": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hooks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/handler"
+          }
+        }
+      }
+    },
+    "groups": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/group"
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "SessionStart": {
+          "$ref": "#/$defs/groups"
+        },
+        "SessionEnd": {
+          "$ref": "#/$defs/groups"
+        },
+        "PreToolUse": {
+          "$ref": "#/$defs/groups"
+        },
+        "PermissionRequest": {
+          "$ref": "#/$defs/groups"
+        },
+        "PostToolUse": {
+          "$ref": "#/$defs/groups"
+        },
+        "PreCompact": {
+          "$ref": "#/$defs/groups"
+        },
+        "PostCompact": {
+          "$ref": "#/$defs/groups"
+        },
+        "SubagentStart": {
+          "$ref": "#/$defs/groups"
+        },
+        "SubagentStop": {
+          "$ref": "#/$defs/groups"
+        },
+        "UserPromptSubmit": {
+          "$ref": "#/$defs/groups"
+        },
+        "Stop": {
+          "$ref": "#/$defs/groups"
+        }
+      }
+    }
+  }
+}

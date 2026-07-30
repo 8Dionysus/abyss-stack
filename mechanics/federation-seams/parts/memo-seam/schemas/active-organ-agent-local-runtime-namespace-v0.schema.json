@@ -1,0 +1,375 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/federation-seams/parts/memo-seam/schemas/active-organ-agent-local-runtime-namespace-v0.schema.json",
+  "title": "Active Organ Agent-Local Runtime Namespace v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "runtime_namespace_id",
+    "namespace_id",
+    "namespace_generation",
+    "agent_id",
+    "tenant_id",
+    "state",
+    "sdk_plan_ref",
+    "sdk_plan_digest",
+    "agent_namespace_contract_ref",
+    "agent_namespace_contract_digest",
+    "case_classes",
+    "storage_budget",
+    "isolation",
+    "expiry",
+    "rollback",
+    "promotion",
+    "shared_organ",
+    "consumer_zero",
+    "execution_posture",
+    "live_execution",
+    "effect_authority"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "active_organ_agent_local_runtime_namespace_v0"
+    },
+    "runtime_namespace_id": {
+      "type": "string",
+      "pattern": "^runtime-namespace:[a-z0-9][a-z0-9._-]+$"
+    },
+    "namespace_id": {
+      "type": "string",
+      "pattern": "^namespace:[a-z0-9][a-z0-9._-]+$"
+    },
+    "namespace_generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "agent_id": {
+      "type": "string",
+      "minLength": 3
+    },
+    "tenant_id": {
+      "type": "string",
+      "pattern": "^tenant:[a-z0-9][a-z0-9._-]+$"
+    },
+    "state": {
+      "enum": [
+        "active",
+        "isolated",
+        "consumer_zero"
+      ]
+    },
+    "sdk_plan_ref": {
+      "type": "string",
+      "minLength": 3
+    },
+    "sdk_plan_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "agent_namespace_contract_ref": {
+      "const": "schemas/active-organ-agent-local-namespace-v0.schema.json"
+    },
+    "agent_namespace_contract_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "case_classes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "episodic",
+          "procedural"
+        ]
+      }
+    },
+    "storage_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_objects",
+        "max_bytes",
+        "write_amplification_ceiling"
+      ],
+      "properties": {
+        "max_objects": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 1073741824
+        },
+        "write_amplification_ceiling": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 8
+        }
+      }
+    },
+    "isolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "storage_key",
+        "read_scope",
+        "write_scope",
+        "cross_agent_read",
+        "cross_tenant_read",
+        "failure_scope"
+      ],
+      "properties": {
+        "storage_key": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]+/[a-z0-9][a-z0-9._-]+/[1-9][0-9]*$"
+        },
+        "read_scope": {
+          "const": "exact_namespace_generation"
+        },
+        "write_scope": {
+          "const": "exact_namespace_generation"
+        },
+        "cross_agent_read": {
+          "const": "forbidden"
+        },
+        "cross_tenant_read": {
+          "const": "forbidden"
+        },
+        "failure_scope": {
+          "const": "namespace_only"
+        }
+      }
+    },
+    "expiry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace_local",
+        "expires_at",
+        "shared_lifecycle_effect"
+      ],
+      "properties": {
+        "namespace_local": {
+          "const": true
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "shared_lifecycle_effect": {
+          "const": "none"
+        }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_generation",
+        "scope",
+        "receipt_ref",
+        "shared_ledger_effect"
+      ],
+      "properties": {
+        "target_generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scope": {
+          "const": "namespace_only"
+        },
+        "receipt_ref": {
+          "type": "string",
+          "minLength": 3
+        },
+        "shared_ledger_effect": {
+          "const": "none"
+        }
+      }
+    },
+    "promotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "handoff_owner",
+        "direct_shared_write"
+      ],
+      "properties": {
+        "mode": {
+          "const": "reviewed_nomination_only"
+        },
+        "handoff_owner": {
+          "const": "aoa-memo"
+        },
+        "direct_shared_write": {
+          "const": "forbidden"
+        }
+      }
+    },
+    "shared_organ": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "available_when_local_isolated",
+        "dependency_on_local_namespace"
+      ],
+      "properties": {
+        "available_when_local_isolated": {
+          "const": true
+        },
+        "dependency_on_local_namespace": {
+          "const": "none"
+        }
+      }
+    },
+    "consumer_zero": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_ref",
+        "local_material_state",
+        "new_reads",
+        "new_writes",
+        "new_promotions"
+      ],
+      "properties": {
+        "evidence_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 3
+        },
+        "local_material_state": {
+          "enum": [
+            "present",
+            "isolated",
+            "absent"
+          ]
+        },
+        "new_reads": {
+          "type": "boolean"
+        },
+        "new_writes": {
+          "type": "boolean"
+        },
+        "new_promotions": {
+          "type": "boolean"
+        }
+      }
+    },
+    "execution_posture": {
+      "const": "reference_lab_only"
+    },
+    "live_execution": {
+      "const": false
+    },
+    "effect_authority": {
+      "const": "none"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "active"
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "consumer_zero": {
+            "properties": {
+              "evidence_ref": {
+                "type": "null"
+              },
+              "local_material_state": {
+                "const": "present"
+              },
+              "new_reads": {
+                "const": true
+              },
+              "new_writes": {
+                "const": true
+              },
+              "new_promotions": {
+                "const": true
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "if": {
+          "properties": {
+            "state": {
+              "const": "isolated"
+            }
+          },
+          "required": [
+            "state"
+          ]
+        },
+        "then": {
+          "properties": {
+            "consumer_zero": {
+              "properties": {
+                "evidence_ref": {
+                  "type": "null"
+                },
+                "local_material_state": {
+                  "const": "isolated"
+                },
+                "new_reads": {
+                  "const": false
+                },
+                "new_writes": {
+                  "const": false
+                },
+                "new_promotions": {
+                  "const": false
+                }
+              }
+            }
+          }
+        },
+        "else": {
+          "properties": {
+            "consumer_zero": {
+              "properties": {
+                "evidence_ref": {
+                  "type": "string"
+                },
+                "local_material_state": {
+                  "const": "absent"
+                },
+                "new_reads": {
+                  "const": false
+                },
+                "new_writes": {
+                  "const": false
+                },
+                "new_promotions": {
+                  "const": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

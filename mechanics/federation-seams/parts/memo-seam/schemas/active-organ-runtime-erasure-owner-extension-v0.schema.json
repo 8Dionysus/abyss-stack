@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/federation-seams/parts/memo-seam/schemas/active-organ-runtime-erasure-owner-extension-v0.schema.json",
+  "title": "abyss-stack Phase 11 runtime erasure owner extension v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "extension_id",
+    "parent_owner",
+    "worker_owner",
+    "surface_id",
+    "work_item_ref",
+    "material_classes",
+    "target_ref_digests",
+    "operation_evidence_refs",
+    "recovery_probe_ref",
+    "result",
+    "residue_refs",
+    "retention_exceptions",
+    "restore_recovery_checked",
+    "project_root_mutation",
+    "host_root_mutation",
+    "subject_material_included",
+    "content_minimized",
+    "execution_posture",
+    "live_execution",
+    "effect_authority",
+    "global_completion_authority",
+    "content_digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "active_organ_owner_erasure_extension_v0"
+    },
+    "extension_id": {
+      "$ref": "#/$defs/ref"
+    },
+    "parent_owner": {
+      "const": "abyss-stack"
+    },
+    "worker_owner": {
+      "enum": [
+        "abyss-stack-er4",
+        "abyss-stack-er5"
+      ]
+    },
+    "surface_id": {
+      "enum": [
+        "ER4",
+        "ER5"
+      ]
+    },
+    "work_item_ref": {
+      "$ref": "#/$defs/ref"
+    },
+    "material_classes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "runtime_store",
+          "cache",
+          "nervous_index",
+          "export",
+          "backup_restore_descendant"
+        ]
+      }
+    },
+    "target_ref_digests": {
+      "$ref": "#/$defs/digests"
+    },
+    "operation_evidence_refs": {
+      "$ref": "#/$defs/refs"
+    },
+    "recovery_probe_ref": {
+      "$ref": "#/$defs/ref"
+    },
+    "result": {
+      "enum": [
+        "erased",
+        "residue",
+        "partial",
+        "failed"
+      ]
+    },
+    "residue_refs": {
+      "$ref": "#/$defs/refs_optional"
+    },
+    "retention_exceptions": {
+      "type": "array"
+    },
+    "restore_recovery_checked": {
+      "const": true
+    },
+    "project_root_mutation": {
+      "const": "forbidden"
+    },
+    "host_root_mutation": {
+      "const": "forbidden"
+    },
+    "subject_material_included": {
+      "const": false
+    },
+    "content_minimized": {
+      "const": true
+    },
+    "execution_posture": {
+      "const": "reference_lab_only"
+    },
+    "live_execution": {
+      "const": false
+    },
+    "effect_authority": {
+      "const": "owner_local_erasure_only"
+    },
+    "global_completion_authority": {
+      "const": false
+    },
+    "content_digest": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "surface_id": {
+            "const": "ER4"
+          }
+        },
+        "required": [
+          "surface_id"
+        ]
+      },
+      "then": {
+        "properties": {
+          "worker_owner": {
+            "const": "abyss-stack-er4"
+          },
+          "material_classes": {
+            "minItems": 3,
+            "maxItems": 3,
+            "allOf": [
+              {
+                "contains": {
+                  "const": "runtime_store"
+                }
+              },
+              {
+                "contains": {
+                  "const": "cache"
+                }
+              },
+              {
+                "contains": {
+                  "const": "nervous_index"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "worker_owner": {
+            "const": "abyss-stack-er5"
+          },
+          "material_classes": {
+            "minItems": 2,
+            "maxItems": 2,
+            "allOf": [
+              {
+                "contains": {
+                  "const": "export"
+                }
+              },
+              {
+                "contains": {
+                  "const": "backup_restore_descendant"
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "digests": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "refs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/ref"
+      }
+    },
+    "refs_optional": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/ref"
+      }
+    }
+  }
+}

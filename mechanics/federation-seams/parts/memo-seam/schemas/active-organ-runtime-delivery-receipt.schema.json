@@ -1,0 +1,664 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/federation-seams/parts/memo-seam/schemas/active-organ-runtime-delivery-receipt.schema.json",
+  "title": "abyss-stack active-organ runtime delivery receipt",
+  "description": "A content-minimized runtime receipt for one bounded active-organ delivery attempt. It records exact contract and policy bindings, not private memory or prompt content.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "receipt_id",
+    "attempt_id",
+    "attempt_no",
+    "recorded_at",
+    "expires_at",
+    "runtime_owner",
+    "runtime_surface",
+    "delivery_state",
+    "recall_intent_ref",
+    "admitted_run_plan_ref",
+    "recall_packet_ref",
+    "intervention_decision",
+    "trigger_binding",
+    "anchor_binding",
+    "policy_binding",
+    "admission",
+    "delivery_target",
+    "result",
+    "retry",
+    "content_minimization",
+    "authority",
+    "receipt_retention",
+    "evidence_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "active_organ_runtime_delivery_receipt_v1"
+    },
+    "contract_id": {
+      "const": "C20"
+    },
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^abyss-stack:active-organ-delivery:[A-Za-z0-9._:-]+$"
+    },
+    "attempt_id": {
+      "type": "string",
+      "pattern": "^active-organ-attempt:[A-Za-z0-9._:-]+$"
+    },
+    "attempt_no": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "runtime_owner": {
+      "const": "abyss-stack"
+    },
+    "runtime_surface": {
+      "type": "string",
+      "minLength": 1
+    },
+    "delivery_state": {
+      "enum": [
+        "attempted",
+        "delivered",
+        "suppressed",
+        "expired",
+        "failed"
+      ]
+    },
+    "recall_intent_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "admitted_run_plan_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recall_packet_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "intervention_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "decision"
+      ],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision": {
+          "enum": [
+            "silence",
+            "bounded_observation"
+          ]
+        }
+      }
+    },
+    "trigger_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trigger_id",
+        "trigger_policy_version"
+      ],
+      "properties": {
+        "trigger_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trigger_policy_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "anchor_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anchor_id",
+        "anchor_ref",
+        "freshness",
+        "checked_at"
+      ],
+      "properties": {
+        "anchor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "anchor_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "freshness": {
+          "enum": [
+            "current",
+            "stale",
+            "missing",
+            "mismatched",
+            "unresolvable"
+          ]
+        },
+        "checked_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "policy_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "policy_version",
+        "consumer_id",
+        "tenant_id",
+        "data_class",
+        "risk_class",
+        "model_prompt_provider_hardware_pin_ref"
+      ],
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "consumer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tenant_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "data_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "risk_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_prompt_provider_hardware_pin_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "ref",
+        "checked_at"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "admitted",
+            "denied",
+            "expired"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checked_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "delivery_target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "consumer_id",
+        "adapter_id",
+        "transport",
+        "target_ref"
+      ],
+      "properties": {
+        "consumer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adapter_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transport": {
+          "enum": [
+            "local_subprocess",
+            "loopback_api",
+            "internal_queue",
+            "filesystem_handoff"
+          ]
+        },
+        "target_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "delivered",
+        "reason_code",
+        "observed_at",
+        "failure_ref"
+      ],
+      "properties": {
+        "delivered": {
+          "type": "boolean"
+        },
+        "reason_code": {
+          "enum": [
+            "dispatch_started",
+            "delivery_confirmed",
+            "policy_silence",
+            "anchor_not_current",
+            "trigger_not_admitted",
+            "policy_mismatch",
+            "data_class_denied",
+            "risk_class_denied",
+            "delivery_window_expired",
+            "transport_unavailable",
+            "consumer_rejected",
+            "internal_error"
+          ]
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "failure_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "retry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "implicit_retry_allowed",
+        "new_attempt_requires_admission_recheck"
+      ],
+      "properties": {
+        "implicit_retry_allowed": {
+          "const": false
+        },
+        "new_attempt_requires_admission_recheck": {
+          "const": true
+        }
+      }
+    },
+    "content_minimization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "persistence_mode",
+        "packet_content_persisted",
+        "prompt_content_persisted",
+        "memory_content_persisted",
+        "payload_digest_persisted",
+        "error_detail_persisted"
+      ],
+      "properties": {
+        "persistence_mode": {
+          "const": "refs_only"
+        },
+        "packet_content_persisted": {
+          "const": false
+        },
+        "prompt_content_persisted": {
+          "const": false
+        },
+        "memory_content_persisted": {
+          "const": false
+        },
+        "payload_digest_persisted": {
+          "const": false
+        },
+        "error_detail_persisted": {
+          "const": false
+        }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "delivery_authority",
+        "effect_authority",
+        "memory_semantic_authority",
+        "policy_widening_authority"
+      ],
+      "properties": {
+        "delivery_authority": {
+          "const": "already_admitted_packet_only"
+        },
+        "effect_authority": {
+          "const": "none"
+        },
+        "memory_semantic_authority": {
+          "const": false
+        },
+        "policy_widening_authority": {
+          "const": false
+        }
+      }
+    },
+    "receipt_retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "retention_class",
+        "minimization_policy_ref",
+        "erase_scope_ref"
+      ],
+      "properties": {
+        "retention_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minimization_policy_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "erase_scope_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "delivery_state": {
+            "const": "attempted"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "recall_packet_ref": {
+            "type": "string"
+          },
+          "intervention_decision": {
+            "properties": {
+              "decision": {
+                "const": "bounded_observation"
+              }
+            }
+          },
+          "anchor_binding": {
+            "properties": {
+              "freshness": {
+                "const": "current"
+              }
+            }
+          },
+          "admission": {
+            "properties": {
+              "state": {
+                "const": "admitted"
+              }
+            }
+          },
+          "result": {
+            "properties": {
+              "delivered": {
+                "const": false
+              },
+              "reason_code": {
+                "const": "dispatch_started"
+              },
+              "failure_ref": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "delivery_state": {
+            "const": "delivered"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "recall_packet_ref": {
+            "type": "string"
+          },
+          "intervention_decision": {
+            "properties": {
+              "decision": {
+                "const": "bounded_observation"
+              }
+            }
+          },
+          "anchor_binding": {
+            "properties": {
+              "freshness": {
+                "const": "current"
+              }
+            }
+          },
+          "admission": {
+            "properties": {
+              "state": {
+                "const": "admitted"
+              }
+            }
+          },
+          "result": {
+            "properties": {
+              "delivered": {
+                "const": true
+              },
+              "reason_code": {
+                "const": "delivery_confirmed"
+              },
+              "failure_ref": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "delivery_state": {
+            "const": "suppressed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "recall_packet_ref": {
+            "type": "null"
+          },
+          "intervention_decision": {
+            "properties": {
+              "decision": {
+                "const": "silence"
+              }
+            }
+          },
+          "admission": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "admitted",
+                  "denied"
+                ]
+              }
+            }
+          },
+          "result": {
+            "properties": {
+              "delivered": {
+                "const": false
+              },
+              "reason_code": {
+                "enum": [
+                  "policy_silence",
+                  "anchor_not_current",
+                  "trigger_not_admitted",
+                  "policy_mismatch",
+                  "data_class_denied",
+                  "risk_class_denied"
+                ]
+              },
+              "failure_ref": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "delivery_state": {
+            "const": "expired"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "recall_packet_ref": {
+            "type": "string"
+          },
+          "intervention_decision": {
+            "properties": {
+              "decision": {
+                "const": "bounded_observation"
+              }
+            }
+          },
+          "admission": {
+            "properties": {
+              "state": {
+                "const": "expired"
+              }
+            }
+          },
+          "result": {
+            "properties": {
+              "delivered": {
+                "const": false
+              },
+              "reason_code": {
+                "const": "delivery_window_expired"
+              },
+              "failure_ref": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "delivery_state": {
+            "const": "failed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "recall_packet_ref": {
+            "type": "string"
+          },
+          "intervention_decision": {
+            "properties": {
+              "decision": {
+                "const": "bounded_observation"
+              }
+            }
+          },
+          "anchor_binding": {
+            "properties": {
+              "freshness": {
+                "const": "current"
+              }
+            }
+          },
+          "admission": {
+            "properties": {
+              "state": {
+                "const": "admitted"
+              }
+            }
+          },
+          "result": {
+            "properties": {
+              "delivered": {
+                "const": false
+              },
+              "reason_code": {
+                "enum": [
+                  "transport_unavailable",
+                  "consumer_rejected",
+                  "internal_error"
+                ]
+              },
+              "failure_ref": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -25,7 +25,8 @@ candidate processes with different tool catalogs, credentials, scopes, client
 identities, and ports.
 
 The read process exposes briefs, search, validation, pending-export inspection,
-and non-writing landing plans. The candidate process exposes only local
+non-writing landing plans, and exact owner-orientation delivery. The candidate
+process exposes only local
 candidate creation, optional generated-index write, intake export, and
 forwarding-receipt tools. Core write guards deny the same calls under the read
 policy and deny candidate writes outside the configured root allowlist.
@@ -58,6 +59,28 @@ without making the MCP result stronger than the reviewed object.
 Candidate creation is local-first. A candidate may be written under the local
 port, validated, and exported for reviewed intake. It does not become durable
 memory just because the MCP tool wrote a file.
+
+Codex owner orientation is an admitted-bundle route, not generic MCP search:
+
+```text
+C07 + exact pins -> aoa-sdk selection plan
+                  -> aoa-memo C08/C09 bundle
+                  -> aoa-memo-mcp exact return + C20
+```
+
+The access plane validates both inputs and returns the plan's exact items. It
+does not query, rank, expand, persist, or reinterpret them. An off,
+fresh-start, silence, or expired route returns no memory content. The C20
+receipt is refs-only and returned to the caller; the adapter does not persist
+it or gain semantic/effect authority.
+
+The Phase 8 selective canary remains a separate source-local method rather
+than an MCP tool. It consumes a frozen shadow selection plus an
+operator-approved SDK release and returns at most one source/currentness
+visible observation to the lab harness. The stack independently enforces the
+one-reminder window from prior refs-only C20 receipts. This method is neither
+registered nor deployed and therefore does not expand the read-contour tool
+catalog.
 
 Local port indexing is also local-first. `PORT.yaml` is the local contract,
 `INDEX.md` and `index.min.json` are generated read models, and MCP may rebuild

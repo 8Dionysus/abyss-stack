@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/federation-seams/parts/memo-seam/schemas/active-organ-shadow-runtime-receipt.schema.json",
+  "title": "abyss-stack active-organ consumer-invisible shadow receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "receipt_id",
+    "recorded_at",
+    "expires_at",
+    "runtime_owner",
+    "runtime_surface",
+    "plan_ref",
+    "plan_digest",
+    "bundle_ref",
+    "bundle_digest",
+    "host_admission_ref",
+    "host_admission_digest",
+    "observation_state",
+    "shadow_item_refs",
+    "consumer_visible",
+    "delivery_attempted",
+    "memory_payload_returned",
+    "content_persisted",
+    "candidate_persisted",
+    "reranking_performed",
+    "reselection_performed",
+    "memory_semantic_authority",
+    "policy_widening_authority",
+    "effect_authority",
+    "action_use",
+    "evidence_refs",
+    "receipt_digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "active_organ_shadow_runtime_receipt_v0"
+    },
+    "contract_id": {
+      "const": "C20"
+    },
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^abyss-stack:active-organ-shadow:[A-Za-z0-9._:-]+$"
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "runtime_owner": {
+      "const": "abyss-stack"
+    },
+    "runtime_surface": {
+      "const": "aoa-memo-mcp/codex-owner-orientation-shadow-v0"
+    },
+    "plan_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "plan_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "bundle_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bundle_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "host_admission_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "host_admission_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "observation_state": {
+      "enum": [
+        "constructed",
+        "silence",
+        "expired",
+        "host_denied"
+      ]
+    },
+    "shadow_item_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "consumer_visible": {
+      "const": false
+    },
+    "delivery_attempted": {
+      "const": false
+    },
+    "memory_payload_returned": {
+      "const": false
+    },
+    "content_persisted": {
+      "const": false
+    },
+    "candidate_persisted": {
+      "const": false
+    },
+    "reranking_performed": {
+      "const": false
+    },
+    "reselection_performed": {
+      "const": false
+    },
+    "memory_semantic_authority": {
+      "const": false
+    },
+    "policy_widening_authority": {
+      "const": false
+    },
+    "effect_authority": {
+      "const": "none"
+    },
+    "action_use": {
+      "const": "forbidden"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "receipt_digest": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "observation_state": {
+            "const": "constructed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "shadow_item_refs": {
+            "minItems": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "shadow_item_refs": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

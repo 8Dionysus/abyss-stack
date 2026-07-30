@@ -18,6 +18,8 @@ bootstrap helpers, sync behavior, or docs about secrets and deployed `Configs`.
 - bootstrap and sync helper behavior
 - deployed config path expectations
 - source/deployed separation language
+- neutral composition, backup, receipt, and rollback for independently owned
+  Codex command-hook fragments
 
 ### Stronger owner split
 
@@ -33,7 +35,8 @@ profile or preset selection, and deployment target paths.
 ### Outputs
 
 Bootstrapped config files, rendered compose or service config, syncable source
-surfaces, and public-safe documentation of the boundary.
+surfaces, composed native Codex hook candidates and content-minimized
+composition receipts, and public-safe documentation of the boundary.
 
 ### Must not claim
 
@@ -41,6 +44,8 @@ surfaces, and public-safe documentation of the boundary.
 - deployed files are source truth
 - sync is safe to run destructively without explicit operator intent
 - config projection owns service health
+- hook composition owns sibling hook meaning, Codex trust, live invocation, or
+  agent benefit
 
 ### Validation
 
@@ -55,4 +60,6 @@ and [federation-seams](../federation-seams/README.md) for owner-surface mirrors.
 
 Current source surfaces stay in `config-templates/`, `env/`, `scripts/`,
 `mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md`, and
-the rendering part's OS Abyss artifact bundle manifest/validator.
+the rendering part's OS Abyss artifact bundle manifest/validator. Independent
+Codex-hook composition lives under
+`mechanics/config-projection/parts/codex-hooks/`.

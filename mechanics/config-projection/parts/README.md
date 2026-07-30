@@ -9,4 +9,5 @@ contracts consume those paths directly.
 - [bootstrap](bootstrap/README.md)
 - [sync](sync/README.md)
 - [rendering](rendering/README.md)
+- [codex-hooks](codex-hooks/README.md)
 - [deployment-paths](deployment-paths/README.md)

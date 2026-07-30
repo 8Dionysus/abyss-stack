@@ -12,6 +12,16 @@ def _print(payload: dict[str, Any]) -> None:
     print(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
+def _write_or_print(payload: dict[str, Any], output: str | None) -> None:
+    if output is None:
+        _print(payload)
+        return
+    Path(output).expanduser().resolve().write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="aoa-memo-mcp")
     parser.add_argument("--workspace-root", default=None)
@@ -25,6 +35,14 @@ def main() -> None:
     search.add_argument("query")
     search.add_argument("--scope", default="all")
     search.add_argument("--mode", default="brief")
+
+    orientation = sub.add_parser("owner-orientation")
+    orientation.add_argument("--plan", required=True)
+    orientation.add_argument("--memo-bundle", required=True)
+    orientation.add_argument("--observed-at")
+    orientation.add_argument("--target-ref", default="codex:current-request")
+    orientation.add_argument("--attempt-no", type=int, default=1)
+    orientation.add_argument("--output")
 
     create = sub.add_parser("create-candidate")
     create.add_argument("--repo", required=True)
@@ -78,6 +96,21 @@ def main() -> None:
         _print(state.build_brief(args.repo, args.intent))
     elif args.command == "search":
         _print(state.search(args.query, args.scope, args.mode))
+    elif args.command == "owner-orientation":
+        _write_or_print(
+            state.deliver_owner_orientation(
+                plan=json.loads(
+                    Path(args.plan).read_text(encoding="utf-8")
+                ),
+                memo_bundle=json.loads(
+                    Path(args.memo_bundle).read_text(encoding="utf-8")
+                ),
+                observed_at=args.observed_at,
+                target_ref=args.target_ref,
+                attempt_no=args.attempt_no,
+            ),
+            args.output,
+        )
     elif args.command == "create-candidate":
         _print(
             state.create_candidate(
