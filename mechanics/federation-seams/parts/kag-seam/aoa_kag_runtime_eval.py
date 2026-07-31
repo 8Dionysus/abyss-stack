@@ -39,6 +39,7 @@ EMBEDDING_PROFILE: dict[str, Any] = {}
 EMBEDDINGS: JsonHttpClient | None = None
 QDRANT: JsonHttpClient | None = None
 GRAPH: graph.Neo4jProjection | None = None
+GRAPH_OWNER_SLICE_STATE: dict[str, Any] = {}
 
 
 def now() -> str:
@@ -46,6 +47,8 @@ def now() -> str:
 
 
 load_config = evaluation.load_config
+
+
 def dotenv_values(path: Path) -> dict[str, str]:
     if not path.is_file():
         return {}
@@ -65,7 +68,9 @@ def dotenv_values(path: Path) -> dict[str, str]:
 def neo4j_headers() -> dict[str, str]:
     env = dotenv_values(STACK_ROOT / "Secrets/Configs/stack.env")
     user = os.environ.get("AOA_KAG_NEO4J_USER") or env.get("AOA_RAG_NEO4J_USER")
-    password = os.environ.get("AOA_KAG_NEO4J_PASSWORD") or env.get("AOA_RAG_NEO4J_PASSWORD")
+    password = os.environ.get("AOA_KAG_NEO4J_PASSWORD") or env.get(
+        "AOA_RAG_NEO4J_PASSWORD"
+    )
     auth = os.environ.get("AOA_KAG_NEO4J_AUTH") or env.get("NEO4J_AUTH", "")
     if (not user or not password) and "/" in auth:
         user, password = auth.split("/", 1)
@@ -149,6 +154,8 @@ def filter_search(
         kind=str(target["kind"]),
         limit=limit or TOP_K,
     )
+
+
 hit_id = evaluation.hit_id
 grounded = evaluation.grounded
 canonical_quality = evaluation.canonical_quality
@@ -201,6 +208,8 @@ def graph_targets(connection: sqlite3.Connection) -> list[dict[str, Any]]:
         connection,
         minimum_cases=MIN_GRAPH_CASES,
     )
+
+
 def graph_search(
     case: dict[str, Any],
     projection: str,
@@ -210,12 +219,15 @@ def graph_search(
     return graph.search_multihop(
         graph=GRAPH,
         projection=projection,
+        owner_slice_state=GRAPH_OWNER_SLICE_STATE,
         source_id=case["source_id"],
         first_relation=case["first_relation"],
         second_relation=case["second_relation"],
         source_path=case["path"],
         limit=TOP_K,
     )
+
+
 def evaluate(connection: sqlite3.Connection, *, config_digest: str) -> dict[str, Any]:
     started_at = now()
     metadata = dict(connection.execute("SELECT key,value FROM metadata"))
@@ -502,6 +514,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     global EMBEDDING_URL
     global EXPECTED_OWNER_COUNT
     global GRAPH
+    global GRAPH_OWNER_SLICE_STATE
     global HTTP_TIMEOUT
     global MIN_GRAPH_CASES
     global NEO4J_DATABASE
@@ -569,6 +582,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             ),
             NEO4J_DATABASE,
         )
+        GRAPH_OWNER_SLICE_STATE = graph.read_owner_slice_state(
+            STACK_ROOT / "Knowledge/kag/repo-self/graph/owner-slices.json"
+        )
         report = evaluate(
             connection,
             config_digest=hashlib.sha256(config_path.read_bytes()).hexdigest(),
@@ -592,7 +608,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             "content_digest"
         )
         if current_projection != projection:
-            raise RuntimeError("current runtime projection changed during retrieval eval")
+            raise RuntimeError(
+                "current runtime projection changed during retrieval eval"
+            )
         current.setdefault("targets", {})["retrieval_eval"] = {
             "status": report["status"],
             "receipt": str(output),

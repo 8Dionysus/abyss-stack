@@ -725,6 +725,35 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.bundle = write_bundle(self.root / "bundle")
 
+    def test_semantic_target_uses_canonical_heading_chunk(self) -> None:
+        connection = sqlite3.connect(":memory:")
+        connection.row_factory = sqlite3.Row
+        connection.execute(
+            "CREATE TABLE documents (id TEXT, repo TEXT, path TEXT, label TEXT, text TEXT)"
+        )
+        connection.executemany(
+            "INSERT INTO documents VALUES (?,?,?,?,?)",
+            (
+                ("continuation", "fixture", "README.md", "Runtime", "continued text"),
+                ("heading", "fixture", "README.md", "Runtime", "## Runtime\nbody"),
+                ("tail", "fixture", "README.md", "Runtime", "tail text"),
+            ),
+        )
+        cases = (
+            {
+                "name": "runtime",
+                "query": "runtime topology",
+                "repo": "fixture",
+                "path": "README.md",
+                "label": "Runtime",
+            },
+        )
+
+        resolved = runtime_eval.evaluation.semantic_targets(connection, cases)
+        connection.close()
+
+        self.assertEqual(resolved[0][1], {"heading"})
+
     def test_bundle_verification_detects_drift(self) -> None:
         report = self.bundle.verify()
         self.assertEqual(report["files"]["documents"]["record_count"], 1)
@@ -1775,16 +1804,12 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         self.assertEqual(result["bootstrap_collection"], legacy_collection)
         self.assertEqual(bootstrap_embeddings.texts, [])
         self.assertEqual(
-            sum(
-                update["reused_point_count"]
-                for update in result["updates"].values()
-            ),
+            sum(update["reused_point_count"] for update in result["updates"].values()),
             2,
         )
         self.assertEqual(
             sum(
-                update["embedded_point_count"]
-                for update in result["updates"].values()
+                update["embedded_point_count"] for update in result["updates"].values()
             ),
             0,
         )
@@ -1961,6 +1986,33 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         self.assertEqual(hits[0]["id"], "target")
         self.assertGreaterEqual(latency, 0.0)
         self.assertEqual(completeness, 1.0)
+
+    def test_neo4j_multihop_query_routes_through_owner_slices(self) -> None:
+        projection = mock.Mock(spec=graph.Neo4jProjection)
+        projection.execute.return_value = []
+        state = {
+            "schema_version": graph.OWNER_SLICE_SCHEMA_VERSION,
+            "storage_mode": "owner_slices",
+            "owners": {"fixture": {"slice_digest": "owner-slice"}},
+            "relations": {"fixture": {"slice_digest": "relation-slice"}},
+            "external_references": {},
+        }
+
+        graph.search_multihop(
+            graph=projection,
+            projection="projection",
+            owner_slice_state=state,
+            source_id="source",
+            first_relation="defines",
+            second_relation="calls",
+            source_path="README.md",
+        )
+
+        query, parameters = projection.execute.call_args.args
+        self.assertIn("AoAKagNodeSlice", query)
+        self.assertIn("AOA_KAG_RELATION_SLICE", query)
+        self.assertEqual(parameters["owner_slices"], ["owner-slice"])
+        self.assertEqual(parameters["relation_slices"], ["relation-slice"])
 
     def test_neo4j_projection_resumes_bounded_retention_after_cutover(self) -> None:
         fake = FakeGraph()
@@ -2306,7 +2358,7 @@ class KagRuntimeProjectionTests(unittest.TestCase):
     def test_retrieval_eval_config_has_unique_semantic_cases(self) -> None:
         config = runtime_eval.load_config(runtime_eval.DEFAULT_CASES_PATH)
         names = [case["name"] for case in config["semantic_cases"]]
-        self.assertEqual(config["expected_owner_count"], 24)
+        self.assertEqual(config["expected_owner_count"], 23)
         self.assertEqual(len(names), len(set(names)))
         self.assertIn("graph_recall_advantage", config["thresholds"]["minimums"])
 
