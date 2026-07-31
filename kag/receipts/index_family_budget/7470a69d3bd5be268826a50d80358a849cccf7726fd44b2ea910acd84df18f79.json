@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 7835756,
+  "allowed_tracked_bytes": 28801959,
+  "approved_by": "repository-owner",
+  "base_ref": "7fa27b2bb58b148e941d24e5148791c4380a302e",
+  "changed_generated_bytes": 7835756,
+  "changed_generated_files": 103,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "7470a69d3bd5be268826a50d80358a849cccf7726fd44b2ea910acd84df18f79",
+  "reason": "Index the Codex 0.146 protocol lab refresh and owner-scoped KAG retrieval evaluator repair; the portable family remains below the global tracked-size ceiling.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 28801959,
+  "tracked_bytes_max": 24117248
+}
