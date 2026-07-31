@@ -242,7 +242,8 @@ def semantic_targets(
     resolved: list[tuple[dict[str, str], set[str]]] = []
     for case in cases:
         rows = connection.execute(
-            "SELECT id FROM documents WHERE repo=? AND path=? AND label=? ORDER BY id",
+            "SELECT id FROM documents WHERE repo=? AND path=? AND label=? "
+            "ORDER BY CASE WHEN ltrim(text) GLOB '#*' THEN 0 ELSE 1 END, id LIMIT 1",
             (case["repo"], case["path"], case["label"]),
         ).fetchall()
         if not rows:

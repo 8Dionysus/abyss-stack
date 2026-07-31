@@ -13,7 +13,7 @@ LAB_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = LAB_ROOT.parents[1]
 BUILDER_PATH = LAB_ROOT / "scripts" / "build_protocol_lab_status.py"
 WIRE_OBSERVATION_PATH = (
-    LAB_ROOT / "fixtures" / "codex-0.145.0-wire-observation.json"
+    LAB_ROOT / "fixtures" / "codex-0.146.0-wire-observation.json"
 )
 WIRE_OBSERVATION_SCHEMA_PATH = (
     LAB_ROOT / "schemas" / "protocol-consumer-wire-observation.schema.json"
@@ -222,7 +222,7 @@ def validate() -> list[str]:
         errors.append("Codex wire observation no longer proves the isolated legacy pair")
     if (
         wire_observation["raw_transcript"]["sha256"]
-        != "52de83b93a48397db05cb80e422e1d924bbc367adfca9b74379ffec0cbcdb66d"
+        != "376a2030eada931b9bfa26dd61443b8dc1da985a17ae85d8facf5d1f8f3499dc"
         or wire_observation["probe"]["mcp_python_wheel_sha256"]
         != "1cb4c75d2d2c7b8c1d756355e5d82a39f2822cc7f13e22a2051d7ca3592349d6"
     ):

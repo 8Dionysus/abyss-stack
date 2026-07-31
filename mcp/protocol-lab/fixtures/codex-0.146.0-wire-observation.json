@@ -1,15 +1,15 @@
 {
   "claim_limits": [
-    "This receipt proves only the isolated Codex 0.145.0 to Python MCP 2.0.0 stdio exchange.",
+    "This receipt proves only the isolated Codex 0.146.0 to Python MCP 2.0.0 stdio exchange.",
     "The Python SDK accepted a legacy client; this is not evidence of a modern Codex pair.",
     "No production registration, credential, owner result, canary, or live runtime was changed.",
     "The local raw transcript is retained outside the repository and is admitted only by its digest."
   ],
   "consumer": {
     "id": "codex-cli",
-    "version": "0.145.0"
+    "version": "0.146.0"
   },
-  "finished_at": "2026-07-29T01:21:23.901888Z",
+  "finished_at": "2026-07-31T00:18:01.062256Z",
   "global_codex_config_mutated": false,
   "isolated_codex_home": true,
   "method_sequence": [
@@ -20,8 +20,8 @@
     "resources/list"
   ],
   "next_wire_pair_observed": false,
-  "observation_id": "codex-0.145.0-python-mcp-2.0.0-stdio-20260729",
-  "observed_at": "2026-07-29T01:21:22.886167Z",
+  "observation_id": "codex-0.146.0-python-mcp-2.0.0-stdio-20260731",
+  "observed_at": "2026-07-31T00:17:59.873211Z",
   "probe": {
     "mcp_python_sdk_commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
     "mcp_python_sdk_version": "2.0.0",
@@ -30,9 +30,9 @@
     "transport": "stdio"
   },
   "raw_transcript": {
-    "record_count": 9,
-    "ref": "local://mcp-protocol-final-lab-20260728/proof/codex-mcp-wire.jsonl",
-    "sha256": "52de83b93a48397db05cb80e422e1d924bbc367adfca9b74379ffec0cbcdb66d"
+    "record_count": 8,
+    "ref": "local://mcp-protocol-codex-0146-20260730/proof/codex-mcp-wire.jsonl",
+    "sha256": "376a2030eada931b9bfa26dd61443b8dc1da985a17ae85d8facf5d1f8f3499dc"
   },
   "schema_version": "abyss_mcp_consumer_wire_observation_v1",
   "server_discover_observed": false,

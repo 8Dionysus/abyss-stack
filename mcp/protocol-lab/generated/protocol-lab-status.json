@@ -9,18 +9,18 @@
     "Final publication and stable SDKs never authorize production migration without exact pair receipts."
   ],
   "effectful_migration_allowed": false,
-  "evaluated_at": "2026-07-29T02:08:11Z",
+  "evaluated_at": "2026-07-31T00:18:01Z",
   "gate_counts": {
     "blocked": 4,
     "passed": 10,
     "pending": 0
   },
-  "matrix_digest": "sha256:9f951bf49b306ae496453aa4c231277264fba78cf5c1a5d68c50085e7688c386",
+  "matrix_digest": "sha256:aadbd31143cd67325381880ee519593b69006ad25b8101ad7f3195662bb977ac",
   "migration_allowed": false,
   "next_action": "Keep the next registration disabled; refresh Codex and repeat the isolated wire probe when consumer support changes.",
   "next_protocol": "2026-07-28",
   "next_release_status": "final",
-  "observation_digest": "sha256:90bdfda16537328d0eb51dbb4f64cc7df431ae098e143d1137fb48f4b86c83c8",
+  "observation_digest": "sha256:e255151a30b176ccbad156041107dee26d7207dbf2aaca82105c56dce3056c8e",
   "passed_gate_ids": [
     "P1-01",
     "P1-02",
@@ -50,6 +50,6 @@
   ],
   "schema_version": "abyss_mcp_protocol_lab_status_v1",
   "stable_registration_retained": true,
-  "status_digest": "sha256:f0eb4898d4fa501dc87d98a519a31446c750fe8a015ebd7666eff8d20eba07ab",
+  "status_digest": "sha256:3dda1132fff70a2d91812652a60002c089582d851531ba2a342b55bc0ef23e77",
   "tasks_extension_allowed": false
 }

@@ -159,9 +159,7 @@ def _owner_slice_digest(value: dict[str, Any]) -> str:
 
 
 def _pair_key(source_repo: str, target_repo: str) -> str:
-    return hashlib.sha256(
-        f"{source_repo}\0{target_repo}".encode("utf-8")
-    ).hexdigest()
+    return hashlib.sha256(f"{source_repo}\0{target_repo}".encode("utf-8")).hexdigest()
 
 
 def _relation_slice_digest(
@@ -212,6 +210,11 @@ def _read_owner_slice_state(path: Path) -> dict[str, Any]:
     ):
         return {}
     return payload
+
+
+def read_owner_slice_state(path: Path) -> dict[str, Any]:
+    """Read validated owner-slice state for bounded query routing."""
+    return _read_owner_slice_state(path.resolve())
 
 
 def _current_digest(graph: Neo4jProjection) -> str | None:
@@ -370,17 +373,12 @@ def _owner_slice_counts(
     graph: Neo4jProjection,
     state: dict[str, Any],
 ) -> dict[str, int]:
-    owner_slices = [
-        str(item["slice_digest"])
-        for item in state["owners"].values()
-    ]
+    owner_slices = [str(item["slice_digest"]) for item in state["owners"].values()]
     relation_slices = [
-        str(item["slice_digest"])
-        for item in state["relations"].values()
+        str(item["slice_digest"]) for item in state["relations"].values()
     ]
     external_slices = [
-        str(item["slice_digest"])
-        for item in state["external_references"].values()
+        str(item["slice_digest"]) for item in state["external_references"].values()
     ]
     queries = {
         "owners": (
@@ -389,8 +387,7 @@ def _owner_slice_counts(
             owner_slices,
         ),
         "nodes": (
-            "MATCH (n:AoAKagNodeSlice) "
-            "WHERE n.slice_digest IN $slices RETURN count(n)",
+            "MATCH (n:AoAKagNodeSlice) WHERE n.slice_digest IN $slices RETURN count(n)",
             owner_slices,
         ),
         "relations": (
@@ -432,8 +429,7 @@ def materialize_owner_slices(
     unknown = sorted(selected - set(inputs))
     if unknown:
         raise RuntimeError(
-            "affected graph owners are absent from the bundle: "
-            + ", ".join(unknown)
+            "affected graph owners are absent from the bundle: " + ", ".join(unknown)
         )
     if previous and set(previous_owners) != set(inputs):
         raise RuntimeError("graph owner membership changed; bootstrap all owner slices")
@@ -776,15 +772,12 @@ def check_owner_slices(
     observed = _owner_slice_counts(graph, state)
     expected = {
         "owners": len(state["owners"]),
-        "nodes": sum(
-            int(item["node_count"]) for item in state["owners"].values()
-        ),
+        "nodes": sum(int(item["node_count"]) for item in state["owners"].values()),
         "relations": sum(
             int(item["record_count"]) for item in state["relations"].values()
         ),
         "external_references": sum(
-            int(item["record_count"])
-            for item in state["external_references"].values()
+            int(item["record_count"]) for item in state["external_references"].values()
         ),
     }
     if observed != expected:
@@ -806,8 +799,7 @@ def check_owner_slices(
             str(item["slice_digest"]) for item in state["relations"].values()
         ),
         "external_reference_slices": sorted(
-            str(item["slice_digest"])
-            for item in state["external_references"].values()
+            str(item["slice_digest"]) for item in state["external_references"].values()
         ),
         "counts": observed,
     }
@@ -828,9 +820,7 @@ def owner_slice_rollback_candidate(
     observed = _owner_slice_counts(graph, candidate)
     expected = {
         "owners": len(candidate["owners"]),
-        "nodes": sum(
-            int(item["node_count"]) for item in candidate["owners"].values()
-        ),
+        "nodes": sum(int(item["node_count"]) for item in candidate["owners"].values()),
         "relations": sum(
             int(item["record_count"]) for item in candidate["relations"].values()
         ),
@@ -898,8 +888,7 @@ def rollback_owner_slices(
             for owner, item in sorted(candidate["owners"].items())
         },
         "relation_slices": sorted(
-            str(item["slice_digest"])
-            for item in candidate["relations"].values()
+            str(item["slice_digest"]) for item in candidate["relations"].values()
         ),
         "external_reference_slices": sorted(
             str(item["slice_digest"])
@@ -1025,25 +1014,65 @@ def search_multihop(
     *,
     graph: Neo4jProjection,
     projection: str,
+    owner_slice_state: dict[str, Any] | None = None,
     source_id: str,
     first_relation: str,
     second_relation: str,
     source_path: str,
     limit: int = 10,
 ) -> tuple[list[dict[str, Any]], float, float]:
+    owner_scoped = (
+        isinstance(owner_slice_state, dict)
+        and owner_slice_state.get("storage_mode") == "owner_slices"
+    )
+    node_label = "AoAKagNodeSlice" if owner_scoped else "AoAKagNode"
+    relation_type = "AOA_KAG_RELATION_SLICE" if owner_scoped else "AOA_KAG_RELATION"
+    owner_slices = (
+        sorted(
+            str(item["slice_digest"])
+            for item in owner_slice_state.get("owners", {}).values()
+        )
+        if owner_scoped
+        else []
+    )
+    relation_slices = (
+        sorted(
+            str(item["slice_digest"])
+            for item in owner_slice_state.get("relations", {}).values()
+        )
+        if owner_scoped
+        else []
+    )
+    source_match = (
+        f"MATCH (source:{node_label} {{id:$source_id}}) "
+        if owner_scoped
+        else "MATCH (source:AoAKagNode {projection_digest:$projection,id:$source_id}) "
+    )
+    identity_conditions = (
+        "AND source.slice_digest IN $owner_slices "
+        "AND middle.slice_digest IN $owner_slices "
+        "AND target.slice_digest IN $owner_slices "
+        "AND r1.slice_digest IN $relation_slices "
+        "AND r2.slice_digest IN $relation_slices "
+        if owner_scoped
+        else "AND r1.projection_digest=$projection AND r2.projection_digest=$projection "
+    )
     started = time.perf_counter()
     rows = graph.execute(
-        "MATCH (source:AoAKagNode {projection_digest:$projection,id:$source_id}) "
-        "-[r1:AOA_KAG_RELATION]->(middle:AoAKagNode)"
-        "-[r2:AOA_KAG_RELATION]->(target:AoAKagNode) "
-        "WHERE r1.projection_digest=$projection AND r2.projection_digest=$projection "
-        "AND r1.relation_kind=$first AND r2.relation_kind=$second "
+        source_match
+        + f"-[r1:{relation_type}]->(middle:{node_label})"
+        + f"-[r2:{relation_type}]->(target:{node_label}) "
+        + "WHERE 1=1 "
+        + identity_conditions
+        + "AND r1.relation_kind=$first AND r2.relation_kind=$second "
         "RETURN target.id,target.repo,target.source_record_ids,target.anchor_ids,"
         "target.access_scope,r1.id,r1.evidence_anchor_ids,r1.provenance_ref,"
         "r1.trust_ref,r2.id,r2.evidence_anchor_ids,r2.provenance_ref,r2.trust_ref "
         "ORDER BY target.id LIMIT $limit",
         {
             "projection": projection,
+            "owner_slices": owner_slices,
+            "relation_slices": relation_slices,
             "source_id": source_id,
             "first": first_relation,
             "second": second_relation,
@@ -1132,9 +1161,7 @@ def traverse(
         isinstance(owner_slice_state, dict)
         and owner_slice_state.get("storage_mode") == "owner_slices"
     )
-    relation_type = (
-        "AOA_KAG_RELATION_SLICE" if owner_scoped else "AOA_KAG_RELATION"
-    )
+    relation_type = "AOA_KAG_RELATION_SLICE" if owner_scoped else "AOA_KAG_RELATION"
     node_label = "AoAKagNodeSlice" if owner_scoped else "AoAKagNode"
     if direction == "outgoing":
         pattern = f"(source)-[:{relation_type}*1..{max_depth}]->(target)"
@@ -1166,8 +1193,7 @@ def traverse(
             )
         )
         source_identity = (
-            "WHERE source.id IN $source_ids "
-            "AND source.access_scope IN $access_scopes "
+            "WHERE source.id IN $source_ids AND source.access_scope IN $access_scopes "
         )
     if relation_kinds:
         conditions.append(

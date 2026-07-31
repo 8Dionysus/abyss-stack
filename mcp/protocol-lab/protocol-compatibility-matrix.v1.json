@@ -9,7 +9,7 @@
     },
     {
       "capability": "server_discover",
-      "notes": "The isolated Python MCP 2.0.0 KAG adapter served server/discover; Codex 0.145.0 was still observed sending initialize instead.",
+      "notes": "The isolated Python MCP 2.0.0 KAG adapter served server/discover; Codex 0.146.0 was still observed sending initialize instead.",
       "production_use": "forbidden",
       "stable": "not_applicable",
       "next": "final_defined"
@@ -77,18 +77,18 @@
       "capability_posture": "blocked",
       "consumer_id": "codex-cli",
       "evidence": [
-        "local command: codex --version -> codex-cli 0.145.0",
+        "local command: codex --version -> codex-cli 0.146.0",
         "local binary contains 2026-07-28 and Tasks type literals",
         "isolated stdio pair with Python MCP 2.0.0 offered and selected 2025-06-18",
         "observed method sequence begins initialize, notifications/initialized, and tools/list",
-        "mcp/protocol-lab/fixtures/codex-0.145.0-wire-observation.json"
+        "mcp/protocol-lab/fixtures/codex-0.146.0-wire-observation.json"
       ],
       "next_protocol_literal_present": true,
       "next_wire_pair_observed": false,
       "server_discover_observed": false,
       "stable_pair_observed": true,
       "tasks_wire_pair_observed": false,
-      "version": "0.145.0"
+      "version": "0.146.0"
     }
   ],
   "dual_support": {
@@ -98,7 +98,7 @@
     "shared_credential_forbidden": true,
     "stable_registration_retained": true
   },
-  "expires_at": "2026-07-31T12:00:00Z",
+  "expires_at": "2026-08-02T12:00:00Z",
   "migration_gates": [
     {
       "evidence_refs": [
@@ -121,10 +121,10 @@
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/codex-0.145.0-wire-observation.json"
+        "mcp/protocol-lab/fixtures/codex-0.146.0-wire-observation.json"
       ],
       "gate_id": "P1-03",
-      "reason": "An isolated wire probe proved that Codex 0.145.0 negotiates legacy 2025-06-18 with Python MCP 2.0.0 and does not send server/discover.",
+      "reason": "An isolated wire probe proved that Codex 0.146.0 negotiates legacy 2025-06-18 with Python MCP 2.0.0 and does not send server/discover.",
       "requirement": "Prove Codex next-protocol capabilities.",
       "status": "blocked"
     },
@@ -223,11 +223,11 @@
     {
       "evidence_refs": [
         "mcp/protocol-lab/protocol-compatibility-matrix.v1.json",
-        "mcp/protocol-lab/fixtures/codex-0.145.0-wire-observation.json",
+        "mcp/protocol-lab/fixtures/codex-0.146.0-wire-observation.json",
         "mcp/protocol-lab/fixtures/kag-next-pair-observation.json"
       ],
       "gate_id": "P1-14",
-      "reason": "Stable-preserving dual-registration and rollback law are source-defined, but the separately credentialed consumer exercise is blocked because Codex 0.145.0 cannot form the next-protocol pair and the registered read canary remains inadmissible.",
+      "reason": "Stable-preserving dual-registration and rollback law are source-defined, but the separately credentialed consumer exercise is blocked because Codex 0.146.0 cannot form the next-protocol pair and the registered read canary remains inadmissible.",
       "requirement": "Retain dual support and rollback.",
       "status": "blocked"
     }
@@ -242,7 +242,7 @@
     "tag": "2026-07-28",
     "wire_version": "2026-07-28"
   },
-  "observed_at": "2026-07-29T02:08:11Z",
+  "observed_at": "2026-07-31T00:18:01Z",
   "official_conformance": {
     "commit": "a9896553900a2ef61787b57adfcbbe936a8ab1f9",
     "next_suite_executed": true,

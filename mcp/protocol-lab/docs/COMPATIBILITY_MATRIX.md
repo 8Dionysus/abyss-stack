@@ -8,7 +8,7 @@ The authoritative machine-readable comparison is
 The observed Codex pair stays on MCP `2025-06-18`. Final MCP `2026-07-28`,
 Python MCP `2.0.0`, and TypeScript client/server `2.0.0` are exact-pinned, but
 this release readiness does not form a usable Codex pair. An isolated stdio
-probe showed Codex `0.145.0` sending `initialize` with `2025-06-18`; it did not
+probe showed Codex `0.146.0` sending `initialize` with `2025-06-18`; it did not
 send `server/discover`. Migration therefore remains blocked until a new Codex
 observation, Abyss pair-conformance, and a stable-preserving read canary
 exist. The exact Python MCP `2.0.0` server and client fixtures pass the pinned

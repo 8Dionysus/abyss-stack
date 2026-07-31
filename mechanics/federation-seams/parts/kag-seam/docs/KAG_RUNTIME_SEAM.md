@@ -22,7 +22,7 @@ The tiered distribution input consists of:
 - a portable offline-complete bundle manifest;
 - an `abyss-machine` trust-gate packet whose admitted subject-store root is the
   family root consumed by this seam;
-- an optional signed OS composition containing exactly 24 verified owner
+- an optional signed OS composition containing exactly 23 verified owner
   release, corpus, and distribution digests.
 
 The projection bundle contains:
@@ -84,7 +84,7 @@ placing them in the local CAS.
 Selective owner/kind/hash-range hydration is allowed, but a partial selection
 stays in `candidate.json`. Only a complete release can become
 `owners/<owner>/current.json`. A composition can become current only when all
-24 owner current states are complete, their exact identities match the signed
+23 owner current states are complete, their exact identities match the signed
 composition, and their CAS objects remain present and byte-valid.
 
 Changing only distribution coordinates does not invalidate semantic
@@ -181,7 +181,7 @@ scripts/aoa-kag-runtime-family \
   --range-prefix 0a
 ```
 
-Activate a signed 24-owner composition only after every exact owner release is
+Activate a signed 23-owner composition only after every exact owner release is
 current:
 
 ```bash
