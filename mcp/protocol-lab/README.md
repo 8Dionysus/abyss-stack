@@ -9,7 +9,7 @@ Current posture after the 2026-07-28 final release:
 - observed Codex production-compatible wire version: `2025-06-18`;
 - next candidate: final `2026-07-28`;
 - stable next SDKs: Python `2.0.0`, TypeScript client/server `2.0.0`;
-- Codex `0.145.0`: observed negotiating `2025-06-18`, not
+- Codex `0.146.0`: observed negotiating `2025-06-18`, not
   `2026-07-28`;
 - official next conformance harness: `0.2.0-alpha.10`; exact Python SDK
   server/client checks pass `114/371` with zero failures, but this is not
@@ -43,7 +43,7 @@ all fourteen P1 gates pass.
 |---|---|
 | `protocol-compatibility-matrix.v1.json` | authored stable/next comparison, exact pins, gates, alias and pilot law |
 | `fixtures/current-pair-observation.json` | current evidence-backed pair observation |
-| `fixtures/codex-0.145.0-wire-observation.json` | normalized receipt for the isolated Codex-to-Python-SDK stdio exchange |
+| `fixtures/codex-0.146.0-wire-observation.json` | normalized receipt for the isolated Codex-to-Python-SDK stdio exchange |
 | `fixtures/python-mcp-2.0.0-conformance-observation.json` | normalized exact-SDK official conformance receipt with raw-result digests |
 | `fixtures/kag-next-pair-observation.json` | normalized isolated KAG next-adapter pair receipt and its claim limits |
 | `fixtures/kag-handle-pair-observation.json` | normalized read-only requestState isolation, expiry, replay, and revocation receipt |

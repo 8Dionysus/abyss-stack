@@ -100,7 +100,7 @@ def test_consumer_literals_are_not_wire_pair_evidence(
 
 def test_codex_wire_receipt_proves_legacy_pair_only(builder: Any) -> None:
     wire_observation_path = (
-        LAB_ROOT / "fixtures" / "codex-0.145.0-wire-observation.json"
+        LAB_ROOT / "fixtures" / "codex-0.146.0-wire-observation.json"
     )
     wire_schema_path = (
         LAB_ROOT / "schemas" / "protocol-consumer-wire-observation.schema.json"
