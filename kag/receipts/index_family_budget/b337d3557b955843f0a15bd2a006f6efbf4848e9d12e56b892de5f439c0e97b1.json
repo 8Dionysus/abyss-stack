@@ -8,7 +8,7 @@
   "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
   "default_limit_bytes": 1048576,
   "head_family_digest": "b337d3557b955843f0a15bd2a006f6efbf4848e9d12e56b892de5f439c0e97b1",
-  "reason": "MCP evidence, rollback, orchestration, and canary source adds reviewed contracts, validators, and tests; this receipt admits only the measured portable-family growth for PR #343.",
+  "reason": "MCP evidence, rollback, orchestration, canary, and test-inventory source adds reviewed contracts and tests; this receipt admits only the measured portable-family growth for PR #343.",
   "repo": "abyss-stack",
   "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
   "scope": "generated_delta_and_tracked_size",
