@@ -1,7 +1,6 @@
 {
   "schema_version": "abyss-stack-repo-self-kag-retrieval-eval-v1",
   "top_k": 10,
-  "expected_owner_count": 23,
   "minimum_graph_cases": 12,
   "semantic_cases": [
     {

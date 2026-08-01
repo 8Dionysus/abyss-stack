@@ -338,6 +338,7 @@
 - [ABYSS-STACK-D-0048 Federation Landing Validator Split](../ABYSS-STACK-D-0048-federation-landing-validator-split.md) (`docs/decisions/ABYSS-STACK-D-0048-federation-landing-validator-split.md`)
 - [ABYSS-STACK-D-0049 Federation Runtime Seams Validator Module](../ABYSS-STACK-D-0049-federation-runtime-seams-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0049-federation-runtime-seams-validator-module.md`)
 - [ABYSS-STACK-D-0102 R1 Memory Runtime Is Exact Pull Delivery](../ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md) (`docs/decisions/ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md`)
+- [ABYSS-STACK-D-0104 Bind KAG Owner Coverage to the Admitted Bundle](../ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md) (`docs/decisions/ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md`)
 
 ## generated read-model
 
@@ -473,6 +474,10 @@
 
 - [ABYSS-STACK-D-0044 Sync Parity Validator Module](../ABYSS-STACK-D-0044-sync-parity-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0044-sync-parity-validator-module.md`)
 
+## retrieval eval
+
+- [ABYSS-STACK-D-0104 Bind KAG Owner Coverage to the Admitted Bundle](../ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md) (`docs/decisions/ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md`)
+
 ## root orchestrator
 
 - [ABYSS-STACK-D-0063 Root Validator Wrapper Tail Removal](../ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md) (`docs/decisions/ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md`)
@@ -488,6 +493,7 @@
 - [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
 - [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
 - [ABYSS-STACK-D-0102 R1 Memory Runtime Is Exact Pull Delivery](../ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md) (`docs/decisions/ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md`)
+- [ABYSS-STACK-D-0104 Bind KAG Owner Coverage to the Admitted Bundle](../ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md) (`docs/decisions/ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md`)
 
 ## runtime docs
 

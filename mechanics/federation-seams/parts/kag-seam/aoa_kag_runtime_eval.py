@@ -30,7 +30,6 @@ NEO4J_URL = os.environ.get("AOA_KAG_NEO4J_HTTP_URL", "http://127.0.0.1:7474")
 NEO4J_DATABASE = os.environ.get("AOA_KAG_NEO4J_DATABASE", "neo4j")
 HTTP_TIMEOUT = 180.0
 TOP_K = 10
-EXPECTED_OWNER_COUNT = 24
 MIN_GRAPH_CASES = 12
 SEMANTIC_CASES: tuple[dict[str, str], ...] = ()
 THRESHOLD_MINIMUMS: dict[str, float] = {}
@@ -47,6 +46,25 @@ def now() -> str:
 
 
 load_config = evaluation.load_config
+
+
+def canonical_owner_names(metadata: dict[str, str]) -> tuple[str, ...]:
+    try:
+        canonical_inputs = json.loads(metadata["canonical_inputs"])
+    except (KeyError, json.JSONDecodeError) as exc:
+        raise RuntimeError("canonical KAG owner inputs are missing or invalid") from exc
+    if not isinstance(canonical_inputs, list) or not canonical_inputs:
+        raise RuntimeError("canonical KAG owner inputs must be a non-empty array")
+    names: list[str] = []
+    for index, item in enumerate(canonical_inputs):
+        repo = item.get("repo") if isinstance(item, dict) else None
+        name = repo.get("name") if isinstance(repo, dict) else None
+        if not isinstance(name, str) or not name:
+            raise RuntimeError(f"canonical KAG owner input {index} has no repo name")
+        names.append(name)
+    if len(names) != len(set(names)):
+        raise RuntimeError("canonical KAG owner inputs contain duplicate repo names")
+    return tuple(sorted(names))
 
 
 def dotenv_values(path: Path) -> dict[str, str]:
@@ -236,6 +254,7 @@ def evaluate(connection: sqlite3.Connection, *, config_digest: str) -> dict[str,
     routes: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
     owner_targets = exact_targets(connection)
+    expected_owner_names = canonical_owner_names(metadata)
     for target in owner_targets:
         relevant = {str(target["id"])}
         hits, latency = exact_search(connection, str(target["id"]))
@@ -429,9 +448,15 @@ def evaluate(connection: sqlite3.Connection, *, config_digest: str) -> dict[str,
             for name, maximum in THRESHOLD_MAXIMUMS.items()
         }
     )
+    exact_owner_names = tuple(
+        sorted(str(target["repo"]) for target in owner_targets)
+    )
+    lexical_owner_names = tuple(
+        sorted(str(target["repo"]) for target in lexical_cases)
+    )
     threshold_results["owner_coverage"] = (
-        len(owner_targets) == EXPECTED_OWNER_COUNT
-        and len(lexical_cases) == EXPECTED_OWNER_COUNT
+        exact_owner_names == expected_owner_names
+        and lexical_owner_names == expected_owner_names
     )
     status = "passed" if all(threshold_results.values()) else "failed"
     return {
@@ -468,6 +493,7 @@ def evaluate(connection: sqlite3.Connection, *, config_digest: str) -> dict[str,
             },
         },
         "inventory": {
+            "expected_owners": len(expected_owner_names),
             "owners": len(owner_targets),
             "exact_cases": len(routes["exact"]),
             "filter_cases": len(routes["filter"]),
@@ -512,7 +538,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     global EMBEDDINGS
     global EMBEDDING_MODEL
     global EMBEDDING_URL
-    global EXPECTED_OWNER_COUNT
     global GRAPH
     global GRAPH_OWNER_SLICE_STATE
     global HTTP_TIMEOUT
@@ -539,7 +564,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     config_path = args.config.resolve()
     config = load_config(config_path)
     TOP_K = int(config.get("top_k", 10))
-    EXPECTED_OWNER_COUNT = int(config["expected_owner_count"])
     MIN_GRAPH_CASES = int(config["minimum_graph_cases"])
     SEMANTIC_CASES = tuple(config["semantic_cases"])
     THRESHOLD_MINIMUMS = {
