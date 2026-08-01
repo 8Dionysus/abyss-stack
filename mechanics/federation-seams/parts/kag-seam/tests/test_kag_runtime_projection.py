@@ -2358,9 +2358,29 @@ class KagRuntimeProjectionTests(unittest.TestCase):
     def test_retrieval_eval_config_has_unique_semantic_cases(self) -> None:
         config = runtime_eval.load_config(runtime_eval.DEFAULT_CASES_PATH)
         names = [case["name"] for case in config["semantic_cases"]]
-        self.assertEqual(config["expected_owner_count"], 23)
+        self.assertNotIn("expected_owner_count", config)
         self.assertEqual(len(names), len(set(names)))
         self.assertIn("graph_recall_advantage", config["thresholds"]["minimums"])
+
+    def test_retrieval_eval_owner_coverage_comes_from_bundle_metadata(self) -> None:
+        metadata = {
+            "canonical_inputs": json.dumps(
+                [
+                    {"repo": {"name": "owner-b"}},
+                    {"repo": {"name": "owner-a"}},
+                ]
+            )
+        }
+        self.assertEqual(
+            runtime_eval.canonical_owner_names(metadata),
+            ("owner-a", "owner-b"),
+        )
+
+        metadata["canonical_inputs"] = json.dumps(
+            [{"repo": {"name": "owner-a"}}, {"repo": {"name": "owner-a"}}]
+        )
+        with self.assertRaisesRegex(RuntimeError, "duplicate repo names"):
+            runtime_eval.canonical_owner_names(metadata)
 
     def test_retrieval_eval_exact_lexical_and_quality_metrics(self) -> None:
         sqlite_path = self.root / "repo-self.sqlite3"

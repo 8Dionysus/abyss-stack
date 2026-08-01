@@ -4,8 +4,8 @@
 
 1. Each repository publishes its canonical repo-self family under `kag/`.
 2. `aoa-kag` validates owner identity, publishes content-addressed owner-family
-   releases, composes the 24-owner federation identity, and publishes the MCP
-   capability and result contracts.
+   releases, composes the exact membership-bound federation identity, and
+   publishes the MCP capability and result contracts.
 3. `abyss-machine` verifies signatures, provenance, lifecycle, access policy,
    and subject-store identity for owner releases and OS compositions.
 4. `abyss-stack` hydrates admitted objects into a local CAS, activates only

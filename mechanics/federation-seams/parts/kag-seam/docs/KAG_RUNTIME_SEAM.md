@@ -181,8 +181,8 @@ scripts/aoa-kag-runtime-family \
   --range-prefix 0a
 ```
 
-Activate a signed 23-owner composition only after every exact owner release is
-current:
+Activate a signed membership-bound composition only after every owner release
+named by that exact composition is current:
 
 ```bash
 scripts/aoa-kag-runtime-family \

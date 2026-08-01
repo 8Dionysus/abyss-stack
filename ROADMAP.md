@@ -197,12 +197,12 @@ The current direction is:
   recovery no longer requires predecessor implementation bytes.
 - Next honest move:
   prove shadow publication, five-owner canary externalization, selective
-  projection refresh, and a verified 24-owner composition before treating the
-  new KAG distribution route as the only live path. For routing, land the
-  coordinated SDK-first owner wave, then collect consecutive SDK-canonical
-  validation and real execution cycles before compatibility exit. Keep the
-  predecessor compatibility tree and archival stop-line until those gates
-  close, even though SDK-only rollback is the operational route.
+  projection refresh, and a verified membership-bound composition before
+  treating the new KAG distribution route as the only live path. For routing,
+  land the coordinated SDK-first owner wave, then collect consecutive
+  SDK-canonical validation and real execution cycles before compatibility
+  exit. Keep the predecessor compatibility tree and archival stop-line until
+  those gates close, even though SDK-only rollback is the operational route.
 - Guardrail:
   federation consumption does not transfer AoA, ToS, skill, memo, eval,
   playbook, routing, KAG, stats, or agent authority into `abyss-stack`.
