@@ -46,6 +46,7 @@ all fourteen P1 gates pass.
 |---|---|
 | `protocol-compatibility-matrix.v1.json` | authored stable/next comparison, exact pins, gates, alias and pilot law |
 | `fixtures/current-pair-observation.json` | current evidence-backed pair observation |
+| `fixtures/codex-0.146.0-production-pair-observation.json` | public-safe derivative of the registered production inventory and direct call; not a next-protocol canary |
 | `fixtures/codex-0.146.0-wire-observation.json` | normalized receipt for the isolated Codex-to-Python-SDK stdio exchange |
 | `fixtures/python-mcp-2.0.0-conformance-observation.json` | normalized exact-SDK official conformance receipt with raw-result digests |
 | `fixtures/kag-next-pair-observation.json` | normalized isolated KAG next-adapter pair receipt and its claim limits |

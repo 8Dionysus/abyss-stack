@@ -38,8 +38,9 @@
     "status": "passed"
   },
   "read_only_canary": {
-    "reason": "The registered production KAG read canary passed on 2025-11-25, but Codex did not use a 2026-07-28 pair and no next-lab registration was enabled.",
+    "reason": "A public-safe derivative proves one registered production KAG schema observation and direct call on 2025-11-25, but Codex did not use a 2026-07-28 pair and no next-lab registration was enabled; this is not the P1 read canary.",
     "receipt_refs": [
+      "mcp/protocol-lab/fixtures/codex-0.146.0-production-pair-observation.json",
       "mcp/protocol-lab/fixtures/kag-next-pair-observation.json",
       "mcp/protocol-lab/fixtures/kag-handle-pair-observation.json"
     ],
@@ -54,7 +55,7 @@
     "read_canary_not_run"
   ],
   "receipt_refs": [
-    "consumer-registration://8Dionysus/codex/aoa_kag/d110a74d3eee2c425d07d856031a1aac4e55fd371cb99f119d30b352586199e8",
+    "mcp/protocol-lab/fixtures/codex-0.146.0-production-pair-observation.json",
     "mcp/protocol-lab/fixtures/codex-0.146.0-wire-observation.json",
     "mcp/protocol-lab/fixtures/python-mcp-2.0.0-conformance-observation.json",
     "mcp/protocol-lab/fixtures/kag-next-pair-observation.json",

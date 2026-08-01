@@ -1,0 +1,36 @@
+{
+  "call": {
+    "is_error": false,
+    "result_digest": "sha256:a94df5afc1038b653357703f76fc26777f2142daf085c98f5b826d93f675b51e",
+    "tool_name": "kag_discover"
+  },
+  "claim_limits": [
+    "This public-safe derivative proves one bounded Codex inventory and direct call through the registered production aoa_kag contour.",
+    "It proves only the observed 2025-11-25 production pair and does not prove a 2026-07-28 Codex pair.",
+    "A successful call does not prove semantic owner acceptance, central proof, admission, rollback, or benefit.",
+    "No credential value, bearer token, environment value, raw result, or private filesystem path is retained."
+  ],
+  "consumer": {
+    "id": "codex-cli",
+    "version": "0.146.0"
+  },
+  "expires_at": "2026-08-02T20:21:35Z",
+  "observation_id": "codex-0.146.0-production-aoa-kag-20260801",
+  "observed_at": "2026-08-01T20:21:35Z",
+  "private_source_receipt": {
+    "digest": "sha256:f69ddc72c69184cfb8413f6f237518e7d336c9eecbce7344000de739761482ca",
+    "registration_ref": "consumer-registration://8Dionysus/codex/aoa_kag/d110a74d3eee2c425d07d856031a1aac4e55fd371cb99f119d30b352586199e8"
+  },
+  "registration": {
+    "name": "aoa_kag",
+    "schema_digest": "sha256:f873485d8aa3a0b8871e64e24a0da7a1b0ea2ca4af1e7f9fc09d0fb3f457f844",
+    "tool_count": 5,
+    "transport": "streamable-http",
+    "wire_protocol_versions": [
+      "2025-11-25"
+    ]
+  },
+  "schema_version": "abyss_mcp_production_pair_observation_v1",
+  "secrets_included": false,
+  "verdict": "production_pair_observed"
+}

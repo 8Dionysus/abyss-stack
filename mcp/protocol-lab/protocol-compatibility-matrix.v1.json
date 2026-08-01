@@ -79,8 +79,7 @@
       "evidence": [
         "local command: codex --version -> codex-cli 0.146.0",
         "local binary contains 2026-07-28 and Tasks type literals",
-        "production aoa_kag app-server inventory and call observed protocol 2025-11-25",
-        "consumer-registration://8Dionysus/codex/aoa_kag/d110a74d3eee2c425d07d856031a1aac4e55fd371cb99f119d30b352586199e8",
+        "mcp/protocol-lab/fixtures/codex-0.146.0-production-pair-observation.json",
         "isolated stdio pair with Python MCP 2.0.0 offered and selected 2025-06-18",
         "observed method sequence begins initialize, notifications/initialized, and tools/list",
         "mcp/protocol-lab/fixtures/codex-0.146.0-wire-observation.json"
@@ -145,6 +144,7 @@
     },
     {
       "evidence_refs": [
+        "mcp/protocol-lab/fixtures/codex-0.146.0-production-pair-observation.json",
         "mcp/protocol-lab/fixtures/kag-next-pair-observation.json"
       ],
       "gate_id": "P1-05",
@@ -222,7 +222,7 @@
         "mcp/protocol-lab/fixtures/kag-next-pair-observation.json"
       ],
       "gate_id": "P1-13",
-      "reason": "The registered production KAG canary passed on 2025-11-25, but no separately named 2026-07-28 lab registration was enabled and Codex did not use the next pair; P1-13 remains blocked.",
+      "reason": "A public-safe derivative proves the registered production KAG schema and direct call on 2025-11-25, but no separately named 2026-07-28 lab registration was enabled and Codex did not use the next pair; this is not the P1-13 canary, which remains blocked.",
       "requirement": "Run one compact read-only canary.",
       "status": "blocked"
     },

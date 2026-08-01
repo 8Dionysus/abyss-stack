@@ -18,6 +18,12 @@ WIRE_OBSERVATION_PATH = (
 WIRE_OBSERVATION_SCHEMA_PATH = (
     LAB_ROOT / "schemas" / "protocol-consumer-wire-observation.schema.json"
 )
+PRODUCTION_OBSERVATION_PATH = (
+    LAB_ROOT / "fixtures" / "codex-0.146.0-production-pair-observation.json"
+)
+PRODUCTION_OBSERVATION_SCHEMA_PATH = (
+    LAB_ROOT / "schemas" / "protocol-production-pair-observation.schema.json"
+)
 CONFORMANCE_OBSERVATION_PATH = (
     LAB_ROOT / "fixtures" / "python-mcp-2.0.0-conformance-observation.json"
 )
@@ -64,6 +70,7 @@ def validate() -> list[str]:
     matrix = _load(builder.MATRIX_PATH)
     observation = _load(builder.OBSERVATION_PATH)
     wire_observation = _load(WIRE_OBSERVATION_PATH)
+    production_observation = _load(PRODUCTION_OBSERVATION_PATH)
     conformance_observation = _load(CONFORMANCE_OBSERVATION_PATH)
     kag_pair_observation = _load(KAG_PAIR_OBSERVATION_PATH)
     kag_handle_observation = _load(KAG_HANDLE_OBSERVATION_PATH)
@@ -72,6 +79,10 @@ def validate() -> list[str]:
         builder.validate_payload(
             wire_observation,
             WIRE_OBSERVATION_SCHEMA_PATH,
+        )
+        builder.validate_payload(
+            production_observation,
+            PRODUCTION_OBSERVATION_SCHEMA_PATH,
         )
         builder.validate_payload(
             conformance_observation,
@@ -225,6 +236,19 @@ def validate() -> list[str]:
         errors.append("Codex next-SDK fallback wire must remain independently recorded")
     if not consumer["next_protocol_literal_present"]:
         errors.append("matrix must retain the observed Codex next-version literal")
+    if (
+        production_observation["consumer"]["version"] != consumer["version"]
+        or production_observation["registration"]["wire_protocol_versions"]
+        != consumer["production_protocol_versions_observed"]
+        or production_observation["registration"]["schema_digest"]
+        != "sha256:f873485d8aa3a0b8871e64e24a0da7a1b0ea2ca4af1e7f9fc09d0fb3f457f844"
+        or production_observation["call"]["is_error"]
+        or production_observation["secrets_included"]
+        or production_observation["verdict"] != "production_pair_observed"
+        or production_observation["private_source_receipt"]["digest"]
+        != "sha256:f69ddc72c69184cfb8413f6f237518e7d336c9eecbce7344000de739761482ca"
+    ):
+        errors.append("public-safe Codex production-pair derivative drifted")
 
     if (
         wire_observation["consumer"]["version"] != consumer["version"]

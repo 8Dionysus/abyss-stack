@@ -15,12 +15,12 @@
     "passed": 10,
     "pending": 0
   },
-  "matrix_digest": "sha256:b9ba36a4ad23b5f2ce3f3e9737d9a32c9bf0d2a70e59b53d5fa8e0bff4eb593d",
+  "matrix_digest": "sha256:a8509dcdcb5e0b4c93eca2ba142225860c4fa55e35b7fc6e0961a85b0b45be62",
   "migration_allowed": false,
   "next_action": "Keep the next registration disabled; refresh Codex and repeat the isolated wire probe when consumer support changes.",
   "next_protocol": "2026-07-28",
   "next_release_status": "final",
-  "observation_digest": "sha256:f822e2b4032cde599662884d5cd1698840726e292e2ab116ecb716d9464fbfaa",
+  "observation_digest": "sha256:98f609ad872f7f193892bd86a8030ed210bdc1c75d1f5d7ff55e9b8580957f97",
   "passed_gate_ids": [
     "P1-01",
     "P1-02",
@@ -51,6 +51,6 @@
   ],
   "schema_version": "abyss_mcp_protocol_lab_status_v1",
   "stable_registration_retained": true,
-  "status_digest": "sha256:d7d48f85e3fc8beff450425185c0506f3e280fae1b3b75bfa5aa07ac968d39df",
+  "status_digest": "sha256:a786ae7f1bfaf6cf04c9bcbe4c10a32a95220bfb08c01d03aa9da99d7df83dbe",
   "tasks_extension_allowed": false
 }

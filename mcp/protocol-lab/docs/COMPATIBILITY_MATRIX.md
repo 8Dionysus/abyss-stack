@@ -5,7 +5,10 @@ The authoritative machine-readable comparison is
 
 ## Current decision
 
-The production Codex/Abyss pair stays on MCP `2025-11-25`. Final MCP `2026-07-28`,
+The production Codex/Abyss pair stays on MCP `2025-11-25`; a minimized
+source fixture binds its schema and direct-call observation to the digest of
+the private receipt without retaining credentials or raw output. That call is
+not treated as the next-protocol canary. Final MCP `2026-07-28`,
 Python MCP `2.0.0`, and TypeScript client/server `2.0.0` are exact-pinned, but
 this release readiness does not form a usable Codex pair. An isolated stdio
 probe against Python MCP `2.0.0` showed Codex `0.146.0` sending `initialize`

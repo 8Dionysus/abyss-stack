@@ -128,6 +128,23 @@ def test_production_pair_is_distinct_from_next_sdk_fallback(
     assert consumer["isolated_next_sdk_fallback_protocol"] == "2025-06-18"
 
 
+def test_production_pair_receipt_is_public_safe_and_bounded(builder: Any) -> None:
+    receipt_path = (
+        LAB_ROOT / "fixtures" / "codex-0.146.0-production-pair-observation.json"
+    )
+    schema_path = (
+        LAB_ROOT / "schemas" / "protocol-production-pair-observation.schema.json"
+    )
+    receipt = _load(receipt_path)
+
+    builder.validate_payload(receipt, schema_path)
+
+    assert receipt["registration"]["wire_protocol_versions"] == ["2025-11-25"]
+    assert receipt["call"]["is_error"] is False
+    assert receipt["secrets_included"] is False
+    assert "does not prove a 2026-07-28" in " ".join(receipt["claim_limits"])
+
+
 def test_official_conformance_receipt_is_sdk_scoped(builder: Any) -> None:
     conformance_path = (
         LAB_ROOT / "fixtures" / "python-mcp-2.0.0-conformance-observation.json"
