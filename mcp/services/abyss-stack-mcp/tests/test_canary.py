@@ -18,6 +18,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+import abyss_stack_mcp.canary as canary
 from abyss_stack_mcp.canary import (
     CANARY_SIGNING_KEY_NAME,
     CanaryInventoryCounts,
@@ -375,6 +376,87 @@ def test_run_canary_reads_one_owner_credential_and_writes_private_outputs(
     result_artifact = json.loads(result_path.read_text(encoding="utf-8"))
     assert result_artifact["result_digest"] == receipt.result_digest
     assert result_artifact["owner_payload"] == grounded_result()
+
+
+def test_listener_wait_absorbs_only_bounded_startup_refusals(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    attempts = 0
+
+    class Writer:
+        def close(self) -> None:
+            pass
+
+        async def wait_closed(self) -> None:
+            pass
+
+    async def connect(host: str, port: int) -> tuple[object, Writer]:
+        nonlocal attempts
+        assert host == "127.0.0.1"
+        assert port == 5431
+        attempts += 1
+        if attempts < 3:
+            raise ConnectionRefusedError
+        return object(), Writer()
+
+    monkeypatch.setattr(canary.asyncio, "open_connection", connect)
+    remaining = asyncio.run(
+        canary._wait_for_endpoint_listener("http://127.0.0.1:5431/mcp", 2)
+    )
+
+    assert attempts == 3
+    assert remaining in {1, 2}
+
+
+def test_listener_wait_rejects_non_loopback_without_connecting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def unexpected(*args: object, **kwargs: object) -> tuple[object, object]:
+        raise AssertionError("non-loopback endpoint must fail before connect")
+
+    monkeypatch.setattr(canary.asyncio, "open_connection", unexpected)
+    with pytest.raises(CanaryRunnerError, match="loopback HTTP"):
+        asyncio.run(
+            canary._wait_for_endpoint_listener("https://example.test/mcp", 2)
+        )
+
+
+def test_last_known_good_canary_uses_distinct_committed_route(tmp_path: Path) -> None:
+    targets_path = write_json(
+        tmp_path / "targets.json",
+        RuntimeTargetCatalog(targets=(target(),)).model_dump(mode="json"),
+    )
+    secret_dir = tmp_path / "secrets"
+    secret_dir.mkdir(mode=0o700)
+    credential_path = secret_dir / "aoa-kag-mcp-read-bearer-token"
+    credential_path.write_text("private-value\n", encoding="utf-8")
+    credential_path.chmod(0o600)
+    write_signing_key(secret_dir)
+
+    async def fake_probe(
+        selected_target: RuntimeTarget,
+        contract: RuntimeCanaryContract,
+        credential: str,
+        timeout_seconds: int,
+    ) -> CanaryProbeResult:
+        assert selected_target.canary_route == (
+            "runbook://mcp-canary/aoa-kag/read/last-known-good"
+        )
+        return successful_probe()
+
+    receipt, _, _, _ = asyncio.run(
+        run_canary(
+            organ_id="aoa-kag",
+            targets_path=targets_path,
+            secret_dir=secret_dir,
+            output_root=tmp_path / "rollback-canary",
+            purpose="last-known-good",
+            clock=lambda: NOW,
+            probe_runner=fake_probe,
+        )
+    )
+
+    assert receipt.canary_route.endswith("/last-known-good")
 
 
 def test_canary_rejects_broad_or_symlinked_credential(tmp_path: Path) -> None:

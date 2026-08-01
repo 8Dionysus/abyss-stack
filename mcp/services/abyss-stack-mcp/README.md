@@ -127,7 +127,9 @@ proof and acceptance, that same ref must be issued by the declared owner. The
 candidate copies and expiry-bounds that exact identity before any step can name
 it. A deploy manifest ref is valid only at the stack-owned immutable record path
 derived from its `sha256:` manifest digest. Package identity also names the
-source revision from which the artifact was built.
+stack adapter revision from which the artifact was built. That revision must
+match the stack deployment revision; it is intentionally distinct from the
+owner organ source revision carried by `SourceIdentity` and central proof.
 Central proof cannot predate the canary link or evidence refs it names.
 Duplicate evidence identities with conflicting `observed_at` values are
 rejected before expiry deduplication.
@@ -200,6 +202,11 @@ digests use the all-zero structural digest only while their source link remains
 explicitly `unknown`; that sentinel is never usable by candidate planning.
 Package and deploy identity come only from exact stack deployment receipts.
 
+The default observation purpose accepts only the committed current-canary
+route. A rollback candidate must be built from a separate invocation with
+`--canary-purpose last-known-good`; that mode expects the purpose-qualified
+`.../last-known-good` route and does not relax route matching for either lane.
+
 The catalog names all fifteen current read targets, but it intentionally
 observes `aoa-organ-mcp-read@...` rather than the transitional
 `aoa-mcp-http@...` processes. The latter share one compatibility bearer and
@@ -215,6 +222,80 @@ unknown targets, expired overlays, future-dated overlays, secrets, and usable
 source/endpoint/freshness/canary claims that lack the corresponding issuing
 owner. It never edits the overlay. Missing or expired overlay evidence falls
 back to explicit unknown states.
+
+`abyss-stack-mcp-overlay-compose` can assemble that single handoff file from
+multiple independently issued overlay fragments. It validates and
+secret-screens every fragment, intersects their expiry envelopes, sorts exact
+organ/policy subjects, and merges only disjoint or canonically identical typed
+fields. Competing values for the same field fail closed; the composer never
+chooses a winner, upgrades a state, or issues consumer, proof, acceptance,
+canary, or rollback evidence.
+
+```bash
+abyss-stack-mcp-overlay-compose \
+  --input /path/to/consumer.overlay.json \
+  --input /path/to/canary.overlay.json \
+  --output /srv/AbyssOS/abyss-stack/Logs/mcp/observations/evidence-overlay.json
+```
+
+`abyss-stack-mcp-proof-project` is a separate non-verdicting bridge for one
+already-issued `aoa-evals` bounded packet review. It rechecks the exact eval
+source-file digests, packet digest, live source/package/deploy/process/schema,
+grounded canary, and one independently issued compatible consumer
+registration before it can emit a `proof` overlay field. In particular, the
+packet must assert `consumer_registered`; the more limited live materializer
+packet that intentionally leaves that axis absent is rejected. The bridge
+copies the unchanged eval report into a private canonical-content-addressed
+record and attributes the evidence to `aoa-evals`. It does not issue the
+verdict, infer owner acceptance, authorize admission or effects, or prove
+rollback.
+
+```bash
+abyss-stack-mcp-proof-project \
+  --review /path/to/aoa-evals-review.json \
+  --packet /path/to/exact-proof-packet.json \
+  --observation /path/to/current-runtime-observation.json \
+  --eval-root /path/to/aoa-evals/evals/boundary/aoa-organ-access-admission-integrity \
+  --record-root /path/to/private/proof-records \
+  --output /path/to/private/aoa-kag.read.proof.overlay.json
+```
+
+Rollback readiness uses two further non-executing processes. First,
+`abyss-stack-mcp-canary --purpose last-known-good` commits a distinct canary
+route and private receipt lane. After source-owner grounding is composed into
+one temporary observation, `abyss-stack-mcp-rollback-candidate` rederives the
+exact package at the immutable deployment revision, compares it byte-for-byte
+with the deployed tree, verifies the unit and executable, observes credential
+metadata without reading the credential, and binds the exact consumer and LKG
+canary. Its content-addressed output keeps execution, admission, and rollback
+false.
+
+After the existing `aoa-organ-access-admission-integrity` bundle reviews that
+candidate, `abyss-stack-mcp-rollback-project` independently repeats the live
+binding against the unchanged observation, deployment record, registry,
+consumer, source revision, deployed bytes, executable, credential posture, and
+LKG canary. Only then does it emit a temporary `rollback.ready=true` overlay,
+with the unchanged eval report copied to a private content-addressed record.
+Readiness means one restoration contour is currently reproducible; it is not
+rollback execution, post-restore health, admission, or effect authority.
+
+```bash
+abyss-stack-mcp-canary --organ aoa-kag --purpose last-known-good \
+  --output-root /path/to/private/rollback-canaries
+abyss-stack-mcp-rollback-candidate \
+  --observation /path/to/lkg-runtime-observation.json \
+  --deployment-record /path/to/deployments/records/<digest>.json \
+  --consumer-id codex-main \
+  --output /path/to/private/rollback.candidate.json
+abyss-stack-mcp-rollback-project \
+  --review /path/to/aoa-evals-rollback-review.json \
+  --candidate /path/to/private/rollback.candidate.json \
+  --observation /path/to/lkg-runtime-observation.json \
+  --deployment-record /path/to/deployments/records/<digest>.json \
+  --eval-root /path/to/exact-eval-bundle \
+  --record-root /path/to/private/rollback-proof-records \
+  --output /path/to/private/rollback.overlay.json
+```
 
 ## Authenticated read canary
 
@@ -233,6 +314,13 @@ their complete content-addressed statement. Their public `signer_id` is the
 SHA-256 digest of the raw public key. A downstream owner must verify both
 attestations against an independently pinned public key before attributing the
 capture to `abyss-stack`; a caller-supplied key is not an authentication root.
+
+The bounded timeout includes a listener-readiness window because a systemd
+`Type=simple` process can be active before Uvicorn has bound its socket. The
+runner retries only loopback TCP connection refusal during that window. Once
+the listener is reachable, authentication, MCP initialization, inventory,
+tool execution, schema, and result failures are never retried or laundered
+into readiness.
 
 Reviewed contracts cover all declared migration-wave targets. Each contract
 binds an exact tool and arguments, owner-specific result schema identity, and
@@ -322,6 +410,40 @@ abyss-stack-mcp-observe \
   --deployment-manifest /path/to/deployments/latest.json \
   --registry /path/to/organ-registry.source.json \
   --output /path/to/observations/current.json
+abyss-stack-mcp-observe \
+  --deployment-manifest /path/to/deployments/latest.json \
+  --registry /path/to/organ-registry.source.json \
+  --overlay /path/to/lkg.overlay.json \
+  --canary-purpose last-known-good \
+  --output /path/to/observations/lkg.json
+abyss-stack-mcp-overlay-compose \
+  --input /path/to/consumer.overlay.json \
+  --input /path/to/canary.overlay.json \
+  --output /path/to/observations/evidence-overlay.json
+abyss-stack-mcp-proof-project \
+  --review /path/to/aoa-evals-review.json \
+  --packet /path/to/exact-proof-packet.json \
+  --observation /path/to/current-runtime-observation.json \
+  --eval-root /path/to/exact-eval-bundle \
+  --record-root /path/to/private/proof-records \
+  --output /path/to/proof.overlay.json
+abyss-stack-mcp-canary --organ aoa-kag --purpose last-known-good \
+  --secret-dir /path/to/private/secrets \
+  --output-root /path/to/private/rollback-canaries
+abyss-stack-mcp-rollback-candidate \
+  --observation /path/to/lkg-observation.json \
+  --deployment-record /path/to/deployments/records/<digest>.json \
+  --registry /path/to/private/organ-registry.source.json \
+  --consumer-id codex-main \
+  --output /path/to/rollback.candidate.json
+abyss-stack-mcp-rollback-project \
+  --review /path/to/rollback-review.json \
+  --candidate /path/to/rollback.candidate.json \
+  --observation /path/to/lkg-observation.json \
+  --deployment-record /path/to/deployments/records/<digest>.json \
+  --eval-root /path/to/exact-eval-bundle \
+  --record-root /path/to/rollback-proof-records \
+  --output /path/to/rollback.overlay.json
 abyss-stack-mcp-canary --organ aoa-kag \
   --secret-dir /path/to/private/secrets \
   --output-root /path/to/private/canaries

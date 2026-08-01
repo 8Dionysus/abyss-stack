@@ -14,8 +14,10 @@ import tempfile
 import time
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta, timezone
+from math import ceil
 from pathlib import Path
 from typing import Annotated, Any, Literal
+from urllib.parse import urlsplit
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -55,6 +57,7 @@ Ed25519Signature = Annotated[
     str,
     Field(min_length=86, max_length=86, pattern=r"^[A-Za-z0-9_-]{86}$"),
 ]
+CanaryPurpose = Literal["current", "last-known-good"]
 
 
 class CanaryRunnerError(ValueError):
@@ -454,6 +457,59 @@ def _bounded_digest(value: Any, *, limit: int, label: str) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
+async def _wait_for_endpoint_listener(
+    endpoint_ref: str,
+    timeout_seconds: int,
+) -> int:
+    """Wait for one committed loopback listener within the canary budget.
+
+    A systemd ``Type=simple`` process becomes active before Uvicorn has bound
+    its socket.  Treating the first connection refusal as a failed canary
+    therefore confuses process activation with endpoint readiness.  This
+    bounded preflight retries only the TCP listener transition; MCP auth,
+    protocol, inventory, tool, and result failures still fail immediately.
+
+    The returned value is the remaining whole-second request budget.
+    """
+
+    parsed = urlsplit(endpoint_ref)
+    host = parsed.hostname
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise CanaryRunnerError("canary endpoint has an invalid port") from exc
+    if parsed.scheme != "http" or host not in {"127.0.0.1", "::1", "localhost"}:
+        raise CanaryRunnerError("canary endpoint must be loopback HTTP")
+    if port is None:
+        raise CanaryRunnerError("canary endpoint must name an explicit port")
+
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise CanaryRunnerError(
+                "authenticated MCP canary endpoint did not become ready"
+            )
+        writer: asyncio.StreamWriter | None = None
+        try:
+            _, writer = await asyncio.wait_for(
+                asyncio.open_connection(host, port),
+                timeout=min(1.0, remaining),
+            )
+            writer.close()
+            await writer.wait_closed()
+            return max(1, ceil(deadline - time.monotonic()))
+        except (OSError, asyncio.TimeoutError):
+            if writer is not None:
+                writer.close()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise CanaryRunnerError(
+                    "authenticated MCP canary endpoint did not become ready"
+                )
+            await asyncio.sleep(min(0.2, remaining))
+
+
 async def _collect_pages(
     method: Callable[..., Awaitable[Any]],
     attribute: str,
@@ -503,10 +559,14 @@ async def live_probe(
         raise CanaryRunnerError("MCP canary runtime dependencies are unavailable") from exc
 
     started = time.monotonic()
+    request_timeout_seconds = await _wait_for_endpoint_listener(
+        target.endpoint_ref,
+        timeout_seconds,
+    )
     try:
         async with httpx.AsyncClient(
             headers={"Authorization": f"Bearer {credential}"},
-            timeout=httpx.Timeout(float(timeout_seconds)),
+            timeout=httpx.Timeout(float(request_timeout_seconds)),
         ) as http_client:
             async with streamable_http_client(
                 target.endpoint_ref,
@@ -580,7 +640,7 @@ async def live_probe(
                         contract.tool_name,
                         contract.arguments,
                         read_timeout_seconds=timedelta(
-                            seconds=timeout_seconds
+                            seconds=request_timeout_seconds
                         ),
                     )
                     call_latency_ms = int(
@@ -971,6 +1031,7 @@ async def run_canary(
     output_root: Path = DEFAULT_OUTPUT_ROOT,
     ttl_seconds: int = 600,
     timeout_seconds: int = 30,
+    purpose: CanaryPurpose = "current",
     clock: Callable[[], datetime] = _now,
     probe_runner: ProbeRunner = live_probe,
 ) -> tuple[CanaryReceipt, Path, Path, Path | None]:
@@ -986,6 +1047,10 @@ async def run_canary(
     if target.canary_contract is None:
         raise CanaryRunnerError(
             "requested organ has no reviewed runtime canary contract"
+        )
+    if purpose == "last-known-good":
+        target = target.model_copy(
+            update={"canary_route": target.canary_route + "/last-known-good"}
         )
     credential_path = (
         _require_no_symlink_components(secret_dir, "canary secret root")
@@ -1054,6 +1119,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--ttl-seconds", type=int, default=600)
     parser.add_argument("--timeout-seconds", type=int, default=30)
+    parser.add_argument(
+        "--purpose",
+        choices=("current", "last-known-good"),
+        default="current",
+    )
     return parser
 
 
@@ -1068,6 +1138,7 @@ def main() -> int:
                 output_root=args.output_root,
                 ttl_seconds=args.ttl_seconds,
                 timeout_seconds=args.timeout_seconds,
+                purpose=args.purpose,
             )
         )
     except CanaryRunnerError as exc:

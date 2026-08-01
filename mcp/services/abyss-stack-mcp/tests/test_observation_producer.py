@@ -543,6 +543,88 @@ def test_successful_canary_requires_runtime_and_owner_grounding_issuers(
     assert observation.subjects[0].canary.succeeded is True
 
 
+def test_last_known_good_canary_requires_explicit_observation_purpose(
+    tmp_path: Path,
+) -> None:
+    latest, registry_path, targets_path = write_inputs(tmp_path)
+    output = tmp_path / "observations" / "current.json"
+    output.parent.mkdir(mode=0o700)
+    expiry = (NOW + timedelta(minutes=30)).isoformat()
+    canary_route = "runbook://mcp-canary/aoa-kag/read/last-known-good"
+    overlay_path = write_json(
+        tmp_path / "lkg-overlay.json",
+        {
+            "schema_version": "abyss_stack_runtime_evidence_overlay_v1",
+            "generated_at": NOW.isoformat(),
+            "expires_at": expiry,
+            "contains_secrets": False,
+            "subjects": [
+                {
+                    "organ_id": "aoa-kag",
+                    "canary": {
+                        "succeeded": True,
+                        "result_grounded": True,
+                        "canary_route": canary_route,
+                        "canary_ref": "receipt://aoa-kag/lkg-grounding-review",
+                        "evidence": {
+                            "state": "exact",
+                            "observed_at": NOW.isoformat(),
+                            "expires_at": expiry,
+                            "evidence_refs": [
+                                {
+                                    "owner": "abyss-stack",
+                                    "evidence_ref": "receipt://mcp-canary/aoa-kag/lkg",
+                                    "revision": STACK_REVISION,
+                                    "observed_at": NOW.isoformat(),
+                                    "expires_at": expiry,
+                                },
+                                {
+                                    "owner": "aoa-kag",
+                                    "evidence_ref": (
+                                        "receipt://aoa-kag/lkg-grounding-review"
+                                    ),
+                                    "revision": OWNER_REVISION,
+                                    "observed_at": NOW.isoformat(),
+                                    "expires_at": expiry,
+                                },
+                            ],
+                            "reason_codes": [],
+                        },
+                    },
+                }
+            ],
+        },
+    )
+
+    with pytest.raises(
+        ObservationProducerError,
+        match="changed the committed canary route",
+    ):
+        produce_observation(
+            deployment_manifest_path=latest,
+            registry_path=registry_path,
+            output_path=output,
+            targets_path=targets_path,
+            overlay_path=overlay_path,
+            clock=lambda: NOW,
+            systemctl_runner=active_systemd,
+        )
+
+    observation, _ = produce_observation(
+        deployment_manifest_path=latest,
+        registry_path=registry_path,
+        output_path=output,
+        targets_path=targets_path,
+        overlay_path=overlay_path,
+        canary_purpose="last-known-good",
+        clock=lambda: NOW,
+        systemctl_runner=active_systemd,
+    )
+
+    assert observation.subjects[0].canary.canary_route == canary_route
+    assert observation.subjects[0].canary.succeeded is True
+
+
 def test_tampered_latest_manifest_and_symlink_target_fail_closed(
     tmp_path: Path,
 ) -> None:

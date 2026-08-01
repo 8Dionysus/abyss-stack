@@ -194,12 +194,17 @@ def _validate_policy_receipt(
             and not _is_sha256_digest(output_digest)
         )
         or receipt.get("filesystem_access")
-        not in {"configured_observation_read", "none"}
+        not in {
+            "configured_observation_read",
+            "configured_observation_and_orchestration_record_read",
+            "none",
+        }
         or receipt.get("network_access") != "none"
         or receipt.get("source_to_sink")
         not in {
             "runtime_observation_to_typed_result",
             "runtime_observation_to_nonexecuting_candidate",
+            "sdk_validated_runtime_record_to_bounded_inspection",
             "none",
         }
         or receipt.get("approval_state")
