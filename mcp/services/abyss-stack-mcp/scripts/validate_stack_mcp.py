@@ -21,6 +21,12 @@ from abyss_stack_mcp.canary import (  # noqa: E402
 from abyss_stack_mcp.contracts import RuntimeObservation  # noqa: E402
 from abyss_stack_mcp.observation import RuntimeTargetCatalog  # noqa: E402
 from abyss_stack_mcp.policy import StackPolicySeam  # noqa: E402
+from abyss_stack_mcp.proof_projection import (  # noqa: E402
+    CentralProofProjectionError,
+)
+from abyss_stack_mcp.proof_packet import ProofPacketBindingError  # noqa: E402
+from abyss_stack_mcp.rollback_candidate import RollbackCandidateError  # noqa: E402
+from abyss_stack_mcp.rollback_projection import RollbackProjectionError  # noqa: E402
 
 
 PIN_RE = re.compile(r"^(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==(?P<version>[^\s\\]+)$")
@@ -159,12 +165,50 @@ def main() -> int:
     ):
         raise SystemExit("runtime observation producer entry point is unavailable")
     if (
+        pyproject["project"]["scripts"].get("abyss-stack-mcp-overlay-compose")
+        != "abyss_stack_mcp.overlay:main"
+    ):
+        raise SystemExit("runtime evidence overlay composer entry point is unavailable")
+    if (
+        pyproject["project"]["scripts"].get("abyss-stack-mcp-proof-project")
+        != "abyss_stack_mcp.proof_projection:main"
+        or CentralProofProjectionError.__module__
+        != "abyss_stack_mcp.proof_projection"
+    ):
+        raise SystemExit("central proof projection entry point is unavailable")
+    if (
+        pyproject["project"]["scripts"].get(
+            "abyss-stack-mcp-proof-packet-bind-consumer"
+        )
+        != "abyss_stack_mcp.proof_packet:main"
+        or ProofPacketBindingError.__module__ != "abyss_stack_mcp.proof_packet"
+    ):
+        raise SystemExit("proof packet consumer-binding entry point is unavailable")
+    if (
         pyproject["project"]["scripts"].get(
             "abyss-stack-mcp-orchestration"
         )
         != "abyss_stack_mcp.orchestration:main"
     ):
         raise SystemExit("cross-organ host entry point is unavailable")
+    if (
+        pyproject["project"]["scripts"].get(
+            "abyss-stack-mcp-rollback-candidate"
+        )
+        != "abyss_stack_mcp.rollback_candidate:main"
+        or RollbackCandidateError.__module__
+        != "abyss_stack_mcp.rollback_candidate"
+    ):
+        raise SystemExit("rollback candidate entry point is unavailable")
+    if (
+        pyproject["project"]["scripts"].get(
+            "abyss-stack-mcp-rollback-project"
+        )
+        != "abyss_stack_mcp.rollback_projection:main"
+        or RollbackProjectionError.__module__
+        != "abyss_stack_mcp.rollback_projection"
+    ):
+        raise SystemExit("rollback projection entry point is unavailable")
     targets_path = SERVICE_ROOT / "src" / "abyss_stack_mcp" / "runtime-targets.v1.json"
     targets = RuntimeTargetCatalog.model_validate(
         json.loads(targets_path.read_text(encoding="utf-8"))

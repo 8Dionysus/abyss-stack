@@ -176,11 +176,53 @@ owner revision without an owner source-tree digest cannot become an exact
 source link, and a listening process cannot become a ready endpoint without an
 observed schema.
 
+When several issuers contribute evidence, a bounded stack composer may produce
+the one explicit overlay consumed by the observation producer. Composition is
+mechanical: it intersects expiry and combines only disjoint or identical typed
+fields. It cannot resolve competing claims, reinterpret an owner receipt, or
+upgrade any evidence state.
+
+Central-proof projection is a separate mechanical binding step. The stack
+does not reinterpret an eval result: it accepts only the exact supported
+bounded `aoa-evals` review at the source-file digests named by that review,
+then verifies that its packet explicitly binds every current runtime target
+field required by `CentralProofObservation`, including one independent
+compatible consumer registration and the grounded canary. A packet that omits
+that consumer axis cannot be repaired by the stack. The projected proof expires
+with the earliest live input and remains distinct from owner acceptance,
+admission, effects, cross-organ benefit, and rollback proof.
+
+Rollback-readiness projection follows the same two-owner pattern without
+pretending to execute recovery. The stack first materializes one
+content-addressed candidate from an immutable deployment record, a reproducible
+historical source tree, the byte-exact deployed package, a stable unit plus
+executable digest, credential metadata, one consumer registration, and a
+distinct owner-grounded last-known-good canary. `aoa-evals` reviews only that
+candidate contract and its negative authority scenarios. The stack projector
+then independently rebuilds the candidate from the unchanged private inputs,
+checks the exact eval source digests, and binds the eval report to a complete
+typed restoration target. The resulting readiness expires with its live
+evidence and remains distinct from restoration execution and post-rollback
+health.
+
+The observation producer preserves the separation between normal and
+last-known-good canaries. Its default purpose commits the catalog route
+unchanged; an explicit `last-known-good` purpose commits only the corresponding
+purpose-qualified route before overlay validation. Thus an LKG overlay cannot
+enter the normal observation lane, and the rollback lane gains no generic
+route override.
+
 The committed targets point at the owner-specific read template. Transitional
 shared-bearer processes are deliberately outside this observation because the
 runtime contract forbids shared credential classes. Migration therefore moves
 an observed target from inactive to active; it does not relabel the legacy
 process.
+
+Owner source identity and stack adapter package identity are independent axes.
+The owner revision grounds the organ result; the package source revision binds
+the stack-built adapter to its deployment revision. Activation requires both
+and central proof covers both, but never requires those unrelated repository
+revisions to be equal.
 
 ## Canary evidence contour
 
@@ -207,6 +249,10 @@ pinned outside the capture and its caller-controlled paths. Content addressing
 alone remains integrity metadata and is never accepted as issuer
 authentication. Signer rotation is explicit and must update the downstream
 owner trust pin before new captures can be reviewed.
+The canary timeout also bounds a loopback listener-readiness wait so systemd
+process activation cannot be mistaken for endpoint failure during startup.
+Only connection refusal is retried; every authenticated MCP, schema, and
+owner-result failure remains a single fail-closed observation.
 Reviewed contracts cover every declared migration-wave target. Contract
 presence proves only that an exact bounded read shape has been selected; an
 inactive endpoint, failed call, schema drift, ungrounded result, missing owner

@@ -1252,9 +1252,9 @@ class StackMCPApplication:
                 blockers.append(f"{name}_not_usable")
         if (
             plan_kind in {"deploy", "activate", "restart"}
-            and subject.package.source_revision != subject.source.revision
+            and subject.package.source_revision != subject.deploy.revision
         ):
-            blockers.append("package_source_revision_mismatch")
+            blockers.append("package_deploy_revision_mismatch")
         if plan_kind in {"activate", "restart"}:
             if subject.policy_family in {"internal_effect", "external_effect"}:
                 blockers.append("effect_activation_contracts_absent")
@@ -1400,7 +1400,7 @@ class StackMCPApplication:
     ) -> bool:
         return bool(cls._proof_consumers(subject, now)) and (
             subject.proof.proved_source_revision == subject.source.revision
-            and subject.package.source_revision == subject.source.revision
+            and subject.package.source_revision == subject.deploy.revision
             and subject.proof.proved_source_tree_digest
             == subject.source.tree_digest
             and subject.proof.proved_package_digest

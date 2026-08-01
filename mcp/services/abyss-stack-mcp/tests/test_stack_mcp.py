@@ -123,7 +123,7 @@ def subject(
         "package": {
             "name": f"{organ_id}-mcp",
             "version": "0.1.0",
-            "source_revision": "source-rev-1",
+            "source_revision": "deploy-rev-1",
             "artifact_digest": DIGEST_B,
             "expected_deploy_tree_digest": DIGEST_F,
             "evidence": evidence("package"),
@@ -782,6 +782,67 @@ def test_policy_audit_journal_persists_secret_free_receipts_across_restart(
         ).read_text(encoding="utf-8")
     )
     Draft202012Validator(schema).validate(summary)
+
+
+def test_policy_audit_journal_accepts_orchestration_read_contour(
+    tmp_path: Path,
+) -> None:
+    journal = PolicyAuditJournal(
+        tmp_path / "policy-read.jsonl",
+        owner="abyss-stack",
+        policy_family="read",
+        clock=lambda: NOW,
+    )
+    seam = StackPolicySeam(
+        owner="abyss-stack",
+        policy_family="read",
+        expected_scope="abyss-stack-mcp:read",
+        tools=(
+            ToolPolicy(
+                tool_id="stack_orchestration_inspect",
+                effect_class="observe",
+                max_input_bytes=4096,
+                max_output_bytes=262_144,
+                timeout_seconds=3.0,
+                filesystem_access=(
+                    "configured_observation_and_orchestration_record_read"
+                ),
+                network_access="none",
+                source_to_sink=(
+                    "sdk_validated_runtime_record_to_bounded_inspection"
+                ),
+            ),
+        ),
+        max_in_flight=2,
+        rate_limit=10,
+        rate_window_seconds=60,
+        clock=lambda: NOW,
+        audit_journal=journal,
+    )
+
+    result = asyncio.run(
+        seam.invoke(
+            request_id="request-orchestration-read",
+            identity=policy_identity(),
+            tool_id="stack_orchestration_inspect",
+            arguments={"run_id": DIGEST_A},
+            dispatch=lambda: {
+                "schema_version": "abyss_stack_cross_organ_inspection_v1",
+                "run_id": DIGEST_A,
+                "state": "accepted",
+            },
+        )
+    )
+
+    receipt = result["metadata"]["policy_receipt"]
+    assert receipt["decision"] == "allowed"
+    assert receipt["filesystem_access"] == (
+        "configured_observation_and_orchestration_record_read"
+    )
+    assert receipt["source_to_sink"] == (
+        "sdk_validated_runtime_record_to_bounded_inspection"
+    )
+    assert journal.summary()["records"] == 1
 
 
 def test_policy_audit_journal_rejects_tamper_partial_records_and_wrong_contour(
@@ -2032,7 +2093,7 @@ def test_activation_verifies_an_already_admitted_registry(tmp_path: Path) -> Non
         (
             "deploy",
             (
-                ("verify-package-source-revision", "source-rev-1"),
+                ("verify-package-source-revision", "deploy-rev-1"),
                 ("verify-package-digest", DIGEST_B),
                 ("stage-exact-package", f"aoa-kag-mcp@{DIGEST_B}"),
                 ("deploy-staged-package", f"aoa-kag-mcp@{DIGEST_B}"),
@@ -2068,7 +2129,7 @@ def test_sync_and_deploy_plans_include_exact_transition_steps(
 
 
 @pytest.mark.parametrize("plan_kind", ("deploy", "activate", "restart"))
-def test_runtime_plan_blocks_package_from_another_source_revision(
+def test_runtime_plan_blocks_package_from_another_stack_deploy_revision(
     tmp_path: Path,
     plan_kind: str,
 ) -> None:
@@ -2077,7 +2138,7 @@ def test_runtime_plan_blocks_package_from_another_source_revision(
     app = application(tmp_path, policy_family="candidate", payload=payload)
     _, digest = app.store.load()
 
-    with pytest.raises(StackMCPError, match="package_source_revision_mismatch"):
+    with pytest.raises(StackMCPError, match="package_deploy_revision_mismatch"):
         app.prepare_plan(
             "aoa-kag",
             "read",

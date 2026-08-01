@@ -76,6 +76,7 @@ DEFAULT_TARGETS_PATH = _packaged_targets_path(Path(__file__))
 MAX_INPUT_BYTES = 2 * 1024 * 1024
 MAX_OVERLAY_FUTURE_SKEW = timedelta(seconds=30)
 UNKNOWN_DIGEST = "sha256:" + ("0" * 64)
+ObservationCanaryPurpose = Literal["current", "last-known-good"]
 
 
 class ObservationProducerError(ValueError):
@@ -630,6 +631,7 @@ def _build_subject(
     observed_at: datetime,
     expires_at: datetime,
     runner: SystemctlRunner,
+    canary_purpose: ObservationCanaryPurpose,
 ) -> RuntimeSubject:
     services = {service["service_id"]: service for service in manifest["services"]}
     service = services.get(target.service_id)
@@ -850,7 +852,11 @@ def _build_subject(
         canary={
             "succeeded": False,
             "result_grounded": False,
-            "canary_route": target.canary_route,
+            "canary_route": (
+                target.canary_route
+                if canary_purpose == "current"
+                else f"{target.canary_route}/last-known-good"
+            ),
             "canary_ref": None,
             "evidence": _link(
                 state="unknown",
@@ -1031,6 +1037,7 @@ def produce_observation(
     targets_path: Path = DEFAULT_TARGETS_PATH,
     overlay_path: Path | None = DEFAULT_OVERLAY_PATH,
     allow_missing_overlay: bool = True,
+    canary_purpose: ObservationCanaryPurpose = "current",
     ttl_seconds: int = 300,
     clock: Callable[[], datetime] = _now,
     systemctl_runner: SystemctlRunner = _systemctl,
@@ -1065,6 +1072,7 @@ def produce_observation(
             observed_at=observed_at,
             expires_at=expires_at,
             runner=systemctl_runner,
+            canary_purpose=canary_purpose,
         )
         overlay_subject = overlay_subjects.pop(
             (target.organ_id, target.policy_family),
@@ -1111,6 +1119,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--targets", type=Path, default=DEFAULT_TARGETS_PATH)
     parser.add_argument("--overlay", type=Path, default=DEFAULT_OVERLAY_PATH)
     parser.add_argument("--require-overlay", action="store_true")
+    parser.add_argument(
+        "--canary-purpose",
+        choices=("current", "last-known-good"),
+        default="current",
+        help=(
+            "select the committed current or distinct last-known-good canary "
+            "route expected in the overlay"
+        ),
+    )
     parser.add_argument("--ttl-seconds", type=int, default=300)
     return parser
 
@@ -1125,6 +1142,7 @@ def main() -> int:
             targets_path=args.targets,
             overlay_path=args.overlay,
             allow_missing_overlay=not args.require_overlay,
+            canary_purpose=args.canary_purpose,
             ttl_seconds=args.ttl_seconds,
         )
     except ObservationProducerError as exc:
