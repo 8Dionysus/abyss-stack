@@ -15,6 +15,9 @@ LAB_ROOT = Path(__file__).resolve().parents[1]
 MATRIX_PATH = LAB_ROOT / "protocol-compatibility-matrix.v1.json"
 OBSERVATION_PATH = LAB_ROOT / "fixtures" / "current-pair-observation.json"
 OUTPUT_PATH = LAB_ROOT / "generated" / "protocol-lab-status.json"
+PRODUCTION_OBSERVATION_PATH = (
+    LAB_ROOT / "fixtures" / "codex-0.146.0-production-pair-observation.json"
+)
 MATRIX_SCHEMA_PATH = (
     LAB_ROOT / "schemas" / "protocol-compatibility-matrix.schema.json"
 )
@@ -22,6 +25,9 @@ OBSERVATION_SCHEMA_PATH = (
     LAB_ROOT / "schemas" / "protocol-pair-observation.schema.json"
 )
 STATUS_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-lab-status.schema.json"
+PRODUCTION_OBSERVATION_SCHEMA_PATH = (
+    LAB_ROOT / "schemas" / "protocol-production-pair-observation.schema.json"
+)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -55,9 +61,13 @@ def validate_payload(payload: dict[str, Any], schema_path: Path) -> None:
 def build_status(
     matrix: dict[str, Any],
     observation: dict[str, Any],
+    production_observation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    if production_observation is None:
+        production_observation = load_json(PRODUCTION_OBSERVATION_PATH)
     validate_payload(matrix, MATRIX_SCHEMA_PATH)
     validate_payload(observation, OBSERVATION_SCHEMA_PATH)
+    validate_payload(production_observation, PRODUCTION_OBSERVATION_SCHEMA_PATH)
     if observation["matrix_version"] != matrix["schema_version"]:
         raise ValueError("pair observation references a different matrix version")
 
@@ -115,6 +125,9 @@ def build_status(
     unsigned = {
         "schema_version": "abyss_mcp_protocol_lab_status_v1",
         "evaluated_at": observation["observed_at"],
+        "evidence_expires_at": min(
+            matrix["expires_at"], production_observation["expires_at"]
+        ),
         "matrix_digest": canonical_digest(matrix),
         "observation_digest": canonical_digest(observation),
         "production_protocol": matrix["production_protocol"],

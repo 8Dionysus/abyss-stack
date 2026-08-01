@@ -5,6 +5,7 @@ import importlib.util
 import json
 import re
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -64,8 +65,20 @@ def _load(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def validate() -> list[str]:
+def _expiry_error(
+    label: str,
+    payload: dict[str, Any],
+    checked_at: datetime,
+) -> str | None:
+    expires_at = datetime.fromisoformat(payload["expires_at"].replace("Z", "+00:00"))
+    if expires_at <= checked_at:
+        return f"{label} expired at {payload['expires_at']}; refresh is required"
+    return None
+
+
+def validate(checked_at: datetime | None = None) -> list[str]:
     errors: list[str] = []
+    checked_at = checked_at or datetime.now(UTC)
     builder = _load_builder()
     matrix = _load(builder.MATRIX_PATH)
     observation = _load(builder.OBSERVATION_PATH)
@@ -103,6 +116,18 @@ def validate() -> list[str]:
         status = builder.build_status(matrix, observation)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return [str(exc)]
+
+    for label, payload in (
+        ("protocol compatibility matrix", matrix),
+        ("Codex production-pair observation", production_observation),
+    ):
+        expiry_error = _expiry_error(label, payload, checked_at)
+        if expiry_error is not None:
+            errors.append(expiry_error)
+    if status["evidence_expires_at"] != min(
+        matrix["expires_at"], production_observation["expires_at"]
+    ):
+        errors.append("generated status lost the earliest evidence expiry")
 
     expected_render = json.dumps(
         status,

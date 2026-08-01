@@ -37,8 +37,9 @@ Current posture after the 2026-07-28 final release:
 
 The matrix pins exact specification, SDK, conformance-suite, and consumer
 observations. The pair observation records which runtime receipts actually
-exist. The generated status is derived from both and remains fail-closed until
-all fourteen P1 gates pass.
+exist. The generated status binds the earliest matrix/production-receipt
+expiry, and validation rejects either expired source before it can retain a
+passed gate. It remains fail-closed until all fourteen P1 gates pass.
 
 ## Source map
 

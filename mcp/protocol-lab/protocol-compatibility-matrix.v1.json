@@ -163,6 +163,7 @@
     },
     {
       "evidence_refs": [
+        "mcp/protocol-lab/fixtures/codex-0.146.0-production-pair-observation.json",
         "mcp/protocol-lab/fixtures/kag-next-pair-observation.json"
       ],
       "gate_id": "P1-07",

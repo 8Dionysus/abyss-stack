@@ -80,5 +80,7 @@ unobserved.
    `aoa_kag`.
 8. Update only gates supported by immutable receipts, then rebuild the status.
 
-If any exact input drifts or the matrix expires, return to a blocked posture
-until the observation is refreshed.
+If any exact input drifts, the matrix expires, or the production-pair receipt
+expires, validation fails and the lab returns to a blocked posture until the
+observation is refreshed. The generated status exposes the earliest of those
+source expiries as `evidence_expires_at`.
