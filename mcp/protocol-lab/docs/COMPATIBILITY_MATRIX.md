@@ -5,15 +5,20 @@ The authoritative machine-readable comparison is
 
 ## Current decision
 
-The observed Codex pair stays on MCP `2025-06-18`. Final MCP `2026-07-28`,
+The production Codex/Abyss pair stays on MCP `2025-11-25`. Final MCP `2026-07-28`,
 Python MCP `2.0.0`, and TypeScript client/server `2.0.0` are exact-pinned, but
 this release readiness does not form a usable Codex pair. An isolated stdio
-probe showed Codex `0.146.0` sending `initialize` with `2025-06-18`; it did not
-send `server/discover`. Migration therefore remains blocked until a new Codex
+probe against Python MCP `2.0.0` showed Codex `0.146.0` sending `initialize`
+and falling back to `2025-06-18`; it did not send `server/discover`. That
+fallback does not redefine the production wire. Migration therefore remains
+blocked until a new Codex
 observation, Abyss pair-conformance, and a stable-preserving read canary
 exist. The exact Python MCP `2.0.0` server and client fixtures pass the pinned
-official `0.2.0-alpha.10` suite at wire `2026-07-28` (`114` and `371`
+tested `0.2.0-alpha.10` package at wire `2026-07-28` (`114` and `371`
 successful checks, zero failures); that receipt is deliberately SDK-scoped.
+The latest public conformance release is still `v0.1.16` from 2026-03-27 and
+does not provide observed final-protocol scenarios, so it is recorded
+separately rather than being confused with the tested prerelease package.
 Separately, an isolated Python MCP `2.0.0` KAG adapter pair proved
 `server/discover`, self-describing stateless requests across two clients,
 private TTL cache use, trace propagation, and fail-closed effect/legacy

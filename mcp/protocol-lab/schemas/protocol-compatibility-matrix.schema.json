@@ -15,7 +15,7 @@
       "type": "string"
     },
     "production_protocol": {
-      "const": "2025-06-18"
+      "const": "2025-11-25"
     },
     "stable_spec": {
       "$ref": "#/$defs/spec"
@@ -41,6 +41,33 @@
         "next_suite_executed": {
           "type": "boolean"
         },
+        "latest_public_release": {
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "commit": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            },
+            "published_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "next_protocol_scenarios_observed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "version",
+            "commit",
+            "published_at",
+            "next_protocol_scenarios_observed"
+          ],
+          "type": "object"
+        },
         "receipt_refs": {
           "items": {
             "minLength": 1,
@@ -54,6 +81,7 @@
         "version",
         "commit",
         "next_suite_executed",
+        "latest_public_release",
         "receipt_refs"
       ],
       "type": "object"
@@ -223,6 +251,18 @@
         "stable_pair_observed": {
           "type": "boolean"
         },
+        "production_protocol_versions_observed": {
+          "items": {
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "isolated_next_sdk_fallback_protocol": {
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "type": "string"
+        },
         "next_protocol_literal_present": {
           "type": "boolean"
         },
@@ -255,6 +295,8 @@
         "consumer_id",
         "version",
         "stable_pair_observed",
+        "production_protocol_versions_observed",
+        "isolated_next_sdk_fallback_protocol",
         "next_protocol_literal_present",
         "next_wire_pair_observed",
         "server_discover_observed",

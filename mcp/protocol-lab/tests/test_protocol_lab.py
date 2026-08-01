@@ -117,6 +117,17 @@ def test_codex_wire_receipt_proves_legacy_pair_only(builder: Any) -> None:
     assert wire_observation["global_codex_config_mutated"] is False
 
 
+def test_production_pair_is_distinct_from_next_sdk_fallback(
+    matrix: dict[str, Any],
+) -> None:
+    consumer = matrix["consumer_pairs"][0]
+
+    assert matrix["production_protocol"] == "2025-11-25"
+    assert matrix["stable_spec"]["wire_version"] == "2025-11-25"
+    assert consumer["production_protocol_versions_observed"] == ["2025-11-25"]
+    assert consumer["isolated_next_sdk_fallback_protocol"] == "2025-06-18"
+
+
 def test_official_conformance_receipt_is_sdk_scoped(builder: Any) -> None:
     conformance_path = (
         LAB_ROOT / "fixtures" / "python-mcp-2.0.0-conformance-observation.json"

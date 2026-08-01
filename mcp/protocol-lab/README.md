@@ -6,12 +6,15 @@ because a specification, SDK, or client advertises support.
 
 Current posture after the 2026-07-28 final release:
 
-- observed Codex production-compatible wire version: `2025-06-18`;
+- observed Codex production-compatible wire version: `2025-11-25`;
 - next candidate: final `2026-07-28`;
 - stable next SDKs: Python `2.0.0`, TypeScript client/server `2.0.0`;
-- Codex `0.146.0`: observed negotiating `2025-06-18`, not
-  `2026-07-28`;
-- official next conformance harness: `0.2.0-alpha.10`; exact Python SDK
+- Codex `0.146.0`: the production `aoa_kag` app-server inventory and call
+  observe `2025-11-25`; a separate isolated Python MCP `2.0.0` probe falls
+  back to `2025-06-18`, not `2026-07-28`;
+- latest public conformance release: `v0.1.16`, with no observed final-protocol
+  suite; the exact tested next conformance package remains
+  `0.2.0-alpha.10`; exact Python SDK
   server/client checks pass `114/371` with zero failures, but this is not
   Codex or Abyss-adapter conformance;
 - isolated KAG adapter pair: `2026-07-28` `server/discover`, stateless

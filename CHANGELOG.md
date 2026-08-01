@@ -9,6 +9,13 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Added
 
+- The MCP protocol lab now separates the observed production
+  Codex/Abyss `2025-11-25` wire from the `2025-06-18` fallback of one isolated
+  Codex-to-Python-MCP-2 probe. It also records Python MCP `1.29.0` as the
+  current maintenance release and distinguishes the latest public conformance
+  release (`v0.1.16`) from the exact tested `0.2.0-alpha.10` next-wire package;
+  migration to `2026-07-28` remains fail-closed.
+
 - A separate credential-bearing, content-addressed Wave 1 read-canary contour
   for KAG, stats, and decisions. It observes one exact loopback schema and
   owner-specific result-contract match, and preserves a successful structured

@@ -123,6 +123,20 @@ def validate() -> list[str]:
         "wire_version": "2026-07-28",
     }:
         errors.append("final 2026-07-28 specification pin drifted")
+    if matrix["stable_spec"] != {
+        "commit": "38c84e9f93ad191d9eb26d92b945d17bd0efcaf3",
+        "final_published": True,
+        "production_allowed": True,
+        "release_label": "2025-11-25",
+        "release_status": "final",
+        "source": (
+            "https://github.com/modelcontextprotocol/modelcontextprotocol/"
+            "releases/tag/2025-11-25"
+        ),
+        "tag": "2025-11-25",
+        "wire_version": "2025-11-25",
+    } or matrix["production_protocol"] != "2025-11-25":
+        errors.append("production 2025-11-25 specification pin drifted")
     if status["migration_allowed"] or status["read_only_pilot_allowed"]:
         errors.append("observed legacy Codex pair must block next-protocol migration")
     if status["effectful_migration_allowed"]:
@@ -166,7 +180,9 @@ def validate() -> list[str]:
         sdk for sdk in matrix["sdk_lines"] if sdk["sdk_id"] == "python-stable"
     )
     if (
-        python_stable["version"] != "1.28.1"
+        python_stable["version"] != "1.29.0"
+        or python_stable["commit"]
+        != "98b7159cb89274964055d2c016e3360a551280d0"
         or python_stable["stack_pin"] != "1.27.2"
         or python_stable["stack_pin_status"] != "compatible_maintenance_drift"
     ):
@@ -203,15 +219,19 @@ def validate() -> list[str]:
         errors.append("Codex next-era capability must reflect the observed legacy pair")
     if not consumer["stable_pair_observed"]:
         errors.append("Codex legacy pair observation must remain recorded")
+    if consumer["production_protocol_versions_observed"] != ["2025-11-25"]:
+        errors.append("Codex production pair must record exact 2025-11-25 support")
+    if consumer["isolated_next_sdk_fallback_protocol"] != "2025-06-18":
+        errors.append("Codex next-SDK fallback wire must remain independently recorded")
     if not consumer["next_protocol_literal_present"]:
         errors.append("matrix must retain the observed Codex next-version literal")
 
     if (
         wire_observation["consumer"]["version"] != consumer["version"]
         or wire_observation["wire_protocol_offered"]
-        != matrix["production_protocol"]
+        != consumer["isolated_next_sdk_fallback_protocol"]
         or wire_observation["wire_protocol_selected"]
-        != matrix["production_protocol"]
+        != consumer["isolated_next_sdk_fallback_protocol"]
         or wire_observation["method_sequence"][0] != "initialize"
         or wire_observation["server_discover_observed"]
         or wire_observation["next_wire_pair_observed"]
@@ -253,6 +273,13 @@ def validate() -> list[str]:
             "mcp/protocol-lab/fixtures/"
             "python-mcp-2.0.0-conformance-observation.json"
         ]
+        or conformance["latest_public_release"]
+        != {
+            "commit": "21a9a2febd7100d7c17ac1021ee7f2ed9f66a1e0",
+            "next_protocol_scenarios_observed": False,
+            "published_at": "2026-03-27T18:47:47Z",
+            "version": "v0.1.16",
+        }
     ):
         errors.append("official conformance exact SDK-pair posture drifted")
     if (
