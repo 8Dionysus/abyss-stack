@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 5089121,
+  "allowed_tracked_bytes": 29067169,
+  "approved_by": "repository-owner",
+  "base_ref": "2ba78dc6b47215882e29756345176c1506afde32",
+  "changed_generated_bytes": 5089121,
+  "changed_generated_files": 66,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "43fa9b153fc16064c1d1c6eea14a66ba29f1b06dcd43665c76fa42266e9a8754",
+  "reason": "Refresh the portable family after separating the observed 2025-11-25 production MCP wire from the isolated 2025-06-18 next-SDK fallback; this receipt admits only the measured generated delta and does not raise standing budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 29067169,
+  "tracked_bytes_max": 24117248
+}
