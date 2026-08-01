@@ -79,12 +79,17 @@
       "evidence": [
         "local command: codex --version -> codex-cli 0.146.0",
         "local binary contains 2026-07-28 and Tasks type literals",
+        "mcp/protocol-lab/fixtures/codex-0.146.0-production-pair-observation.json",
         "isolated stdio pair with Python MCP 2.0.0 offered and selected 2025-06-18",
         "observed method sequence begins initialize, notifications/initialized, and tools/list",
         "mcp/protocol-lab/fixtures/codex-0.146.0-wire-observation.json"
       ],
+      "isolated_next_sdk_fallback_protocol": "2025-06-18",
       "next_protocol_literal_present": true,
       "next_wire_pair_observed": false,
+      "production_protocol_versions_observed": [
+        "2025-11-25"
+      ],
       "server_discover_observed": false,
       "stable_pair_observed": true,
       "tasks_wire_pair_observed": false,
@@ -98,7 +103,7 @@
     "shared_credential_forbidden": true,
     "stable_registration_retained": true
   },
-  "expires_at": "2026-08-02T12:00:00Z",
+  "expires_at": "2026-08-02T20:41:52Z",
   "migration_gates": [
     {
       "evidence_refs": [
@@ -139,6 +144,7 @@
     },
     {
       "evidence_refs": [
+        "mcp/protocol-lab/fixtures/codex-0.146.0-production-pair-observation.json",
         "mcp/protocol-lab/fixtures/kag-next-pair-observation.json"
       ],
       "gate_id": "P1-05",
@@ -157,6 +163,7 @@
     },
     {
       "evidence_refs": [
+        "mcp/protocol-lab/fixtures/codex-0.146.0-production-pair-observation.json",
         "mcp/protocol-lab/fixtures/kag-next-pair-observation.json"
       ],
       "gate_id": "P1-07",
@@ -216,7 +223,7 @@
         "mcp/protocol-lab/fixtures/kag-next-pair-observation.json"
       ],
       "gate_id": "P1-13",
-      "reason": "An isolated adapter read succeeded, but it is not a Codex consumer canary and KAG owner freshness remains source_unavailable; the registered pilot stays blocked.",
+      "reason": "A public-safe derivative proves the registered production KAG schema and direct call on 2025-11-25, but no separately named 2026-07-28 lab registration was enabled and Codex did not use the next pair; this is not the P1-13 canary, which remains blocked.",
       "requirement": "Run one compact read-only canary.",
       "status": "blocked"
     },
@@ -242,9 +249,15 @@
     "tag": "2026-07-28",
     "wire_version": "2026-07-28"
   },
-  "observed_at": "2026-07-31T00:18:01Z",
+  "observed_at": "2026-08-01T20:41:52Z",
   "official_conformance": {
     "commit": "a9896553900a2ef61787b57adfcbbe936a8ab1f9",
+    "latest_public_release": {
+      "commit": "21a9a2febd7100d7c17ac1021ee7f2ed9f66a1e0",
+      "next_protocol_scenarios_observed": false,
+      "published_at": "2026-03-27T18:47:47Z",
+      "version": "v0.1.16"
+    },
     "next_suite_executed": true,
     "receipt_refs": [
       "mcp/protocol-lab/fixtures/python-mcp-2.0.0-conformance-observation.json"
@@ -266,7 +279,7 @@
     "stable_registration": "aoa_kag",
     "state": "blocked"
   },
-  "production_protocol": "2025-06-18",
+  "production_protocol": "2025-11-25",
   "refresh_triggers": [
     "The final 2026-07-28 specification tag or exact commit changes.",
     "Python or TypeScript v2 publishes a new stable release.",
@@ -278,7 +291,7 @@
   "schema_version": "abyss_mcp_protocol_compatibility_matrix_v1",
   "sdk_lines": [
     {
-      "commit": "777b8d06710c140e3606b0d4598e2aa48546c266",
+      "commit": "98b7159cb89274964055d2c016e3360a551280d0",
       "ecosystem": "python",
       "production_allowed": true,
       "protocol_versions": [
@@ -291,7 +304,7 @@
       "sdk_id": "python-stable",
       "stack_pin": "1.27.2",
       "stack_pin_status": "compatible_maintenance_drift",
-      "version": "1.28.1"
+      "version": "1.29.0"
     },
     {
       "commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
@@ -326,8 +339,9 @@
     }
   ],
   "sources": [
-    "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2025-06-18",
+    "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2025-11-25",
     "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28",
+    "https://github.com/modelcontextprotocol/python-sdk/releases/tag/v1.29.0",
     "https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.0.0",
     "https://github.com/modelcontextprotocol/typescript-sdk/releases",
     "https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/migration/support-2026-07-28.md",
@@ -335,13 +349,13 @@
     "https://github.com/openai/codex"
   ],
   "stable_spec": {
-    "commit": "f5ccad944fdf2b7d9cc70cf817f66ca5a8aa03a4",
+    "commit": "38c84e9f93ad191d9eb26d92b945d17bd0efcaf3",
     "final_published": true,
     "production_allowed": true,
-    "release_label": "2025-06-18",
+    "release_label": "2025-11-25",
     "release_status": "final",
-    "source": "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2025-06-18",
-    "tag": "2025-06-18",
-    "wire_version": "2025-06-18"
+    "source": "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2025-11-25",
+    "tag": "2025-11-25",
+    "wire_version": "2025-11-25"
   }
 }

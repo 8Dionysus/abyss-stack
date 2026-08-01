@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 8374328,
+  "allowed_tracked_bytes": 29090379,
+  "approved_by": "repository-owner",
+  "base_ref": "2ba78dc6b47215882e29756345176c1506afde32",
+  "changed_generated_bytes": 8374328,
+  "changed_generated_files": 109,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "ca8056797a7d3acca35d75a93b4b57ef1c0d0dde1d26d59f3a9a66525b76e1a1",
+  "reason": "Refresh the portable family after making production-pair expiry fail closed and linking its evidence directly to P1-13; this receipt admits only the measured generated delta and does not raise standing budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 29090379,
+  "tracked_bytes_max": 24117248
+}

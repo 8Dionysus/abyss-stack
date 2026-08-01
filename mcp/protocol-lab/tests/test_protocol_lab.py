@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -11,12 +12,25 @@ import pytest
 
 LAB_ROOT = Path(__file__).resolve().parents[1]
 BUILDER_PATH = LAB_ROOT / "scripts" / "build_protocol_lab_status.py"
+VALIDATOR_PATH = LAB_ROOT / "scripts" / "validate_protocol_lab.py"
 
 
 def _load_builder() -> Any:
     spec = importlib.util.spec_from_file_location(
         "protocol_lab_builder_under_test",
         BUILDER_PATH,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_validator() -> Any:
+    spec = importlib.util.spec_from_file_location(
+        "protocol_lab_validator_under_test",
+        VALIDATOR_PATH,
     )
     assert spec is not None
     assert spec.loader is not None
@@ -53,6 +67,7 @@ def test_current_status_is_deterministic_and_blocks_migration(
     second = builder.build_status(copy.deepcopy(matrix), copy.deepcopy(observation))
 
     assert first == second
+    assert first["evidence_expires_at"] == "2026-08-02T20:21:35Z"
     assert first["gate_counts"] == {"passed": 10, "blocked": 4, "pending": 0}
     assert first["passed_gate_ids"] == [
         "P1-01",
@@ -115,6 +130,55 @@ def test_codex_wire_receipt_proves_legacy_pair_only(builder: Any) -> None:
     assert wire_observation["server_discover_observed"] is False
     assert wire_observation["next_wire_pair_observed"] is False
     assert wire_observation["global_codex_config_mutated"] is False
+
+
+def test_production_pair_is_distinct_from_next_sdk_fallback(
+    matrix: dict[str, Any],
+) -> None:
+    consumer = matrix["consumer_pairs"][0]
+
+    assert matrix["production_protocol"] == "2025-11-25"
+    assert matrix["stable_spec"]["wire_version"] == "2025-11-25"
+    assert consumer["production_protocol_versions_observed"] == ["2025-11-25"]
+    assert consumer["isolated_next_sdk_fallback_protocol"] == "2025-06-18"
+
+
+def test_production_pair_receipt_is_public_safe_and_bounded(builder: Any) -> None:
+    receipt_path = (
+        LAB_ROOT / "fixtures" / "codex-0.146.0-production-pair-observation.json"
+    )
+    schema_path = (
+        LAB_ROOT / "schemas" / "protocol-production-pair-observation.schema.json"
+    )
+    receipt = _load(receipt_path)
+
+    builder.validate_payload(receipt, schema_path)
+
+    assert receipt["registration"]["wire_protocol_versions"] == ["2025-11-25"]
+    assert receipt["call"]["is_error"] is False
+    assert receipt["secrets_included"] is False
+    assert "does not prove a 2026-07-28" in " ".join(receipt["claim_limits"])
+
+
+def test_expired_production_pair_receipt_is_rejected() -> None:
+    validator = _load_validator()
+    receipt = _load(
+        LAB_ROOT / "fixtures" / "codex-0.146.0-production-pair-observation.json"
+    )
+    expires_at = datetime.fromisoformat(
+        receipt["expires_at"].replace("Z", "+00:00")
+    )
+
+    error = validator._expiry_error(
+        "Codex production-pair observation",
+        receipt,
+        expires_at + timedelta(seconds=1),
+    )
+
+    assert error == (
+        "Codex production-pair observation expired at "
+        f"{receipt['expires_at']}; refresh is required"
+    )
 
 
 def test_official_conformance_receipt_is_sdk_scoped(builder: Any) -> None:

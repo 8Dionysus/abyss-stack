@@ -19,6 +19,7 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
     Path("mcp/protocol-lab/schemas/protocol-consumer-wire-observation.schema.json"),
     Path("mcp/protocol-lab/schemas/protocol-lab-status.schema.json"),
     Path("mcp/protocol-lab/schemas/protocol-pair-observation.schema.json"),
+    Path("mcp/protocol-lab/schemas/protocol-production-pair-observation.schema.json"),
     Path("mcp/services/abyss-stack-mcp/schemas/policy-audit-summary.schema.json"),
     Path("mcp/services/abyss-stack-mcp/schemas/runtime-observation.schema.json"),
     Path("mcp/services/abyss-stack-mcp/schemas/runtime-plan-candidate.schema.json"),

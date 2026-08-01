@@ -26,10 +26,13 @@ process start, or one client call.
 On 2026-07-28 the final specification was published at exact commit
 `5f5440bb26a62e2cf3440b92da5a667efa03b267`. Python MCP `2.0.0` and
 TypeScript client/server `2.0.0` are stable. This closes publication gates but
-not pair compatibility. An isolated stdio exchange between Codex `0.145.0` and
-Python MCP `2.0.0` showed Codex offering and selecting `2025-06-18`, then
-calling legacy list methods; it never sent `server/discover`. The current
-next-protocol conformance package is still `0.2.0-alpha.10`. Against the exact
+not pair compatibility. An isolated stdio exchange between Codex `0.146.0` and
+Python MCP `2.0.0` showed an isolated Codex probe offering and selecting
+`2025-06-18`, then calling legacy list methods; it never sent
+`server/discover`. The production `aoa_kag` app-server inventory and call
+separately observe `2025-11-25`; the isolated fallback is not production
+selection. The latest public conformance release remains `v0.1.16`, while the
+tested next-protocol package is `0.2.0-alpha.10`. Against the exact
 Python MCP `2.0.0` fixtures, its 2026 wire suite passes `114` server and `371`
 client checks with zero failures, but that does not turn Codex into a modern
 client. The isolated KAG next-protocol adapter subsequently passed the Abyss
@@ -52,7 +55,9 @@ retain `mcp>=1.27.2,<2` and the `abyss-stack-mcp` exact lock `1.27.2`.
 
 Choose option 3.
 
-The current Codex-compatible wire remains MCP `2025-06-18`.
+The current production Codex-compatible wire remains MCP `2025-11-25`.
+The isolated Python MCP `2.0.0` compatibility probe's `2025-06-18` fallback
+remains separate evidence and does not redefine production.
 `mcp/protocol-lab/` owns fourteen
 explicit P1 gates covering exact final spec and stable SDK pins, Codex
 capabilities, official and Abyss conformance, stable/next comparison,
@@ -87,7 +92,7 @@ changing source, or emitting external effects.
 - The current source verdict is blocked; P1-01, P1-02, P1-04 through P1-10,
   and P1-12 pass. P1-03, P1-11, P1-13, and P1-14 are blocked.
 - Final publication and stable SDK availability are now proven, while Codex
-  next-wire support is negatively resolved for version `0.145.0`.
+  next-wire support is negatively resolved for version `0.146.0`.
 - Official SDK conformance and the isolated Abyss adapter, handle, and cache
   receipts are proven without changing the stable Codex registration.
 - Final publication alone cannot authorize migration.

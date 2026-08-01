@@ -6,12 +6,15 @@ because a specification, SDK, or client advertises support.
 
 Current posture after the 2026-07-28 final release:
 
-- observed Codex production-compatible wire version: `2025-06-18`;
+- observed Codex production-compatible wire version: `2025-11-25`;
 - next candidate: final `2026-07-28`;
 - stable next SDKs: Python `2.0.0`, TypeScript client/server `2.0.0`;
-- Codex `0.146.0`: observed negotiating `2025-06-18`, not
-  `2026-07-28`;
-- official next conformance harness: `0.2.0-alpha.10`; exact Python SDK
+- Codex `0.146.0`: the production `aoa_kag` app-server inventory and call
+  observe `2025-11-25`; a separate isolated Python MCP `2.0.0` probe falls
+  back to `2025-06-18`, not `2026-07-28`;
+- latest public conformance release: `v0.1.16`, with no observed final-protocol
+  suite; the exact tested next conformance package remains
+  `0.2.0-alpha.10`; exact Python SDK
   server/client checks pass `114/371` with zero failures, but this is not
   Codex or Abyss-adapter conformance;
 - isolated KAG adapter pair: `2026-07-28` `server/discover`, stateless
@@ -34,8 +37,9 @@ Current posture after the 2026-07-28 final release:
 
 The matrix pins exact specification, SDK, conformance-suite, and consumer
 observations. The pair observation records which runtime receipts actually
-exist. The generated status is derived from both and remains fail-closed until
-all fourteen P1 gates pass.
+exist. The generated status binds the earliest matrix/production-receipt
+expiry, and validation rejects either expired source before it can retain a
+passed gate. It remains fail-closed until all fourteen P1 gates pass.
 
 ## Source map
 
@@ -43,6 +47,7 @@ all fourteen P1 gates pass.
 |---|---|
 | `protocol-compatibility-matrix.v1.json` | authored stable/next comparison, exact pins, gates, alias and pilot law |
 | `fixtures/current-pair-observation.json` | current evidence-backed pair observation |
+| `fixtures/codex-0.146.0-production-pair-observation.json` | public-safe derivative of the registered production inventory and direct call; not a next-protocol canary |
 | `fixtures/codex-0.146.0-wire-observation.json` | normalized receipt for the isolated Codex-to-Python-SDK stdio exchange |
 | `fixtures/python-mcp-2.0.0-conformance-observation.json` | normalized exact-SDK official conformance receipt with raw-result digests |
 | `fixtures/kag-next-pair-observation.json` | normalized isolated KAG next-adapter pair receipt and its claim limits |

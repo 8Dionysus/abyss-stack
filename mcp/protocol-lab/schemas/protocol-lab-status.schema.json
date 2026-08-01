@@ -10,6 +10,10 @@
       "format": "date-time",
       "type": "string"
     },
+    "evidence_expires_at": {
+      "format": "date-time",
+      "type": "string"
+    },
     "matrix_digest": {
       "pattern": "^sha256:[0-9a-f]{64}$",
       "type": "string"
@@ -23,7 +27,7 @@
       "type": "string"
     },
     "production_protocol": {
-      "const": "2025-06-18"
+      "const": "2025-11-25"
     },
     "next_protocol": {
       "const": "2026-07-28"
@@ -112,6 +116,7 @@
   "required": [
     "schema_version",
     "evaluated_at",
+    "evidence_expires_at",
     "matrix_digest",
     "observation_digest",
     "status_digest",

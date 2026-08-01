@@ -5,6 +5,7 @@ import importlib.util
 import json
 import re
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,12 @@ WIRE_OBSERVATION_PATH = (
 )
 WIRE_OBSERVATION_SCHEMA_PATH = (
     LAB_ROOT / "schemas" / "protocol-consumer-wire-observation.schema.json"
+)
+PRODUCTION_OBSERVATION_PATH = (
+    LAB_ROOT / "fixtures" / "codex-0.146.0-production-pair-observation.json"
+)
+PRODUCTION_OBSERVATION_SCHEMA_PATH = (
+    LAB_ROOT / "schemas" / "protocol-production-pair-observation.schema.json"
 )
 CONFORMANCE_OBSERVATION_PATH = (
     LAB_ROOT / "fixtures" / "python-mcp-2.0.0-conformance-observation.json"
@@ -58,12 +65,25 @@ def _load(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def validate() -> list[str]:
+def _expiry_error(
+    label: str,
+    payload: dict[str, Any],
+    checked_at: datetime,
+) -> str | None:
+    expires_at = datetime.fromisoformat(payload["expires_at"].replace("Z", "+00:00"))
+    if expires_at <= checked_at:
+        return f"{label} expired at {payload['expires_at']}; refresh is required"
+    return None
+
+
+def validate(checked_at: datetime | None = None) -> list[str]:
     errors: list[str] = []
+    checked_at = checked_at or datetime.now(UTC)
     builder = _load_builder()
     matrix = _load(builder.MATRIX_PATH)
     observation = _load(builder.OBSERVATION_PATH)
     wire_observation = _load(WIRE_OBSERVATION_PATH)
+    production_observation = _load(PRODUCTION_OBSERVATION_PATH)
     conformance_observation = _load(CONFORMANCE_OBSERVATION_PATH)
     kag_pair_observation = _load(KAG_PAIR_OBSERVATION_PATH)
     kag_handle_observation = _load(KAG_HANDLE_OBSERVATION_PATH)
@@ -72,6 +92,10 @@ def validate() -> list[str]:
         builder.validate_payload(
             wire_observation,
             WIRE_OBSERVATION_SCHEMA_PATH,
+        )
+        builder.validate_payload(
+            production_observation,
+            PRODUCTION_OBSERVATION_SCHEMA_PATH,
         )
         builder.validate_payload(
             conformance_observation,
@@ -92,6 +116,18 @@ def validate() -> list[str]:
         status = builder.build_status(matrix, observation)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return [str(exc)]
+
+    for label, payload in (
+        ("protocol compatibility matrix", matrix),
+        ("Codex production-pair observation", production_observation),
+    ):
+        expiry_error = _expiry_error(label, payload, checked_at)
+        if expiry_error is not None:
+            errors.append(expiry_error)
+    if status["evidence_expires_at"] != min(
+        matrix["expires_at"], production_observation["expires_at"]
+    ):
+        errors.append("generated status lost the earliest evidence expiry")
 
     expected_render = json.dumps(
         status,
@@ -123,6 +159,20 @@ def validate() -> list[str]:
         "wire_version": "2026-07-28",
     }:
         errors.append("final 2026-07-28 specification pin drifted")
+    if matrix["stable_spec"] != {
+        "commit": "38c84e9f93ad191d9eb26d92b945d17bd0efcaf3",
+        "final_published": True,
+        "production_allowed": True,
+        "release_label": "2025-11-25",
+        "release_status": "final",
+        "source": (
+            "https://github.com/modelcontextprotocol/modelcontextprotocol/"
+            "releases/tag/2025-11-25"
+        ),
+        "tag": "2025-11-25",
+        "wire_version": "2025-11-25",
+    } or matrix["production_protocol"] != "2025-11-25":
+        errors.append("production 2025-11-25 specification pin drifted")
     if status["migration_allowed"] or status["read_only_pilot_allowed"]:
         errors.append("observed legacy Codex pair must block next-protocol migration")
     if status["effectful_migration_allowed"]:
@@ -166,7 +216,9 @@ def validate() -> list[str]:
         sdk for sdk in matrix["sdk_lines"] if sdk["sdk_id"] == "python-stable"
     )
     if (
-        python_stable["version"] != "1.28.1"
+        python_stable["version"] != "1.29.0"
+        or python_stable["commit"]
+        != "98b7159cb89274964055d2c016e3360a551280d0"
         or python_stable["stack_pin"] != "1.27.2"
         or python_stable["stack_pin_status"] != "compatible_maintenance_drift"
     ):
@@ -203,15 +255,32 @@ def validate() -> list[str]:
         errors.append("Codex next-era capability must reflect the observed legacy pair")
     if not consumer["stable_pair_observed"]:
         errors.append("Codex legacy pair observation must remain recorded")
+    if consumer["production_protocol_versions_observed"] != ["2025-11-25"]:
+        errors.append("Codex production pair must record exact 2025-11-25 support")
+    if consumer["isolated_next_sdk_fallback_protocol"] != "2025-06-18":
+        errors.append("Codex next-SDK fallback wire must remain independently recorded")
     if not consumer["next_protocol_literal_present"]:
         errors.append("matrix must retain the observed Codex next-version literal")
+    if (
+        production_observation["consumer"]["version"] != consumer["version"]
+        or production_observation["registration"]["wire_protocol_versions"]
+        != consumer["production_protocol_versions_observed"]
+        or production_observation["registration"]["schema_digest"]
+        != "sha256:f873485d8aa3a0b8871e64e24a0da7a1b0ea2ca4af1e7f9fc09d0fb3f457f844"
+        or production_observation["call"]["is_error"]
+        or production_observation["secrets_included"]
+        or production_observation["verdict"] != "production_pair_observed"
+        or production_observation["private_source_receipt"]["digest"]
+        != "sha256:f69ddc72c69184cfb8413f6f237518e7d336c9eecbce7344000de739761482ca"
+    ):
+        errors.append("public-safe Codex production-pair derivative drifted")
 
     if (
         wire_observation["consumer"]["version"] != consumer["version"]
         or wire_observation["wire_protocol_offered"]
-        != matrix["production_protocol"]
+        != consumer["isolated_next_sdk_fallback_protocol"]
         or wire_observation["wire_protocol_selected"]
-        != matrix["production_protocol"]
+        != consumer["isolated_next_sdk_fallback_protocol"]
         or wire_observation["method_sequence"][0] != "initialize"
         or wire_observation["server_discover_observed"]
         or wire_observation["next_wire_pair_observed"]
@@ -253,6 +322,13 @@ def validate() -> list[str]:
             "mcp/protocol-lab/fixtures/"
             "python-mcp-2.0.0-conformance-observation.json"
         ]
+        or conformance["latest_public_release"]
+        != {
+            "commit": "21a9a2febd7100d7c17ac1021ee7f2ed9f66a1e0",
+            "next_protocol_scenarios_observed": False,
+            "published_at": "2026-03-27T18:47:47Z",
+            "version": "v0.1.16",
+        }
     ):
         errors.append("official conformance exact SDK-pair posture drifted")
     if (

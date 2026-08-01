@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 6422041,
+  "allowed_tracked_bytes": 29084907,
+  "approved_by": "repository-owner",
+  "base_ref": "2ba78dc6b47215882e29756345176c1506afde32",
+  "changed_generated_bytes": 6422041,
+  "changed_generated_files": 84,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "0706aecde93bf5eeacb03be3827459c1dd1a60dbe178d39895780e146afce4a0",
+  "reason": "Refresh the portable family after adding the public-safe production pair derivative and keeping the next-protocol canary fail-closed; this receipt admits only the measured generated delta and does not raise standing budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 29084907,
+  "tracked_bytes_max": 24117248
+}

@@ -1,0 +1,142 @@
+{
+  "$id": "https://abyss-stack.local/schemas/mcp-production-pair-observation.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "abyss_mcp_production_pair_observation_v1"
+    },
+    "observation_id": {
+      "pattern": "^[a-z0-9][a-z0-9._-]+$",
+      "type": "string"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "consumer": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "codex-cli"
+        },
+        "version": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ],
+      "type": "object"
+    },
+    "registration": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "const": "aoa_kag"
+        },
+        "transport": {
+          "const": "streamable-http"
+        },
+        "wire_protocol_versions": {
+          "items": {
+            "const": "2025-11-25"
+          },
+          "maxItems": 1,
+          "minItems": 1,
+          "type": "array"
+        },
+        "schema_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "tool_count": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "transport",
+        "wire_protocol_versions",
+        "schema_digest",
+        "tool_count"
+      ],
+      "type": "object"
+    },
+    "call": {
+      "additionalProperties": false,
+      "properties": {
+        "tool_name": {
+          "const": "kag_discover"
+        },
+        "is_error": {
+          "const": false
+        },
+        "result_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool_name",
+        "is_error",
+        "result_digest"
+      ],
+      "type": "object"
+    },
+    "private_source_receipt": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "registration_ref": {
+          "pattern": "^consumer-registration://",
+          "type": "string"
+        }
+      },
+      "required": [
+        "digest",
+        "registration_ref"
+      ],
+      "type": "object"
+    },
+    "secrets_included": {
+      "const": false
+    },
+    "verdict": {
+      "const": "production_pair_observed"
+    },
+    "claim_limits": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 3,
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "observation_id",
+    "observed_at",
+    "expires_at",
+    "consumer",
+    "registration",
+    "call",
+    "private_source_receipt",
+    "secrets_included",
+    "verdict",
+    "claim_limits"
+  ],
+  "title": "OS Abyss MCP production pair observation",
+  "type": "object"
+}

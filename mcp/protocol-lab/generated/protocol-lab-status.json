@@ -9,18 +9,19 @@
     "Final publication and stable SDKs never authorize production migration without exact pair receipts."
   ],
   "effectful_migration_allowed": false,
-  "evaluated_at": "2026-07-31T00:18:01Z",
+  "evaluated_at": "2026-08-01T20:41:52Z",
+  "evidence_expires_at": "2026-08-02T20:21:35Z",
   "gate_counts": {
     "blocked": 4,
     "passed": 10,
     "pending": 0
   },
-  "matrix_digest": "sha256:aadbd31143cd67325381880ee519593b69006ad25b8101ad7f3195662bb977ac",
+  "matrix_digest": "sha256:5980091ede6af74923659acc00a3c2b19a50c45539a60c8d6e45658c02e61546",
   "migration_allowed": false,
   "next_action": "Keep the next registration disabled; refresh Codex and repeat the isolated wire probe when consumer support changes.",
   "next_protocol": "2026-07-28",
   "next_release_status": "final",
-  "observation_digest": "sha256:e255151a30b176ccbad156041107dee26d7207dbf2aaca82105c56dce3056c8e",
+  "observation_digest": "sha256:98f609ad872f7f193892bd86a8030ed210bdc1c75d1f5d7ff55e9b8580957f97",
   "passed_gate_ids": [
     "P1-01",
     "P1-02",
@@ -33,10 +34,11 @@
     "P1-10",
     "P1-12"
   ],
-  "production_protocol": "2025-06-18",
+  "production_protocol": "2025-11-25",
   "read_only_pilot_allowed": false,
   "reason_codes": [
-    "codex_negotiated_2025-06-18",
+    "production_pair_observed_2025-11-25",
+    "next_sdk_probe_fell_back_2025-06-18",
     "codex_next_pair_blocked",
     "tasks_extension_unavailable",
     "dual_support_consumer_blocked",
@@ -50,6 +52,6 @@
   ],
   "schema_version": "abyss_mcp_protocol_lab_status_v1",
   "stable_registration_retained": true,
-  "status_digest": "sha256:3dda1132fff70a2d91812652a60002c089582d851531ba2a342b55bc0ef23e77",
+  "status_digest": "sha256:644cd9db87aa3301fc6221b3040f6f946b99e1155636011e24369ef26134c79e",
   "tasks_extension_allowed": false
 }
