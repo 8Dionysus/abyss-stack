@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 16361872,
+  "allowed_tracked_bytes": 29027143,
+  "approved_by": "repository-owner",
+  "base_ref": "4a7d6212011a3a01c61ffdd6f91f38b8faa9cfea",
+  "changed_generated_bytes": 16361872,
+  "changed_generated_files": 209,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "e07b95275d6c24ea89138a17746e2990e73beec8202f189b742ed48be6cdaa20",
+  "reason": "MCP evidence, rollback, orchestration, canary, and committed test-inventory source adds reviewed contracts and tests; this receipt admits only the measured portable-family growth for PR #343.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 29027143,
+  "tracked_bytes_max": 24117248
+}
