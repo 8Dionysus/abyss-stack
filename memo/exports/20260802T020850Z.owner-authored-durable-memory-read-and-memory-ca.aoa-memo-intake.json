@@ -1,0 +1,23 @@
+{
+  "schema": "aoa_local_memo_export_v1",
+  "id": "export:abyss-stack:20260802T020850Z:owner-authored-durable-memory-read-and-memory-ca",
+  "repo": "abyss-stack",
+  "target_owner": "aoa-memo",
+  "target_route": "reviewed_intake",
+  "candidate_refs": [
+    "candidates/20260802T020849Z.e61fc527.owner-authored-durable-memory-read-and-memory-ca.candidate.json"
+  ],
+  "receipt_refs": [],
+  "source_refs": [
+    "mcp/services/aoa-memo-mcp/DESIGN.md",
+    "mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/server.py"
+  ],
+  "evidence_refs": [
+    "mcp/services/aoa-memo-mcp/DESIGN.md",
+    "mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/organ_access.py",
+    "mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/server.py"
+  ],
+  "allowed_result": "candidate_only",
+  "created_at": "2026-08-02T02:08:50Z",
+  "notes": "Prepared by aoa-memo-mcp. This is not durable memory landing."
+}

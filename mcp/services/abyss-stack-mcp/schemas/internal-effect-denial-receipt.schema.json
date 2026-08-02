@@ -1,0 +1,79 @@
+{
+  "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/internal-effect-denial-receipt.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "contains_secrets": {
+      "const": false,
+      "default": false,
+      "title": "Contains Secrets",
+      "type": "boolean"
+    },
+    "effect_attempted": {
+      "const": false,
+      "default": false,
+      "title": "Effect Attempted",
+      "type": "boolean"
+    },
+    "external_effect_authorized": {
+      "const": false,
+      "default": false,
+      "title": "External Effect Authorized",
+      "type": "boolean"
+    },
+    "issuer": {
+      "const": "abyss-stack",
+      "default": "abyss-stack",
+      "title": "Issuer",
+      "type": "string"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "title": "Observed At",
+      "type": "string"
+    },
+    "reason_code": {
+      "maxLength": 160,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "title": "Reason Code",
+      "type": "string"
+    },
+    "receipt_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Receipt Id",
+      "type": "string"
+    },
+    "request_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Request Digest",
+      "type": "string"
+    },
+    "runtime_effect_authorized": {
+      "const": false,
+      "default": false,
+      "title": "Runtime Effect Authorized",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "abyss_stack_internal_effect_denial_receipt_v1",
+      "default": "abyss_stack_internal_effect_denial_receipt_v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "tool_id": {
+      "const": "stack_execute_approved_read_restart_pilot",
+      "default": "stack_execute_approved_read_restart_pilot",
+      "title": "Tool Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "receipt_id",
+    "request_digest",
+    "reason_code",
+    "observed_at"
+  ],
+  "title": "InternalEffectDenialReceipt",
+  "type": "object"
+}

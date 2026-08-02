@@ -16,6 +16,8 @@ This directory stores user-unit skeletons for the deployed runtime.
 - `abyss-stack-mcp-read.service`, the stack-owned runtime-observation plane
 - `abyss-stack-mcp-candidate.service`, the separate non-executing plan-candidate
   plane
+- `abyss-stack-mcp-internal-effect.service`, the separately credentialed exact
+  read-service restart-and-rollback pilot on port `5439`
 - `abyss-stack-mcp-observation.service` and
   `abyss-stack-mcp-observation.timer`, the bounded five-minute observation
   producer and two-minute refresh schedule
@@ -86,10 +88,12 @@ The current allowlist covers the local working surface:
   deployed workspace wrappers with explicit authenticated loopback Streamable
   HTTP, preserve each package's tool authority, and reject unauthenticated
   callers before dispatch
-- the separate `abyss-stack-mcp-read.service` and
-  `abyss-stack-mcp-candidate.service` processes; neither belongs to the shared
-  owner bundle, and each has a disjoint tool catalog, port, scope, client
-  identity, and systemd credential; their explicit ports are `5431` and `5433`
+- the separate `abyss-stack-mcp-read.service`,
+  `abyss-stack-mcp-candidate.service`, and
+  `abyss-stack-mcp-internal-effect.service` processes; none belongs to the
+  shared owner bundle, and each has a disjoint tool catalog, port, scope,
+  client identity, and systemd credential; their explicit ports are `5431`,
+  `5433`, and `5439`
   because the storage module owns PostgreSQL on `5432`
 - the credential-free `abyss-stack-mcp-observation.service`, which composes
   only the exact deployment record, private registry projection, committed
@@ -166,16 +170,16 @@ Startup validates the complete bounded hash chain before bind.
 The same provision action creates the private
 `${AOA_STACK_ROOT}/Logs/mcp/observations` directory. It does not create a live
 claim. Start `abyss-stack-mcp-observation.service` once to atomically produce
-`current.json`; the stack read and candidate units refuse to start without it.
+`current.json`; all three stack MCP units refuse to start without it.
 Enable `abyss-stack-mcp-observation.timer` only as a separate reviewed rollout
 step. Its process has no bearer credential, no network address family, and no
 writable path outside that observation directory.
 Provisioning installs the exact artifact-hashed lock, binds the bytes behind
 the resolved venv interpreter into the runtime-content digest, and refuses to
-replace a changed environment while either stack MCP unit is active or its
+replace a changed environment while any stack MCP unit is active or its
 state cannot be observed; it never stops a plane implicitly.
-Both lifetime locks mean an applying MCP Configs sync and changed runtime
-provisioning fail closed while either plane is active; stop both planes
+The lifetime locks mean an applying MCP Configs sync and changed runtime
+provisioning fail closed while any plane is active; stop all three planes
 explicitly before sync or reprovisioning. The units execute the installed venv
 module, not the mutable `Configs/src` tree, clear inherited `PYTHONHOME` and
 `PYTHONPATH`, invoke Python in isolated mode, and pass `-B` explicitly. Neither

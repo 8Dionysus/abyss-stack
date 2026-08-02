@@ -81,11 +81,14 @@ consumer, proof, acceptance, and rollback gates pass.
 | `aoa-course-connector` | 5436 |
 | `aoa-stackoverflow-connector` | 5437 |
 | `aoa-xda-connector` | 5438 |
+| `abyss-stack` internal-effect pilot | 5439 |
 
 `abyss-stack-mcp` does not join the transitional shared owner credential. Its
-read and candidate planes select distinct credential names, scopes, client
-identities, ports, and tool catalogs. The candidate plane only prepares
-content-addressed plans and has no dispatch method. Neither plane is included
+read, candidate, and exact internal-effect planes select distinct credential
+names, scopes, client identities, ports, and tool catalogs. The candidate
+plane only prepares content-addressed plans and has no dispatch method. The
+effect plane exposes only the approved read-service restart-and-rollback pilot
+on port `5439`; it cannot select a unit, command, or external effect. No plane is included
 in the existing owner bundle until package/deploy provenance, a live
 observation, consumer canary, and rollback evidence are present.
 The managed units use the explicitly provisioned

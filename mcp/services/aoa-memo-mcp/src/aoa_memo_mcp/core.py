@@ -1100,6 +1100,31 @@ class AoAMemoMCPState:
             ],
         }
 
+    def build_reviewed_brief(self, repo: str, intent: str = "") -> dict[str, Any]:
+        """Return only accepted durable-memory rows and their authority posture."""
+
+        route = self.repo_route(repo)
+        return {
+            "schema": "aoa_memo_reviewed_brief_v1",
+            "repo": route.name,
+            "intent": intent,
+            "reviewed_memory": self._reviewed_memory_for_repo(route.name, intent),
+            "source_owner": "aoa-memo",
+            "source_catalog": str(self.aoa_memo_root / MEMORY_OBJECT_CATALOG),
+            "access_projection": "reviewed_corpus_only",
+            "authority_boundary": (
+                "Reviewed memory is durable recall, not proof, current source truth, "
+                "routing authority, runtime state, or permission."
+            ),
+            "state_law": (
+                "Current, stale, superseded, retracted, and quarantined recall states "
+                "remain distinct and must be checked on the source object."
+            ),
+            "next_route": "open the exact reviewed object and then verify its stronger owner source",
+            "candidate_route_exposed": False,
+            "durable_write_authorized": False,
+        }
+
     def deliver_owner_orientation(
         self,
         *,
@@ -2677,6 +2702,28 @@ class AoAMemoMCPState:
             "fallback_registry": str(registry_path),
             "found": bool(matches),
             "matches": matches,
+        }
+
+    def build_reviewed_memory_object(self, object_id: str) -> dict[str, Any]:
+        """Resolve one object only when it belongs to the reviewed durable corpus."""
+
+        payload = self.build_memory_object(object_id)
+        reviewed = [
+            item
+            for item in payload.get("matches", [])
+            if isinstance(item, dict) and item.get("source_kind") == "reviewed_corpus"
+        ]
+        return {
+            "schema": "aoa_memo_reviewed_object_lookup_v1",
+            "object_id": object_id,
+            "catalog": payload.get("catalog"),
+            "found": bool(reviewed),
+            "matches": reviewed,
+            "source_owner": "aoa-memo",
+            "access_projection": "reviewed_corpus_only",
+            "authority_boundary": (
+                "The reviewed object remains memory, not proof or current stronger-owner truth."
+            ),
         }
 
     def build_session_rehydrate(self, session_id: str) -> dict[str, Any]:

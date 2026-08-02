@@ -72,6 +72,7 @@ It does not own:
 | report skeleton behavior | `src/aoa_evals_mcp/core.py` and source bundle report contract |
 | repo-local eval ports | `src/aoa_evals_mcp/core.py` and `aoa-evals:docs/guides/LOCAL_EVAL_PORT_STANDARD.md` |
 | Codex-plane registration | `8Dionysus:config/codex_plane/runtime_manifest.v1.json` |
+| admitted capability profiles | `aoa-evals:docs/architecture/aoa_evals_mcp_capabilities.v1.json` and `src/aoa_evals_mcp/organ_access.py` |
 
 ## AGENTS Stack Law
 
@@ -105,6 +106,11 @@ For source-local service execution from the `abyss-stack` repo root, run:
 python mcp/services/aoa-evals-mcp/scripts/aoa_evals_mcp_server.py
 AOA_MCP_POLICY_FAMILY=candidate python mcp/services/aoa-evals-mcp/scripts/aoa_evals_mcp_server.py
 ```
+
+Set `AOA_EVALS_MCP_CAPABILITY_PROFILE` to one exact owner capability only for a
+profiled contour. The allowed pairs are read with `eval-discovery-read` or
+`proof-result-read`, and candidate with `eval-request-prepare`. The owner
+manifest must be present and must bind the exact runtime catalog.
 
 The first command defaults to the read contour. Candidate writes additionally
 require `AOA_EVALS_MCP_CANDIDATE_ROOTS`; managed lifecycle supplies the exact

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "abyss-stack-mcp"
-version = "0.3.0"
-description = "Owner-bounded runtime observation and plan-candidate MCP for abyss-stack"
+version = "0.4.0"
+description = "Owner-bounded runtime observation, candidate, and exact internal-effect MCP for abyss-stack"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -25,6 +25,8 @@ abyss-stack-mcp-proof-packet-bind-consumer = "abyss_stack_mcp.proof_packet:main"
 abyss-stack-mcp-rollback-candidate = "abyss_stack_mcp.rollback_candidate:main"
 abyss-stack-mcp-rollback-project = "abyss_stack_mcp.rollback_projection:main"
 abyss-stack-mcp-orchestration = "abyss_stack_mcp.orchestration:main"
+abyss-stack-mcp-effect = "abyss_stack_mcp.effect:main"
+abyss-stack-mcp-effect-server = "abyss_stack_mcp.effect_server:main"
 abyss-stack-mcp-server = "abyss_stack_mcp.server:main"
 
 [tool.setuptools.packages.find]

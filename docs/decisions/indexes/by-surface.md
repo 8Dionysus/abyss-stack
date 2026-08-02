@@ -112,6 +112,8 @@
 - [ABYSS-STACK-D-0093 Connector Read Contour Isolation](../ABYSS-STACK-D-0093-connector-read-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0093-connector-read-contour-isolation.md`)
 - [ABYSS-STACK-D-0094 Wave 6 Access-Form and Retirement Classification](../ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md) (`docs/decisions/ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md`)
 - [ABYSS-STACK-D-0095 Cross-Organ Orchestration Host Boundary](../ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md) (`docs/decisions/ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md`)
+- [ABYSS-STACK-D-0105 Bind Stack MCP Capabilities to Process Contours](../ABYSS-STACK-D-0105-bind-stack-mcp-capabilities-to-process-contours.md) (`docs/decisions/ABYSS-STACK-D-0105-bind-stack-mcp-capabilities-to-process-contours.md`)
+- [ABYSS-STACK-D-0106 Admit One Exact Stack MCP Read Restart Pilot](../ABYSS-STACK-D-0106-admit-one-exact-stack-mcp-read-restart-pilot.md) (`docs/decisions/ABYSS-STACK-D-0106-admit-one-exact-stack-mcp-read-restart-pilot.md`)
 
 ## federation/read-model
 
@@ -259,6 +261,10 @@
 - [ABYSS-STACK-D-0085 SDK Routing Canary Intake](../ABYSS-STACK-D-0085-sdk-routing-canary-intake.md) (`docs/decisions/ABYSS-STACK-D-0085-sdk-routing-canary-intake.md`)
 - [ABYSS-STACK-D-0086 Receipt-Bound SDK Routing Cutover](../ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md) (`docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md`)
 
+## capability identity
+
+- [ABYSS-STACK-D-0105 Bind Stack MCP Capabilities to Process Contours](../ABYSS-STACK-D-0105-bind-stack-mcp-capabilities-to-process-contours.md) (`docs/decisions/ABYSS-STACK-D-0105-bind-stack-mcp-capabilities-to-process-contours.md`)
+
 ## compatibility bridge
 
 - [ABYSS-STACK-D-0047 Federation Upstream Compatibility Language Split](../ABYSS-STACK-D-0047-federation-upstream-compatibility-language-split.md) (`docs/decisions/ABYSS-STACK-D-0047-federation-upstream-compatibility-language-split.md`)
@@ -403,6 +409,10 @@
 - [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
 - [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
 
+## internal runtime effect
+
+- [ABYSS-STACK-D-0106 Admit One Exact Stack MCP Read Restart Pilot](../ABYSS-STACK-D-0106-admit-one-exact-stack-mcp-read-restart-pilot.md) (`docs/decisions/ABYSS-STACK-D-0106-admit-one-exact-stack-mcp-read-restart-pilot.md`)
+
 ## lifecycle
 
 - [ABYSS-STACK-D-0082 Observability Bind State and Launcher Cgroup Boundary](../ABYSS-STACK-D-0082-observability-bind-state-and-launcher-cgroup-boundary.md) (`docs/decisions/ABYSS-STACK-D-0082-observability-bind-state-and-launcher-cgroup-boundary.md`)
@@ -435,6 +445,11 @@
 ## organ portfolio
 
 - [ABYSS-STACK-D-0094 Wave 6 Access-Form and Retirement Classification](../ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md) (`docs/decisions/ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md`)
+
+## owner contract
+
+- [ABYSS-STACK-D-0105 Bind Stack MCP Capabilities to Process Contours](../ABYSS-STACK-D-0105-bind-stack-mcp-capabilities-to-process-contours.md) (`docs/decisions/ABYSS-STACK-D-0105-bind-stack-mcp-capabilities-to-process-contours.md`)
+- [ABYSS-STACK-D-0106 Admit One Exact Stack MCP Read Restart Pilot](../ABYSS-STACK-D-0106-admit-one-exact-stack-mcp-read-restart-pilot.md) (`docs/decisions/ABYSS-STACK-D-0106-admit-one-exact-stack-mcp-read-restart-pilot.md`)
 
 ## owner skill home
 

@@ -195,3 +195,8 @@
 ## 2026-08-01
 
 - [ABYSS-STACK-D-0104 Bind KAG Owner Coverage to the Admitted Bundle](../ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md) (`docs/decisions/ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md`)
+- [ABYSS-STACK-D-0105 Bind Stack MCP Capabilities to Process Contours](../ABYSS-STACK-D-0105-bind-stack-mcp-capabilities-to-process-contours.md) (`docs/decisions/ABYSS-STACK-D-0105-bind-stack-mcp-capabilities-to-process-contours.md`)
+
+## 2026-08-02
+
+- [ABYSS-STACK-D-0106 Admit One Exact Stack MCP Read Restart Pilot](../ABYSS-STACK-D-0106-admit-one-exact-stack-mcp-read-restart-pilot.md) (`docs/decisions/ABYSS-STACK-D-0106-admit-one-exact-stack-mcp-read-restart-pilot.md`)

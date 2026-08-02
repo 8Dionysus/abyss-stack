@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+import jsonschema
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC = REPO_ROOT / "src"
@@ -24,11 +26,18 @@ def main() -> None:
         "docs/THREAT_MODEL.md",
         "src/aoa_decisions_mcp/core.py",
         "src/aoa_decisions_mcp/server.py",
+        "src/aoa_decisions_mcp/organ_access.py",
+        "organ-access.v1.json",
+        "organ-access.schema.json",
         "scripts/aoa_decisions_mcp_server.py",
     ]
     missing = [path for path in required if not (REPO_ROOT / path).exists()]
     if missing:
         raise SystemExit(f"missing required files: {missing}")
+
+    manifest = json.loads((REPO_ROOT / "organ-access.v1.json").read_text())
+    schema = json.loads((REPO_ROOT / "organ-access.schema.json").read_text())
+    jsonschema.Draft202012Validator(schema).validate(manifest)
 
     state = AoADecisionsMCPState.discover()
     status = state.ensure_fresh()
@@ -64,6 +73,14 @@ def main() -> None:
     server = build_server()
     if server is None:
         raise SystemExit("MCP server did not build")
+    profile_server = build_server(capability_profile="decision-retrieval")
+    profile_tools = set(profile_server._tool_manager._tools)
+    if profile_tools != {
+        "aoa_decisions_status",
+        "aoa_decisions_packet",
+        "aoa_decisions_decision",
+    }:
+        raise SystemExit(f"unexpected decision-retrieval tools: {profile_tools}")
 
     print(
         json.dumps(

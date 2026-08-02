@@ -4,9 +4,11 @@ Applies to `mcp/services/abyss-stack-mcp/`.
 
 ## Role
 
-This package is the stack-owned runtime observation and plan-candidate access
-plane accepted by `ABYSS-STACK-D-0087`. It reports evidence about direct owner
-adapters. It is not a gateway and does not execute prepared plans.
+This package is the stack-owned runtime observation, plan-candidate, and one
+exact internal-effect access plane accepted by `ABYSS-STACK-D-0087` and
+`ABYSS-STACK-D-0106`. It reports evidence about direct owner adapters. It is
+not a gateway. Only the separately credentialed pilot process may execute the
+approved restart-and-rollback contract for `abyss-stack-mcp-read.service`.
 
 ## Read before editing
 
@@ -18,14 +20,15 @@ adapters. It is not a gateway and does not execute prepared plans.
 
 ## Boundaries
 
-- Keep read and candidate processes, tools, ports, credentials, and scopes
-  disjoint.
+- Keep read, candidate, and internal-effect processes, tools, ports,
+  credentials, scopes, and writable paths disjoint.
 - Runtime observations come from one explicit secret-free file; do not scan the
   workspace or infer owner acceptance.
 - Candidate plans are immutable, content-addressed, short-lived, and always
   `execution_authorized=false`.
-- Do not add runtime effects until a separate threat model, policy proof,
-  approval contract, postcondition canary, and rollback proof are accepted.
+- Do not generalize the D-0106 pilot. Another target, action, lasting applied
+  state, or external effect requires a separate threat model, owner decision,
+  policy proof, approval contract, postcondition canary, and rollback proof.
 
 ## Validation
 

@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 24958150,
+  "allowed_tracked_bytes": 29827508,
+  "approved_by": "repository-owner",
+  "base_ref": "9cabe283f20f2d0b2861aaad061d2049d6878375",
+  "changed_generated_bytes": 24958150,
+  "changed_generated_files": 361,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "280a93671645ec541a20ddbe761c16e8aa30a501fbfe0c9c27ed182fc9fd2f9f",
+  "reason": "Refresh the portable family after landing the owner-scoped MCP organ fabric, the bounded modern KAG lab, and the exact rollback-required internal effect pilot; this receipt admits only the measured generated delta and does not raise standing budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 29827508,
+  "tracked_bytes_max": 24117248
+}

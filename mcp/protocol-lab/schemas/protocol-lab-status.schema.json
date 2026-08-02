@@ -1,141 +1,79 @@
 {
-  "$id": "https://abyss-stack.local/schemas/mcp-protocol-lab-status.v1.json",
+  "$id": "https://abyss-stack.local/schemas/mcp-protocol-lab-status.v2.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
-    "schema_version": {
-      "const": "abyss_mcp_protocol_lab_status_v1"
-    },
-    "evaluated_at": {
-      "format": "date-time",
-      "type": "string"
-    },
-    "evidence_expires_at": {
-      "format": "date-time",
-      "type": "string"
-    },
-    "matrix_digest": {
-      "pattern": "^sha256:[0-9a-f]{64}$",
-      "type": "string"
-    },
-    "observation_digest": {
-      "pattern": "^sha256:[0-9a-f]{64}$",
-      "type": "string"
-    },
-    "status_digest": {
-      "pattern": "^sha256:[0-9a-f]{64}$",
-      "type": "string"
-    },
-    "production_protocol": {
-      "const": "2025-11-25"
-    },
-    "next_protocol": {
-      "const": "2026-07-28"
-    },
-    "next_release_status": {
-      "enum": [
-        "release_candidate",
-        "final"
-      ]
-    },
-    "migration_allowed": {
-      "type": "boolean"
-    },
-    "read_only_pilot_allowed": {
-      "type": "boolean"
-    },
-    "tasks_extension_allowed": {
-      "type": "boolean"
-    },
-    "effectful_migration_allowed": {
-      "const": false
-    },
-    "stable_registration_retained": {
-      "const": true
-    },
-    "authority_move_combined": {
-      "const": false
-    },
+    "schema_version": {"const": "abyss_mcp_protocol_lab_status_v2"},
+    "evaluated_at": {"type": "string", "format": "date-time"},
+    "evidence_expires_at": {"type": "string", "format": "date-time"},
+    "matrix_digest": {"$ref": "#/$defs/digest"},
+    "observation_digest": {"$ref": "#/$defs/digest"},
+    "codex_lab_observation_digest": {"$ref": "#/$defs/digest"},
+    "stable_rollback_observation_digest": {"$ref": "#/$defs/digest"},
+    "status_digest": {"$ref": "#/$defs/digest"},
+    "production_protocol": {"const": "2025-11-25"},
+    "next_protocol": {"const": "2026-07-28"},
+    "next_release_status": {"const": "final"},
+    "read_only_pilot_allowed": {"type": "boolean"},
+    "read_only_pilot_completed": {"type": "boolean"},
+    "core_read_migration_allowed": {"type": "boolean"},
+    "tasks_extension_allowed": {"type": "boolean"},
+    "candidate_migration_allowed": {"const": false},
+    "internal_effect_migration_allowed": {"const": false},
+    "external_effect_migration_allowed": {"const": false},
+    "stable_registration_retained": {"const": true},
+    "authority_move_combined": {"const": false},
     "gate_counts": {
+      "type": "object",
       "additionalProperties": false,
       "properties": {
-        "passed": {
-          "minimum": 0,
-          "type": "integer"
-        },
-        "blocked": {
-          "minimum": 0,
-          "type": "integer"
-        },
-        "pending": {
-          "minimum": 0,
-          "type": "integer"
-        }
+        "passed": {"type": "integer", "minimum": 0},
+        "blocked": {"type": "integer", "minimum": 0},
+        "pending": {"type": "integer", "minimum": 0}
       },
-      "required": [
-        "passed",
-        "blocked",
-        "pending"
-      ],
-      "type": "object"
+      "required": ["passed", "blocked", "pending"]
     },
-    "passed_gate_ids": {
-      "items": {
-        "pattern": "^P1-[0-9]{2}$",
-        "type": "string"
-      },
-      "type": "array"
-    },
-    "remaining_gate_ids": {
-      "items": {
-        "pattern": "^P1-[0-9]{2}$",
-        "type": "string"
-      },
-      "type": "array"
+    "passed_gate_ids": {"$ref": "#/$defs/gate_ids"},
+    "remaining_gate_ids": {"$ref": "#/$defs/gate_ids"},
+    "remaining_core_gate_ids": {"$ref": "#/$defs/gate_ids"},
+    "remaining_tasks_gate_ids": {"$ref": "#/$defs/gate_ids"},
+    "production_cutover_blockers": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$"},
+      "minItems": 0,
+      "uniqueItems": true
     },
     "reason_codes": {
-      "items": {
-        "pattern": "^[a-z0-9][a-z0-9._-]+$",
-        "type": "string"
-      },
-      "type": "array"
+      "type": "array",
+      "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$"},
+      "minItems": 1,
+      "uniqueItems": true
     },
-    "next_action": {
-      "minLength": 3,
-      "type": "string"
-    },
-    "claim_limits": {
-      "items": {
-        "minLength": 3,
-        "type": "string"
-      },
-      "minItems": 5,
-      "type": "array"
-    }
+    "next_action": {"type": "string", "minLength": 3},
+    "claim_limits": {"type": "array", "items": {"type": "string", "minLength": 3}, "minItems": 5}
   },
   "required": [
-    "schema_version",
-    "evaluated_at",
-    "evidence_expires_at",
-    "matrix_digest",
-    "observation_digest",
-    "status_digest",
-    "production_protocol",
-    "next_protocol",
-    "next_release_status",
-    "migration_allowed",
-    "read_only_pilot_allowed",
-    "tasks_extension_allowed",
-    "effectful_migration_allowed",
-    "stable_registration_retained",
-    "authority_move_combined",
-    "gate_counts",
-    "passed_gate_ids",
-    "remaining_gate_ids",
-    "reason_codes",
-    "next_action",
-    "claim_limits"
+    "schema_version", "evaluated_at", "evidence_expires_at", "matrix_digest",
+    "observation_digest", "codex_lab_observation_digest",
+    "stable_rollback_observation_digest", "status_digest",
+    "production_protocol", "next_protocol", "next_release_status",
+    "read_only_pilot_allowed", "read_only_pilot_completed",
+    "core_read_migration_allowed", "tasks_extension_allowed",
+    "candidate_migration_allowed", "internal_effect_migration_allowed",
+    "external_effect_migration_allowed", "stable_registration_retained",
+    "authority_move_combined", "gate_counts", "passed_gate_ids",
+    "remaining_gate_ids", "remaining_core_gate_ids",
+    "remaining_tasks_gate_ids", "production_cutover_blockers",
+    "reason_codes", "next_action", "claim_limits"
   ],
   "title": "OS Abyss MCP protocol lab status",
-  "type": "object"
+  "type": "object",
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "gate_ids": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^P1-[0-9]{2}$"},
+      "uniqueItems": true
+    }
+  }
 }

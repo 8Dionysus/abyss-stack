@@ -1,0 +1,78 @@
+{
+  "schema_version": "aoa_decisions_mcp_organ_access_v1",
+  "organ_id": "aoa-decisions",
+  "source_owner": "federated-repository-decision-owners",
+  "access_runtime_owner": "abyss-stack",
+  "admission_owner": "aoa-sdk",
+  "proof_owner": "aoa-evals",
+  "owner_decision_refs": [
+    "owner://abyss-stack/decision/ABYSS-STACK-D-0066",
+    "owner://abyss-stack/decision/ABYSS-STACK-D-0068",
+    "owner://abyss-stack/decision/ABYSS-STACK-D-0089"
+  ],
+  "capabilities": [
+    {
+      "capability_id": "decision-retrieval",
+      "summary": "Read cache posture, compact decision matches, and one exact owner-qualified decision neighborhood without refreshing the graph.",
+      "policy_family": "read",
+      "process_contour": "read",
+      "credential_class": "decisions-read",
+      "primitives": [
+        {
+          "primitive_id": "read-decision-cache-posture",
+          "mcp_name": "aoa_decisions_status",
+          "kind": "tool",
+          "effect_class": "observe",
+          "approval_required": false
+        },
+        {
+          "primitive_id": "find-owner-decisions",
+          "mcp_name": "aoa_decisions_packet",
+          "kind": "tool",
+          "effect_class": "observe",
+          "approval_required": false
+        },
+        {
+          "primitive_id": "read-owner-decision-neighborhood",
+          "mcp_name": "aoa_decisions_decision",
+          "kind": "tool",
+          "effect_class": "observe",
+          "approval_required": false
+        },
+        {
+          "primitive_id": "open-decision-cache-posture",
+          "mcp_name": "aoa-decisions://status",
+          "kind": "resource",
+          "effect_class": "observe",
+          "approval_required": false
+        },
+        {
+          "primitive_id": "open-owner-decision-neighborhood",
+          "mcp_name": "aoa-decisions://decision/{decision_id}",
+          "kind": "resource_template",
+          "effect_class": "observe",
+          "approval_required": false
+        }
+      ],
+      "authority_ceiling": "navigation read model; repo-local decision records retain rationale authority",
+      "freshness_policy": "fail closed unless the prepared graph matches current local workspace inputs",
+      "eval_refs": [
+        "eval://aoa-organ-access-admission-integrity"
+      ]
+    }
+  ],
+  "guardrails": {
+    "cache_refresh_allowed": false,
+    "decision_mutation_allowed": false,
+    "remote_fetch_allowed": false,
+    "owner_acceptance_inference_allowed": false,
+    "proof_issuance_allowed": false,
+    "registry_mutation_allowed": false,
+    "hidden_mcp_chaining_allowed": false,
+    "annotations_are_security_enforcement": false
+  },
+  "contains_secrets": false,
+  "admission_asserted": false,
+  "owner_acceptance_asserted": false,
+  "effect_activation_authorized": false
+}

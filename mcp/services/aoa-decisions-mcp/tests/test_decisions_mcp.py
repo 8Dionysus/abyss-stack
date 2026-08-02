@@ -459,3 +459,32 @@ def test_resources_and_server_build(tmp_path: Path) -> None:
         )
         is not None
     )
+
+
+def test_exact_decision_view_preserves_owner_status_rationale_and_revision(
+    tmp_path: Path,
+) -> None:
+    seed_workspace(tmp_path)
+    state = state_for(tmp_path)
+    state.ensure_fresh()
+
+    packet = state.decision("AAA-D-0001")
+
+    assert len(packet["decision_views"]) == 1
+    view = packet["decision_views"][0]
+    assert view["decision_id"] == "AAA-D-0001"
+    assert view["repository_owner"] == "repo-a"
+    assert view["status"] == "accepted"
+    assert view["rationale_summary"] == "accepted"
+    assert view["rationale_source_ref"].startswith(
+        "repo://repo-a/docs/decisions/AAA-D-0001"
+    )
+    assert view["source_revision"].startswith("sha256:")
+    assert view["repository_revision"] == git(
+        tmp_path / "repo-a", "rev-parse", "HEAD"
+    )
+    assert view["source_posture"]["remote_freshness_checked"] is False
+    assert view["predecessors"] == []
+    assert view["successors"] == []
+    assert view["superseded_by"] == []
+    assert packet["claim_limits"]

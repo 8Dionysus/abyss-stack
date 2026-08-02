@@ -4,17 +4,23 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from ._http_auth import http_auth_kwargs as _http_auth_kwargs
 from ._http_auth import transport_settings as _transport_settings
 from .core import AoADecisionsMCPState
+from .organ_access import CAPABILITY_ID
+from .organ_access import load_organ_access_manifest
+from .organ_access import validate_runtime_bindings
 
 LOGGER = logging.getLogger(__name__)
 PACKAGE_NAME = "aoa-decisions-mcp"
 APPLICATION_VERSION = "0.2.0"
 DEFAULT_HTTP_PORT = 5420
 SUPPORTED_CONTOURS = frozenset({"read", "internal_effect"})
+CAPABILITY_PROFILE_ENV_VAR = "AOA_DECISIONS_MCP_CAPABILITY_PROFILE"
+CAPABILITY_PROFILE_MAX_OUTPUT_BYTES = 32_768
+CapabilityProfile = Literal["complete", "decision-retrieval"]
 CONTOUR_AUTH = {
     "read": {
         "token_env_var": "AOA_DECISIONS_MCP_READ_BEARER_TOKEN",
@@ -55,6 +61,66 @@ def _contour_http_auth_kwargs(contour: str) -> dict[str, Any]:
     return _http_auth_kwargs(DEFAULT_HTTP_PORT, **auth)
 
 
+def configured_capability_profile(contour: str) -> CapabilityProfile:
+    value = os.environ.get(CAPABILITY_PROFILE_ENV_VAR, "complete").strip()
+    allowed = {"complete", CAPABILITY_ID} if contour == "read" else {"complete"}
+    if value not in allowed:
+        expected = ", ".join(sorted(allowed))
+        raise SystemExit(
+            f"{CAPABILITY_PROFILE_ENV_VAR} is incompatible with {contour}; "
+            f"expected one of: {expected}"
+        )
+    return value  # type: ignore[return-value]
+
+
+def _profile_freshness(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: payload.get(key)
+        for key in (
+            "status",
+            "cache_status",
+            "freshness_scope",
+            "remote_freshness_checked",
+            "input_fingerprint",
+            "source_posture_status",
+            "source_warning_repo_count",
+        )
+    }
+
+
+def _profile_packet(payload: dict[str, Any]) -> dict[str, Any]:
+    decisions = [
+        {
+            key: item.get(key)
+            for key in ("label", "title", "status", "path", "source_sha256")
+        }
+        for item in payload.get("decisions", payload.get("matches", []))
+        if isinstance(item, dict)
+    ]
+    result = {
+        "schema": "aoa_decisions_retrieval_profile_result_v1",
+        "decision_count": len(decisions),
+        "decisions": decisions,
+        "decision_views": list(payload.get("decision_views", [])),
+        "freshness": _profile_freshness(payload.get("freshness", {})),
+        "authority_note": payload.get("authority_note")
+        or "Repo-local decision records own rationale; MCP is a navigation read model.",
+        "claim_limits": payload.get("claim_limits", []),
+        "max_output_bytes": CAPABILITY_PROFILE_MAX_OUTPUT_BYTES,
+        "truncated": False,
+    }
+    while (
+        len(json.dumps(result, ensure_ascii=False, separators=(",", ":")).encode())
+        > CAPABILITY_PROFILE_MAX_OUTPUT_BYTES
+        and result["decision_views"]
+    ):
+        result["decision_views"].pop()
+        result["decisions"].pop()
+        result["decision_count"] = len(result["decisions"])
+        result["truncated"] = True
+    return result
+
+
 def _run_server(server: Any, *, contour: str = "read") -> None:
     settings = _transport_settings(DEFAULT_HTTP_PORT)
     _contour_http_auth_kwargs(contour)
@@ -73,6 +139,7 @@ def build_server(
     stack_root: str | Path | None = None,
     output_dir: str | Path | None = None,
     contour: str = "read",
+    capability_profile: CapabilityProfile | None = None,
 ) -> Any:
     try:
         from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
@@ -88,8 +155,17 @@ def build_server(
             f"expected one of {sorted(SUPPORTED_CONTOURS)}"
         )
 
+    profile = capability_profile or configured_capability_profile(contour)
+    allowed_profiles = {"complete", CAPABILITY_ID} if contour == "read" else {"complete"}
+    if profile not in allowed_profiles:
+        expected = ", ".join(sorted(allowed_profiles))
+        raise SystemExit(
+            f"aoa-decisions capability profile {profile!r} is incompatible with "
+            f"{contour!r}; expected one of: {expected}"
+        )
+
     mcp = FastMCP(
-        f"aoa-decisions-mcp-{contour.replace('_', '-')}",
+        f"aoa-decisions-mcp-{contour.replace('_', '-')}-{profile}",
         json_response=True,
         **_contour_http_auth_kwargs(contour),
     )
@@ -115,6 +191,70 @@ def build_server(
     def aoa_decisions_status() -> dict[str, Any]:
         """Inspect local cache readiness without creating or refreshing files."""
         return current_state().cache_posture()
+
+    if contour == "read" and profile == CAPABILITY_ID:
+
+        @read_only_tool
+        def aoa_decisions_packet(
+            query: str = "",
+            repo: str | None = None,
+            decision_id: str | None = None,
+            path: str | None = None,
+            limit: int = 12,
+        ) -> dict[str, Any]:
+            """Return compact owner-qualified decision matches from a fresh cache."""
+            return _profile_packet(
+                current_state().packet(
+                    query=query,
+                    repo=repo,
+                    decision_id=decision_id,
+                    path=path,
+                    limit=min(max(limit, 1), 12),
+                )
+            )
+
+        @read_only_tool
+        def aoa_decisions_decision(
+            decision_id: str, repo: str | None = None
+        ) -> dict[str, Any]:
+            """Return one exact owner-qualified decision neighborhood."""
+            return _profile_packet(
+                current_state().decision(decision_id=decision_id, repo=repo)
+            )
+
+        @mcp.resource("aoa-decisions://status")
+        def status_resource() -> str:
+            return json.dumps(
+                current_state().cache_posture(), ensure_ascii=False, indent=2
+            )
+
+        @mcp.resource("aoa-decisions://decision/{decision_id}")
+        def decision_resource(decision_id: str) -> str:
+            return json.dumps(
+                _profile_packet(current_state().decision(decision_id)),
+                ensure_ascii=False,
+                indent=2,
+            )
+
+        manifest = load_organ_access_manifest()
+        validate_runtime_bindings(
+            manifest,
+            tool_names={
+                "aoa_decisions_status",
+                "aoa_decisions_packet",
+                "aoa_decisions_decision",
+            },
+            resource_names={
+                "aoa-decisions://status",
+                "aoa-decisions://decision/{decision_id}",
+            },
+        )
+        LOGGER.info(
+            "AoA decisions MCP server ready: contour=%s profile=%s",
+            contour,
+            profile,
+        )
+        return mcp
 
     if contour == "internal_effect":
 
@@ -259,7 +399,9 @@ def build_server(
                 "authoritative repo-local source rather than the workspace graph."
             )
 
-    LOGGER.info("AoA decisions MCP server ready: contour=%s", contour)
+    LOGGER.info(
+        "AoA decisions MCP server ready: contour=%s profile=%s", contour, profile
+    )
     return mcp
 
 

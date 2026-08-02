@@ -19,6 +19,7 @@ import uvicorn
 from mcp.client import Client
 from mcp.client.caching import CacheConfig
 from mcp.server import CacheHint, MCPServer, ServerRequestContext
+from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.shared.exceptions import MCPError
 from mcp_types import Implementation, ToolAnnotations
 
@@ -27,6 +28,9 @@ from aoa_kag_mcp.runtime import build_application
 
 
 NEXT_WIRE_VERSION = "2026-07-28"
+MAX_INPUT_BYTES = 16_384
+MAX_OUTPUT_BYTES = 262_144
+CANCELLATION_META_KEY = "io.os-abyss.protocol-lab/cancel-delay-ms"
 TRACEPARENT = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
 READ_METHODS = frozenset(
     {
@@ -105,8 +109,46 @@ class AccessRecorder:
             "protocol_header": headers.get("mcp-protocol-version"),
             "session_header_present": "mcp-session-id" in headers,
             "can_send_server_request": ctx.session.can_send_request,
+            "authenticated_principal": None,
+            "input_bytes": len(
+                json.dumps(
+                    raw_params,
+                    ensure_ascii=True,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                    default=str,
+                ).encode()
+            ),
+            "output_bytes": None,
             "outcome": "entered",
         }
+        access_token = get_access_token()
+        if access_token is not None:
+            record["authenticated_principal"] = {
+                "client_id": access_token.client_id,
+                "issuer": access_token.claims.get("iss"),
+                "subject": access_token.subject,
+            }
+        if record["input_bytes"] > MAX_INPUT_BYTES:
+            record["outcome"] = "denied_input_limit"
+            raise MCPError(
+                code=mcp_types.INVALID_PARAMS,
+                message="The isolated KAG next request exceeds its byte limit.",
+                data={"limit_bytes": MAX_INPUT_BYTES},
+            )
+        cancel_delay_ms = meta.get(CANCELLATION_META_KEY)
+        if cancel_delay_ms is not None:
+            if not isinstance(cancel_delay_ms, int) or not 1 <= cancel_delay_ms <= 10_000:
+                record["outcome"] = "denied_cancellation_probe"
+                raise MCPError(
+                    code=mcp_types.INVALID_PARAMS,
+                    message="The isolated cancellation delay is invalid.",
+                )
+            try:
+                await anyio.sleep(cancel_delay_ms / 1000)
+            except anyio.get_cancelled_exc_class():
+                record["outcome"] = "cancelled"
+                raise
         self.records.append(record)
 
         if ctx.method == "initialize":
@@ -140,6 +182,27 @@ class AccessRecorder:
                 )
 
         result = await call_next(ctx)
+        dumped = (
+            result.model_dump(by_alias=True, mode="json", exclude_none=True)
+            if hasattr(result, "model_dump")
+            else result
+        )
+        record["output_bytes"] = len(
+            json.dumps(
+                dumped,
+                ensure_ascii=True,
+                separators=(",", ":"),
+                sort_keys=True,
+                default=str,
+            ).encode()
+        )
+        if record["output_bytes"] > MAX_OUTPUT_BYTES:
+            record["outcome"] = "denied_output_limit"
+            raise MCPError(
+                code=mcp_types.INTERNAL_ERROR,
+                message="The isolated KAG next response exceeds its byte limit.",
+                data={"limit_bytes": MAX_OUTPUT_BYTES},
+            )
         record["outcome"] = "passed"
         return result
 
@@ -147,6 +210,9 @@ class AccessRecorder:
 def build_next_server(
     application: Any,
     recorder: AccessRecorder,
+    *,
+    token_verifier: Any | None = None,
+    auth: Any | None = None,
 ) -> MCPServer:
     annotations = ToolAnnotations(
         read_only_hint=True,
@@ -177,6 +243,8 @@ def build_next_server(
             "resources/read": CacheHint(ttl_ms=0, scope="private"),
         },
         middleware=[recorder],
+        token_verifier=token_verifier,
+        auth=auth,
     )
 
     @server.tool(
@@ -349,6 +417,32 @@ async def _exercise_pair(
                 if not denied_effect:
                     raise RuntimeError("unknown effect-like tool was not denied")
 
+                with anyio.move_on_after(0.1) as cancellation_scope:
+                    await client.call_tool(
+                        "kag_discover",
+                        {"owner": "abyss-stack", "detail": "compact"},
+                        meta={CANCELLATION_META_KEY: 5_000},
+                    )
+                if not cancellation_scope.cancel_called:
+                    raise RuntimeError("cancellation probe completed instead of cancelling")
+                with anyio.fail_after(7):
+                    while not any(
+                        item["method"] == "tools/call"
+                        and item["outcome"] in {"cancelled", "passed"}
+                        and item.get("traceparent") is None
+                        and item.get("input_bytes", 0) > 100
+                        for item in recorder.records
+                    ):
+                        await anyio.sleep(0.01)
+                cancellation_record = next(
+                    item
+                    for item in reversed(recorder.records)
+                    if item["method"] == "tools/call"
+                    and item["outcome"] in {"cancelled", "passed"}
+                    and item.get("traceparent") is None
+                    and item.get("input_bytes", 0) > 100
+                )
+
             async with Client(
                 url,
                 mode="auto",
@@ -474,6 +568,14 @@ async def _exercise_pair(
         "denials": {
             "effect_like_tool": denied_effect,
             "legacy_client": legacy_denial,
+        },
+        "cancellation": {
+            "client_request_cancelled": True,
+            "server_dispatch_cancelled": cancellation_record["outcome"]
+            == "cancelled",
+            "server_dispatch_completed_after_client_cancel": (
+                cancellation_record["outcome"] == "passed"
+            ),
         },
         "request_dispatch_records": recorder.records,
     }

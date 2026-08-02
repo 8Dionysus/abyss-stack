@@ -6,16 +6,16 @@ Generated from `PORT.yaml` and local memo packets.
 
 | District | Count |
 |---|---:|
-| candidates | 4 |
-| receipts | 5 |
-| exports | 4 |
+| candidates | 8 |
+| receipts | 7 |
+| exports | 6 |
 | local | 0 |
 
 ## Routes
 
 | Route | Count |
 |---|---:|
-| `reviewed_intake` | 4 |
+| `reviewed_intake` | 8 |
 
 ## Open Items
 
@@ -25,6 +25,10 @@ Generated from `PORT.yaml` and local memo packets.
 | `candidate:abyss-stack:20260522T021004Z:aoa-memo-mcp-access-plane-reviewed-route` | `reviewed` | `reviewed_intake` | `candidates/20260522T021004Z.aoa-memo-mcp-access-plane-reviewed-route.candidate.json` |
 | `candidate:abyss-stack:20260526T003500Z:os-access-plane-mcp-services-owner-split` | `reviewed` | `reviewed_intake` | `candidates/20260526T003500Z.os-access-plane-mcp-services-owner-split.candidate.json` |
 | `candidate:abyss-stack:20260526T021616Z:b4df4c0f-aoa-memo-mcp-derives-known-local` | `reviewed` | `reviewed_intake` | `candidates/20260526T021616Z.b4df4c0f.aoa-memo-mcp-derives-known-local-memo-ports-from.candidate.json` |
+| `candidate:abyss-stack:20260802T020849Z:e61fc527-owner-authored-durable-memory-re` | `candidate` | `reviewed_intake` | `candidates/20260802T020849Z.e61fc527.owner-authored-durable-memory-read-and-memory-ca.candidate.json` |
+| `candidate:abyss-stack:20260802T033240Z:10c8c6e8-a-direct-owner-mcp-chain-must-pr` | `candidate` | `reviewed_intake` | `candidates/20260802T033240Z.10c8c6e8.a-direct-owner-mcp-chain-must-preserve-aoa-memo.candidate.json` |
+| `candidate:abyss-stack:20260802T055122Z:9a2275e7-a-direct-owner-mcp-chain-must-pr` | `candidate` | `reviewed_intake` | `candidates/20260802T055122Z.9a2275e7.a-direct-owner-mcp-chain-must-preserve-aoa-memo.candidate.json` |
+| `candidate:abyss-stack:20260802T055314Z:be3a648f-a-direct-owner-mcp-chain-must-pr` | `candidate` | `reviewed_intake` | `candidates/20260802T055314Z.be3a648f.a-direct-owner-mcp-chain-must-preserve-aoa-memo.candidate.json` |
 
 ## Agent Route
 

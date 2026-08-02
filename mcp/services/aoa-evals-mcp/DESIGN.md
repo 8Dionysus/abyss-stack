@@ -27,6 +27,13 @@ authority: read and candidate run as different processes with disjoint tool
 catalogs, ports, credentials, scopes, and client identities.
 `abyss-stack` owns the runnable MCP service package.
 
+Admission uses a narrower owner-authored split than the historical complete
+catalog: discovery read, non-persistent request preparation, and issued proof
+result read. The stack adapter loads the `aoa-evals` capability manifest and
+rejects catalog drift. The result-read profile projects one source report with
+content identity and owner revision; report retrieval is not verdict issuance
+or proof acceptance.
+
 ## Operation
 
 An agent should be able to start from a proof question:

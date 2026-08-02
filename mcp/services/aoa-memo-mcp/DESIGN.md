@@ -31,6 +31,14 @@ candidate creation, optional generated-index write, intake export, and
 forwarding-receipt tools. Core write guards deny the same calls under the read
 policy and deny candidate writes outside the configured root allowlist.
 
+Managed HTTP narrows those complete dual-era catalogs through an
+owner-authored capability manifest from `aoa-memo`. `durable-memory-read`
+contains only reviewed-corpus brief, search, exact-object, and known-object
+resource access. `memory-candidate-prepare` contains only local candidate,
+candidate-only intake, and forwarding-receipt preparation. `abyss-stack`
+validates and binds the manifest but cannot change its memory semantics;
+`aoa-sdk`, proof, and owner acceptance remain later independent gates.
+
 ## Operation
 
 An agent should be able to enter any pilot root and run a brief:

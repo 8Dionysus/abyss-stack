@@ -80,11 +80,17 @@ operational evidence, not central proof or owner acceptance.
 
 Catalog results are compact and deliberately omit detailed schemas. Inspection
 loads one owner/policy subject and one view. A separate candidate process can
-compile one bounded plan against the exact observation digest. No call invokes
-an owner server or runtime lifecycle command.
-Read and candidate bearer contours are distinct values as well as distinct
-credential names: provisioning rejects a pre-existing or generated equality
-before either contour is considered usable.
+compile one bounded plan against the exact observation digest. Neither read nor
+candidate calls invoke an owner server or runtime lifecycle command. A third
+process implements only the D-0106 exact read-service restart pilot. It
+consumes a staged plan and separate approval, revalidates the current
+observation and process identity, invokes one literal systemd restart target,
+proves the postcondition, always invokes the same literal restart as
+restoration, and proves the post-rollback state. Its private artifacts include
+pre-effect, denial, recovery, and success receipts.
+Read, candidate, and internal-effect bearer contours are pairwise distinct
+values and credential names; provisioning rejects equality before any contour
+is considered usable.
 
 Cross-organ host persistence is a separate path:
 

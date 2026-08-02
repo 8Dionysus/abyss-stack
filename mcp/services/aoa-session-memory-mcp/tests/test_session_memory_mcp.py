@@ -3353,6 +3353,7 @@ def test_goal_lifecycle_route_wraps_archive_cli_and_compacts_payload(tmp_path: P
     assert args[args.index("--status") + 1] == "complete"
     assert args[args.index("--event-kind") + 1] == "goal_completed"
     assert args[args.index("--order") + 1] == "chronological"
+    assert dict(runner.timeouts)["goal-lifecycles"] == 60.0
 
 
 def test_goal_lifecycle_route_rejects_invalid_order_before_cli(tmp_path: Path) -> None:
@@ -3495,10 +3496,46 @@ def test_validator_search_alias_smoke_is_route_only() -> None:
 
     assert arguments["query"] == ""
     assert arguments["limit"] == 2
-    assert arguments["filters"]["route_signal"] == "mcp:aoa_session_memory_mcp"
-    assert arguments["filters"]["doc_type"] == "event"
-    assert arguments["filters"]["layer"] == "mcp"
-    assert arguments["filters"]["use_shards"] is True
+    assert arguments["filters"] == {"route_signal": "mcp:aoa_session_memory_mcp"}
+
+
+def test_validator_selects_session_with_direct_mcp_usage_evidence() -> None:
+    validator = load_validator_module()
+
+    class SmokeState:
+        def session_search(self, query: str, *, filters: dict, limit: int) -> dict:
+            assert filters == {
+                "route_signal": "mcp:aoa_session_memory_mcp",
+                "use_shards": False,
+            }
+            assert limit == 16
+            if query:
+                return {"results": []}
+            return {
+                "results": [
+                    {"session_label": "mention-only"},
+                    {"session_label": "direct-usage"},
+                ]
+            }
+
+        def session_entity_usage_chain(self, **kwargs: Any) -> dict:
+            if kwargs["session"] == "mention-only":
+                return {
+                    "ok": True,
+                    "counts": {"usage_event_count": 0},
+                    "quality": {"raw_or_segment_ref_present": True},
+                    "first_ref": {"raw": "raw:line:1"},
+                }
+            return {
+                "ok": True,
+                "counts": {"usage_event_count": 1},
+                "quality": {"raw_or_segment_ref_present": True},
+                "first_ref": {"segment": "000.md#event-000001"},
+            }
+
+    selected = validator._select_mcp_usage_smoke_session(SmokeState())
+
+    assert selected == "direct-usage"
 
 
 def test_validator_freshness_smoke_selector_skips_stale_latest_for_stable_candidate() -> None:

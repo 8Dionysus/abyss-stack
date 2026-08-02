@@ -1,162 +1,67 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://os-abyss.dev/schemas/protocol-conformance-observation.schema.json",
-  "title": "OS Abyss MCP protocol conformance observation",
+  "title": "MCP protocol conformance observation",
   "additionalProperties": false,
   "properties": {
-    "claim_limits": {
-      "items": {
-        "minLength": 1,
-        "type": "string"
-      },
-      "minItems": 1,
-      "type": "array"
-    },
+    "schema_version": {"const": "abyss_mcp_protocol_conformance_observation_v2"},
+    "observation_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "spec_version": {"const": "2026-07-28"},
     "conformance_harness": {
+      "type": "object",
       "additionalProperties": false,
       "properties": {
-        "npm_git_head": {
-          "pattern": "^[0-9a-f]{40}$",
-          "type": "string"
-        },
-        "npm_integrity": {
-          "pattern": "^sha512-[A-Za-z0-9+/=]+$",
-          "type": "string"
-        },
-        "release_status": {
-          "const": "alpha"
-        },
-        "version": {
-          "const": "0.2.0-alpha.10"
-        }
+        "commit": {"const": "81eb1c3edaed87d7fd585d7b80186da7a2960660"},
+        "package_version": {"const": "0.2.0-alpha.10"},
+        "public_release_version": {"const": "v0.1.16"},
+        "source_checkout_clean": {"const": true}
       },
-      "required": [
-        "version",
-        "release_status",
-        "npm_git_head",
-        "npm_integrity"
-      ],
-      "type": "object"
-    },
-    "directions": {
-      "additionalProperties": {
-        "additionalProperties": false,
-        "properties": {
-          "expected_failure_baseline_entries": {
-            "minimum": 0,
-            "type": "integer"
-          },
-          "failed_checks": {
-            "const": 0
-          },
-          "info_checks": {
-            "minimum": 0,
-            "type": "integer"
-          },
-          "manifest_sha256": {
-            "pattern": "^[0-9a-f]{64}$",
-            "type": "string"
-          },
-          "raw_result_ref": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "scenario_count": {
-            "minimum": 1,
-            "type": "integer"
-          },
-          "skipped_checks": {
-            "minimum": 0,
-            "type": "integer"
-          },
-          "success_checks": {
-            "minimum": 1,
-            "type": "integer"
-          },
-          "suite": {
-            "const": "all"
-          }
-        },
-        "required": [
-          "suite",
-          "scenario_count",
-          "success_checks",
-          "failed_checks",
-          "info_checks",
-          "skipped_checks",
-          "expected_failure_baseline_entries",
-          "raw_result_ref",
-          "manifest_sha256"
-        ],
-        "type": "object"
-      },
-      "maxProperties": 2,
-      "minProperties": 2,
-      "propertyNames": {
-        "enum": [
-          "client",
-          "server"
-        ]
-      },
-      "required": [
-        "client",
-        "server"
-      ],
-      "type": "object"
-    },
-    "finished_at": {
-      "format": "date-time",
-      "type": "string"
-    },
-    "observation_id": {
-      "pattern": "^[a-z0-9][a-z0-9._-]+$",
-      "type": "string"
-    },
-    "observed_at": {
-      "format": "date-time",
-      "type": "string"
+      "required": ["commit", "package_version", "public_release_version", "source_checkout_clean"]
     },
     "python_sdk": {
+      "type": "object",
       "additionalProperties": false,
       "properties": {
-        "commit": {
-          "const": "6f69a3758ebf2ee55ce050f58b470ce11af71133"
-        },
-        "source_checkout_clean": {
-          "const": true
-        },
-        "version": {
-          "const": "2.0.0"
-        }
+        "version": {"const": "2.0.0"},
+        "commit": {"const": "6f69a3758ebf2ee55ce050f58b470ce11af71133"},
+        "source_checkout_clean": {"const": true}
       },
-      "required": [
-        "version",
-        "commit",
-        "source_checkout_clean"
-      ],
-      "type": "object"
+      "required": ["version", "commit", "source_checkout_clean"]
     },
-    "schema_version": {
-      "const": "abyss_mcp_protocol_conformance_observation_v1"
+    "directions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "client": {"$ref": "#/$defs/direction"},
+        "server": {"$ref": "#/$defs/direction"}
+      },
+      "required": ["client", "server"]
     },
-    "spec_version": {
-      "const": "2026-07-28"
-    },
-    "verdict": {
-      "const": "sdk_pair_passed"
-    }
+    "verdict": {"const": "sdk_pair_blocked_current_harness_fixture_mismatch"},
+    "claim_limits": {"type": "array", "items": {"type": "string", "minLength": 3}, "minItems": 5}
   },
-  "required": [
-    "schema_version",
-    "observation_id",
-    "observed_at",
-    "finished_at",
-    "spec_version",
-    "conformance_harness",
-    "python_sdk",
-    "directions",
-    "verdict",
-    "claim_limits"
-  ],
-  "type": "object"
+  "required": ["schema_version", "observation_id", "observed_at", "finished_at", "spec_version", "conformance_harness", "python_sdk", "directions", "verdict", "claim_limits"],
+  "type": "object",
+  "$defs": {
+    "direction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "suite": {"const": "all"},
+        "scenario_count": {"type": "integer", "minimum": 1},
+        "success_checks": {"type": "integer", "minimum": 0},
+        "failed_checks": {"type": "integer", "minimum": 0},
+        "info_checks": {"type": "integer", "minimum": 0},
+        "skipped_checks": {"type": "integer", "minimum": 0},
+        "expected_failure_baseline_entries": {"type": "integer", "minimum": 0},
+        "status": {"enum": ["passed", "failed"]},
+        "failure_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "raw_result_ref": {"type": "string", "pattern": "^local://"},
+        "manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "required": ["suite", "scenario_count", "success_checks", "failed_checks", "info_checks", "skipped_checks", "expected_failure_baseline_entries", "status", "failure_ids", "raw_result_ref", "manifest_sha256"]
+    }
+  }
 }

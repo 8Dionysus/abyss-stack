@@ -1,5 +1,6 @@
 {
   "authority_move_combined": false,
+  "candidate_migration_allowed": false,
   "claim_limits": [
     "Protocol literals in a binary do not prove negotiated wire support.",
     "A stable SDK release does not prove Codex pair support.",
@@ -8,50 +9,67 @@
     "A registered alias does not prove schema observation or a grounded call.",
     "Final publication and stable SDKs never authorize production migration without exact pair receipts."
   ],
-  "effectful_migration_allowed": false,
-  "evaluated_at": "2026-08-01T20:41:52Z",
-  "evidence_expires_at": "2026-08-02T20:21:35Z",
+  "codex_lab_observation_digest": "sha256:269fac4eacfa622a8e1aa3e7bdf44f4da001d2db9da926e36e7f83f3803a0ae5",
+  "core_read_migration_allowed": false,
+  "evaluated_at": "2026-08-02T00:05:44Z",
+  "evidence_expires_at": "2026-08-09T00:05:07Z",
+  "external_effect_migration_allowed": false,
   "gate_counts": {
-    "blocked": 4,
-    "passed": 10,
+    "blocked": 3,
+    "passed": 11,
     "pending": 0
   },
-  "matrix_digest": "sha256:5980091ede6af74923659acc00a3c2b19a50c45539a60c8d6e45658c02e61546",
-  "migration_allowed": false,
-  "next_action": "Keep the next registration disabled; refresh Codex and repeat the isolated wire probe when consumer support changes.",
+  "internal_effect_migration_allowed": false,
+  "matrix_digest": "sha256:ccd81d70333a2716bb2a0d196b15aeec8361af2fe25d38a422f63b2c7c631b95",
+  "next_action": "Retain the stable 2025-11-25 route; repair or refresh the current conformance fixture pair, prove cancellation propagation, and wait for a production-eligible Codex modern pair before any core-read cutover.",
   "next_protocol": "2026-07-28",
   "next_release_status": "final",
-  "observation_digest": "sha256:98f609ad872f7f193892bd86a8030ed210bdc1c75d1f5d7ff55e9b8580957f97",
+  "observation_digest": "sha256:bf927cfadd8c57746f81f4191f184cdd4af6fb09b9ca47a6b7efa7c6916a24d9",
   "passed_gate_ids": [
     "P1-01",
     "P1-02",
-    "P1-04",
-    "P1-05",
+    "P1-03",
     "P1-06",
     "P1-07",
     "P1-08",
     "P1-09",
     "P1-10",
-    "P1-12"
-  ],
-  "production_protocol": "2025-11-25",
-  "read_only_pilot_allowed": false,
-  "reason_codes": [
-    "production_pair_observed_2025-11-25",
-    "next_sdk_probe_fell_back_2025-06-18",
-    "codex_next_pair_blocked",
-    "tasks_extension_unavailable",
-    "dual_support_consumer_blocked",
-    "read_canary_not_run"
-  ],
-  "remaining_gate_ids": [
-    "P1-03",
-    "P1-11",
+    "P1-12",
     "P1-13",
     "P1-14"
   ],
-  "schema_version": "abyss_mcp_protocol_lab_status_v1",
+  "production_cutover_blockers": [
+    "stable_codex_modern_pair_unavailable",
+    "current_conformance_fixture_mismatch",
+    "modern_cancellation_not_propagated"
+  ],
+  "production_protocol": "2025-11-25",
+  "read_only_pilot_allowed": false,
+  "read_only_pilot_completed": true,
+  "reason_codes": [
+    "production_pair_remains_2025-11-25",
+    "prerelease_modern_canary_passed",
+    "current_conformance_fixture_mismatch",
+    "stable_codex_modern_cutover_blocked",
+    "tasks_extension_unavailable",
+    "candidate_and_effect_migration_independent",
+    "modern_cancellation_not_propagated"
+  ],
+  "remaining_core_gate_ids": [
+    "P1-04",
+    "P1-05"
+  ],
+  "remaining_gate_ids": [
+    "P1-04",
+    "P1-05",
+    "P1-11"
+  ],
+  "remaining_tasks_gate_ids": [
+    "P1-11"
+  ],
+  "schema_version": "abyss_mcp_protocol_lab_status_v2",
   "stable_registration_retained": true,
-  "status_digest": "sha256:644cd9db87aa3301fc6221b3040f6f946b99e1155636011e24369ef26134c79e",
+  "stable_rollback_observation_digest": "sha256:a229143346e7c59631d03fe8e81f6836883eb21bc84a271d7f9cce0608acbaa6",
+  "status_digest": "sha256:e480aa9617933f9be276db0c952b454c9d810de034a9634b45e8040f70e48590",
   "tasks_extension_allowed": false
 }

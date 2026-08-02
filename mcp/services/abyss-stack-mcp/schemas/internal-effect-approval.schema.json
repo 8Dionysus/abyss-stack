@@ -1,0 +1,111 @@
+{
+  "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/internal-effect-approval.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "const": "restart_and_rollback_pilot",
+      "default": "restart_and_rollback_pilot",
+      "title": "Action",
+      "type": "string"
+    },
+    "approval_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Approval Id",
+      "type": "string"
+    },
+    "approved_by": {
+      "maxLength": 160,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "title": "Approved By",
+      "type": "string"
+    },
+    "authorized_principal": {
+      "const": "abyss-stack-mcp-internal-effect-client",
+      "default": "abyss-stack-mcp-internal-effect-client",
+      "title": "Authorized Principal",
+      "type": "string"
+    },
+    "contains_secrets": {
+      "const": false,
+      "default": false,
+      "title": "Contains Secrets",
+      "type": "boolean"
+    },
+    "decision": {
+      "const": "approved",
+      "default": "approved",
+      "title": "Decision",
+      "type": "string"
+    },
+    "exact_unit_name": {
+      "const": "abyss-stack-mcp-read.service",
+      "default": "abyss-stack-mcp-read.service",
+      "title": "Exact Unit Name",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "human_approval": {
+      "const": true,
+      "default": true,
+      "title": "Human Approval",
+      "type": "boolean"
+    },
+    "idempotency_key": {
+      "maxLength": 160,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "title": "Idempotency Key",
+      "type": "string"
+    },
+    "issued_at": {
+      "format": "date-time",
+      "title": "Issued At",
+      "type": "string"
+    },
+    "plan_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "abyss_stack_internal_effect_approval_v1",
+      "default": "abyss_stack_internal_effect_approval_v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_to_sink_policy_ref": {
+      "const": "owner://abyss-stack/internal-effect/read-restart-pilot-v1",
+      "default": "owner://abyss-stack/internal-effect/read-restart-pilot-v1",
+      "title": "Source To Sink Policy Ref",
+      "type": "string"
+    },
+    "target_organ_id": {
+      "const": "abyss-stack",
+      "default": "abyss-stack",
+      "title": "Target Organ Id",
+      "type": "string"
+    },
+    "target_policy_family": {
+      "const": "read",
+      "default": "read",
+      "title": "Target Policy Family",
+      "type": "string"
+    }
+  },
+  "required": [
+    "approval_id",
+    "plan_id",
+    "approved_by",
+    "issued_at",
+    "expires_at",
+    "idempotency_key"
+  ],
+  "title": "InternalEffectApproval",
+  "type": "object"
+}

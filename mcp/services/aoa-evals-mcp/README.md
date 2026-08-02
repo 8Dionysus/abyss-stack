@@ -13,6 +13,23 @@ The read catalog contains all resources and non-persistent tools. The
 candidate catalog contains only the three gated local-port writer tools and no
 resources.
 
+For organ admission, the historical complete catalogs are narrowed by
+`AOA_EVALS_MCP_CAPABILITY_PROFILE` and bound fail-closed to the owner manifest
+`aoa-evals:docs/architecture/aoa_evals_mcp_capabilities.v1.json`:
+
+- `eval-discovery-read`: four source-linked discovery/freshness tools plus two
+  static resources and two resource templates;
+- `eval-request-prepare`: one non-persistent typed request-candidate tool;
+- `proof-result-read`: one tool and one resource template for an already issued
+  indexed bundle-local report.
+
+The proof-result profile reads owner-issued proof; it never runs an eval,
+computes or publishes a verdict, accepts evidence, or infers admission. Stdio
+keeps the complete compatibility catalog unless a profile is explicit.
+Request preparation does not scan the stack runtime-export lane implicitly;
+explicit evidence refs remain visible in the typed proposal without turning a
+request-shaping call into broad private candidate discovery.
+
 It does not replace `aoa-evals`, generated readers, bundle-local review, or
 runtime-candidate contracts. It gives agents one repeatable route to ask:
 
@@ -83,6 +100,16 @@ Read-contour tools:
 - `aoa_evals_local_ports(status, include_skeleton)`
 - `aoa_evals_local_port(repo)`
 - `aoa_evals_find_or_propose_local(repo, proof_question, proposal)`
+
+Profile-only tools:
+
+- `aoa_evals_prepare_request_candidate(proof_question, proposal)` on
+  `eval-request-prepare`;
+- `aoa_evals_read_proof_result(report_id)` on `proof-result-read`.
+
+Profile-only resource template:
+
+- `aoa-evals://proof-result/{report_id}` on `proof-result-read`.
 Candidate-contour tools:
 
 - `aoa_evals_write_local_intake(repo, packet, file_slug, apply, replace_existing)`

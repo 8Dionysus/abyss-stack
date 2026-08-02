@@ -3,6 +3,7 @@
 - Decision ID: ABYSS-STACK-D-0096
 - Status: accepted
 - Date: 2026-07-26
+- Last evidence refresh: 2026-08-01
 - Owner surface: `mcp/protocol-lab/`
 
 ## Index Metadata
@@ -12,105 +13,119 @@
 - Stack lanes: MCP services, organ access fabric, validation
 - Mechanic parents: runtime-lifecycle
 - Guard families: exact pin, fail closed, dual support, read-only canary, rollback
-- Posture: accepted post-final pair-evidence block
+- Posture: accepted modern-lab proof with production cutover blocked
 
 ## Context
 
-Final MCP `2026-07-28` changes core wire assumptions: the
-protocol session handshake is removed, server discovery becomes explicit,
-application state moves behind explicit handles, cache and trace metadata
-expand, and Tasks remains a separately negotiated extension. OS Abyss cannot
-infer compatibility from a date literal, SDK type, schema listing, successful
-process start, or one client call.
+Final MCP `2026-07-28` changes core wire assumptions: the protocol session
+handshake is removed, server discovery becomes explicit, application state
+moves behind explicit handles, cache and trace metadata expand, and Tasks is a
+separate extension. OS Abyss cannot infer compatibility from a date literal,
+SDK type, schema listing, process start, or one unqualified client call.
 
-On 2026-07-28 the final specification was published at exact commit
+The final specification is pinned at
 `5f5440bb26a62e2cf3440b92da5a667efa03b267`. Python MCP `2.0.0` and
-TypeScript client/server `2.0.0` are stable. This closes publication gates but
-not pair compatibility. An isolated stdio exchange between Codex `0.146.0` and
-Python MCP `2.0.0` showed an isolated Codex probe offering and selecting
-`2025-06-18`, then calling legacy list methods; it never sent
-`server/discover`. The production `aoa_kag` app-server inventory and call
-separately observe `2025-11-25`; the isolated fallback is not production
-selection. The latest public conformance release remains `v0.1.16`, while the
-tested next-protocol package is `0.2.0-alpha.10`. Against the exact
-Python MCP `2.0.0` fixtures, its 2026 wire suite passes `114` server and `371`
-client checks with zero failures, but that does not turn Codex into a modern
-client. The isolated KAG next-protocol adapter subsequently passed the Abyss
-pair, stateless, `server/discover`, explicit-handle, trace, and cache gates.
-Those receipts prove only the exact isolated read adapter: the owner projection
-was current, but owner freshness remained `source_unavailable`; no Codex
-registration or consumer canary was enabled. Python MCP `2.0.0` explicitly
-does not implement the final Tasks extension. Stack services intentionally
-retain `mcp>=1.27.2,<2` and the `abyss-stack-mcp` exact lock `1.27.2`.
+TypeScript client/server `2.0.0` are stable. Production Codex `0.146.0`
+remains on MCP `2025-11-25`; its earlier isolated Python `2.0.0` exchange
+fell back to `2025-06-18` and never sent `server/discover`.
+
+Current conformance source at exact commit
+`81eb1c3edaed87d7fd585d7b80186da7a2960660` changes the former green SDK
+observation. The Python `2.0.0` server fixture passed 40 checks in the twenty
+scenarios exposed by its SDK runner. The client fixture passed 372 checks and
+failed two because it does not recognize the newly added
+`json-schema-2020-12-preservation` scenario. The mismatch is a real blocker
+and is not hidden in an expected-failure baseline.
+
+An exact Codex `0.147.0-alpha.4` isolated contour has passed the actual
+registered modern read canary. With `mcp_2026_07_28` explicitly enabled, the separately named
+and credentialed `aoa_kag_next_lab` used `server/discover`, MCP
+`2026-07-28`, no legacy initialization, no MCP session header, and performed
+one exact `kag_discover` call with principal and trace evidence. A wrong bearer
+was rejected with HTTP `401`; an oversized request was rejected with MCP
+`-32602` under explicit input/output bounds. A separate direct Python MCP
+`2.0.0` cancellation probe then found that local client cancellation did not
+stop server dispatch: the client request was cancelled, but the server handler
+completed afterward. That is a failed pair property, not a passed canary fact.
+
+Rollback removed only the lab app-server, MCP process, endpoint, credential,
+registration, and isolated `CODEX_HOME`. The operator config remained
+byte-identical, after which Codex `0.146.0` successfully called the existing
+`aoa_kag` registration through the actual operator config. Because the modern
+consumer is a prerelease, current conformance is red, and cancellation does
+not propagate, this closes the registered canary and rollback experiment but
+does not pass the complete lab pair or authorize production cutover. Python MCP `2.0.0` also does
+not implement the final Tasks extension. Production services intentionally
+retain `mcp>=1.27.2,<2` and the `abyss-stack-mcp` exact `1.27.2` lock.
 
 ## Options considered
 
 1. Update all organs when the final protocol tag appears.
 2. Infer support from SDK/client source and switch the existing registration.
-3. Pin a source-authored stable/next matrix, require pair-level receipts, keep
-   stable support untouched, and admit one separately named read-only pilot
-   only after every prerequisite passes.
+3. Pin a stable/next matrix, require exact pair receipts, retain stable support,
+   and use one separately named, removable, read-only pilot.
 
 ## Decision
 
 Choose option 3.
 
-The current production Codex-compatible wire remains MCP `2025-11-25`.
-The isolated Python MCP `2.0.0` compatibility probe's `2025-06-18` fallback
-remains separate evidence and does not redefine production.
-`mcp/protocol-lab/` owns fourteen
-explicit P1 gates covering exact final spec and stable SDK pins, Codex
-capabilities, official and Abyss conformance, stable/next comparison,
-stateless behavior, explicit handles, `server/discover`, trace/cache behavior,
-Tasks, aliases, a read-only canary, dual support, and rollback.
+The production Codex-compatible wire remains MCP `2025-11-25`. The protocol
+lab owns fourteen P1 gates over spec and SDK pins, Codex capabilities,
+conformance, stable/next comparison, stateless behavior, explicit handles,
+discovery, trace/cache behavior, Tasks, aliases, canary, dual support, and
+rollback.
 
-The first candidate is the compact read-only `aoa-kag` access plane. Its stable
-registration remains `aoa_kag`. A future next-protocol lab uses the separate
-disabled name `aoa_kag_next_lab`, an independent process and credential
-contour, and rollback that removes only the lab registration. Candidate and
-effect organs are excluded, and protocol migration cannot be combined with an
-owner-authority move.
+The first pilot is the compact read-only `aoa-kag` access plane. Its stable
+registration remains `aoa_kag`. The modern lab uses `aoa_kag_next_lab` with
+an independent process, endpoint, credential, runtime, exact consumer, and
+Codex home. A prerelease pair may pass the lab without acquiring production
+authority. Candidate and effect organs are excluded, and protocol migration
+cannot be combined with an owner-authority move.
 
-The generated status may permit migration only when every P1 gate and every
-pair/runtime prerequisite passes. It always keeps effectful migration false.
-Tasks has its own verdict and is not inferred from core protocol support.
+The generated status reports separate:
+
+- `core_read_migration_allowed`;
+- `tasks_extension_allowed`;
+- `candidate_migration_allowed`;
+- `internal_effect_migration_allowed`;
+- `external_effect_migration_allowed`.
+
+P1-11 is Tasks-only and cannot block interpretation of the core-read gate. A
+passed prerelease pilot is reported separately from production eligibility.
 
 ## Rationale
 
-Compatibility is a property of an exact client/server pair under an exact
-specification and transport behavior. Separating authored pins from observed
-receipts makes freshness and missing proof visible. Retaining the stable
-registration makes rollback real and prevents a lab failure from removing the
-known-good route.
+Compatibility belongs to an exact client/server pair under an exact spec,
+transport, credential, and source identity. Separating source pins from
+runtime receipts makes freshness and missing proof visible. Keeping the stable
+registration untouched makes rollback observable rather than aspirational.
 
-Starting with KAG bounds blast radius and exercises real discovery and
-read-result behavior without creating durable memory, accepting proof,
-changing source, or emitting external effects.
+KAG bounds blast radius and exercises discovery and owner-qualified read
+behavior without durable memory, proof acceptance, source changes, or effects.
 
 ## Consequences
 
-- The current source verdict is blocked; P1-01, P1-02, P1-04 through P1-10,
-  and P1-12 pass. P1-03, P1-11, P1-13, and P1-14 are blocked.
-- Final publication and stable SDK availability are now proven, while Codex
-  next-wire support is negatively resolved for version `0.146.0`.
-- Official SDK conformance and the isolated Abyss adapter, handle, and cache
-  receipts are proven without changing the stable Codex registration.
-- Final publication alone cannot authorize migration.
-- Every spec, SDK, conformance, Codex, transport, auth, or registration drift
-  requires a refreshed observation.
-- The future canary must record exact wire, schema, call, isolation, and
-  rollback receipts.
-- Organ migration beyond the read pilot requires later evidence and decisions.
+- P1-03, P1-13, and P1-14 now pass on the actual prerelease canary and rollback.
+- P1-04 remains blocked on the current conformance fixture mismatch.
+- P1-05 remains blocked because client cancellation did not stop server
+  dispatch.
+- P1-11 remains independently blocked on Tasks; the other eleven gates pass.
+- Codex `0.146.0` remains the legacy production consumer; Codex
+  `0.147.0-alpha.4` is proven only as an isolated modern lab consumer.
+- Production cutover requires both a production-eligible modern Codex pair and
+  green current conformance.
+- Candidate, internal-effect, and external-effect migration remain false.
+- Every spec, SDK, conformance, Codex, transport, auth, source-artifact, or
+  registration drift requires a refreshed observation.
 
 ## Claim limits
 
-This decision and its green validators prove a deterministic, fail-closed
-source gate, exact final/SDK pins, exact official SDK conformance, a bounded
-legacy Codex wire observation, and isolated Abyss adapter, handle, and
-single-process cache behavior. They do not prove modern Codex pair support, a
-deployed or registered next server, a separately credentialed consumer canary,
-multi-replica cache invalidation, owner freshness or acceptance, benefit, or
-runtime rollback.
+This decision and its validators prove an exact prerelease modern Codex contour,
+a separately credentialed registered read canary, fail-closed auth and input
+bounds, lab removal, operator-config non-mutation, and stable-route recovery.
+They do not prove a production-eligible modern Codex pair, green current
+conformance, propagated cancellation, multi-replica invalidation, owner admission or acceptance, task
+benefit, candidate safety, or any effect migration.
 
 ## Source surfaces
 
@@ -121,10 +136,9 @@ runtime rollback.
 
 ## Follow-up route
 
-Refresh exact evidence when Codex changes or documents final-protocol support,
-then repeat the isolated wire probe. Do not enable the isolated KAG lab
-registration while Codex next-wire support or KAG owner freshness is blocked.
-Wait for an exact SDK implementation before reopening the separate Tasks gate.
-Only after those prerequisites pass, run a separately credentialed registered
-consumer canary and exercise start/stop rollback without touching the stable
-registration. Do not migrate an effectful organ in this phase.
+Refresh the exact lab whenever Codex, SDK, auth, schema, source artifacts, or
+transport changes. Repair or refresh the current conformance fixture pair,
+prove cancellation propagation, and wait for a production-eligible Codex
+modern pair before reopening core-read production cutover. Wait for an exact SDK implementation before reopening
+Tasks. Candidate and effect migration remain under later independent
+contracts.

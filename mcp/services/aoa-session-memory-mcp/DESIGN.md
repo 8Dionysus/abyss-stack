@@ -41,6 +41,23 @@ cannot authenticate it.
 `aoa-memo` owns durable reviewed memory and writeback review. This MCP may
 prepare evidence refs for that route, but it does not write memory.
 
+The owner capability contract keeps access form explicit. Argument-bearing,
+budgeted discovery and retrieval remain tools; exact known-session artifacts
+are resource templates. This avoids modeling an entire session index as
+always-loaded context while preserving a direct URI route once the session is
+known. The complete server may retain additional diagnostic tools, resources,
+and prompts, but consumer admission is scoped to the smaller
+`session-evidence-read` manifest.
+
+For the credentialed HTTP contour, the profile bounds each response to 32 KiB.
+Its retrieval adapter oversamples at most 50 owner-ranked candidates and
+suppresses only recognizable retrieval-control call/output echoes before
+applying the caller's limit. It preserves owner ordering and emits the omitted
+refs plus byte accounting, so the adapter remains an explicit consumer
+projection rather than a correction of session truth. Failure to fit the
+bounded representation is a structured denial. The complete portable stdio
+surface is unchanged unless a caller explicitly selects the profile.
+
 ## Operation
 
 An agent should be able to start from a stable operational anchor:
