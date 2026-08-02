@@ -9,6 +9,13 @@ from typing import Any, Literal
 from ._http_auth import http_auth_kwargs as _http_auth_kwargs
 from ._http_auth import transport_settings as _transport_settings
 from .core import AoAMemoMCPState
+from .organ_access import CANDIDATE_CAPABILITY_ID
+from .organ_access import CANDIDATE_TOOL_BINDINGS
+from .organ_access import READ_CAPABILITY_ID
+from .organ_access import READ_RESOURCE_TEMPLATE_BINDINGS
+from .organ_access import READ_TOOL_BINDINGS
+from .organ_access import load_owner_manifest
+from .organ_access import validate_runtime_bindings
 
 LOGGER = logging.getLogger(__name__)
 PACKAGE_NAME = "aoa-memo-mcp"
@@ -27,6 +34,7 @@ CANDIDATE_TOKEN_ENV_VAR = "AOA_MEMO_MCP_CANDIDATE_BEARER_TOKEN"
 CANDIDATE_CREDENTIAL_NAME = "aoa-memo-mcp-candidate-bearer-token"
 CANDIDATE_AUTH_SCOPE = "mcp:aoa-memo:candidate"
 CANDIDATE_CLIENT_ID = "aoa-loopback-codex:aoa-memo:candidate"
+CAPABILITY_PROFILE_ENV_VAR = "AOA_MEMO_MCP_CAPABILITY_PROFILE"
 
 
 def _application_version() -> str:
@@ -88,6 +96,72 @@ def _read_http_auth_kwargs() -> dict[str, Any]:
     return _contour_http_auth_kwargs("read")
 
 
+def _expected_capability(policy_family: PolicyFamily) -> str:
+    return (
+        READ_CAPABILITY_ID
+        if policy_family == "read"
+        else CANDIDATE_CAPABILITY_ID
+    )
+
+
+def _apply_capability_profile(
+    mcp: Any,
+    *,
+    policy_family: PolicyFamily,
+    workspace_root: str | Path | None,
+) -> None:
+    profile = os.environ.get(CAPABILITY_PROFILE_ENV_VAR, "").strip()
+    if not profile:
+        return
+    expected = _expected_capability(policy_family)
+    if profile != expected:
+        raise SystemExit(
+            f"{CAPABILITY_PROFILE_ENV_VAR} must be {expected!r} for the "
+            f"{policy_family} contour"
+        )
+    tool_names = set(
+        READ_TOOL_BINDINGS.values()
+        if policy_family == "read"
+        else CANDIDATE_TOOL_BINDINGS.values()
+    )
+    template_names = set(
+        READ_RESOURCE_TEMPLATE_BINDINGS.values()
+        if policy_family == "read"
+        else []
+    )
+    mcp._tool_manager._tools = {
+        name: item
+        for name, item in mcp._tool_manager._tools.items()
+        if name in tool_names
+    }
+    mcp._resource_manager._resources = {}
+    mcp._resource_manager._templates = {
+        name: item
+        for name, item in mcp._resource_manager._templates.items()
+        if str(item.uri_template) in template_names
+    }
+    mcp._prompt_manager._prompts = {}
+    validate_runtime_bindings(
+        load_owner_manifest(workspace_root),
+        capability_id=profile,
+        tool_names=set(mcp._tool_manager._tools),
+        resource_templates={
+            str(item.uri_template)
+            for item in mcp._resource_manager._templates.values()
+        },
+    )
+
+
+def _default_http_capability_profile(policy_family: PolicyFamily) -> str | None:
+    explicit = os.environ.get(CAPABILITY_PROFILE_ENV_VAR, "").strip()
+    if explicit:
+        return explicit
+    port, *_ = _contour(policy_family)
+    if _transport_settings(port).transport == "streamable-http":
+        return _expected_capability(policy_family)
+    return None
+
+
 def _run_server(server: Any) -> None:
     policy_family = configured_policy_family()
     port, *_ = _contour(policy_family)
@@ -144,6 +218,33 @@ def build_server(
         return AoAMemoMCPState.discover(workspace_root)
 
     if contour == "read":
+
+        @read_only_tool
+        def aoa_memo_recall_brief(
+            repo: str,
+            intent: str = "",
+        ) -> dict[str, Any]:
+            """Return only reviewed durable-memory rows for one owner route."""
+            return current_state().build_reviewed_brief(repo=repo, intent=intent)
+
+        @read_only_tool
+        def aoa_memo_recall_reviewed(
+            query: str,
+            mode: str = "brief",
+            limit: int = 8,
+        ) -> dict[str, Any]:
+            """Search only reviewed durable-corpus memory read models."""
+            return current_state().search(
+                query=query,
+                scope="reviewed",
+                mode=mode,
+                limit=max(1, min(int(limit), 12)),
+            )
+
+        @read_only_tool
+        def aoa_memo_read_object(object_id: str) -> dict[str, Any]:
+            """Read one object only when it belongs to the reviewed durable corpus."""
+            return current_state().build_reviewed_memory_object(object_id)
 
         @read_only_tool
         def aoa_memo_brief(
@@ -240,7 +341,7 @@ def build_server(
         @mcp.resource("aoa-memo://memory/object/{object_id}")
         def memory_object_resource(object_id: str) -> str:
             return json.dumps(
-                current_state().build_memory_object(object_id),
+                current_state().build_reviewed_memory_object(object_id),
                 ensure_ascii=False,
                 indent=2,
             )
@@ -386,6 +487,11 @@ def build_server(
             """Write a forwarding-check receipt without accepting durable memory."""
             return current_state().review_intake(path)
 
+        @candidate_tool
+        def aoa_memo_prepare_forwarding_receipt(path: str) -> dict[str, Any]:
+            """Write a forwarding-check receipt without accepting durable memory."""
+            return current_state().review_intake(path)
+
         @mcp.prompt(name="memo-intake")
         def memo_intake(repo: str, claim: str) -> str:
             """Prompt route for creating a repo-local memory candidate."""
@@ -405,10 +511,19 @@ def build_server(
                 "forwarding-check receipt. MCP is not aoa-memo review."
             )
 
+    _apply_capability_profile(
+        mcp,
+        policy_family=contour,
+        workspace_root=workspace_root,
+    )
     LOGGER.info("AoA memo MCP %s contour ready", contour)
     return mcp
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
-    _run_server(build_server())
+    contour = configured_policy_family()
+    profile = _default_http_capability_profile(contour)
+    if profile:
+        os.environ[CAPABILITY_PROFILE_ENV_VAR] = profile
+    _run_server(build_server(policy_family=contour))

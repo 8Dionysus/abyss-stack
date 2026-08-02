@@ -1,0 +1,36 @@
+{
+  "canary": {
+    "is_error": false,
+    "owner": "abyss-stack",
+    "result_schema": "aoa-kag-mcp-capabilities-v1",
+    "tool": "kag_discover"
+  },
+  "claim_limits": [
+    "This proves the existing stable registration remained callable after removal of the isolated lab contour.",
+    "It does not prove modern MCP support in stable Codex or admit a production cutover.",
+    "KAG output remains derived navigation evidence rather than owner truth."
+  ],
+  "consumer": {
+    "actual_operator_config": true,
+    "binary_sha256": "2e863156ed35ecc5253b1e2f907a9143077b9f7cb51942070c61996471ff6e04",
+    "registration": "aoa_kag",
+    "version": "0.146.0"
+  },
+  "expires_at": "2026-08-09T00:05:38Z",
+  "finished_at": "2026-08-02T00:05:44.672516Z",
+  "observation_id": "codex-0.146.0-stable-kag-post-rollback-20260801",
+  "observed_at": "2026-08-02T00:05:38.039215Z",
+  "private_receipt": {
+    "ref": "local:///srv/abyss-machine/cache/mcp-protocol-modern-lab/stable-kag-post-rollback-private.json",
+    "sha256": "3507765e2f3f408532adfb6881eb6737601710616c22309017885c711da922f2"
+  },
+  "process_stopped": true,
+  "schema_version": "abyss_mcp_stable_kag_post_rollback_observation_v1",
+  "secrets_included": false,
+  "stable_registration": {
+    "config_sha256_after": "8d6d38d17e52cb9fe5160270c41dac56a1b4191bcec76b8d5c9a0ce1e867d063",
+    "config_sha256_before": "8d6d38d17e52cb9fe5160270c41dac56a1b4191bcec76b8d5c9a0ce1e867d063",
+    "unchanged": true
+  },
+  "verdict": "stable_production_route_passed_after_lab_rollback"
+}

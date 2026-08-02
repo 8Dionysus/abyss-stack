@@ -94,6 +94,25 @@
       "stable_pair_observed": true,
       "tasks_wire_pair_observed": false,
       "version": "0.146.0"
+    },
+    {
+      "capability_posture": "supported",
+      "consumer_id": "codex-cli-prerelease-lab",
+      "evidence": [
+        "mcp/protocol-lab/fixtures/codex-0.147.0-alpha.4-kag-next-lab-observation.json",
+        "isolated binary sha256:8185beb794bf7374ecac1a5db7ff06611c708e4806b8b85d3b1f7cdbd7aa2826",
+        "mcp_2026_07_28 was explicitly enabled only for the removable lab contour"
+      ],
+      "isolated_next_sdk_fallback_protocol": "2026-07-28",
+      "next_protocol_literal_present": true,
+      "next_wire_pair_observed": true,
+      "production_protocol_versions_observed": [
+        "2026-07-28"
+      ],
+      "server_discover_observed": true,
+      "stable_pair_observed": false,
+      "tasks_wire_pair_observed": false,
+      "version": "0.147.0-alpha.4"
     }
   ],
   "dual_support": {
@@ -103,7 +122,7 @@
     "shared_credential_forbidden": true,
     "stable_registration_retained": true
   },
-  "expires_at": "2026-08-02T20:41:52Z",
+  "expires_at": "2026-08-09T00:05:07Z",
   "migration_gates": [
     {
       "evidence_refs": [
@@ -126,31 +145,32 @@
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/codex-0.146.0-wire-observation.json"
+        "mcp/protocol-lab/fixtures/codex-0.147.0-alpha.4-kag-next-lab-observation.json"
       ],
       "gate_id": "P1-03",
-      "reason": "An isolated wire probe proved that Codex 0.146.0 negotiates legacy 2025-06-18 with Python MCP 2.0.0 and does not send server/discover.",
+      "reason": "An exact isolated Codex 0.147.0-alpha.4 pair used server/discover and MCP 2026-07-28 with the feature explicitly enabled; this proves prerelease lab support, not production eligibility.",
       "requirement": "Prove Codex next-protocol capabilities.",
-      "status": "blocked"
+      "status": "passed"
     },
     {
       "evidence_refs": [
         "mcp/protocol-lab/fixtures/python-mcp-2.0.0-conformance-observation.json"
       ],
       "gate_id": "P1-04",
-      "reason": "The exact Python MCP 2.0.0 server and client fixtures passed the spec-version-filtered official 0.2.0-alpha.10 suite at wire 2026-07-28; this SDK gate does not imply Codex support.",
+      "reason": "Current conformance source at 81eb1c3 adds json-schema-2020-12-preservation, but the released Python 2.0.0 client fixture does not recognize that scenario and failed two checks; the mismatch is not baselined away.",
       "requirement": "Run official conformance against the exact pair.",
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "evidence_refs": [
         "mcp/protocol-lab/fixtures/codex-0.146.0-production-pair-observation.json",
-        "mcp/protocol-lab/fixtures/kag-next-pair-observation.json"
+        "mcp/protocol-lab/fixtures/kag-next-pair-observation.json",
+        "mcp/protocol-lab/fixtures/codex-0.147.0-alpha.4-kag-next-lab-observation.json"
       ],
       "gate_id": "P1-05",
-      "reason": "The isolated KAG next adapter passed the Abyss pair harness with exact SDK and source pins, read-only denials, and stable-registration non-mutation.",
+      "reason": "The isolated KAG pair passed discovery, stateless, auth, limits and read behavior, but client cancellation did not stop the server dispatch; exact pair-conformance remains blocked on propagation.",
       "requirement": "Run Abyss pair-conformance.",
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "evidence_refs": [
@@ -164,7 +184,8 @@
     {
       "evidence_refs": [
         "mcp/protocol-lab/fixtures/codex-0.146.0-production-pair-observation.json",
-        "mcp/protocol-lab/fixtures/kag-next-pair-observation.json"
+        "mcp/protocol-lab/fixtures/kag-next-pair-observation.json",
+        "mcp/protocol-lab/fixtures/codex-0.147.0-alpha.4-kag-next-lab-observation.json"
       ],
       "gate_id": "P1-07",
       "reason": "The isolated KAG pair used two independent clients with self-describing requests, no protocol session header, and no server-request backchannel.",
@@ -193,7 +214,8 @@
     {
       "evidence_refs": [
         "mcp/protocol-lab/fixtures/kag-next-pair-observation.json",
-        "mcp/protocol-lab/fixtures/kag-cache-pair-observation.json"
+        "mcp/protocol-lab/fixtures/kag-cache-pair-observation.json",
+        "mcp/protocol-lab/fixtures/codex-0.147.0-alpha.4-kag-next-lab-observation.json"
       ],
       "gate_id": "P1-10",
       "reason": "The isolated KAG pair preserved trace context and proved private TTL hits, exact-expiry refetch, subscription invalidation, removal revocation, bounded stale-catalog behavior, and explicit refresh.",
@@ -220,23 +242,23 @@
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/kag-next-pair-observation.json"
+        "mcp/protocol-lab/fixtures/codex-0.147.0-alpha.4-kag-next-lab-observation.json"
       ],
       "gate_id": "P1-13",
-      "reason": "A public-safe derivative proves the registered production KAG schema and direct call on 2025-11-25, but no separately named 2026-07-28 lab registration was enabled and Codex did not use the next pair; this is not the P1-13 canary, which remains blocked.",
+      "reason": "The separately named and credentialed aoa_kag_next_lab registration performed one exact kag_discover call through Codex 0.147.0-alpha.4 on MCP 2026-07-28.",
       "requirement": "Run one compact read-only canary.",
-      "status": "blocked"
+      "status": "passed"
     },
     {
       "evidence_refs": [
         "mcp/protocol-lab/protocol-compatibility-matrix.v1.json",
-        "mcp/protocol-lab/fixtures/codex-0.146.0-wire-observation.json",
-        "mcp/protocol-lab/fixtures/kag-next-pair-observation.json"
+        "mcp/protocol-lab/fixtures/codex-0.147.0-alpha.4-kag-next-lab-observation.json",
+        "mcp/protocol-lab/fixtures/codex-0.146.0-stable-kag-post-rollback-observation.json"
       ],
       "gate_id": "P1-14",
-      "reason": "Stable-preserving dual-registration and rollback law are source-defined, but the separately credentialed consumer exercise is blocked because Codex 0.146.0 cannot form the next-protocol pair and the registered read canary remains inadmissible.",
+      "reason": "The isolated process, endpoint, credential, registration and CODEX_HOME were removed; the operator config remained byte-identical and the production aoa_kag registration passed a real post-rollback canary.",
       "requirement": "Retain dual support and rollback.",
-      "status": "blocked"
+      "status": "passed"
     }
   ],
   "next_spec": {
@@ -249,9 +271,9 @@
     "tag": "2026-07-28",
     "wire_version": "2026-07-28"
   },
-  "observed_at": "2026-08-01T20:41:52Z",
+  "observed_at": "2026-08-02T00:05:44Z",
   "official_conformance": {
-    "commit": "a9896553900a2ef61787b57adfcbbe936a8ab1f9",
+    "commit": "81eb1c3edaed87d7fd585d7b80186da7a2960660",
     "latest_public_release": {
       "commit": "21a9a2febd7100d7c17ac1021ee7f2ed9f66a1e0",
       "next_protocol_scenarios_observed": false,

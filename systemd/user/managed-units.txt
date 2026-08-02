@@ -9,6 +9,7 @@ aoa-evals-mcp-candidate.service
 aoa-mcp-http.service
 abyss-stack-mcp-read.service
 abyss-stack-mcp-candidate.service
+abyss-stack-mcp-internal-effect.service
 abyss-stack-mcp-observation.service
 abyss-stack-mcp-observation.timer
 ydotoold.service

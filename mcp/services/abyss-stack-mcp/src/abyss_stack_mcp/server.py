@@ -28,12 +28,14 @@ from .policy import PolicyIdentity, StackPolicySeam, ToolPolicy
 LOGGER = logging.getLogger(__name__)
 READ_PORT = 5431
 CANDIDATE_PORT = 5433
+INTERNAL_EFFECT_PORT = 5439
 AUTH_MANIFEST_CREDENTIAL = "abyss-stack-mcp-auth-manifest.json"
-AUTH_MANIFEST_SCHEMA = "abyss_stack_mcp_auth_manifest_v1"
+AUTH_MANIFEST_SCHEMA = "abyss_stack_mcp_auth_manifest_v2"
 PACKAGE_NAME = "abyss-stack-mcp"
-APPLICATION_VERSION = "0.3.0"
+APPLICATION_VERSION = "0.4.0"
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 PolicyMode = Literal["read", "candidate"]
+CredentialContour = Literal["read", "candidate", "internal_effect"]
 CatalogLimit = Annotated[int, Field(ge=1, le=64)]
 CatalogBudget = Annotated[int, Field(ge=512, le=131_072)]
 
@@ -59,14 +61,28 @@ def configured_policy_family() -> PolicyMode:
     return value  # type: ignore[return-value]
 
 
-def _contour(policy_family: PolicyMode) -> tuple[int, str, str, str]:
-    upper = policy_family.upper()
-    return (
-        READ_PORT if policy_family == "read" else CANDIDATE_PORT,
-        f"ABYSS_STACK_MCP_{upper}_BEARER_TOKEN",
-        f"abyss-stack-mcp-{policy_family}-bearer-token",
-        f"abyss-stack-mcp:{policy_family}",
-    )
+def _contour(policy_family: CredentialContour) -> tuple[int, str, str, str]:
+    contours = {
+        "read": (
+            READ_PORT,
+            "ABYSS_STACK_MCP_READ_BEARER_TOKEN",
+            "abyss-stack-mcp-read-bearer-token",
+            "abyss-stack-mcp:read",
+        ),
+        "candidate": (
+            CANDIDATE_PORT,
+            "ABYSS_STACK_MCP_CANDIDATE_BEARER_TOKEN",
+            "abyss-stack-mcp-candidate-bearer-token",
+            "abyss-stack-mcp:candidate",
+        ),
+        "internal_effect": (
+            INTERNAL_EFFECT_PORT,
+            "ABYSS_STACK_MCP_INTERNAL_EFFECT_BEARER_TOKEN",
+            "abyss-stack-mcp-internal-effect-bearer-token",
+            "abyss-stack-mcp:internal_effect",
+        ),
+    }
+    return contours[policy_family]
 
 
 def _credential_text(credential_name: str, label: str) -> str:
@@ -82,7 +98,9 @@ def _credential_text(credential_name: str, label: str) -> str:
         raise SystemExit(f"managed startup cannot read {label}") from exc
 
 
-def _require_managed_credential_separation(policy_family: PolicyMode) -> None:
+def _require_managed_credential_separation(
+    policy_family: CredentialContour,
+) -> None:
     required = os.environ.get(
         "ABYSS_STACK_MCP_REQUIRE_AUTH_MANIFEST",
         "",
@@ -110,6 +128,7 @@ def _require_managed_credential_separation(policy_family: PolicyMode) -> None:
         "schema_version",
         "read_sha256",
         "candidate_sha256",
+        "internal_effect_sha256",
     }
     if (
         not isinstance(manifest, dict)
@@ -118,15 +137,21 @@ def _require_managed_credential_separation(policy_family: PolicyMode) -> None:
         or any(
             not isinstance(manifest.get(key), str)
             or _SHA256_PATTERN.fullmatch(manifest[key]) is None
-            for key in ("read_sha256", "candidate_sha256")
+            for key in (
+                "read_sha256",
+                "candidate_sha256",
+                "internal_effect_sha256",
+            )
         )
     ):
         raise SystemExit("managed credential separation manifest is invalid")
     read_digest = manifest["read_sha256"]
     candidate_digest = manifest["candidate_sha256"]
-    if hmac.compare_digest(read_digest, candidate_digest):
+    internal_effect_digest = manifest["internal_effect_sha256"]
+    if len({read_digest, candidate_digest, internal_effect_digest}) != 3:
         raise SystemExit(
-            "managed read and candidate bearer credentials must be distinct"
+            "managed read, candidate, and internal-effect bearer credentials "
+            "must be distinct"
         )
     observed_digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
     if not hmac.compare_digest(
@@ -139,7 +164,7 @@ def _require_managed_credential_separation(policy_family: PolicyMode) -> None:
         )
 
 
-def _auth_kwargs(policy_family: PolicyMode) -> dict[str, Any]:
+def _auth_kwargs(policy_family: CredentialContour) -> dict[str, Any]:
     port, env_name, credential_name, scope = _contour(policy_family)
     _require_managed_credential_separation(policy_family)
     return http_auth_kwargs(
@@ -151,7 +176,7 @@ def _auth_kwargs(policy_family: PolicyMode) -> dict[str, Any]:
     )
 
 
-def _policy_identity(policy_family: PolicyMode) -> PolicyIdentity:
+def _policy_identity(policy_family: CredentialContour) -> PolicyIdentity:
     port, _, _, expected_scope = _contour(policy_family)
     settings = transport_settings(port)
     if settings.transport == "stdio":

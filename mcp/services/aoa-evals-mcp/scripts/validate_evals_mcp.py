@@ -23,6 +23,7 @@ def main() -> None:
         "docs/BOUNDARIES.md",
         "docs/THREAT_MODEL.md",
         "src/aoa_evals_mcp/core.py",
+        "src/aoa_evals_mcp/organ_access.py",
         "src/aoa_evals_mcp/server.py",
         "scripts/aoa_evals_mcp_server.py",
     ]

@@ -17,6 +17,13 @@ from abyss_stack_mcp.contracts import (  # noqa: E402
     RuntimeObservation,
     RuntimePlanCandidate,
 )
+from abyss_stack_mcp.organ_access import StackOrganAccessManifest  # noqa: E402
+from abyss_stack_mcp.effect import (  # noqa: E402
+    InternalEffectApproval,
+    InternalEffectDenialReceipt,
+    InternalEffectRecoveryReceipt,
+    InternalEffectReceipt,
+)
 
 
 NOW = datetime(2026, 7, 25, 12, 0, tzinfo=timezone.utc)
@@ -275,6 +282,26 @@ def rendered_outputs() -> dict[Path, str]:
         SERVICE_ROOT / "schemas" / "runtime-plan-candidate.schema.json": schema(
             "runtime-plan-candidate.schema.json",
             RuntimePlanCandidate,
+        ),
+        SERVICE_ROOT / "schemas" / "organ-access.schema.json": schema(
+            "organ-access.schema.json",
+            StackOrganAccessManifest,
+        ),
+        SERVICE_ROOT / "schemas" / "internal-effect-approval.schema.json": schema(
+            "internal-effect-approval.schema.json",
+            InternalEffectApproval,
+        ),
+        SERVICE_ROOT / "schemas" / "internal-effect-receipt.schema.json": schema(
+            "internal-effect-receipt.schema.json",
+            InternalEffectReceipt,
+        ),
+        SERVICE_ROOT / "schemas" / "internal-effect-denial-receipt.schema.json": schema(
+            "internal-effect-denial-receipt.schema.json",
+            InternalEffectDenialReceipt,
+        ),
+        SERVICE_ROOT / "schemas" / "internal-effect-recovery-receipt.schema.json": schema(
+            "internal-effect-recovery-receipt.schema.json",
+            InternalEffectRecoveryReceipt,
         ),
         SERVICE_ROOT / "examples" / "runtime-observation.public.example.json": (
             json.dumps(

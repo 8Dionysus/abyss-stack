@@ -26,10 +26,21 @@ Production migration is allowed only when:
 - official and Abyss pair-conformance pass;
 - compatibility aliases, dual support, and rollback pass;
 - the isolated read-only `aoa-kag` canary passes;
-- all P1 gates are `passed`.
+- all core-read P1 gates are `passed`; P1-11 remains an independent Tasks
+  extension gate and never blocks interpretation of the core-read verdict.
 
-The derived status always reports `effectful_migration_allowed=false`.
-Effectful migration requires a later, separate contract.
+The derived status reports five separate verdicts:
+
+- `core_read_migration_allowed`;
+- `tasks_extension_allowed`;
+- `candidate_migration_allowed`;
+- `internal_effect_migration_allowed`;
+- `external_effect_migration_allowed`.
+
+The KAG protocol pilot can advance only the first two lab facts: whether a
+read-only pilot may run and whether it completed. Candidate and effect
+verdicts remain false until their own owner, proof, approval, and rollback
+contracts exist.
 
 Adapter-level proof and consumer-level proof are independent. A Python
 next-era adapter may pass `server/discover`, stateless, and Abyss behavior
@@ -57,11 +68,12 @@ conformance cannot pass that gate.
 
 ## Dual support and rollback
 
-`aoa_kag` remains the stable registration. `aoa_kag_next_lab` is an independent
-lab alias and remains disabled after final publication until pair prerequisites
-pass. It must use an
-independent process and credential contour. Rollback removes only the lab
-alias and then revalidates the unchanged stable pair and schema digest.
+`aoa_kag` remains the stable registration. `aoa_kag_next_lab` is a removable
+lab alias with an independent process, loopback endpoint, credential,
+`CODEX_HOME`, exact Codex binary, and exact SDK/source identity. A prerelease
+consumer may prove this lab pair but cannot acquire production authority.
+Rollback removes only the lab contour and then performs an actual call through
+the unchanged stable operator registration.
 
 ## Claim limits
 

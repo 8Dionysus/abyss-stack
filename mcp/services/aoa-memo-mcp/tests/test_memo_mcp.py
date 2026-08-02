@@ -9,6 +9,10 @@ import pytest
 
 from aoa_memo_mcp.core import AoAMemoMCPState
 from aoa_memo_mcp.server import build_server
+from aoa_memo_mcp.server import CAPABILITY_PROFILE_ENV_VAR
+from aoa_memo_mcp.organ_access import CANDIDATE_CAPABILITY_ID
+from aoa_memo_mcp.organ_access import ORGAN_ACCESS_MANIFEST_ENV_VAR
+from aoa_memo_mcp.organ_access import READ_CAPABILITY_ID
 
 
 PROFILE_SHA = (
@@ -40,6 +44,73 @@ def canonical_digest(
         separators=(",", ":"),
     ).encode("utf-8")
     return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
+def write_organ_access_manifest(path: Path) -> Path:
+    def primitive(primitive_id: str, kind: str, mcp_name: str) -> dict:
+        return {
+            "primitive_id": primitive_id,
+            "kind": kind,
+            "mcp_name": mcp_name,
+            "approval_required": False,
+        }
+
+    payload = {
+        "schema_version": "aoa_memo_organ_access_v1",
+        "organ_id": "aoa-memo",
+        "source_owner": "aoa-memo",
+        "access_runtime_owner": "abyss-stack",
+        "admission_owner": "aoa-sdk",
+        "proof_owner": "aoa-evals",
+        "contains_secrets": False,
+        "admission_asserted": False,
+        "owner_acceptance_asserted": False,
+        "proof_asserted": False,
+        "effect_activation_authorized": False,
+        "capabilities": [
+            {
+                "capability_id": READ_CAPABILITY_ID,
+                "policy_family": "read",
+                "credential_class": "memo-read",
+                "process_contour": "read",
+                "primitives": [
+                    primitive("brief-reviewed-memory", "tool", "aoa_memo_recall_brief"),
+                    primitive("recall-reviewed-memory", "tool", "aoa_memo_recall_reviewed"),
+                    primitive("read-reviewed-object", "tool", "aoa_memo_read_object"),
+                    primitive(
+                        "open-reviewed-object",
+                        "resource_template",
+                        "aoa-memo://memory/object/{object_id}",
+                    ),
+                ],
+            },
+            {
+                "capability_id": CANDIDATE_CAPABILITY_ID,
+                "policy_family": "candidate",
+                "credential_class": "memo-candidate",
+                "process_contour": "candidate",
+                "primitives": [
+                    primitive("create-local-candidate", "tool", "aoa_memo_create_candidate"),
+                    primitive("prepare-intake-packet", "tool", "aoa_memo_prepare_intake_packet"),
+                    primitive(
+                        "prepare-forwarding-receipt",
+                        "tool",
+                        "aoa_memo_prepare_forwarding_receipt",
+                    ),
+                ],
+            },
+        ],
+        "guardrails": {
+            "durable_corpus_write_allowed": False,
+            "owner_acceptance_inference_allowed": False,
+            "proof_inference_allowed": False,
+            "hidden_mcp_chaining_allowed": False,
+            "annotations_are_security_enforcement": False,
+            "discovery_can_expand_write_roots": False,
+        },
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
 
 
 def orientation_plan() -> dict:
@@ -1340,6 +1411,9 @@ def test_mcp_surface_contracts(tmp_path: Path) -> None:
         inspect(candidate_server)
     )
     assert set(read_tools) == {
+        "aoa_memo_recall_brief",
+        "aoa_memo_recall_reviewed",
+        "aoa_memo_read_object",
         "aoa_memo_build_port_index",
         "aoa_memo_brief",
         "aoa_memo_owner_orientation",
@@ -1351,6 +1425,7 @@ def test_mcp_surface_contracts(tmp_path: Path) -> None:
     }
     assert set(candidate_tools) == {
         "aoa_memo_create_candidate",
+        "aoa_memo_prepare_forwarding_receipt",
         "aoa_memo_prepare_intake_packet",
         "aoa_memo_review_intake",
         "aoa_memo_write_port_index",
@@ -1384,6 +1459,79 @@ def test_mcp_surface_contracts(tmp_path: Path) -> None:
         "aoa-memo://intake/{packet_id}/review",
     }
     assert candidate_templates == set()
+
+
+def test_owner_capability_profiles_remove_legacy_surfaces(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest = write_organ_access_manifest(tmp_path / "organ-access.v1.json")
+    monkeypatch.setenv(ORGAN_ACCESS_MANIFEST_ENV_VAR, str(manifest))
+
+    monkeypatch.setenv(CAPABILITY_PROFILE_ENV_VAR, READ_CAPABILITY_ID)
+    read_server = build_server(tmp_path, policy_family="read")
+    assert set(read_server._tool_manager._tools) == {
+        "aoa_memo_recall_brief",
+        "aoa_memo_recall_reviewed",
+        "aoa_memo_read_object",
+    }
+    assert read_server._resource_manager._resources == {}
+    assert {
+        str(item.uri_template)
+        for item in read_server._resource_manager._templates.values()
+    } == {"aoa-memo://memory/object/{object_id}"}
+    assert read_server._prompt_manager._prompts == {}
+
+    monkeypatch.setenv(CAPABILITY_PROFILE_ENV_VAR, CANDIDATE_CAPABILITY_ID)
+    candidate_server = build_server(tmp_path, policy_family="candidate")
+    assert set(candidate_server._tool_manager._tools) == {
+        "aoa_memo_create_candidate",
+        "aoa_memo_prepare_intake_packet",
+        "aoa_memo_prepare_forwarding_receipt",
+    }
+    assert candidate_server._resource_manager._resources == {}
+    assert candidate_server._resource_manager._templates == {}
+    assert candidate_server._prompt_manager._prompts == {}
+
+
+def test_capability_profile_rejects_wrong_process_contour(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest = write_organ_access_manifest(tmp_path / "organ-access.v1.json")
+    monkeypatch.setenv(ORGAN_ACCESS_MANIFEST_ENV_VAR, str(manifest))
+    monkeypatch.setenv(CAPABILITY_PROFILE_ENV_VAR, CANDIDATE_CAPABILITY_ID)
+
+    with pytest.raises(SystemExit, match="must be 'durable-memory-read'"):
+        build_server(tmp_path, policy_family="read")
+
+
+def test_reviewed_access_methods_exclude_local_and_registry_fallbacks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seed_workspace(tmp_path)
+    monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "stack-source"))
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    brief = state.build_reviewed_brief("abyss-stack", "access plane")
+    assert brief["schema"] == "aoa_memo_reviewed_brief_v1"
+    assert brief["reviewed_memory"]
+    assert brief["candidate_route_exposed"] is False
+    assert "local_port" not in brief
+    assert "local_intake" not in brief
+
+    object_id = brief["reviewed_memory"][0]["id"]
+    reviewed = state.build_reviewed_memory_object(object_id)
+    missing = state.build_reviewed_memory_object("memory-object-kinds")
+    assert reviewed["found"] is True
+    assert all(item["source_kind"] == "reviewed_corpus" for item in reviewed["matches"])
+    assert missing["found"] is False
+    assert missing["matches"] == []
+
+    search = state.search("access plane", scope="reviewed", limit=8)
+    assert all(item.get("type") == "memory_object" for item in search["hits"])
+    assert all(item.get("source_kind") == "reviewed_corpus" for item in search["hits"])
 
 
 def test_mcp_policy_family_and_candidate_root_gate_writes(

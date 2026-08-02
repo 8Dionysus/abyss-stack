@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -37,6 +38,7 @@ LOCAL_PORT_INVENTORY_ACCEPTED_CONTRACT_SCHEMAS = {
     LOCAL_PORT_INVENTORY_CONTRACT_SCHEMA_V2,
 }
 LOCAL_PORT_DISCOVERY_DEFAULT_MAX_DEPTH = 4
+MAX_PROOF_RESULT_BYTES = 64 * 1024
 
 
 def _require_candidate_write_root(path: Path, *, label: str) -> None:
@@ -2860,6 +2862,8 @@ class AoAEvalsMCPState:
         self,
         proof_question: str = "",
         proposal: dict[str, Any] | None = None,
+        *,
+        include_runtime_exports: bool = True,
     ) -> dict[str, Any]:
         input_proposal = proposal if isinstance(proposal, dict) else {}
         effective_question = str(input_proposal.get("proof_question") or proof_question or "").strip()
@@ -2871,10 +2875,14 @@ class AoAEvalsMCPState:
         selection = self.select(effective_question, {**filters, "limit": 8} if filters else {"limit": 8})
         existing_matches = selection["matches"]
         match_names = {str(match.get("name") or "") for match in existing_matches}
-        runtime_export_refs = self._runtime_export_refs_for_proposal(
-            effective_question,
-            match_names,
-            _string_list(input_proposal.get("candidate_evidence_refs")),
+        runtime_export_refs = (
+            self._runtime_export_refs_for_proposal(
+                effective_question,
+                match_names,
+                _string_list(input_proposal.get("candidate_evidence_refs")),
+            )
+            if include_runtime_exports
+            else []
         )
         proposal_packet = self._draft_eval_need_proposal(
             proof_question=effective_question,
@@ -2924,6 +2932,31 @@ class AoAEvalsMCPState:
                 "inspect existing bundle refs or run the repo-local eval-authoring scaffold helper; "
                 "MCP must not write source"
             ),
+            "authority_boundary": self.authority_boundary(),
+        }
+
+    def prepare_request_candidate(
+        self,
+        proof_question: str = "",
+        proposal: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Prepare a typed, non-persistent eval request candidate."""
+        routed = self.find_or_propose(
+            proof_question=proof_question,
+            proposal=proposal,
+            include_runtime_exports=False,
+        )
+        return {
+            "schema": "aoa_evals_request_candidate_v1",
+            "candidate_only": True,
+            "persistent": False,
+            "runtime_export_discovery_performed": False,
+            "source_mutation_allowed": False,
+            "eval_execution_allowed": False,
+            "verdict_issuance_allowed": False,
+            "proof_acceptance_allowed": False,
+            "request": routed,
+            "next_owner": "aoa-evals eval-authoring or selected existing bundle route",
             "authority_boundary": self.authority_boundary(),
         }
 
@@ -3002,6 +3035,66 @@ class AoAEvalsMCPState:
             "count": len(records),
             "reports": records,
             "source_reader": (self.evals_root / REPORT_INDEX).as_posix(),
+            "authority_boundary": self.authority_boundary(),
+        }
+
+    def read_proof_result(self, report_id: str) -> dict[str, Any]:
+        """Read one already issued bundle-local report without issuing proof."""
+        matches = [
+            record
+            for record in self.report_records()
+            if record.get("report_id") == report_id
+        ]
+        if not matches:
+            raise ValueError(f"unknown proof result report_id: {report_id}")
+        if len(matches) != 1:
+            raise ValueError(f"ambiguous proof result report_id: {report_id}")
+        record = matches[0]
+        source_ref = record.get("source_report_path")
+        if not isinstance(source_ref, str) or not source_ref:
+            raise ValueError("proof result index entry lacks source_report_path")
+        relative = Path(source_ref)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError("proof result source path must be repo-relative")
+        root = self.evals_root.resolve()
+        source_path = (root / relative).resolve()
+        try:
+            source_path.relative_to(root)
+        except ValueError as exc:
+            raise ValueError("proof result source path escapes aoa-evals") from exc
+        if source_path.suffix != ".json" or not source_path.name.endswith(
+            ".report.json"
+        ):
+            raise ValueError("proof result source must be a bundle-local report JSON")
+        raw = source_path.read_bytes()
+        if len(raw) > MAX_PROOF_RESULT_BYTES:
+            raise ValueError(
+                "proof result exceeds the 65536-byte MCP response limit; "
+                "read the owner source report directly"
+            )
+        payload = json.loads(raw)
+        if not isinstance(payload, dict):
+            raise ValueError("proof result source report must be an object")
+        if payload.get("eval_name") != record.get("eval_name"):
+            raise ValueError("proof result index and source eval_name drifted")
+        return {
+            "schema": "aoa_evals_proof_result_read_v1",
+            "report_id": report_id,
+            "eval_name": record.get("eval_name"),
+            "source_report_path": source_ref,
+            "source_report_sha256": hashlib.sha256(raw).hexdigest(),
+            "source_report_bytes": len(raw),
+            "source_revision": _git_commit(self.source_root or self.evals_root),
+            "source_bundle_ref": record.get("source_bundle_ref"),
+            "manifest_ref": record.get("manifest_ref"),
+            "report_schema_ref": record.get("report_schema_ref"),
+            "report_index_ref": (self.evals_root / REPORT_INDEX).as_posix(),
+            "report": payload,
+            "proof_owner": "aoa-evals bundle-local report and review route",
+            "mcp_issued_proof": False,
+            "mcp_computed_verdict": False,
+            "owner_acceptance_inferred": False,
+            "admission_inferred": False,
             "authority_boundary": self.authority_boundary(),
         }
 

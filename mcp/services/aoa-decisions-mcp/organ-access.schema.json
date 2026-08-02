@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/aoa-decisions-mcp-organ-access-v1.json",
+  "title": "AoA Decisions MCP organ access manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "organ_id",
+    "source_owner",
+    "access_runtime_owner",
+    "admission_owner",
+    "proof_owner",
+    "owner_decision_refs",
+    "capabilities",
+    "guardrails",
+    "contains_secrets",
+    "admission_asserted",
+    "owner_acceptance_asserted",
+    "effect_activation_authorized"
+  ],
+  "properties": {
+    "schema_version": {"const": "aoa_decisions_mcp_organ_access_v1"},
+    "organ_id": {"const": "aoa-decisions"},
+    "source_owner": {"const": "federated-repository-decision-owners"},
+    "access_runtime_owner": {"const": "abyss-stack"},
+    "admission_owner": {"const": "aoa-sdk"},
+    "proof_owner": {"const": "aoa-evals"},
+    "owner_decision_refs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {"$ref": "#/$defs/capability"}
+    },
+    "guardrails": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"const": false}
+    },
+    "contains_secrets": {"const": false},
+    "admission_asserted": {"const": false},
+    "owner_acceptance_asserted": {"const": false},
+    "effect_activation_authorized": {"const": false}
+  },
+  "$defs": {
+    "primitive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primitive_id",
+        "mcp_name",
+        "kind",
+        "effect_class",
+        "approval_required"
+      ],
+      "properties": {
+        "primitive_id": {"type": "string", "minLength": 1},
+        "mcp_name": {"type": "string", "minLength": 1},
+        "kind": {"enum": ["tool", "resource", "resource_template"]},
+        "effect_class": {"const": "observe"},
+        "approval_required": {"const": false}
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_id",
+        "summary",
+        "policy_family",
+        "process_contour",
+        "credential_class",
+        "primitives",
+        "authority_ceiling",
+        "freshness_policy",
+        "eval_refs"
+      ],
+      "properties": {
+        "capability_id": {"const": "decision-retrieval"},
+        "summary": {"type": "string", "minLength": 1},
+        "policy_family": {"const": "read"},
+        "process_contour": {"const": "read"},
+        "credential_class": {"const": "decisions-read"},
+        "primitives": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/primitive"}
+        },
+        "authority_ceiling": {"type": "string", "minLength": 1},
+        "freshness_policy": {"type": "string", "minLength": 1},
+        "eval_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

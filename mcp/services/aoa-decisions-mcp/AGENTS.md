@@ -70,6 +70,9 @@ It does not own:
 - Do not hide unmodeled decision-lane files; add a graph-registry entry or
   report a summary issue.
 - Do not install hooks, timers, or daemons from this package.
+- `AOA_DECISIONS_MCP_CAPABILITY_PROFILE=decision-retrieval` selects the exact
+  organ read profile. It must remain bound to `organ-access.v1.json` and is
+  invalid for `internal_effect`.
 
 ## Run
 

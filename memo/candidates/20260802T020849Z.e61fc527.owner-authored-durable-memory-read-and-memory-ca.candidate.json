@@ -1,0 +1,29 @@
+{
+  "schema": "aoa_local_memo_candidate_v1",
+  "id": "candidate:abyss-stack:20260802T020849Z:e61fc527-owner-authored-durable-memory-re",
+  "repo": "abyss-stack",
+  "kind": "route",
+  "family": "memory-access",
+  "scope": "repo",
+  "claim": "Owner-authored durable-memory-read and memory-candidate-prepare profiles keep memo read and local candidate authority on disjoint runtime catalogs and credentials",
+  "source_refs": [
+    "mcp/services/aoa-memo-mcp/DESIGN.md",
+    "mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/server.py"
+  ],
+  "evidence_refs": [
+    "mcp/services/aoa-memo-mcp/DESIGN.md",
+    "mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/server.py",
+    "mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/organ_access.py"
+  ],
+  "route": "reviewed_intake",
+  "review_state": "candidate",
+  "lifecycle": "captured",
+  "source_trust": "review_required",
+  "operation_mode": "write_candidate_only",
+  "created_at": "2026-08-02T02:08:49Z",
+  "guardrails": {
+    "direct_durable_write": false,
+    "instructions_treated_as_data": true,
+    "requires_reviewed_intake": true
+  }
+}

@@ -16,6 +16,24 @@ presence cannot register, reload, or remove a Codex consumer.
 
 ## Process contours
 
+The owner-authored capability identities are intentionally narrower than a
+runtime admission claim:
+
+- `runtime-topology-read` binds the read contour to
+  `stack_runtime_catalog`, `stack_runtime_inspect`, and
+  `stack_orchestration_inspect` under credential class `abyss-stack-read`;
+- `stack-access-plan` binds the candidate contour to
+  `stack_prepare_runtime_plan` under credential class
+  `abyss-stack-candidate`;
+- `exact-read-restart-pilot` binds the separately admitted internal-effect
+  contour to `stack_execute_approved_read_restart_pilot` under credential
+  class `abyss-stack-internal-effect`.
+
+The machine-readable owner source is `organ-access.v1.json`; its generated
+JSON Schema is `schemas/organ-access.schema.json`. It defines identity and
+tool bindings only. It explicitly does not assert registry admission, owner
+acceptance, proof completion, consumer registration, or effect activation.
+
 The read process exposes only:
 
 - `stack_runtime_catalog`: compact discovery with zero detail-schema bytes;
@@ -33,10 +51,29 @@ The candidate process exposes only:
 - `stack_prepare_runtime_plan`: a content-addressed `sync`, `deploy`,
   `activate`, `restart`, or `rollback` candidate.
 
-The processes use different tools, default ports (`5431`, `5433`), environment
-variables, systemd credential names, scopes, and client identities. A read
-credential cannot authenticate to or enumerate the candidate process.
-Both contours publish the `abyss-stack-mcp` application version in
+The internal-effect process exposes only:
+
+- `stack_execute_approved_read_restart_pilot`: execute one approved exact
+  restart of `abyss-stack-mcp-read.service`, run an authenticated canary,
+  perform a mandatory second restart as restoration, and run a post-rollback
+  canary.
+
+It accepts no unit or command parameter. The request names only an already
+staged content-addressed restart candidate, a distinct expiring approval, and
+their bound idempotency key and exact internal-effect principal. It rechecks the live observation and exact systemd
+process identity before mutation, persists a pre-effect receipt, and emits a
+secret-free success, denial, or recovery receipt. The process is isolated from
+the candidate audit journal and cross-organ orchestration tree and can write
+only its private effect root. A persistent attempt receipt and execution lock
+limit starts to one serialized pilot per minute; idempotent success replay does
+not repeat either restart. Its source manifest does not itself activate the
+effect; live admission and approval remain separate transactions.
+
+The processes use different tools, default ports (`5431`, `5433`, `5439`),
+environment variables, systemd credential names, scopes, and client
+identities. Read and candidate credentials cannot authenticate to or enumerate
+the effect process, and the effect credential cannot select another tool.
+All contours publish the `abyss-stack-mcp` application version in
 `serverInfo.version`; the pinned SDK version is dependency evidence, not the
 server identity.
 Every exported primitive also crosses the package-local protocol-independent
@@ -57,15 +94,15 @@ change. The public-safe `abyss-stack-mcp-audit` summary exposes counts and
 continuity metadata, not request/result values. It proves only local journal
 shape and hash-chain continuity; it does not prove caller intent, grounding,
 admission, owner acceptance, or a runtime effect.
-Provisioning validates the two existing or newly created bearer values
-together and fails closed if they are identical. It also atomically publishes
+Provisioning validates the three existing or newly created bearer values
+together and fails closed unless they are pairwise distinct. It also atomically publishes
 a non-secret digest manifest. Each managed startup receives only its own
-bearer plus that manifest, verifies that the two committed digests are
+bearer plus that manifest, verifies that all three committed digests are
 distinct, and binds its loaded bearer to the matching contour digest before
 the server can listen. Copying or rotating a credential file without
 refreshing a valid separated pair therefore fails closed on the next start.
-The lifecycle-owned rotation command changes both contour values and their
-manifest only while both managed units are observably stopped, never prints a
+The lifecycle-owned rotation command changes all three contour values and their
+manifest only while all three managed units are observably stopped, never prints a
 value, and leaves consumer refresh plus restart to a later canary transaction.
 
 Every candidate remains `execution_authorized=false`, requires separate human
@@ -80,10 +117,11 @@ revision, tree digest, and content-addressed deployment-manifest digest, schema,
 running process identity, consumer, and exact canary route and receipt, named
 acceptance-owner evidence bound to the current source revision and package
 digest, a grounded canary, and usable
-rollback proof. Activation or restart of `internal_effect` and
-`external_effect` targets is rejected because this package does not model
-their separately required threat, approval, egress, compensation, or rollback
-contracts. The central-proof and acceptance receipts plus the selected
+rollback proof. Generic activation or restart of `internal_effect` and
+`external_effect` targets remains rejected. The D-0106 pilot is narrower: its
+separate process may consume only an exact admitted `read` restart candidate
+for `abyss-stack-mcp-read.service`, then enforce its own approval, execution,
+canary, and mandatory restoration contract. The central-proof and acceptance receipts plus the selected
 compatible consumer's exact
 `registration_ref` are embedded in ordered activation steps, preceded by exact
 process-identity verification. A shadow registry receives an exact admission
@@ -471,7 +509,7 @@ scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime
 
 These are intentionally separate transactions; combining both flags is
 rejected so provisioning cannot run before the link-and-reload phase. The
-standalone provision step verifies that both units are loaded from the
+standalone provision step verifies that all three units are loaded from the
 expected managed fragments and that user systemd's effective `ExecStart`
 contains the exact shared runtime lock; absent, stale, or unexpectedly sourced
 unit definitions fail closed and require another `daemon-reload`.
@@ -488,9 +526,9 @@ directory. Repeating the command with unchanged source and lock rehashes the
 installed environment before verification and reuses it only when the content
 digest still matches; missing or changed installed or interpreter bytes force a
 guarded rebuild. A changed identity is never installed
-over a running plane: provisioning fails closed while either the read or
-candidate unit is active or their user-systemd state cannot be observed. Stop
-both units explicitly before reprovisioning, then start or canary them as a
+over a running plane: provisioning fails closed while any read, candidate, or
+internal-effect unit is active or its user-systemd state cannot be observed.
+Stop all three units explicitly before reprovisioning, then start or canary them as a
 separate action. The units have `ConditionPathExists` guards for the runtime
 and both lock files, an executable `ExecCondition`, and a read-only verifier
 condition. Their final launch path then acquires the shared source-projection
@@ -499,8 +537,8 @@ source-and-lock plus runtime-content verification under those locks, and only
 then `exec`s the server. They remain inactive when the runtime is absent,
 unusable, drifted, or no longer matches the deployed package. Both shared locks
 remain held for the full process lifetime. Changed provisioning and applying
-MCP Configs sync therefore fail closed while either plane runs; stop both
-planes explicitly before either operation. Provisioning checks both unit
+MCP Configs sync therefore fail closed while any plane runs; stop all three
+planes explicitly before either operation. Provisioning checks all unit
 states before the build and again immediately before the guarded environment
 swap, and aborts if a start races the build. Linking and reloading the
 committed units before provisioning is therefore a required rollout
@@ -517,13 +555,13 @@ Every provisioner Python call clears inherited `PYTHONHOME`/`PYTHONPATH` and
 uses isolated interpreter mode, including venv creation, pip installation,
 dependency checks, and import verification.
 They execute the package installed inside that venv, not `Configs/src`.
-Both units clear ambient `PYTHONHOME`/`PYTHONPATH`, invoke the venv with Python
+All three units clear ambient `PYTHONHOME`/`PYTHONPATH`, invoke the venv with Python
 isolated mode, and pass `-B` explicitly so service imports cannot add bytecode
 to the measured environment. A user-manager import override therefore cannot
 precede the measured site-packages, and a normal launch cannot invalidate the
 recorded runtime-content digest.
 Consequently, a later Configs sync cannot cross a running plane or mix new code
-with an older dependency closure; after explicitly stopping both planes, the
+with an older dependency closure; after explicitly stopping all three planes, the
 synced package becomes eligible for a later start only after this explicit
 reprovision step succeeds.
 The same explicit provision action creates, but never truncates, the
@@ -538,6 +576,10 @@ Provisioning also creates the mode-`0700`
 `${AOA_STACK_ROOT}/Logs/mcp/observations` root without creating or rewriting
 evidence. The producer receives that directory as its only writable stack path
 and atomically publishes mode-`0600` `current.json`.
+Provisioning creates a separate mode-`0700`
+`${AOA_STACK_ROOT}/Logs/mcp/internal-effects/read-restart-pilot` root for the
+effect process. It does not stage a plan, issue approval, start a unit, or
+authorize an effect.
 
 Runtime dependencies and the build backend are exact pins in
 `requirements.constraints`; the committed `requirements.lock` carries the

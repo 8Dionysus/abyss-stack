@@ -9,6 +9,11 @@ from typing import Any, Literal
 from ._http_auth import http_auth_kwargs as _http_auth_kwargs
 from ._http_auth import transport_settings as _transport_settings
 from .core import AoAEvalsMCPState
+from .organ_access import DISCOVERY_CAPABILITY_ID
+from .organ_access import PROOF_RESULT_CAPABILITY_ID
+from .organ_access import REQUEST_CAPABILITY_ID
+from .organ_access import load_owner_manifest
+from .organ_access import validate_runtime_bindings
 
 
 LOGGER = logging.getLogger(__name__)
@@ -18,6 +23,12 @@ READ_HTTP_PORT = 5424
 CANDIDATE_HTTP_PORT = 5435
 DEFAULT_HTTP_PORT = READ_HTTP_PORT
 PolicyFamily = Literal["read", "candidate"]
+CapabilityProfile = Literal[
+    "complete",
+    "eval-discovery-read",
+    "eval-request-prepare",
+    "proof-result-read",
+]
 
 READ_TOKEN_ENV_VAR = "AOA_EVALS_MCP_READ_BEARER_TOKEN"
 READ_CREDENTIAL_NAME = "aoa-evals-mcp-read-bearer-token"
@@ -47,6 +58,25 @@ def configured_policy_family() -> PolicyFamily:
     value = os.environ.get("AOA_MCP_POLICY_FAMILY", "read").strip()
     if value not in {"read", "candidate"}:
         raise SystemExit("AOA_MCP_POLICY_FAMILY must be read or candidate")
+    return value  # type: ignore[return-value]
+
+
+def configured_capability_profile(
+    policy_family: PolicyFamily,
+) -> CapabilityProfile:
+    value = os.environ.get(
+        "AOA_EVALS_MCP_CAPABILITY_PROFILE", "complete"
+    ).strip()
+    allowed = {
+        "read": {"complete", DISCOVERY_CAPABILITY_ID, PROOF_RESULT_CAPABILITY_ID},
+        "candidate": {"complete", REQUEST_CAPABILITY_ID},
+    }
+    if value not in allowed[policy_family]:
+        expected = ", ".join(sorted(allowed[policy_family]))
+        raise SystemExit(
+            "AOA_EVALS_MCP_CAPABILITY_PROFILE is incompatible with "
+            f"{policy_family}; expected one of: {expected}"
+        )
     return value  # type: ignore[return-value]
 
 
@@ -109,6 +139,7 @@ def build_server(
     evals_root: str | Path | None = None,
     *,
     policy_family: PolicyFamily | None = None,
+    capability_profile: CapabilityProfile | None = None,
 ) -> Any:
     try:
         from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
@@ -119,8 +150,19 @@ def build_server(
         ) from exc
 
     contour = policy_family or configured_policy_family()
+    profile = capability_profile or configured_capability_profile(contour)
+    if profile != configured_capability_profile(contour):
+        allowed = {
+            "read": {"complete", DISCOVERY_CAPABILITY_ID, PROOF_RESULT_CAPABILITY_ID},
+            "candidate": {"complete", REQUEST_CAPABILITY_ID},
+        }
+        if profile not in allowed[contour]:
+            raise SystemExit(
+                f"aoa-evals capability profile {profile!r} is incompatible with "
+                f"{contour!r}"
+            )
     mcp = FastMCP(
-        f"aoa-evals-mcp-{contour}",
+        f"aoa-evals-mcp-{contour}-{profile}",
         json_response=True,
         **_contour_http_auth_kwargs(contour),
     )
@@ -141,12 +183,146 @@ def build_server(
             openWorldHint=False,
         )
     )
+    candidate_prepare_tool = mcp.tool(
+        annotations=ToolAnnotations(
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        )
+    )
 
     def current_state() -> AoAEvalsMCPState:
         return AoAEvalsMCPState.discover(
             workspace_root=workspace_root,
             evals_root=evals_root,
         )
+
+    if profile == DISCOVERY_CAPABILITY_ID:
+
+        @read_only_tool
+        def aoa_evals_select(
+            proof_question: str = "",
+            filters: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            """Select bounded eval candidates from compact owner read models."""
+            return current_state().select(
+                proof_question=proof_question,
+                filters=filters,
+            )
+
+        @read_only_tool
+        def aoa_evals_inspect(name: str) -> dict[str, Any]:
+            """Inspect one eval bundle through generated readers and source refs."""
+            return current_state().inspect_bundle(name)
+
+        @read_only_tool
+        def aoa_evals_expand(
+            name: str,
+            section_key: str | None = None,
+        ) -> dict[str, Any]:
+            """Expand one generated bundle section or list section keys."""
+            return current_state().expand_bundle(
+                name=name,
+                section_key=section_key,
+            )
+
+        @read_only_tool
+        def aoa_evals_runtime_status() -> dict[str, Any]:
+            """Report source or approved-mirror freshness."""
+            return current_state().runtime_status()
+
+        @mcp.resource("aoa-evals://catalog")
+        def catalog_resource() -> str:
+            return json.dumps(
+                current_state().build_catalog(), ensure_ascii=False, indent=2
+            )
+
+        @mcp.resource("aoa-evals://bundle/{name}")
+        def bundle_resource(name: str) -> str:
+            return json.dumps(
+                current_state().inspect_bundle(name), ensure_ascii=False, indent=2
+            )
+
+        @mcp.resource("aoa-evals://bundle/{name}/sections")
+        def bundle_sections_resource(name: str) -> str:
+            return json.dumps(
+                current_state().expand_bundle(name), ensure_ascii=False, indent=2
+            )
+
+        @mcp.resource("aoa-evals://runtime-status")
+        def runtime_status_resource() -> str:
+            return json.dumps(
+                current_state().runtime_status(), ensure_ascii=False, indent=2
+            )
+
+        owner_manifest = load_owner_manifest(workspace_root, evals_root)
+        validate_runtime_bindings(
+            owner_manifest,
+            capability_id=profile,
+            tool_names={
+                "aoa_evals_select",
+                "aoa_evals_inspect",
+                "aoa_evals_expand",
+                "aoa_evals_runtime_status",
+            },
+            resource_templates={
+                "aoa-evals://catalog",
+                "aoa-evals://bundle/{name}",
+                "aoa-evals://bundle/{name}/sections",
+                "aoa-evals://runtime-status",
+            },
+        )
+        LOGGER.info("AoA evals MCP %s profile ready", profile)
+        return mcp
+
+    if profile == PROOF_RESULT_CAPABILITY_ID:
+
+        @read_only_tool
+        def aoa_evals_read_proof_result(report_id: str) -> dict[str, Any]:
+            """Read one already issued source report without issuing proof."""
+            return current_state().read_proof_result(report_id)
+
+        @mcp.resource("aoa-evals://proof-result/{report_id}")
+        def proof_result_resource(report_id: str) -> str:
+            return json.dumps(
+                current_state().read_proof_result(report_id),
+                ensure_ascii=False,
+                indent=2,
+            )
+
+        owner_manifest = load_owner_manifest(workspace_root, evals_root)
+        validate_runtime_bindings(
+            owner_manifest,
+            capability_id=profile,
+            tool_names={"aoa_evals_read_proof_result"},
+            resource_templates={"aoa-evals://proof-result/{report_id}"},
+        )
+        LOGGER.info("AoA evals MCP %s profile ready", profile)
+        return mcp
+
+    if profile == REQUEST_CAPABILITY_ID:
+
+        @candidate_prepare_tool
+        def aoa_evals_prepare_request_candidate(
+            proof_question: str = "",
+            proposal: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            """Prepare one typed, non-persistent eval request candidate."""
+            return current_state().prepare_request_candidate(
+                proof_question=proof_question,
+                proposal=proposal,
+            )
+
+        owner_manifest = load_owner_manifest(workspace_root, evals_root)
+        validate_runtime_bindings(
+            owner_manifest,
+            capability_id=profile,
+            tool_names={"aoa_evals_prepare_request_candidate"},
+            resource_templates=set(),
+        )
+        LOGGER.info("AoA evals MCP %s profile ready", profile)
+        return mcp
 
     if contour == "read":
 

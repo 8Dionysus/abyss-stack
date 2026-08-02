@@ -1,50 +1,57 @@
 {
   "claim_limits": [
-    "This receipt proves the exact Python MCP 2.0.0 client and server fixtures against the pinned official conformance harness at wire 2026-07-28.",
-    "The official harness is still 0.2.0-alpha.10; its suite composition may change.",
-    "Eight client checks for legacy-only method headers were skipped as inapplicable on the modern wire.",
-    "This SDK-level result does not prove that Codex supports 2026-07-28, that an Abyss adapter conforms, or that any production registration is safe to migrate.",
-    "Tasks is an extension and is outside this spec-version-filtered receipt."
+    "This is a current-source observation at conformance commit 81eb1c3edaed87d7fd585d7b80186da7a2960660, not the older public v0.1.16 release.",
+    "The Python MCP 2.0.0 server fixture passed the scenarios exercised by its SDK runner, but that runner exposed only twenty server scenarios.",
+    "The Python MCP 2.0.0 client fixture does not know the newly added json-schema-2020-12-preservation scenario and therefore failed two checks.",
+    "The failure is a harness-fixture compatibility blocker; it is not converted to green by an expected-failure baseline.",
+    "This SDK-level observation does not prove Codex, an Abyss adapter, owner admission, Tasks, or effect safety."
   ],
   "conformance_harness": {
-    "npm_git_head": "a9896553900a2ef61787b57adfcbbe936a8ab1f9",
-    "npm_integrity": "sha512-0V/HZDdWHcg6j0zVBzBsXcPZ571IVi6umKgTpnBhtTx/jm/LONmGF6cIWL2k4Xjyps0OiHV6B37nj2s0pUg0nQ==",
-    "release_status": "alpha",
-    "version": "0.2.0-alpha.10"
+    "commit": "81eb1c3edaed87d7fd585d7b80186da7a2960660",
+    "package_version": "0.2.0-alpha.10",
+    "public_release_version": "v0.1.16",
+    "source_checkout_clean": true
   },
   "directions": {
     "client": {
       "expected_failure_baseline_entries": 0,
-      "failed_checks": 0,
+      "failed_checks": 2,
+      "failure_ids": [
+        "json-schema-2020-12-client-echo-completed",
+        "json-schema-2020-12-client-tool-found"
+      ],
       "info_checks": 412,
-      "manifest_sha256": "aac85de8d21427a941317db1d9ad209d208ecf67242eb0d772c90394affc4a95",
-      "raw_result_ref": "local://mcp-protocol-final-lab-20260728/conformance/client-2026-07-28",
-      "scenario_count": 32,
-      "skipped_checks": 8,
-      "success_checks": 371,
+      "manifest_sha256": "9bc72f6c46aaead9b2ad35af934dcab179fb4feb2b853346449927f43dbf9a0a",
+      "raw_result_ref": "local:///srv/abyss-machine/cache/mcp-conformance-81eb1c3/results/client-20260801c",
+      "scenario_count": 33,
+      "skipped_checks": 14,
+      "status": "failed",
+      "success_checks": 372,
       "suite": "all"
     },
     "server": {
       "expected_failure_baseline_entries": 0,
       "failed_checks": 0,
+      "failure_ids": [],
       "info_checks": 1,
-      "manifest_sha256": "531b28daa7a2bbc740dfdc3f21de92b69235360ffdd16c8dc9f1284a14968a5d",
-      "raw_result_ref": "local://mcp-protocol-final-lab-20260728/conformance/server-2026-07-28",
-      "scenario_count": 40,
+      "manifest_sha256": "98d6b86748174f114051897979b6d9b7711ba63dbab0e04dc8dc923d2c823014",
+      "raw_result_ref": "local:///srv/abyss-machine/cache/mcp-conformance-81eb1c3/results/server-20260801b",
+      "scenario_count": 20,
       "skipped_checks": 0,
-      "success_checks": 114,
+      "status": "passed",
+      "success_checks": 40,
       "suite": "all"
     }
   },
-  "finished_at": "2026-07-29T01:36:26.199Z",
-  "observation_id": "python-mcp-2.0.0-official-conformance-20260729",
-  "observed_at": "2026-07-29T01:35:23.664Z",
+  "finished_at": "2026-08-01T23:27:13Z",
+  "observation_id": "python-mcp-2.0.0-current-conformance-20260801",
+  "observed_at": "2026-08-01T23:25:07Z",
   "python_sdk": {
     "commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
     "source_checkout_clean": true,
     "version": "2.0.0"
   },
-  "schema_version": "abyss_mcp_protocol_conformance_observation_v1",
+  "schema_version": "abyss_mcp_protocol_conformance_observation_v2",
   "spec_version": "2026-07-28",
-  "verdict": "sdk_pair_passed"
+  "verdict": "sdk_pair_blocked_current_harness_fixture_mismatch"
 }

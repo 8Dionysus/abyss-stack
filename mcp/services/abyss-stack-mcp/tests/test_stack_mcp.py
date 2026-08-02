@@ -3166,10 +3166,10 @@ def test_read_and_candidate_servers_expose_disjoint_tools(tmp_path: Path) -> Non
     path = write_observation(tmp_path / "observation.json")
     read = build_server(path, policy_family="read")
     candidate = build_server(path, policy_family="candidate")
-    assert read._mcp_server.create_initialization_options().server_version == "0.3.0"
+    assert read._mcp_server.create_initialization_options().server_version == "0.4.0"
     assert (
         candidate._mcp_server.create_initialization_options().server_version
-        == "0.3.0"
+        == "0.4.0"
     )
     read_tools = {tool.name for tool in asyncio.run(read.list_tools())}
     candidate_tools = {tool.name for tool in asyncio.run(candidate.list_tools())}
@@ -3349,6 +3349,12 @@ def test_policy_contours_use_distinct_ports_credentials_and_scopes(
         "abyss-stack-mcp-candidate-bearer-token",
         "abyss-stack-mcp:candidate",
     )
+    assert _contour("internal_effect") == (
+        5439,
+        "ABYSS_STACK_MCP_INTERNAL_EFFECT_BEARER_TOKEN",
+        "abyss-stack-mcp-internal-effect-bearer-token",
+        "abyss-stack-mcp:internal_effect",
+    )
     credentials = tmp_path / "credentials"
     credentials.mkdir()
     (credentials / "aoa-mcp-http-bearer-token").write_text(
@@ -3385,19 +3391,25 @@ def test_managed_startup_rejects_copied_or_equal_contour_credentials(
 ) -> None:
     read_token = "r" * 64
     candidate_token = "c" * 64
+    effect_token = "e" * 64
     credentials = tmp_path / "credentials"
     credentials.mkdir()
     read_path = credentials / "abyss-stack-mcp-read-bearer-token"
     candidate_path = credentials / "abyss-stack-mcp-candidate-bearer-token"
+    effect_path = credentials / "abyss-stack-mcp-internal-effect-bearer-token"
     manifest_path = credentials / "abyss-stack-mcp-auth-manifest.json"
     read_path.write_text(read_token, encoding="utf-8")
     candidate_path.write_text(candidate_token, encoding="utf-8")
+    effect_path.write_text(effect_token, encoding="utf-8")
     manifest = {
         "candidate_sha256": hashlib.sha256(
             candidate_token.encode("utf-8")
         ).hexdigest(),
         "read_sha256": hashlib.sha256(read_token.encode("utf-8")).hexdigest(),
-        "schema_version": "abyss_stack_mcp_auth_manifest_v1",
+        "internal_effect_sha256": hashlib.sha256(
+            effect_token.encode("utf-8")
+        ).hexdigest(),
+        "schema_version": "abyss_stack_mcp_auth_manifest_v2",
     }
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     monkeypatch.setenv("AOA_MCP_TRANSPORT", "streamable-http")
@@ -3405,9 +3417,13 @@ def test_managed_startup_rejects_copied_or_equal_contour_credentials(
     monkeypatch.setenv("ABYSS_STACK_MCP_REQUIRE_AUTH_MANIFEST", "1")
     monkeypatch.delenv("ABYSS_STACK_MCP_READ_BEARER_TOKEN", raising=False)
     monkeypatch.delenv("ABYSS_STACK_MCP_CANDIDATE_BEARER_TOKEN", raising=False)
+    monkeypatch.delenv(
+        "ABYSS_STACK_MCP_INTERNAL_EFFECT_BEARER_TOKEN", raising=False
+    )
 
     assert "auth" in _auth_kwargs("read")
     assert "auth" in _auth_kwargs("candidate")
+    assert "auth" in _auth_kwargs("internal_effect")
 
     candidate_path.write_text(read_token, encoding="utf-8")
     with pytest.raises(SystemExit, match="does not match"):

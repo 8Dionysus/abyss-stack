@@ -4,12 +4,18 @@ import json
 import logging
 import os
 import importlib
+from functools import wraps
 from pathlib import Path
 from typing import Any, Literal
 
 from . import core as core_module
 from ._http_auth import http_auth_kwargs as _http_auth_kwargs
 from ._http_auth import transport_settings as _transport_settings
+from .organ_access import (
+    CAPABILITY_ID,
+    RESOURCE_TEMPLATE_BINDINGS,
+    TOOL_BINDINGS,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -20,6 +26,19 @@ READ_TOKEN_ENV_VAR = "AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN"
 READ_CREDENTIAL_NAME = "aoa-session-memory-mcp-read-bearer-token"
 READ_AUTH_SCOPE = "mcp:aoa-session-memory:read"
 READ_CLIENT_ID = "aoa-loopback-codex:aoa-session-memory:read"
+CAPABILITY_PROFILE_ENV_VAR = "AOA_SESSION_MEMORY_MCP_CAPABILITY_PROFILE"
+CAPABILITY_PROFILE_MAX_OUTPUT_BYTES = 32_768
+CAPABILITY_RETRIEVE_MAX_CANDIDATES = 50
+CAPABILITY_RETRIEVAL_CONTROL_MARKERS = (
+    "aoa_session_retrieve",
+    "aoa_session_literal_query_plan",
+    "mcp__aoa_session_memory",
+    "literal-query-plan",
+    "archived-raw-search",
+    "live-tail-search",
+    "evidence-window",
+    "session_retrieve(",
+)
 
 
 def _application_version() -> str:
@@ -82,6 +101,254 @@ def _reload_core_if_changed() -> None:
         core_module.MCP_CORE_SOURCE_PATH,
     )
     importlib.reload(core_module)
+
+
+def _apply_capability_profile(mcp: Any) -> None:
+    profile = os.environ.get(CAPABILITY_PROFILE_ENV_VAR, "").strip()
+    if not profile:
+        return
+    if profile != CAPABILITY_ID:
+        raise SystemExit(
+            f"{CAPABILITY_PROFILE_ENV_VAR} must be {CAPABILITY_ID!r} when set"
+        )
+    tool_names = set(TOOL_BINDINGS.values())
+    template_names = set(RESOURCE_TEMPLATE_BINDINGS.values())
+    mcp._tool_manager._tools = {
+        name: item
+        for name, item in mcp._tool_manager._tools.items()
+        if name in tool_names
+    }
+    for name, item in mcp._tool_manager._tools.items():
+        item.fn = _capability_output_wrapper(name, item.fn)
+    mcp._resource_manager._resources = {}
+    mcp._resource_manager._templates = {
+        name: item
+        for name, item in mcp._resource_manager._templates.items()
+        if str(item.uri_template) in template_names
+    }
+    mcp._prompt_manager._prompts = {}
+
+
+def _payload_bytes(payload: Any) -> int:
+    return len(
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    )
+
+
+def _compact_provider(provider: Any) -> Any:
+    if not isinstance(provider, dict):
+        return provider
+    status = provider.get("status")
+    compact_status: dict[str, Any] | None = None
+    if isinstance(status, dict):
+        provider_states: dict[str, Any] = {}
+        for name, item in (status.get("providers") or {}).items():
+            if not isinstance(item, dict):
+                continue
+            provider_states[str(name)] = {
+                key: item[key]
+                for key in ("ok", "status", "reasons", "diagnostics")
+                if key in item
+            }
+        compact_status = {
+            key: status[key]
+            for key in (
+                "ok",
+                "selected_provider",
+                "status_mode",
+                "diagnostics",
+            )
+            if key in status
+        }
+        if provider_states:
+            compact_status["provider_states"] = provider_states
+    compact = {
+        key: provider[key]
+        for key in (
+            "selected",
+            "authoritative_result_provider",
+            "accelerator_provider",
+            "authority_law",
+        )
+        if key in provider
+    }
+    if compact_status is not None:
+        compact["status"] = compact_status
+    return compact
+
+
+def _compact_evidence_item(item: Any) -> Any:
+    if not isinstance(item, dict):
+        return item
+    compact = {
+        key: item[key]
+        for key in (
+            "doc_id",
+            "doc_type",
+            "event_type",
+            "event_id",
+            "timestamp",
+            "source_type",
+            "title",
+            "archive_status",
+            "session_id",
+            "session_label",
+            "raw_ref",
+            "segment_ref",
+            "session_ref",
+            "freshness",
+            "reading_contract",
+        )
+        if key in item
+    }
+    preview = item.get("preview")
+    if isinstance(preview, str):
+        compact["preview"] = preview[:500]
+        compact["preview_truncated"] = len(preview) > 500
+    refs = item.get("refs")
+    if isinstance(refs, dict):
+        compact["refs"] = {
+            key: refs[key]
+            for key in ("raw", "raw_block", "segment", "segment_index", "session")
+            if key in refs
+        }
+    return compact
+
+
+def _capability_profile_active() -> bool:
+    return os.environ.get(CAPABILITY_PROFILE_ENV_VAR, "").strip() == CAPABILITY_ID
+
+
+def _is_capability_retrieval_control_echo(item: Any) -> bool:
+    """Recognize access-plane retrieval calls without suppressing owner evidence broadly."""
+
+    if not isinstance(item, dict):
+        return False
+    title = str(item.get("title") or "").strip().casefold()
+    if not (title.startswith("tool call:") or title.startswith("tool output:")):
+        return False
+    preview = str(item.get("preview") or "").casefold()
+    return any(marker in preview for marker in CAPABILITY_RETRIEVAL_CONTROL_MARKERS)
+
+
+def _project_capability_retrieve_candidates(
+    payload: dict[str, Any],
+    *,
+    requested_limit: int,
+    candidate_limit: int,
+) -> dict[str, Any]:
+    """Project owner-ranked candidates for a bounded consumer without changing owner truth."""
+
+    projected = dict(payload)
+    hits = payload.get("evidence_hits")
+    if not isinstance(hits, list):
+        return projected
+
+    selected: list[Any] = []
+    suppressed_refs: list[str] = []
+    suppressed_count = 0
+    for item in hits:
+        if _is_capability_retrieval_control_echo(item):
+            suppressed_count += 1
+            if len(suppressed_refs) < 16 and isinstance(item, dict):
+                ref = str(item.get("raw_ref") or item.get("event_id") or "").strip()
+                if ref:
+                    suppressed_refs.append(ref)
+            continue
+        if len(selected) < requested_limit:
+            selected.append(item)
+
+    projected["evidence_hits"] = selected
+    access = projected.get("mcp_access")
+    projected["mcp_access"] = {
+        **(access if isinstance(access, dict) else {}),
+        "consumer_candidate_projection": {
+            "projection": "retrieval_control_echo_suppression_v1",
+            "requested_limit": requested_limit,
+            "owner_candidate_limit": candidate_limit,
+            "owner_candidate_count": len(hits),
+            "selected_count": len(selected),
+            "suppressed_control_echo_count": suppressed_count,
+            "suppressed_control_echo_refs": suppressed_refs,
+            "ordering": "owner_order_preserved",
+            "authority_boundary": (
+                "This is a non-authoritative consumer projection. Owner evidence and "
+                "refs remain authoritative; only recognized retrieval-control tool "
+                "echoes are omitted from the bounded MCP response."
+            ),
+        },
+    }
+    return projected
+
+
+def _project_capability_output(tool_name: str, payload: Any) -> Any:
+    if not isinstance(payload, dict):
+        return payload
+    source_bytes = _payload_bytes(payload)
+    projected = dict(payload)
+    if "provider" in projected:
+        projected["provider"] = _compact_provider(projected["provider"])
+    compacted_collections: list[str] = []
+    if _payload_bytes(projected) > CAPABILITY_PROFILE_MAX_OUTPUT_BYTES:
+        for key in ("evidence_hits", "results"):
+            value = projected.get(key)
+            if isinstance(value, list):
+                projected[key] = [_compact_evidence_item(item) for item in value]
+                compacted_collections.append(key)
+    access = projected.get("mcp_access")
+    projected["mcp_access"] = {
+        **(access if isinstance(access, dict) else {}),
+        "capability_profile": CAPABILITY_ID,
+        "response_projection": "bounded_owner_refs_v1",
+        "source_payload_bytes": source_bytes,
+        "provider_detail_omitted": "provider" in payload,
+        "compacted_collections": compacted_collections,
+        "max_output_bytes": CAPABILITY_PROFILE_MAX_OUTPUT_BYTES,
+    }
+    projected["mcp_access"]["projected_payload_bytes"] = _payload_bytes(projected)
+    projected_bytes = _payload_bytes(projected)
+    projected["mcp_access"]["projected_payload_bytes"] = projected_bytes
+    if _payload_bytes(projected) <= CAPABILITY_PROFILE_MAX_OUTPUT_BYTES:
+        return projected
+    return {
+        "schema_version": 1,
+        "artifact_type": "session_memory_capability_output_blocked",
+        "ok": False,
+        "error": "capability_output_limit_exceeded",
+        "tool_name": tool_name,
+        "source_payload_bytes": source_bytes,
+        "projected_payload_bytes": _payload_bytes(projected),
+        "max_output_bytes": CAPABILITY_PROFILE_MAX_OUTPUT_BYTES,
+        "next_route": "narrow the query, session scope, or result limit",
+        "authority_boundary": (
+            "No owner result was returned because the bounded HTTP capability "
+            "projection exceeded its output ceiling."
+        ),
+    }
+
+
+def _capability_output_wrapper(tool_name: str, function: Any) -> Any:
+    @wraps(function)
+    def wrapped(*args: Any, **kwargs: Any) -> Any:
+        return _project_capability_output(tool_name, function(*args, **kwargs))
+
+    return wrapped
+
+
+def _default_http_capability_profile() -> str | None:
+    """Select a profile without mutating callers that only inspect the policy."""
+
+    explicit = os.environ.get(CAPABILITY_PROFILE_ENV_VAR, "").strip()
+    if explicit:
+        return explicit
+    if _transport_settings(DEFAULT_HTTP_PORT).transport == "streamable-http":
+        return CAPABILITY_ID
+    return None
 
 
 def build_server(
@@ -464,12 +731,26 @@ def build_server(
         event_limit: int = 12,
     ) -> dict[str, Any]:
         """Build a compact .aoa retrieval packet for review."""
-        return current_state().session_retrieve(
+        requested_limit = max(1, min(int(limit), 50))
+        candidate_limit = requested_limit
+        if _capability_profile_active():
+            candidate_limit = min(
+                CAPABILITY_RETRIEVE_MAX_CANDIDATES,
+                max(requested_limit * 8, 32),
+            )
+        payload = current_state().session_retrieve(
             recipe=recipe,
             query=query,
             session=session,
-            limit=limit,
+            limit=candidate_limit,
             event_limit=event_limit,
+        )
+        if not _capability_profile_active():
+            return payload
+        return _project_capability_retrieve_candidates(
+            payload,
+            requested_limit=requested_limit,
+            candidate_limit=candidate_limit,
         )
 
     @read_only_tool
@@ -831,6 +1112,7 @@ def build_server(
             "Promotion still requires reviewed distillation or owner-repo change outside MCP."
         )
 
+    _apply_capability_profile(mcp)
     LOGGER.debug("AoA session-memory MCP server ready")
     return mcp
 
@@ -839,4 +1121,7 @@ def main() -> None:
     level_name = os.environ.get("AOA_SESSION_MEMORY_MCP_LOG_LEVEL", "WARNING").upper()
     level = getattr(logging, level_name, logging.WARNING)
     logging.basicConfig(level=level)
+    profile = _default_http_capability_profile()
+    if profile is not None:
+        os.environ[CAPABILITY_PROFILE_ENV_VAR] = profile
     _run_server(build_server())

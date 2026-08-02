@@ -67,24 +67,30 @@ def test_current_status_is_deterministic_and_blocks_migration(
     second = builder.build_status(copy.deepcopy(matrix), copy.deepcopy(observation))
 
     assert first == second
-    assert first["evidence_expires_at"] == "2026-08-02T20:21:35Z"
-    assert first["gate_counts"] == {"passed": 10, "blocked": 4, "pending": 0}
+    assert first["evidence_expires_at"] == "2026-08-09T00:05:07Z"
+    assert first["gate_counts"] == {"passed": 11, "blocked": 3, "pending": 0}
     assert first["passed_gate_ids"] == [
         "P1-01",
         "P1-02",
-        "P1-04",
-        "P1-05",
+        "P1-03",
         "P1-06",
         "P1-07",
         "P1-08",
         "P1-09",
         "P1-10",
         "P1-12",
+        "P1-13",
+        "P1-14",
     ]
-    assert first["migration_allowed"] is False
+    assert first["core_read_migration_allowed"] is False
     assert first["read_only_pilot_allowed"] is False
+    assert first["read_only_pilot_completed"] is True
     assert first["tasks_extension_allowed"] is False
-    assert first["effectful_migration_allowed"] is False
+    assert first["candidate_migration_allowed"] is False
+    assert first["internal_effect_migration_allowed"] is False
+    assert first["external_effect_migration_allowed"] is False
+    assert first["remaining_core_gate_ids"] == ["P1-04", "P1-05"]
+    assert first["remaining_tasks_gate_ids"] == ["P1-11"]
     assert first["stable_registration_retained"] is True
 
 
@@ -95,7 +101,7 @@ def test_final_spec_and_stable_sdks_cannot_enable_migration(
 ) -> None:
     status = builder.build_status(copy.deepcopy(matrix), observation)
 
-    assert status["migration_allowed"] is False
+    assert status["core_read_migration_allowed"] is False
     assert status["read_only_pilot_allowed"] is False
 
 
@@ -109,8 +115,8 @@ def test_consumer_literals_are_not_wire_pair_evidence(
     status = builder.build_status(matrix, observation)
 
     assert matrix["consumer_pairs"][0]["capability_posture"] == "blocked"
-    assert "codex_next_pair_blocked" in status["reason_codes"]
-    assert status["migration_allowed"] is False
+    assert "stable_codex_modern_cutover_blocked" in status["reason_codes"]
+    assert status["core_read_migration_allowed"] is False
 
 
 def test_codex_wire_receipt_proves_legacy_pair_only(builder: Any) -> None:
@@ -193,10 +199,11 @@ def test_official_conformance_receipt_is_sdk_scoped(builder: Any) -> None:
     builder.validate_payload(conformance, conformance_schema_path)
 
     assert conformance["spec_version"] == "2026-07-28"
-    assert conformance["directions"]["server"]["success_checks"] == 114
-    assert conformance["directions"]["client"]["success_checks"] == 371
+    assert conformance["directions"]["server"]["success_checks"] == 40
+    assert conformance["directions"]["client"]["success_checks"] == 372
     assert conformance["directions"]["server"]["failed_checks"] == 0
-    assert conformance["directions"]["client"]["failed_checks"] == 0
+    assert conformance["directions"]["client"]["failed_checks"] == 2
+    assert conformance["verdict"] == "sdk_pair_blocked_current_harness_fixture_mismatch"
     assert "Codex" in " ".join(conformance["claim_limits"])
 
 
@@ -217,7 +224,12 @@ def test_kag_next_pair_is_adapter_scoped(builder: Any) -> None:
     assert pair["pair"]["trace_sent"] == pair["pair"]["trace_observed"]
     assert pair["stable_registration"]["unchanged"] is True
     assert pair["owner_canary"]["projection_exact_state"] == "current"
-    assert pair["owner_canary"]["freshness_state"] == "source_unavailable"
+    assert pair["owner_canary"]["freshness_state"] == "current"
+    assert pair["pair"]["cancellation"] == {
+        "client_request_cancelled": True,
+        "server_dispatch_cancelled": False,
+        "server_dispatch_completed_after_client_cancel": True,
+    }
     assert "Codex" in " ".join(pair["claim_limits"])
 
 
@@ -344,11 +356,11 @@ def test_all_core_and_runtime_receipts_are_required_for_migration(
         pair[check_name]["receipt_refs"] = [f"receipts/{check_name}.json"]
 
     admitted = builder.build_status(candidate, pair)
-    assert admitted["migration_allowed"] is True
+    assert admitted["core_read_migration_allowed"] is True
     assert admitted["read_only_pilot_allowed"] is True
-    assert admitted["effectful_migration_allowed"] is False
+    assert admitted["internal_effect_migration_allowed"] is False
 
     pair["rollback"]["status"] = "failed"
     rejected = builder.build_status(candidate, pair)
-    assert rejected["migration_allowed"] is False
+    assert rejected["core_read_migration_allowed"] is False
     assert rejected["read_only_pilot_allowed"] is False

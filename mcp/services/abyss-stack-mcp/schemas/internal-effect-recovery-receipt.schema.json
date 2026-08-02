@@ -1,0 +1,251 @@
+{
+  "$defs": {
+    "ProcessSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "active_state": {
+          "const": "active",
+          "default": "active",
+          "title": "Active State",
+          "type": "string"
+        },
+        "captured_at": {
+          "format": "date-time",
+          "title": "Captured At",
+          "type": "string"
+        },
+        "main_pid": {
+          "exclusiveMinimum": 0,
+          "title": "Main Pid",
+          "type": "integer"
+        },
+        "process_identity": {
+          "title": "Process Identity",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "abyss_stack_internal_effect_process_snapshot_v1",
+          "default": "abyss_stack_internal_effect_process_snapshot_v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "start_timestamp_monotonic": {
+          "exclusiveMinimum": 0,
+          "title": "Start Timestamp Monotonic",
+          "type": "integer"
+        },
+        "sub_state": {
+          "const": "running",
+          "default": "running",
+          "title": "Sub State",
+          "type": "string"
+        },
+        "unit_name": {
+          "const": "abyss-stack-mcp-read.service",
+          "default": "abyss-stack-mcp-read.service",
+          "title": "Unit Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "main_pid",
+        "start_timestamp_monotonic",
+        "process_identity",
+        "captured_at"
+      ],
+      "title": "ProcessSnapshot",
+      "type": "object"
+    }
+  },
+  "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/internal-effect-recovery-receipt.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "approval_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Approval Id",
+      "type": "string"
+    },
+    "contains_secrets": {
+      "const": false,
+      "default": false,
+      "title": "Contains Secrets",
+      "type": "boolean"
+    },
+    "effect_attempted": {
+      "const": true,
+      "default": true,
+      "title": "Effect Attempted",
+      "type": "boolean"
+    },
+    "exact_unit_name": {
+      "const": "abyss-stack-mcp-read.service",
+      "default": "abyss-stack-mcp-read.service",
+      "title": "Exact Unit Name",
+      "type": "string"
+    },
+    "external_effect_authorized": {
+      "const": false,
+      "default": false,
+      "title": "External Effect Authorized",
+      "type": "boolean"
+    },
+    "idempotency_key_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Idempotency Key Digest",
+      "type": "string"
+    },
+    "issuer": {
+      "const": "abyss-stack",
+      "default": "abyss-stack",
+      "title": "Issuer",
+      "type": "string"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "title": "Observed At",
+      "type": "string"
+    },
+    "outcome": {
+      "enum": [
+        "effect_failed_rollback_succeeded",
+        "effect_failed_rollback_failed"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "plan_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "post_effect": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProcessSnapshot"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "post_effect_canary_digest": {
+      "anyOf": [
+        {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Post Effect Canary Digest"
+    },
+    "post_effect_canary_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Post Effect Canary Ref"
+    },
+    "post_rollback": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProcessSnapshot"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "post_rollback_canary_digest": {
+      "anyOf": [
+        {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Post Rollback Canary Digest"
+    },
+    "post_rollback_canary_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Post Rollback Canary Ref"
+    },
+    "reason_codes": {
+      "items": {
+        "maxLength": 160,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Reason Codes",
+      "type": "array"
+    },
+    "receipt_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Receipt Id",
+      "type": "string"
+    },
+    "rollback_executed": {
+      "const": true,
+      "default": true,
+      "title": "Rollback Executed",
+      "type": "boolean"
+    },
+    "rollback_succeeded": {
+      "title": "Rollback Succeeded",
+      "type": "boolean"
+    },
+    "runtime_effect_authorized": {
+      "const": true,
+      "default": true,
+      "title": "Runtime Effect Authorized",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "abyss_stack_internal_effect_recovery_receipt_v1",
+      "default": "abyss_stack_internal_effect_recovery_receipt_v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "tool_id": {
+      "const": "stack_execute_approved_read_restart_pilot",
+      "default": "stack_execute_approved_read_restart_pilot",
+      "title": "Tool Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "receipt_id",
+    "plan_id",
+    "approval_id",
+    "idempotency_key_digest",
+    "rollback_succeeded",
+    "outcome",
+    "reason_codes",
+    "observed_at"
+  ],
+  "title": "InternalEffectRecoveryReceipt",
+  "type": "object"
+}

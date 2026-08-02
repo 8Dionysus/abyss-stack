@@ -3,22 +3,23 @@
     "This receipt proves one isolated Python MCP 2.0.0 KAG adapter pair, not Codex next-wire support.",
     "The adapter was not registered, deployed, credentialed, or admitted.",
     "KAG output remains navigation and evidence; owner sources retain authority.",
-    "The exact projection is current, but owner freshness is source_unavailable.",
+    "The exact projection and owner source digest were current for this bounded observation.",
+    "Client-side cancellation did not stop the server dispatch; that dispatch completed and remains an explicit blocker.",
     "No candidate, memory, proof acceptance, source mutation, or external effect was performed."
   ],
   "denials": {
     "effect_like_tool_code": -32601,
     "legacy_client_code": -32022
   },
-  "finished_at": "2026-07-29T01:51:46.629607Z",
-  "observation_id": "aoa-kag-next-pair-20260729",
-  "observed_at": "2026-07-29T01:51:45.761462Z",
+  "finished_at": "2026-08-02T00:02:17.469177Z",
+  "observation_id": "aoa-kag-next-pair-20260802",
+  "observed_at": "2026-08-02T00:01:53.519581Z",
   "owner_canary": {
     "degradation": [],
-    "freshness_state": "source_unavailable",
+    "freshness_state": "current",
     "owner": "abyss-stack",
     "projection_exact_state": "current",
-    "runtime_source_digest": "b31cea08319c67238866a1ded77577ad49dfa366f290e0a109c5a01e25275c38",
+    "runtime_source_digest": "5aeb7b89dce54b414281f5390c8cc063f59bb75d02b28e1a014da2d96701e164",
     "schema_version": "aoa-kag-mcp-capabilities-v1"
   },
   "pair": {
@@ -27,11 +28,16 @@
       "scope": "private",
       "ttl_ms": 30000
     },
+    "cancellation": {
+      "client_request_cancelled": true,
+      "server_dispatch_cancelled": false,
+      "server_dispatch_completed_after_client_cancel": true
+    },
     "independent_clients": 2,
     "resource_inventory": [
       "aoa-kag-next://capabilities"
     ],
-    "self_describing_dispatches": 11,
+    "self_describing_dispatches": 13,
     "server_discover_observed": true,
     "server_request_backchannel_observed": false,
     "session_header_observed": false,
@@ -51,18 +57,18 @@
   },
   "raw_receipt": {
     "mode": "0600",
-    "ref": "local://mcp-protocol-final-lab-20260728/proof/kag-next-pair.json",
-    "sha256": "0883381024bf6416e659c395f6acacce9f9dc6546c8101dd6b141f1b2376fb6d"
+    "ref": "local:///srv/abyss-machine/cache/mcp-protocol-modern-lab/kag-next-pair-private.json",
+    "sha256": "cf839aa6a04ec37bdf7e021ea5781787aecb6a826aceb3d26da49f7124d0514d"
   },
   "schema_version": "abyss_mcp_kag_next_pair_observation_v1",
   "source_revisions": {
-    "abyss_stack": "8bcfe0edf7ad499d666207ca2087d8db9df4d7a9",
-    "aoa_kag": "0ff913279868735b41a17aab84c0c89341d7cb77",
-    "stack_runtime_current_digest": "sha256:0326859c123700a349e11cd86b523de2b12d98e584e573dd7d9334ef660fb0a1"
+    "abyss_stack": "9cabe283f20f2d0b2861aaad061d2049d6878375",
+    "aoa_kag": "ba7805190527a635ff5c515701be29379af8277f",
+    "stack_runtime_current_digest": "sha256:1bc95d7cf75bcc807616b49d50426d61260ef440ecf567329cde29e1757945a0"
   },
   "stable_registration": {
-    "config_digest_after": "sha256:8332b07a01dba35e7550332f0f36c047041132509137167ab9e2457a4a900780",
-    "config_digest_before": "sha256:8332b07a01dba35e7550332f0f36c047041132509137167ab9e2457a4a900780",
+    "config_digest_after": "sha256:8d6d38d17e52cb9fe5160270c41dac56a1b4191bcec76b8d5c9a0ce1e867d063",
+    "config_digest_before": "sha256:8d6d38d17e52cb9fe5160270c41dac56a1b4191bcec76b8d5c9a0ce1e867d063",
     "unchanged": true
   },
   "verdict": "adapter_pair_passed"

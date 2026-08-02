@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os-abyss.dev/schemas/codex-kag-next-lab-observation.schema.json",
+  "title": "Codex KAG next-lab observation",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "abyss_mcp_codex_kag_next_lab_observation_v1"},
+    "observation_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "verdict": {"const": "isolated_prerelease_pair_passed"},
+    "consumer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {"const": "0.147.0-alpha.4"},
+        "binary_sha256": {"const": "8185beb794bf7374ecac1a5db7ff06611c708e4806b8b85d3b1f7cdbd7aa2826"},
+        "feature": {"const": "mcp_2026_07_28"},
+        "feature_default": {"const": false},
+        "production_authority": {"const": false}
+      },
+      "required": ["version", "binary_sha256", "feature", "feature_default", "production_authority"]
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "registration": {"const": "aoa_kag_next_lab"},
+        "endpoint": {"const": "http://127.0.0.1:5441/mcp"},
+        "python_mcp_version": {"const": "2.0.0"},
+        "credential_regular_non_symlink_0600": {"const": true},
+        "source_artifacts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "driver_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "adapter_harness_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "adapter_package_tree_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          },
+          "required": ["driver_sha256", "adapter_harness_sha256", "adapter_package_tree_sha256"]
+        },
+        "source_revisions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "abyss_stack": {"pattern": "^[0-9a-f]{40}$"},
+            "aoa_kag": {"pattern": "^[0-9a-f]{40}$"}
+          },
+          "required": ["abyss_stack", "aoa_kag"]
+        }
+      },
+      "required": ["registration", "endpoint", "python_mcp_version", "credential_regular_non_symlink_0600", "source_artifacts", "source_revisions"]
+    },
+    "wire": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {"const": "2026-07-28"},
+        "server_discover_observed": {"const": true},
+        "initialize_observed": {"const": false},
+        "input_limit_bytes": {"const": 16384},
+        "mcp_session_id_observed": {"const": false},
+        "output_limit_bytes": {"const": 262144},
+        "oversized_input_denied_code": {"const": -32602},
+        "oversized_input_http_status": {"const": 400},
+        "self_describing_requests": {"type": "integer", "minimum": 1},
+        "authenticated_principal": {
+          "const": {
+            "client_id": "https://os-abyss.invalid/codex-kag-next-lab.json",
+            "issuer": "https://auth.os-abyss.invalid",
+            "subject": "codex-kag-next-lab"
+          }
+        },
+        "trace_sent": {"type": "string", "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"},
+        "trace_observed": {"type": "string", "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"},
+        "tool_inventory": {"const": ["kag_discover"]},
+        "tool_schema_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "tool_call": {"const": "kag_discover"},
+        "owner": {"const": "abyss-stack"},
+        "result_schema": {"const": "aoa-kag-mcp-capabilities-v1"},
+        "request_bytes": {"type": "integer", "minimum": 1, "maximum": 16384},
+        "response_bytes": {"type": "integer", "minimum": 1, "maximum": 262144},
+        "wrong_bearer_http_status": {"const": 401}
+      },
+      "required": ["version", "server_discover_observed", "initialize_observed", "input_limit_bytes", "mcp_session_id_observed", "output_limit_bytes", "oversized_input_denied_code", "oversized_input_http_status", "self_describing_requests", "authenticated_principal", "trace_sent", "trace_observed", "tool_inventory", "tool_schema_sha256", "tool_call", "owner", "result_schema", "request_bytes", "response_bytes", "wrong_bearer_http_status"]
+    },
+    "stable_registration": {"$ref": "#/$defs/config_unchanged"},
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "app_process_stopped": {"const": true},
+        "server_process_stopped": {"const": true},
+        "port_closed": {"const": true},
+        "registration_removed": {"const": true},
+        "credential_removed": {"const": true}
+      },
+      "required": ["app_process_stopped", "server_process_stopped", "port_closed", "registration_removed", "credential_removed"]
+    },
+    "private_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "normalized_from": {"type": "string", "pattern": "^local://"},
+        "raw_receipt_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "server_record_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "required": ["normalized_from", "raw_receipt_sha256", "server_record_sha256"]
+    },
+    "claim_limits": {"type": "array", "items": {"type": "string", "minLength": 3}, "minItems": 5}
+  },
+  "required": ["schema_version", "observation_id", "observed_at", "finished_at", "expires_at", "verdict", "consumer", "server", "wire", "stable_registration", "rollback", "private_evidence", "claim_limits"],
+  "type": "object",
+  "$defs": {
+    "config_unchanged": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "config_sha256_before": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "config_sha256_after": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "unchanged": {"const": true}
+      },
+      "required": ["config_sha256_before", "config_sha256_after", "unchanged"]
+    }
+  }
+}

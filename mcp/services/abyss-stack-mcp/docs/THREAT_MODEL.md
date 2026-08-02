@@ -9,17 +9,20 @@
 - one credential cannot cross owner or policy contours.
 - a host receipt cannot be confused with an owner result or SDK transition
   verdict.
+- the internal-effect credential cannot select another unit, action, tool, or
+  lasting applied state;
+- a denied or incomplete effect attempt cannot disappear without a receipt.
 
 ## Controls
 
-- a separate credential for each read and candidate process, alongside
+- a separate credential for each read, candidate, and internal-effect process, alongside
   separate ports, tools, scopes, and client identities, with equal bearer
   values rejected after provisioning; an atomically published non-secret
   digest manifest is loaded beside only the selected contour credential, so
-  every managed startup verifies both committed digests remain distinct and
+  every managed startup verifies all three committed digests remain distinct and
   its own loaded bearer still matches its contour before binding a listener;
-- explicit pair rotation only after both managed planes are observably stopped;
-  it replaces both bearer values and the binding manifest without printing
+- explicit three-credential rotation only after all managed planes are observably stopped;
+  it replaces all bearer values and the binding manifest without printing
   them, leaves restart and consumer refresh explicit, and any partial
   publication fails closed at the next startup manifest check;
 - loopback-only HTTP with DNS-rebinding protection;
@@ -29,6 +32,29 @@
 - a protocol-independent exact tool/effect allowlist with input/output byte
   limits, per-process concurrency and rate limits, bounded dispatch deadlines,
   cancellation propagation, and public-safe allow/deny/cancel receipts;
+- a separate port-`5439` internal-effect process with one tool, one
+  `apply_runtime` class, one literal systemd unit, its own bearer and scope, a
+  process-isolated worker, a 120-second bound, and no generic shell, target,
+  action, or external-network parameter;
+- staged plan and approval artifacts are private regular mode-`0600` files
+  below a mode-`0700` effect root; the approval is content-addressed, expiring,
+  human-issued, and bound to the plan and idempotency key;
+- the approval names the one fixed internal-effect principal, while HTTP auth
+  binds the distinct bearer to that exact client identity and scope; read or
+  candidate principals therefore cannot replay the approval;
+- a process-wide file lock serializes execution and a private persistent
+  attempt journal permits at most one new pilot start per minute; an
+  idempotency receipt replays an existing success without repeating effects;
+- immediately before mutation the executor rechecks the observation digest,
+  freshness, source/package/deploy identity, unit, and exact live systemd
+  process identity, then persists a pre-effect receipt;
+- any pre-effect rejection writes a content-addressed denial receipt containing
+  only a request digest and bounded reason code; any failure after the first
+  restart attempt writes a recovery receipt with the actual rollback and
+  post-canary state;
+- after every first restart attempt the worker attempts the exact restart again
+  as restoration; success requires distinct pre/post/post-rollback process
+  identities plus authenticated post-effect and post-rollback canaries;
 - policy receipts contain input/output digests rather than values, mark all
   returned content as untrusted data with no instruction authority, and never
   authorize runtime effects;
@@ -84,12 +110,12 @@
   runtime-content digest before any reuse;
   generated entry-point shebangs are rebound to the stable publication path
   before that digest is recorded and the staged environment is renamed;
-- fail-closed reprovisioning while either managed stack MCP plane is active,
+- fail-closed reprovisioning while any managed stack MCP plane is active,
   with lifetime shared source-projection and runtime service locks, exclusive
   provision locks, and a final stopped-state check before environment
   replacement;
 - unit link/reload and runtime provisioning cannot be combined in one
-  invocation; the standalone provisioner requires both units to be loaded from
+  invocation; the standalone provisioner requires all three units to be loaded from
   their expected managed fragments with user systemd's effective lock-aware
   `ExecStart`; MCP Configs sync and runtime provisioning share an exclusive
   source-projection lock from their first mutation/read through publication,
@@ -118,9 +144,10 @@
   and bound to the current source revision and tree digest, package, deployed
   revision and tree digest, running process identity, schema, consumer, and
   exact canary route and receipt;
-- activation and restart reject `internal_effect` and `external_effect`
-  subjects while their distinct threat, approval, egress, compensation, and
-  rollback contracts are absent;
+- generic candidate activation and restart continue to reject
+  `internal_effect` and `external_effect` subjects. The D-0106 executor consumes
+  only an exact read-subject restart candidate under its separate approval and
+  rollback contract;
 - activation requires acceptance-owner evidence bound to the exact source
   revision and package digest, and carries that expiring receipt into the
   candidate;
@@ -176,21 +203,24 @@
 
 ## Confused deputy
 
-The server never proxies another MCP tool and never dispatches a plan. An
-operator or later effect plane must revalidate the exact target, evidence,
-approval, current snapshot, postcondition canary, and rollback route. Discovery
-therefore cannot turn this service into a confused deputy for sibling
-authority.
+The read and candidate servers never proxy another MCP tool or dispatch a
+plan. The effect server accepts IDs only and independently revalidates the
+exact target, evidence, approval, current snapshot, postcondition canary, and
+rollback route. It cannot receive another unit, action, executable, endpoint,
+or owner-tool name. Discovery therefore cannot turn this service into a
+confused deputy for sibling authority.
 
 ## Residual risk
 
 A same-UID process that can read the deployed Secrets tree remains outside the
-protection offered by bearer authentication. OS-user or container isolation is
-required before any effect plane. No effect plane is admitted by this package.
-Deadline cancellation cannot terminate an already-running Python worker
-thread. Current dispatches are bounded, local, and non-effecting; an effect
-plane must use cooperatively cancellable or process-isolated handlers before
-admission.
+protection offered by bearer authentication. Stronger OS-user or container
+isolation remains desirable for broader effects. The admitted pilot therefore
+has only the exact user-level read-service restart authority and no persistent
+applied state or external effect.
+Caller cancellation does not abort restoration midway: the server waits the
+bounded worker window for the process-isolated executor to finish. If the
+worker exceeds that bound the process group is terminated, and live operator
+recovery plus the persisted pre-effect/recovery evidence becomes mandatory.
 The journal hash chain is tamper-evident, not externally notarized. A same-UID
 actor can still rewrite the file and recompute a replacement chain while the
 service is stopped. External anchoring belongs to a later proof/evidence

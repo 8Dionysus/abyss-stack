@@ -1,0 +1,259 @@
+{
+  "$defs": {
+    "OrganAccessCapability": {
+      "additionalProperties": false,
+      "properties": {
+        "capability_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Capability Id",
+          "type": "string"
+        },
+        "credential_class": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Credential Class",
+          "type": "string"
+        },
+        "eval_refs": {
+          "default": [],
+          "items": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "title": "Eval Refs",
+          "type": "array"
+        },
+        "owner_payload_schema_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Owner Payload Schema Ref",
+          "type": "string"
+        },
+        "policy_family": {
+          "enum": [
+            "read",
+            "candidate",
+            "internal_effect"
+          ],
+          "title": "Policy Family",
+          "type": "string"
+        },
+        "primitives": {
+          "items": {
+            "$ref": "#/$defs/OrganAccessPrimitive"
+          },
+          "minItems": 1,
+          "title": "Primitives",
+          "type": "array"
+        },
+        "summary": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Summary",
+          "type": "string"
+        },
+        "task_intent_terms": {
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Task Intent Terms",
+          "type": "array"
+        }
+      },
+      "required": [
+        "capability_id",
+        "summary",
+        "policy_family",
+        "credential_class",
+        "primitives",
+        "owner_payload_schema_ref",
+        "task_intent_terms"
+      ],
+      "title": "OrganAccessCapability",
+      "type": "object"
+    },
+    "OrganAccessPrimitive": {
+      "additionalProperties": false,
+      "properties": {
+        "annotations_are_security_enforcement": {
+          "const": false,
+          "default": false,
+          "title": "Annotations Are Security Enforcement",
+          "type": "boolean"
+        },
+        "approval_required": {
+          "default": false,
+          "title": "Approval Required",
+          "type": "boolean"
+        },
+        "effect_class": {
+          "enum": [
+            "observe",
+            "prepare_candidate",
+            "apply_runtime"
+          ],
+          "title": "Effect Class",
+          "type": "string"
+        },
+        "idempotency": {
+          "enum": [
+            "read_only",
+            "idempotent"
+          ],
+          "title": "Idempotency",
+          "type": "string"
+        },
+        "input_schema_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Input Schema Ref",
+          "type": "string"
+        },
+        "kind": {
+          "const": "tool",
+          "default": "tool",
+          "title": "Kind",
+          "type": "string"
+        },
+        "maximum_blast_radius": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Maximum Blast Radius",
+          "type": "string"
+        },
+        "mcp_name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Mcp Name",
+          "type": "string"
+        },
+        "output_schema_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Output Schema Ref",
+          "type": "string"
+        },
+        "policy_family": {
+          "enum": [
+            "read",
+            "candidate",
+            "internal_effect"
+          ],
+          "title": "Policy Family",
+          "type": "string"
+        },
+        "primitive_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Primitive Id",
+          "type": "string"
+        },
+        "rollback_route": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rollback Route"
+        }
+      },
+      "required": [
+        "primitive_id",
+        "mcp_name",
+        "effect_class",
+        "policy_family",
+        "input_schema_ref",
+        "output_schema_ref",
+        "idempotency",
+        "maximum_blast_radius"
+      ],
+      "title": "OrganAccessPrimitive",
+      "type": "object"
+    }
+  },
+  "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/organ-access.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "admission_asserted": {
+      "const": false,
+      "default": false,
+      "title": "Admission Asserted",
+      "type": "boolean"
+    },
+    "capabilities": {
+      "items": {
+        "$ref": "#/$defs/OrganAccessCapability"
+      },
+      "minItems": 3,
+      "title": "Capabilities",
+      "type": "array"
+    },
+    "contains_secrets": {
+      "const": false,
+      "default": false,
+      "title": "Contains Secrets",
+      "type": "boolean"
+    },
+    "effect_activation_authorized": {
+      "const": false,
+      "default": false,
+      "title": "Effect Activation Authorized",
+      "type": "boolean"
+    },
+    "organ_id": {
+      "const": "abyss-stack",
+      "default": "abyss-stack",
+      "title": "Organ Id",
+      "type": "string"
+    },
+    "owner_decision_ref": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Owner Decision Ref",
+      "type": "string"
+    },
+    "registry_mutation_authorized": {
+      "const": false,
+      "default": false,
+      "title": "Registry Mutation Authorized",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "abyss_stack_mcp_organ_access_v1",
+      "default": "abyss_stack_mcp_organ_access_v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "owner_decision_ref",
+    "capabilities"
+  ],
+  "title": "StackOrganAccessManifest",
+  "type": "object"
+}

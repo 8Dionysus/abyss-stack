@@ -31,6 +31,14 @@ exposes only cache posture and explicit refresh. The two contours must use
 different credentials when deployed. The owner-local CLI can prepare the same
 cache without exposing an effectful MCP route.
 
+The optional `decision-retrieval` capability profile narrows the read contour
+to three tools and two addressable resources. Its stack-owned manifest binds
+the access runtime to the federated repository decision owners without moving
+rationale authority into `abyss-stack`. A normalized `decision_views`
+projection makes owner identity, status, rationale summary, lineage, source
+reference, and observed local source revision explicit while preserving the
+repo-local record as the source of full rationale.
+
 The graph builder also owns a decision-surface registry. Every fingerprinted
 file under `docs/decisions/` must either become a known graph node type or be
 reported in summary issues as an unmodeled surface.
@@ -61,6 +69,8 @@ not merged with a second copy.
   `Logs/decision-graph/latest/`.
 - A read credential cannot enumerate or invoke refresh.
 - MCP does not fetch, switch, reset, clean, or otherwise mutate source repos.
+- The `decision-retrieval` profile cannot be selected for the cache-refresh
+  `internal_effect` contour.
 - Cache freshness does not claim owner-source or remote freshness.
 - Unknown decision-lane surface types require graph-registry work before agents
   rely on them through this MCP.

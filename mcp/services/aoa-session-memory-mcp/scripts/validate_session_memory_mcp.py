@@ -18,6 +18,10 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from aoa_session_memory_mcp.core import AoASessionMemoryMCPState  # noqa: E402
+from aoa_session_memory_mcp.organ_access import (  # noqa: E402
+    load_organ_access_manifest,
+    validate_runtime_bindings,
+)
 from aoa_session_memory_mcp.server import build_server  # noqa: E402
 from mcp import ClientSession  # noqa: E402
 from mcp.client.stdio import StdioServerParameters, stdio_client  # noqa: E402
@@ -77,12 +81,7 @@ CONFIGURED_HTTP_RESPONSE_TIMEOUT_SECONDS = 120.0
 def _search_alias_smoke_arguments(limit: int = 3) -> dict:
     return {
         "query": "",
-        "filters": {
-            "route_signal": "mcp:aoa_session_memory_mcp",
-            "doc_type": "event",
-            "layer": "mcp",
-            "use_shards": True,
-        },
+        "filters": {"route_signal": "mcp:aoa_session_memory_mcp"},
         "limit": limit,
     }
 
@@ -694,6 +693,46 @@ def _select_usage_neighborhood_probe(
     raise SystemExit(f"usage neighborhood returned no evidence windows for indexed smoke candidates: {attempts}")
 
 
+def _select_mcp_usage_smoke_session(state: AoASessionMemoryMCPState) -> str:
+    candidate_payloads = [
+        state.session_search(
+            query,
+            filters={
+                "route_signal": "mcp:aoa_session_memory_mcp",
+                "use_shards": False,
+            },
+            limit=16,
+        )
+        for query in ("aoa_session_entity_usage_chain", "")
+    ]
+    attempts: list[str] = []
+    for session in _candidate_sessions(*candidate_payloads):
+        if session == "entity-registry":
+            continue
+        attempts.append(session)
+        usage_chain = state.session_entity_usage_chain(
+            anchor="aoa-session-memory-mcp",
+            kind="mcp_service",
+            limit=2,
+            per_route_limit=3,
+            session=session,
+        )
+        counts = usage_chain.get("counts") if isinstance(usage_chain.get("counts"), dict) else {}
+        quality = usage_chain.get("quality") if isinstance(usage_chain.get("quality"), dict) else {}
+        first_ref = usage_chain.get("first_ref") if isinstance(usage_chain.get("first_ref"), dict) else {}
+        if (
+            usage_chain.get("ok")
+            and counts.get("usage_event_count", 0) > 0
+            and quality.get("raw_or_segment_ref_present") is True
+            and _has_first_raw_or_segment_ref(first_ref)
+        ):
+            return session
+    raise SystemExit(
+        "no indexed session with direct aoa-session-memory MCP usage evidence: "
+        f"{attempts}"
+    )
+
+
 def _stdio_route_count_summary(
     inventory: dict,
     mcp_service_inventory: dict,
@@ -860,7 +899,11 @@ def _stdio_route_count_summary(
     }
 
 
-async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> dict:
+async def _stdio_tool_smoke(
+    state: AoASessionMemoryMCPState,
+    session: str,
+    usage_session: str,
+) -> dict:
     params = StdioServerParameters(
         command=sys.executable,
         args=[(REPO_ROOT / "scripts" / "aoa_session_memory_mcp_server.py").as_posix()],
@@ -950,12 +993,26 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
             )
             usage_alias = await call_json(
                 "aoa_session_entity_usage_audit",
-                {"anchor": "aoa-session-memory-mcp", "kind": "mcp_service", "limit": 2, "per_route_limit": 2},
+                {
+                    "anchor": "aoa-session-memory-mcp",
+                    "kind": "mcp_service",
+                    "limit": 1,
+                    "per_route_limit": 1,
+                    "consequence_window": 2,
+                    "document_limit": 12,
+                    "session": usage_session,
+                },
                 timeout_seconds=90,
             )
             usage_chain = await call_json(
                 "aoa_session_entity_usage_chain",
-                {"anchor": "aoa-session-memory-mcp", "kind": "mcp_service", "limit": 2, "per_route_limit": 3},
+                {
+                    "anchor": "aoa-session-memory-mcp",
+                    "kind": "mcp_service",
+                    "limit": 2,
+                    "per_route_limit": 3,
+                    "session": usage_session,
+                },
                 timeout_seconds=90,
             )
             entity_dossier = await call_json(
@@ -967,6 +1024,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                     "neighborhood_limit": 1,
                     "graph_limit": 6,
                     "graph_edge_limit": 6,
+                    "session": usage_session,
                 },
                 timeout_seconds=90,
             )
@@ -987,7 +1045,13 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
             )
             retrieve_usage = await call_json(
                 "aoa_session_retrieve",
-                {"recipe": "entity_usage", "query": "aoa-session-memory-mcp", "limit": 2, "event_limit": 2},
+                {
+                    "recipe": "entity_usage",
+                    "query": "aoa-session-memory-mcp",
+                    "session": usage_session,
+                    "limit": 2,
+                    "event_limit": 2,
+                },
                 timeout_seconds=90,
             )
             live_scenario = await call_json(
@@ -1251,7 +1315,10 @@ def _configured_transport_http_client(bearer_token: str, *, transport=None):
     )
 
 
-async def _configured_transport_smoke(state: AoASessionMemoryMCPState) -> dict:
+async def _configured_transport_smoke(
+    state: AoASessionMemoryMCPState,
+    usage_session: str,
+) -> dict:
     transport_spec, meta = _configured_transport_spec(state)
     if transport_spec is None:
         return {**meta, "ok": True, "skipped": True}
@@ -1336,7 +1403,13 @@ async def _configured_transport_smoke(state: AoASessionMemoryMCPState) -> dict:
 
             usage_chain_result = await mcp_session.call_tool(
                 "aoa_session_entity_usage_chain",
-                {"anchor": "aoa-session-memory-mcp", "kind": "mcp_service", "limit": 2, "per_route_limit": 3},
+                {
+                    "anchor": "aoa-session-memory-mcp",
+                    "kind": "mcp_service",
+                    "limit": 2,
+                    "per_route_limit": 3,
+                    "session": usage_session,
+                },
                 read_timeout_seconds=timedelta(seconds=90),
             )
             if usage_chain_result.isError or not usage_chain_result.content:
@@ -1377,7 +1450,15 @@ async def _configured_transport_smoke(state: AoASessionMemoryMCPState) -> dict:
 
             usage_result = await mcp_session.call_tool(
                 "aoa_session_entity_usage_audit",
-                {"anchor": "aoa-session-memory-mcp", "kind": "mcp_service", "limit": 2, "per_route_limit": 2},
+                {
+                    "anchor": "aoa-session-memory-mcp",
+                    "kind": "mcp_service",
+                    "limit": 1,
+                    "per_route_limit": 1,
+                    "consequence_window": 2,
+                    "document_limit": 12,
+                    "session": usage_session,
+                },
                 read_timeout_seconds=timedelta(seconds=90),
             )
             if usage_result.isError or not usage_result.content:
@@ -1399,6 +1480,7 @@ async def _configured_transport_smoke(state: AoASessionMemoryMCPState) -> dict:
                     "neighborhood_limit": 1,
                     "graph_limit": 6,
                     "graph_edge_limit": 6,
+                    "session": usage_session,
                 },
                 read_timeout_seconds=timedelta(seconds=90),
             )
@@ -1433,7 +1515,13 @@ async def _configured_transport_smoke(state: AoASessionMemoryMCPState) -> dict:
 
             retrieve_result = await mcp_session.call_tool(
                 "aoa_session_retrieve",
-                {"recipe": "entity_usage", "query": "aoa-session-memory-mcp", "limit": 2, "event_limit": 2},
+                {
+                    "recipe": "entity_usage",
+                    "query": "aoa-session-memory-mcp",
+                    "session": usage_session,
+                    "limit": 2,
+                    "event_limit": 2,
+                },
                 read_timeout_seconds=timedelta(seconds=90),
             )
             if retrieve_result.isError or not retrieve_result.content:
@@ -1538,10 +1626,10 @@ def main(argv: list[str] | None = None) -> None:
     trace = state.session_trace("aoa-session-memory-mcp", kind="mcp", doc_type="session", limit=5, per_route_limit=3)
     if not trace.get("route_candidates"):
         raise SystemExit("trace-route did not return route candidates")
-    search = state.session_search("", filters={"route_signal": "mcp:aoa_session_memory_mcp", "doc_type": "session"}, limit=3)
+    search = state.session_search("", filters={"route_signal": "mcp:aoa_session_memory_mcp"}, limit=3)
     if search.get("result_count", 0) <= 0:
         raise SystemExit("session search returned no smoke hits")
-    route_only = state.session_search("", filters={"route_signal": "tool:view_image", "doc_type": "event"}, limit=3)
+    route_only = state.session_search("", filters={"route_signal": "tool:view_image"}, limit=3)
     if route_only.get("result_count", 0) <= 0:
         raise SystemExit("route-only session search returned no smoke hits")
     skill_inventory = state.session_entity_inventory(layer="skill", limit=5)
@@ -1606,8 +1694,21 @@ def main(argv: list[str] | None = None) -> None:
     server = build_server()
     if server is None:
         raise SystemExit("MCP server did not build")
-    stdio_smoke = asyncio.run(_stdio_tool_smoke(state, latest_session))
-    configured_transport_smoke = asyncio.run(_configured_transport_smoke(state))
+    validate_runtime_bindings(
+        load_organ_access_manifest(),
+        tool_names=set(server._tool_manager._tools),
+        resource_templates={
+            str(item.uri_template)
+            for item in server._resource_manager._templates.values()
+        },
+    )
+    mcp_usage_session = _select_mcp_usage_smoke_session(state)
+    stdio_smoke = asyncio.run(
+        _stdio_tool_smoke(state, latest_session, mcp_usage_session)
+    )
+    configured_transport_smoke = asyncio.run(
+        _configured_transport_smoke(state, mcp_usage_session)
+    )
     transport_preflight = state.session_mcp_transport_preflight()
     running_processes = transport_preflight.get("running_mcp_processes", {})
     codex_session = transport_preflight.get("codex_session", {})

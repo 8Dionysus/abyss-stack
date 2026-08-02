@@ -42,6 +42,9 @@ STACK_MCP_READ_UNIT = REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-read.ser
 STACK_MCP_CANDIDATE_UNIT = (
     REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-candidate.service"
 )
+STACK_MCP_INTERNAL_EFFECT_UNIT = (
+    REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-internal-effect.service"
+)
 STACK_MCP_OBSERVATION_UNIT = (
     REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-observation.service"
 )
@@ -71,6 +74,7 @@ MCP_HTTP_SECRET_RELATIVE = Path("Secrets") / "Configs" / MCP_HTTP_CREDENTIAL_NAM
 STACK_MCP_CREDENTIAL_NAMES = (
     "abyss-stack-mcp-read-bearer-token",
     "abyss-stack-mcp-candidate-bearer-token",
+    "abyss-stack-mcp-internal-effect-bearer-token",
 )
 STACK_MCP_CANARY_SIGNING_KEY_NAME = (
     "abyss-stack-mcp-canary-ed25519-private-key.pem"
@@ -884,7 +888,12 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                     "read_sha256": hashlib.sha256(
                         credentials["abyss-stack-mcp-read-bearer-token"].encode("utf-8")
                     ).hexdigest(),
-                    "schema_version": "abyss_stack_mcp_auth_manifest_v1",
+                    "internal_effect_sha256": hashlib.sha256(
+                        credentials[
+                            "abyss-stack-mcp-internal-effect-bearer-token"
+                        ].encode("utf-8")
+                    ).hexdigest(),
+                    "schema_version": "abyss_stack_mcp_auth_manifest_v2",
                 },
             )
             self.assertEqual(manifest_path.stat().st_mode & 0o777, 0o600)
@@ -918,6 +927,10 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 first.stdout,
             )
             self.assertIn(
+                "provisioned abyss-stack MCP internal-effect bearer credential",
+                first.stdout,
+            )
+            self.assertIn(
                 "provisioned abyss-stack MCP canary signing key",
                 first.stdout,
             )
@@ -942,7 +955,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                         token,
                     )
                     self.assertNotIn(token, second.stdout + second.stderr)
-            self.assertEqual(second.stdout.count("already provisioned"), 3)
+            self.assertEqual(second.stdout.count("already provisioned"), 4)
             self.assertIn(
                 "refreshed abyss-stack MCP credential separation manifest",
                 second.stdout,
@@ -984,7 +997,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
-                "read and candidate bearer credentials must be distinct",
+                "read, candidate, and internal-effect bearer credentials must be distinct",
                 result.stderr,
             )
             self.assertNotIn(shared_token, result.stdout + result.stderr)
@@ -1051,7 +1064,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 .removesuffix("\n")
                 for name in STACK_MCP_CREDENTIAL_NAMES
             }
-            self.assertEqual(len(set(after.values())), 2)
+            self.assertEqual(len(set(after.values())), 3)
             for name in STACK_MCP_CREDENTIAL_NAMES:
                 self.assertNotEqual(before[name], after[name])
                 self.assertNotIn(after[name], rotate.stdout + rotate.stderr)
@@ -1071,6 +1084,18 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 hashlib.sha256(
                     after["abyss-stack-mcp-candidate-bearer-token"].encode("utf-8")
                 ).hexdigest(),
+            )
+            self.assertEqual(
+                manifest["internal_effect_sha256"],
+                hashlib.sha256(
+                    after[
+                        "abyss-stack-mcp-internal-effect-bearer-token"
+                    ].encode("utf-8")
+                ).hexdigest(),
+            )
+            self.assertEqual(
+                manifest["schema_version"],
+                "abyss_stack_mcp_auth_manifest_v2",
             )
             self.assertIn("managed units remain stopped", rotate.stdout)
 
@@ -1214,6 +1239,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             for source_unit in (
                 STACK_MCP_READ_UNIT,
                 STACK_MCP_CANDIDATE_UNIT,
+                STACK_MCP_INTERNAL_EFFECT_UNIT,
             ):
                 source_path = unit_source_dir / source_unit.name
                 source_path.write_text(
@@ -1238,6 +1264,8 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 'fragment_path="${XDG_CONFIG_HOME}/systemd/user/${unit}"\n'
                 'contour="${unit#abyss-stack-mcp-}"\n'
                 'contour="${contour%.service}"\n'
+                'if [[ "$contour" == "internal-effect" ]]; then '
+                'contour=internal_effect; fi\n'
                 "exec_path=/usr/bin/flock\n"
                 'exec_start="/usr/bin/flock --shared --no-fork '
                 "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/"
@@ -1805,6 +1833,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             for active_unit in (
                 "abyss-stack-mcp-read.service",
                 "abyss-stack-mcp-candidate.service",
+                "abyss-stack-mcp-internal-effect.service",
             ):
                 with self.subTest(active_unit=active_unit):
                     blocked = subprocess.run(
@@ -1971,7 +2000,8 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         )
         self.assertNotEqual(invalid_contour.returncode, 0)
         self.assertIn(
-            "runtime verification contour must be all, read, or candidate",
+            "runtime verification contour must be all, read, candidate, or "
+            "internal_effect",
             invalid_contour.stderr,
         )
 
@@ -2397,9 +2427,10 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         )
         self.assertNotIn("evals/suites/*.suite.json", evals_candidate)
 
-    def test_stack_mcp_units_keep_read_and_candidate_contours_disjoint(self) -> None:
+    def test_stack_mcp_units_keep_all_contours_disjoint(self) -> None:
         read_unit = STACK_MCP_READ_UNIT.read_text(encoding="utf-8")
         candidate_unit = STACK_MCP_CANDIDATE_UNIT.read_text(encoding="utf-8")
+        effect_unit = STACK_MCP_INTERNAL_EFFECT_UNIT.read_text(encoding="utf-8")
         observation_path = (
             "Environment=ABYSS_STACK_MCP_OBSERVATION_PATH="
             "/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json"
@@ -2416,6 +2447,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         read_deployed_entrypoint = f"{deployed_entrypoint_prefix}=read"
         candidate_deployed_entrypoint = (
             f"{deployed_entrypoint_prefix}=candidate"
+        )
+        effect_deployed_entrypoint = (
+            f"{deployed_entrypoint_prefix}=internal_effect"
         )
         runtime_condition = (
             "ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/"
@@ -2447,11 +2481,14 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         candidate_runtime_verifier_condition = (
             f"{runtime_verifier_condition_prefix}=candidate"
         )
+        effect_runtime_verifier_condition = (
+            f"{runtime_verifier_condition_prefix}=internal_effect"
+        )
         installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")
         self.assertIn("aoa_launch_verified_abyss_stack_mcp()", installer)
         self.assertIn(
             '"$abyss_stack_mcp_venv/bin/python" \\\n'
-            "    -I -B -m abyss_stack_mcp.server",
+            '    -I -B -m "$module"',
             installer,
         )
 
@@ -2465,9 +2502,14 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertNotIn(
             "Environment=ABYSS_STACK_MCP_POLICY_FAMILY=read", candidate_unit
         )
+        self.assertIn(
+            "Environment=ABYSS_STACK_MCP_POLICY_FAMILY=internal_effect",
+            effect_unit,
+        )
         self.assertIn(observation_path, read_unit)
         self.assertIn(observation_path, candidate_unit)
-        for unit in (read_unit, candidate_unit):
+        self.assertIn(observation_path, effect_unit)
+        for unit in (read_unit, candidate_unit, effect_unit):
             self.assertIn(
                 "ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/"
                 "observations/current.json",
@@ -2477,6 +2519,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertNotIn("Environment=AOA_MCP_PORT=5433", read_unit)
         self.assertIn("Environment=AOA_MCP_PORT=5433", candidate_unit)
         self.assertNotIn("Environment=AOA_MCP_PORT=5431", candidate_unit)
+        self.assertIn("Environment=AOA_MCP_PORT=5439", effect_unit)
         self.assertIn(
             "LoadCredential=abyss-stack-mcp-read-bearer-token:"
             "/srv/AbyssOS/abyss-stack/Secrets/Configs/"
@@ -2491,6 +2534,14 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             candidate_unit,
         )
         self.assertNotIn("read-bearer-token", candidate_unit)
+        self.assertIn(
+            "LoadCredential=abyss-stack-mcp-internal-effect-bearer-token:",
+            effect_unit,
+        )
+        self.assertIn(
+            "LoadCredential=abyss-stack-mcp-read-bearer-token:", effect_unit
+        )
+        self.assertNotIn("candidate-bearer-token", effect_unit)
         self.assertIn(
             f"ConditionPathExists={read_audit_path}",
             read_unit,
@@ -2523,17 +2574,20 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertNotIn(candidate_runtime_verifier_condition, read_unit)
         self.assertIn(candidate_runtime_verifier_condition, candidate_unit)
         self.assertNotIn(read_runtime_verifier_condition, candidate_unit)
+        self.assertIn(effect_runtime_verifier_condition, effect_unit)
         self.assertIn(read_deployed_entrypoint, read_unit)
         self.assertNotIn(candidate_deployed_entrypoint, read_unit)
         self.assertIn(candidate_deployed_entrypoint, candidate_unit)
         self.assertNotIn(read_deployed_entrypoint, candidate_unit)
+        self.assertIn(effect_deployed_entrypoint, effect_unit)
         for unit in (read_unit, candidate_unit):
             self.assertIn(
-                "Environment=ABYSS_STACK_MCP_REQUIRE_AUTH_MANIFEST=1",
+                "Environment=ABYSS_STACK_MCP_REQUIRE_AUDIT_JOURNAL=1",
                 unit,
             )
+        for unit in (read_unit, candidate_unit, effect_unit):
             self.assertIn(
-                "Environment=ABYSS_STACK_MCP_REQUIRE_AUDIT_JOURNAL=1",
+                "Environment=ABYSS_STACK_MCP_REQUIRE_AUTH_MANIFEST=1",
                 unit,
             )
             self.assertIn(
@@ -2569,6 +2623,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         }
         self.assertIn(STACK_MCP_READ_UNIT.name, managed_units)
         self.assertIn(STACK_MCP_CANDIDATE_UNIT.name, managed_units)
+        self.assertIn(STACK_MCP_INTERNAL_EFFECT_UNIT.name, managed_units)
 
     def test_stack_mcp_observation_producer_is_bounded_and_separately_timed(
         self,

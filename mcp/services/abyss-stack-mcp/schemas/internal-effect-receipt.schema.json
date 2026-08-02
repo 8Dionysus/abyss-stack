@@ -1,0 +1,284 @@
+{
+  "$defs": {
+    "ProcessSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "active_state": {
+          "const": "active",
+          "default": "active",
+          "title": "Active State",
+          "type": "string"
+        },
+        "captured_at": {
+          "format": "date-time",
+          "title": "Captured At",
+          "type": "string"
+        },
+        "main_pid": {
+          "exclusiveMinimum": 0,
+          "title": "Main Pid",
+          "type": "integer"
+        },
+        "process_identity": {
+          "title": "Process Identity",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "abyss_stack_internal_effect_process_snapshot_v1",
+          "default": "abyss_stack_internal_effect_process_snapshot_v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "start_timestamp_monotonic": {
+          "exclusiveMinimum": 0,
+          "title": "Start Timestamp Monotonic",
+          "type": "integer"
+        },
+        "sub_state": {
+          "const": "running",
+          "default": "running",
+          "title": "Sub State",
+          "type": "string"
+        },
+        "unit_name": {
+          "const": "abyss-stack-mcp-read.service",
+          "default": "abyss-stack-mcp-read.service",
+          "title": "Unit Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "main_pid",
+        "start_timestamp_monotonic",
+        "process_identity",
+        "captured_at"
+      ],
+      "title": "ProcessSnapshot",
+      "type": "object"
+    }
+  },
+  "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/internal-effect-receipt.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "actual_effects": {
+      "default": [
+        "restart_exact_unit",
+        "rollback_restart_exact_unit"
+      ],
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "const": "restart_exact_unit",
+          "type": "string"
+        },
+        {
+          "const": "rollback_restart_exact_unit",
+          "type": "string"
+        }
+      ],
+      "title": "Actual Effects",
+      "type": "array"
+    },
+    "approval_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Approval Id",
+      "type": "string"
+    },
+    "approval_verified": {
+      "const": true,
+      "default": true,
+      "title": "Approval Verified",
+      "type": "boolean"
+    },
+    "claim_limit": {
+      "const": "This receipt proves one approved restart and one executed rollback restart of abyss-stack-mcp-read.service with authenticated post-effect and post-rollback canaries. It authorizes no other unit, command, source mutation, credential use, admission, or external effect.",
+      "default": "This receipt proves one approved restart and one executed rollback restart of abyss-stack-mcp-read.service with authenticated post-effect and post-rollback canaries. It authorizes no other unit, command, source mutation, credential use, admission, or external effect.",
+      "title": "Claim Limit",
+      "type": "string"
+    },
+    "contains_secrets": {
+      "const": false,
+      "default": false,
+      "title": "Contains Secrets",
+      "type": "boolean"
+    },
+    "deployed_revision": {
+      "title": "Deployed Revision",
+      "type": "string"
+    },
+    "deployed_tree_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Deployed Tree Digest",
+      "type": "string"
+    },
+    "exact_unit_name": {
+      "const": "abyss-stack-mcp-read.service",
+      "default": "abyss-stack-mcp-read.service",
+      "title": "Exact Unit Name",
+      "type": "string"
+    },
+    "expected_observation_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Expected Observation Digest",
+      "type": "string"
+    },
+    "external_effect_authorized": {
+      "const": false,
+      "default": false,
+      "title": "External Effect Authorized",
+      "type": "boolean"
+    },
+    "idempotency_key": {
+      "maxLength": 160,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "title": "Idempotency Key",
+      "type": "string"
+    },
+    "issuer": {
+      "const": "abyss-stack",
+      "default": "abyss-stack",
+      "title": "Issuer",
+      "type": "string"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "title": "Observed At",
+      "type": "string"
+    },
+    "outcome": {
+      "const": "succeeded_rolled_back",
+      "default": "succeeded_rolled_back",
+      "title": "Outcome",
+      "type": "string"
+    },
+    "package_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Package Digest",
+      "type": "string"
+    },
+    "plan_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "post_effect": {
+      "$ref": "#/$defs/ProcessSnapshot"
+    },
+    "post_effect_canary_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Post Effect Canary Digest",
+      "type": "string"
+    },
+    "post_effect_canary_ref": {
+      "title": "Post Effect Canary Ref",
+      "type": "string"
+    },
+    "post_effect_canary_succeeded": {
+      "const": true,
+      "default": true,
+      "title": "Post Effect Canary Succeeded",
+      "type": "boolean"
+    },
+    "post_rollback": {
+      "$ref": "#/$defs/ProcessSnapshot"
+    },
+    "post_rollback_canary_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Post Rollback Canary Digest",
+      "type": "string"
+    },
+    "post_rollback_canary_ref": {
+      "title": "Post Rollback Canary Ref",
+      "type": "string"
+    },
+    "post_rollback_canary_succeeded": {
+      "const": true,
+      "default": true,
+      "title": "Post Rollback Canary Succeeded",
+      "type": "boolean"
+    },
+    "pre_effect": {
+      "$ref": "#/$defs/ProcessSnapshot"
+    },
+    "receipt_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Receipt Id",
+      "type": "string"
+    },
+    "rollback_executed": {
+      "const": true,
+      "default": true,
+      "title": "Rollback Executed",
+      "type": "boolean"
+    },
+    "rollback_target_process_identity": {
+      "title": "Rollback Target Process Identity",
+      "type": "string"
+    },
+    "runtime_effect_authorized": {
+      "const": true,
+      "default": true,
+      "title": "Runtime Effect Authorized",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "abyss_stack_internal_effect_receipt_v1",
+      "default": "abyss_stack_internal_effect_receipt_v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_revision": {
+      "title": "Source Revision",
+      "type": "string"
+    },
+    "source_to_sink_policy_verified": {
+      "const": true,
+      "default": true,
+      "title": "Source To Sink Policy Verified",
+      "type": "boolean"
+    },
+    "target_organ_id": {
+      "const": "abyss-stack",
+      "default": "abyss-stack",
+      "title": "Target Organ Id",
+      "type": "string"
+    },
+    "target_policy_family": {
+      "const": "read",
+      "default": "read",
+      "title": "Target Policy Family",
+      "type": "string"
+    },
+    "tool_id": {
+      "const": "stack_execute_approved_read_restart_pilot",
+      "default": "stack_execute_approved_read_restart_pilot",
+      "title": "Tool Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "receipt_id",
+    "plan_id",
+    "approval_id",
+    "idempotency_key",
+    "expected_observation_digest",
+    "source_revision",
+    "package_digest",
+    "deployed_revision",
+    "deployed_tree_digest",
+    "pre_effect",
+    "post_effect",
+    "post_effect_canary_ref",
+    "post_effect_canary_digest",
+    "rollback_target_process_identity",
+    "post_rollback",
+    "post_rollback_canary_ref",
+    "post_rollback_canary_digest",
+    "observed_at"
+  ],
+  "title": "InternalEffectReceipt",
+  "type": "object"
+}

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os-abyss.dev/schemas/stable-kag-post-rollback-observation.schema.json",
+  "title": "Stable KAG post-rollback observation",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "abyss_mcp_stable_kag_post_rollback_observation_v1"},
+    "observation_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "verdict": {"const": "stable_production_route_passed_after_lab_rollback"},
+    "consumer": {
+      "const": {
+        "actual_operator_config": true,
+        "binary_sha256": "2e863156ed35ecc5253b1e2f907a9143077b9f7cb51942070c61996471ff6e04",
+        "registration": "aoa_kag",
+        "version": "0.146.0"
+      }
+    },
+    "canary": {
+      "const": {
+        "is_error": false,
+        "owner": "abyss-stack",
+        "result_schema": "aoa-kag-mcp-capabilities-v1",
+        "tool": "kag_discover"
+      }
+    },
+    "stable_registration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "config_sha256_before": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "config_sha256_after": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "unchanged": {"const": true}
+      },
+      "required": ["config_sha256_before", "config_sha256_after", "unchanged"]
+    },
+    "process_stopped": {"const": true},
+    "private_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {"type": "string", "pattern": "^local://"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "required": ["ref", "sha256"]
+    },
+    "secrets_included": {"const": false},
+    "claim_limits": {"type": "array", "items": {"type": "string", "minLength": 3}, "minItems": 3}
+  },
+  "required": ["schema_version", "observation_id", "observed_at", "finished_at", "expires_at", "verdict", "consumer", "canary", "stable_registration", "process_stopped", "private_receipt", "secrets_included", "claim_limits"],
+  "type": "object"
+}

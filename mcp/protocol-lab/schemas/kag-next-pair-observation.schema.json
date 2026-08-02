@@ -48,7 +48,7 @@
           "type": "array"
         },
         "freshness_state": {
-          "const": "source_unavailable"
+          "const": "current"
         },
         "owner": {
           "const": "abyss-stack"
@@ -94,6 +94,20 @@
             "repeat_tools_list_wire_fetches",
             "ttl_ms",
             "scope"
+          ],
+          "type": "object"
+        },
+        "cancellation": {
+          "additionalProperties": false,
+          "properties": {
+            "client_request_cancelled": {"const": true},
+            "server_dispatch_cancelled": {"const": false},
+            "server_dispatch_completed_after_client_cancel": {"const": true}
+          },
+          "required": [
+            "client_request_cancelled",
+            "server_dispatch_cancelled",
+            "server_dispatch_completed_after_client_cancel"
           ],
           "type": "object"
         },
@@ -153,6 +167,7 @@
         "tool_inventory",
         "resource_inventory",
         "cache",
+        "cancellation",
         "independent_clients",
         "self_describing_dispatches",
         "session_header_observed",
@@ -189,7 +204,7 @@
           "type": "string"
         },
         "sha256": {
-          "const": "0883381024bf6416e659c395f6acacce9f9dc6546c8101dd6b141f1b2376fb6d"
+          "const": "cf839aa6a04ec37bdf7e021ea5781787aecb6a826aceb3d26da49f7124d0514d"
         }
       },
       "required": [
@@ -206,10 +221,10 @@
       "additionalProperties": false,
       "properties": {
         "aoa_kag": {
-          "const": "0ff913279868735b41a17aab84c0c89341d7cb77"
+          "const": "ba7805190527a635ff5c515701be29379af8277f"
         },
         "abyss_stack": {
-          "const": "8bcfe0edf7ad499d666207ca2087d8db9df4d7a9"
+          "const": "9cabe283f20f2d0b2861aaad061d2049d6878375"
         },
         "stack_runtime_current_digest": {
           "pattern": "^sha256:[0-9a-f]{64}$",

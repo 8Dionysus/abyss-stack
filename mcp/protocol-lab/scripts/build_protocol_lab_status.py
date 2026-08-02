@@ -15,19 +15,15 @@ LAB_ROOT = Path(__file__).resolve().parents[1]
 MATRIX_PATH = LAB_ROOT / "protocol-compatibility-matrix.v1.json"
 OBSERVATION_PATH = LAB_ROOT / "fixtures" / "current-pair-observation.json"
 OUTPUT_PATH = LAB_ROOT / "generated" / "protocol-lab-status.json"
-PRODUCTION_OBSERVATION_PATH = (
-    LAB_ROOT / "fixtures" / "codex-0.146.0-production-pair-observation.json"
-)
-MATRIX_SCHEMA_PATH = (
-    LAB_ROOT / "schemas" / "protocol-compatibility-matrix.schema.json"
-)
-OBSERVATION_SCHEMA_PATH = (
-    LAB_ROOT / "schemas" / "protocol-pair-observation.schema.json"
-)
+PRODUCTION_OBSERVATION_PATH = LAB_ROOT / "fixtures" / "codex-0.146.0-production-pair-observation.json"
+CODEX_LAB_OBSERVATION_PATH = LAB_ROOT / "fixtures" / "codex-0.147.0-alpha.4-kag-next-lab-observation.json"
+STABLE_ROLLBACK_OBSERVATION_PATH = LAB_ROOT / "fixtures" / "codex-0.146.0-stable-kag-post-rollback-observation.json"
+MATRIX_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-compatibility-matrix.schema.json"
+OBSERVATION_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-pair-observation.schema.json"
 STATUS_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-lab-status.schema.json"
-PRODUCTION_OBSERVATION_SCHEMA_PATH = (
-    LAB_ROOT / "schemas" / "protocol-production-pair-observation.schema.json"
-)
+PRODUCTION_OBSERVATION_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-production-pair-observation.schema.json"
+CODEX_LAB_OBSERVATION_SCHEMA_PATH = LAB_ROOT / "schemas" / "codex-kag-next-lab-observation.schema.json"
+STABLE_ROLLBACK_OBSERVATION_SCHEMA_PATH = LAB_ROOT / "schemas" / "stable-kag-post-rollback-observation.schema.json"
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -58,88 +54,127 @@ def validate_payload(payload: dict[str, Any], schema_path: Path) -> None:
         raise ValueError(f"{schema_path.name}: {rendered}")
 
 
+def _consumer(matrix: dict[str, Any], consumer_id: str) -> dict[str, Any]:
+    matches = [
+        item for item in matrix["consumer_pairs"] if item["consumer_id"] == consumer_id
+    ]
+    if len(matches) != 1:
+        raise ValueError(f"expected one consumer pair named {consumer_id}")
+    return matches[0]
+
+
+def _passed(observation: dict[str, Any], name: str) -> bool:
+    return observation[name]["status"] == "passed"
+
+
 def build_status(
     matrix: dict[str, Any],
     observation: dict[str, Any],
     production_observation: dict[str, Any] | None = None,
+    codex_lab_observation: dict[str, Any] | None = None,
+    stable_rollback_observation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    if production_observation is None:
-        production_observation = load_json(PRODUCTION_OBSERVATION_PATH)
-    validate_payload(matrix, MATRIX_SCHEMA_PATH)
-    validate_payload(observation, OBSERVATION_SCHEMA_PATH)
-    validate_payload(production_observation, PRODUCTION_OBSERVATION_SCHEMA_PATH)
+    production_observation = production_observation or load_json(PRODUCTION_OBSERVATION_PATH)
+    codex_lab_observation = codex_lab_observation or load_json(CODEX_LAB_OBSERVATION_PATH)
+    stable_rollback_observation = stable_rollback_observation or load_json(STABLE_ROLLBACK_OBSERVATION_PATH)
+    for payload, schema in (
+        (matrix, MATRIX_SCHEMA_PATH),
+        (observation, OBSERVATION_SCHEMA_PATH),
+        (production_observation, PRODUCTION_OBSERVATION_SCHEMA_PATH),
+        (codex_lab_observation, CODEX_LAB_OBSERVATION_SCHEMA_PATH),
+        (stable_rollback_observation, STABLE_ROLLBACK_OBSERVATION_SCHEMA_PATH),
+    ):
+        validate_payload(payload, schema)
     if observation["matrix_version"] != matrix["schema_version"]:
         raise ValueError("pair observation references a different matrix version")
 
     gates = matrix["migration_gates"]
     gate_counts = Counter(gate["status"] for gate in gates)
-    passed_gate_ids = [
-        gate["gate_id"] for gate in gates if gate["status"] == "passed"
-    ]
-    remaining_gate_ids = [
-        gate["gate_id"] for gate in gates if gate["status"] != "passed"
-    ]
+    passed_gate_ids = [gate["gate_id"] for gate in gates if gate["status"] == "passed"]
+    remaining_gate_ids = [gate["gate_id"] for gate in gates if gate["status"] != "passed"]
+    remaining_core_gate_ids = [gate_id for gate_id in remaining_gate_ids if gate_id != "P1-11"]
+    remaining_tasks_gate_ids = [gate_id for gate_id in remaining_gate_ids if gate_id == "P1-11"]
+
+    next_version = matrix["next_spec"]["wire_version"]
     next_sdk_ready = any(
         sdk["release_status"] == "stable"
         and sdk["production_allowed"]
-        and matrix["next_spec"]["wire_version"] in sdk["protocol_versions"]
+        and next_version in sdk["protocol_versions"]
         for sdk in matrix["sdk_lines"]
     )
-    consumer = matrix["consumer_pairs"][0]
-    core_pair_ready = all(
+    production_consumer = _consumer(matrix, "codex-cli")
+    lab_consumer = _consumer(matrix, "codex-cli-prerelease-lab")
+    lab_canary_completed = all(
         (
             matrix["next_spec"]["final_published"],
-            matrix["next_spec"]["production_allowed"],
             next_sdk_ready,
-            consumer["next_wire_pair_observed"],
-            consumer["server_discover_observed"],
-            observation["spec_final_observed"],
-            observation["stable_sdk_release_observed"],
-            observation["consumer_next_pair_observed"],
-            observation["server_discover_observed"],
-            observation["stateless_behavior_observed"],
-            observation["explicit_handles_observed"],
-            observation["trace_cache_metadata_observed"],
-            observation["official_conformance"]["status"] == "passed",
-            observation["abyss_pair_conformance"]["status"] == "passed",
-            observation["compatibility_aliases"]["status"] == "passed",
-            observation["dual_support"]["status"] == "passed",
-            observation["rollback"]["status"] == "passed",
+            lab_consumer["next_wire_pair_observed"],
+            lab_consumer["server_discover_observed"],
+            codex_lab_observation["verdict"] == "isolated_prerelease_pair_passed",
+            codex_lab_observation["wire"]["version"] == next_version,
+            not codex_lab_observation["consumer"]["production_authority"],
+            _passed(observation, "read_only_canary"),
+            _passed(observation, "compatibility_aliases"),
+            _passed(observation, "dual_support"),
+            _passed(observation, "rollback"),
+            not matrix["pilot"]["effectful"],
         )
     )
-    read_only_pilot_allowed = (
-        core_pair_ready
-        and observation["read_only_canary"]["status"] in {"not_run", "passed"}
-        and matrix["pilot"]["state"] in {"ready", "running", "passed"}
-        and not matrix["pilot"]["effectful"]
-    )
-    migration_allowed = (
-        core_pair_ready
-        and observation["read_only_canary"]["status"] == "passed"
+    lab_pair_ready = bool(
+        lab_canary_completed
+        and _passed(observation, "abyss_pair_conformance")
         and matrix["pilot"]["state"] == "passed"
-        and not remaining_gate_ids
     )
-    tasks_extension_allowed = (
-        core_pair_ready and observation["tasks_extension"]["status"] == "passed"
+    production_pair_ready = all(
+        (
+            production_consumer["next_wire_pair_observed"],
+            production_consumer["server_discover_observed"],
+            observation["official_conformance"]["status"] == "passed",
+            _passed(observation, "abyss_pair_conformance"),
+            _passed(observation, "read_only_canary"),
+            _passed(observation, "compatibility_aliases"),
+            _passed(observation, "dual_support"),
+            _passed(observation, "rollback"),
+            matrix["pilot"]["state"] == "passed",
+            not remaining_core_gate_ids,
+        )
     )
+    tasks_extension_allowed = bool(
+        production_pair_ready
+        and observation["tasks_extension"]["status"] == "passed"
+        and not remaining_tasks_gate_ids
+    )
+    production_cutover_blockers: list[str] = []
+    if not production_consumer["next_wire_pair_observed"]:
+        production_cutover_blockers.append("stable_codex_modern_pair_unavailable")
+    if observation["official_conformance"]["status"] != "passed":
+        production_cutover_blockers.append("current_conformance_fixture_mismatch")
+    if observation["abyss_pair_conformance"]["status"] != "passed":
+        production_cutover_blockers.append("modern_cancellation_not_propagated")
+
     unsigned = {
-        "schema_version": "abyss_mcp_protocol_lab_status_v1",
+        "schema_version": "abyss_mcp_protocol_lab_status_v2",
         "evaluated_at": observation["observed_at"],
         "evidence_expires_at": min(
-            matrix["expires_at"], production_observation["expires_at"]
+            matrix["expires_at"],
+            codex_lab_observation["expires_at"],
+            stable_rollback_observation["expires_at"],
         ),
         "matrix_digest": canonical_digest(matrix),
         "observation_digest": canonical_digest(observation),
+        "codex_lab_observation_digest": canonical_digest(codex_lab_observation),
+        "stable_rollback_observation_digest": canonical_digest(stable_rollback_observation),
         "production_protocol": matrix["production_protocol"],
-        "next_protocol": matrix["next_spec"]["wire_version"],
+        "next_protocol": next_version,
         "next_release_status": matrix["next_spec"]["release_status"],
-        "migration_allowed": migration_allowed,
-        "read_only_pilot_allowed": read_only_pilot_allowed,
+        "read_only_pilot_allowed": lab_pair_ready,
+        "read_only_pilot_completed": lab_canary_completed,
+        "core_read_migration_allowed": production_pair_ready,
         "tasks_extension_allowed": tasks_extension_allowed,
-        "effectful_migration_allowed": False,
-        "stable_registration_retained": matrix["dual_support"][
-            "stable_registration_retained"
-        ],
+        "candidate_migration_allowed": False,
+        "internal_effect_migration_allowed": False,
+        "external_effect_migration_allowed": False,
+        "stable_registration_retained": matrix["dual_support"]["stable_registration_retained"],
         "authority_move_combined": observation["authority_move_combined"],
         "gate_counts": {
             "passed": gate_counts["passed"],
@@ -148,41 +183,30 @@ def build_status(
         },
         "passed_gate_ids": passed_gate_ids,
         "remaining_gate_ids": remaining_gate_ids,
+        "remaining_core_gate_ids": remaining_core_gate_ids,
+        "remaining_tasks_gate_ids": remaining_tasks_gate_ids,
+        "production_cutover_blockers": production_cutover_blockers,
         "reason_codes": observation["reason_codes"],
         "next_action": (
-            "Keep the next registration disabled; refresh Codex and repeat "
-            "the isolated wire probe when consumer support changes."
-            if not consumer["next_wire_pair_observed"]
-            else (
-                "Complete exact-pair conformance, Abyss behavior, canary, and "
-                "rollback receipts before migration."
-                if not migration_allowed
-                else "Keep stable support while the read-only pilot advances."
-            )
+            "Retain the stable 2025-11-25 route; repair or refresh the current "
+            "conformance fixture pair, prove cancellation propagation, and wait "
+            "for a production-eligible Codex modern pair before any core-read "
+            "cutover."
         ),
         "claim_limits": matrix["claim_limits"],
     }
-    result = {
-        **unsigned,
-        "status_digest": canonical_digest(unsigned),
-    }
+    result = {**unsigned, "status_digest": canonical_digest(unsigned)}
     validate_payload(result, STATUS_SCHEMA_PATH)
     return result
 
 
 def render() -> str:
-    return (
-        json.dumps(
-            build_status(
-                load_json(MATRIX_PATH),
-                load_json(OBSERVATION_PATH),
-            ),
-            indent=2,
-            ensure_ascii=True,
-            sort_keys=True,
-        )
-        + "\n"
-    )
+    return json.dumps(
+        build_status(load_json(MATRIX_PATH), load_json(OBSERVATION_PATH)),
+        indent=2,
+        ensure_ascii=True,
+        sort_keys=True,
+    ) + "\n"
 
 
 def main() -> int:

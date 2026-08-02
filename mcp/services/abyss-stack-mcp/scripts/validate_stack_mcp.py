@@ -20,6 +20,12 @@ from abyss_stack_mcp.canary import (  # noqa: E402
 )
 from abyss_stack_mcp.contracts import RuntimeObservation  # noqa: E402
 from abyss_stack_mcp.observation import RuntimeTargetCatalog  # noqa: E402
+from abyss_stack_mcp.organ_access import (  # noqa: E402
+    CANDIDATE_TOOL_BINDINGS,
+    INTERNAL_EFFECT_TOOL_BINDINGS,
+    READ_TOOL_BINDINGS,
+    load_organ_access_manifest,
+)
 from abyss_stack_mcp.policy import StackPolicySeam  # noqa: E402
 from abyss_stack_mcp.proof_projection import (  # noqa: E402
     CentralProofProjectionError,
@@ -141,6 +147,17 @@ def main() -> int:
 
     example = SERVICE_ROOT / "examples" / "runtime-observation.public.example.json"
     RuntimeObservation.model_validate(json.loads(example.read_text(encoding="utf-8")))
+    organ_access = load_organ_access_manifest(SERVICE_ROOT / "organ-access.v1.json")
+    declared_tools = {
+        item.mcp_name
+        for capability in organ_access.capabilities
+        for item in capability.primitives
+    }
+    expected_tools = set(READ_TOOL_BINDINGS.values()) | set(
+        CANDIDATE_TOOL_BINDINGS.values()
+    ) | set(INTERNAL_EFFECT_TOOL_BINDINGS.values())
+    if declared_tools != expected_tools:
+        raise SystemExit("stack organ capability tools drifted from owner policy seams")
     if StackPolicySeam.__module__ != "abyss_stack_mcp.policy":
         raise SystemExit("protocol-independent stack policy seam is unavailable")
     if PolicyAuditJournal.__module__ != "abyss_stack_mcp.audit":
@@ -159,6 +176,15 @@ def main() -> int:
         != "abyss_stack_mcp.canary:main"
     ):
         raise SystemExit("authenticated read canary entry point is unavailable")
+    if (
+        pyproject["project"]["scripts"].get("abyss-stack-mcp-effect")
+        != "abyss_stack_mcp.effect:main"
+        or pyproject["project"]["scripts"].get(
+            "abyss-stack-mcp-effect-server"
+        )
+        != "abyss_stack_mcp.effect_server:main"
+    ):
+        raise SystemExit("exact internal-effect entry points are unavailable")
     if (
         pyproject["project"]["scripts"].get("abyss-stack-mcp-observe")
         != "abyss_stack_mcp.observation:main"
@@ -242,8 +268,12 @@ def main() -> int:
     required = {
         "README.md": (
             "not a gateway",
+            "runtime-topology-read",
+            "stack-access-plan",
             "read process",
             "candidate process",
+            "internal-effect process",
+            "mandatory second restart",
             "execution_authorized=false",
             "policy seam",
             "hash chain",
@@ -261,6 +291,7 @@ def main() -> int:
             "journal continuity",
             "production observation",
             "cross-organ",
+            "pre-effect, denial, recovery, and success receipts",
         ),
         "docs/BOUNDARIES.md": (
             "does not own",
@@ -285,6 +316,7 @@ def main() -> int:
             "tamper-evident",
             "observation producer",
             "host receipt",
+            "port-`5439` internal-effect process",
         ),
     }
     for relative, needles in required.items():

@@ -28,6 +28,17 @@ decision validators. It gives agents one repeatable route to ask:
 
 ## MCP Surface
 
+For admitted organ access, set
+`AOA_DECISIONS_MCP_CAPABILITY_PROFILE=decision-retrieval`. The server then
+fails closed against the stack-owned `organ-access.v1.json` contract and
+exposes only cache posture, compact decision packets, and exact decision
+neighborhoods. The full read catalog remains the compatibility default.
+
+Exact decision packets include a normalized `decision_views` projection with
+repository owner, status, owner-authored rationale summary, source ref, local
+source revision, predecessor/successor relations, and supersession state. The
+repo-local record remains the authority for the full rationale.
+
 Resources:
 
 - `aoa-decisions://status`
@@ -65,6 +76,10 @@ separate process with a credential that the read process does not accept.
 The owner-local CLI can prepare the cache without enabling the effect contour.
 If a new file appears under `docs/decisions/` without a graph-registry entry,
 the refreshed summary reports an issue instead of silently hiding that surface.
+
+The capability profile never exposes `aoa_decisions_refresh`; it is invalid
+for the `internal_effect` contour and uses only the `decisions-read` credential
+class.
 
 Freshness is deliberately split into two claims:
 

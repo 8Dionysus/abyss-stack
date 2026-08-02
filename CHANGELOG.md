@@ -9,6 +9,15 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Added
 
+- Decision `ABYSS-STACK-D-0106` and a third, separately credentialed
+  `abyss-stack-mcp` process admit one exact internal-effect pilot on loopback
+  port `5439`. Its only tool consumes a content-addressed read-service restart
+  candidate and expiring human approval, rechecks live source/package/deploy
+  and process identity, writes pre-effect or denial evidence, performs an
+  authenticated canary, mandates a second exact restart as restoration, and
+  proves the post-rollback state. The process has no generic unit, command,
+  source-mutation, lasting applied-state, or external-effect route.
+
 - The MCP protocol lab now separates the observed production
   Codex/Abyss `2025-11-25` wire from the `2025-06-18` fallback of one isolated
   Codex-to-Python-MCP-2 probe. It also records Python MCP `1.29.0` as the

@@ -215,10 +215,10 @@ if ((launch_verified_abyss_stack_mcp && \
 fi
 if ((verify_abyss_stack_mcp_runtime)); then
   case "$verify_abyss_stack_mcp_runtime_contour" in
-    all|read|candidate)
+    all|read|candidate|internal_effect)
       ;;
     *)
-      aoa_die "abyss-stack MCP runtime verification contour must be all, read, or candidate"
+      aoa_die "abyss-stack MCP runtime verification contour must be all, read, candidate, or internal_effect"
       ;;
   esac
 fi
@@ -229,10 +229,10 @@ if ((launch_verified_abyss_stack_mcp)); then
     )"
   fi
   case "$launch_verified_abyss_stack_mcp_contour" in
-    read|candidate)
+    read|candidate|internal_effect)
       ;;
     *)
-      aoa_die "verified abyss-stack MCP launch contour must be read or candidate"
+      aoa_die "verified abyss-stack MCP launch contour must be read, candidate, or internal_effect"
       ;;
   esac
 fi
@@ -276,6 +276,7 @@ organ_mcp_candidate_auth_manifest_name="organ-mcp-candidate-auth-manifest.json"
 organ_mcp_candidate_auth_manifest_path="${mcp_http_secret_dir}/${organ_mcp_candidate_auth_manifest_name}"
 abyss_stack_mcp_read_credential_name="abyss-stack-mcp-read-bearer-token"
 abyss_stack_mcp_candidate_credential_name="abyss-stack-mcp-candidate-bearer-token"
+abyss_stack_mcp_internal_effect_credential_name="abyss-stack-mcp-internal-effect-bearer-token"
 abyss_stack_mcp_canary_signing_key_name="abyss-stack-mcp-canary-ed25519-private-key.pem"
 abyss_stack_mcp_auth_manifest_name="abyss-stack-mcp-auth-manifest.json"
 abyss_stack_mcp_auth_manifest_path="${mcp_http_secret_dir}/${abyss_stack_mcp_auth_manifest_name}"
@@ -286,6 +287,7 @@ abyss_stack_mcp_runtime_lock="${abyss_stack_mcp_runtime_root}/.runtime-provision
 abyss_stack_mcp_audit_root="${AOA_STACK_ROOT}/Logs/mcp/audit"
 abyss_stack_mcp_read_audit_journal="${abyss_stack_mcp_audit_root}/policy-read.jsonl"
 abyss_stack_mcp_candidate_audit_journal="${abyss_stack_mcp_audit_root}/policy-candidate.jsonl"
+abyss_stack_mcp_effect_root="${AOA_STACK_ROOT}/Logs/mcp/internal-effects/read-restart-pilot"
 abyss_stack_mcp_observation_root="${AOA_STACK_ROOT}/Logs/mcp/observations"
 abyss_stack_mcp_observation_path="${abyss_stack_mcp_observation_root}/current.json"
 abyss_stack_mcp_observation_overlay_path="${abyss_stack_mcp_observation_root}/evidence-overlay.json"
@@ -707,10 +709,13 @@ aoa_provision_organ_mcp_candidate_auth() {
 aoa_provision_abyss_stack_mcp_auth() {
   local read_path="${mcp_http_secret_dir}/${abyss_stack_mcp_read_credential_name}"
   local candidate_path="${mcp_http_secret_dir}/${abyss_stack_mcp_candidate_credential_name}"
+  local effect_path="${mcp_http_secret_dir}/${abyss_stack_mcp_internal_effect_credential_name}"
   local read_token=""
   local candidate_token=""
+  local effect_token=""
   local read_digest=""
   local candidate_digest=""
+  local effect_digest=""
   local manifest_temp=""
 
   aoa_provision_mcp_bearer \
@@ -719,20 +724,32 @@ aoa_provision_abyss_stack_mcp_auth() {
   aoa_provision_mcp_bearer \
     "$abyss_stack_mcp_candidate_credential_name" \
     "abyss-stack MCP candidate bearer credential"
+  aoa_provision_mcp_bearer \
+    "$abyss_stack_mcp_internal_effect_credential_name" \
+    "abyss-stack MCP internal-effect bearer credential"
   aoa_provision_abyss_stack_mcp_canary_signing_key
   read_token="$(<"$read_path")"
   candidate_token="$(<"$candidate_path")"
-  [[ "$read_token" != "$candidate_token" ]] || \
-    aoa_die "abyss-stack MCP read and candidate bearer credentials must be distinct"
+  effect_token="$(<"$effect_path")"
+  [[ "$read_token" != "$candidate_token" && \
+     "$read_token" != "$effect_token" && \
+     "$candidate_token" != "$effect_token" ]] || \
+    aoa_die "abyss-stack MCP read, candidate, and internal-effect bearer credentials must be distinct"
   read_digest="$(
     printf '%s' "$read_token" | sha256sum | cut -d' ' -f1
   )"
   candidate_digest="$(
     printf '%s' "$candidate_token" | sha256sum | cut -d' ' -f1
   )"
+  effect_digest="$(
+    printf '%s' "$effect_token" | sha256sum | cut -d' ' -f1
+  )"
   [[ "$read_digest" =~ ^[0-9a-f]{64}$ && \
      "$candidate_digest" =~ ^[0-9a-f]{64}$ && \
-     "$read_digest" != "$candidate_digest" ]] || \
+     "$effect_digest" =~ ^[0-9a-f]{64}$ && \
+     "$read_digest" != "$candidate_digest" && \
+     "$read_digest" != "$effect_digest" && \
+     "$candidate_digest" != "$effect_digest" ]] || \
     aoa_die "failed to bind distinct abyss-stack MCP credentials"
   if [[ -e "$abyss_stack_mcp_auth_manifest_path" || \
         -L "$abyss_stack_mcp_auth_manifest_path" ]]; then
@@ -745,8 +762,8 @@ aoa_provision_abyss_stack_mcp_auth() {
   )"
   chmod 0600 "$manifest_temp"
   if ! printf \
-      '{"candidate_sha256":"%s","read_sha256":"%s","schema_version":"abyss_stack_mcp_auth_manifest_v1"}\n' \
-      "$candidate_digest" "$read_digest" > "$manifest_temp"; then
+      '{"candidate_sha256":"%s","internal_effect_sha256":"%s","read_sha256":"%s","schema_version":"abyss_stack_mcp_auth_manifest_v2"}\n' \
+      "$candidate_digest" "$effect_digest" "$read_digest" > "$manifest_temp"; then
     rm -f -- "$manifest_temp"
     aoa_die "failed to stage the abyss-stack MCP auth manifest"
   fi
@@ -790,6 +807,10 @@ aoa_verify_abyss_stack_mcp_audit_journals() {
       aoa_validate_abyss_stack_mcp_audit_journal \
         "$abyss_stack_mcp_candidate_audit_journal" \
         "abyss-stack MCP candidate audit journal"
+      [[ -d "$abyss_stack_mcp_effect_root" && \
+         ! -L "$abyss_stack_mcp_effect_root" && \
+         "$(stat -c '%a' "$abyss_stack_mcp_effect_root")" == "700" ]] || \
+        aoa_die "abyss-stack MCP internal-effect root must be a mode-0700 non-symlink directory"
       ;;
     read)
       aoa_validate_abyss_stack_mcp_audit_journal \
@@ -800,6 +821,13 @@ aoa_verify_abyss_stack_mcp_audit_journals() {
       aoa_validate_abyss_stack_mcp_audit_journal \
         "$abyss_stack_mcp_candidate_audit_journal" \
         "abyss-stack MCP candidate audit journal"
+      ;;
+    internal_effect)
+      [[ -d "$abyss_stack_mcp_effect_root" && \
+         ! -L "$abyss_stack_mcp_effect_root" ]] || \
+        aoa_die "abyss-stack MCP internal-effect root must be a non-symlink directory"
+      [[ "$(stat -c '%a' "$abyss_stack_mcp_effect_root")" == "700" ]] || \
+        aoa_die "abyss-stack MCP internal-effect root must have mode 0700"
       ;;
     *)
       aoa_die "unknown abyss-stack MCP audit contour: ${contour}"
@@ -850,7 +878,8 @@ aoa_provision_abyss_stack_mcp_audit_journals() {
     fi
     chmod 0600 "$journal_path"
   done
-  aoa_verify_abyss_stack_mcp_audit_journals
+  aoa_verify_abyss_stack_mcp_audit_journals read
+  aoa_verify_abyss_stack_mcp_audit_journals candidate
 }
 
 aoa_provision_abyss_stack_mcp_observation_root() {
@@ -913,11 +942,32 @@ aoa_provision_abyss_stack_mcp_orchestration_root() {
   chmod 0700 "$abyss_stack_mcp_orchestration_root"
 }
 
+aoa_provision_abyss_stack_mcp_effect_root() {
+  local parent=""
+
+  for parent in \
+    "${AOA_STACK_ROOT}/Logs" \
+    "${AOA_STACK_ROOT}/Logs/mcp" \
+    "${AOA_STACK_ROOT}/Logs/mcp/internal-effects" \
+    "$abyss_stack_mcp_effect_root"; do
+    if [[ -e "$parent" || -L "$parent" ]]; then
+      [[ -d "$parent" && ! -L "$parent" ]] || \
+        aoa_die "abyss-stack MCP effect root must use non-symlink directories"
+    else
+      install -d -m 0700 "$parent"
+    fi
+    chmod 0700 "$parent"
+  done
+}
+
 aoa_require_abyss_stack_mcp_units_stopped_for_rotation() {
   local unit=""
   local active_state=""
 
-  for unit in abyss-stack-mcp-read.service abyss-stack-mcp-candidate.service; do
+  for unit in \
+    abyss-stack-mcp-read.service \
+    abyss-stack-mcp-candidate.service \
+    abyss-stack-mcp-internal-effect.service; do
     if ! active_state="$(
       systemctl --user show \
         --property=ActiveState \
@@ -939,13 +989,17 @@ aoa_require_abyss_stack_mcp_units_stopped_for_rotation() {
 aoa_rotate_abyss_stack_mcp_auth() {
   local read_path="${mcp_http_secret_dir}/${abyss_stack_mcp_read_credential_name}"
   local candidate_path="${mcp_http_secret_dir}/${abyss_stack_mcp_candidate_credential_name}"
+  local effect_path="${mcp_http_secret_dir}/${abyss_stack_mcp_internal_effect_credential_name}"
   local read_temp=""
   local candidate_temp=""
+  local effect_temp=""
   local manifest_temp=""
   local read_token=""
   local candidate_token=""
+  local effect_token=""
   local read_digest=""
   local candidate_digest=""
+  local effect_digest=""
 
   aoa_require_abyss_stack_mcp_units_stopped_for_rotation
   aoa_provision_abyss_stack_mcp_auth
@@ -955,27 +1009,38 @@ aoa_rotate_abyss_stack_mcp_auth() {
   candidate_temp="$(
     mktemp "${mcp_http_secret_dir}/.${abyss_stack_mcp_candidate_credential_name}.rotate.XXXXXX"
   )"
+  effect_temp="$(
+    mktemp "${mcp_http_secret_dir}/.${abyss_stack_mcp_internal_effect_credential_name}.rotate.XXXXXX"
+  )"
   manifest_temp="$(
     mktemp "${mcp_http_secret_dir}/.${abyss_stack_mcp_auth_manifest_name}.rotate.XXXXXX"
   )"
   if ! aoa_run_isolated_python python3 \
       -c 'import secrets; print(secrets.token_urlsafe(48))' > "$read_temp" || \
      ! aoa_run_isolated_python python3 \
-      -c 'import secrets; print(secrets.token_urlsafe(48))' > "$candidate_temp"; then
-    rm -f -- "$read_temp" "$candidate_temp" "$manifest_temp"
+      -c 'import secrets; print(secrets.token_urlsafe(48))' > "$candidate_temp" || \
+     ! aoa_run_isolated_python python3 \
+      -c 'import secrets; print(secrets.token_urlsafe(48))' > "$effect_temp"; then
+    rm -f -- "$read_temp" "$candidate_temp" "$effect_temp" "$manifest_temp"
     aoa_die "failed to generate rotated abyss-stack MCP credentials"
   fi
-  chmod 0600 "$read_temp" "$candidate_temp" "$manifest_temp"
+  chmod 0600 "$read_temp" "$candidate_temp" "$effect_temp" "$manifest_temp"
   aoa_validate_mcp_bearer_file \
     "$read_temp" \
     "rotated abyss-stack MCP read bearer credential"
   aoa_validate_mcp_bearer_file \
     "$candidate_temp" \
     "rotated abyss-stack MCP candidate bearer credential"
+  aoa_validate_mcp_bearer_file \
+    "$effect_temp" \
+    "rotated abyss-stack MCP internal-effect bearer credential"
   read_token="$(<"$read_temp")"
   candidate_token="$(<"$candidate_temp")"
-  [[ "$read_token" != "$candidate_token" ]] || {
-    rm -f -- "$read_temp" "$candidate_temp" "$manifest_temp"
+  effect_token="$(<"$effect_temp")"
+  [[ "$read_token" != "$candidate_token" && \
+     "$read_token" != "$effect_token" && \
+     "$candidate_token" != "$effect_token" ]] || {
+    rm -f -- "$read_temp" "$candidate_temp" "$effect_temp" "$manifest_temp"
     aoa_die "rotated abyss-stack MCP credentials must be distinct"
   }
   read_digest="$(
@@ -984,18 +1049,25 @@ aoa_rotate_abyss_stack_mcp_auth() {
   candidate_digest="$(
     printf '%s' "$candidate_token" | sha256sum | cut -d' ' -f1
   )"
+  effect_digest="$(
+    printf '%s' "$effect_token" | sha256sum | cut -d' ' -f1
+  )"
   if ! printf \
-      '{"candidate_sha256":"%s","read_sha256":"%s","schema_version":"abyss_stack_mcp_auth_manifest_v1"}\n' \
-      "$candidate_digest" "$read_digest" > "$manifest_temp"; then
-    rm -f -- "$read_temp" "$candidate_temp" "$manifest_temp"
+      '{"candidate_sha256":"%s","internal_effect_sha256":"%s","read_sha256":"%s","schema_version":"abyss_stack_mcp_auth_manifest_v2"}\n' \
+      "$candidate_digest" "$effect_digest" "$read_digest" > "$manifest_temp"; then
+    rm -f -- "$read_temp" "$candidate_temp" "$effect_temp" "$manifest_temp"
     aoa_die "failed to stage the rotated abyss-stack MCP auth manifest"
   fi
   if ! mv -f -- "$read_temp" "$read_path"; then
-    rm -f -- "$read_temp" "$candidate_temp" "$manifest_temp"
+    rm -f -- "$read_temp" "$candidate_temp" "$effect_temp" "$manifest_temp"
     aoa_die "failed to publish the rotated abyss-stack MCP read credential"
   fi
   if ! mv -f -- "$candidate_temp" "$candidate_path"; then
-    rm -f -- "$candidate_temp" "$manifest_temp"
+    rm -f -- "$candidate_temp" "$effect_temp" "$manifest_temp"
+    aoa_die "credential rotation stopped in a fail-closed partial state"
+  fi
+  if ! mv -f -- "$effect_temp" "$effect_path"; then
+    rm -f -- "$effect_temp" "$manifest_temp"
     aoa_die "credential rotation stopped in a fail-closed partial state"
   fi
   if ! mv -f -- "$manifest_temp" "$abyss_stack_mcp_auth_manifest_path"; then
@@ -1005,8 +1077,9 @@ aoa_rotate_abyss_stack_mcp_auth() {
   chmod 0600 \
     "$read_path" \
     "$candidate_path" \
+    "$effect_path" \
     "$abyss_stack_mcp_auth_manifest_path"
-  aoa_note "rotated both abyss-stack MCP credentials and their digest manifest"
+  aoa_note "rotated all three abyss-stack MCP credentials and their digest manifest"
   aoa_note "managed units remain stopped; refresh consumers before a canary start"
 }
 
@@ -1025,9 +1098,15 @@ aoa_require_abyss_stack_mcp_units_stopped() {
   local unit_contour=""
 
   abyss_stack_mcp_units_error=""
-  for unit in abyss-stack-mcp-read.service abyss-stack-mcp-candidate.service; do
+  for unit in \
+    abyss-stack-mcp-read.service \
+    abyss-stack-mcp-candidate.service \
+    abyss-stack-mcp-internal-effect.service; do
     unit_contour="${unit#abyss-stack-mcp-}"
     unit_contour="${unit_contour%.service}"
+    if [[ "$unit_contour" == "internal-effect" ]]; then
+      unit_contour="internal_effect"
+    fi
     expected_unit_source="${AOA_CONFIGS_ROOT}/systemd/user/${unit}"
     expected_unit_target="${XDG_CONFIG_HOME:-${HOME}/.config}/systemd/user/${unit}"
     expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_source_lock} /usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} /usr/bin/env ${AOA_CONFIGS_ROOT}/scripts/aoa-install-systemd --launch-verified-abyss-stack-mcp=${unit_contour}"
@@ -1280,13 +1359,17 @@ aoa_verify_abyss_stack_mcp_runtime() {
 
 aoa_launch_verified_abyss_stack_mcp() {
   local contour="$1"
+  local module="abyss_stack_mcp.server"
 
   [[ "${ABYSS_STACK_MCP_POLICY_FAMILY:-}" == "$contour" ]] || \
     aoa_die "verified abyss-stack MCP launch contour does not match the policy family"
   aoa_verify_abyss_stack_mcp_runtime "$contour"
+  if [[ "$contour" == "internal_effect" ]]; then
+    module="abyss_stack_mcp.effect_server"
+  fi
   exec /usr/bin/env -u PYTHONHOME -u PYTHONPATH \
     "$abyss_stack_mcp_venv/bin/python" \
-    -I -B -m abyss_stack_mcp.server
+    -I -B -m "$module"
 }
 
 aoa_rewrite_abyss_stack_mcp_entrypoint_shebangs() {
@@ -1457,6 +1540,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
   aoa_provision_abyss_stack_mcp_audit_journals
   aoa_provision_abyss_stack_mcp_observation_root
   aoa_provision_abyss_stack_mcp_orchestration_root
+  aoa_provision_abyss_stack_mcp_effect_root
 
   if [[ -e "$abyss_stack_mcp_venv" || -L "$abyss_stack_mcp_venv" ]]; then
     [[ -d "$abyss_stack_mcp_venv" && ! -L "$abyss_stack_mcp_venv" ]] || \

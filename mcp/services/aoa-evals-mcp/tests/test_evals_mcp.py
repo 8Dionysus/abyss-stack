@@ -21,6 +21,97 @@ def write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def write_organ_access_manifest(path: Path) -> Path:
+    def primitive(primitive_id: str, kind: str, mcp_name: str) -> dict[str, object]:
+        return {
+            "primitive_id": primitive_id,
+            "kind": kind,
+            "mcp_name": mcp_name,
+            "approval_required": False,
+        }
+
+    write_json(
+        path,
+        {
+            "schema_version": "aoa_evals_mcp_capabilities_v1",
+            "organ_id": "aoa-evals",
+            "source_owner": "aoa-evals",
+            "access_runtime_owner": "abyss-stack",
+            "admission_owner": "aoa-sdk",
+            "proof_owner": "aoa-evals",
+            "contains_secrets": False,
+            "admission_asserted": False,
+            "owner_acceptance_asserted": False,
+            "proof_issuance_via_mcp_allowed": False,
+            "effect_activation_authorized": False,
+            "capabilities": [
+                {
+                    "capability_id": "eval-discovery-read",
+                    "policy_family": "read",
+                    "process_contour": "read",
+                    "credential_class": "evals-read",
+                    "primitives": [
+                        primitive("select-bounded-eval", "tool", "aoa_evals_select"),
+                        primitive("inspect-bounded-eval", "tool", "aoa_evals_inspect"),
+                        primitive("read-eval-sections", "tool", "aoa_evals_expand"),
+                        primitive("read-evals-freshness", "tool", "aoa_evals_runtime_status"),
+                        primitive("open-eval-catalog", "resource", "aoa-evals://catalog"),
+                        primitive("open-eval-bundle", "resource_template", "aoa-evals://bundle/{name}"),
+                        primitive(
+                            "open-eval-sections",
+                            "resource_template",
+                            "aoa-evals://bundle/{name}/sections",
+                        ),
+                        primitive("open-evals-freshness", "resource", "aoa-evals://runtime-status"),
+                    ],
+                },
+                {
+                    "capability_id": "eval-request-prepare",
+                    "policy_family": "candidate",
+                    "process_contour": "candidate",
+                    "credential_class": "evals-candidate",
+                    "primitives": [
+                        primitive(
+                            "prepare-eval-request",
+                            "tool",
+                            "aoa_evals_prepare_request_candidate",
+                        )
+                    ],
+                },
+                {
+                    "capability_id": "proof-result-read",
+                    "policy_family": "read",
+                    "process_contour": "read",
+                    "credential_class": "evals-read",
+                    "primitives": [
+                        primitive(
+                            "read-issued-proof-result",
+                            "tool",
+                            "aoa_evals_read_proof_result",
+                        ),
+                        primitive(
+                            "open-issued-proof-result",
+                            "resource_template",
+                            "aoa-evals://proof-result/{report_id}",
+                        ),
+                    ],
+                },
+            ],
+            "guardrails": {
+                "eval_execution_allowed": False,
+                "verdict_computation_allowed": False,
+                "report_publication_allowed": False,
+                "proof_acceptance_inference_allowed": False,
+                "registry_mutation_allowed": False,
+                "hidden_mcp_chaining_allowed": False,
+                "annotations_are_security_enforcement": False,
+                "discovery_can_expand_write_roots": False,
+            },
+        },
+    )
+    return path
+
+
 def valid_eval_need_packet(name: str = "aoa-memory-guardrail-pressure") -> dict[str, object]:
     return {
         "schema_version": "eval_need_v1",
@@ -473,10 +564,31 @@ def seed_evals(root: Path) -> None:
                 {
                     "report_id": "example",
                     "eval_name": record["name"],
+                    "source_report_path": (
+                        "evals/workflow/aoa-bounded-change-quality/"
+                        "reports/example.report.json"
+                    ),
                     "source_bundle_ref": record["eval_path"],
+                    "manifest_ref": (
+                        "evals/workflow/aoa-bounded-change-quality/eval.yaml"
+                    ),
+                    "report_schema_ref": (
+                        "evals/workflow/aoa-bounded-change-quality/"
+                        "reports/summary.schema.json"
+                    ),
                     "receipt_status": "not_a_receipt",
                 }
             ],
+        },
+    )
+    write_json(
+        evals
+        / "evals/workflow/aoa-bounded-change-quality/reports/example.report.json",
+        {
+            "eval_name": record["name"],
+            "verdict": "supports bounded claim",
+            "claim_boundary": "Supports only the bounded fixture claim.",
+            "limitations": ["does not prove general agent competence"],
         },
     )
     write_json(
@@ -893,6 +1005,11 @@ def test_find_or_propose_routes_existing_eval_and_runtime_export(tmp_path: Path)
     seed_evals(tmp_path)
     export = seed_runtime_candidate_export(tmp_path)
     state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+    source_files_before = {
+        path.relative_to(tmp_path / "aoa-evals")
+        for path in (tmp_path / "aoa-evals").rglob("*")
+        if path.is_file()
+    }
 
     result = state.find_or_propose("bounded change verification runtime evidence")
 
@@ -906,7 +1023,12 @@ def test_find_or_propose_routes_existing_eval_and_runtime_export(tmp_path: Path)
     assert result["proposal_validation"]["valid"] is True
     assert result["runtime_candidate_export_refs"][0]["record_id"] == export["record_id"]
     assert result["runtime_candidate_export_refs"][0]["candidate_payload_included"] is False
-    assert not (tmp_path / "aoa-evals/evals/workflow").exists()
+    source_files_after = {
+        path.relative_to(tmp_path / "aoa-evals")
+        for path in (tmp_path / "aoa-evals").rglob("*")
+        if path.is_file()
+    }
+    assert source_files_after == source_files_before
 
 
 def test_find_or_propose_uses_significant_runtime_export_tokens(tmp_path: Path) -> None:
@@ -2083,6 +2205,125 @@ def test_server_contours_have_disjoint_annotated_tool_catalogs(
         in read_templates
     )
     assert candidate_templates == set()
+
+
+def test_owner_capability_profiles_expose_exact_disjoint_catalogs(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    seed_evals(tmp_path)
+    manifest = write_organ_access_manifest(tmp_path / "organ-access.v1.json")
+    monkeypatch.setenv("AOA_EVALS_MCP_ORGAN_ACCESS_MANIFEST", str(manifest))
+
+    discovery = build_server(
+        workspace_root=tmp_path,
+        policy_family="read",
+        capability_profile="eval-discovery-read",
+    )
+    request = build_server(
+        workspace_root=tmp_path,
+        policy_family="candidate",
+        capability_profile="eval-request-prepare",
+    )
+    proof = build_server(
+        workspace_root=tmp_path,
+        policy_family="read",
+        capability_profile="proof-result-read",
+    )
+
+    async def inspect(server):
+        return (
+            {tool.name: tool.annotations for tool in await server.list_tools()},
+            {str(resource.uri) for resource in await server.list_resources()},
+            {
+                template.uriTemplate
+                for template in await server.list_resource_templates()
+            },
+            {prompt.name for prompt in await server.list_prompts()},
+        )
+
+    discovery_tools, discovery_resources, discovery_templates, prompts = (
+        asyncio.run(inspect(discovery))
+    )
+    assert set(discovery_tools) == {
+        "aoa_evals_select",
+        "aoa_evals_inspect",
+        "aoa_evals_expand",
+        "aoa_evals_runtime_status",
+    }
+    assert discovery_resources == {
+        "aoa-evals://catalog",
+        "aoa-evals://runtime-status",
+    }
+    assert discovery_templates == {
+        "aoa-evals://bundle/{name}",
+        "aoa-evals://bundle/{name}/sections",
+    }
+    assert prompts == set()
+
+    request_tools, request_resources, request_templates, prompts = asyncio.run(
+        inspect(request)
+    )
+    assert set(request_tools) == {"aoa_evals_prepare_request_candidate"}
+    assert request_resources == set()
+    assert request_templates == set()
+    assert prompts == set()
+    request_annotations = request_tools["aoa_evals_prepare_request_candidate"]
+    assert request_annotations.readOnlyHint is False
+    assert request_annotations.destructiveHint is False
+    assert request_annotations.idempotentHint is True
+
+    proof_tools, proof_resources, proof_templates, prompts = asyncio.run(
+        inspect(proof)
+    )
+    assert set(proof_tools) == {"aoa_evals_read_proof_result"}
+    assert proof_resources == set()
+    assert proof_templates == {"aoa-evals://proof-result/{report_id}"}
+    assert prompts == set()
+    assert set(discovery_tools).isdisjoint(request_tools)
+    assert set(discovery_tools).isdisjoint(proof_tools)
+    assert set(request_tools).isdisjoint(proof_tools)
+
+
+def test_request_candidate_and_proof_result_keep_owner_boundaries(
+    tmp_path: Path,
+) -> None:
+    seed_evals(tmp_path)
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    candidate = state.prepare_request_candidate(
+        proof_question="Does bounded change evidence satisfy the owner eval?",
+        proposal={"authoring_route": "existing_eval_route"},
+    )
+    assert candidate["candidate_only"] is True
+    assert candidate["persistent"] is False
+    assert candidate["runtime_export_discovery_performed"] is False
+    assert candidate["eval_execution_allowed"] is False
+    assert candidate["verdict_issuance_allowed"] is False
+    assert candidate["proof_acceptance_allowed"] is False
+    assert candidate["request"]["proposal_context"]["packet"]["schema_version"] == (
+        "eval_need_v1"
+    )
+
+    result = state.read_proof_result("example")
+    assert result["report"]["verdict"] == "supports bounded claim"
+    assert len(result["source_report_sha256"]) == 64
+    assert result["mcp_issued_proof"] is False
+    assert result["mcp_computed_verdict"] is False
+    assert result["owner_acceptance_inferred"] is False
+    assert result["admission_inferred"] is False
+
+
+def test_capability_profile_rejects_wrong_process_contour(
+    tmp_path: Path,
+) -> None:
+    seed_evals(tmp_path)
+    with pytest.raises(SystemExit, match="incompatible"):
+        build_server(
+            workspace_root=tmp_path,
+            policy_family="read",
+            capability_profile="eval-request-prepare",
+        )
 
 
 def test_evals_candidate_root_gate_denies_read_and_unlisted_writes(

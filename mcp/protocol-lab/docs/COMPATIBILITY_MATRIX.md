@@ -5,82 +5,86 @@ The authoritative machine-readable comparison is
 
 ## Current decision
 
-The production Codex/Abyss pair stays on MCP `2025-11-25`; a minimized
-source fixture binds its schema and direct-call observation to the digest of
-the private receipt without retaining credentials or raw output. That call is
-not treated as the next-protocol canary. Final MCP `2026-07-28`,
-Python MCP `2.0.0`, and TypeScript client/server `2.0.0` are exact-pinned, but
-this release readiness does not form a usable Codex pair. An isolated stdio
-probe against Python MCP `2.0.0` showed Codex `0.146.0` sending `initialize`
-and falling back to `2025-06-18`; it did not send `server/discover`. That
-fallback does not redefine the production wire. Migration therefore remains
-blocked until a new Codex
-observation, Abyss pair-conformance, and a stable-preserving read canary
-exist. The exact Python MCP `2.0.0` server and client fixtures pass the pinned
-tested `0.2.0-alpha.10` package at wire `2026-07-28` (`114` and `371`
-successful checks, zero failures); that receipt is deliberately SDK-scoped.
-The latest public conformance release is still `v0.1.16` from 2026-03-27 and
-does not provide observed final-protocol scenarios, so it is recorded
-separately rather than being confused with the tested prerelease package.
-Separately, an isolated Python MCP `2.0.0` KAG adapter pair proved
-`server/discover`, self-describing stateless requests across two clients,
-private TTL cache use, trace propagation, and fail-closed effect/legacy
-denials. It did not alter stable Codex configuration. This advances the Abyss
-adapter, stateless, and discovery gates, but that first receipt alone did not
-prove explicit handles or full cache invalidation/revocation. The KAG exact
-projection was current while owner freshness reported `source_unavailable`,
-which is preserved as a canary blocker.
-The same isolated owner then passed the explicit `requestState` handle gate
-over stateless HTTP with per-request bearer verification: a handle completed
-for its original principal and request, expired deterministically, failed for
-another subject of the same OAuth client, failed on different arguments,
-failed after tampering, and failed after its signing key was retired across a
-server restart. Same-request replay returned the identical read result and is
-recorded as read-only/idempotent behavior, not a policy for effects.
-The catalog cache gate then passed independently: one private `tools/list`
-response was reused within 30 seconds and refetched exactly at expiry;
-subscription events invalidated additions and removals before the next list;
-events published without a listener were not replayed; an old warm listing
-could still mention a removed lab tool but the server refused its call; and an
-explicit refresh replaced that stale entry. This is a single-process bus
-proof, not multi-replica fan-out.
+Production stays on MCP `2025-11-25` with Codex `0.146.0`. The modern
+`2026-07-28` registered read canary has now been exercised, but only through the exact
+isolated prerelease Codex `0.147.0-alpha.4` binary with
+`mcp_2026_07_28` explicitly enabled. This is a successful registered canary,
+not a complete successful pair or a production cutover.
 
-Together these isolated receipts pass the adapter, stateless, handle,
-discovery, trace, and cache gates. They do not pass the Codex consumer gate,
-registered canary, owner-freshness gate, dual-registration exercise, or
-runtime rollback. Those latter gates remain blocked, not merely assumed from
-source-defined rollback law.
+The separately named `aoa_kag_next_lab` contour used:
 
-The important next-era behaviors are tested separately:
+- a dedicated process and `127.0.0.1:5441` endpoint;
+- a generated regular non-symlink `0600` bearer credential;
+- an isolated `CODEX_HOME` and registration;
+- Python MCP `2.0.0` and exact source-artifact digests;
+- one exposed tool, `kag_discover`, with a deterministic schema digest.
 
-- removal of the protocol session handshake and request independence;
-- explicit application-state handles, including isolation, expiry, replay,
-  and revocation;
-- `server/discover`;
-- trace propagation and cache TTL/invalidation;
-- wider JSON Schema behavior;
-- Tasks as a distinct extension rather than implied core support.
+The actual wire showed `server/discover`, protocol `2026-07-28`, no legacy
+`initialize`, no `Mcp-Session-Id`, self-describing request envelopes, the
+expected authenticated principal, and preserved trace context. A wrong bearer
+received HTTP `401`. The server enforces a 16 KiB input bound and a 256 KiB
+output bound; the oversized-input probe was rejected with MCP `-32602`.
 
-Python MCP `2.0.0` explicitly does not implement the final Tasks extension,
-so the Tasks gate is blocked on this exact SDK line rather than merely
-unobserved.
+Rollback stopped the Codex app-server and KAG lab server, closed the port, and
+removed the lab registration, credential, and isolated `CODEX_HOME`. The
+operator config digest remained byte-identical. Codex `0.146.0` then called
+the existing `aoa_kag` registration successfully through the actual operator
+config.
+
+A separate direct Python MCP `2.0.0` cancellation probe did not preserve the
+required lifecycle property. Local client cancellation occurred, but it did
+not cancel the server dispatch, which completed afterward. P1-05 therefore
+remains blocked even though the registered read call and rollback passed.
+
+## Independent blockers
+
+The current conformance checkout is exact commit
+`81eb1c3edaed87d7fd585d7b80186da7a2960660`, newer than the still-public
+`v0.1.16` release. Its Python `2.0.0` server SDK runner exposed twenty server
+scenarios and passed 40 checks. The client fixture ran 33 scenarios, passed
+372 checks, and failed these two new checks:
+
+- `json-schema-2020-12-client-tool-found`;
+- `json-schema-2020-12-client-echo-completed`.
+
+The released Python fixture reports the scenario as unknown. The gap is kept
+red rather than hidden in an expected-failure baseline. This current
+conformance mismatch, failed cancellation propagation, and the absence of a
+production-eligible modern Codex pair independently block core-read production
+migration.
+
+Python MCP `2.0.0` also does not implement the `2026-07-28` Tasks extension.
+Tasks is therefore blocked separately and does not contaminate the core-read
+gate. Candidate, internal-effect, and external-effect migration remain false
+because the read pilot has no authority to advance them.
+
+## Supporting behavior receipts
+
+The earlier exact Python adapter receipts remain relevant and independent:
+
+- stateless `server/discover` and self-describing requests;
+- principal-bound opaque `requestState`, expiry, tamper rejection,
+  cross-request replay denial, and key-retirement revocation;
+- private TTL cache hits and expiry;
+- `subscriptions/listen` addition/removal invalidation;
+- stale-catalog inability to authorize a removed tool;
+- explicit refresh after a disconnected listener.
+
+These are bounded single-process read proofs. They do not prove multi-replica
+fan-out, effectful replay safety, owner freshness, admission, or task benefit.
 
 ## Refresh workflow
 
-1. Recheck official specification and SDK tags against their exact current
-   commits.
-2. Recheck the official conformance package and pin its exact package commit.
-3. Record the actual Codex version and repeat the isolated pair-level wire
-   probe.
-4. Run official conformance against the exact server/client pair.
-5. Run the Abyss checks for owner boundaries, handles, cache revocation,
-   cancellation, credential isolation, and no authority merge.
-6. Enable only the separately named read-only lab registration.
-7. Run the `aoa-kag` read canary and exercise rollback without altering
-   `aoa_kag`.
-8. Update only gates supported by immutable receipts, then rebuild the status.
+1. Recheck official specification and SDK tags against exact current commits.
+2. Recheck current conformance source, scenarios, and released fixture pair.
+3. Re-run the isolated exact Codex pair whenever Codex, SDK, auth, schema, or
+   transport changes.
+4. Keep stable and lab names, processes, credentials, endpoints, and homes
+   independent.
+5. Re-run the stable operator-config canary after every lab rollback.
+6. Update only receipt-backed gates and regenerate the status.
+7. Do not perform production cutover until a production-eligible Codex pair
+   has correct cancellation behavior and current conformance is green.
 
-If any exact input drifts, the matrix expires, or the production-pair receipt
-expires, validation fails and the lab returns to a blocked posture until the
-observation is refreshed. The generated status exposes the earliest of those
-source expiries as `evidence_expires_at`.
+The matrix and current lab/rollback observations expire independently. The
+generated status exposes their earliest expiry as `evidence_expires_at`.

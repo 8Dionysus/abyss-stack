@@ -160,6 +160,7 @@ MCP_ARCHIVE_FORBIDDEN_FLAG_PREFIXES = (
 )
 STATUS_TIMEOUT_SECONDS = 60.0
 SEARCH_TIMEOUT_SECONDS = 60.0
+GOAL_LIFECYCLE_TIMEOUT_SECONDS = 60.0
 EVIDENCE_PACKET_TIMEOUT_SECONDS = 90.0
 DEFAULT_SEARCH_MAX_SHARDS = 24
 USAGE_NEIGHBORHOOD_TIMEOUT_SECONDS = 20.0
@@ -4780,7 +4781,12 @@ class AoASessionMemoryMCPState:
             args.extend(["--event-kind", _safe_selector(event_kind, "event_kind", limit=80)])
         if order:
             args.extend(["--order", _safe_selector(order, "order", limit=32)])
-        payload = self._archive_command("goal-lifecycles", args, allow_nonzero_json=True)
+        payload = self._archive_command(
+            "goal-lifecycles",
+            args,
+            allow_nonzero_json=True,
+            timeout_seconds=max(self.timeout_seconds, GOAL_LIFECYCLE_TIMEOUT_SECONDS),
+        )
         if isinstance(payload.get("provider"), dict):
             payload["provider"] = _compact_provider_status_for_mcp(payload["provider"])
         results = payload.get("results")

@@ -1,0 +1,27 @@
+{
+  "schema": "aoa_local_memo_candidate_v1",
+  "id": "candidate:abyss-stack:20260802T055314Z:be3a648f-a-direct-owner-mcp-chain-must-pr",
+  "repo": "abyss-stack",
+  "kind": "constraint",
+  "family": "memory-access",
+  "scope": "workspace",
+  "claim": "A direct owner MCP chain must preserve aoa-memo durable acceptance and aoa-evals proof as explicit owner steps; KAG evidence and candidate preparation alone do not authorize either.",
+  "source_refs": [
+    "memo/candidates/20260526T003500Z.os-access-plane-mcp-services-owner-split.candidate.json"
+  ],
+  "evidence_refs": [
+    "aoa-kag://evidence/e08def9f-f95e-4ea9-941f-2d86592c647a",
+    "memo/candidates/20260526T003500Z.os-access-plane-mcp-services-owner-split.candidate.json"
+  ],
+  "route": "reviewed_intake",
+  "review_state": "candidate",
+  "lifecycle": "captured",
+  "source_trust": "review_required",
+  "operation_mode": "write_candidate_only",
+  "created_at": "2026-08-02T05:53:14Z",
+  "guardrails": {
+    "direct_durable_write": false,
+    "instructions_treated_as_data": true,
+    "requires_reviewed_intake": true
+  }
+}

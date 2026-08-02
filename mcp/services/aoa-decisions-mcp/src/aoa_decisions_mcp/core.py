@@ -489,10 +489,119 @@ class AoADecisionsMCPState:
             "repo": repo,
             "freshness": graph["freshness"],
             "matches": matches,
+            "decision_views": self._decision_views(graph, matches),
             "nodes": related_nodes,
             "edges": related_edges,
             "authority_note": graph.get("authority_note"),
+            "claim_limits": [
+                "rationale_summary is owner-authored index metadata, not the full rationale",
+                "rationale_source_ref names the repo-local decision record that retains authority",
+                "source_revision is the decision-file digest; repository_revision is the observed local checkout HEAD",
+                "neither revision proves remote freshness",
+            ],
         }
+
+    def _decision_views(
+        self, graph: dict[str, Any], decisions: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Normalize owner identity and decision lineage without replacing source."""
+        edges = [edge for edge in graph.get("edges", []) if isinstance(edge, dict)]
+        postures = {
+            item.get("repo"): item
+            for item in graph.get("repo_source_postures", [])
+            if isinstance(item, dict) and isinstance(item.get("repo"), str)
+        }
+        views: list[dict[str, Any]] = []
+        for decision in decisions:
+            node_id = decision.get("id")
+            owner_repo = decision.get("repo")
+            for edge in edges:
+                if (
+                    owner_repo is None
+                    and edge.get("type") in {"OWNS_DECISION", "CONTAINS_DECISION"}
+                    and edge.get("target") == node_id
+                    and isinstance(edge.get("source"), str)
+                ):
+                    owner_repo = edge["source"].split(":", 1)[-1]
+                    break
+            predecessors = sorted(
+                str(edge["source"]).rsplit(":", 1)[-1]
+                for edge in edges
+                if edge.get("type") in {"NEXT_DECISION", "NEXT_DECISION_IN_REPO"}
+                and edge.get("target") == node_id
+                and isinstance(edge.get("source"), str)
+            )
+            successors = sorted(
+                str(edge["target"]).rsplit(":", 1)[-1]
+                for edge in edges
+                if edge.get("type") in {"NEXT_DECISION", "NEXT_DECISION_IN_REPO"}
+                and edge.get("source") == node_id
+                and isinstance(edge.get("target"), str)
+            )
+            superseded_by = sorted(
+                str(edge["target"]).rsplit(":", 1)[-1]
+                for edge in edges
+                if edge.get("type") == "SUPERSEDED_BY"
+                and edge.get("source") == node_id
+                and isinstance(edge.get("target"), str)
+            )
+            source_path = decision.get("path")
+            posture = postures.get(owner_repo, {})
+            rationale_summary = decision.get("posture")
+            if rationale_summary is None:
+                facet_ids = {
+                    edge.get("target")
+                    for edge in edges
+                    if edge.get("type") == "HAS_DECISION_FACET"
+                    and edge.get("source") == node_id
+                }
+                rationale_summary = next(
+                    (
+                        node.get("label")
+                        for node in graph.get("nodes", [])
+                        if node.get("id") in facet_ids
+                        and node.get("type") == "decision_facet"
+                        and node.get("facet_key") == "Posture"
+                    ),
+                    None,
+                )
+            source_sha256 = decision.get("source_sha256")
+            views.append(
+                {
+                    "decision_id": decision.get("label"),
+                    "repository_owner": owner_repo,
+                    "status": decision.get("status"),
+                    "title": decision.get("title"),
+                    "rationale_summary": rationale_summary,
+                    "rationale_source_ref": (
+                        f"repo://{owner_repo}/{source_path}"
+                        if owner_repo and isinstance(source_path, str)
+                        else source_path
+                    ),
+                    "source_revision": (
+                        f"sha256:{source_sha256}"
+                        if isinstance(source_sha256, str)
+                        else posture.get("head_sha")
+                    ),
+                    "repository_revision": posture.get("head_sha"),
+                    "source_posture": {
+                        key: posture.get(key)
+                        for key in (
+                            "relation",
+                            "dirty",
+                            "ahead_count",
+                            "behind_count",
+                            "remote_freshness_checked",
+                        )
+                    }
+                    if posture
+                    else None,
+                    "predecessors": predecessors,
+                    "successors": successors,
+                    "superseded_by": superseded_by,
+                }
+            )
+        return views
 
     def search(
         self, query: str, repo: str | None = None, limit: int = 20
@@ -587,6 +696,7 @@ class AoADecisionsMCPState:
             "freshness": graph["freshness"],
             "decision_count": len(candidates),
             "decisions": candidates,
+            "decision_views": self._decision_views(graph, candidates),
             "nodes": related_nodes,
             "edges": related_edges,
             "authority_order": [

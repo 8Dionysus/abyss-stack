@@ -28,6 +28,29 @@ memory review. It gives agents one repeatable route to ask:
 
 ## MCP Surface
 
+The admitted owner capability is deliberately smaller than the complete
+diagnostic surface. `session-evidence-read` binds six query/retrieval tools
+and four known-session resource templates under credential class
+`session-memory-read`; its source is
+`src/aoa_session_memory_mcp/organ-access.v1.json`.
+
+Use tools when the caller needs query planning, filters, budgets, typed
+retrieval, or freshness validation. Use resource templates only after a
+session identity is known, for its brief, manifest, index, or bounded
+rehydration packet. Bulk index loading and default raw-transcript hydration
+remain forbidden. The manifest does not assert admission, owner acceptance,
+central proof, registry mutation, or effects.
+
+The HTTP capability profile also enforces a 32 KiB response ceiling. For
+retrieval it may ask the owner route for up to 50 ranked candidates, omit only
+recognized retrieval-control tool-call echoes, preserve the remaining owner
+order, and return no more than the caller's requested limit. The response
+records the omitted refs and source/projected byte counts. This is a
+non-authoritative context-economy projection: raw, segment, and session refs
+remain owner evidence, and an over-limit result fails closed instead of being
+silently truncated. Portable stdio retains the complete owner surface unless
+the profile is explicitly selected.
+
 Resources:
 
 - `aoa-session-memory://status`

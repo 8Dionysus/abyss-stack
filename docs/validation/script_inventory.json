@@ -380,6 +380,7 @@
       "family": "mcp-protocol-lab-scripts",
       "paths": [
         "mcp/protocol-lab/scripts/build_protocol_lab_status.py",
+        "mcp/protocol-lab/scripts/run_codex_kag_next_lab.py",
         "mcp/protocol-lab/scripts/run_kag_cache_pair.py",
         "mcp/protocol-lab/scripts/run_kag_handle_pair.py",
         "mcp/protocol-lab/scripts/run_kag_next_pair.py",

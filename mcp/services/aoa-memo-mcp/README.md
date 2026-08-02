@@ -34,6 +34,22 @@ one repeatable route to ask:
 
 ## MCP Surface
 
+The complete catalogs below remain the portable/legacy surface during the
+migration window. Managed HTTP selects one owner-authored capability profile:
+
+- `durable-memory-read`: `aoa_memo_recall_brief`,
+  `aoa_memo_recall_reviewed`, `aoa_memo_read_object`, and only the known-object
+  resource template;
+- `memory-candidate-prepare`: `aoa_memo_create_candidate`,
+  `aoa_memo_prepare_intake_packet`, and
+  `aoa_memo_prepare_forwarding_receipt`.
+
+Both profiles remove prompts and every legacy helper outside the owner
+manifest. The manifest is owned by
+`aoa-memo:mechanics/consumer-handoff/parts/mcp-organ-access/`; this package
+owns runtime binding only. Portable stdio keeps the complete contour unless a
+profile is explicitly selected.
+
 Read-contour resources:
 
 - `aoa-memo://brief/repo/{repo}`
@@ -48,6 +64,9 @@ Read-contour resources:
 
 Read-contour tools:
 
+- `aoa_memo_recall_brief(repo, intent)` for reviewed durable-memory rows only
+- `aoa_memo_recall_reviewed(query, mode, limit)` for reviewed-corpus search only
+- `aoa_memo_read_object(object_id)` for an exact reviewed corpus object only
 - `aoa_memo_brief(repo, intent)`
 - `aoa_memo_search(query, scope, mode)`
 - `aoa_memo_owner_orientation(plan, memo_bundle, observed_at, target_ref,
@@ -67,6 +86,8 @@ Candidate-contour tools:
 - `aoa_memo_prepare_intake_packet(repo, candidate_refs, receipt_refs)`
 - `aoa_memo_review_intake(path)` as a local forwarding check, not durable
   review
+- `aoa_memo_prepare_forwarding_receipt(path)` as the capability-profile name
+  for the same bounded forwarding check
 
 Read prompts:
 
