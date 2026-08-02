@@ -230,22 +230,24 @@
     {
       "canary_contract": {
         "arguments": {
-          "include_live": false
+          "filters": {},
+          "kind": "mcp_service",
+          "query": "MCP"
         },
         "array_contains": [],
         "exact_values": {
-          "/authority_boundary/schema": "aoa_session_memory_mcp_authority_boundary_v1",
-          "/mutates": false
+          "/mcp_access/capability_profile": "session-evidence-read",
+          "/mutates": false,
+          "/requested_kind": "mcp_service"
         },
         "required_pointers": [
-          "/runtime",
-          "/provider",
-          "/readiness_policy",
-          "/authority_boundary"
+          "/primary_route",
+          "/fallback_plan",
+          "/mcp_access"
         ],
-        "schema_pointer": "/schema",
-        "schema_value": "aoa_session_memory_status_v1",
-        "tool_name": "aoa_session_memory_status"
+        "schema_pointer": "/artifact_type",
+        "schema_value": "session_memory_literal_query_plan",
+        "tool_name": "aoa_session_literal_query_plan"
       },
       "canary_route": "runbook://mcp-canary/aoa-session-memory/read",
       "effect_classes": [
