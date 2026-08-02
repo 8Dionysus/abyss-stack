@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 3602355,
+  "allowed_tracked_bytes": 29837795,
+  "approved_by": "repository-owner",
+  "base_ref": "9155394d47212c4ad1fae4e8379c1350ed2535e1",
+  "changed_generated_bytes": 3602355,
+  "changed_generated_files": 42,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "6821cb7c54e553803e117974c3f0cb46e46e10cbf7c291f046c13b16354e6b64",
+  "reason": "The merged modern MCP fabric expanded tracked owner source above the standing portable-family budget; this receipt records the exact already-landed corpus size while this narrow PR refreshes the source-linked family for the bounded session-memory canary contract.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 29837795,
+  "tracked_bytes_max": 24117248
+}
