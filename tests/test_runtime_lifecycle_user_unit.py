@@ -2575,6 +2575,18 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertIn(candidate_runtime_verifier_condition, candidate_unit)
         self.assertNotIn(read_runtime_verifier_condition, candidate_unit)
         self.assertIn(effect_runtime_verifier_condition, effect_unit)
+        audit_verifier = installer.split(
+            "aoa_verify_abyss_stack_mcp_audit_journals() {", 1
+        )[1].split("\naoa_provision_abyss_stack_mcp_audit_journals() {", 1)[0]
+        verifier_preamble, verifier_cases = audit_verifier.split(
+            '  case "$contour" in', 1
+        )
+        internal_effect_case = verifier_cases.split(
+            "    internal_effect)", 1
+        )[1].split("      ;;", 1)[0]
+        self.assertNotIn("abyss_stack_mcp_audit_root", verifier_preamble)
+        self.assertNotIn("abyss_stack_mcp_audit_root", internal_effect_case)
+        self.assertIn("abyss_stack_mcp_effect_root", internal_effect_case)
         self.assertIn(read_deployed_entrypoint, read_unit)
         self.assertNotIn(candidate_deployed_entrypoint, read_unit)
         self.assertIn(candidate_deployed_entrypoint, candidate_unit)

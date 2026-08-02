@@ -794,13 +794,13 @@ aoa_validate_abyss_stack_mcp_audit_journal() {
 aoa_verify_abyss_stack_mcp_audit_journals() {
   local contour="${1:-all}"
 
-  [[ -d "$abyss_stack_mcp_audit_root" && \
-     ! -L "$abyss_stack_mcp_audit_root" ]] || \
-    aoa_die "abyss-stack MCP audit root must be a non-symlink directory"
-  [[ "$(stat -c '%a' "$abyss_stack_mcp_audit_root")" == "700" ]] || \
-    aoa_die "abyss-stack MCP audit root must have mode 0700"
   case "$contour" in
     all)
+      [[ -d "$abyss_stack_mcp_audit_root" && \
+         ! -L "$abyss_stack_mcp_audit_root" ]] || \
+        aoa_die "abyss-stack MCP audit root must be a non-symlink directory"
+      [[ "$(stat -c '%a' "$abyss_stack_mcp_audit_root")" == "700" ]] || \
+        aoa_die "abyss-stack MCP audit root must have mode 0700"
       aoa_validate_abyss_stack_mcp_audit_journal \
         "$abyss_stack_mcp_read_audit_journal" \
         "abyss-stack MCP read audit journal"
@@ -813,11 +813,21 @@ aoa_verify_abyss_stack_mcp_audit_journals() {
         aoa_die "abyss-stack MCP internal-effect root must be a mode-0700 non-symlink directory"
       ;;
     read)
+      [[ -d "$abyss_stack_mcp_audit_root" && \
+         ! -L "$abyss_stack_mcp_audit_root" ]] || \
+        aoa_die "abyss-stack MCP audit root must be a non-symlink directory"
+      [[ "$(stat -c '%a' "$abyss_stack_mcp_audit_root")" == "700" ]] || \
+        aoa_die "abyss-stack MCP audit root must have mode 0700"
       aoa_validate_abyss_stack_mcp_audit_journal \
         "$abyss_stack_mcp_read_audit_journal" \
         "abyss-stack MCP read audit journal"
       ;;
     candidate)
+      [[ -d "$abyss_stack_mcp_audit_root" && \
+         ! -L "$abyss_stack_mcp_audit_root" ]] || \
+        aoa_die "abyss-stack MCP audit root must be a non-symlink directory"
+      [[ "$(stat -c '%a' "$abyss_stack_mcp_audit_root")" == "700" ]] || \
+        aoa_die "abyss-stack MCP audit root must have mode 0700"
       aoa_validate_abyss_stack_mcp_audit_journal \
         "$abyss_stack_mcp_candidate_audit_journal" \
         "abyss-stack MCP candidate audit journal"
