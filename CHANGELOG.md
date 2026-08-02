@@ -266,6 +266,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- The exact stack MCP restart-and-rollback pilot now accepts systemd's
+  owner-only mode-`0400` `LoadCredential` projection of the canary Ed25519
+  key, while the source key remains mode-`0600` and group/world-readable,
+  foreign-owned, symlinked, or non-regular keys still fail closed. This lets
+  both mandatory post-restart canaries use the isolated effect credential
+  contour instead of rejecting systemd's read-only projection before probing.
 - The configured session-memory HTTP smoke now keeps connect/write/pool and
   ordinary response reads plus the SSE handshake bounded, removes the read
   deadline only after its authenticated long-lived SSE GET is established,
