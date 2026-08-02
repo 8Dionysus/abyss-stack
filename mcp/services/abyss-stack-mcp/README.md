@@ -393,6 +393,9 @@ current-user-owned mode-`0600` Ed25519 private key alongside the contour bearer
 files. Reprovisioning validates and preserves that key; bearer rotation does
 not silently rotate the capture trust root. Public-key pinning and any later
 signer rotation require a separately reviewed consumer-owner update.
+The internal-effect unit receives systemd's read-only mode-`0400`
+`LoadCredential` projection of that same owner-only key; the canary reader
+accepts only those two owner-only modes and still rejects group/world access.
 
 The command never starts or stops a unit, changes consumer configuration,
 merges the overlay into the production observation, invokes the owner
