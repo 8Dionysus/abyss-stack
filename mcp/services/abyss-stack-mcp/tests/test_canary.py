@@ -750,3 +750,6 @@ def test_session_memory_canary_tracks_the_bounded_admission_profile() -> None:
     assert contract.exact_values["/mcp_access/capability_profile"] == (
         "session-evidence-read"
     )
+    assert contract.exact_values["/mutates"] is False
+    assert "/mcp_access/mutates" not in contract.exact_values
+    assert "/truth_status" not in contract.required_pointers

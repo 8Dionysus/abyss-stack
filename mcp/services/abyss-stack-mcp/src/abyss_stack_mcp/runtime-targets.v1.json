@@ -237,14 +237,12 @@
         "array_contains": [],
         "exact_values": {
           "/mcp_access/capability_profile": "session-evidence-read",
-          "/mcp_access/mutates": false,
           "/mutates": false,
           "/requested_kind": "mcp_service"
         },
         "required_pointers": [
           "/primary_route",
           "/fallback_plan",
-          "/truth_status",
           "/mcp_access"
         ],
         "schema_pointer": "/artifact_type",
