@@ -509,7 +509,7 @@ def test_canary_rejects_broad_or_symlinked_signing_key(tmp_path: Path) -> None:
     signing_key = write_signing_key(secret_dir)
     signing_key.chmod(0o640)
 
-    with pytest.raises(CanaryRunnerError, match="mode 0600"):
+    with pytest.raises(CanaryRunnerError, match="owner-only mode 0400 or 0600"):
         asyncio.run(
             run_canary(
                 organ_id="aoa-kag",
@@ -539,6 +539,27 @@ def test_canary_rejects_broad_or_symlinked_signing_key(tmp_path: Path) -> None:
                 output_root=tmp_path / "output",
             )
         )
+
+
+def test_canary_accepts_systemd_loadcredential_signing_key_mode(
+    tmp_path: Path,
+) -> None:
+    secret_dir = tmp_path / "credentials"
+    secret_dir.mkdir(mode=0o700)
+    signing_key = write_signing_key(secret_dir)
+    signing_key.chmod(0o400)
+
+    loaded = canary._read_signing_key(signing_key)
+
+    assert loaded.private_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PrivateFormat.Raw,
+        encryption_algorithm=serialization.NoEncryption(),
+    ) == SIGNING_KEY.private_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PrivateFormat.Raw,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
 
 
 def test_live_probe_uses_authenticated_http_and_observes_application_version(

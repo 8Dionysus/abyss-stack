@@ -74,8 +74,9 @@
   and rollback issuer checks;
 - a separate authenticated read canary that selects only a committed target,
   derives one exact owner credential filename, refuses symlinked or
-  group/world-readable credentials, requires a current-user-owned mode-`0600`
-  non-symlink Ed25519 private key, never serializes result values, and emits
+  group/world-readable credentials, requires a current-user-owned owner-only
+  mode-`0600` source key or systemd mode-`0400` `LoadCredential` projection of
+  that non-symlink Ed25519 private key, never serializes result values, and emits
   only an independently attested content-addressed mode-`0600` receipt,
   result artifact, and typed one-subject overlay;
 - downstream attribution of a capture to `abyss-stack` requires verification

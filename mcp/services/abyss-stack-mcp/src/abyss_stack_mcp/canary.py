@@ -404,8 +404,10 @@ def _read_signing_key(path: Path) -> Ed25519PrivateKey:
                 raise CanaryRunnerError(
                     "canary signing key must be a regular non-symlink file"
                 )
-            if stat.S_IMODE(metadata.st_mode) != 0o600:
-                raise CanaryRunnerError("canary signing key must have mode 0600")
+            if stat.S_IMODE(metadata.st_mode) not in {0o400, 0o600}:
+                raise CanaryRunnerError(
+                    "canary signing key must have owner-only mode 0400 or 0600"
+                )
             if metadata.st_uid != os.geteuid():
                 raise CanaryRunnerError(
                     "canary signing key must be owned by the current user"
