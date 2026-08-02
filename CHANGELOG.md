@@ -7,6 +7,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ## [Unreleased]
 
+### Fixed
+
+- Align the `aoa-session-memory` runtime canary with its landed bounded
+  `session-evidence-read` HTTP profile by probing the admitted literal-route
+  planner instead of the deliberately hidden full-surface status tool.
+
 ### Added
 
 - Decision `ABYSS-STACK-D-0106` and a third, separately credentialed

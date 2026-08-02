@@ -722,3 +722,31 @@ def test_committed_catalog_covers_every_migration_wave_target() -> None:
         "aoa-stackoverflow-connector",
         "aoa-xda-connector",
     }
+
+
+def test_session_memory_canary_tracks_the_bounded_admission_profile() -> None:
+    catalog = RuntimeTargetCatalog.model_validate_json(
+        (
+            Path(__file__).resolve().parents[1]
+            / "src"
+            / "abyss_stack_mcp"
+            / "runtime-targets.v1.json"
+        ).read_text(encoding="utf-8")
+    )
+    target = next(
+        item for item in catalog.targets if item.organ_id == "aoa-session-memory"
+    )
+    contract = target.canary_contract
+
+    assert contract is not None
+    assert contract.tool_name == "aoa_session_literal_query_plan"
+    assert contract.arguments == {
+        "filters": {},
+        "kind": "mcp_service",
+        "query": "MCP",
+    }
+    assert contract.schema_pointer == "/artifact_type"
+    assert contract.schema_value == "session_memory_literal_query_plan"
+    assert contract.exact_values["/mcp_access/capability_profile"] == (
+        "session-evidence-read"
+    )
