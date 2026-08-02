@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 4923104,
+  "allowed_tracked_bytes": 29834354,
+  "approved_by": "repository-owner",
+  "base_ref": "81643673e9f54a5324c866097fe0ad3ed684b758",
+  "changed_generated_bytes": 4923104,
+  "changed_generated_files": 62,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "d87ae39cd55118013863176ec12bcf0fccc0f2e161e9bc7ea3701c2f82f6a62e",
+  "reason": "bounded owner-reviewed MCP canary credential projection fix with release-note traceability",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 29834354,
+  "tracked_bytes_max": 24117248
+}
