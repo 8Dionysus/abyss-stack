@@ -9,8 +9,8 @@ lifecycle bindings, and owner handoff.
 ### Trigger
 
 Use this package when changing `aoa-governed-run`, the `aoa-sdk` Agent OS
-runtime adapter, autonomy status, return policy, candidate export, review
-packets, or local-worker execution records.
+runtime adapter, an external Codex incarnation/session, autonomy status, return
+policy, candidate export, review packets, or local-worker execution records.
 
 ### abyss-stack owns
 
@@ -21,6 +21,8 @@ packets, or local-worker execution records.
 - runtime evidence refs for local-worker activity
 - explicit Agent OS runtime admission, durable runtime state, and execution
   receipts
+- exact external Codex launch, persistent thread/resume, runtime events,
+  budget/effect observation, and reviewed-return export
 
 ### Stronger owner split
 
@@ -62,6 +64,7 @@ Current source surfaces stay in `mechanics/governed-execution/parts/governed-run
 `mechanics/governed-execution/parts/governed-runner/aoa_governed_run.py`,
 `mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py`,
 `mechanics/governed-execution/parts/agent-os-adapter/`,
+`mechanics/governed-execution/parts/external-codex-agent/`,
 `mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py`,
 `scripts/aoa-governed-run`, `scripts/aoa-status`, candidate export wrappers,
 config templates, and

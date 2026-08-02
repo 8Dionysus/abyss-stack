@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-resume.schema.json",
+  "title": "Exact external Codex resume request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "session_id", "thread_id", "after_event_sequence", "reason", "instruction"],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_external_codex_resume_v1"},
+    "session_id": {"type": "string", "minLength": 1},
+    "thread_id": {"type": "string", "minLength": 1},
+    "after_event_sequence": {"type": "integer", "minimum": 0},
+    "reason": {"enum": ["checkpoint_continue", "process_death_recovery", "bounded_repair", "review_followup"]},
+    "instruction": {"type": "string", "minLength": 1},
+    "previous_result_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

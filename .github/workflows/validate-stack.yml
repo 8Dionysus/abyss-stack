@@ -61,11 +61,15 @@ jobs:
       - name: Shellcheck scripts
         run: python scripts/ci_gate.py --mode shellcheck
 
-      - name: Compile Agent OS runtime bridge
+      - name: Compile governed external-agent bridges
         run: >-
           python -m py_compile
           scripts/aoa-agent-os-runtime
           mechanics/governed-execution/parts/agent-os-adapter/aoa_agent_os_runtime.py
+          scripts/aoa-external-codex-agent
+          mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py
+          mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py
+          mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py
 
       - name: Rehearse bootstrap flow
         run: |

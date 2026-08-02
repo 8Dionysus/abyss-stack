@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.abyss.local/stack/external-codex-parent-obligation.schema.json",
+  "title": "External Codex parent yield and re-entry obligation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "reentry_id",
+    "parent_task_id",
+    "parent_model_realization_ref",
+    "parent_role_ref",
+    "child_task_ref",
+    "child_incarnation_binding_ref",
+    "parent_workspace",
+    "codex_executable",
+    "codex_executable_digest",
+    "codex_home",
+    "return_owner",
+    "expected_wake_condition_id",
+    "expected_wake_event_kind",
+    "permission_posture",
+    "usage_metering",
+    "deferred_parent_decisions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "abyss_stack_external_codex_parent_obligation_v1"
+    },
+    "reentry_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[a-z0-9._:-]*[a-z0-9])?$",
+      "maxLength": 192
+    },
+    "parent_task_id": {"type": "string", "minLength": 1},
+    "parent_model_realization_ref": {"$ref": "#/$defs/artifactRef"},
+    "parent_role_ref": {"$ref": "#/$defs/artifactRef"},
+    "child_task_ref": {"$ref": "#/$defs/artifactRef"},
+    "child_incarnation_binding_ref": {"$ref": "#/$defs/artifactRef"},
+    "parent_workspace": {"type": "string", "pattern": "^/"},
+    "codex_executable": {"type": "string", "pattern": "^/"},
+    "codex_executable_digest": {"$ref": "#/$defs/digest"},
+    "codex_home": {"type": "string", "pattern": "^/"},
+    "return_owner": {"type": "string", "minLength": 1},
+    "expected_wake_condition_id": {"type": "string", "minLength": 1},
+    "expected_wake_event_kind": {"type": "string", "minLength": 1},
+    "permission_posture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sandbox_mode",
+        "approval_policy",
+        "network_access",
+        "external_effects",
+        "multi_agent_enabled"
+      ],
+      "properties": {
+        "sandbox_mode": {"const": "read-only"},
+        "approval_policy": {"const": "never"},
+        "network_access": {"const": "disabled"},
+        "external_effects": {"const": false},
+        "multi_agent_enabled": {"const": false}
+      }
+    },
+    "usage_metering": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "execution_limit_policy", "metering_regime"],
+      "properties": {
+        "mode": {"const": "observe_only"},
+        "execution_limit_policy": {"const": "none"},
+        "metering_regime": {"enum": ["chatgpt_quota", "api_billing", "unknown"]}
+      }
+    },
+    "deferred_parent_decisions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_repo", "artifact_ref", "artifact_digest"],
+      "properties": {
+        "owner_repo": {"type": "string", "minLength": 1},
+        "artifact_ref": {"type": "string", "pattern": "^/"},
+        "artifact_digest": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

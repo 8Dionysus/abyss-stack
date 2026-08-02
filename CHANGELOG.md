@@ -31,6 +31,36 @@ Tracking starts with the community-docs baseline for this repository.
   release (`v0.1.16`) from the exact tested `0.2.0-alpha.10` next-wire package;
   migration to `2026-07-28` remains fail-closed.
 
+- A source-local external Codex incarnation runtime now binds exact `aoa-sdk`
+  plans, `aoa-agents` roles, and `aoa-models` realizations to separate
+  OS-process landing-readiness, preparation, review, closeout, and
+  ambiguity-stop tasks without using built-in Codex subagents. Its initial
+  admission is transport-fixture-only: exact byte manifests include ignored
+  workspace content while refusing secret-shaped ignored inputs, validation
+  claims bind to observed argv/exit states, required review cannot close as
+  completed, produced-artifact and status-selected wake claims fail closed,
+  high-risk command families and path drift remain bounded, and Linux
+  parent-death/subreaper containment covers TERM-resistant `setsid` descendants
+  and unexpected worker death without pre-empting Codex's own sandbox
+  namespaces. A2A return remains gated on a
+  different accepted reviewer runtime and thread;
+  usage is observe-only rather than an execution budget, stable
+  immutable/source/runtime-validation evidence schemes fail closed, admission-
+  time failure closeout survives later input drift, and canonical reviewer
+  preparation forwards exact writer evidence into a distinct non-started
+  session. Mutation paths, source-evidence paths, and the controller-owned
+  post-exit manifest identity are separate. A session-local output schema pins
+  exact task/incarnation IDs, and one explicit prior-result-digest-bound route
+  can continue the same unchanged read-only reviewer thread after an identity
+  typo while preserving the failed receipt. Every admitted resume now
+  preserves its prior terminal receipt, and an interruption before Codex emits
+  turn usage is reported as partial observation rather than zero work. A
+  semantically read-only launch now gives Codex a distinct attempt-local
+  execution root and `TMPDIR`; the target checkout stays outside writable
+  roots, the exact execution root is receipted, and network remains disabled;
+  no model-fit, owner-acceptance, landing, commit, publication, or runtime
+  activation claim is implied.
+
 - A separate credential-bearing, content-addressed Wave 1 read-canary contour
   for KAG, stats, and decisions. It observes one exact loopback schema and
   owner-specific result-contract match, and preserves a successful structured

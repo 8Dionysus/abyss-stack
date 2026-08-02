@@ -1,0 +1,121 @@
+{
+  "$schema": "schemas/external-codex-runtime-profile.schema.json",
+  "schema_version": "abyss_stack_external_codex_runtime_profile_v1",
+  "profile_id": "runtime-profile:abyss-stack-external-codex-agent-v1",
+  "runtime_owner": "abyss-stack",
+  "adapter_id": "abyss_stack_external_codex_agent_v1",
+  "adapter_protocol_version": "aoa_runtime_adapter_v1",
+  "transport": "codex_exec_jsonl_v1",
+  "source_ref": "abyss_stack_external_codex_agent_v1",
+  "schema_ref": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-runtime-profile.schema.json",
+  "supported_plan_schema_versions": ["aoa_control_plane_v1"],
+  "supported_event_schema_versions": ["aoa_control_plane_v1", "abyss_stack_external_codex_event_v1"],
+  "supported_effect_classes": ["read_only", "repo_mutation"],
+  "process_containment": {
+    "strategy": "linux_subreaper_supervisor_v1",
+    "supervisor_ref": "external_codex_supervisor.py",
+    "parent_death_signal": "SIGTERM",
+    "term_timeout_seconds": 3.0,
+    "kill_timeout_seconds": 3.0,
+    "probe_executable": "/usr/bin/true"
+  },
+  "codex_cli": {
+    "required_version": "codex-cli 0.146.0",
+    "ignore_user_config": true,
+    "ignore_exec_rules": true,
+    "multi_agent_enabled": false,
+    "structured_events": true,
+    "structured_final_output": true,
+    "persistent_sessions": true
+  },
+  "model_admission": [
+    {
+      "model_slug": "gpt-5.6-luna",
+      "reasoning_efforts": [
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "model_slug": "gpt-5.6-sol",
+      "reasoning_efforts": [
+        "max"
+      ]
+    }
+  ],
+  "tool_profiles": [
+    {
+      "profile_id": "abyss-stack:external_codex_agent/luna-landing-readonly-v1",
+      "sandbox_mode": "read_only",
+      "codex_sandbox": "workspace-write",
+      "codex_execution_root": "attempt-local",
+      "approval_policy": "never",
+      "allowed_effect_classes": [
+        "read_only"
+      ],
+      "required_tool_ids": [
+        "shell-read"
+      ],
+      "required_mcp_server_ids": [],
+      "network_access": "disabled",
+      "external_effects": false
+    },
+    {
+      "profile_id": "abyss-stack:external_codex_agent/sol-landing-readonly-v1",
+      "sandbox_mode": "read_only",
+      "codex_sandbox": "workspace-write",
+      "codex_execution_root": "attempt-local",
+      "approval_policy": "never",
+      "allowed_effect_classes": [
+        "read_only"
+      ],
+      "required_tool_ids": [
+        "shell-read"
+      ],
+      "required_mcp_server_ids": [],
+      "network_access": "disabled",
+      "external_effects": false
+    },
+    {
+      "profile_id": "abyss-stack:external_codex_agent/luna-landing-workspace-write-v1",
+      "sandbox_mode": "workspace_write",
+      "codex_sandbox": "workspace-write",
+      "codex_execution_root": "target-workspace",
+      "approval_policy": "never",
+      "allowed_effect_classes": [
+        "read_only",
+        "repo_mutation"
+      ],
+      "required_tool_ids": [
+        "shell-read",
+        "workspace-write"
+      ],
+      "required_mcp_server_ids": [],
+      "network_access": "disabled",
+      "external_effects": false
+    }
+  ],
+  "task_families": [
+    "landing_readiness",
+    "landing_preparation",
+    "landing_review",
+    "landing_closeout",
+    "landing_ambiguity_stop"
+  ],
+  "result_schema_ref": "schemas/external-codex-report.schema.json",
+  "boundaries": {
+    "launches_separate_os_process": true,
+    "uses_builtin_codex_subagents": false,
+    "uses_tui_transport": false,
+    "selects_model_from_binding": true,
+    "model_fit_authority": false,
+    "role_authority": false,
+    "eval_authority": false,
+    "owner_acceptance_authority": false,
+    "external_effects_enabled": false,
+    "commit_effect_enabled": false,
+    "push_effect_enabled": false,
+    "merge_effect_enabled": false,
+    "release_effect_enabled": false
+  }
+}

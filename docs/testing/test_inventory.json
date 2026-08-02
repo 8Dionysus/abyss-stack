@@ -115,6 +115,8 @@
         "mechanics/governed-execution/parts/autonomy-status/tests/test_aoa_status_autonomy.py",
         "mechanics/governed-execution/parts/candidate-exports/tests/test_runtime_eval_evidence_export.py",
         "mechanics/governed-execution/parts/agent-os-adapter/tests/test_agent_os_runtime_bridge.py",
+        "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py",
+        "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_runtime_install.py",
         "mechanics/governed-execution/parts/governed-runner/tests/governed_runner_test_support.py",
         "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_edit_specs.py",
         "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_lifecycle.py",

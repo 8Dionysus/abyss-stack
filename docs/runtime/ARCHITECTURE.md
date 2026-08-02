@@ -65,6 +65,14 @@ a network API. `aoa-sdk` owns its generic plan and lifecycle contracts;
 `abyss-stack` admits supported plans and owns durable runtime state, approvals,
 governed execution, rollback, runtime evidence, and outcomes.
 
+The source-local external Codex incarnation lane is another explicit local
+process boundary, not a network API and not the Agent OS return reviewer. It
+consumes a post-compile SDK incarnation binding, launches an exact Codex
+model/effort with built-in multi-agent behavior disabled, owns durable thread
+and resume evidence, and may export only an independently reviewed child-result
+candidate into the existing A2A return lane. Role, model-fit, eval, owner
+acceptance, and external-effect authority remain outside this runtime part.
+
 ### 5. Speech and tool layer
 
 Optional runtime helpers:

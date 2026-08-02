@@ -15,6 +15,10 @@ Current posture:
 - keep Agent OS plan admission exact, runtime-owned, durable, and limited to
   explicitly mapped execution lanes; repository mutation alone delegates to
   the governed runner
+- keep external Codex incarnations post-compile, owner-bound, separately
+  processed, persistently resumable, and outside Codex's built-in subagent
+  transport; keep their first landing-oriented admission free of external
+  effects
 - keep governed mutation owner-bound to `abyss-stack`; the routing predecessor
   is retained for compatibility rollback, not as a mutable external target
 
@@ -29,3 +33,6 @@ Near direction:
   SDK C5 projection while the runtime adapter validates only its exact
   closeout scope
 - keep recurrence and return language bounded, evidence-linked, and reversible
+- compare Luna max, Luna xhigh, and Sol max on one fixed landing packet before
+  any model-fit or center-routing claim; route comparable evidence to
+  `aoa-evals` rather than treating runtime completion as quality proof

@@ -53,6 +53,7 @@
         "scripts/aoa-doctor",
         "scripts/aoa-doctor-win.ps1",
         "scripts/aoa-down",
+        "scripts/aoa-external-codex-agent",
         "scripts/aoa-export-artifact-hook-candidate",
         "scripts/aoa-export-memo-candidate",
         "scripts/aoa-export-runtime-evidence-selection",

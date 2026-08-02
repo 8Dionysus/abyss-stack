@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-event.schema.json",
+  "title": "Normalized external Codex runtime event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "sequence", "recorded_at", "session_id", "attempt_id", "thread_id", "event_type", "source_event_type", "payload_digest", "significance", "payload"],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_external_codex_event_v1"},
+    "sequence": {"type": "integer", "minimum": 0},
+    "recorded_at": {"type": "string", "format": "date-time"},
+    "session_id": {"type": "string", "minLength": 1},
+    "attempt_id": {"type": "string", "minLength": 1},
+    "thread_id": {"type": ["string", "null"]},
+    "event_type": {"type": "string", "minLength": 1},
+    "source_event_type": {"type": ["string", "null"]},
+    "payload_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "significance": {"enum": ["trace", "progress", "checkpoint", "review", "authority", "parent_wake", "terminal"]},
+    "payload": {"type": "object"}
+  }
+}

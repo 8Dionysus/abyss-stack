@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-launch.schema.json",
+  "title": "Exact delivery binding for one external Codex incarnation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "launch_id", "session_id", "admission_class", "plan", "incarnation_binding", "model_realization", "task", "runtime_profile", "role_contract", "result_schema", "workspace_path", "workspace_expected_head", "workspace_initial_posture", "workspace_manifest_input_id", "codex_executable", "codex_executable_digest", "codex_home", "environment_allowlist"],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_external_codex_launch_v1"},
+    "launch_id": {"type": "string", "minLength": 1},
+    "session_id": {"type": "string", "minLength": 1},
+    "admission_class": {"enum": ["owner_contour", "transport_study_fixture"]},
+    "plan": {"$ref": "#/$defs/artifactCoordinate"},
+    "incarnation_binding": {"$ref": "#/$defs/artifactCoordinate"},
+    "model_realization": {"$ref": "#/$defs/artifactCoordinate"},
+    "task": {"$ref": "#/$defs/artifactCoordinate"},
+    "runtime_profile": {"$ref": "#/$defs/artifactCoordinate"},
+    "role_contract": {"$ref": "#/$defs/artifactCoordinate"},
+    "result_schema": {"$ref": "#/$defs/artifactCoordinate"},
+    "workspace_path": {"type": "string", "pattern": "^/"},
+    "workspace_expected_head": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "workspace_initial_posture": {"enum": ["clean_required", "exact_baseline"]},
+    "workspace_manifest_input_id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "maxLength": 96},
+    "codex_executable": {"type": "string", "pattern": "^/"},
+    "codex_executable_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "codex_home": {"type": "string", "pattern": "^/"},
+    "environment_allowlist": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["HOME", "LANG", "LC_ALL", "PATH", "SSL_CERT_FILE", "SSL_CERT_DIR", "TERM"]}}
+  },
+  "$defs": {
+    "artifactCoordinate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^/"},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

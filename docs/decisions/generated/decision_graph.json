@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 107,
-  "edge_count": 2413,
+  "decision_count": 108,
+  "edge_count": 2437,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 919,
-    "DATED": 107,
-    "GUARDED_BY": 318,
-    "HAS_STATUS": 107,
-    "HAS_SURFACE_CLASS": 279,
-    "IN_STACK_LANE": 242,
-    "NEXT_DECISION": 106,
-    "OWNED_BY_SURFACE": 113,
-    "OWNS_DECISION": 107,
+    "CITES_SOURCE_SURFACE": 924,
+    "DATED": 108,
+    "GUARDED_BY": 324,
+    "HAS_STATUS": 108,
+    "HAS_SURFACE_CLASS": 283,
+    "IN_STACK_LANE": 245,
+    "NEXT_DECISION": 107,
+    "OWNED_BY_SURFACE": 114,
+    "OWNS_DECISION": 108,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 113
+    "UNDER_MECHANIC_PARENT": 114
   },
   "edges": [
     {
@@ -11538,12 +11538,127 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0107",
+      "target": "decision:ABYSS-STACK-D-0108",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
       "target": "owner_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/admission_automation.py",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0107",
       "target": "mechanic_parent:runtime-lifecycle",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "source_surface:mechanics/governed-execution/PARTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "source_surface:mechanics/governed-execution/PROVENANCE.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "source_surface:mechanics/governed-execution/parts/agent-os-adapter/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "source_surface:scripts/aoa-external-codex-agent",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "date:2026-08-01",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "guard_family:durable%20resume",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "guard_family:effect%20ceiling",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "guard_family:exact%20binding",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "guard_family:independent%20review",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "guard_family:owner%20provenance",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "guard_family:process%20isolation",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "surface_class:A2A%20return",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "surface_class:model%20incarnation",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "surface_class:persistent%20session",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "surface_class:runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "stack_lane:review",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "stack_lane:source",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
+      "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -12080,21 +12195,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0107",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0108",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1075,
+  "node_count": 1092,
   "node_type_counts": {
     "date": 32,
-    "decision": 107,
-    "guard_family": 159,
+    "decision": 108,
+    "guard_family": 165,
     "mechanic_parent": 10,
-    "owner_surface": 59,
+    "owner_surface": 60,
     "repo": 1,
-    "source_surface": 548,
-    "stack_lane": 45,
+    "source_surface": 552,
+    "stack_lane": 46,
     "status": 3,
-    "surface_class": 111
+    "surface_class": 115
   },
   "nodes": [
     {
@@ -13328,6 +13448,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-01",
+      "id": "decision:ABYSS-STACK-D-0108",
+      "label": "ABYSS-STACK-D-0108",
+      "path": "docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md",
+      "posture": "accepted source-local runtime with reviewed nonproduction machine-local vertical proof; model fit and production admission remain external",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -13538,8 +13668,18 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:durable%20resume",
+      "label": "durable resume",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:effect%20boundary",
       "label": "effect boundary",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:effect%20ceiling",
+      "label": "effect ceiling",
       "type": "guard_family"
     },
     {
@@ -13555,6 +13695,11 @@
     {
       "id": "guard_family:exact%20admission",
       "label": "exact admission",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:exact%20binding",
+      "label": "exact binding",
       "type": "guard_family"
     },
     {
@@ -13675,6 +13820,11 @@
     {
       "id": "guard_family:independent%20reference",
       "label": "independent reference",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:independent%20review",
+      "label": "independent review",
       "type": "guard_family"
     },
     {
@@ -13803,6 +13953,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:owner%20provenance",
+      "label": "owner provenance",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:owner%20skill%20package",
       "label": "owner skill package",
       "type": "guard_family"
@@ -13850,6 +14005,11 @@
     {
       "id": "guard_family:post-reveal%20evidence%20join",
       "label": "post-reveal evidence join",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:process%20isolation",
+      "label": "process isolation",
       "type": "guard_family"
     },
     {
@@ -14320,6 +14480,11 @@
     {
       "id": "owner_surface:mechanics/governed-execution/parts/agent-os-adapter/",
       "label": "mechanics/governed-execution/parts/agent-os-adapter/",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/",
       "type": "owner_surface"
     },
     {
@@ -16239,6 +16404,16 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/governed-execution/PARTS.md",
+      "label": "mechanics/governed-execution/PARTS.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/PROVENANCE.md",
+      "label": "mechanics/governed-execution/PROVENANCE.md",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/governed-execution/parts/agent-os-adapter/",
       "label": "mechanics/governed-execution/parts/agent-os-adapter/",
       "type": "source_surface"
@@ -16276,6 +16451,11 @@
     {
       "id": "source_surface:mechanics/governed-execution/parts/candidate-exports/",
       "label": "mechanics/governed-execution/parts/candidate-exports/",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/",
       "type": "source_surface"
     },
     {
@@ -16706,6 +16886,11 @@
     {
       "id": "source_surface:scripts/aoa-diagnose",
       "label": "scripts/aoa-diagnose",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:scripts/aoa-external-codex-agent",
+      "label": "scripts/aoa-external-codex-agent",
       "type": "source_surface"
     },
     {
@@ -17354,6 +17539,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:review",
+      "label": "review",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:runtime",
       "label": "runtime",
       "type": "stack_lane"
@@ -17452,6 +17642,11 @@
       "id": "status:superseded",
       "label": "superseded",
       "type": "status"
+    },
+    {
+      "id": "surface_class:A2A%20return",
+      "label": "A2A return",
+      "type": "surface_class"
     },
     {
       "id": "surface_class:Codex%20hooks",
@@ -17784,6 +17979,11 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:model%20incarnation",
+      "label": "model incarnation",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:operational%20evidence",
       "label": "operational evidence",
       "type": "surface_class"
@@ -17811,6 +18011,11 @@
     {
       "id": "surface_class:owner-local%20stats%20ports",
       "label": "owner-local stats ports",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:persistent%20session",
+      "label": "persistent session",
       "type": "surface_class"
     },
     {
@@ -17871,6 +18076,11 @@
     {
       "id": "surface_class:runtime%20admission",
       "label": "runtime admission",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:runtime%20boundary",
+      "label": "runtime boundary",
       "type": "surface_class"
     },
     {

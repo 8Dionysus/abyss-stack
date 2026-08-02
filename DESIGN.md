@@ -66,6 +66,10 @@ The runtime body has these organs:
 - **governed agent execution**: an explicit local subprocess bridge that
   consumes exact `aoa-sdk` plans while keeping session state, approvals,
   effects, rollback, runtime evidence, and outcomes owned by this runtime
+- **external model incarnations**: a post-compile, owner-bound Codex process
+  lane that keeps role and model meaning outside the runtime, persists exact
+  thread/re-entry evidence, and feeds independently reviewed returns back into
+  governed execution without using built-in subagent transport
 - **federation seams**: opt-in runtime bridges to sibling repositories that
   consume or mirror surfaces without stealing their authority
 - **runtime knowledge projections**: manifest-bound exact, lexical, vector,

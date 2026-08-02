@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-report.schema.json",
+  "title": "Model-authored bounded external Codex report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "incarnation_id",
+    "status",
+    "decision",
+    "transition",
+    "summary",
+    "findings",
+    "artifact_paths",
+    "validation_claims",
+    "residuals",
+    "reentry_request",
+    "owner_acceptance_claimed",
+    "external_effects_claimed"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "abyss_stack_external_codex_report_v1"
+    },
+    "task_id": {"type": "string"},
+    "incarnation_id": {"type": "string"},
+    "status": {
+      "type": "string",
+      "enum": ["completed", "failed", "paused", "review_required", "authority_blocked"]
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["proceed", "submit_for_review", "return_for_repair", "escalate", "stop", "checkpoint"]
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from_status",
+        "to_status",
+        "owner",
+        "evidence_refs",
+        "approval_posture",
+        "rollback_reentry_route"
+      ],
+      "properties": {
+        "from_status": {"type": "string"},
+        "to_status": {"type": "string"},
+        "owner": {"type": "string"},
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^(?:source:[^#]+|immutable:[a-z0-9]+(?:-[a-z0-9]+)*|runtime:workspace-final-manifest)#[^#]+$"
+          }
+        },
+        "approval_posture": {"type": "string"},
+        "rollback_reentry_route": {"type": "string"}
+      }
+    },
+    "summary": {"type": "string"},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "category", "summary", "evidence_refs"],
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["info", "warning", "blocking"]
+          },
+          "category": {"type": "string"},
+          "summary": {"type": "string"},
+          "evidence_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "pattern": "^(?:source:[^#]+|immutable:[a-z0-9]+(?:-[a-z0-9]+)*|runtime:workspace-final-manifest)#[^#]+$"
+            }
+          }
+        }
+      }
+    },
+    "artifact_paths": {"type": "array", "items": {"type": "string"}},
+    "validation_claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command_id", "status", "evidence_ref"],
+        "properties": {
+          "command_id": {"type": "string"},
+          "status": {
+            "type": "string",
+            "enum": ["passed", "failed", "skipped"]
+          },
+          "evidence_ref": {
+            "type": "string",
+            "pattern": "^runtime:validation:[a-z0-9]+(?:-[a-z0-9]+)*$"
+          }
+        }
+      }
+    },
+    "residuals": {"type": "array", "items": {"type": "string"}},
+    "reentry_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["condition_id", "proposed_action", "reason"],
+      "properties": {
+        "condition_id": {"type": "string"},
+        "proposed_action": {
+          "type": "string",
+          "enum": ["continue_without_parent", "activate_review_role", "wake_parent", "stop"]
+        },
+        "reason": {"type": "string"}
+      }
+    },
+    "owner_acceptance_claimed": {"type": "boolean", "const": false},
+    "external_effects_claimed": {"type": "boolean", "const": false}
+  }
+}

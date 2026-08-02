@@ -1,0 +1,254 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-state.schema.json",
+  "title": "Durable external Codex runtime state",
+  "type": "object",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema_version": {"const": "abyss_stack_external_codex_runtime_state_v2"}
+        },
+        "required": ["schema_version"]
+      },
+      "then": {"required": ["failure_closeout"]}
+    }
+  ],
+  "required": [
+    "schema_version", "session_id", "launch_id", "launch_digest", "admission_class", "status",
+    "incarnation_id", "task_id", "task_family", "model_slug",
+    "reasoning_effort", "tool_profile_id", "workspace_path",
+    "workspace_expected_head", "workspace_baseline", "workspace_manifest_baseline",
+    "materialized_inputs",
+    "materialized_task_inputs", "preflight", "created_at", "started_at",
+    "finished_at", "thread_id", "attempts", "active_attempt_id", "worker_pid",
+    "worker_start_ticks", "codex_pid", "codex_start_ticks",
+    "last_event_sequence", "usage", "turn_count", "output_bytes",
+    "active_wall_seconds", "executed_commands", "changed_paths", "result_path",
+    "wake_evaluation"
+  ],
+  "properties": {
+    "schema_version": {"enum": ["abyss_stack_external_codex_runtime_state_v1", "abyss_stack_external_codex_runtime_state_v2"]},
+    "session_id": {"type": "string", "minLength": 1},
+    "launch_id": {"type": "string", "minLength": 1},
+    "launch_digest": {"$ref": "#/$defs/digest"},
+    "admission_class": {"enum": ["owner_contour", "transport_study_fixture"]},
+    "status": {"$ref": "#/$defs/status"},
+    "incarnation_id": {"type": "string", "minLength": 1},
+    "task_id": {"type": "string", "minLength": 1},
+    "task_family": {"type": "string", "minLength": 1},
+    "model_slug": {"type": "string", "minLength": 1},
+    "reasoning_effort": {"enum": ["low", "medium", "high", "xhigh", "max"]},
+    "tool_profile_id": {"type": "string", "minLength": 1},
+    "workspace_path": {"type": "string", "pattern": "^/"},
+    "workspace_expected_head": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "workspace_baseline": {
+      "type": "object",
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "workspace_manifest_baseline": {"type": "object"},
+    "materialized_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan", "incarnation_binding", "model_realization", "task", "runtime_profile", "role_contract", "result_schema"],
+      "properties": {
+        "plan": {"type": "string", "pattern": "^/"},
+        "incarnation_binding": {"type": "string", "pattern": "^/"},
+        "model_realization": {"type": "string", "pattern": "^/"},
+        "task": {"type": "string", "pattern": "^/"},
+        "runtime_profile": {"type": "string", "pattern": "^/"},
+        "role_contract": {"type": "string", "pattern": "^/"},
+        "result_schema": {"type": "string", "pattern": "^/"}
+      }
+    },
+    "execution_result_schema_ref": {"$ref": "#/$defs/artifactRef"},
+    "materialized_task_inputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["input_id", "path", "provenance"],
+        "properties": {
+          "input_id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "maxLength": 96},
+          "path": {"type": "string", "pattern": "^/"},
+          "provenance": {"$ref": "#/$defs/provenanceRef"}
+        }
+      }
+    },
+    "failure_closeout": {"$ref": "#/$defs/failureCloseout"},
+    "preflight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "auth_regime", "model_slug", "reasoning_effort", "executable_digest"],
+      "properties": {
+        "version": {"type": "string", "minLength": 1},
+        "auth_regime": {"const": "chatgpt_login"},
+        "model_slug": {"type": "string", "minLength": 1},
+        "reasoning_effort": {"enum": ["low", "medium", "high", "xhigh", "max"]},
+        "executable_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "created_at": {"type": "string", "format": "date-time"},
+    "started_at": {"type": ["string", "null"], "format": "date-time"},
+    "finished_at": {"type": ["string", "null"], "format": "date-time"},
+    "thread_id": {"type": ["string", "null"]},
+    "attempts": {"type": "array", "items": {"$ref": "#/$defs/attempt"}},
+    "active_attempt_id": {"type": ["string", "null"]},
+    "worker_pid": {"$ref": "#/$defs/pid"},
+    "worker_start_ticks": {"$ref": "#/$defs/ticks"},
+    "supervisor_pid": {"$ref": "#/$defs/pid"},
+    "supervisor_start_ticks": {"$ref": "#/$defs/ticks"},
+    "codex_pid": {"$ref": "#/$defs/pid"},
+    "codex_start_ticks": {"$ref": "#/$defs/ticks"},
+    "last_event_sequence": {"type": "integer", "minimum": -1},
+    "usage": {"$ref": "#/$defs/usage"},
+    "usage_observation_gaps": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/usageObservationGap"}
+    },
+    "turn_count": {"type": "integer", "minimum": 0},
+    "output_bytes": {"type": "integer", "minimum": 0},
+    "active_wall_seconds": {"type": "number", "minimum": 0},
+    "executed_commands": {"type": "array", "items": {"type": "object"}},
+    "changed_paths": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "status"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "status": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "result_path": {"type": ["string", "null"]},
+    "result_digest": {
+      "type": ["string", "null"],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "wake_evaluation": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/wakeEvaluation"}
+      ]
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "pid": {"type": ["integer", "null"], "minimum": 2},
+    "ticks": {"type": ["integer", "null"], "minimum": 0},
+    "status": {"enum": ["prepared", "running", "completed", "failed", "interrupted", "paused", "review_required", "authority_blocked"]},
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_tokens", "cached_input_tokens", "output_tokens"],
+      "properties": {
+        "input_tokens": {"type": "integer", "minimum": 0},
+        "cached_input_tokens": {"type": "integer", "minimum": 0},
+        "output_tokens": {"type": "integer", "minimum": 0}
+      }
+    },
+    "usageObservationGap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempt_id", "reason", "event_sequence"],
+      "properties": {
+        "attempt_id": {"type": "string", "minLength": 1},
+        "reason": {"const": "controlled_interruption_before_turn_usage"},
+        "event_sequence": {"type": "integer", "minimum": 0}
+      }
+    },
+    "provenanceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_repo", "artifact_ref", "source_ref", "artifact_digest", "schema_ref", "schema_version"],
+      "properties": {
+        "owner_repo": {"type": "string", "minLength": 1},
+        "artifact_ref": {"type": "string", "minLength": 1},
+        "source_ref": {"type": "string", "minLength": 1},
+        "artifact_digest": {"$ref": "#/$defs/digest"},
+        "schema_ref": {"type": "string", "minLength": 1},
+        "schema_version": {"type": "string", "minLength": 1}
+      }
+    },
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_repo", "artifact_ref", "artifact_digest"],
+      "properties": {
+        "owner_repo": {"type": "string", "minLength": 1},
+        "artifact_ref": {"type": "string", "minLength": 1},
+        "artifact_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempt_id", "attempt_number", "mode", "status", "worker_pid", "worker_start_ticks", "codex_pid", "codex_start_ticks", "started_at", "finished_at", "exit_code", "thread_id", "codex_argv", "output_bytes", "active_wall_seconds", "wall_time_accounted"],
+      "properties": {
+        "attempt_id": {"type": "string", "minLength": 1},
+        "attempt_number": {"type": "integer", "minimum": 1},
+        "mode": {"enum": ["start", "resume"]},
+        "status": {"enum": ["starting", "running", "completed", "failed", "interrupted", "paused", "review_required", "authority_blocked"]},
+        "worker_pid": {"$ref": "#/$defs/pid"},
+        "worker_start_ticks": {"$ref": "#/$defs/ticks"},
+        "supervisor_pid": {"$ref": "#/$defs/pid"},
+        "supervisor_start_ticks": {"$ref": "#/$defs/ticks"},
+        "process_identity_ref": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/artifactRef"}
+          ]
+        },
+        "codex_pid": {"$ref": "#/$defs/pid"},
+        "codex_start_ticks": {"$ref": "#/$defs/ticks"},
+        "started_at": {"type": ["string", "null"], "format": "date-time"},
+        "finished_at": {"type": ["string", "null"], "format": "date-time"},
+        "exit_code": {"type": ["integer", "null"]},
+        "thread_id": {"type": ["string", "null"]},
+        "codex_argv": {
+          "type": ["array", "null"],
+          "items": {"type": "string"}
+        },
+        "execution_root": {"type": ["string", "null"], "pattern": "^/"},
+        "output_bytes": {"type": "integer", "minimum": 0},
+        "active_wall_seconds": {"type": "number", "minimum": 0},
+        "wall_time_accounted": {"type": "boolean"}
+      }
+    },
+    "wakeEvaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_kind", "condition_id", "action", "wake_parent", "reason"],
+      "properties": {
+        "event_kind": {"type": "string", "minLength": 1},
+        "condition_id": {"type": ["string", "null"]},
+        "action": {"enum": ["continue_without_parent", "activate_review_role", "wake_parent", "stop"]},
+        "wake_parent": {"type": "boolean"},
+        "reason": {"type": "string", "minLength": 1}
+      }
+    },
+    "failureCloseout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_owner", "task_ref", "incarnation_binding_ref", "wake_evaluations"],
+      "properties": {
+        "target_owner": {"type": "string", "minLength": 1},
+        "task_ref": {"$ref": "#/$defs/artifactRef"},
+        "incarnation_binding_ref": {"$ref": "#/$defs/artifactRef"},
+        "wake_evaluations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["failed", "authority_blocked"],
+          "properties": {
+            "failed": {"$ref": "#/$defs/wakeEvaluation"},
+            "authority_blocked": {"$ref": "#/$defs/wakeEvaluation"}
+          }
+        }
+      }
+    }
+  }
+}

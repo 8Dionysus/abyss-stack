@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-result.schema.json",
+  "title": "Runtime-observed external Codex agent result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "session_id", "admission_class", "incarnation_id", "task_id", "task_family", "status", "thread_id", "model_slug", "reasoning_effort", "started_at", "finished_at", "duration_seconds", "attempt_count", "turn_count", "output_bytes", "active_wall_seconds", "exit_code", "usage", "codex_invocations", "executed_commands", "changed_paths", "workspace_manifest_ref", "report_ref", "events_ref", "stderr_ref", "wake_evaluation", "evidence_refs"],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_external_codex_result_v1"},
+    "session_id": {"type": "string", "minLength": 1},
+    "admission_class": {"enum": ["owner_contour", "transport_study_fixture"]},
+    "incarnation_id": {"type": "string", "minLength": 1},
+    "task_id": {"type": "string", "minLength": 1},
+    "task_family": {"type": "string", "minLength": 1},
+    "status": {"enum": ["completed", "failed", "interrupted", "paused", "review_required", "authority_blocked"]},
+    "failure_code": {"type": ["string", "null"]},
+    "thread_id": {"type": ["string", "null"]},
+    "model_slug": {"type": "string", "minLength": 1},
+    "reasoning_effort": {"enum": ["low", "medium", "high", "xhigh", "max"]},
+    "started_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": ["string", "null"], "format": "date-time"},
+    "duration_seconds": {"type": "number", "minimum": 0},
+    "attempt_count": {"type": "integer", "minimum": 1},
+    "turn_count": {"type": "integer", "minimum": 0},
+    "output_bytes": {"type": "integer", "minimum": 0},
+    "active_wall_seconds": {"type": "number", "minimum": 0},
+    "exit_code": {"type": ["integer", "null"]},
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_tokens", "cached_input_tokens", "output_tokens", "metering_mode", "active_cost_regime", "cost_usd"],
+      "properties": {
+        "input_tokens": {"type": "integer", "minimum": 0},
+        "cached_input_tokens": {"type": "integer", "minimum": 0},
+        "output_tokens": {"type": "integer", "minimum": 0},
+        "metering_mode": {"const": "observe_only"},
+        "active_cost_regime": {"type": "string", "minLength": 1},
+        "cost_usd": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "usage_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "gap_reasons"],
+      "properties": {
+        "status": {"enum": ["complete", "partial"]},
+        "gap_reasons": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/usageObservationGap"}
+        }
+      }
+    },
+    "codex_invocations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["attempt_id", "mode", "worker_pid", "codex_pid", "thread_id", "argv", "argv_digest"],
+        "properties": {
+          "attempt_id": {"type": "string", "minLength": 1},
+          "mode": {"enum": ["start", "resume"]},
+          "worker_pid": {"type": "integer", "minimum": 2},
+          "supervisor_pid": {"type": ["integer", "null"], "minimum": 2},
+          "supervisor_start_ticks": {"type": ["integer", "null"], "minimum": 0},
+          "codex_pid": {"type": ["integer", "null"], "minimum": 2},
+          "codex_start_ticks": {"type": ["integer", "null"], "minimum": 0},
+          "process_identity_ref": {
+            "oneOf": [
+              {"type": "null"},
+              {"$ref": "#/$defs/evidenceRef"}
+            ]
+          },
+          "thread_id": {"type": ["string", "null"]},
+          "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "argv_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "execution_root": {"type": ["string", "null"], "pattern": "^/"}
+        }
+      }
+    },
+    "executed_commands": {"type": "array", "items": {"type": "object"}},
+    "changed_paths": {"type": "array", "items": {"type": "object", "required": ["path", "status"], "properties": {"path": {"type": "string", "minLength": 1}, "status": {"type": "string", "minLength": 1}}, "additionalProperties": false}},
+    "workspace_manifest_match": {"type": ["boolean", "null"]},
+    "workspace_manifest_ref": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/evidenceRef"}
+      ]
+    },
+    "report_ref": {"$ref": "#/$defs/evidenceRef"},
+    "events_ref": {"$ref": "#/$defs/evidenceRef"},
+    "stderr_ref": {"$ref": "#/$defs/evidenceRef"},
+    "wake_evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_kind", "condition_id", "action", "wake_parent", "reason"],
+      "properties": {
+        "event_kind": {"type": "string", "minLength": 1},
+        "condition_id": {"type": ["string", "null"]},
+        "action": {"enum": ["continue_without_parent", "activate_review_role", "wake_parent", "stop"]},
+        "wake_parent": {"type": "boolean"},
+        "reason": {"type": "string", "minLength": 1}
+      }
+    },
+    "evidence_refs": {"type": "array", "minItems": 3, "items": {"$ref": "#/$defs/evidenceRef"}}
+  },
+  "$defs": {
+    "usageObservationGap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempt_id", "reason", "event_sequence"],
+      "properties": {
+        "attempt_id": {"type": "string", "minLength": 1},
+        "reason": {"const": "controlled_interruption_before_turn_usage"},
+        "event_sequence": {"type": "integer", "minimum": 0}
+      }
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_repo", "artifact_ref", "artifact_digest"],
+      "properties": {
+        "owner_repo": {"type": "string", "minLength": 1},
+        "artifact_ref": {"type": "string", "minLength": 1},
+        "artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

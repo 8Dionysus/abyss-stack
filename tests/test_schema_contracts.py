@@ -160,6 +160,51 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
         "mechanics/governed-execution/parts/candidate-exports/schemas/runtime-memo-export-candidate.schema.json"
     ),
     Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-event.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-launch.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-parent-obligation.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-parent-reentry.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-parent-yield.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-reentry-state.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-report.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-result.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-resume.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-review-preparation.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-runtime-profile.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-state.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-study-preparation.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-task.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-workspace-manifest.schema.json"
+    ),
+    Path(
         "mechanics/governed-execution/parts/return-policy/schemas/runtime-return-event.schema.json"
     ),
     Path(
