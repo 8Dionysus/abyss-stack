@@ -78,6 +78,7 @@ REENTRY_STATE_SCHEMA_VERSION = "abyss_stack_external_codex_reentry_state_v2"
 MAX_CONTROL_BYTES = 16 * 1024 * 1024
 MAX_ROLE_BYTES = 2 * 1024 * 1024
 MAX_EVENT_LINE_BYTES = 8 * 1024 * 1024
+SHELL_NESTING_INSPECTION_LIMIT = 4
 FOREGROUND_OBSERVATION_INTERVAL_SECONDS = 0.25
 TERMINAL_STATES = {
     "completed",
@@ -1161,13 +1162,16 @@ def _secret_shaped_path(value: str) -> bool:
     )
 
 
-def _shell_tokenizations(command: str) -> tuple[tuple[str, ...], ...]:
-    """Return bounded outer and nested shell tokenizations for one event."""
+def _shell_tokenization_analysis(
+    command: str,
+) -> tuple[tuple[tuple[str, ...], ...], bool]:
+    """Return bounded shell tokenizations plus incomplete-inspection state."""
 
     pending = [command]
     tokenizations: list[tuple[str, ...]] = []
     seen: set[str] = set()
-    while pending and len(tokenizations) < 4:
+    incomplete = False
+    while pending and len(tokenizations) < SHELL_NESTING_INSPECTION_LIMIT:
         raw = pending.pop(0)
         if raw in seen:
             continue
@@ -1178,6 +1182,7 @@ def _shell_tokenizations(command: str) -> tuple[tuple[str, ...], ...]:
             lexer.commenters = ""
             tokens = tuple(lexer)
         except ValueError:
+            incomplete = True
             continue
         if not tokens:
             continue
@@ -1188,7 +1193,14 @@ def _shell_tokenizations(command: str) -> tuple[tuple[str, ...], ...]:
                 if token in {"-c", "-lc"}:
                     pending.append(tokens[index + 1])
                     break
-    return tuple(tokenizations)
+    incomplete = incomplete or any(raw not in seen for raw in pending)
+    return tuple(tokenizations), incomplete
+
+
+def _shell_tokenizations(command: str) -> tuple[tuple[str, ...], ...]:
+    """Return bounded outer and nested shell tokenizations for one event."""
+
+    return _shell_tokenization_analysis(command)[0]
 
 
 def _command_segments(tokens: Sequence[str]) -> tuple[tuple[str, ...], ...]:
@@ -1531,8 +1543,10 @@ def _command_effects(command: str) -> set[str]:
 def _command_has_unclassified_indirection(command: str) -> bool:
     """Identify executable command bodies that argv inspection cannot classify."""
 
-    tokenizations = _shell_tokenizations(command)
-    if not tokenizations:
+    if "$(" in command or "`" in command or "<(" in command or ">(" in command:
+        return True
+    tokenizations, incomplete = _shell_tokenization_analysis(command)
+    if not tokenizations or incomplete:
         return True
     for tokenization in tokenizations:
         if any(
@@ -1704,6 +1718,54 @@ def _tracked_index_flags(workspace: Path) -> dict[str, tuple[str, ...]]:
     return flags
 
 
+def _workspace_filesystem_paths(workspace: Path) -> set[str]:
+    """Inventory every supported entry without following links or reading bytes."""
+
+    paths: set[str] = set()
+    pending = [workspace]
+    while pending:
+        current = pending.pop()
+        try:
+            with os.scandir(current) as scan:
+                children = sorted(scan, key=lambda item: item.name)
+        except OSError as exc:
+            raise ExternalCodexRuntimeError(
+                "workspace_manifest_failed",
+                "cannot enumerate the exact workspace filesystem tree",
+            ) from exc
+        for child in children:
+            path = Path(child.path)
+            relative = path.relative_to(workspace).as_posix()
+            if relative == ".git":
+                continue
+            if child.name == ".git":
+                embedded = path.parent.relative_to(workspace).as_posix()
+                raise ExternalCodexRuntimeError(
+                    "workspace_embedded_repository_unsupported",
+                    "workspace manifest does not yet admit embedded repository "
+                    f"{embedded}",
+                )
+            try:
+                mode = child.stat(follow_symlinks=False).st_mode
+            except OSError as exc:
+                raise ExternalCodexRuntimeError(
+                    "workspace_manifest_failed",
+                    f"cannot inspect workspace entry {relative}",
+                ) from exc
+            if stat.S_ISLNK(mode) or stat.S_ISREG(mode):
+                paths.add(relative)
+            elif stat.S_ISDIR(mode):
+                paths.add(relative)
+                pending.append(path)
+            else:
+                raise ExternalCodexRuntimeError(
+                    "workspace_entry_type_unsupported",
+                    "workspace manifest does not admit FIFO, socket, device, or "
+                    f"other special entry {relative}",
+                )
+    return paths
+
+
 def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
     """Describe exact HEAD plus every tracked, untracked, or ignored byte."""
 
@@ -1765,7 +1827,14 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
                 )
             current = current.parent
     entries: list[dict[str, Any]] = []
-    all_paths = set(tracked_flags) | set(changed) | set(untracked) | set(ignored)
+    filesystem_paths = _workspace_filesystem_paths(location)
+    all_paths = (
+        set(tracked_flags)
+        | set(changed)
+        | set(untracked)
+        | set(ignored)
+        | filesystem_paths
+    )
     for relative in sorted(all_paths):
         path = location / relative
         index_flags = list(tracked_flags.get(relative, ()))
@@ -6622,7 +6691,39 @@ Runtime session identity: {state['session_id']}
                 raise ExternalCodexRuntimeError(
                     "a2a_output_conflict", "A2A output already contains different bytes"
                 )
-            _atomic_write_bytes(output, encoded)
+            with reviewer_runtime._lock(reviewer_session_id):
+                current_reviewer_state = reviewer_runtime._load_state(
+                    reviewer_session_id
+                )
+                expected_reviewer_result_path = (
+                    reviewer_runtime._session_dir(reviewer_session_id) / "result.json"
+                )
+                current_result_path = current_reviewer_state.get("result_path")
+                if (
+                    current_result_path != str(expected_reviewer_result_path)
+                    or expected_reviewer_result_path.is_symlink()
+                    or not expected_reviewer_result_path.is_file()
+                    or current_reviewer_state.get("result_digest")
+                    != reviewer_receipt_digest
+                    or sha256_file(expected_reviewer_result_path)
+                    != reviewer_receipt_digest
+                    or current_reviewer_state.get("incarnation_id")
+                    != reviewer_binding.incarnation_id
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "a2a_review_state_unbound",
+                        "reviewer changed before its A2A export became durable",
+                    )
+                for label, ref in (
+                    ("reviewer report", reviewer["report_ref"]),
+                    ("reviewer events", reviewer["events_ref"]),
+                    (
+                        "reviewer final workspace manifest",
+                        reviewer["workspace_manifest_ref"],
+                    ),
+                ):
+                    _verified_artifact_ref_path(ref, label=label)
+                _atomic_write_bytes(output, encoded)
             return {
                 "child_task_result": payload,
                 "artifact_ref": _artifact_ref(output),

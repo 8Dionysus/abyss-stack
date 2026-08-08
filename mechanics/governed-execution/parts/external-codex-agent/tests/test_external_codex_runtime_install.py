@@ -137,6 +137,9 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
         assert (release_root / "sdk" / relative).is_file()
     for owner, relative in runtime_install.OWNER_CONTRACT_FILES:
         assert (release_root / "owners" / owner / relative).is_file()
+    for directory in (release_root / "sdk/src").rglob("*"):
+        if directory.is_dir():
+            directory.chmod(0o755)
     completed = subprocess.run(
         [str(bin_dir / "aoa-external-codex-agent")],
         check=True,
@@ -158,6 +161,7 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
         text=True,
     )
     assert study.stdout == "study:exact-sdk\n"
+    assert not list(release_root.rglob("__pycache__"))
 
     repeated = runtime_install.install(
         source,

@@ -83,9 +83,14 @@ The controller:
   visible even when attached to arguments, redirection remains an opaque
   authority signal, `env --split-string` cannot smuggle an executable past the
   observer, value-taking `timeout` options cannot hide the wrapped command,
+  shell nesting that exceeds the bounded inspection depth fails opaque,
+  command/backtick/process substitutions remain opaque executable indirection,
   and commands are durably observed
   from `item.started` rather than only after completion, while exact task validation
   argv remain admitted by their owner-supplied identity;
+- cross-checks Git with a non-following filesystem inventory, so a FIFO,
+  Unix-domain socket, device, or other Git-invisible special entry cannot evade
+  baseline or final workspace observation;
 - constrains every `immutable:` evidence reference in the session-local output
   schema to the exact materialized input identities, so a plausible alias is
   rejected during structured decoding as well as by post-output byte checks;
@@ -111,7 +116,9 @@ The controller:
   only when the supplied writer summon request matches the admitted immutable
   bytes and both writer/reviewer SDK request semantics and outputs; the
   reviewer state digest must still equal the exact result bytes initially
-  admitted by the exporter, so a concurrent resume cannot mix verdicts.
+  admitted by the exporter; its session lock is retained across the final
+  artifact revalidation and atomic A2A write, so a concurrent resume cannot mix
+  verdicts or referenced bytes.
 - records a digest-bound `yielding` parent state before `yield-parent` may
   launch Codex, preserves every partial yield attempt in a distinct directory,
   recovers a completed yield event without a second inference, ends the
@@ -186,9 +193,11 @@ non-symlink wrappers in `~/.local/bin`:
 - `aoa-external-actor-bind` for model-neutral launch binding;
 - `aoa-external-codex-study` for the canonical study preparer.
 
-Each wrapper launches Python in isolated mode through a release-local
-entrypoint that inserts only the packaged SDK source before entering the
-runtime. The packaged SDK subtree is also a valid `--aoa-sdk-root` for study
+Each wrapper launches Python in isolated, bytecode-disabled mode through a
+release-local entrypoint that inserts only the packaged SDK source before
+entering the runtime. Ordinary wrapper execution therefore cannot add
+`__pycache__` entries to the immutable release. The packaged SDK subtree is
+also a valid `--aoa-sdk-root` for study
 preparation because it carries the exact non-Python contracts consumed there.
 `status` rejects extra files, directories, symlinks, or missing entries,
 re-hashes every released file, and verifies all three wrappers.

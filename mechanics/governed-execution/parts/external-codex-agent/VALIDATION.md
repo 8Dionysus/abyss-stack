@@ -75,11 +75,14 @@ identity typo while preserving the failed result,
 canonical non-starting reviewer preparation with stable forwarded input IDs,
 an explicit workspace-write coder to read-only reviewer transition with a
 post-write manifest and reviewed A2A return, exact review-input-to-writer-final
-manifest binding, reviewer-result race refusal, wrapper-delimiter effect observation,
+manifest binding, reviewer lock retention through durable A2A export,
+reviewer-result race refusal, wrapper-delimiter effect observation,
 unclassified non-validation interpreter indirection with exact fixed-validation
 exemption, fail-closed `env --split-string` handling, value-aware `timeout`
 wrapper parsing, opaque process-launch-wrapper refusal,
-attached-redirection observation, final-manifest tamper refusal,
+attached-redirection observation, fail-closed shell nesting at the inspection
+limit, command/backtick/process-substitution refusal, Git-invisible FIFO and
+Unix-socket refusal, final-manifest tamper refusal,
 provenance checks for all loaded `aoa_sdk` modules in the study preparer plus a
 post-compilation persisted
 path inventory, produced-artifact admission, source-evidence file/line
@@ -105,8 +108,10 @@ separate live receipts are required for the installed product surface. The
 installer suite additionally proves that index-hidden packaged source and
 ignored files entering the packaged SDK require explicit dirty-source
 admission, and that activation plus status reject an executable which cannot
-pass the isolated compatible-CPython probe. It also rejects an unmanifested
-importable file from an otherwise content-addressed release.
+pass the isolated compatible-CPython probe. Wrapper execution under writable
+directory modes is also proven not to create bytecode inside the immutable
+release. The suite also rejects an unmanifested importable file from an
+otherwise content-addressed release.
 
 It also proves role-scoped MCP argv isolation: the selected AoA server alone is
 configured, its exact token is required but never exposed in argv or the model

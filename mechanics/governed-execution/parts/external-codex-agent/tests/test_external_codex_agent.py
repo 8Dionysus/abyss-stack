@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import importlib.util
 import json
 import os
 import re
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -220,6 +222,7 @@ def _fake_codex(path: Path) -> None:
     path.write_text(
         r"""#!/usr/bin/python3
 import json
+import os
 import re
 import shlex
 import signal
@@ -352,6 +355,8 @@ if "FAKE_WAIT_FOR_INTERRUPT" in task["objective"] and not resume:
     time.sleep(60)
 if "FAKE_WRITE_OUT_OF_SCOPE" in task["objective"]:
     (workspace / "unexpected.txt").write_text("drift\n", encoding="utf-8")
+if "FAKE_CREATE_FIFO_OUT_OF_SCOPE" in task["objective"]:
+    os.mkfifo(workspace / "unexpected.pipe")
 if "FAKE_WRITE_ALLOWED" in task["objective"]:
     (workspace / "landing-note.md").write_text("bounded preparation\n", encoding="utf-8")
 if "FAKE_SAME_STATUS_MUTATION" in task["objective"]:
@@ -375,6 +380,23 @@ if "FAKE_OPAQUE_LAUNCH_WRAPPER" in task["objective"]:
     emit({"type": "item.completed", "item": {
         "type": "command_execution",
         "command": "/usr/bin/nice /usr/bin/cat /home/fixture/.ssh/id_rsa",
+        "status": "completed",
+        "exit_code": 0,
+    }})
+if "FAKE_DEEP_SHELL_NESTING" in task["objective"]:
+    nested_command = "/usr/bin/git push"
+    for _ in range(4):
+        nested_command = shlex.join(["/usr/bin/bash", "-lc", nested_command])
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": nested_command,
+        "status": "completed",
+        "exit_code": 0,
+    }})
+if "FAKE_COMMAND_SUBSTITUTION" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/bash -lc 'echo $(cat /home/operator/.ssh/id_rsa)'",
         "status": "completed",
         "exit_code": 0,
     }})
@@ -2633,6 +2655,22 @@ def test_read_only_workspace_drift_is_authority_blocked(tmp_path: Path) -> None:
     assert result["wake_evaluation"]["wake_parent"] is True
 
 
+def test_special_workspace_entry_is_authority_blocked_at_closeout(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, objective_marker="FAKE_CREATE_FIFO_OUT_OF_SCOPE")
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "authority_blocked"
+    assert result is not None
+    assert result["failure_code"] == "workspace_manifest_observation_gap"
+    assert result["workspace_manifest_match"] is None
+
+
 def test_workspace_write_preparation_stays_inside_allowed_paths(tmp_path: Path) -> None:
     fixture = _fixture(
         tmp_path,
@@ -3053,6 +3091,30 @@ def test_process_launch_wrappers_are_fail_closed(command: str) -> None:
     assert RUNTIME._command_has_unclassified_indirection(command) is True
 
 
+def test_shell_nesting_beyond_inspection_limit_is_fail_closed() -> None:
+    command = "/usr/bin/git push"
+    for _ in range(RUNTIME.SHELL_NESTING_INSPECTION_LIMIT):
+        command = RUNTIME.shlex.join(["/usr/bin/bash", "-lc", command])
+
+    tokenizations, incomplete = RUNTIME._shell_tokenization_analysis(command)
+
+    assert len(tokenizations) == RUNTIME.SHELL_NESTING_INSPECTION_LIMIT
+    assert incomplete is True
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/bash -lc 'echo $(cat /home/operator/.ssh/id_rsa)'",
+        "/usr/bin/bash -lc 'echo `cat /home/operator/.ssh/id_rsa`'",
+        "/usr/bin/bash -lc 'cat <(printf secret)'",
+    ),
+)
+def test_shell_command_substitution_is_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
 def test_started_command_survives_interruption_and_blocks_authority(
     tmp_path: Path,
 ) -> None:
@@ -3083,7 +3145,12 @@ def test_started_command_survives_interruption_and_blocks_authority(
 
 @pytest.mark.parametrize(
     "objective_marker",
-    ("FAKE_OPAQUE_INDIRECT_COMMAND", "FAKE_OPAQUE_LAUNCH_WRAPPER"),
+    (
+        "FAKE_OPAQUE_INDIRECT_COMMAND",
+        "FAKE_OPAQUE_LAUNCH_WRAPPER",
+        "FAKE_DEEP_SHELL_NESTING",
+        "FAKE_COMMAND_SUBSTITUTION",
+    ),
 )
 def test_opaque_command_authority_blocks_terminal_result(
     tmp_path: Path,
@@ -3266,6 +3333,37 @@ def test_workspace_manifest_rejects_untracked_or_ignored_embedded_repository(
         RUNTIME.build_workspace_manifest(workspace)
 
     assert exc_info.value.code == "workspace_embedded_repository_unsupported"
+
+
+@pytest.mark.parametrize("entry_kind", ("fifo", "unix_socket"))
+def test_workspace_manifest_rejects_git_invisible_special_entries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry_kind: str,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "tracked.txt").write_text("baseline\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    _git(workspace, "commit", "-m", "fixture")
+    special_path = workspace / f"unexpected-{entry_kind}"
+    if entry_kind == "fifo":
+        os.mkfifo(special_path)
+    else:
+        listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            monkeypatch.chdir(workspace)
+            listener.bind(special_path.name)
+        finally:
+            listener.close()
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.build_workspace_manifest(workspace)
+
+    assert exc_info.value.code == "workspace_entry_type_unsupported"
 
 
 @pytest.mark.parametrize(
@@ -3931,6 +4029,35 @@ def test_a2a_export_requires_exact_independent_review_result(
     summon_path = writer["summon_request_path"]
     output_path = tmp_path / "child-task-result.json"
 
+    original_atomic_write = RUNTIME._atomic_write_bytes
+    reviewer_lock_observed = False
+
+    def atomic_write_with_reviewer_lock_check(
+        path: Path,
+        data: bytes,
+        *,
+        mode: int = 0o600,
+    ) -> None:
+        nonlocal reviewer_lock_observed
+        if Path(path) == output_path:
+            lock_path = (
+                runtime._session_dir(reviewer["session_id"]) / "session.lock"
+            )
+            with lock_path.open("a+b") as competing_lock:
+                with pytest.raises(BlockingIOError):
+                    fcntl.flock(
+                        competing_lock.fileno(),
+                        fcntl.LOCK_EX | fcntl.LOCK_NB,
+                    )
+            reviewer_lock_observed = True
+        original_atomic_write(path, data, mode=mode)
+
+    monkeypatch.setattr(
+        RUNTIME,
+        "_atomic_write_bytes",
+        atomic_write_with_reviewer_lock_check,
+    )
+
     exported = runtime.export_a2a_result(
         writer["session_id"],
         reviewer_session_id=reviewer["session_id"],
@@ -3947,6 +4074,8 @@ def test_a2a_export_requires_exact_independent_review_result(
         == str(writer_result_path)
     )
     assert output_path.is_file()
+    assert reviewer_lock_observed is True
+    monkeypatch.setattr(RUNTIME, "_atomic_write_bytes", original_atomic_write)
 
     reviewer_result_path = runtime._session_dir(reviewer["session_id"]) / "result.json"
     reviewer_state_path = runtime._state_path(reviewer["session_id"])

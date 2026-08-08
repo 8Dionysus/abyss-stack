@@ -318,7 +318,7 @@ entrypoint = release_root / {entrypoint_name!r}
 python = Path(record["python_executable"])
 if entrypoint.is_symlink() or not entrypoint.is_file():
     raise SystemExit(f"external Codex entrypoint is unavailable: {{entrypoint}}")
-os.execv(str(python), [str(python), "-I", str(entrypoint), *sys.argv[1:]])
+os.execv(str(python), [str(python), "-I", "-B", str(entrypoint), *sys.argv[1:]])
 '''
 
 

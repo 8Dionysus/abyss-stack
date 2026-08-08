@@ -39,8 +39,10 @@ profile pins before packaging them.
 The packaged SDK root must therefore satisfy both isolated imports and the
 preparer's exact non-Python contract reads. Stable wrappers consult a regular-file active
 receipt and execute a release-local bootstrap with Python isolated mode; they
-do not follow a mutable source checkout, import ambient `PYTHONPATH`, or use a
-symlinked `current` directory. The selected and recorded Python coordinate must
+also disable bytecode writes so ordinary execution cannot add `__pycache__`
+entries to its own immutable release. They do not follow a mutable source
+checkout, import ambient `PYTHONPATH`, or use a symlinked `current` directory.
+The selected and recorded Python coordinate must
 be a regular executable compatible CPython 3.11-or-newer interpreter at
 install, activation, and status time; executable-bit presence alone is not
 admission. Before packaging, every selected source file hidden by
@@ -262,7 +264,10 @@ with its own `.git` administrative marker likewise fails as
 `workspace_embedded_repository_unsupported`; a digestless directory entry may
 not conceal a separately governed repository. Same-status byte changes, ignored and untracked bytes,
 path kind, symlink target, size, binary diff, and HEAD drift therefore remain
-observable. Every workspace symlink must resolve to an existing target inside
+observable. A non-following `lstat` inventory cross-checks the complete
+filesystem tree instead of trusting Git to enumerate every entry; FIFO,
+Unix-domain socket, device, and other unsupported special entries fail closed.
+Every workspace symlink must resolve to an existing target inside
 the exact checkout; an absent or outward target fails admission as
 `workspace_symlink_target_unsupported`. The receipt recorded for each exact validation command carries the
 workspace-manifest digest observed at command completion; report admission
@@ -288,6 +293,11 @@ recognized. In addition,
 `item.started` command evidence is durable before completion; a controller or
 worker loss therefore cannot erase an effect that began without emitting
 `item.completed`.
+Nested shell bodies are inspected only to a fixed parser-safety depth; any
+still-pending or syntactically unparsed body at that boundary is itself an
+unclassified authority signal rather than an implicitly safe command. Shell
+command substitution, backticks, and process substitution likewise fail closed
+instead of being treated as inert command arguments.
 
 Any model evidence reference beginning with `source:` is semantic, not opaque
 prose. It must resolve to a regular non-symlink file inside the exact workspace
@@ -403,8 +413,11 @@ semantics, requested outputs, and the caller-supplied writer request digest
 before it can emit a child result.
 The exporter also serializes the initially loaded reviewer result to its exact
 artifact digest and requires the later locked durable state to retain that
-same digest. A reviewer continuation racing the export therefore aborts the
-export instead of pairing a stale verdict with a newer receipt.
+same digest. Immediately before output publication, it reacquires the reviewer
+session lock, revalidates the canonical result plus every exported reviewer
+artifact, and holds that lock through the atomic output write. A reviewer
+continuation racing the export therefore either precedes a failed revalidation
+or follows a durable export; it cannot mix a stale verdict with newer bytes.
 
 The reviewer task does not require a third review by default. It may return
 `completed/proceed` when no blocker remains or
