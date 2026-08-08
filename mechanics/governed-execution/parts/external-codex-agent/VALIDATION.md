@@ -43,7 +43,8 @@ read-only drift containment including every tracked byte,
 assume-unchanged/skip-worktree mutations, and ignored bytes,
 tracked-submodule refusal, a foreground `run-to-terminal` lifecycle for transient cgroup launchers without execution
 ceilings, secret-shaped ignored
-input refusal, wrapped effect-family observation, exact validation-claim
+input refusal, exclusive same-workspace active-attempt admission across distinct
+session identities, wrapped effect-family observation, exact validation-claim
 binding to final workspace bytes, authority-blocked failure closeout when the
 final manifest is unobservable, streaming rejection of an unterminated
 oversized protocol record, review-gate enforcement, TERM-resistant and unexpected-worker-death
@@ -81,8 +82,10 @@ runtime final-manifest evidence with false-anchor refusal, signal-notified
 steady-state supervisor waiting, status-selected
 wake binding, failed-reviewer A2A refusal, absence of an outer namespace that
 would conflict with Codex sandboxing, and a separately bound review/A2A export.
-It also proves parent obligation admission, a completed yield turn followed by
-durable waiting, canonical child state/result/event receipt binding, rejection
+It also proves parent obligation admission, durable pre-inference `yielding`
+state, preservation and retry beyond a partial yield attempt, recovery of a
+complete yield event without a second inference, a completed yield turn followed
+by durable waiting, canonical child state/result/event receipt binding, rejection
 of a standalone result, child-session locking through the durable parent event
 admission, recovery of a valid event append that preceded its
 state save, recovery of the completed semantic turn when its event preceded

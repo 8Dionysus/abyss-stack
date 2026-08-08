@@ -24,16 +24,24 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "abyss_stack_external_codex_reentry_state_v1"
+      "enum": [
+        "abyss_stack_external_codex_reentry_state_v1",
+        "abyss_stack_external_codex_reentry_state_v2"
+      ]
     },
     "reentry_id": {"type": "string", "minLength": 1},
     "status": {
-      "enum": ["waiting", "reentering", "filtered", "reentered", "failed"]
+      "enum": ["yielding", "yielded", "waiting", "reentering", "filtered", "reentered", "failed"]
     },
     "created_at": {"type": "string", "format": "date-time"},
     "updated_at": {"type": "string", "format": "date-time"},
     "obligation_ref": {"$ref": "#/$defs/artifactRef"},
-    "parent_thread_id": {"type": "string", "minLength": 1},
+    "parent_thread_id": {
+      "anyOf": [
+        {"type": "string", "minLength": 1},
+        {"type": "null"}
+      ]
+    },
     "continuation_id": {"type": "string", "minLength": 1},
     "child_task_id": {"type": "string", "minLength": 1},
     "child_incarnation_id": {"type": "string", "minLength": 1},
@@ -49,7 +57,7 @@
     },
     "turns": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 0,
       "maxItems": 2,
       "items": {
         "type": "object",
@@ -110,6 +118,27 @@
       "anyOf": [{"$ref": "#/$defs/artifactRef"}, {"type": "null"}]
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"status": {"const": "yielding"}},
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "schema_version": {"const": "abyss_stack_external_codex_reentry_state_v2"},
+          "parent_thread_id": {"type": "null"},
+          "turns": {"maxItems": 0}
+        }
+      },
+      "else": {
+        "properties": {
+          "parent_thread_id": {"type": "string", "minLength": 1},
+          "turns": {"minItems": 1}
+        }
+      }
+    }
+  ],
   "$defs": {
     "digest": {
       "type": "string",

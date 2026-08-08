@@ -685,6 +685,7 @@ def _fixture(
     parent_task_id: str = "parent:fixture:goal",
     identity_suffix: str = "luna-max",
     state_root: Path | None = None,
+    shared_workspace: Path | None = None,
     extra_immutable_inputs: tuple[
         tuple[str, Path, ProvenanceRef], ...
     ] = (),
@@ -711,18 +712,25 @@ def _fixture(
             "owner-contour fixture requires exact aoa-agents and aoa-skills source roots"
         )
     tmp_path.mkdir(parents=True, exist_ok=True)
-    workspace = tmp_path / "workspace"
-    workspace.mkdir()
-    _git(workspace, "init", "-b", "main")
-    _git(workspace, "config", "user.email", "fixture@example.invalid")
-    _git(workspace, "config", "user.name", "Fixture")
+    workspace = shared_workspace or (tmp_path / "workspace")
+    initialize_workspace = not workspace.exists()
+    if initialize_workspace:
+        workspace.mkdir()
+        _git(workspace, "init", "-b", "main")
+        _git(workspace, "config", "user.email", "fixture@example.invalid")
+        _git(workspace, "config", "user.name", "Fixture")
     readme = workspace / "README.md"
-    readme.write_text("# Landing fixture\n", encoding="utf-8")
-    _git(workspace, "add", "README.md")
-    if ignored_baseline:
-        (workspace / ".gitignore").write_text("cache/\n", encoding="utf-8")
-        _git(workspace, "add", ".gitignore")
-    _git(workspace, "commit", "-m", "fixture")
+    if initialize_workspace:
+        readme.write_text("# Landing fixture\n", encoding="utf-8")
+        _git(workspace, "add", "README.md")
+        if ignored_baseline:
+            (workspace / ".gitignore").write_text("cache/\n", encoding="utf-8")
+            _git(workspace, "add", ".gitignore")
+        _git(workspace, "commit", "-m", "fixture")
+    elif ignored_baseline or exact_baseline:
+        raise AssertionError(
+            "shared workspace fixtures cannot create a second baseline posture"
+        )
     head = _git(workspace, "rev-parse", "HEAD")
     if ignored_baseline:
         cache = workspace / "cache"
@@ -2286,6 +2294,43 @@ def test_prepared_session_retries_launch_after_spawn_failure(
     retried = runtime.start(fixture["launch_path"])
     assert retried["status"] == "prepared"
     assert calls == 2
+
+
+def test_active_attempt_exclusively_holds_its_exact_workspace(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "shared-workspace"
+    first = _fixture(
+        tmp_path / "first",
+        objective_marker="FAKE_WAIT_FOR_INTERRUPT",
+        identity_suffix="workspace-holder-one",
+        state_root=tmp_path / "first-state",
+        shared_workspace=workspace,
+    )
+    second = _fixture(
+        tmp_path / "second",
+        identity_suffix="workspace-holder-two",
+        state_root=tmp_path / "second-state",
+        shared_workspace=workspace,
+    )
+    runtime = first["runtime"]
+    running = runtime.start(first["launch_path"])
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        running = runtime.status(first["session_id"])
+        if running["codex_pid"]:
+            break
+        time.sleep(0.05)
+    assert running["codex_pid"]
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        second["runtime"].start(second["launch_path"])
+    assert exc_info.value.code == "workspace_active_attempt_conflict"
+
+    interrupted = runtime.interrupt(first["session_id"])
+    assert interrupted["status"] == "interrupted"
+    terminal = second["runtime"].run_to_terminal(second["launch_path"])
+    assert terminal["status"] == "completed"
 
 
 def test_recovered_codex_events_replay_thread_usage_and_command_state(
@@ -4066,12 +4111,133 @@ def test_parent_inference_yields_and_exact_authority_event_reenters_same_thread(
         .splitlines()
     ]
     assert [event["event_type"] for event in events] == [
+        "external_parent.yield_prepared",
         "external_parent.inference_yielded",
         "external_parent.wait_registered",
         "external_parent.child_event_admitted",
         "external_parent.reentry_started",
         "external_parent.reentry_completed",
     ]
+
+
+def test_parent_yield_retries_from_durable_state_without_rewriting_partial_attempt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_ambiguity_stop",
+        identity_suffix="luna-xhigh-yield-retry",
+    )
+    reentry_id = "reentry:fixture:luna-xhigh-yield-retry"
+    obligation_path = _parent_reentry_obligation(
+        tmp_path, fixture, reentry_id=reentry_id
+    )
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    original_run_parent_turn = bridge._run_parent_turn
+    partial_attempt = (
+        bridge._reentry_dir(reentry_id)
+        / "turns"
+        / "001-yield-attempt-001"
+    )
+
+    def crash_after_pre_yield_state(*args: Any, **kwargs: Any) -> Any:
+        durable = RUNTIME.load_json(
+            bridge._state_path(reentry_id), label="durable pre-yield state"
+        )
+        assert durable["status"] == "yielding"
+        assert durable["turns"] == []
+        partial_attempt.mkdir(parents=True)
+        (partial_attempt / "prompt.txt").write_text(
+            "preserved partial attempt\n", encoding="utf-8"
+        )
+        raise RUNTIME.ExternalCodexRuntimeError(
+            "fixture_controller_crash", "controller stopped before parent inference"
+        )
+
+    monkeypatch.setattr(bridge, "_run_parent_turn", crash_after_pre_yield_state)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        bridge.yield_parent(obligation_path)
+    assert exc_info.value.code == "fixture_controller_crash"
+
+    monkeypatch.setattr(bridge, "_run_parent_turn", original_run_parent_turn)
+    recovered = bridge.yield_parent(obligation_path)["state"]
+
+    assert recovered["status"] == "waiting"
+    assert recovered["schema_version"] == RUNTIME.REENTRY_STATE_SCHEMA_VERSION
+    assert partial_attempt.joinpath("prompt.txt").read_text(encoding="utf-8") == (
+        "preserved partial attempt\n"
+    )
+    assert (
+        bridge._reentry_dir(reentry_id)
+        / "turns"
+        / "001-yield-attempt-002"
+        / "model-output.json"
+    ).is_file()
+
+
+def test_parent_yield_recovers_completed_turn_event_without_second_inference(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_ambiguity_stop",
+        identity_suffix="luna-xhigh-yield-event-recovery",
+    )
+    reentry_id = "reentry:fixture:luna-xhigh-yield-event-recovery"
+    obligation_path = _parent_reentry_obligation(
+        tmp_path, fixture, reentry_id=reentry_id
+    )
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    original_save_state = bridge._save_state
+    dropped_yielded_save = False
+
+    def crash_after_yield_event(state: dict[str, Any]) -> None:
+        nonlocal dropped_yielded_save
+        if state["status"] == "yielded" and not dropped_yielded_save:
+            dropped_yielded_save = True
+            raise RUNTIME.ExternalCodexRuntimeError(
+                "fixture_controller_crash",
+                "controller stopped after the complete yield event",
+            )
+        original_save_state(state)
+
+    monkeypatch.setattr(bridge, "_save_state", crash_after_yield_event)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        bridge.yield_parent(obligation_path)
+    assert exc_info.value.code == "fixture_controller_crash"
+
+    dropped_waiting_save = False
+
+    def crash_after_wait_event(state: dict[str, Any]) -> None:
+        nonlocal dropped_waiting_save
+        if state["status"] == "waiting" and not dropped_waiting_save:
+            dropped_waiting_save = True
+            raise RUNTIME.ExternalCodexRuntimeError(
+                "fixture_wait_registration_crash",
+                "controller stopped after the durable wait event",
+            )
+        original_save_state(state)
+
+    monkeypatch.setattr(bridge, "_save_state", crash_after_wait_event)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as wait_exc_info:
+        bridge.yield_parent(obligation_path)
+    assert wait_exc_info.value.code == "fixture_wait_registration_crash"
+
+    monkeypatch.setattr(bridge, "_save_state", original_save_state)
+    recovered = bridge.yield_parent(obligation_path)["state"]
+
+    assert recovered["status"] == "waiting"
+    assert len(recovered["turns"]) == 1
+    attempts = list(
+        (bridge._reentry_dir(reentry_id) / "turns").glob(
+            "001-yield-attempt-*"
+        )
+    )
+    assert len(attempts) == 1
 
 
 def test_parent_admits_child_event_while_canonical_child_lock_is_held(

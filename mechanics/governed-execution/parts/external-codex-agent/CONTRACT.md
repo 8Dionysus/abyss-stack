@@ -175,6 +175,11 @@ fails closed. For semantic `workspace-write`, Codex instead uses the exact
 target checkout as its execution root, and a reviewed local preparation may be
 made inside task `allowed_paths`. Those paths govern mutation and declared
 workspace artifacts; they do not double as the source-evidence boundary. The
+runtime acquires one nonblocking advisory lock on the canonical target
+workspace directory inode before fork, without adding checkout bytes. The worker retains that lock through terminal
+receipt finalization, so another session cannot concurrently read or mutate the
+same evidence surface; a conflicting start fails as
+`workspace_active_attempt_conflict` before it launches a process. The
 optional `source_evidence_paths` field governs anchored workspace citations and
 falls back to `allowed_paths` only for older v1 tasks. Neither field authorizes
 commit, push, PR, merge, tag, release, publication, service mutation, secret
@@ -409,7 +414,12 @@ decision.
 Parent re-entry is a separate runtime lifecycle, not ordinary child-session
 resume. `yield-parent` validates and privately materializes the exact parent
 obligation, child task, incarnation binding, role, model realization, and SDK
-schema bytes. It starts a distinct `gpt-5.6-sol` max process with built-in
+schema bytes. Before inference it persists a v2 `yielding` state with the exact
+obligation and an empty event stream. Each retry uses a new numbered yield
+attempt directory and preserves all incomplete predecessor bytes; a still-live
+prior supervisor blocks overlap. A durable complete `inference_yielded` event
+carries the exact turn delta, so append-before-state-save recovery advances to
+`yielded` and registers the wait without a second Sol turn. It starts a distinct `gpt-5.6-sol` max process with built-in
 multi-agent behavior disabled and requires one structured yield report. After
 `turn.completed`, that process exits; the controller persists the parent Codex
 thread and a `waiting` state. No model inference or model-driven polling remains
@@ -434,9 +444,9 @@ the next load may advance `events_ref` only when the current JSONL bytes are a
 strict extension of the previously recorded digest and every event remains a
 contiguous record for the same re-entry identity. Rewrites, truncation,
 partial records, and foreign identities remain fail-closed drift.
-Recognized appended terminal events also replay their semantic state delta:
-the admitted child receipt and wake evaluation, filtered or failed status, or
-the exact completed parent turn and result reference. Event recovery therefore
+Recognized appended events also replay their semantic state delta: the complete
+yield turn and registered wait, admitted child receipt and wake evaluation,
+filtered or failed status, or the exact completed parent turn and result reference. Event recovery therefore
 cannot leave a successful re-entry stranded as `reentering`.
 
 When and only when the admitted event selects `wake_parent`, the controller

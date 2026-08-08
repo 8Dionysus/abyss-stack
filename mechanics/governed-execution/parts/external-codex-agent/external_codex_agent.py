@@ -69,7 +69,8 @@ SDK_SUMMON_REQUEST_SCHEMA_VERSION = "urn:aoa-sdk:a2a:summon-request:v4"
 LEGACY_STATE_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v1"
 STATE_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v2"
 RESPONSE_SCHEMA_VERSION = "abyss_stack_external_codex_response_v1"
-REENTRY_STATE_SCHEMA_VERSION = "abyss_stack_external_codex_reentry_state_v1"
+LEGACY_REENTRY_STATE_SCHEMA_VERSION = "abyss_stack_external_codex_reentry_state_v1"
+REENTRY_STATE_SCHEMA_VERSION = "abyss_stack_external_codex_reentry_state_v2"
 MAX_CONTROL_BYTES = 16 * 1024 * 1024
 MAX_ROLE_BYTES = 2 * 1024 * 1024
 MAX_EVENT_LINE_BYTES = 8 * 1024 * 1024
@@ -1856,6 +1857,24 @@ class ExternalCodexRuntime:
             finally:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
+    def _acquire_workspace_attempt_lock(self, workspace: str | Path) -> int:
+        """Hold one workspace across the full lifetime of an active worker."""
+
+        resolved = Path(workspace).resolve(strict=True)
+        lock_fd = os.open(
+            resolved,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC,
+        )
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            os.close(lock_fd)
+            raise ExternalCodexRuntimeError(
+                "workspace_active_attempt_conflict",
+                "another external-agent attempt already owns this exact workspace",
+            ) from exc
+        return lock_fd
+
     def _state_path(self, session_id: str) -> Path:
         return self._session_dir(session_id) / "state.json"
 
@@ -3141,12 +3160,20 @@ class ExternalCodexRuntime:
         attempt_dir.mkdir(parents=True, exist_ok=True)
         if resume_payload is not None:
             _atomic_write_json(attempt_dir / "resume.json", resume_payload, mode=0o400)
-        read_fd, write_fd = os.pipe()
+        workspace_lock = self._acquire_workspace_attempt_lock(
+            state["workspace_path"]
+        )
+        try:
+            read_fd, write_fd = os.pipe()
+        except BaseException:
+            os.close(workspace_lock)
+            raise
         try:
             pid = os.fork()
         except BaseException:
             os.close(read_fd)
             os.close(write_fd)
+            os.close(workspace_lock)
             raise
         if pid == 0:  # pragma: no cover - exercised through subprocess-level tests
             try:
@@ -3189,6 +3216,10 @@ class ExternalCodexRuntime:
                     pass
                 os._exit(70)
         os.close(read_fd)
+        # The forked worker retains the inherited open-file description until
+        # its complete attempt and terminal receipt are finished. The caller
+        # must not keep the workspace occupied merely because start returned.
+        os.close(workspace_lock)
         start_ticks = _process_start_ticks(pid)
         if start_ticks is None:
             os.close(write_fd)
@@ -6280,7 +6311,11 @@ class ExternalCodexParentReentry:
         state = load_json(path, label="parent re-entry state")
         validate_json(state, REENTRY_STATE_SCHEMA_PATH, label="parent re-entry state")
         if (
-            state.get("schema_version") != REENTRY_STATE_SCHEMA_VERSION
+            state.get("schema_version")
+            not in {
+                LEGACY_REENTRY_STATE_SCHEMA_VERSION,
+                REENTRY_STATE_SCHEMA_VERSION,
+            }
             or state.get("reentry_id") != reentry_id
         ):
             raise ExternalCodexRuntimeError(
@@ -6372,7 +6407,56 @@ class ExternalCodexParentReentry:
         for event in events[prefix_count:]:
             payload = event["payload"]
             event_type = event["event_type"]
-            if event_type == "external_parent.child_event_admitted":
+            if event_type == "external_parent.inference_yielded":
+                turn = payload.get("turn")
+                turn_events_ref = (
+                    turn.get("events_ref") if isinstance(turn, dict) else None
+                )
+                turn_output_ref = (
+                    turn.get("output_ref") if isinstance(turn, dict) else None
+                )
+                if (
+                    recovered.get("status") != "yielding"
+                    or not isinstance(turn, dict)
+                    or turn.get("kind") != "yield"
+                    or not isinstance(turn.get("thread_id"), str)
+                    or not turn["thread_id"]
+                    or not isinstance(turn_events_ref, dict)
+                    or not isinstance(turn_output_ref, dict)
+                    or payload.get("thread_id") != turn["thread_id"]
+                    or payload.get("turn_output_digest")
+                    != turn_output_ref.get("artifact_digest")
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "reentry_event_recovery_failed",
+                        "yield event lacks its exact semantic turn delta",
+                    )
+                _verified_artifact_ref_path(
+                    turn_events_ref, label="recovered parent yield events"
+                )
+                _verified_artifact_ref_path(
+                    turn_output_ref, label="recovered parent yield output"
+                )
+                recovered["parent_thread_id"] = turn["thread_id"]
+                recovered["turns"] = [turn]
+                recovered["status"] = "yielded"
+            elif event_type == "external_parent.wait_registered":
+                if (
+                    recovered.get("status") != "yielded"
+                    or payload.get("condition_id")
+                    != recovered["expected_wake"]["condition_id"]
+                    or payload.get("event_kind")
+                    != recovered["expected_wake"]["event_kind"]
+                    or payload.get("child_task_id") != recovered["child_task_id"]
+                    or payload.get("child_incarnation_id")
+                    != recovered["child_incarnation_id"]
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "reentry_event_recovery_failed",
+                        "wait event differs from the durable parent obligation",
+                    )
+                recovered["status"] = "waiting"
+            elif event_type == "external_parent.child_event_admitted":
                 child_result_ref = payload.get("child_result_ref")
                 wake_evaluation = payload.get("wake_evaluation")
                 if not isinstance(child_result_ref, dict) or not isinstance(
@@ -6673,12 +6757,50 @@ class ExternalCodexParentReentry:
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         reentry_id = str(obligation["reentry_id"])
         index = 1 if kind == "yield" else 2
-        turn_root = self._reentry_dir(reentry_id) / "turns" / f"{index:03d}-{kind}"
-        if turn_root.exists():
-            raise ExternalCodexRuntimeError(
-                "reentry_turn_already_materialized",
-                f"parent {kind} turn already has durable bytes",
+        turns_root = self._reentry_dir(reentry_id) / "turns"
+        if kind == "yield":
+            turns_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+            numbered_attempts = sorted(
+                (
+                    int(match.group(1)),
+                    candidate,
+                )
+                for candidate in turns_root.glob("001-yield-attempt-*")
+                if (
+                    match := re.fullmatch(
+                        r"001-yield-attempt-([0-9]{3,})", candidate.name
+                    )
+                )
             )
+            prior_attempts = [candidate for _, candidate in numbered_attempts]
+            for prior in prior_attempts:
+                identity_path = prior / "process-identity.json"
+                if not identity_path.is_file() or identity_path.is_symlink():
+                    continue
+                try:
+                    identity = load_json(
+                        identity_path,
+                        label="prior parent yield process identity",
+                    )
+                except ExternalCodexRuntimeError:
+                    continue
+                if _pid_matches(
+                    identity.get("supervisor_pid"),
+                    identity.get("supervisor_start_ticks"),
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "reentry_parent_yield_still_active",
+                        "a prior parent yield attempt is still being contained",
+                    )
+            next_attempt = numbered_attempts[-1][0] + 1 if numbered_attempts else 1
+            turn_root = turns_root / f"001-yield-attempt-{next_attempt:03d}"
+        else:
+            turn_root = turns_root / f"{index:03d}-{kind}"
+            if turn_root.exists():
+                raise ExternalCodexRuntimeError(
+                    "reentry_turn_already_materialized",
+                    f"parent {kind} turn already has durable bytes",
+                )
         scratch = turn_root / "scratch"
         scratch.mkdir(parents=True, exist_ok=False, mode=0o700)
         prompt_path = turn_root / "prompt.txt"
@@ -6838,29 +6960,141 @@ class ExternalCodexParentReentry:
         reentry_id = str(obligation["reentry_id"])
         with self._lock(reentry_id):
             if self._state_path(reentry_id).exists():
-                raise ExternalCodexRuntimeError(
-                    "reentry_already_exists", "parent re-entry state already exists"
+                state = self._load_state(reentry_id)
+                if state["status"] not in {"yielding", "yielded", "waiting"}:
+                    raise ExternalCodexRuntimeError(
+                        "reentry_already_exists",
+                        "parent re-entry state already passed its yielding phase",
+                    )
+                materialized_path = _verified_artifact_ref_path(
+                    state["obligation_ref"],
+                    label="durable parent re-entry obligation",
                 )
-            self._validate_obligation(obligation)
-            materialized_path, materialized = self._materialize_obligation(path, obligation)
-            task, binding, realization = self._validate_obligation(materialized)
-            turn, output = self._run_parent_turn(
-                materialized,
-                realization,
-                kind="yield",
-                prompt=self._yield_prompt(materialized, task, binding),
-                thread_id=None,
-            )
-            self._validate_yield_output(output, materialized, task, binding)
-            self._append_event(
-                reentry_id,
-                event_type="external_parent.inference_yielded",
-                payload={
-                    "thread_id": turn["thread_id"],
-                    "turn_output_digest": turn["output_ref"]["artifact_digest"],
-                },
-                significance="checkpoint",
-            )
+                materialized = load_json(
+                    materialized_path,
+                    label="durable parent re-entry obligation",
+                )
+                validate_json(
+                    materialized,
+                    PARENT_OBLIGATION_SCHEMA_PATH,
+                    label="durable parent re-entry obligation",
+                )
+                if materialized.get("reentry_id") != reentry_id:
+                    raise ExternalCodexRuntimeError(
+                        "reentry_identity_mismatch",
+                        "durable parent obligation names another re-entry",
+                    )
+                identity_fields = (
+                    "parent_task_id",
+                    "return_owner",
+                    "expected_wake_condition_id",
+                    "expected_wake_event_kind",
+                    "deferred_parent_decisions",
+                )
+                ref_fields = (
+                    "parent_model_realization_ref",
+                    "parent_role_ref",
+                    "child_task_ref",
+                    "child_incarnation_binding_ref",
+                )
+                if any(
+                    obligation.get(key) != materialized.get(key)
+                    for key in identity_fields
+                ) or any(
+                    not isinstance(obligation.get(key), dict)
+                    or not isinstance(materialized.get(key), dict)
+                    or obligation[key].get("owner_repo")
+                    != materialized[key].get("owner_repo")
+                    or obligation[key].get("artifact_digest")
+                    != materialized[key].get("artifact_digest")
+                    or obligation[key].get("schema_version")
+                    != materialized[key].get("schema_version")
+                    for key in ref_fields
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "reentry_identity_mismatch",
+                        "supplied parent obligation differs from its durable identity",
+                    )
+                task, binding, realization = self._validate_obligation(materialized)
+                if state["status"] == "waiting":
+                    return {
+                        "state": state,
+                        "state_ref": _artifact_ref(self._state_path(reentry_id)),
+                    }
+            else:
+                self._validate_obligation(obligation)
+                materialized_path, materialized = self._materialize_obligation(
+                    path, obligation
+                )
+                task, binding, realization = self._validate_obligation(materialized)
+                now = iso_now()
+                events_path = self._events_path(reentry_id)
+                _atomic_write_bytes(events_path, b"", mode=0o600)
+                state = {
+                    "schema_version": REENTRY_STATE_SCHEMA_VERSION,
+                    "reentry_id": reentry_id,
+                    "status": "yielding",
+                    "created_at": now,
+                    "updated_at": now,
+                    "obligation_ref": _artifact_ref(materialized_path),
+                    "parent_thread_id": None,
+                    "continuation_id": binding.continuation.continuation_id,
+                    "child_task_id": task["task_id"],
+                    "child_incarnation_id": binding.incarnation_id,
+                    "expected_wake": {
+                        "condition_id": materialized[
+                            "expected_wake_condition_id"
+                        ],
+                        "event_kind": materialized["expected_wake_event_kind"],
+                        "action": "wake_parent",
+                    },
+                    "turns": [],
+                    "events_ref": _artifact_ref(events_path),
+                    "child_result_ref": None,
+                    "wake_evaluation": None,
+                    "reentry_result_ref": None,
+                }
+                # This state is durable before any Codex process or turn bytes
+                # can exist. A replacement controller can therefore continue
+                # the exact obligation without rewriting a partial attempt.
+                self._save_state(state)
+                self._append_event(
+                    reentry_id,
+                    event_type="external_parent.yield_prepared",
+                    payload={
+                        "obligation_digest": state["obligation_ref"][
+                            "artifact_digest"
+                        ],
+                        "child_task_id": task["task_id"],
+                    },
+                    significance="progress",
+                )
+                self._save_state(state)
+            if state["status"] == "yielding":
+                turn, output = self._run_parent_turn(
+                    materialized,
+                    realization,
+                    kind="yield",
+                    prompt=self._yield_prompt(materialized, task, binding),
+                    thread_id=None,
+                )
+                self._validate_yield_output(output, materialized, task, binding)
+                state["parent_thread_id"] = turn["thread_id"]
+                state["turns"] = [turn]
+                state["status"] = "yielded"
+                self._append_event(
+                    reentry_id,
+                    event_type="external_parent.inference_yielded",
+                    payload={
+                        "thread_id": turn["thread_id"],
+                        "turn_output_digest": turn["output_ref"][
+                            "artifact_digest"
+                        ],
+                        "turn": turn,
+                    },
+                    significance="checkpoint",
+                )
+                self._save_state(state)
             self._append_event(
                 reentry_id,
                 event_type="external_parent.wait_registered",
@@ -6872,29 +7106,7 @@ class ExternalCodexParentReentry:
                 },
                 significance="waiting",
             )
-            now = iso_now()
-            state = {
-                "schema_version": REENTRY_STATE_SCHEMA_VERSION,
-                "reentry_id": reentry_id,
-                "status": "waiting",
-                "created_at": now,
-                "updated_at": now,
-                "obligation_ref": _artifact_ref(materialized_path),
-                "parent_thread_id": turn["thread_id"],
-                "continuation_id": binding.continuation.continuation_id,
-                "child_task_id": task["task_id"],
-                "child_incarnation_id": binding.incarnation_id,
-                "expected_wake": {
-                    "condition_id": materialized["expected_wake_condition_id"],
-                    "event_kind": materialized["expected_wake_event_kind"],
-                    "action": "wake_parent",
-                },
-                "turns": [turn],
-                "events_ref": _artifact_ref(self._events_path(reentry_id)),
-                "child_result_ref": None,
-                "wake_evaluation": None,
-                "reentry_result_ref": None,
-            }
+            state["status"] = "waiting"
             self._save_state(state)
             return self.status(reentry_id)
 

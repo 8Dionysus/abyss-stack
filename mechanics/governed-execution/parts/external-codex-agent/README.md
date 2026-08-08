@@ -54,7 +54,9 @@ The controller:
   recursive nested-byte contract exists, drains a
   terminal process stream before finalization, counts tokens/turns/time/output
   without imposing execution budgets, includes ignored workspace bytes without
-  reading secret-shaped ignored inputs, and runs Codex beneath a Linux
+  reading secret-shaped ignored inputs, holds an inode-scoped exclusive lock
+  on the exact workspace through each active worker attempt so separate
+  sessions cannot overlap their evidence or mutations, and runs Codex beneath a Linux
   parent-death/subreaper supervisor that
   adopts and cleans detached descendants without placing an outer namespace in
   front of Codex's own sandbox, while retaining exact PGID/SID TERM/KILL
@@ -100,7 +102,9 @@ The controller:
   bytes and both writer/reviewer SDK request semantics and outputs; the
   reviewer state digest must still equal the exact result bytes initially
   admitted by the exporter, so a concurrent resume cannot mix verdicts.
-- records a digest-bound parent continuation with `yield-parent`, ends the
+- records a digest-bound `yielding` parent state before `yield-parent` may
+  launch Codex, preserves every partial yield attempt in a distinct directory,
+  recovers a completed yield event without a second inference, ends the
   external Sol inference and process, evaluates the child result against the
   SDK wake policy without model polling, and uses `codex exec resume` through
   `reenter-parent` only for the exact parent thread when one bound event is

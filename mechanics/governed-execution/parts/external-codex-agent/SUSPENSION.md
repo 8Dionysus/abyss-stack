@@ -50,7 +50,9 @@ python scripts/aoa-external-codex-agent \
   --reentry-id 'reentry:exact-id'
 ```
 
-A `waiting` parent has no Sol inference to kill. Suspending it means preserving
+A `yielding` or `yielded` parent must be inspected before retry: preserve every
+numbered turn attempt, and do not overlap a still-live recorded supervisor. A
+`waiting` parent has no Sol inference to kill. Suspending it means preserving
 the obligation, event stream, yielded thread ID, and child evidence while not
 calling `reenter-parent`. Do not synthesize a wake, edit the state, or resume
 the thread directly. A `filtered`, `reentered`, or `failed` cycle is terminal
