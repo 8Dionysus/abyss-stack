@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 15395755,
+  "allowed_tracked_bytes": 30753159,
+  "approved_by": "repository-owner",
+  "base_ref": "93415d31bcd6e35559981c2a8eb125d907e24bed",
+  "changed_generated_bytes": 15395755,
+  "changed_generated_files": 182,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "502fcfff4f07eb824fc2dd290fd2a06b59379d3981af1cc7c9f95517b4d4a49f",
+  "reason": "Refresh the current-main KAG family after versioning deployment-bound canary receipts as a breaking authenticated evidence contract without raising the standing budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 30753159,
+  "tracked_bytes_max": 24117248
+}
