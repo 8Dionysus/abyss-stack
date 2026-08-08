@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26473508,
+  "allowed_tracked_bytes": 32092401,
+  "approved_by": "repository-owner",
+  "base_ref": "e690b4153e5ecc682d21825d92cc18d482a42f86",
+  "changed_generated_bytes": 26473508,
+  "changed_generated_files": 328,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "69a614dbf39b72b79c8fbb2a793700b54c21d9b259d4e44ca441634ae7186b37",
+  "reason": "Refresh the exact external-actor workspace serialization and durable parent-yield source surface; count the bounded projection delta without constraining actor work.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 32092401,
+  "tracked_bytes_max": 24117248
+}
