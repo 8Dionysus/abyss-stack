@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
-import time
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -32,9 +30,6 @@ from .observation import (
 
 
 DeploymentLoader = Callable[[Path], tuple[dict[str, Any], str]]
-BootTimeClock = Callable[[], float]
-WallClock = Callable[[], datetime]
-MAX_PROCESS_START_CLOCK_SKEW = timedelta(seconds=2)
 
 
 def build_runtime_overlay(
@@ -48,8 +43,6 @@ def build_runtime_overlay(
     generated_at: datetime | None = None,
     systemctl_runner: SystemctlRunner = _systemctl,
     deployment_loader: DeploymentLoader = _load_deployment,
-    boottime_clock: BootTimeClock = lambda: time.clock_gettime(time.CLOCK_BOOTTIME),
-    process_wall_clock: WallClock = lambda: datetime.now(timezone.utc),
 ) -> tuple[dict[str, Any], tuple[dict[str, str], ...]]:
     now = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
     try:
@@ -170,21 +163,16 @@ def build_runtime_overlay(
         )
         if not process.active or process.process_identity is None:
             raise PreflightError("managed process identity is not exact")
-        if not _canary_follows_process_start(
-            receipt,
-            process.process_identity,
+        _require_equal(
+            receipt.process_unit_name,
             target.unit_name,
-            observed_at=process_wall_clock().astimezone(timezone.utc),
-            boottime_seconds=boottime_clock(),
-        ):
-            skipped.append(
-                {
-                    "organ_id": target.registry_organ_id,
-                    "contour_id": target.policy_family,
-                    "reason_code": "canary_evidence_precedes_current_process",
-                }
-            )
-            continue
+            "canary process unit",
+        )
+        _require_equal(
+            receipt.process_identity,
+            process.process_identity,
+            "canary process identity",
+        )
         record_ref = deployment.get("record_ref")
         if not isinstance(record_ref, str):
             raise PreflightError("immutable deployment record identity is absent")
@@ -262,30 +250,6 @@ def build_runtime_overlay(
         "contains_secrets": False,
     }
     return overlay, tuple(skipped)
-
-
-def _canary_follows_process_start(
-    receipt: CanaryReceipt,
-    process_identity: str,
-    unit_name: str,
-    *,
-    observed_at: datetime,
-    boottime_seconds: float,
-) -> bool:
-    match = re.fullmatch(
-        rf"systemd-user:{re.escape(unit_name)}:pid:[1-9][0-9]*:start:([1-9][0-9]*)",
-        process_identity,
-    )
-    if match is None or boottime_seconds < 0:
-        return False
-    process_start_us = int(match.group(1))
-    boottime_us = int(boottime_seconds * 1_000_000)
-    if process_start_us > boottime_us:
-        return False
-    process_started_at = observed_at - timedelta(
-        microseconds=boottime_us - process_start_us
-    )
-    return receipt.observed_at + MAX_PROCESS_START_CLOCK_SKEW >= process_started_at
 
 
 def _find_contour(

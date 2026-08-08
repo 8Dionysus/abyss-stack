@@ -17,8 +17,9 @@ Tracking starts with the community-docs baseline for this repository.
   instead of aborting the complete managed refresh. Admission now also keeps
   the live LKG PID observation distinct from the rollback target's verified
   stable executable identity, rehashes that executable before admission, and
-  requires the signed canary observation to follow the currently observed
-  systemd process start. Runtime projection validates the complete
+  signs the exact named-systemd PID/start identity after proving that it stayed
+  unchanged across the canary probe. Runtime projection requires that signed
+  identity to equal the current process and validates the complete
   content-addressed deployment record, and a malformed sibling receipt is now
   a contour-local skip rather than a sweep-wide parse failure.
 - Move the observation producer onto registry v2 and bind the managed

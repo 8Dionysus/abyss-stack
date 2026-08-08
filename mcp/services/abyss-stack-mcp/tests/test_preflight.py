@@ -12,7 +12,6 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from abyss_stack_mcp.canary import (
-    CanaryReceipt,
     CanaryDeploymentBinding,
     CanaryInventoryCounts,
     CanaryProbeResult,
@@ -32,10 +31,7 @@ from abyss_stack_mcp.preflight import (
     _tree_digest,
     run_preflight,
 )
-from abyss_stack_mcp.runtime_overlay import (
-    _canary_follows_process_start,
-    build_runtime_overlay,
-)
+from abyss_stack_mcp.runtime_overlay import build_runtime_overlay
 from abyss_stack_mcp.preflight_sweep import run_sweep
 from abyss_stack_mcp.managed_catalog import (
     ManagedContourTopology,
@@ -215,6 +211,7 @@ def _fixture(tmp_path: Path) -> ManagedContourBinding:
         ttl_seconds=3600,
         signing_key=SIGNING_KEY,
         deployment=deployment,
+        process_identity="systemd-user:demo.service:pid:321:start:654",
     )
     canary_path = tmp_path / "Logs/canaries/latest/demo-organ.read.json"
     _json(canary_path, receipt.model_dump(mode="json"))
@@ -418,8 +415,6 @@ def test_runtime_overlay_binds_authenticated_canary_to_exact_deployment(
         generated_at=NOW,
         systemctl_runner=process_runner,
         deployment_loader=lambda path: (deployment, deployment["manifest_id"]),
-        boottime_clock=lambda: 120.0,
-        process_wall_clock=lambda: NOW,
     )
 
     assert skipped == ()
@@ -444,8 +439,6 @@ def test_runtime_overlay_binds_authenticated_canary_to_exact_deployment(
             generated_at=NOW,
             systemctl_runner=process_runner,
             deployment_loader=lambda path: (deployment, deployment["manifest_id"]),
-            boottime_clock=lambda: 120.0,
-            process_wall_clock=lambda: NOW,
         )
 
     verified_deployment = json.loads(json.dumps(deployment))
@@ -464,8 +457,6 @@ def test_runtime_overlay_binds_authenticated_canary_to_exact_deployment(
                 verified_deployment,
                 verified_deployment["manifest_id"],
             ),
-            boottime_clock=lambda: 120.0,
-            process_wall_clock=lambda: NOW,
         )
 
 
@@ -522,8 +513,6 @@ def test_runtime_overlay_rejects_unobserved_managed_process(tmp_path: Path) -> N
             generated_at=NOW,
             systemctl_runner=inactive_runner,
             deployment_loader=lambda path: (deployment, deployment["manifest_id"]),
-            boottime_clock=lambda: 120.0,
-            process_wall_clock=lambda: NOW,
         )
 
 
@@ -531,26 +520,52 @@ def test_runtime_overlay_rejects_canary_from_predecessor_process(
     tmp_path: Path,
 ) -> None:
     binding = _fixture(tmp_path)
-    receipt = CanaryReceipt.model_validate_json(
-        Path(binding.canary_receipt_path).read_bytes()
+    registry = json.loads(Path(binding.registry_path).read_text(encoding="utf-8"))
+    registry["records"][0]["contours"][0]["runtime_identity"]["source_revision"] = (
+        "a" * 40
     )
-    unit_name = binding.unit_name
-    process_identity = f"systemd-user:{unit_name}:pid:321:start:90000000"
+    deployment_path = Path(binding.deployment_manifest_path)
+    deployment = json.loads(deployment_path.read_text(encoding="utf-8"))
+    deployment["record_ref"] = (
+        "Logs/mcp/deployments/records/"
+        + deployment["manifest_id"].removeprefix("sha256:")
+        + ".json"
+    )
+    target = RuntimeTarget(
+        organ_id=binding.organ_id,
+        registry_organ_id=binding.organ_id,
+        service_id=binding.service_id,
+        unit_name=binding.unit_name,
+        executable_ref=binding.executable_path,
+        endpoint_ref=binding.endpoint_ref,
+        protocol_versions=(binding.protocol_version,),
+        effect_classes=("observe",),
+        canary_route="runbook://demo/read",
+        rollback_route="runbook://demo/rollback/read",
+    )
 
-    assert not _canary_follows_process_start(
-        receipt,
-        process_identity,
-        unit_name,
-        observed_at=NOW,
-        boottime_seconds=120.0,
-    )
-    assert _canary_follows_process_start(
-        receipt,
-        process_identity,
-        unit_name,
-        observed_at=NOW,
-        boottime_seconds=180.0,
-    )
+    def replacement_process(command: tuple[str, ...]) -> SimpleNamespace:
+        return SimpleNamespace(
+            returncode=0,
+            stdout=(
+                "LoadState=loaded\nActiveState=active\nMainPID=322\n"
+                "ExecMainStartTimestampMonotonic=655\n"
+                "FragmentPath=/tmp/demo.service\n"
+            ),
+        )
+
+    with pytest.raises(PreflightError, match="canary process identity"):
+        build_runtime_overlay(
+            registry,
+            deployment,
+            RuntimeTargetCatalog(targets=(target,)),
+            canary_root=Path(binding.canary_receipt_path).parent,
+            canary_public_key_path=Path(binding.canary_public_key_path),
+            deployment_manifest_path=deployment_path,
+            generated_at=NOW,
+            systemctl_runner=replacement_process,
+            deployment_loader=lambda path: (deployment, deployment["manifest_id"]),
+        )
 
 
 def test_runtime_overlay_skips_malformed_sibling_canary(tmp_path: Path) -> None:
@@ -612,8 +627,6 @@ def test_runtime_overlay_skips_malformed_sibling_canary(tmp_path: Path) -> None:
         generated_at=NOW,
         systemctl_runner=process_runner,
         deployment_loader=lambda path: (deployment, deployment["manifest_id"]),
-        boottime_clock=lambda: 120.0,
-        process_wall_clock=lambda: NOW,
     )
 
     assert len(overlay["contours"]) == 1

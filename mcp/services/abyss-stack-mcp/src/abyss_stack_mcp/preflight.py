@@ -421,6 +421,14 @@ def run_preflight(
         )
         _check_equal(
             checks,
+            "canary-process-unit",
+            receipt.process_unit_name,
+            binding.unit_name,
+            "canary_process_unit_mismatch",
+            binding.canary_receipt_path,
+        )
+        _check_equal(
+            checks,
             "canary-source",
             receipt.deployment_source_revision,
             service.get("package_source_revision"),
