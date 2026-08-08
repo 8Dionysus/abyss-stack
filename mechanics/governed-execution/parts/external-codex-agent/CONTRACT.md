@@ -235,7 +235,9 @@ safety invariant, not a task or research budget.
 Finalization rebuilds and durably records the full workspace manifest rather
 than comparing only porcelain status. Every tracked path is hashed even when
 Git marks it assume-unchanged or skip-worktree, and those index flags are
-recorded explicitly. Same-status byte changes, ignored and untracked bytes,
+recorded explicitly. A tracked gitlink fails admission as
+`workspace_submodule_unsupported` until the runtime owns a recursive manifest
+for every nested submodule worktree byte. Same-status byte changes, ignored and untracked bytes,
 path kind, symlink target, size, binary diff, and HEAD drift therefore remain
 observable. The receipt recorded for each exact validation command carries the
 workspace-manifest digest observed at command completion; report admission
@@ -397,6 +399,10 @@ the next load may advance `events_ref` only when the current JSONL bytes are a
 strict extension of the previously recorded digest and every event remains a
 contiguous record for the same re-entry identity. Rewrites, truncation,
 partial records, and foreign identities remain fail-closed drift.
+Recognized appended terminal events also replay their semantic state delta:
+the admitted child receipt and wake evaluation, filtered or failed status, or
+the exact completed parent turn and result reference. Event recovery therefore
+cannot leave a successful re-entry stranded as `reentering`.
 
 When and only when the admitted event selects `wake_parent`, the controller
 builds a compact return bound to the child-result and observed-event digests,

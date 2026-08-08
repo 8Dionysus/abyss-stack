@@ -41,7 +41,8 @@ The controller:
   time, token, turn, output, command, cost, or memory budget;
 - rebuilds the exact byte-level workspace manifest for every tracked,
   untracked, and ignored path at finalization, records assume-unchanged and
-  skip-worktree index flags, drains a
+  skip-worktree index flags, rejects tracked submodule worktrees until a
+  recursive nested-byte contract exists, drains a
   terminal process stream before finalization, counts tokens/turns/time/output
   without imposing execution budgets, includes ignored workspace bytes without
   reading secret-shaped ignored inputs, and runs Codex beneath a Linux
@@ -92,7 +93,9 @@ The controller:
   `reenter-parent` only for the exact parent thread when one bound event is
   significant; the child result must match its canonical durable runtime
   state/result/event receipt, and a crash after a valid re-entry event append
-  is recovered only as a strict extension of the previously digested stream;
+  is recovered only as a strict extension of the previously digested stream,
+  with recognized terminal events replaying their filtered, failed, or
+  completed semantic state;
   `reentry-status` observes the durable wait without inference.
 
 Token counters contain only usage actually emitted by Codex. A controlled

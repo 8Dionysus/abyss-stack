@@ -40,8 +40,8 @@ non-starting binder, accepted responsibility transfer with two exact holders,
 a ready task-local DAG and exact domain procedure refs, a distinct OS process,
 structured events and output, no built-in multi-agent flag, byte-aware
 read-only drift containment including every tracked byte,
-assume-unchanged/skip-worktree mutations, and ignored bytes, a foreground
-`run-to-terminal` lifecycle for transient cgroup launchers without execution
+assume-unchanged/skip-worktree mutations, and ignored bytes,
+tracked-submodule refusal, a foreground `run-to-terminal` lifecycle for transient cgroup launchers without execution
 ceilings, secret-shaped ignored
 input refusal, wrapped effect-family observation, exact validation-claim
 binding to final workspace bytes, authority-blocked failure closeout when the
@@ -75,7 +75,8 @@ would conflict with Codex sandboxing, and a separately bound review/A2A export.
 It also proves parent obligation admission, a completed yield turn followed by
 durable waiting, canonical child state/result/event receipt binding, rejection
 of a standalone result, recovery of a valid event append that preceded its
-state save, false-event filtering with no second parent turn, and exact-thread parent re-entry with a distilled
+state save, recovery of the completed semantic turn when its event preceded
+the state save, false-event filtering with no second parent turn, and exact-thread parent re-entry with a distilled
 return. The fake Codex fixture exercises both filtered and wake branches;
 separate live receipts are required for the installed product surface.
 

@@ -2836,6 +2836,39 @@ def test_workspace_manifest_hashes_tracked_bytes_hidden_by_index_flags(
     ]
 
 
+def test_workspace_manifest_rejects_tracked_submodule_worktree(
+    tmp_path: Path,
+) -> None:
+    submodule = tmp_path / "submodule-source"
+    submodule.mkdir()
+    _git(submodule, "init", "-b", "main")
+    _git(submodule, "config", "user.email", "fixture@example.invalid")
+    _git(submodule, "config", "user.name", "Fixture")
+    (submodule / "tracked.txt").write_text("submodule\n", encoding="utf-8")
+    _git(submodule, "add", "tracked.txt")
+    _git(submodule, "commit", "-m", "fixture")
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    _git(
+        workspace,
+        "-c",
+        "protocol.file.allow=always",
+        "submodule",
+        "add",
+        str(submodule),
+        "nested",
+    )
+    _git(workspace, "commit", "-am", "add submodule")
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.build_workspace_manifest(workspace)
+
+    assert exc_info.value.code == "workspace_submodule_unsupported"
+
+
 @pytest.mark.parametrize(
     "relative_path",
     (
@@ -3863,6 +3896,44 @@ def test_parent_reentry_recovers_valid_event_appended_before_state_save(
     assert recovered["events_ref"]["artifact_digest"] == RUNTIME.sha256_file(
         bridge._events_path(reentry_id)
     )
+
+
+def test_parent_reentry_recovers_completed_semantic_state_after_event_append(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_ambiguity_stop",
+        identity_suffix="luna-xhigh-semantic-recovery",
+    )
+    reentry_id = "reentry:fixture:luna-xhigh-semantic-recovery"
+    obligation_path = _parent_reentry_obligation(
+        tmp_path, fixture, reentry_id=reentry_id
+    )
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge.yield_parent(obligation_path)
+    assert fixture["runtime"].run_to_terminal(fixture["launch_path"])["status"] == (
+        "authority_blocked"
+    )
+    child_result_path = (
+        fixture["runtime"]._session_dir(fixture["session_id"]) / "result.json"
+    )
+    original_save_state = bridge._save_state
+
+    def crash_before_completed_state_save(state: dict[str, Any]) -> None:
+        if state["status"] != "reentered":
+            original_save_state(state)
+
+    monkeypatch.setattr(bridge, "_save_state", crash_before_completed_state_save)
+    recovered = bridge.reenter_parent(reentry_id, child_result_path)["state"]
+
+    assert recovered["status"] == "reentered"
+    assert len(recovered["turns"]) == 2
+    assert recovered["reentry_result_ref"] == recovered["turns"][1]["output_ref"]
+    persisted = json.loads(bridge._state_path(reentry_id).read_text(encoding="utf-8"))
+    assert persisted["status"] == "reentered"
 
 
 def test_non_parent_child_event_is_filtered_without_second_sol_turn(

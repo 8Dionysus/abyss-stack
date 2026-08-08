@@ -1456,6 +1456,28 @@ def _nul_paths(payload: bytes, *, label: str) -> tuple[str, ...]:
 
 def _tracked_index_flags(workspace: Path) -> dict[str, tuple[str, ...]]:
     flags: dict[str, tuple[str, ...]] = {}
+    for raw in _git_bytes(workspace, "ls-files", "--stage", "-z").split(b"\0"):
+        if not raw:
+            continue
+        try:
+            metadata, raw_path = raw.split(b"\t", 1)
+            mode = metadata.split(b" ", 1)[0]
+            paths = _nul_paths(raw_path + b"\0", label="tracked index entries")
+        except (ValueError, ExternalCodexRuntimeError) as exc:
+            raise ExternalCodexRuntimeError(
+                "workspace_manifest_failed",
+                "git ls-files returned an invalid staged index record",
+            ) from exc
+        if len(paths) != 1:
+            raise ExternalCodexRuntimeError(
+                "workspace_manifest_failed",
+                "git ls-files returned an invalid staged path",
+            )
+        if mode == b"160000":
+            raise ExternalCodexRuntimeError(
+                "workspace_submodule_unsupported",
+                f"workspace manifest does not yet admit tracked submodule {paths[0]}",
+            )
     for raw in _git_bytes(workspace, "ls-files", "-v", "-z").split(b"\0"):
         if not raw:
             continue
@@ -5763,6 +5785,7 @@ class ExternalCodexParentReentry:
                 "reentry_event_recovery_failed",
                 "re-entry event stream is not a strict extension of its recorded prefix",
             )
+        events: list[dict[str, Any]] = []
         for sequence, line in enumerate(lines):
             try:
                 event = json.loads(line)
@@ -5794,7 +5817,50 @@ class ExternalCodexParentReentry:
                     "reentry_event_recovery_failed",
                     f"re-entry event line {sequence + 1} has no valid observation time",
                 ) from exc
+            events.append(event)
         recovered = dict(state)
+        for event in events[prefix_count:]:
+            payload = event["payload"]
+            event_type = event["event_type"]
+            if event_type == "external_parent.child_event_admitted":
+                child_result_ref = payload.get("child_result_ref")
+                wake_evaluation = payload.get("wake_evaluation")
+                if not isinstance(child_result_ref, dict) or not isinstance(
+                    wake_evaluation, dict
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "reentry_event_recovery_failed",
+                        "admitted child event lacks its semantic state delta",
+                    )
+                _verified_artifact_ref_path(
+                    child_result_ref, label="recovered child result"
+                )
+                recovered["child_result_ref"] = child_result_ref
+                recovered["wake_evaluation"] = wake_evaluation
+            elif event_type == "external_parent.wake_filtered":
+                recovered["status"] = "filtered"
+            elif event_type == "external_parent.reentry_failed":
+                recovered["status"] = "failed"
+            elif event_type == "external_parent.reentry_completed":
+                turn = payload.get("turn")
+                result_ref = payload.get("reentry_result_ref")
+                if (
+                    not isinstance(turn, dict)
+                    or turn.get("kind") != "reentry"
+                    or turn.get("thread_id") != recovered["parent_thread_id"]
+                    or not isinstance(result_ref, dict)
+                    or turn.get("output_ref") != result_ref
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "reentry_event_recovery_failed",
+                        "completed re-entry event lacks its semantic state delta",
+                    )
+                _verified_artifact_ref_path(
+                    result_ref, label="recovered parent re-entry result"
+                )
+                recovered["turns"] = [recovered["turns"][0], turn]
+                recovered["reentry_result_ref"] = result_ref
+                recovered["status"] = "reentered"
         recovered["updated_at"] = iso_now()
         recovered["events_ref"] = _artifact_ref(path)
         validate_json(
@@ -6556,6 +6622,7 @@ class ExternalCodexParentReentry:
                 event_type="external_parent.child_event_admitted",
                 payload={
                     "child_result_digest": child_ref["artifact_digest"],
+                    "child_result_ref": child_ref,
                     "observed_event_digest": canonical_digest(observed_event),
                     "wake_evaluation": wake,
                 },
@@ -6626,6 +6693,8 @@ class ExternalCodexParentReentry:
                     "parent_thread_id": turn["thread_id"],
                     "result_digest": turn["output_ref"]["artifact_digest"],
                     "next_action": output["next_action"],
+                    "turn": turn,
+                    "reentry_result_ref": turn["output_ref"],
                 },
                 significance="authority",
             )
