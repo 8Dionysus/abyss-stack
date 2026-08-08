@@ -316,7 +316,12 @@ command substitution, backticks, and process substitution likewise fail closed
 instead of being treated as inert command arguments. Build, package, test, and
 task runners that may execute manifest-, plugin-, or project-defined commands
 are opaque for model-issued commands; only an exact owner-fixed validation argv
-receives the fixed-validation exemption. Shell `source` and `.` bodies remain
+receives the fixed-validation exemption. Active shell parameter, glob, brace,
+and tilde expansion is opaque because the event does not expose the resulting
+argv; single-quoted and escaped literal text remains classifiable. A directly
+executed relative, workspace, home, or temporary program is likewise opaque;
+only stable system bin roots or an exact owner-fixed validation may select an
+executable by path. Shell `source` and `.` bodies remain
 opaque because the observed argv does not expose the sourced commands. Git
 configuration writes, including repository-local and per-worktree writes, and
 Git global options that can inject

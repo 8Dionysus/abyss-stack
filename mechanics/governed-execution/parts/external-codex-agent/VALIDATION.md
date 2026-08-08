@@ -86,7 +86,9 @@ exemption, fail-closed `env --split-string` handling, value-aware `timeout`
 wrapper parsing, opaque process-launch-wrapper refusal,
 attached-redirection observation, fail-closed shell nesting at the inspection
 limit, command/backtick/process-substitution refusal, opaque build/package/test
-runner refusal, sourced-shell refusal, Git alias/config-write/external-subcommand refusal, ambient
+runner refusal, active parameter/glob/brace/tilde-expansion refusal with quoted
+literal preservation, direct workspace/non-system executable refusal,
+sourced-shell refusal, Git alias/config-write/external-subcommand refusal, ambient
 environment-assignment refusal, Git-invisible FIFO and Unix-socket refusal,
 post-preflight full-manifest drift refusal, final-manifest tamper refusal,
 provenance checks for all loaded `aoa_sdk` modules in the study preparer plus a

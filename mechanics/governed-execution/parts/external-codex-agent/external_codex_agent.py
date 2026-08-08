@@ -290,6 +290,14 @@ GIT_OPAQUE_GLOBAL_OPTIONS = {
     "--work-tree",
 }
 SYSTEM_PATH_PREFIXES = ("/etc", "/opt", "/usr", "/var/lib", "/var/run")
+TRUSTED_EXECUTABLE_PREFIXES = (
+    Path("/bin"),
+    Path("/sbin"),
+    Path("/usr/bin"),
+    Path("/usr/sbin"),
+    Path("/usr/local/bin"),
+    Path("/usr/local/sbin"),
+)
 
 
 class ExternalCodexRuntimeError(RuntimeError):
@@ -1289,6 +1297,8 @@ def _shell_tokenization_analysis(
         if raw in seen:
             continue
         seen.add(raw)
+        if _shell_has_active_expansion(raw):
+            incomplete = True
         try:
             lexer = shlex.shlex(raw, posix=True, punctuation_chars=";&|<>")
             lexer.whitespace_split = True
@@ -1308,6 +1318,67 @@ def _shell_tokenization_analysis(
                     break
     incomplete = incomplete or any(raw not in seen for raw in pending)
     return tuple(tokenizations), incomplete
+
+
+def _shell_has_active_expansion(command: str) -> bool:
+    """Detect shell expansions whose executed argv is absent from the event."""
+
+    quote: str | None = None
+    word_start = True
+    index = 0
+    while index < len(command):
+        character = command[index]
+        if quote == "'":
+            if character == "'":
+                quote = None
+            index += 1
+            continue
+        if character == "\\":
+            index += 2
+            word_start = False
+            continue
+        if character == '"':
+            quote = None if quote == '"' else '"'
+            word_start = False
+            index += 1
+            continue
+        if quote == '"':
+            if character == "$":
+                return True
+            index += 1
+            continue
+        if character == "'":
+            quote = "'"
+            word_start = False
+            index += 1
+            continue
+        if character == "$":
+            return True
+        if character in "*?[":
+            return True
+        if character == "{" and "}" in command[index + 1 :]:
+            body = command[index + 1 : command.index("}", index + 1)]
+            if "," in body or ".." in body:
+                return True
+        if character == "~" and word_start:
+            return True
+        if character.isspace() or character in SHELL_SEPARATORS:
+            word_start = True
+        else:
+            word_start = False
+        index += 1
+    return False
+
+
+def _executable_path_is_opaque(value: str) -> bool:
+    """Reject model-selected executable files outside stable system bin roots."""
+
+    if "/" not in value:
+        return False
+    candidate = Path(value)
+    if not candidate.is_absolute() or ".." in candidate.parts:
+        return True
+    return not any(candidate.is_relative_to(root) for root in TRUSTED_EXECUTABLE_PREFIXES)
 
 
 def _shell_tokenizations(command: str) -> tuple[tuple[str, ...], ...]:
@@ -1749,6 +1820,8 @@ def _command_has_unclassified_indirection(command: str) -> bool:
                 return True
             executable = Path(segment[0]).name.lower()
             args = tuple(value.lower() for value in segment[1:])
+            if _executable_path_is_opaque(segment[0]):
+                return True
             if segment[0] == "." or executable == "source":
                 return True
             if executable in (

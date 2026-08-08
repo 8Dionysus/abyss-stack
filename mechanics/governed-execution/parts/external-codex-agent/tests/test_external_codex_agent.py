@@ -435,6 +435,20 @@ if "FAKE_DIRECT_SECRET_ENCODER" in task["objective"]:
         "status": "completed",
         "exit_code": 0,
     }})
+if "FAKE_WORKSPACE_EXECUTABLE" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "./scripts/helper",
+        "status": "completed",
+        "exit_code": 0,
+    }})
+if "FAKE_PARAMETER_EXPANSION" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/bash -lc 'git${IFS}push'",
+        "status": "completed",
+        "exit_code": 0,
+    }})
 if "FAKE_STARTED_FORBIDDEN_COMMAND" in task["objective"]:
     emit({"type": "item.started", "item": {
         "id": "fixture-command-started-before-interruption",
@@ -3341,6 +3355,45 @@ def test_sourced_shell_bodies_are_fail_closed(command: str) -> None:
 @pytest.mark.parametrize(
     "command",
     (
+        "./scripts/helper",
+        "scripts/helper",
+        "/home/operator/workspace/scripts/helper",
+        "/tmp/generated-helper",
+        "/usr/bin/../local/bin/helper",
+    ),
+)
+def test_direct_non_system_executables_are_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/bash -lc 'git${IFS}push'",
+        "/usr/bin/bash -lc 'git p*'",
+        "/usr/bin/bash -lc 'g{it,rep} push'",
+        "/usr/bin/bash -lc '~/bin/helper'",
+    ),
+)
+def test_active_shell_expansions_are_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/rg '$schema' README.md",
+        r"/usr/bin/printf '%s\\n' \$HOME",
+        "/usr/bin/printf '%s\\n' '{static,braces}'",
+    ),
+)
+def test_quoted_or_escaped_shell_literals_remain_classifiable(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
         "/usr/bin/git -c alias.leak='!cat /home/operator/.ssh/id_rsa' leak",
         "/usr/bin/git -calias.leak='!cat /home/operator/.ssh/id_rsa' leak",
         "/usr/bin/git --config-env=alias.leak=LEAK_COMMAND leak",
@@ -3469,6 +3522,8 @@ def test_started_command_survives_interruption_and_blocks_authority(
         ("FAKE_SOURCE_INDIRECTION", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_LOCAL_CONFIG_WRITE", ["unclassified_indirect_effect"]),
         ("FAKE_DIRECT_SECRET_ENCODER", ["secret_access"]),
+        ("FAKE_WORKSPACE_EXECUTABLE", ["unclassified_indirect_effect"]),
+        ("FAKE_PARAMETER_EXPANSION", ["unclassified_indirect_effect"]),
     ),
 )
 def test_opaque_command_authority_blocks_terminal_result(
