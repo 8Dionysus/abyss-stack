@@ -2,9 +2,6 @@
 Description=AoA evals MCP candidate-only local-port contour
 Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/aoa-evals-mcp/README.md
 PartOf=aoa-mcp-http.service
-ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
-ConditionPathExists=/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json
-ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/managed-contours.json
 StartLimitIntervalSec=60
 StartLimitBurst=3
 
@@ -21,7 +18,6 @@ Environment=AOA_MCP_POLICY_FAMILY=candidate
 Environment="AOA_EVALS_MCP_CANDIDATE_ROOTS=/srv/AbyssOS/8Dionysus/evals:/srv/AbyssOS/Agents-of-Abyss/evals:/srv/AbyssOS/Tree-of-Sophia/evals:/srv/AbyssOS/aoa-agents/evals:/srv/AbyssOS/aoa-kag/evals:/srv/AbyssOS/aoa-memo/evals:/srv/AbyssOS/aoa-playbooks/evals:/srv/AbyssOS/aoa-sdk/evals:/srv/AbyssOS/aoa-skills/evals:/srv/AbyssOS/aoa-stats/evals:/srv/AbyssOS/aoa-techniques/evals:/srv/AbyssOS/connectors/aoa-4pda-connector/evals:/srv/AbyssOS/connectors/aoa-course-connector/evals:/srv/AbyssOS/connectors/aoa-discord-connector/evals:/srv/AbyssOS/connectors/aoa-stackoverflow-connector/evals:/srv/AbyssOS/connectors/aoa-telegram-connector/evals:/srv/AbyssOS/connectors/aoa-xda-connector/evals"
 Environment=PYTHONDONTWRITEBYTECODE=1
 LoadCredential=aoa-evals-mcp-candidate-bearer-token:/srv/AbyssOS/abyss-stack/Secrets/Configs/aoa-evals-mcp-candidate-bearer-token
-ExecCondition=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -I -B -m abyss_stack_mcp.preflight --catalog /srv/AbyssOS/abyss-stack/Logs/mcp/admission/managed-contours.json --binding-id aoa-evals-candidate
 ExecStart=/usr/bin/env python3 /srv/AbyssOS/.codex/bin/aoa-evals-mcp-server.py
 Restart=on-failure
 RestartSec=2

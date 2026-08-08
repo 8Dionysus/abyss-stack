@@ -2,9 +2,6 @@
 Description=AoA memo MCP candidate-only contour
 Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/aoa-memo-mcp/README.md
 PartOf=aoa-mcp-http.service
-ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
-ConditionPathExists=/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json
-ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/managed-contours.json
 StartLimitIntervalSec=60
 StartLimitBurst=3
 
@@ -20,7 +17,6 @@ Environment=AOA_MCP_POLICY_FAMILY=candidate
 Environment="AOA_MEMO_MCP_CANDIDATE_ROOTS=/srv/AbyssOS/Agents-of-Abyss/memo:/srv/AbyssOS/Tree-of-Sophia/memo:/srv/AbyssOS/abyss-stack/Configs/memo:/srv/AbyssOS/aoa-agents/memo:/srv/AbyssOS/aoa-evals/memo:/srv/AbyssOS/aoa-playbooks/memo:/srv/AbyssOS/aoa-techniques/memo:/var/lib/abyss-machine/memo"
 Environment=PYTHONDONTWRITEBYTECODE=1
 LoadCredential=aoa-memo-mcp-candidate-bearer-token:/srv/AbyssOS/abyss-stack/Secrets/Configs/aoa-memo-mcp-candidate-bearer-token
-ExecCondition=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -I -B -m abyss_stack_mcp.preflight --catalog /srv/AbyssOS/abyss-stack/Logs/mcp/admission/managed-contours.json --binding-id aoa-memo-candidate
 ExecStart=/usr/bin/env python3 /srv/AbyssOS/.codex/bin/aoa-memo-mcp-server.py
 Restart=on-failure
 RestartSec=2

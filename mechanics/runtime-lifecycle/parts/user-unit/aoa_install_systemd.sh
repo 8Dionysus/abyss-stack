@@ -278,6 +278,7 @@ abyss_stack_mcp_read_credential_name="abyss-stack-mcp-read-bearer-token"
 abyss_stack_mcp_candidate_credential_name="abyss-stack-mcp-candidate-bearer-token"
 abyss_stack_mcp_internal_effect_credential_name="abyss-stack-mcp-internal-effect-bearer-token"
 abyss_stack_mcp_canary_signing_key_name="abyss-stack-mcp-canary-ed25519-private-key.pem"
+abyss_stack_mcp_canary_public_key_name="abyss-stack-mcp-canary-ed25519-public-key.pem"
 abyss_stack_mcp_auth_manifest_name="abyss-stack-mcp-auth-manifest.json"
 abyss_stack_mcp_auth_manifest_path="${mcp_http_secret_dir}/${abyss_stack_mcp_auth_manifest_name}"
 abyss_stack_mcp_service_root="${AOA_CONFIGS_ROOT}/mcp/services/abyss-stack-mcp"
@@ -416,6 +417,59 @@ aoa_provision_abyss_stack_mcp_canary_signing_key() {
   fi
   aoa_validate_abyss_stack_mcp_canary_signing_key "$key_path"
   aoa_note "abyss-stack MCP canary signing key already provisioned under the deployed Secrets root"
+}
+
+aoa_validate_abyss_stack_mcp_canary_public_key() {
+  local key_path="$1"
+
+  [[ -f "$key_path" && ! -L "$key_path" ]] || \
+    aoa_die "existing abyss-stack MCP canary public key must be a regular non-symlink file"
+  [[ "$(stat -c '%a' "$key_path")" == "600" ]] || \
+    aoa_die "existing abyss-stack MCP canary public key must have mode 0600"
+  [[ "$(stat -c '%u' "$key_path")" == "$(id -u)" ]] || \
+    aoa_die "existing abyss-stack MCP canary public key must be owned by the current user"
+  if ! openssl pkey -pubin -in "$key_path" -pubout -out /dev/null 2>/dev/null; then
+    aoa_die "existing abyss-stack MCP canary public key must be a valid public key"
+  fi
+  if [[ "$(openssl pkey -pubin -in "$key_path" -text_pub -noout 2>/dev/null | head -n 1)" != "ED25519 Public-Key:" ]]; then
+    aoa_die "existing abyss-stack MCP canary public key must be Ed25519"
+  fi
+}
+
+aoa_provision_abyss_stack_mcp_canary_public_key() {
+  local private_path="${mcp_http_secret_dir}/${abyss_stack_mcp_canary_signing_key_name}"
+  local public_path="${mcp_http_secret_dir}/${abyss_stack_mcp_canary_public_key_name}"
+  local temp_path=""
+
+  aoa_validate_abyss_stack_mcp_canary_signing_key "$private_path"
+  temp_path="$(mktemp "${mcp_http_secret_dir}/.${abyss_stack_mcp_canary_public_key_name}.XXXXXX")"
+  chmod 0600 "$temp_path"
+  if ! openssl pkey -in "$private_path" -pubout -out "$temp_path" >/dev/null 2>&1; then
+    rm -f -- "$temp_path"
+    aoa_die "failed to derive the abyss-stack MCP canary public key"
+  fi
+  aoa_validate_abyss_stack_mcp_canary_public_key "$temp_path"
+  if [[ -e "$public_path" || -L "$public_path" ]]; then
+    aoa_validate_abyss_stack_mcp_canary_public_key "$public_path"
+    if ! cmp -s -- "$temp_path" "$public_path"; then
+      rm -f -- "$temp_path"
+      aoa_die "existing abyss-stack MCP canary public key conflicts with the signing key"
+    fi
+    rm -f -- "$temp_path"
+    aoa_note "abyss-stack MCP canary public key already pinned under the deployed Secrets root"
+    return 0
+  fi
+  if ln -- "$temp_path" "$public_path" 2>/dev/null; then
+    rm -f -- "$temp_path"
+    aoa_note "pinned abyss-stack MCP canary public key under the deployed Secrets root"
+    return 0
+  fi
+  rm -f -- "$temp_path"
+  if [[ ! -e "$public_path" && ! -L "$public_path" ]]; then
+    aoa_die "failed to atomically pin the abyss-stack MCP canary public key"
+  fi
+  aoa_validate_abyss_stack_mcp_canary_public_key "$public_path"
+  aoa_note "abyss-stack MCP canary public key already pinned under the deployed Secrets root"
 }
 
 aoa_provision_mcp_http_auth() {
@@ -731,6 +785,7 @@ aoa_provision_abyss_stack_mcp_auth() {
     "$abyss_stack_mcp_internal_effect_credential_name" \
     "abyss-stack MCP internal-effect bearer credential"
   aoa_provision_abyss_stack_mcp_canary_signing_key
+  aoa_provision_abyss_stack_mcp_canary_public_key
   read_token="$(<"$read_path")"
   candidate_token="$(<"$candidate_path")"
   effect_token="$(<"$effect_path")"

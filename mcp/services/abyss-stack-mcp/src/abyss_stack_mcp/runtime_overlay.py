@@ -8,6 +8,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
+
+from .canary import (
+    CanaryReceipt,
+    CanaryRunnerError,
+    _read_public_key,
+    verify_canary_receipt,
+)
 from .preflight import PreflightError, _safe_json
 from .managed_catalog import publish_private_json
 from .observation import RuntimeTargetCatalog
@@ -19,14 +27,21 @@ def build_runtime_overlay(
     targets: RuntimeTargetCatalog,
     *,
     canary_root: Path,
+    canary_public_key_path: Path,
     deployment_manifest_path: Path,
     generated_at: datetime | None = None,
 ) -> tuple[dict[str, Any], tuple[dict[str, str], ...]]:
     now = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
     contours: list[dict[str, Any]] = []
     skipped: list[dict[str, str]] = []
+    try:
+        canary_public_key = _read_public_key(canary_public_key_path)
+    except CanaryRunnerError as exc:
+        raise PreflightError(str(exc)) from exc
     for target in targets.targets:
-        contour = _find_contour(registry, target.registry_organ_id, target.policy_family)
+        contour = _find_contour(
+            registry, target.registry_organ_id, target.policy_family
+        )
         if contour is None:
             skipped.append(
                 {
@@ -46,16 +61,28 @@ def build_runtime_overlay(
                 }
             )
             continue
-        canary = _safe_json(canary_path, "canary receipt")
-        service = _deployment_service(deployment, canary.get("service_id"))
-        _require_equal(canary.get("organ_id"), target.organ_id, "canary organ")
-        _require_equal(canary.get("policy_family"), target.policy_family, "canary contour")
-        _require_equal(canary.get("endpoint_ref"), target.endpoint_ref, "canary endpoint")
-        if canary.get("protocol_version") not in target.protocol_versions:
+        try:
+            receipt = CanaryReceipt.model_validate(
+                _safe_json(canary_path, "canary receipt")
+            )
+            verify_canary_receipt(
+                receipt,
+                canary_public_key,
+                checked_at=now,
+                require_success=True,
+            )
+        except (CanaryRunnerError, ValidationError) as exc:
+            raise PreflightError(
+                "canary receipt failed authenticated validation"
+            ) from exc
+        canary = receipt.model_dump(mode="json")
+        service = _deployment_service(deployment, receipt.service_id)
+        _require_equal(receipt.organ_id, target.organ_id, "canary organ")
+        _require_equal(receipt.policy_family, target.policy_family, "canary contour")
+        _require_equal(receipt.endpoint_ref, target.endpoint_ref, "canary endpoint")
+        if receipt.protocol_version not in target.protocol_versions:
             raise PreflightError("canary protocol is absent from runtime target")
-        server_schema_digest = canary.get("server_schema_digest")
-        if not isinstance(server_schema_digest, str):
-            raise PreflightError("canary server schema digest is absent")
+        server_schema_digest = receipt.server_schema_digest
         runtime = contour.get("runtime_identity")
         if not isinstance(runtime, dict):
             raise PreflightError("registry contour runtime identity is absent")
@@ -138,14 +165,15 @@ def _find_contour(
     for record in registry.get("records", []):
         if isinstance(record, dict) and record.get("organ_id") == organ_id:
             for contour in record.get("contours", []):
-                if isinstance(contour, dict) and contour.get("contour_id") == contour_id:
+                if (
+                    isinstance(contour, dict)
+                    and contour.get("contour_id") == contour_id
+                ):
                     return contour
     return None
 
 
-def _deployment_service(
-    deployment: dict[str, Any], service_id: Any
-) -> dict[str, Any]:
+def _deployment_service(deployment: dict[str, Any], service_id: Any) -> dict[str, Any]:
     matches = [
         item
         for item in deployment.get("services", [])
@@ -167,6 +195,7 @@ def main() -> int:
     parser.add_argument("--deployment-manifest", type=Path, required=True)
     parser.add_argument("--runtime-targets", type=Path, required=True)
     parser.add_argument("--canary-root", type=Path, required=True)
+    parser.add_argument("--canary-public-key", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     try:
@@ -180,6 +209,7 @@ def main() -> int:
             deployment,
             targets,
             canary_root=args.canary_root,
+            canary_public_key_path=args.canary_public_key,
             deployment_manifest_path=args.deployment_manifest,
         )
         publish_private_json(overlay, args.output)

@@ -11,8 +11,11 @@ acceptance.
 
 ## Admission maintenance
 
-Managed organ processes now have two fail-closed control surfaces below any
-owner admission decision:
+Read contours in the committed runtime-target catalog now have two fail-closed
+control surfaces below any owner admission decision. Candidate and
+internal-effect processes remain outside this admission preflight until they
+have contour-specific target and evidence contracts; a read canary never
+authorizes either contour:
 
 - `abyss-stack-mcp-preflight` verifies the exact contour registry entry,
   source/package/deployment tree, measured executable target and digest,
@@ -429,7 +432,8 @@ abyss-stack-mcp-canary --organ aoa-kag
 
 The stack auth provisioner creates the canary signing key once as a regular
 current-user-owned mode-`0600` Ed25519 private key alongside the contour bearer
-files. Reprovisioning validates and preserves that key; bearer rotation does
+files and pins its derived mode-`0600` public key for stack-owned admission
+verification. Reprovisioning validates and preserves that key pair; bearer rotation does
 not silently rotate the capture trust root. Public-key pinning and any later
 signer rotation require a separately reviewed consumer-owner update.
 The internal-effect unit receives systemd's read-only mode-`0400`

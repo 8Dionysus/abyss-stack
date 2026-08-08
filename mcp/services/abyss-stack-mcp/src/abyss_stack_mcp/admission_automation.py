@@ -12,7 +12,11 @@ from pydantic import Field
 
 from .contracts import Identifier, NonEmpty, StrictModel
 from .keeper_specs import build_keeper_specs
-from .managed_catalog import build_managed_catalog, publish_catalog, publish_private_json
+from .managed_catalog import (
+    build_managed_catalog,
+    publish_catalog,
+    publish_private_json,
+)
 from .managed_topology import derive_managed_topology
 from .observation import RuntimeTargetCatalog
 from .preflight import PreflightError, _safe_json
@@ -77,6 +81,7 @@ def run_admission_automation(
     deployment_manifest_path: Path,
     runtime_targets_path: Path,
     canary_root: Path,
+    canary_public_key_path: Path,
     deployed_root: Path,
     output_root: Path,
     generated_at: datetime | None = None,
@@ -92,6 +97,7 @@ def run_admission_automation(
         deployment,
         targets,
         canary_root=canary_root,
+        canary_public_key_path=canary_public_key_path,
         deployment_manifest_path=deployment_manifest_path,
         generated_at=now,
     )
@@ -135,9 +141,8 @@ def run_admission_automation(
         keepers=keepers,
         next_safe_step=(
             "refresh the expired owner registry through owner proof and acceptance"
-            if "registry_source_expired" in {
-                reason for entry in preflight.entries for reason in entry.reason_codes
-            }
+            if "registry_source_expired"
+            in {reason for entry in preflight.entries for reason in entry.reason_codes}
             else (
                 "repair the first preflight blocker"
                 if preflight.blocked_count
@@ -159,10 +164,14 @@ def _run_keeper_cycles(
         from aoa_sdk.contracts.admission_keeper import AdmissionKeeperSpec
         from aoa_sdk.organs import KeeperEvidenceStore, run_keeper_cycle
     except ImportError as exc:
-        raise PreflightError("compatible aoa-sdk Admission Keeper is unavailable") from exc
+        raise PreflightError(
+            "compatible aoa-sdk Admission Keeper is unavailable"
+        ) from exc
     statuses: list[KeeperContourStatus] = []
     for entry in entries:
-        spec = AdmissionKeeperSpec.model_validate_json(Path(entry.spec_path).read_bytes())
+        spec = AdmissionKeeperSpec.model_validate_json(
+            Path(entry.spec_path).read_bytes()
+        )
         cycle = run_keeper_cycle(
             spec,
             store=KeeperEvidenceStore(
@@ -213,6 +222,7 @@ def main() -> int:
     parser.add_argument("--deployment-manifest", type=Path, required=True)
     parser.add_argument("--runtime-targets", type=Path, required=True)
     parser.add_argument("--canary-root", type=Path, required=True)
+    parser.add_argument("--canary-public-key", type=Path, required=True)
     parser.add_argument("--deployed-root", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     args = parser.parse_args()
@@ -222,6 +232,7 @@ def main() -> int:
             deployment_manifest_path=args.deployment_manifest,
             runtime_targets_path=args.runtime_targets,
             canary_root=args.canary_root,
+            canary_public_key_path=args.canary_public_key,
             deployed_root=args.deployed_root,
             output_root=args.output_root,
         )

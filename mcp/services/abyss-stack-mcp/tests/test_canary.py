@@ -20,6 +20,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 import abyss_stack_mcp.canary as canary
 from abyss_stack_mcp.canary import (
+    CANARY_PUBLIC_KEY_NAME,
     CANARY_SIGNING_KEY_NAME,
     CanaryInventoryCounts,
     CanaryProbeResult,
@@ -30,6 +31,7 @@ from abyss_stack_mcp.canary import (
     live_probe,
     run_canary,
     validate_result_contract,
+    verify_canary_receipt,
 )
 from abyss_stack_mcp.observation import (
     RuntimeCanaryContract,
@@ -61,6 +63,18 @@ def write_signing_key(secret_dir: Path) -> Path:
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
             encryption_algorithm=serialization.NoEncryption(),
+        )
+    )
+    path.chmod(0o600)
+    return path
+
+
+def write_public_key(secret_dir: Path) -> Path:
+    path = secret_dir / CANARY_PUBLIC_KEY_NAME
+    path.write_bytes(
+        SIGNING_KEY.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
         )
     )
     path.chmod(0o600)
@@ -224,6 +238,80 @@ def test_receipt_is_content_addressed_and_preserves_claim_limit() -> None:
     assert receipt.reason_codes == ()
     assert "owner freshness" in receipt.claim_limit
     assert receipt.server_version == "0.1.0"
+
+
+def test_receipt_verification_requires_current_success_and_pinned_signer() -> None:
+    receipt = build_receipt(
+        target=target(),
+        contract=canary_contract(),
+        probe=successful_probe(),
+        observed_at=NOW,
+        ttl_seconds=600,
+        signing_key=SIGNING_KEY,
+    )
+    verified = verify_canary_receipt(
+        receipt,
+        SIGNING_KEY.public_key(),
+        checked_at=NOW,
+        require_success=True,
+    )
+    assert verified.receipt_id == receipt.receipt_id
+
+    with pytest.raises(CanaryRunnerError, match="expired"):
+        verify_canary_receipt(
+            receipt,
+            SIGNING_KEY.public_key(),
+            checked_at=receipt.expires_at,
+            require_success=True,
+        )
+
+    wrong_key = Ed25519PrivateKey.from_private_bytes(bytes(reversed(range(32))))
+    with pytest.raises(CanaryRunnerError, match="pinned public key"):
+        verify_canary_receipt(
+            receipt,
+            wrong_key.public_key(),
+            checked_at=NOW,
+            require_success=True,
+        )
+
+    tampered = receipt.model_copy(update={"server_version": "tampered"})
+    with pytest.raises(CanaryRunnerError, match="identity"):
+        verify_canary_receipt(
+            tampered,
+            SIGNING_KEY.public_key(),
+            checked_at=NOW,
+            require_success=True,
+        )
+
+    bad_signature = receipt.model_copy(update={"attestation": "A" * 86})
+    with pytest.raises(CanaryRunnerError, match="attestation"):
+        verify_canary_receipt(
+            bad_signature,
+            SIGNING_KEY.public_key(),
+            checked_at=NOW,
+            require_success=True,
+        )
+
+
+def test_receipt_verification_rejects_nonmatching_read() -> None:
+    probe = successful_probe().model_copy(
+        update={"result": {**grounded_result(), "owners": []}}
+    )
+    receipt = build_receipt(
+        target=target(),
+        contract=canary_contract(),
+        probe=probe,
+        observed_at=NOW,
+        ttl_seconds=600,
+        signing_key=SIGNING_KEY,
+    )
+    with pytest.raises(CanaryRunnerError, match="successful matching read"):
+        verify_canary_receipt(
+            receipt,
+            SIGNING_KEY.public_key(),
+            checked_at=NOW,
+            require_success=True,
+        )
 
 
 def test_private_result_artifact_is_independently_content_addressed() -> None:
@@ -416,9 +504,7 @@ def test_listener_wait_rejects_non_loopback_without_connecting(
 
     monkeypatch.setattr(canary.asyncio, "open_connection", unexpected)
     with pytest.raises(CanaryRunnerError, match="loopback HTTP"):
-        asyncio.run(
-            canary._wait_for_endpoint_listener("https://example.test/mcp", 2)
-        )
+        asyncio.run(canary._wait_for_endpoint_listener("https://example.test/mcp", 2))
 
 
 def test_last_known_good_canary_uses_distinct_committed_route(tmp_path: Path) -> None:

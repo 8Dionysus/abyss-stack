@@ -33,8 +33,12 @@ likely to hide partial drift.
 
 Choose the third option.
 
-Each managed unit receives a fail-closed `ExecCondition` bound to a private
-catalog. Preflight checks registry expiry/state, policy and authority,
+Each read contour present in the committed runtime-target catalog and backed
+by a successful, current, content-addressed canary attested by the pinned stack
+public key receives a fail-closed `ExecCondition` bound to a private catalog.
+Candidate and internal-effect units remain outside this gate until their own
+target and evidence contracts exist; the read-only canary cannot be promoted
+into evidence for them. Preflight checks registry expiry/state, policy and authority,
 allowlist, endpoint and protocol, source/package/deployment identities,
 deployed tree, pinned executable realpath and digest, regular non-symlink
 credential value, auth manifest, schemas, validator, unit environment, and
@@ -64,6 +68,8 @@ explicit instead of green.
   mistaken for literal instance paths.
 - Missing canary or registry contours are reported individually and do not
   fabricate topology.
+- Candidate and internal-effect services are not permanently blocked on read-only
+  bindings that admission automation cannot build.
 - The current private registry remains fail-closed when expired even if every
   process is active and all lower runtime identities match.
 - The Keeper runtime requires an exact compatible `aoa-sdk` artifact before
