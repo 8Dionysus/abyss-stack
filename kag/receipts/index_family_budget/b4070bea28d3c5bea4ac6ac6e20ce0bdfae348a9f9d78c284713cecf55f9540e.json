@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 414290,
+  "allowed_tracked_bytes": 30927866,
+  "approved_by": "repository-owner",
+  "base_ref": "0c45fdfeb8870db120516f30d5368977aef19137",
+  "changed_generated_bytes": 414290,
+  "changed_generated_files": 6,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "b4070bea28d3c5bea4ac6ac6e20ce0bdfae348a9f9d78c284713cecf55f9540e",
+  "reason": "Align the runtime provisioner dependency verification with the exact released aoa-sdk 0.10.1 lock without raising standing budgets",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "tracked_size",
+  "tracked_bytes": 30927866,
+  "tracked_bytes_max": 24117248
+}
