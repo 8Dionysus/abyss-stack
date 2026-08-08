@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 6621246,
+  "allowed_tracked_bytes": 30938269,
+  "approved_by": "repository-owner",
+  "base_ref": "7ab5d1273e1185e495af7b7d12ca0ab717fe1b1a",
+  "changed_generated_bytes": 6621246,
+  "changed_generated_files": 75,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "8d7282fe88ad4b4d1532bea7c794b6907f3e2a3c82b20987066888db4f158ce8",
+  "reason": "Refresh the portable owner index family after the admitted MCP runtime identity contract changed; preserve full source coverage and record the generated-size exception explicitly.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 30938269,
+  "tracked_bytes_max": 24117248
+}
