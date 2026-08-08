@@ -255,7 +255,10 @@ than comparing only porcelain status. Every tracked path is hashed even when
 Git marks it assume-unchanged or skip-worktree, and those index flags are
 recorded explicitly. A tracked gitlink fails admission as
 `workspace_submodule_unsupported` until the runtime owns a recursive manifest
-for every nested submodule worktree byte. Same-status byte changes, ignored and untracked bytes,
+for every nested submodule worktree byte. An untracked or ignored directory
+with its own `.git` administrative marker likewise fails as
+`workspace_embedded_repository_unsupported`; a digestless directory entry may
+not conceal a separately governed repository. Same-status byte changes, ignored and untracked bytes,
 path kind, symlink target, size, binary diff, and HEAD drift therefore remain
 observable. The receipt recorded for each exact validation command carries the
 workspace-manifest digest observed at command completion; report admission
@@ -341,9 +344,15 @@ attempt count and is not mistaken for the current terminal commit. Only when no
 current recoverable result exists does unexpected worker death produce its own
 typed failure receipt.
 
-Before every admitted resume, the controller validates the current terminal
-`result.json`, copies its exact bytes into the prior attempt directory, and
-adds that immutable reference to the continuation's event/evidence chain. A
+Every terminal closeout copies the exact `result.json` bytes into its attempt
+directory and snapshots every unique artifact named by that result before any
+later resume can change a session-wide evidence surface. Before admitting a
+resume, the controller validates the current terminal result and this preserved
+closure. A schema-validated closure receipt binds each
+original coordinate and digest to its immutable snapshot; later event appends
+or final-manifest replacement therefore cannot make the prior result
+unverifiable. Both the exact result and closure receipt enter the
+continuation's event/evidence chain. A
 caller may bind `previous_result_digest` on any resume; when supplied it must
 match exactly. This prevents a continued result from erasing the checkpoint,
 interruption, or review receipt that justified re-entry.

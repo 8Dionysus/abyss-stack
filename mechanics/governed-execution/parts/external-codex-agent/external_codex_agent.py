@@ -18,6 +18,7 @@ import re
 import selectors
 import shlex
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -47,6 +48,9 @@ PROFILE_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-runtime-profile.schema.json"
 REPORT_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-report.schema.json"
 EVENT_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-event.schema.json"
 RESULT_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-result.schema.json"
+RESULT_EVIDENCE_CLOSURE_SCHEMA_PATH = (
+    SCHEMA_ROOT / "external-codex-result-evidence-closure.schema.json"
+)
 RESUME_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-resume.schema.json"
 STATE_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-state.schema.json"
 PARENT_OBLIGATION_SCHEMA_PATH = (
@@ -453,6 +457,76 @@ def _atomic_write_json(path: Path, value: Any, *, mode: int = 0o600) -> None:
         json.dumps(value, ensure_ascii=True, sort_keys=True, indent=2) + "\n"
     ).encode("utf-8")
     _atomic_write_bytes(path, payload, mode=mode)
+
+
+def _snapshot_artifact_ref(
+    source_ref: Mapping[str, Any],
+    target: Path,
+) -> dict[str, str]:
+    """Copy the exact bytes named by one evidence ref into a durable snapshot."""
+
+    source_value = source_ref.get("artifact_ref")
+    expected_digest = source_ref.get("artifact_digest")
+    if not isinstance(source_value, str) or not isinstance(expected_digest, str):
+        raise ExternalCodexRuntimeError(
+            "runtime_result_evidence_invalid",
+            "prior runtime result contains an incomplete evidence reference",
+        )
+    source = Path(source_value)
+    if not source.is_absolute() or source.is_symlink():
+        raise ExternalCodexRuntimeError(
+            "runtime_result_evidence_invalid",
+            "prior runtime result evidence is not an absolute regular-file coordinate",
+        )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(
+        prefix=f".{target.name}.", dir=str(target.parent)
+    )
+    temp_path = Path(temporary)
+    digest = hashlib.sha256()
+    try:
+        source_descriptor = os.open(
+            source,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+        )
+        try:
+            if not stat.S_ISREG(os.fstat(source_descriptor).st_mode):
+                raise ExternalCodexRuntimeError(
+                    "runtime_result_evidence_invalid",
+                    "prior runtime result evidence is not a regular file",
+                )
+            with os.fdopen(source_descriptor, "rb") as source_handle, os.fdopen(
+                descriptor, "wb"
+            ) as target_handle:
+                source_descriptor = -1
+                descriptor = -1
+                for chunk in iter(lambda: source_handle.read(1024 * 1024), b""):
+                    digest.update(chunk)
+                    target_handle.write(chunk)
+                target_handle.flush()
+                os.fsync(target_handle.fileno())
+        finally:
+            if source_descriptor >= 0:
+                os.close(source_descriptor)
+        actual_digest = "sha256:" + digest.hexdigest()
+        if actual_digest != expected_digest:
+            raise ExternalCodexRuntimeError(
+                "runtime_result_evidence_drift",
+                "prior runtime result evidence bytes differ from its recorded digest",
+            )
+        os.chmod(temp_path, 0o400)
+        os.replace(temp_path, target)
+    except OSError as exc:
+        raise ExternalCodexRuntimeError(
+            "runtime_result_evidence_unavailable",
+            "cannot preserve prior runtime result evidence",
+        ) from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if temp_path.exists():
+            temp_path.unlink()
+    return _artifact_ref(target)
 
 
 def _append_jsonl(path: Path, value: Any) -> None:
@@ -1629,6 +1703,18 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
                 "workspace_secret_path_present",
                 "workspace contains an untracked or ignored secret-shaped path",
             )
+        candidate = location / relative
+        current = candidate if candidate.is_dir() else candidate.parent
+        while current != location:
+            git_marker = current / ".git"
+            if git_marker.exists() or git_marker.is_symlink():
+                embedded = current.relative_to(location).as_posix()
+                raise ExternalCodexRuntimeError(
+                    "workspace_embedded_repository_unsupported",
+                    "workspace manifest does not yet admit untracked or ignored "
+                    f"embedded repository {embedded}",
+                )
+            current = current.parent
     entries: list[dict[str, Any]] = []
     all_paths = set(tracked_flags) | set(changed) | set(untracked) | set(ignored)
     for relative in sorted(all_paths):
@@ -2035,17 +2121,31 @@ class ExternalCodexRuntime:
         binding: AgentIncarnationBinding,
         task: Mapping[str, Any],
         materialized_inputs: Mapping[str, str],
+        session_dir: Path,
     ) -> dict[str, Any]:
         """Freeze source-independent failure evidence and wake semantics."""
 
+        closeout_dir = session_dir / "failure-closeout"
+        task_path = closeout_dir / "task.json"
+        binding_path = closeout_dir / "incarnation-binding.json"
+        _atomic_write_bytes(
+            task_path,
+            read_bounded(Path(materialized_inputs["task"])),
+            mode=0o400,
+        )
+        _atomic_write_bytes(
+            binding_path,
+            read_bounded(Path(materialized_inputs["incarnation_binding"])),
+            mode=0o400,
+        )
         return {
             "target_owner": task["target_owner"],
             "task_ref": _artifact_ref(
-                Path(materialized_inputs["task"]),
+                task_path,
                 owner=str(task["target_owner"]),
             ),
             "incarnation_binding_ref": _artifact_ref(
-                Path(materialized_inputs["incarnation_binding"]),
+                binding_path,
                 owner="aoa-sdk",
             ),
             "wake_evaluations": {
@@ -3071,6 +3171,7 @@ class ExternalCodexRuntime:
                 binding=validated["binding"],
                 task=validated["task"],
                 materialized_inputs=materialized,
+                session_dir=session_dir,
             )
             state = {
                 "schema_version": STATE_SCHEMA_VERSION,
@@ -3665,15 +3766,197 @@ class ExternalCodexRuntime:
             attempt_number = attempt.get("attempt_number")
             if not isinstance(attempt_number, int):
                 continue
-            path = (
+            attempt_dir = (
                 session_dir
                 / "attempts"
                 / f"{attempt_number:03d}"
-                / "runtime-result.json"
             )
-            if path.is_file() and not path.is_symlink():
-                references.append(_artifact_ref(path))
+            result_paths = [attempt_dir / "runtime-result.json"]
+            result_paths.extend(
+                sorted(attempt_dir.glob("runtime-result-revision-*.json"))
+            )
+            for path in result_paths:
+                if path.is_file() and not path.is_symlink():
+                    references.append(_artifact_ref(path))
+                closure_path = path.with_name(
+                    f"{path.stem}-evidence-closure.json"
+                )
+                if closure_path.is_file() and not closure_path.is_symlink():
+                    references.append(_artifact_ref(closure_path))
         return references
+
+    def _preserve_result_evidence_closure_locked(
+        self,
+        *,
+        previous_result: Mapping[str, Any],
+        preserved_result_ref: Mapping[str, Any],
+        preserved_result_path: Path,
+    ) -> dict[str, str]:
+        """Retain every evidence byte needed to verify one resumed result."""
+
+        evidence = previous_result.get("evidence_refs")
+        if not isinstance(evidence, list):
+            raise ExternalCodexRuntimeError(
+                "runtime_result_evidence_invalid",
+                "prior runtime result has no evidence reference collection",
+            )
+        snapshot_dir = preserved_result_path.with_name(
+            f"{preserved_result_path.stem}-evidence"
+        )
+        preserved_evidence: list[dict[str, Any]] = []
+        seen: set[tuple[str, str, str]] = set()
+        for index, source_ref in enumerate(evidence):
+            if not isinstance(source_ref, Mapping):
+                raise ExternalCodexRuntimeError(
+                    "runtime_result_evidence_invalid",
+                    "prior runtime result contains a malformed evidence reference",
+                )
+            identity = (
+                str(source_ref.get("owner_repo", "")),
+                str(source_ref.get("artifact_ref", "")),
+                str(source_ref.get("artifact_digest", "")),
+            )
+            if identity in seen:
+                continue
+            seen.add(identity)
+            snapshot_ref = _snapshot_artifact_ref(
+                source_ref,
+                snapshot_dir / f"artifact-{index:03d}",
+            )
+            preserved_evidence.append(
+                {
+                    "source_ref": dict(source_ref),
+                    "snapshot_ref": snapshot_ref,
+                }
+            )
+        closure = {
+            "schema_version": "abyss_stack_external_codex_result_evidence_closure_v1",
+            "source_result_ref": dict(preserved_result_ref),
+            "preserved_evidence": preserved_evidence,
+        }
+        validate_json(
+            closure,
+            RESULT_EVIDENCE_CLOSURE_SCHEMA_PATH,
+            label="prior runtime result evidence closure",
+        )
+        closure_path = preserved_result_path.with_name(
+            f"{preserved_result_path.stem}-evidence-closure.json"
+        )
+        _atomic_write_json(closure_path, closure, mode=0o400)
+        return _artifact_ref(closure_path)
+
+    def _preserve_terminal_result_locked(
+        self,
+        state: Mapping[str, Any],
+        result: Mapping[str, Any],
+        result_path: Path,
+    ) -> tuple[dict[str, str], dict[str, str]]:
+        """Freeze a terminal result and its evidence before later resume pressure."""
+
+        attempt = state["attempts"][-1]
+        attempt_dir = (
+            self._session_dir(str(state["session_id"]))
+            / "attempts"
+            / f"{int(attempt['attempt_number']):03d}"
+        )
+        raw_result = read_bounded(result_path)
+        result_digest = sha256_bytes(raw_result)
+        preserved_path = attempt_dir / "runtime-result.json"
+        if preserved_path.exists() and (
+            preserved_path.is_symlink() or not preserved_path.is_file()
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_result_evidence_closure_drift",
+                "preserved terminal result coordinate is not a regular file",
+            )
+        if preserved_path.is_file() and sha256_file(preserved_path) != result_digest:
+            revision = 2
+            while True:
+                candidate = attempt_dir / f"runtime-result-revision-{revision:03d}.json"
+                if candidate.exists() and (
+                    candidate.is_symlink() or not candidate.is_file()
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "runtime_result_evidence_closure_drift",
+                        "preserved terminal result revision is not a regular file",
+                    )
+                if not candidate.exists() or (
+                    candidate.is_file() and sha256_file(candidate) == result_digest
+                ):
+                    preserved_path = candidate
+                    break
+                revision += 1
+        if not preserved_path.exists():
+            _atomic_write_bytes(preserved_path, raw_result, mode=0o400)
+        preserved_ref = _artifact_ref(preserved_path)
+        closure_ref = self._verified_preserved_result_closure_ref_locked(
+            previous_result=result,
+            preserved_result_ref=preserved_ref,
+            preserved_result_path=preserved_path,
+        )
+        return preserved_ref, closure_ref
+
+    def _verified_preserved_result_closure_ref_locked(
+        self,
+        *,
+        previous_result: Mapping[str, Any],
+        preserved_result_ref: Mapping[str, Any],
+        preserved_result_path: Path,
+    ) -> dict[str, str]:
+        """Verify the pre-resume snapshot closure for one terminal result."""
+
+        closure_path = preserved_result_path.with_name(
+            f"{preserved_result_path.stem}-evidence-closure.json"
+        )
+        if not closure_path.is_file() or closure_path.is_symlink():
+            return self._preserve_result_evidence_closure_locked(
+                previous_result=previous_result,
+                preserved_result_ref=preserved_result_ref,
+                preserved_result_path=preserved_result_path,
+            )
+        closure = load_json(
+            closure_path,
+            label="preserved prior runtime result evidence closure",
+        )
+        validate_json(
+            closure,
+            RESULT_EVIDENCE_CLOSURE_SCHEMA_PATH,
+            label="preserved prior runtime result evidence closure",
+        )
+        if closure["source_result_ref"] != dict(preserved_result_ref):
+            raise ExternalCodexRuntimeError(
+                "runtime_result_evidence_closure_drift",
+                "preserved evidence closure names another runtime result",
+            )
+        expected_sources: list[dict[str, Any]] = []
+        seen: set[tuple[str, str, str]] = set()
+        for source_ref in previous_result["evidence_refs"]:
+            identity = (
+                str(source_ref["owner_repo"]),
+                str(source_ref["artifact_ref"]),
+                str(source_ref["artifact_digest"]),
+            )
+            if identity in seen:
+                continue
+            seen.add(identity)
+            expected_sources.append(dict(source_ref))
+        preserved_evidence = closure["preserved_evidence"]
+        if [item["source_ref"] for item in preserved_evidence] != expected_sources:
+            raise ExternalCodexRuntimeError(
+                "runtime_result_evidence_closure_drift",
+                "preserved evidence closure does not cover the exact result evidence",
+            )
+        for item in preserved_evidence:
+            snapshot_path = _verified_artifact_ref_path(
+                item["snapshot_ref"],
+                label="preserved prior runtime result evidence snapshot",
+            )
+            if sha256_file(snapshot_path) != item["source_ref"]["artifact_digest"]:
+                raise ExternalCodexRuntimeError(
+                    "runtime_result_evidence_closure_drift",
+                    "preserved evidence snapshot differs from its original digest",
+                )
+        return _artifact_ref(closure_path)
 
     def _owner_admission_ref(
         self, state: Mapping[str, Any]
@@ -5148,6 +5431,7 @@ Runtime session identity: {state['session_id']}
         validate_json(result, RESULT_SCHEMA_PATH, label="runtime result")
         result_path = self._session_dir(str(state["session_id"])) / "result.json"
         _atomic_write_json(result_path, result)
+        self._preserve_terminal_result_locked(state, result, result_path)
         state["result_path"] = str(result_path)
         state["result_digest"] = sha256_file(result_path)
         state["active_attempt_id"] = None
@@ -5362,6 +5646,7 @@ Runtime session identity: {state['session_id']}
         validate_json(result, RESULT_SCHEMA_PATH, label="runtime failure result")
         result_path = session_dir / "result.json"
         _atomic_write_json(result_path, result)
+        self._preserve_terminal_result_locked(state, result, result_path)
         state["result_path"] = str(result_path)
         state["result_digest"] = sha256_file(result_path)
 
@@ -5756,19 +6041,44 @@ Runtime session identity: {state['session_id']}
                         "only an unchanged read-only review identity failure is recoverable",
                     )
             prior_attempt = state["attempts"][-1]
-            preserved_path = (
+            attempt_dir = (
                 self._session_dir(session_id)
                 / "attempts"
                 / f"{int(prior_attempt['attempt_number']):03d}"
-                / "runtime-result.json"
             )
-            _atomic_write_bytes(preserved_path, raw_result, mode=0o400)
+            result_candidates = [attempt_dir / "runtime-result.json"]
+            result_candidates.extend(
+                sorted(attempt_dir.glob("runtime-result-revision-*.json"))
+            )
+            preserved_path = next(
+                (
+                    candidate
+                    for candidate in result_candidates
+                    if candidate.is_file()
+                    and not candidate.is_symlink()
+                    and sha256_file(candidate) == result_digest
+                ),
+                None,
+            )
+            if preserved_path is None:
+                preserved_path = attempt_dir / "runtime-result.json"
+                if preserved_path.exists():
+                    raise ExternalCodexRuntimeError(
+                        "runtime_result_evidence_closure_drift",
+                        "no preserved prior runtime result matches the canonical digest",
+                    )
+                _atomic_write_bytes(preserved_path, raw_result, mode=0o400)
             preserved_ref = _artifact_ref(preserved_path)
             if preserved_ref["artifact_digest"] != result_digest:
                 raise ExternalCodexRuntimeError(
                     "runtime_result_drift",
                     "preserved prior runtime result digest differs",
                 )
+            preserved_closure_ref = self._verified_preserved_result_closure_ref_locked(
+                previous_result=previous_result,
+                preserved_result_ref=preserved_ref,
+                preserved_result_path=preserved_path,
+            )
             if state["status"] == "interrupted":
                 self._record_interrupted_usage_gap_locked(
                     state,
@@ -5780,6 +6090,7 @@ Runtime session identity: {state['session_id']}
                 payload={
                     "previous_status": previous_result["status"],
                     "previous_result_ref": preserved_ref,
+                    "previous_result_evidence_closure_ref": preserved_closure_ref,
                     "reason": resume["reason"],
                 },
                 attempt_id=str(prior_attempt["attempt_id"]),

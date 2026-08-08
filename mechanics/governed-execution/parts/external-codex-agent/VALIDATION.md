@@ -41,7 +41,7 @@ a ready task-local DAG and exact domain procedure refs, a distinct OS process,
 structured events and output, no built-in multi-agent flag, byte-aware
 read-only drift containment including every tracked byte,
 assume-unchanged/skip-worktree mutations, and ignored bytes,
-tracked-submodule refusal, a foreground `run-to-terminal` lifecycle for transient cgroup launchers without execution
+tracked-submodule and untracked-embedded-repository refusal, a foreground `run-to-terminal` lifecycle for transient cgroup launchers without execution
 ceilings, secret-shaped ignored
 input refusal, exclusive same-workspace active-attempt admission across distinct
 session identities, wrapped effect-family observation, exact validation-claim
@@ -59,7 +59,9 @@ incremental recovery and observation of cumulative event history without an
 aggregate control-file read, recovery of an exact atomically written terminal
 result when the final state save is lost without fabricating worker death,
 partial-usage classification when interruption precedes Codex usage emission,
-immutable preservation of the interrupted receipt across ordinary resume,
+immutable preservation of the interrupted receipt and its complete evidence
+closure across ordinary resume, including multiple terminal revisions within
+one recovered attempt,
 read-only target projection through a separately recorded attempt-local Codex
 execution root and temp area, with the target checkout outside writable roots,
 session-local exact task/incarnation constraints with tamper refusal,

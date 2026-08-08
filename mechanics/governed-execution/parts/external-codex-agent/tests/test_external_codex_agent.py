@@ -3122,6 +3122,32 @@ def test_workspace_manifest_rejects_tracked_submodule_worktree(
     assert exc_info.value.code == "workspace_submodule_unsupported"
 
 
+@pytest.mark.parametrize("ignored", (False, True))
+def test_workspace_manifest_rejects_untracked_or_ignored_embedded_repository(
+    tmp_path: Path,
+    ignored: bool,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "tracked.txt").write_text("outer\n", encoding="utf-8")
+    if ignored:
+        (workspace / ".gitignore").write_text("nested/\n", encoding="utf-8")
+    _git(workspace, "add", ".")
+    _git(workspace, "commit", "-m", "fixture")
+    nested = workspace / "nested"
+    nested.mkdir()
+    _git(nested, "init", "-b", "main")
+    (nested / "hidden.txt").write_text("nested\n", encoding="utf-8")
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.build_workspace_manifest(workspace)
+
+    assert exc_info.value.code == "workspace_embedded_repository_unsupported"
+
+
 @pytest.mark.parametrize(
     "relative_path",
     (
@@ -3378,11 +3404,35 @@ def test_interrupted_process_resumes_exact_thread(tmp_path: Path) -> None:
         / "attempts/001/runtime-result.json"
     )
     assert _digest_path(preserved_path) == first_result_digest
+    closure_path = preserved_path.with_name(
+        "runtime-result-evidence-closure.json"
+    )
+    closure = json.loads(closure_path.read_text(encoding="utf-8"))
+    RUNTIME.validate_json(
+        closure,
+        RUNTIME.RESULT_EVIDENCE_CLOSURE_SCHEMA_PATH,
+        label="test preserved result evidence closure",
+    )
+    assert closure["source_result_ref"] == RUNTIME._artifact_ref(preserved_path)
+    prior_events_ref = interrupted_result["events_ref"]
+    events_snapshot_ref = next(
+        item["snapshot_ref"]
+        for item in closure["preserved_evidence"]
+        if item["source_ref"] == prior_events_ref
+    )
+    assert events_snapshot_ref["artifact_digest"] == prior_events_ref["artifact_digest"]
+    assert _digest_path(Path(events_snapshot_ref["artifact_ref"])) == prior_events_ref[
+        "artifact_digest"
+    ]
+    assert _digest_path(Path(prior_events_ref["artifact_ref"])) != prior_events_ref[
+        "artifact_digest"
+    ]
     assert any(
         item["artifact_ref"] == str(preserved_path)
         and item["artifact_digest"] == first_result_digest
         for item in result["evidence_refs"]
     )
+    assert RUNTIME._artifact_ref(closure_path) in result["evidence_refs"]
     assert any(
         event["event_type"] == "external_agent.resume_source_preserved"
         for event in runtime.events(fixture["session_id"], after_sequence=-1)

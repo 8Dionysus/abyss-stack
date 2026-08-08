@@ -51,7 +51,9 @@ The controller:
 - rebuilds the exact byte-level workspace manifest for every tracked,
   untracked, and ignored path at finalization, records assume-unchanged and
   skip-worktree index flags, rejects tracked submodule worktrees until a
-  recursive nested-byte contract exists, drains a
+  recursive nested-byte contract exists, and rejects untracked or ignored
+  embedded Git repositories rather than representing them as digestless
+  directories; drains a
   terminal process stream before finalization, counts tokens/turns/time/output
   without imposing execution budgets, includes ignored workspace bytes without
   reading secret-shaped ignored inputs, holds an inode-scoped exclusive lock
@@ -68,8 +70,9 @@ The controller:
   roots and network remains disabled;
 - resumes only the exact durable thread and event cursor, with one explicit
   digest-bound follow-up route for an unchanged read-only review rejected only
-  by an identity-field mismatch, and preserves every prior terminal result in
-  its attempt directory before any admitted continuation;
+  by an identity-field mismatch, and preserves every prior terminal result plus
+  a digest-bound snapshot closure for all referenced evidence in its attempt
+  directory before any admitted continuation;
 - turns read-only drift, out-of-scope paths, forbidden effects, identity drift,
   or report-contract drift into typed failure or authority-blocked evidence;
   non-owner-fixed interpreter, script, `find -exec`, `eval`, and `xargs`
