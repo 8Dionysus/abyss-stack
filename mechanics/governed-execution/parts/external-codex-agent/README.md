@@ -34,7 +34,9 @@ The controller:
   the exact final workspace manifest, wake evaluation, and a typed terminal
   result beneath an explicit state root; each state save binds the normalized
   event-stream digest, and a complete append that precedes a crash is recovered
-  only as a strict, contiguous extension of that digest; event history is
+  only as a strict, contiguous extension of that digest; runtime-authored
+  Codex deltas replay thread, usage, turn, and command state from such an
+  extension before any worker-death closeout; event history is
   verified incrementally with a per-record parser boundary rather than a
   cumulative task budget, and an atomically written terminal result can repair
   the final semantic state save only when its attempt, identity, event, and
@@ -42,7 +44,10 @@ The controller:
 - exposes asynchronous `start` for durable owner-managed sessions and
   `run-to-terminal` for transient cgroup launchers that must keep their main
   process alive until the exact semantic terminal receipt, without adding a
-  time, token, turn, output, command, cost, or memory budget;
+  time, token, turn, output, command, cost, or memory budget; an admitted
+  `prepared` session with no attempt or worker is retryable through the same
+  exact `start`, and the child cannot pass its one-byte launch gate before its
+  worker identity is durable;
 - rebuilds the exact byte-level workspace manifest for every tracked,
   untracked, and ignored path at finalization, records assume-unchanged and
   skip-worktree index flags, rejects tracked submodule worktrees until a
@@ -65,6 +70,10 @@ The controller:
   its attempt directory before any admitted continuation;
 - turns read-only drift, out-of-scope paths, forbidden effects, identity drift,
   or report-contract drift into typed failure or authority-blocked evidence;
+  non-owner-fixed interpreter, script, `find -exec`, `eval`, and `xargs`
+  commands whose indirect effects cannot be classified are retained as
+  counterevidence and authority-block the result, while exact task validation
+  argv remain admitted by their owner-supplied identity;
 - constrains every `immutable:` evidence reference in the session-local output
   schema to the exact materialized input identities, so a plausible alias is
   rejected during structured decoding as well as by post-output byte checks;

@@ -50,6 +50,10 @@ oversized protocol record, review-gate enforcement, TERM-resistant and unexpecte
 cleanup including a detached `setsid` descendant, high token/turn usage
 measurement without truncation, durable interrupt/resume on one thread,
 strict recovery of a complete main-session event append before state save,
+semantic replay of a lost thread, usage, turn, and indirect command state save,
+authority-blocked worker-death closeout after that recovered command, retry of
+a durable attempt-free `prepared` session after launch failure, and an exact
+pre-fork child launch gate,
 incremental recovery and observation of cumulative event history without an
 aggregate control-file read, recovery of an exact atomically written terminal
 result when the final state save is lost without fabricating worker death,
@@ -66,7 +70,9 @@ identity typo while preserving the failed result,
 canonical non-starting reviewer preparation with stable forwarded input IDs,
 an explicit workspace-write coder to read-only reviewer transition with a
 post-write manifest and reviewed A2A return, exact review-input-to-writer-final
-manifest binding, reviewer-result race refusal, wrapper-delimiter effect observation, final-manifest tamper refusal,
+manifest binding, reviewer-result race refusal, wrapper-delimiter effect observation,
+unclassified non-validation interpreter indirection with exact fixed-validation
+exemption, final-manifest tamper refusal,
 provenance checks for all loaded `aoa_sdk` modules in the study preparer plus a
 post-compilation persisted
 path inventory, produced-artifact admission, source-evidence file/line

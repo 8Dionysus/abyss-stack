@@ -357,6 +357,13 @@ if "FAKE_UNKNOWN_COMMAND" in task["objective"]:
     emit({"type": "item.completed", "item": {
         "type": "command_execution", "status": "completed", "exit_code": 0
     }})
+if "FAKE_OPAQUE_INDIRECT_COMMAND" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/python3 -c 'print(42)'",
+        "status": "completed",
+        "exit_code": 0,
+    }})
 for validation in task["validation_commands"]:
     validation_argv = validation["argv"]
     if "FAKE_UNBOUND_VALIDATION_CWD" not in task["objective"]:
@@ -2254,6 +2261,144 @@ def test_main_runtime_recovers_event_append_before_state_save(
     assert [event["sequence"] for event in events] == list(range(len(events)))
 
 
+def test_prepared_session_retries_launch_after_spawn_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path)
+    runtime = fixture["runtime"]
+    calls = 0
+
+    def fail_once_then_hold(*args: Any, **kwargs: Any) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("fixture fork failure")
+
+    monkeypatch.setattr(runtime, "_spawn_worker", fail_once_then_hold)
+    with pytest.raises(OSError, match="fixture fork failure"):
+        runtime.start(fixture["launch_path"])
+
+    persisted = runtime._load_state(fixture["session_id"])
+    assert persisted["status"] == "prepared"
+    assert persisted["attempts"] == []
+
+    retried = runtime.start(fixture["launch_path"])
+    assert retried["status"] == "prepared"
+    assert calls == 2
+
+
+def test_recovered_codex_events_replay_thread_usage_and_command_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path)
+    runtime = fixture["runtime"]
+    monkeypatch.setattr(runtime, "_spawn_worker", lambda *args, **kwargs: None)
+    runtime.start(fixture["launch_path"])
+    attempt_id = f"{fixture['session_id']}:attempt:1"
+    with runtime._lock(fixture["session_id"]):
+        state = runtime._load_state(fixture["session_id"])
+        state["attempts"].append(
+            {
+                "attempt_id": attempt_id,
+                "attempt_number": 1,
+                "mode": "start",
+                "status": "starting",
+                "worker_pid": None,
+                "worker_start_ticks": None,
+                "supervisor_pid": None,
+                "supervisor_start_ticks": None,
+                "process_identity_ref": None,
+                "codex_pid": None,
+                "codex_start_ticks": None,
+                "started_at": None,
+                "finished_at": None,
+                "exit_code": None,
+                "thread_id": None,
+                "codex_argv": None,
+                "execution_root": None,
+                "output_bytes": 0,
+                "active_wall_seconds": 0.0,
+                "wall_time_accounted": False,
+            }
+        )
+        state["active_attempt_id"] = attempt_id
+        runtime._save_state(state)
+
+    original_save_state = runtime._save_state
+
+    def append_then_lose_state(payload: dict[str, Any]) -> None:
+        monkeypatch.setattr(runtime, "_save_state", lambda state: None)
+        runtime._record_codex_event(
+            fixture["session_id"],
+            attempt_id=attempt_id,
+            attempt_number=1,
+            line=(json.dumps(payload) + "\n").encode("utf-8"),
+        )
+        monkeypatch.setattr(runtime, "_save_state", original_save_state)
+        runtime.status(fixture["session_id"])
+
+    thread_id = "thread:semantic-recovery"
+    append_then_lose_state({"type": "thread.started", "thread_id": thread_id})
+    append_then_lose_state(
+        {
+            "type": "turn.completed",
+            "usage": {
+                "input_tokens": 101,
+                "cached_input_tokens": 17,
+                "output_tokens": 23,
+            },
+        }
+    )
+    command = "/usr/bin/python3 -c 'print(42)'"
+    append_then_lose_state(
+        {
+            "type": "item.completed",
+            "item": {
+                "type": "command_execution",
+                "command": command,
+                "status": "completed",
+                "exit_code": 0,
+            },
+        }
+    )
+
+    recovered = runtime._load_state(fixture["session_id"])
+    task = json.loads(fixture["task_path"].read_text(encoding="utf-8"))
+    assert recovered["thread_id"] == thread_id
+    assert recovered["attempts"][0]["thread_id"] == thread_id
+    assert recovered["turn_count"] == 1
+    assert recovered["usage"] == {
+        "input_tokens": 101,
+        "cached_input_tokens": 17,
+        "output_tokens": 23,
+    }
+    assert recovered["executed_commands"] == [
+        {
+            "attempt_id": attempt_id,
+            "command": command,
+            "status": "completed",
+            "exit_code": 0,
+        }
+    ]
+    assert runtime._forbidden_effects(
+        recovered["executed_commands"], task
+    ) == ["unclassified_indirect_effect"]
+    with runtime._lock(fixture["session_id"]):
+        failed_state = runtime._load_state(fixture["session_id"])
+        runtime._worker_failure_locked(
+            failed_state,
+            attempt_id=attempt_id,
+            code="unexpected_worker_death",
+            message="fixture worker died after the durable command event",
+        )
+    result = runtime.result(fixture["session_id"])
+    assert result is not None
+    assert result["status"] == "authority_blocked"
+    assert result["failure_code"] == "authority_boundary_crossed"
+
+
 def test_main_event_recovery_streams_without_aggregate_control_file_read(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2788,6 +2933,35 @@ def test_forbidden_effect_observer_handles_wrappers_and_effect_families(
 )
 def test_effect_observer_does_not_block_fixed_read_commands(command: str) -> None:
     assert RUNTIME._command_effects(command) == set()
+
+
+def test_indirect_interpreter_effect_is_unclassified_but_fixed_validation_is_admitted() -> None:
+    command = "/usr/bin/python3 -c 'print(42)'"
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+    assert RUNTIME._command_has_unclassified_indirection(
+        "/usr/bin/zsh -lc '/usr/bin/rg -n fixture README.md'"
+    ) is False
+
+
+def test_opaque_indirect_command_authority_blocks_terminal_result(tmp_path: Path) -> None:
+    fixture = _fixture(tmp_path, objective_marker="FAKE_OPAQUE_INDIRECT_COMMAND")
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+    validation_events = [
+        event
+        for event in runtime.events(fixture["session_id"], after_sequence=-1)
+        if event["event_type"] == "external_agent.report_validated"
+    ]
+
+    assert terminal["status"] == "authority_blocked"
+    assert result is not None
+    assert result["failure_code"] == "authority_boundary_crossed"
+    assert validation_events[-1]["payload"]["detected_forbidden_effects"] == [
+        "unclassified_indirect_effect"
+    ]
 
 
 def test_ignored_workspace_bytes_are_manifested_and_drift_is_blocked(

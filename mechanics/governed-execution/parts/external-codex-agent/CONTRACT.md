@@ -73,7 +73,11 @@ Operations are:
 
 Each CLI call writes one `abyss_stack_external_codex_response_v1` JSON object.
 `start` returns after the independent worker is durably recorded; later calls
-observe the persisted session. `run-to-terminal` starts the same durable
+observe the persisted session. If a caller stops after the exact `prepared`
+state is durable but before any worker attempt exists, a later `start` with the
+same launch digest retries that launch. The forked child remains behind a
+one-byte gate and exits on EOF; it cannot form a Codex process group until the
+parent has durably recorded its PID and start ticks. `run-to-terminal` starts the same durable
 session but keeps the caller alive until one runtime-owned semantic terminal
 state is recorded. It is the compatible entry point for transient service
 launchers whose cgroup is torn down when their main process exits. Its polling
@@ -190,7 +194,10 @@ descendants that call `setsid`. An attempt-local interrupt request binds the
 signal to the session, attempt, supervisor PID, and process start ticks; only
 then may the worker finalize an `interrupted` receipt suitable for exact-thread
 resume. Unexpected worker death produces a typed failed result and is not
-misrepresented as a controlled checkpoint.
+misrepresented as a controlled checkpoint. If its recovered command history
+contains a forbidden, unavailable, or unclassifiable indirect effect, that
+death closes as `authority_blocked` instead of erasing the authority breach
+behind an ordinary process failure.
 
 While Codex is live, signal handlers notify a nonblocking self-pipe for child
 state and termination events. The supervisor therefore sleeps in `select`
@@ -254,7 +261,10 @@ write, or a command event whose command text is unavailable fails closed as
 manifest, it becomes `workspace_manifest_observation_gap/authority_blocked`
 rather than emitting a false ordinary failure receipt. The command observer recognizes wrapped/scoped
 Git and GitHub effects plus publication, service, secret-access, and global
-configuration command families; the sandbox remains the primary effect
+configuration command families. Non-owner-fixed interpreter or script bodies,
+`find -exec`, `eval`, and `xargs` are treated as unclassified indirect effects
+and authority-block the terminal result; exact fixed validation argv are
+separately admitted by their owner identity. The sandbox remains the primary effect
 boundary, and command observation is retained as auditable counterevidence.
 
 Any model evidence reference beginning with `source:` is semantic, not opaque
@@ -307,6 +317,11 @@ but before saving state, the next locked load advances the cursor only when
 the previous digest matches an exact prefix and the remaining records are
 schema-valid, contiguous, and owned by the same session. Missing, truncated,
 rewritten, partial, duplicate-sequence, or foreign streams fail closed. The
+normalized payload of every Codex event carries a runtime-reserved semantic
+delta. Recovery validates and replays that delta for thread identity, turn and
+usage counters, and exact executed-command receipts before saving the advanced
+cursor or classifying worker death; a Codex-authored collision with the
+reserved field or a non-replayable delta fails closed. The
 append-only history is hashed and validated incrementally: only one protocol
 record has a parser safety boundary, while the cumulative stream has no
 runtime-authored size budget.

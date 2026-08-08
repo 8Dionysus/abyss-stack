@@ -152,6 +152,16 @@ READ_CAPABLE_COMMANDS = {
     "tar",
     "tee",
 }
+OPAQUE_EFFECT_EXECUTABLES = {
+    "deno",
+    "lua",
+    "node",
+    "perl",
+    "php",
+    "python",
+    "python3",
+    "ruby",
+}
 SYSTEM_PATH_PREFIXES = ("/etc", "/opt", "/usr", "/var/lib", "/var/run")
 
 
@@ -1402,6 +1412,42 @@ def _command_effects(command: str) -> set[str]:
     return detected
 
 
+def _command_has_unclassified_indirection(command: str) -> bool:
+    """Identify executable command bodies that argv inspection cannot classify."""
+
+    tokenizations = _shell_tokenizations(command)
+    if not tokenizations:
+        return True
+    for tokenization in tokenizations:
+        for raw_segment in _command_segments(tokenization):
+            if not raw_segment:
+                continue
+            raw_executable = Path(raw_segment[0]).name.lower()
+            if raw_executable in SHELL_NAMES:
+                has_inline_body = any(
+                    token in {"-c", "-lc"}
+                    for token in raw_segment[:-1]
+                )
+                if not has_inline_body:
+                    return True
+                continue
+            segment = _unwrap_command(raw_segment)
+            if not segment:
+                return True
+            executable = Path(segment[0]).name.lower()
+            args = tuple(value.lower() for value in segment[1:])
+            if executable in OPAQUE_EFFECT_EXECUTABLES:
+                return True
+            if executable == "find" and any(
+                value in {"-exec", "-execdir", "-ok", "-okdir"}
+                for value in args
+            ):
+                return True
+            if executable in {"eval", "xargs"}:
+                return True
+    return False
+
+
 def _git_head(workspace: Path) -> str:
     completed = subprocess.run(
         ["/usr/bin/git", "-C", str(workspace), "rev-parse", "HEAD"],
@@ -1849,6 +1895,7 @@ class ExternalCodexRuntime:
         digest = hashlib.sha256()
         prefix_digest = sha256_bytes(b"") if durable_count == 0 else None
         line_count = 0
+        extension_events: list[dict[str, Any]] = []
         if path.exists():
             for line_number, line in _iter_jsonl_bytes(
                 path,
@@ -1873,6 +1920,8 @@ class ExternalCodexRuntime:
                         "runtime_event_state_drift",
                         f"runtime event line {line_number} is not contiguous or owned",
                     )
+                if line_count >= durable_count:
+                    extension_events.append(event)
                 digest.update(line)
                 line_count += 1
                 if line_count == durable_count:
@@ -1904,11 +1953,45 @@ class ExternalCodexRuntime:
                     "runtime event extension rewrites its durable prefix",
                 )
         recovered = dict(state)
+        for event in extension_events:
+            self._apply_recovered_codex_event_state(recovered, event)
         recovered["last_event_sequence"] = line_count - 1
         recovered["events_digest"] = current_digest
         validate_json(recovered, STATE_SCHEMA_PATH, label="recovered runtime state")
         _atomic_write_json(self._state_path(session_id), recovered)
         return recovered
+
+    def _apply_recovered_codex_event_state(
+        self,
+        state: dict[str, Any],
+        event: Mapping[str, Any],
+    ) -> None:
+        """Replay the semantic delta carried by one durable Codex event."""
+
+        source_type = event.get("source_event_type")
+        if not isinstance(source_type, str) or not event.get("event_type", "").startswith(
+            "codex."
+        ):
+            return
+        payload = event.get("payload")
+        if not isinstance(payload, dict) or payload.get("type") != source_type:
+            raise ExternalCodexRuntimeError(
+                "runtime_event_semantic_recovery_invalid",
+                "recovered Codex event differs from its normalized source type",
+            )
+        delta = payload.get("_runtime_state_delta_v1")
+        if not isinstance(delta, dict):
+            raise ExternalCodexRuntimeError(
+                "runtime_event_semantic_recovery_incomplete",
+                "durable Codex event has no replayable semantic state delta",
+            )
+        self._apply_codex_state_delta(
+            state,
+            attempt_id=str(event["attempt_id"]),
+            source_type=source_type,
+            source_payload=payload,
+            delta=delta,
+        )
 
     def _save_state(self, state: Mapping[str, Any]) -> None:
         candidate = dict(state)
@@ -2913,6 +2996,13 @@ class ExternalCodexRuntime:
                         "session_binding_conflict",
                         "session already exists with another launch binding",
                     )
+                if (
+                    state.get("status") == "prepared"
+                    and not state.get("attempts")
+                    and state.get("active_attempt_id") is None
+                    and state.get("worker_pid") is None
+                ):
+                    self._spawn_worker(state, mode="start", resume_payload=None)
                 return self._public_state(state)
             inputs_dir = session_dir / "inputs"
             materialized: dict[str, str] = {}
@@ -3052,12 +3142,19 @@ class ExternalCodexRuntime:
         if resume_payload is not None:
             _atomic_write_json(attempt_dir / "resume.json", resume_payload, mode=0o400)
         read_fd, write_fd = os.pipe()
-        pid = os.fork()
+        try:
+            pid = os.fork()
+        except BaseException:
+            os.close(read_fd)
+            os.close(write_fd)
+            raise
         if pid == 0:  # pragma: no cover - exercised through subprocess-level tests
             try:
                 os.close(write_fd)
-                os.read(read_fd, 1)
+                admitted = os.read(read_fd, 1)
                 os.close(read_fd)
+                if admitted != b"1":
+                    os._exit(70)
                 os.setsid()
                 worker_log = (attempt_dir / "worker.log").open("ab", buffering=0)
                 os.dup2(worker_log.fileno(), 1)
@@ -3095,6 +3192,10 @@ class ExternalCodexRuntime:
         start_ticks = _process_start_ticks(pid)
         if start_ticks is None:
             os.close(write_fd)
+            try:
+                os.waitpid(pid, 0)
+            except ChildProcessError:
+                pass
             raise ExternalCodexRuntimeError(
                 "worker_launch_failed", "cannot identify external-agent worker process"
             )
@@ -3120,27 +3221,45 @@ class ExternalCodexRuntime:
             "active_wall_seconds": 0.0,
             "wall_time_accounted": False,
         }
-        state["attempts"].append(attempt)
-        state["active_attempt_id"] = attempt_id
-        state["worker_pid"] = pid
-        state["worker_start_ticks"] = start_ticks
-        state["status"] = "running"
-        if state["started_at"] is None:
-            state["started_at"] = iso_now()
-        self._append_event(
-            state,
-            event_type=(
-                "external_agent.resume_started"
-                if mode == "resume"
-                else "external_agent.started"
-            ),
-            payload={"worker_pid": pid, "mode": mode},
-            attempt_id=attempt_id,
-            significance="progress",
-        )
-        self._save_state(state)
-        os.write(write_fd, b"1")
-        os.close(write_fd)
+        try:
+            state["attempts"].append(attempt)
+            state["active_attempt_id"] = attempt_id
+            state["worker_pid"] = pid
+            state["worker_start_ticks"] = start_ticks
+            state["status"] = "running"
+            if state["started_at"] is None:
+                state["started_at"] = iso_now()
+            # Persist the exact worker identity before the child can leave its
+            # one-byte launch gate. A failed save therefore leaves the prior
+            # prepared state retryable and emits no misleading start event.
+            self._save_state(state)
+            self._append_event(
+                state,
+                event_type=(
+                    "external_agent.resume_started"
+                    if mode == "resume"
+                    else "external_agent.started"
+                ),
+                payload={"worker_pid": pid, "worker_start_ticks": start_ticks, "mode": mode},
+                attempt_id=attempt_id,
+                significance="progress",
+            )
+            self._save_state(state)
+            os.write(write_fd, b"1")
+        except BaseException:
+            os.close(write_fd)
+            if _pid_matches(pid, start_ticks):
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+            try:
+                os.waitpid(pid, 0)
+            except ChildProcessError:
+                pass
+            raise
+        else:
+            os.close(write_fd)
 
     def run_to_terminal(
         self,
@@ -4173,6 +4292,227 @@ Runtime session identity: {state['session_id']}
             self._save_state(state)
             return int(state["output_bytes"])
 
+    def _codex_state_delta(
+        self,
+        state: Mapping[str, Any],
+        *,
+        payload: Mapping[str, Any],
+        attempt_id: str,
+    ) -> dict[str, Any]:
+        """Build the exact replayable state delta for one normalized event."""
+
+        if "_runtime_state_delta_v1" in payload:
+            raise ExternalCodexRuntimeError(
+                "codex_event_reserved_field",
+                "Codex event used a runtime-reserved semantic delta field",
+            )
+        source_type = str(payload.get("type") or "unknown")
+        thread_delta: str | None = None
+        thread_id = payload.get("thread_id")
+        if source_type == "thread.started" and isinstance(thread_id, str) and thread_id:
+            thread_delta = thread_id
+        usage_delta = {
+            "input_tokens": 0,
+            "cached_input_tokens": 0,
+            "output_tokens": 0,
+        }
+        turn_increment = 0
+        if source_type == "turn.completed" and isinstance(payload.get("usage"), dict):
+            turn_increment = 1
+            usage = payload["usage"]
+            for target in usage_delta:
+                value = usage.get(target)
+                if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                    usage_delta[target] = value
+        command_record: dict[str, Any] | None = None
+        item = payload.get("item")
+        if (
+            source_type == "item.completed"
+            and isinstance(item, dict)
+            and item.get("type") == "command_execution"
+        ):
+            command = _command_text(item)
+            command_record = {
+                "attempt_id": attempt_id,
+                "command": command or "<unavailable>",
+                "status": str(item.get("status") or "unknown"),
+                "exit_code": item.get("exit_code"),
+            }
+            if command:
+                task = load_json(
+                    Path(state["materialized_inputs"]["task"]),
+                    label="materialized task",
+                )
+                wrappers = (
+                    _validation_wrapper_argv(state["workspace_path"], spec)
+                    for spec in task["validation_commands"]
+                )
+                if any(
+                    _command_matches_argv(command, wrapper)
+                    for wrapper in wrappers
+                ):
+                    command_record["workspace_manifest_digest"] = canonical_digest(
+                        build_workspace_manifest(state["workspace_path"])
+                    )
+        return {
+            "thread_id": thread_delta,
+            "turn_count_increment": turn_increment,
+            "usage_increment": usage_delta,
+            "executed_command": command_record,
+        }
+
+    def _apply_codex_state_delta(
+        self,
+        state: dict[str, Any],
+        *,
+        attempt_id: str,
+        source_type: str,
+        source_payload: Mapping[str, Any],
+        delta: Mapping[str, Any],
+    ) -> None:
+        """Validate and apply one runtime-authored Codex semantic delta."""
+
+        required = {
+            "thread_id",
+            "turn_count_increment",
+            "usage_increment",
+            "executed_command",
+        }
+        if set(delta) != required:
+            raise ExternalCodexRuntimeError(
+                "runtime_event_semantic_recovery_invalid",
+                "Codex event semantic delta has an invalid shape",
+            )
+        attempt = next(
+            (
+                item
+                for item in state.get("attempts", [])
+                if item.get("attempt_id") == attempt_id
+            ),
+            None,
+        )
+        if not isinstance(attempt, dict):
+            raise ExternalCodexRuntimeError(
+                "runtime_event_semantic_recovery_invalid",
+                "Codex event semantic delta names no durable attempt",
+            )
+        expected_thread = (
+            source_payload.get("thread_id")
+            if source_type == "thread.started"
+            and isinstance(source_payload.get("thread_id"), str)
+            and source_payload.get("thread_id")
+            else None
+        )
+        if delta.get("thread_id") != expected_thread:
+            raise ExternalCodexRuntimeError(
+                "runtime_event_semantic_recovery_invalid",
+                "Codex thread delta differs from the source event",
+            )
+        if expected_thread is not None:
+            previous = state.get("thread_id")
+            if previous is not None and previous != expected_thread:
+                raise ExternalCodexRuntimeError(
+                    "thread_identity_drift",
+                    "Codex resume returned another thread identity",
+                )
+            state["thread_id"] = expected_thread
+            attempt["thread_id"] = expected_thread
+
+        expected_turn_increment = int(
+            source_type == "turn.completed"
+            and isinstance(source_payload.get("usage"), dict)
+        )
+        if delta.get("turn_count_increment") != expected_turn_increment:
+            raise ExternalCodexRuntimeError(
+                "runtime_event_semantic_recovery_invalid",
+                "Codex turn delta differs from the source event",
+            )
+        usage_delta = delta.get("usage_increment")
+        if not isinstance(usage_delta, dict) or set(usage_delta) != {
+            "input_tokens",
+            "cached_input_tokens",
+            "output_tokens",
+        }:
+            raise ExternalCodexRuntimeError(
+                "runtime_event_semantic_recovery_invalid",
+                "Codex usage delta has an invalid shape",
+            )
+        source_usage = source_payload.get("usage")
+        for target in ("input_tokens", "cached_input_tokens", "output_tokens"):
+            expected_value = 0
+            if expected_turn_increment and isinstance(source_usage, dict):
+                raw_value = source_usage.get(target)
+                if (
+                    isinstance(raw_value, int)
+                    and not isinstance(raw_value, bool)
+                    and raw_value >= 0
+                ):
+                    expected_value = raw_value
+            if usage_delta.get(target) != expected_value:
+                raise ExternalCodexRuntimeError(
+                    "runtime_event_semantic_recovery_invalid",
+                    "Codex usage delta differs from the source event",
+                )
+            state["usage"][target] = int(state["usage"].get(target, 0)) + expected_value
+        state["turn_count"] = int(state.get("turn_count", 0)) + expected_turn_increment
+
+        item = source_payload.get("item")
+        source_is_command = (
+            source_type == "item.completed"
+            and isinstance(item, dict)
+            and item.get("type") == "command_execution"
+        )
+        command_record = delta.get("executed_command")
+        if source_is_command:
+            if not isinstance(command_record, dict):
+                raise ExternalCodexRuntimeError(
+                    "runtime_event_semantic_recovery_invalid",
+                    "Codex command event has no durable execution delta",
+                )
+            command = _command_text(item)
+            expected_record = {
+                "attempt_id": attempt_id,
+                "command": command or "<unavailable>",
+                "status": str(item.get("status") or "unknown"),
+                "exit_code": item.get("exit_code"),
+            }
+            if any(command_record.get(key) != value for key, value in expected_record.items()):
+                raise ExternalCodexRuntimeError(
+                    "runtime_event_semantic_recovery_invalid",
+                    "Codex command delta differs from the source event",
+                )
+            if set(command_record) - {*expected_record, "workspace_manifest_digest"}:
+                raise ExternalCodexRuntimeError(
+                    "runtime_event_semantic_recovery_invalid",
+                    "Codex command delta contains unsupported fields",
+                )
+            task = load_json(
+                Path(state["materialized_inputs"]["task"]),
+                label="materialized task",
+            )
+            is_fixed_validation = bool(command) and any(
+                _command_matches_argv(
+                    command,
+                    _validation_wrapper_argv(state["workspace_path"], spec),
+                )
+                for spec in task["validation_commands"]
+            )
+            manifest_digest = command_record.get("workspace_manifest_digest")
+            if is_fixed_validation != isinstance(manifest_digest, str) or (
+                isinstance(manifest_digest, str)
+                and re.fullmatch(r"sha256:[0-9a-f]{64}", manifest_digest) is None
+            ):
+                raise ExternalCodexRuntimeError(
+                    "runtime_event_semantic_recovery_invalid",
+                    "Codex command delta has no exact fixed-validation manifest digest",
+                )
+            state["executed_commands"].append(dict(command_record))
+        elif command_record is not None:
+            raise ExternalCodexRuntimeError(
+                "runtime_event_semantic_recovery_invalid",
+                "non-command Codex event carries a command delta",
+            )
+
     def _record_codex_event(
         self,
         session_id: str,
@@ -4196,63 +4536,33 @@ Runtime session identity: {state['session_id']}
         source_type = str(payload.get("type") or "unknown")
         with self._lock(session_id):
             state = self._load_state(session_id)
-            thread_id = payload.get("thread_id")
-            if source_type == "thread.started" and isinstance(thread_id, str) and thread_id:
-                previous = state.get("thread_id")
-                if previous is not None and previous != thread_id:
-                    raise ExternalCodexRuntimeError(
-                        "thread_identity_drift",
-                        "Codex resume returned another thread identity",
-                    )
-                state["thread_id"] = thread_id
-                state["attempts"][attempt_number - 1]["thread_id"] = thread_id
-            if source_type == "turn.completed" and isinstance(payload.get("usage"), dict):
-                state["turn_count"] = int(state.get("turn_count", 0)) + 1
-                usage = payload["usage"]
-                for target, aliases in {
-                    "input_tokens": ("input_tokens",),
-                    "cached_input_tokens": ("cached_input_tokens",),
-                    "output_tokens": ("output_tokens",),
-                }.items():
-                    value = next(
-                        (usage.get(alias) for alias in aliases if isinstance(usage.get(alias), int)),
-                        0,
-                    )
-                    state["usage"][target] = int(state["usage"].get(target, 0)) + int(value)
-            item = payload.get("item")
-            if source_type == "item.completed" and isinstance(item, dict):
-                if item.get("type") == "command_execution":
-                    command = _command_text(item)
-                    record = {
-                        "attempt_id": attempt_id,
-                        "command": command or "<unavailable>",
-                        "status": str(item.get("status") or "unknown"),
-                        "exit_code": item.get("exit_code"),
-                    }
-                    if command:
-                        task = load_json(
-                            Path(state["materialized_inputs"]["task"]),
-                            label="materialized task",
-                        )
-                        wrappers = (
-                            _validation_wrapper_argv(state["workspace_path"], spec)
-                            for spec in task["validation_commands"]
-                        )
-                        if any(
-                            _command_matches_argv(command, wrapper)
-                            for wrapper in wrappers
-                        ):
-                            record["workspace_manifest_digest"] = canonical_digest(
-                                build_workspace_manifest(state["workspace_path"])
-                            )
-                    state["executed_commands"].append(record)
+            attempt = state["attempts"][attempt_number - 1]
+            if attempt.get("attempt_id") != attempt_id:
+                raise ExternalCodexRuntimeError(
+                    "attempt_identity_mismatch",
+                    "Codex event belongs to another durable attempt",
+                )
+            delta = self._codex_state_delta(
+                state,
+                payload=payload,
+                attempt_id=attempt_id,
+            )
+            self._apply_codex_state_delta(
+                state,
+                attempt_id=attempt_id,
+                source_type=source_type,
+                source_payload=payload,
+                delta=delta,
+            )
+            normalized_payload = dict(payload)
+            normalized_payload["_runtime_state_delta_v1"] = delta
             significance: Literal[
                 "trace", "progress", "checkpoint", "review", "authority", "parent_wake", "terminal"
             ] = "progress" if source_type in {"thread.started", "turn.started", "turn.completed"} else "trace"
             self._append_event(
                 state,
                 event_type=f"codex.{source_type}",
-                payload=payload,
+                payload=normalized_payload,
                 attempt_id=attempt_id,
                 thread_id=state.get("thread_id"),
                 source_event_type=source_type,
@@ -4527,6 +4837,37 @@ Runtime session identity: {state['session_id']}
         for item in commands:
             command = str(item.get("command") or "")
             detected.update(_command_effects(command) & forbidden)
+            if (
+                item.get("validation_command_id") is None
+                and _command_has_unclassified_indirection(command)
+            ):
+                detected.add("unclassified_indirect_effect")
+        return sorted(detected)
+
+    def _failure_authority_effects(
+        self,
+        commands: Sequence[Mapping[str, Any]],
+    ) -> list[str]:
+        """Classify an incomplete worker from durable observations alone.
+
+        Failure closeout must remain possible when a materialized launch or
+        task is itself the object that drifted. Known effect families are
+        intrinsically outside the runtime mandate, while the manifest digest
+        recorded with an exact fixed-validation command is its durable
+        exemption from the otherwise opaque-interpreter rule.
+        """
+
+        detected: set[str] = set()
+        for item in commands:
+            command = str(item.get("command") or "")
+            detected.update(_command_effects(command))
+            is_fixed_validation = isinstance(
+                item.get("workspace_manifest_digest"), str
+            )
+            if not is_fixed_validation and _command_has_unclassified_indirection(
+                command
+            ):
+                detected.add("unclassified_indirect_effect")
         return sorted(detected)
 
     def _finalize_attempt_locked(
@@ -4798,7 +5139,29 @@ Runtime session identity: {state['session_id']}
                 cleanup_failed = True
                 code = exc.code
                 message = str(exc)
-        terminal_status = "authority_blocked" if cleanup_failed else "failed"
+        detected_effects = self._failure_authority_effects(
+            state["executed_commands"]
+        )
+        command_observation_gap = any(
+            item.get("command") == "<unavailable>"
+            for item in state["executed_commands"]
+        )
+        authority_crossed = bool(
+            cleanup_failed or detected_effects or command_observation_gap
+        )
+        if command_observation_gap:
+            code = "command_observation_gap"
+            message = (
+                "worker ended after an unobservable command; authority-safe "
+                "failure classification is unavailable"
+            )
+        elif detected_effects:
+            code = "authority_boundary_crossed"
+            message = (
+                "worker ended after a forbidden or unclassified command effect: "
+                + ", ".join(detected_effects)
+            )
+        terminal_status = "authority_blocked" if authority_crossed else "failed"
         self._account_attempt_wall_locked(state, attempt_id, utc_now())
         state["status"] = terminal_status
         state["finished_at"] = iso_now()
@@ -4818,9 +5181,14 @@ Runtime session identity: {state['session_id']}
         self._append_event(
             state,
             event_type="external_agent.runtime_failed",
-            payload={"failure_code": code, "message": message},
+            payload={
+                "failure_code": code,
+                "message": message,
+                "detected_forbidden_effects": detected_effects,
+                "command_observation_gap": command_observation_gap,
+            },
             attempt_id=attempt_id,
-            significance="authority" if cleanup_failed else "terminal",
+            significance="authority" if authority_crossed else "terminal",
         )
         self._write_failure_result_locked(
             state,
