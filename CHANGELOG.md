@@ -9,6 +9,14 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Bind registry-v2 runtime overlays to the live named user-systemd process
+  identity and the immutable deployment record instead of treating MCP
+  `serverInfo` and mutable `latest.json` as process and deployment identities.
+  An inactive or unobserved managed process now fails the projection closed,
+  while one expired or invalid sibling canary blocks only its own contour
+  instead of aborting the complete managed refresh. Admission now also keeps
+  the live LKG PID observation distinct from the rollback target's verified
+  stable executable identity.
 - Move the observation producer onto registry v2 and bind the managed
   admission Keeper to its provisioned private owner-evidence inbox, so the
   production units exercise the same v2 and incremental-refresh paths proven

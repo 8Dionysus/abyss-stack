@@ -367,6 +367,87 @@ def test_runtime_overlay_binds_authenticated_canary_to_exact_deployment(
     )
     deployment_path = Path(binding.deployment_manifest_path)
     deployment = json.loads(deployment_path.read_text(encoding="utf-8"))
+    deployment["record_ref"] = (
+        "Logs/mcp/deployments/records/"
+        + deployment["manifest_id"].removeprefix("sha256:")
+        + ".json"
+    )
+    target = RuntimeTarget(
+        organ_id=binding.organ_id,
+        registry_organ_id=binding.organ_id,
+        service_id=binding.service_id,
+        unit_name=binding.unit_name,
+        executable_ref=binding.executable_path,
+        endpoint_ref=binding.endpoint_ref,
+        protocol_versions=(binding.protocol_version,),
+        effect_classes=("observe",),
+        canary_route="runbook://demo/read",
+        canary_contract=RuntimeCanaryContract(
+            tool_name="demo_read",
+            arguments={},
+            schema_pointer="/schema_version",
+            schema_value="demo-v1",
+            required_pointers=("/value",),
+        ),
+        rollback_route="runbook://demo/rollback/read",
+    )
+    def process_runner(command: tuple[str, ...]) -> SimpleNamespace:
+        return SimpleNamespace(
+            returncode=0,
+            stdout=(
+                "LoadState=loaded\n"
+                "ActiveState=active\n"
+                "MainPID=321\n"
+                "ExecMainStartTimestampMonotonic=654\n"
+                "FragmentPath=/tmp/demo.service\n"
+            ),
+        )
+
+    overlay, skipped = build_runtime_overlay(
+        registry,
+        deployment,
+        RuntimeTargetCatalog(targets=(target,)),
+        canary_root=Path(binding.canary_receipt_path).parent,
+        canary_public_key_path=Path(binding.canary_public_key_path),
+        deployment_manifest_path=deployment_path,
+        generated_at=NOW,
+        systemctl_runner=process_runner,
+    )
+
+    assert skipped == ()
+    assert overlay["contours"][0]["canary_evidence"]["receipt_id"] == (
+        binding.canary_receipt_id
+    )
+    runtime_identity = overlay["contours"][0]["runtime_identity"]
+    assert runtime_identity["deployment_manifest_ref"] == deployment["record_ref"]
+    assert runtime_identity["process_identity"] == (
+        f"systemd-user:{binding.unit_name}:pid:321:start:654"
+    )
+
+    deployment["services"][0]["package_digest"] = "sha256:" + "8" * 64
+    with pytest.raises(PreflightError, match="canary deployment package"):
+        build_runtime_overlay(
+            registry,
+            deployment,
+            RuntimeTargetCatalog(targets=(target,)),
+            canary_root=Path(binding.canary_receipt_path).parent,
+            canary_public_key_path=Path(binding.canary_public_key_path),
+            deployment_manifest_path=deployment_path,
+            generated_at=NOW,
+            systemctl_runner=process_runner,
+        )
+
+
+def test_runtime_overlay_rejects_unobserved_managed_process(tmp_path: Path) -> None:
+    binding = _fixture(tmp_path)
+    registry = json.loads(Path(binding.registry_path).read_text(encoding="utf-8"))
+    deployment_path = Path(binding.deployment_manifest_path)
+    deployment = json.loads(deployment_path.read_text(encoding="utf-8"))
+    deployment["record_ref"] = (
+        "Logs/mcp/deployments/records/"
+        + deployment["manifest_id"].removeprefix("sha256:")
+        + ".json"
+    )
     target = RuntimeTarget(
         organ_id=binding.organ_id,
         registry_organ_id=binding.organ_id,
@@ -387,23 +468,19 @@ def test_runtime_overlay_binds_authenticated_canary_to_exact_deployment(
         rollback_route="runbook://demo/rollback/read",
     )
 
-    overlay, skipped = build_runtime_overlay(
-        registry,
-        deployment,
-        RuntimeTargetCatalog(targets=(target,)),
-        canary_root=Path(binding.canary_receipt_path).parent,
-        canary_public_key_path=Path(binding.canary_public_key_path),
-        deployment_manifest_path=deployment_path,
-        generated_at=NOW,
-    )
+    def inactive_runner(command: tuple[str, ...]) -> SimpleNamespace:
+        return SimpleNamespace(
+            returncode=0,
+            stdout=(
+                "LoadState=loaded\n"
+                "ActiveState=inactive\n"
+                "MainPID=0\n"
+                "ExecMainStartTimestampMonotonic=0\n"
+                "FragmentPath=/tmp/demo.service\n"
+            ),
+        )
 
-    assert skipped == ()
-    assert overlay["contours"][0]["canary_evidence"]["receipt_id"] == (
-        binding.canary_receipt_id
-    )
-
-    deployment["services"][0]["package_digest"] = "sha256:" + "8" * 64
-    with pytest.raises(PreflightError, match="canary deployment package"):
+    with pytest.raises(PreflightError, match="managed process identity is not exact"):
         build_runtime_overlay(
             registry,
             deployment,
@@ -412,6 +489,7 @@ def test_runtime_overlay_binds_authenticated_canary_to_exact_deployment(
             canary_public_key_path=Path(binding.canary_public_key_path),
             deployment_manifest_path=deployment_path,
             generated_at=NOW,
+            systemctl_runner=inactive_runner,
         )
 
 

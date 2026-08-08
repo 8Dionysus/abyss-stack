@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
@@ -129,7 +130,21 @@ def _lkg_matches_rollback_target(lkg: Any, current: Any) -> bool:
         & set(lkg.endpoint.protocol_versions)
         and consumer.evidence.state == "exact"
     ]
-    return len(matching_consumers) == 1 and (
+    live_process_identity = lkg.process.process_identity or ""
+    exact_live_process = re.fullmatch(
+        rf"systemd-user:{re.escape(target.unit_name)}:pid:[1-9][0-9]*:start:[1-9][0-9]*",
+        live_process_identity,
+    )
+    exact_stable_target = re.fullmatch(
+        rf"systemd-user:{re.escape(target.unit_name)}:executable:sha256:[0-9a-f]{{64}}",
+        target.process_identity,
+    )
+    process_target_matches = (
+        live_process_identity == target.process_identity
+        or exact_live_process is not None
+        and exact_stable_target is not None
+    )
+    return len(matching_consumers) == 1 and process_target_matches and (
         lkg.package.artifact_digest == target.package_digest
         and lkg.package.source_revision == target.deploy_revision
         and lkg.deploy.revision == target.deploy_revision
@@ -139,7 +154,6 @@ def _lkg_matches_rollback_target(lkg: Any, current: Any) -> bool:
         and lkg.process.unit_name == target.unit_name
         and lkg.credential_class == target.credential_class
         and lkg.process.executable_ref == target.executable_ref
-        and lkg.process.process_identity == target.process_identity
         and lkg.canary.canary_route == target.canary_route
         and lkg.canary.canary_ref == target.canary_ref
     )

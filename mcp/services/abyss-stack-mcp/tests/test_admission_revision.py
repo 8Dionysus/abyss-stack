@@ -268,6 +268,32 @@ def test_composes_content_addressed_non_effect_admission_revision(
     assert revision.maturity.cross_organ_proven.state == "not_asserted"
 
 
+def test_accepts_stable_executable_rollback_target_for_live_lkg_process(
+    tmp_path: Path,
+) -> None:
+    paths = _inputs(tmp_path)
+    current = json.loads(paths["current"].read_text())
+    lkg = json.loads(paths["lkg"].read_text())
+    subject_payload = current["subjects"][0]
+    rollback = subject_payload["rollback"]
+    unit_name = rollback["proved_target"]["unit_name"]
+    stable_process = f"systemd-user:{unit_name}:executable:{DIGEST_A}"
+    rollback["proved_target"]["process_identity"] = stable_process
+    rollback["last_known_good_process_identity"] = stable_process
+    lkg["subjects"][0]["process"]["process_identity"] = (
+        f"systemd-user:{unit_name}:pid:321:start:654"
+    )
+    _write(paths["current"], current)
+    _write(paths["lkg"], lkg)
+
+    revision = _compose(paths)
+
+    assert revision.admission_authorized is True
+    assert revision.last_good.runtime_identity.process_identity == (
+        f"systemd-user:{unit_name}:pid:321:start:654"
+    )
+
+
 def test_rejects_operator_decision_for_different_contour(tmp_path: Path) -> None:
     paths = _inputs(tmp_path)
     registry = OrganRegistrySourceV2.model_validate_json(
