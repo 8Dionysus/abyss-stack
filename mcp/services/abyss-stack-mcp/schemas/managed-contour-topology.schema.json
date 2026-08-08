@@ -38,6 +38,44 @@
           "title": "Binding Id",
           "type": "string"
         },
+        "canary_deployment_manifest_id": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Canary Deployment Manifest Id",
+          "type": "string"
+        },
+        "canary_expires_at": {
+          "format": "date-time",
+          "title": "Canary Expires At",
+          "type": "string"
+        },
+        "canary_observed_at": {
+          "format": "date-time",
+          "title": "Canary Observed At",
+          "type": "string"
+        },
+        "canary_public_key_path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Canary Public Key Path",
+          "type": "string"
+        },
+        "canary_receipt_id": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Canary Receipt Id",
+          "type": "string"
+        },
+        "canary_receipt_path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Canary Receipt Path",
+          "type": "string"
+        },
         "contour_id": {
           "maxLength": 160,
           "minLength": 1,
@@ -171,6 +209,13 @@
           "title": "Unit Credential Binding",
           "type": "string"
         },
+        "unit_exec_start_binding": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Unit Exec Start Binding",
+          "type": "string"
+        },
         "unit_name": {
           "maxLength": 2048,
           "minLength": 1,
@@ -206,7 +251,14 @@
         "owner_validator_path",
         "owner_validator_digest",
         "required_environment",
-        "unit_credential_binding"
+        "unit_credential_binding",
+        "unit_exec_start_binding",
+        "canary_receipt_path",
+        "canary_receipt_id",
+        "canary_observed_at",
+        "canary_expires_at",
+        "canary_deployment_manifest_id",
+        "canary_public_key_path"
       ],
       "title": "ManagedContourTopologyEntry",
       "type": "object"

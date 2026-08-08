@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "abyss-stack-mcp"
-version = "0.5.0"
+version = "0.5.1"
 description = "Owner-bounded runtime observation, candidate, and exact internal-effect MCP for abyss-stack"
 readme = "README.md"
 requires-python = ">=3.11"

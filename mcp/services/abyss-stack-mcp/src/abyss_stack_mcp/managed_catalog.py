@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -42,9 +43,14 @@ class ManagedContourTopologyEntry(StrictModel):
     owner_validator_digest: NonEmpty
     required_environment: dict[Identifier, NonEmpty]
     unit_credential_binding: NonEmpty
-    allowed_registry_states: tuple[Literal["shadow", "admitted"], ...] = (
-        "admitted",
-    )
+    unit_exec_start_binding: NonEmpty
+    canary_receipt_path: NonEmpty
+    canary_receipt_id: NonEmpty
+    canary_observed_at: datetime
+    canary_expires_at: datetime
+    canary_deployment_manifest_id: NonEmpty
+    canary_public_key_path: NonEmpty
+    allowed_registry_states: tuple[Literal["shadow", "admitted"], ...] = ("admitted",)
 
 
 class ManagedContourTopology(StrictModel):
@@ -125,6 +131,15 @@ def build_managed_catalog(
                 rollback_route=contour["rollback_route"],
                 required_environment=topology_entry.required_environment,
                 unit_credential_binding=topology_entry.unit_credential_binding,
+                unit_exec_start_binding=topology_entry.unit_exec_start_binding,
+                canary_receipt_path=topology_entry.canary_receipt_path,
+                canary_receipt_id=topology_entry.canary_receipt_id,
+                canary_observed_at=topology_entry.canary_observed_at,
+                canary_expires_at=topology_entry.canary_expires_at,
+                canary_deployment_manifest_id=(
+                    topology_entry.canary_deployment_manifest_id
+                ),
+                canary_public_key_path=topology_entry.canary_public_key_path,
                 allowed_registry_states=topology_entry.allowed_registry_states,
                 allowed_mcp_names=tuple(contour["allowlist"]),
             )
@@ -136,7 +151,10 @@ def _find_contour(registry: dict, organ_id: str, contour_id: str) -> dict:
     for record in registry.get("records", []):
         if isinstance(record, dict) and record.get("organ_id") == organ_id:
             for contour in record.get("contours", []):
-                if isinstance(contour, dict) and contour.get("contour_id") == contour_id:
+                if (
+                    isinstance(contour, dict)
+                    and contour.get("contour_id") == contour_id
+                ):
                     return contour
     raise PreflightError("topology organ contour is absent from owner registry")
 
@@ -149,9 +167,10 @@ def publish_private_json(payload_value: Any, output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     if output.parent.is_symlink():
         raise PreflightError("managed catalog directory cannot be a symlink")
-    payload = json.dumps(
-        payload_value, ensure_ascii=True, indent=2, sort_keys=True
-    ).encode() + b"\n"
+    payload = (
+        json.dumps(payload_value, ensure_ascii=True, indent=2, sort_keys=True).encode()
+        + b"\n"
+    )
     fd, temporary = tempfile.mkstemp(prefix=f".{output.name}.", dir=output.parent)
     try:
         os.fchmod(fd, 0o600)
@@ -189,7 +208,9 @@ def main() -> int:
         publish_catalog(catalog, args.output)
     except (OSError, ValueError) as exc:
         parser.error(str(exc))
-    print(json.dumps(catalog.model_dump(mode="json"), ensure_ascii=True, sort_keys=True))
+    print(
+        json.dumps(catalog.model_dump(mode="json"), ensure_ascii=True, sort_keys=True)
+    )
     return 0
 
 

@@ -82,6 +82,36 @@ def build_runtime_overlay(
         _require_equal(receipt.endpoint_ref, target.endpoint_ref, "canary endpoint")
         if receipt.protocol_version not in target.protocol_versions:
             raise PreflightError("canary protocol is absent from runtime target")
+        _require_equal(
+            receipt.deployment_manifest_id,
+            deployment.get("manifest_id"),
+            "canary deployment manifest",
+        )
+        _require_equal(
+            receipt.deployment_service_id,
+            service.get("service_id"),
+            "canary deployment service",
+        )
+        _require_equal(
+            receipt.deployment_source_revision,
+            service.get("package_source_revision"),
+            "canary deployment source",
+        )
+        _require_equal(
+            receipt.deployment_package_digest,
+            service.get("package_digest"),
+            "canary deployment package",
+        )
+        _require_equal(
+            receipt.deployment_tree_digest,
+            service.get("deployed_tree", {}).get("tree_digest"),
+            "canary deployed tree",
+        )
+        _require_equal(
+            receipt.deployment_deployed_at.isoformat(),
+            _normalized_timestamp(deployment.get("deployed_at")),
+            "canary deployment timestamp",
+        )
         server_schema_digest = receipt.server_schema_digest
         runtime = contour.get("runtime_identity")
         if not isinstance(runtime, dict):
@@ -137,6 +167,14 @@ def build_runtime_overlay(
                         "expires_at": canary["expires_at"],
                     },
                 ],
+                "canary_evidence": {
+                    "receipt_ref": str(canary_path),
+                    "receipt_id": receipt.receipt_id,
+                    "observed_at": receipt.observed_at.isoformat(),
+                    "expires_at": receipt.expires_at.isoformat(),
+                    "deployment_manifest_id": receipt.deployment_manifest_id,
+                    "public_key_ref": str(canary_public_key_path),
+                },
                 "observation_route": target.canary_route,
                 "rollback_route": target.rollback_route,
             }
@@ -187,6 +225,19 @@ def _deployment_service(deployment: dict[str, Any], service_id: Any) -> dict[str
 def _require_equal(observed: Any, expected: Any, label: str) -> None:
     if observed != expected:
         raise PreflightError(f"{label} conflicts with runtime target")
+
+
+def _normalized_timestamp(value: Any) -> str:
+    if not isinstance(value, str):
+        raise PreflightError("deployment timestamp is absent")
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise PreflightError("deployment timestamp is invalid") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise PreflightError("deployment timestamp lacks timezone")
+    return parsed.astimezone(timezone.utc).isoformat()
 
 
 def main() -> int:

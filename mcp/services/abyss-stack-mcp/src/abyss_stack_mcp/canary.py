@@ -50,6 +50,9 @@ from .observation import (
 
 DEFAULT_SECRET_DIR = Path("/srv/AbyssOS/abyss-stack/Secrets/Configs")
 DEFAULT_OUTPUT_ROOT = Path("/srv/AbyssOS/abyss-stack/Logs/mcp/canaries")
+DEFAULT_DEPLOYMENT_MANIFEST = Path(
+    "/srv/AbyssOS/abyss-stack/Logs/mcp/deployments/latest.json"
+)
 CANARY_SIGNING_KEY_NAME = "abyss-stack-mcp-canary-ed25519-private-key.pem"
 CANARY_PUBLIC_KEY_NAME = "abyss-stack-mcp-canary-ed25519-public-key.pem"
 MAX_CREDENTIAL_BYTES = 8 * 1024
@@ -98,6 +101,22 @@ class CanaryProbeResult(StrictModel):
         return self
 
 
+class CanaryDeploymentBinding(StrictModel):
+    manifest_id: Digest
+    service_id: Identifier
+    package_source_revision: NonEmpty
+    package_digest: Digest
+    deployed_tree_digest: Digest
+    deployed_at: datetime
+
+    @field_validator("deployed_at")
+    @classmethod
+    def require_aware_time(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("canary deployment timestamp must be timezone-aware")
+        return value.astimezone(timezone.utc)
+
+
 class CanaryReceipt(StrictModel):
     schema_version: Literal["abyss_stack_mcp_canary_receipt_v2"] = (
         "abyss_stack_mcp_canary_receipt_v2"
@@ -112,6 +131,12 @@ class CanaryReceipt(StrictModel):
     policy_family: Literal["read"] = "read"
     service_id: Identifier
     endpoint_ref: NonEmpty
+    deployment_manifest_id: Digest
+    deployment_service_id: Identifier
+    deployment_source_revision: NonEmpty
+    deployment_package_digest: Digest
+    deployment_tree_digest: Digest
+    deployment_deployed_at: datetime
     canary_route: NonEmpty
     tool_name: Identifier
     tool_arguments_digest: Digest
@@ -146,7 +171,7 @@ class CanaryReceipt(StrictModel):
         "admission, or rollback."
     )
 
-    @field_validator("observed_at", "expires_at")
+    @field_validator("observed_at", "expires_at", "deployment_deployed_at")
     @classmethod
     def require_aware_time(cls, value: datetime) -> datetime:
         if value.tzinfo is None or value.utcoffset() is None:
@@ -157,6 +182,10 @@ class CanaryReceipt(StrictModel):
     def validate_receipt(self) -> CanaryReceipt:
         if self.expires_at <= self.observed_at:
             raise ValueError("canary receipt expiry must follow observation")
+        if self.observed_at < self.deployment_deployed_at:
+            raise ValueError("canary receipt must follow its exact deployment")
+        if self.service_id != self.deployment_service_id:
+            raise ValueError("canary deployment service must match the target service")
         if self.result_contract_matched and not self.call_succeeded:
             raise ValueError(
                 "a matching canary result contract requires a successful call"
@@ -534,6 +563,46 @@ def _bounded_digest(value: Any, *, limit: int, label: str) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
+def _read_deployment_binding(
+    path: Path,
+    target: RuntimeTarget,
+) -> CanaryDeploymentBinding:
+    path = _require_no_symlink_components(path, "canary deployment manifest")
+    if not path.is_file() or path.stat().st_size > MAX_SCHEMA_BYTES:
+        raise CanaryRunnerError(
+            "canary deployment manifest must be a bounded regular non-symlink file"
+        )
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise CanaryRunnerError("canary deployment manifest is invalid") from exc
+    if not isinstance(payload, dict) or payload.get("parity_state") != "exact":
+        raise CanaryRunnerError("canary deployment manifest is not exact")
+    matches = [
+        item
+        for item in payload.get("services", [])
+        if isinstance(item, dict) and item.get("service_id") == target.service_id
+    ]
+    if len(matches) != 1:
+        raise CanaryRunnerError("canary deployment service is absent or ambiguous")
+    service = matches[0]
+    try:
+        return CanaryDeploymentBinding.model_validate(
+            {
+                "manifest_id": payload.get("manifest_id"),
+                "service_id": service.get("service_id"),
+                "package_source_revision": service.get("package_source_revision"),
+                "package_digest": service.get("package_digest"),
+                "deployed_tree_digest": service.get("deployed_tree", {}).get(
+                    "tree_digest"
+                ),
+                "deployed_at": payload.get("deployed_at"),
+            }
+        )
+    except ValidationError as exc:
+        raise CanaryRunnerError("canary deployment binding is incomplete") from exc
+
+
 async def _wait_for_endpoint_listener(
     endpoint_ref: str,
     timeout_seconds: int,
@@ -839,6 +908,7 @@ def _receipt_body(
     probe: CanaryProbeResult,
     observed_at: datetime,
     expires_at: datetime,
+    deployment: CanaryDeploymentBinding,
 ) -> dict[str, Any]:
     contract_matched = False
     contract_reasons: tuple[str, ...] = ()
@@ -867,6 +937,12 @@ def _receipt_body(
         "policy_family": target.policy_family,
         "service_id": target.service_id,
         "endpoint_ref": target.endpoint_ref,
+        "deployment_manifest_id": deployment.manifest_id,
+        "deployment_service_id": deployment.service_id,
+        "deployment_source_revision": deployment.package_source_revision,
+        "deployment_package_digest": deployment.package_digest,
+        "deployment_tree_digest": deployment.deployed_tree_digest,
+        "deployment_deployed_at": deployment.deployed_at.isoformat(),
         "canary_route": target.canary_route,
         "tool_name": contract.tool_name,
         "tool_arguments_digest": _digest(contract.arguments),
@@ -990,10 +1066,13 @@ def build_receipt(
     observed_at: datetime,
     ttl_seconds: int,
     signing_key: Ed25519PrivateKey,
+    deployment: CanaryDeploymentBinding,
 ) -> CanaryReceipt:
     if not 30 <= ttl_seconds <= 3600:
         raise CanaryRunnerError("canary receipt TTL must be 30..3600 seconds")
     observed_at = observed_at.astimezone(timezone.utc)
+    if observed_at < deployment.deployed_at:
+        raise CanaryRunnerError("canary receipt must follow its exact deployment")
     expires_at = observed_at + timedelta(seconds=ttl_seconds)
     body = _receipt_body(
         target=target,
@@ -1001,6 +1080,7 @@ def build_receipt(
         probe=probe,
         observed_at=observed_at,
         expires_at=expires_at,
+        deployment=deployment,
     )
     try:
         normalized = CanaryReceipt.model_validate(
@@ -1095,6 +1175,7 @@ async def run_canary(
     targets_path: Path = DEFAULT_TARGETS_PATH,
     secret_dir: Path = DEFAULT_SECRET_DIR,
     output_root: Path = DEFAULT_OUTPUT_ROOT,
+    deployment_manifest_path: Path = DEFAULT_DEPLOYMENT_MANIFEST,
     ttl_seconds: int = 600,
     timeout_seconds: int = 30,
     purpose: CanaryPurpose = "current",
@@ -1124,6 +1205,7 @@ async def run_canary(
     )
     credential = _read_credential(credential_path)
     signing_key = _read_signing_key(secret_dir / CANARY_SIGNING_KEY_NAME)
+    deployment = _read_deployment_binding(deployment_manifest_path, target)
     probe = await probe_runner(
         target,
         target.canary_contract,
@@ -1138,6 +1220,7 @@ async def run_canary(
         observed_at=observed_at,
         ttl_seconds=ttl_seconds,
         signing_key=signing_key,
+        deployment=deployment,
     )
     root = _ensure_private_directory(output_root)
     result_path: Path | None = None
@@ -1181,6 +1264,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--targets", type=Path, default=DEFAULT_TARGETS_PATH)
     parser.add_argument("--secret-dir", type=Path, default=DEFAULT_SECRET_DIR)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    parser.add_argument(
+        "--deployment-manifest",
+        type=Path,
+        default=DEFAULT_DEPLOYMENT_MANIFEST,
+    )
     parser.add_argument("--ttl-seconds", type=int, default=600)
     parser.add_argument("--timeout-seconds", type=int, default=30)
     parser.add_argument(
@@ -1200,6 +1288,7 @@ def main() -> int:
                 targets_path=args.targets,
                 secret_dir=args.secret_dir,
                 output_root=args.output_root,
+                deployment_manifest_path=args.deployment_manifest,
                 ttl_seconds=args.ttl_seconds,
                 timeout_seconds=args.timeout_seconds,
                 purpose=args.purpose,

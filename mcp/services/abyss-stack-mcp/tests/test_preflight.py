@@ -6,14 +6,31 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from abyss_stack_mcp.canary import (
+    CanaryDeploymentBinding,
+    CanaryInventoryCounts,
+    CanaryProbeResult,
+    build_receipt,
+)
+from abyss_stack_mcp.observation import (
+    RuntimeCanaryContract,
+    RuntimeTarget,
+    RuntimeTargetCatalog,
+)
 from abyss_stack_mcp.preflight import (
     ManagedContourCatalog,
     ManagedContourBinding,
+    PreflightError,
     _bundle_digest,
     _sha256_file,
     _tree_digest,
     run_preflight,
 )
+from abyss_stack_mcp.runtime_overlay import build_runtime_overlay
 from abyss_stack_mcp.preflight_sweep import run_sweep
 from abyss_stack_mcp.managed_catalog import (
     ManagedContourTopology,
@@ -31,6 +48,7 @@ from abyss_stack_mcp.system_status import build_system_status
 
 
 NOW = datetime(2026, 8, 8, 12, 0, tzinfo=timezone.utc)
+SIGNING_KEY = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
 
 
 def _write(path: Path, payload: str, mode: int = 0o600) -> None:
@@ -76,7 +94,8 @@ def _fixture(tmp_path: Path) -> ManagedContourBinding:
         unit,
         "[Service]\n"
         "Environment=AOA_MCP_POLICY_FAMILY=read\n"
-        f"LoadCredential=demo:{credential}\n",
+        f"LoadCredential=demo:{credential}\n"
+        f"ExecStart={executable}\n",
     )
 
     manifest_path = tmp_path / "Logs/deployments/latest.json"
@@ -84,6 +103,7 @@ def _fixture(tmp_path: Path) -> ManagedContourBinding:
     manifest = {
         "manifest_id": manifest_id,
         "parity_state": "exact",
+        "deployed_at": (NOW - timedelta(minutes=2)).isoformat(),
         "source": {"revision": "a" * 40},
         "services": [
             {
@@ -139,6 +159,66 @@ def _fixture(tmp_path: Path) -> ManagedContourBinding:
             ],
         },
     )
+    canary_contract = RuntimeCanaryContract(
+        tool_name="demo_read",
+        arguments={},
+        schema_pointer="/schema_version",
+        schema_value="demo-v1",
+        required_pointers=("/value",),
+    )
+    target = RuntimeTarget(
+        organ_id="demo-organ",
+        registry_organ_id="demo-organ",
+        service_id="demo-mcp",
+        unit_name="demo.service",
+        executable_ref=str(executable),
+        endpoint_ref="http://127.0.0.1:5999/mcp",
+        protocol_versions=("2025-11-25",),
+        effect_classes=("observe",),
+        canary_route="runbook://demo/read",
+        canary_contract=canary_contract,
+        rollback_route="runbook://demo/rollback/read",
+    )
+    deployment = CanaryDeploymentBinding(
+        manifest_id=manifest_id,
+        service_id="demo-mcp",
+        package_source_revision="a" * 40,
+        package_digest=tree_digest,
+        deployed_tree_digest=tree_digest,
+        deployed_at=NOW - timedelta(minutes=2),
+    )
+    receipt = build_receipt(
+        target=target,
+        contract=canary_contract,
+        probe=CanaryProbeResult(
+            protocol_version="2025-11-25",
+            server_name="demo-mcp",
+            server_version="1.0",
+            server_schema_digest=schema_digest,
+            selected_tool_schema_digest="sha256:" + "2" * 64,
+            inventory_counts=CanaryInventoryCounts(
+                tools=1, resources=0, resource_templates=0, prompts=0
+            ),
+            call_succeeded=True,
+            result={"schema_version": "demo-v1", "value": "ok"},
+            call_latency_ms=1,
+            total_latency_ms=2,
+        ),
+        observed_at=NOW - timedelta(minutes=1),
+        ttl_seconds=3600,
+        signing_key=SIGNING_KEY,
+        deployment=deployment,
+    )
+    canary_path = tmp_path / "Logs/canaries/latest/demo-organ.read.json"
+    _json(canary_path, receipt.model_dump(mode="json"))
+    public_key_path = tmp_path / "Secrets/canary-public.pem"
+    public_key_path.write_bytes(
+        SIGNING_KEY.public_key().public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+    )
+    public_key_path.chmod(0o600)
     return ManagedContourBinding(
         binding_id="demo-read",
         organ_id="demo-organ",
@@ -170,18 +250,31 @@ def _fixture(tmp_path: Path) -> ManagedContourBinding:
         rollback_route="owner://demo/runtime/rollback/read",
         required_environment={"AOA_MCP_POLICY_FAMILY": "read"},
         unit_credential_binding=f"LoadCredential=demo:{credential}",
+        unit_exec_start_binding=f"ExecStart={executable}",
+        canary_receipt_path=str(canary_path),
+        canary_receipt_id=receipt.receipt_id,
+        canary_observed_at=receipt.observed_at,
+        canary_expires_at=receipt.expires_at,
+        canary_deployment_manifest_id=receipt.deployment_manifest_id,
+        canary_public_key_path=str(public_key_path),
         allowed_mcp_names=("demo_read",),
     )
 
 
-def test_preflight_passes_exact_identity_and_blocks_deployed_drift(tmp_path: Path) -> None:
+def test_preflight_passes_exact_identity_and_blocks_deployed_drift(
+    tmp_path: Path,
+) -> None:
     binding = _fixture(tmp_path)
     exact = run_preflight(binding, checked_at=NOW)
     assert exact.eligible_to_start
     assert exact.reason_codes == ()
 
-    package_file = Path(binding.deployed_root) / "Configs/mcp/services/demo-mcp/pyproject.toml"
-    package_file.write_text("[project]\nname='demo-mcp'\nversion='drift'\n", encoding="utf-8")
+    package_file = (
+        Path(binding.deployed_root) / "Configs/mcp/services/demo-mcp/pyproject.toml"
+    )
+    package_file.write_text(
+        "[project]\nname='demo-mcp'\nversion='drift'\n", encoding="utf-8"
+    )
     drifted = run_preflight(binding, checked_at=NOW)
     assert not drifted.eligible_to_start
     assert "deployed_tree_digest_mismatch" in drifted.reason_codes
@@ -191,7 +284,9 @@ def test_preflight_passes_exact_identity_and_blocks_deployed_drift(tmp_path: Pat
     assert check.expected_identity != check.observed_identity
 
 
-def test_preflight_blocks_expired_registry_and_symlink_credential(tmp_path: Path) -> None:
+def test_preflight_blocks_expired_registry_and_symlink_credential(
+    tmp_path: Path,
+) -> None:
     binding = _fixture(tmp_path)
     registry_path = Path(binding.registry_path)
     registry = json.loads(registry_path.read_text(encoding="utf-8"))
@@ -209,7 +304,117 @@ def test_preflight_blocks_expired_registry_and_symlink_credential(tmp_path: Path
     assert "credential_identity_mismatch" in report.reason_codes
 
 
-def test_preflight_sweep_persists_bounded_status_and_detects_change(tmp_path: Path) -> None:
+def test_preflight_revalidates_canary_ttl_on_every_start(tmp_path: Path) -> None:
+    binding = _fixture(tmp_path)
+
+    report = run_preflight(binding, checked_at=binding.canary_expires_at)
+
+    assert not report.eligible_to_start
+    assert "canary_receipt_invalid_or_expired" in report.reason_codes
+    assert not report.restart_loop_allowed
+
+
+def test_preflight_reports_missing_canary_as_machine_readable_block(
+    tmp_path: Path,
+) -> None:
+    binding = _fixture(tmp_path)
+    Path(binding.canary_receipt_path).unlink()
+
+    report = run_preflight(binding, checked_at=NOW)
+
+    assert not report.eligible_to_start
+    assert "canary_receipt_invalid_or_expired" in report.reason_codes
+
+
+def test_preflight_requires_one_exact_exec_start_binding(tmp_path: Path) -> None:
+    binding = _fixture(tmp_path)
+    unit_path = Path(binding.unit_path)
+    unit_path.write_text(
+        unit_path.read_text(encoding="utf-8") + "ExecStart=/tmp/unreviewed-server\n",
+        encoding="utf-8",
+    )
+
+    report = run_preflight(binding, checked_at=NOW)
+
+    assert not report.eligible_to_start
+    assert "unit_exec_start_binding_mismatch" in report.reason_codes
+
+
+def test_preflight_rejects_canary_from_predecessor_deployment(tmp_path: Path) -> None:
+    binding = _fixture(tmp_path)
+    manifest_path = Path(binding.deployment_manifest_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["manifest_id"] = "sha256:" + "9" * 64
+    _json(manifest_path, manifest)
+
+    report = run_preflight(binding, checked_at=NOW)
+
+    assert not report.eligible_to_start
+    assert "canary_deployment_mismatch" in report.reason_codes
+    assert "catalog_canary_deployment_mismatch" in report.reason_codes
+
+
+def test_runtime_overlay_binds_authenticated_canary_to_exact_deployment(
+    tmp_path: Path,
+) -> None:
+    binding = _fixture(tmp_path)
+    registry = json.loads(Path(binding.registry_path).read_text(encoding="utf-8"))
+    registry["records"][0]["contours"][0]["runtime_identity"]["source_revision"] = (
+        "a" * 40
+    )
+    deployment_path = Path(binding.deployment_manifest_path)
+    deployment = json.loads(deployment_path.read_text(encoding="utf-8"))
+    target = RuntimeTarget(
+        organ_id=binding.organ_id,
+        registry_organ_id=binding.organ_id,
+        service_id=binding.service_id,
+        unit_name=binding.unit_name,
+        executable_ref=binding.executable_path,
+        endpoint_ref=binding.endpoint_ref,
+        protocol_versions=(binding.protocol_version,),
+        effect_classes=("observe",),
+        canary_route="runbook://demo/read",
+        canary_contract=RuntimeCanaryContract(
+            tool_name="demo_read",
+            arguments={},
+            schema_pointer="/schema_version",
+            schema_value="demo-v1",
+            required_pointers=("/value",),
+        ),
+        rollback_route="runbook://demo/rollback/read",
+    )
+
+    overlay, skipped = build_runtime_overlay(
+        registry,
+        deployment,
+        RuntimeTargetCatalog(targets=(target,)),
+        canary_root=Path(binding.canary_receipt_path).parent,
+        canary_public_key_path=Path(binding.canary_public_key_path),
+        deployment_manifest_path=deployment_path,
+        generated_at=NOW,
+    )
+
+    assert skipped == ()
+    assert overlay["contours"][0]["canary_evidence"]["receipt_id"] == (
+        binding.canary_receipt_id
+    )
+
+    deployment["services"][0]["package_digest"] = "sha256:" + "8" * 64
+    with pytest.raises(PreflightError, match="canary deployment package"):
+        build_runtime_overlay(
+            registry,
+            deployment,
+            RuntimeTargetCatalog(targets=(target,)),
+            canary_root=Path(binding.canary_receipt_path).parent,
+            canary_public_key_path=Path(binding.canary_public_key_path),
+            deployment_manifest_path=deployment_path,
+            generated_at=NOW,
+        )
+
+
+def test_preflight_sweep_persists_bounded_status_and_detects_change(
+    tmp_path: Path,
+) -> None:
     binding = _fixture(tmp_path)
     catalog_path = tmp_path / "catalog.json"
     catalog = ManagedContourCatalog(contours=(binding,))
@@ -258,6 +463,13 @@ def test_managed_catalog_is_derived_from_exact_owner_and_runtime_inputs(
                 owner_validator_digest=binding.owner_validator_digest,
                 required_environment=binding.required_environment,
                 unit_credential_binding=binding.unit_credential_binding,
+                unit_exec_start_binding=binding.unit_exec_start_binding,
+                canary_receipt_path=binding.canary_receipt_path,
+                canary_receipt_id=binding.canary_receipt_id,
+                canary_observed_at=binding.canary_observed_at,
+                canary_expires_at=binding.canary_expires_at,
+                canary_deployment_manifest_id=(binding.canary_deployment_manifest_id),
+                canary_public_key_path=binding.canary_public_key_path,
             ),
         )
     )

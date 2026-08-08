@@ -10,10 +10,14 @@ This directory stores user-unit skeletons for the deployed runtime.
   for shadow owners not yet split by policy family
 - `aoa-organ-mcp-read@.service`, the owner-specific, filesystem-read-only
   template for admitted read candidates
+- `aoa-organ-mcp-read-bootstrap@.service`, the manual, ten-minute bootstrap
+  route used only to obtain the first deployment-bound canary before admission
 - `aoa-memo-mcp-candidate.service` and
   `aoa-evals-mcp-candidate.service`, the finite-write candidate contours
 - `aoa-mcp-http.service`, the fifteen-process local organ bundle
 - `abyss-stack-mcp-read.service`, the stack-owned runtime-observation plane
+- `abyss-stack-mcp-read-bootstrap.service`, the equivalent manual bootstrap
+  route for the stack-owned read contour
 - `abyss-stack-mcp-candidate.service`, the separate non-executing plan-candidate
   plane
 - `abyss-stack-mcp-internal-effect.service`, the separately credentialed exact
@@ -85,18 +89,27 @@ The current allowlist covers the local working surface:
   `aoa-apply-resource-guards --wait-game-guard-clear` and applies staged cgroup
   limits only after the game guard clears
 - the transitional `aoa-mcp-http@.service`, owner-specific
-  `aoa-organ-mcp-read@.service`, Memo/Evals candidate units, and
+  `aoa-organ-mcp-read@.service`, its manual-only bootstrap template,
+  Memo/Evals candidate units, and
   `aoa-mcp-http.service` bundle; these run
   deployed workspace wrappers with explicit authenticated loopback Streamable
   HTTP, preserve each package's tool authority, and reject unauthenticated
   callers before dispatch
 - the separate `abyss-stack-mcp-read.service`,
+  manual-only `abyss-stack-mcp-read-bootstrap.service`,
   `abyss-stack-mcp-candidate.service`, and
   `abyss-stack-mcp-internal-effect.service` processes; none belongs to the
   shared owner bundle, and each has a disjoint tool catalog, port, scope,
   client identity, and systemd credential; their explicit ports are `5431`,
   `5433`, and `5439`
-  because the storage module owns PostgreSQL on `5432`
+  because the storage module owns PostgreSQL on `5432`.
+  The bootstrap units have no `[Install]` section, never run the registry/catalog
+  preflight, conflict with their production peer, use the exact same credential
+  and executable binding, set `Restart=no`, and terminate after ten minutes.
+  They exist only to break the first-admission cycle: start one manually after an
+  exact deployment, issue its signed deployment-bound canary, stop it, build and
+  review registry admission, then start the gated production unit. They are not
+  a recovery bypass and must never be enabled or left running.
 - the credential-free `abyss-stack-mcp-observation.service`, which composes
   only the exact deployment record, private registry projection, committed
   target catalog, named unit state, and an optional typed evidence overlay;

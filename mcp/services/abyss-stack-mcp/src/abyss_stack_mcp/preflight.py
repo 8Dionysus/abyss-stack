@@ -14,6 +14,12 @@ from typing import Any, Literal
 
 from pydantic import Field, ValidationError, field_validator, model_validator
 
+from .canary import (
+    CanaryReceipt,
+    CanaryRunnerError,
+    _read_public_key,
+    verify_canary_receipt,
+)
 from .contracts import Identifier, NonEmpty, StrictModel
 from .core import canonical_json_bytes
 
@@ -56,9 +62,14 @@ class ManagedContourBinding(StrictModel):
     rollback_route: NonEmpty
     required_environment: dict[Identifier, NonEmpty]
     unit_credential_binding: NonEmpty
-    allowed_registry_states: tuple[
-        Literal["shadow", "admitted"], ...
-    ] = ("admitted",)
+    unit_exec_start_binding: NonEmpty
+    canary_receipt_path: NonEmpty
+    canary_receipt_id: NonEmpty
+    canary_observed_at: datetime
+    canary_expires_at: datetime
+    canary_deployment_manifest_id: NonEmpty
+    canary_public_key_path: NonEmpty
+    allowed_registry_states: tuple[Literal["shadow", "admitted"], ...] = ("admitted",)
     allowed_mcp_names: tuple[NonEmpty, ...] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -156,76 +167,497 @@ def run_preflight(
 
     registry = _safe_json(Path(binding.registry_path), "registry")
     contour = _registry_contour(registry, binding.organ_id, binding.contour_id)
-    _check_equal(checks, "registry-schema", registry.get("schema_version"), "aoa_organ_registry_source_v2", "registry_schema_mismatch", binding.registry_path)
+    _check_equal(
+        checks,
+        "registry-schema",
+        registry.get("schema_version"),
+        "aoa_organ_registry_source_v2",
+        "registry_schema_mismatch",
+        binding.registry_path,
+    )
     expiry = _timestamp(registry.get("expires_at"), "registry expiry")
-    _check_bool(checks, "registry-current", expiry > now, "registry_source_expired", _format_time(expiry), _format_time(now), binding.registry_path)
-    _check_equal(checks, "registry-state", contour.get("registry_state"), binding.allowed_registry_states, "registry_state_blocked", binding.registry_path)
-    _check_equal(checks, "policy-family", contour.get("policy_family"), binding.policy_family, "policy_family_mismatch", binding.registry_path)
-    _check_equal(checks, "authority-class", contour.get("authority_class"), binding.authority_class, "authority_class_mismatch", binding.registry_path)
-    _check_equal(checks, "credential-class", contour.get("credential_class"), binding.credential_class, "credential_class_mismatch", binding.registry_path)
-    _check_equal(checks, "principal", contour.get("principal_id"), binding.principal_id, "principal_identity_mismatch", binding.registry_path)
-    _check_equal(checks, "allowlist", sorted(contour.get("allowlist", [])), sorted(binding.allowed_mcp_names), "tool_allowlist_mismatch", binding.registry_path)
-    endpoint = contour.get("endpoint") if isinstance(contour.get("endpoint"), dict) else {}
-    _check_equal(checks, "endpoint", endpoint.get("endpoint_ref"), binding.endpoint_ref, "endpoint_binding_mismatch", binding.registry_path)
-    _check_bool(checks, "protocol", binding.protocol_version in endpoint.get("protocol_versions", []), "protocol_binding_mismatch", binding.protocol_version, json.dumps(endpoint.get("protocol_versions", []), sort_keys=True), binding.registry_path)
-    _check_equal(checks, "observation-route", contour.get("observation_route"), binding.observation_route, "observation_route_mismatch", binding.registry_path)
-    _check_equal(checks, "rollback-route", contour.get("rollback_route"), binding.rollback_route, "rollback_route_mismatch", binding.registry_path)
+    _check_bool(
+        checks,
+        "registry-current",
+        expiry > now,
+        "registry_source_expired",
+        _format_time(expiry),
+        _format_time(now),
+        binding.registry_path,
+    )
+    _check_equal(
+        checks,
+        "registry-state",
+        contour.get("registry_state"),
+        binding.allowed_registry_states,
+        "registry_state_blocked",
+        binding.registry_path,
+    )
+    _check_equal(
+        checks,
+        "policy-family",
+        contour.get("policy_family"),
+        binding.policy_family,
+        "policy_family_mismatch",
+        binding.registry_path,
+    )
+    _check_equal(
+        checks,
+        "authority-class",
+        contour.get("authority_class"),
+        binding.authority_class,
+        "authority_class_mismatch",
+        binding.registry_path,
+    )
+    _check_equal(
+        checks,
+        "credential-class",
+        contour.get("credential_class"),
+        binding.credential_class,
+        "credential_class_mismatch",
+        binding.registry_path,
+    )
+    _check_equal(
+        checks,
+        "principal",
+        contour.get("principal_id"),
+        binding.principal_id,
+        "principal_identity_mismatch",
+        binding.registry_path,
+    )
+    _check_equal(
+        checks,
+        "allowlist",
+        sorted(contour.get("allowlist", [])),
+        sorted(binding.allowed_mcp_names),
+        "tool_allowlist_mismatch",
+        binding.registry_path,
+    )
+    endpoint = (
+        contour.get("endpoint") if isinstance(contour.get("endpoint"), dict) else {}
+    )
+    _check_equal(
+        checks,
+        "endpoint",
+        endpoint.get("endpoint_ref"),
+        binding.endpoint_ref,
+        "endpoint_binding_mismatch",
+        binding.registry_path,
+    )
+    _check_bool(
+        checks,
+        "protocol",
+        binding.protocol_version in endpoint.get("protocol_versions", []),
+        "protocol_binding_mismatch",
+        binding.protocol_version,
+        json.dumps(endpoint.get("protocol_versions", []), sort_keys=True),
+        binding.registry_path,
+    )
+    _check_equal(
+        checks,
+        "observation-route",
+        contour.get("observation_route"),
+        binding.observation_route,
+        "observation_route_mismatch",
+        binding.registry_path,
+    )
+    _check_equal(
+        checks,
+        "rollback-route",
+        contour.get("rollback_route"),
+        binding.rollback_route,
+        "rollback_route_mismatch",
+        binding.registry_path,
+    )
 
     manifest = _safe_json(Path(binding.deployment_manifest_path), "deployment manifest")
-    _check_equal(checks, "deployment-parity", manifest.get("parity_state"), "exact", "deployment_parity_not_exact", binding.deployment_manifest_path)
+    _check_equal(
+        checks,
+        "deployment-parity",
+        manifest.get("parity_state"),
+        "exact",
+        "deployment_parity_not_exact",
+        binding.deployment_manifest_path,
+    )
     service = _deployment_service(manifest, binding.service_id)
     source_revision = manifest.get("source", {}).get("revision")
     runtime_identity = contour.get("runtime_identity", {})
-    _check_equal(checks, "source-revision", service.get("package_source_revision"), source_revision, "package_source_revision_mismatch", binding.deployment_manifest_path)
-    _check_equal(checks, "required-source-revision", runtime_identity.get("deployment_revision"), service.get("package_source_revision"), "required_source_revision_mismatch", binding.registry_path)
-    _check_equal(checks, "package-name", service.get("package_name"), runtime_identity.get("package_name"), "package_identity_mismatch", binding.deployment_manifest_path)
-    _check_equal(checks, "package-version", service.get("package_version"), runtime_identity.get("package_version"), "package_version_mismatch", binding.deployment_manifest_path)
-    _check_equal(checks, "package-digest", service.get("package_digest"), runtime_identity.get("package_digest"), "package_digest_mismatch", binding.deployment_manifest_path)
-    _check_equal(checks, "deployment-manifest-digest", _manifest_digest(manifest), runtime_identity.get("deployment_manifest_digest"), "deployment_manifest_digest_mismatch", binding.deployment_manifest_path)
+    _check_equal(
+        checks,
+        "source-revision",
+        service.get("package_source_revision"),
+        source_revision,
+        "package_source_revision_mismatch",
+        binding.deployment_manifest_path,
+    )
+    _check_equal(
+        checks,
+        "required-source-revision",
+        runtime_identity.get("deployment_revision"),
+        service.get("package_source_revision"),
+        "required_source_revision_mismatch",
+        binding.registry_path,
+    )
+    _check_equal(
+        checks,
+        "package-name",
+        service.get("package_name"),
+        runtime_identity.get("package_name"),
+        "package_identity_mismatch",
+        binding.deployment_manifest_path,
+    )
+    _check_equal(
+        checks,
+        "package-version",
+        service.get("package_version"),
+        runtime_identity.get("package_version"),
+        "package_version_mismatch",
+        binding.deployment_manifest_path,
+    )
+    _check_equal(
+        checks,
+        "package-digest",
+        service.get("package_digest"),
+        runtime_identity.get("package_digest"),
+        "package_digest_mismatch",
+        binding.deployment_manifest_path,
+    )
+    _check_equal(
+        checks,
+        "deployment-manifest-digest",
+        _manifest_digest(manifest),
+        runtime_identity.get("deployment_manifest_digest"),
+        "deployment_manifest_digest_mismatch",
+        binding.deployment_manifest_path,
+    )
+
+    receipt: CanaryReceipt | None = None
+    canary_authenticated = False
+    try:
+        canary_payload = _safe_json(Path(binding.canary_receipt_path), "canary receipt")
+        receipt = CanaryReceipt.model_validate(canary_payload)
+        verify_canary_receipt(
+            receipt,
+            _read_public_key(Path(binding.canary_public_key_path)),
+            checked_at=now,
+            require_success=True,
+        )
+        canary_authenticated = True
+    except (CanaryRunnerError, PreflightError, ValidationError):
+        pass
+    _check_bool(
+        checks,
+        "canary-authenticated-current",
+        canary_authenticated,
+        "canary_receipt_invalid_or_expired",
+        "authenticated-successful-current",
+        "invalid-or-expired",
+        binding.canary_receipt_path,
+    )
+    if receipt is not None:
+        _check_equal(
+            checks,
+            "canary-receipt-id",
+            receipt.receipt_id,
+            binding.canary_receipt_id,
+            "canary_receipt_identity_mismatch",
+            binding.canary_receipt_path,
+        )
+        _check_equal(
+            checks,
+            "canary-observed-at",
+            _format_time(receipt.observed_at),
+            _format_time(binding.canary_observed_at),
+            "canary_observation_mismatch",
+            binding.canary_receipt_path,
+        )
+        _check_equal(
+            checks,
+            "canary-expires-at",
+            _format_time(receipt.expires_at),
+            _format_time(binding.canary_expires_at),
+            "canary_expiry_mismatch",
+            binding.canary_receipt_path,
+        )
+        _check_equal(
+            checks,
+            "canary-deployment",
+            receipt.deployment_manifest_id,
+            _manifest_digest(manifest),
+            "canary_deployment_mismatch",
+            binding.canary_receipt_path,
+        )
+        _check_equal(
+            checks,
+            "catalog-canary-deployment",
+            binding.canary_deployment_manifest_id,
+            _manifest_digest(manifest),
+            "catalog_canary_deployment_mismatch",
+            binding.canary_receipt_path,
+        )
+        _check_equal(
+            checks,
+            "canary-organ",
+            receipt.organ_id,
+            binding.organ_id,
+            "canary_organ_mismatch",
+            binding.canary_receipt_path,
+        )
+        _check_equal(
+            checks,
+            "canary-contour",
+            receipt.policy_family,
+            binding.policy_family,
+            "canary_contour_mismatch",
+            binding.canary_receipt_path,
+        )
+        _check_equal(
+            checks,
+            "canary-service",
+            receipt.deployment_service_id,
+            service.get("service_id"),
+            "canary_deployment_service_mismatch",
+            binding.canary_receipt_path,
+        )
+        _check_equal(
+            checks,
+            "canary-source",
+            receipt.deployment_source_revision,
+            service.get("package_source_revision"),
+            "canary_deployment_source_mismatch",
+            binding.canary_receipt_path,
+        )
+        _check_equal(
+            checks,
+            "canary-package",
+            receipt.deployment_package_digest,
+            service.get("package_digest"),
+            "canary_deployment_package_mismatch",
+            binding.canary_receipt_path,
+        )
+        _check_equal(
+            checks,
+            "canary-tree",
+            receipt.deployment_tree_digest,
+            service.get("deployed_tree", {}).get("tree_digest"),
+            "canary_deployment_tree_mismatch",
+            binding.canary_receipt_path,
+        )
+        deployment_timestamp = _timestamp(
+            manifest.get("deployed_at"), "deployment timestamp"
+        )
+        _check_equal(
+            checks,
+            "canary-deployed-at",
+            _format_time(receipt.deployment_deployed_at),
+            _format_time(deployment_timestamp),
+            "canary_deployment_timestamp_mismatch",
+            binding.canary_receipt_path,
+        )
+        _check_equal(
+            checks,
+            "canary-endpoint",
+            receipt.endpoint_ref,
+            binding.endpoint_ref,
+            "canary_endpoint_mismatch",
+            binding.canary_receipt_path,
+        )
+        _check_bool(
+            checks,
+            "canary-tool-authority",
+            receipt.tool_name in binding.allowed_mcp_names,
+            "canary_tool_not_allowed",
+            _identity(binding.allowed_mcp_names),
+            receipt.tool_name,
+            binding.canary_receipt_path,
+        )
 
     deployed_path = _bounded_deployed_path(binding, service)
     tree_digest = _tree_digest(deployed_path)
     expected_tree = service.get("deployed_tree", {}).get("tree_digest")
-    _check_equal(checks, "deployed-tree", tree_digest, expected_tree, "deployed_tree_digest_mismatch", str(deployed_path))
-    _check_equal(checks, "required-deployed-tree", tree_digest, runtime_identity.get("deployed_tree_digest"), "required_deployed_tree_digest_mismatch", binding.registry_path)
+    _check_equal(
+        checks,
+        "deployed-tree",
+        tree_digest,
+        expected_tree,
+        "deployed_tree_digest_mismatch",
+        str(deployed_path),
+    )
+    _check_equal(
+        checks,
+        "required-deployed-tree",
+        tree_digest,
+        runtime_identity.get("deployed_tree_digest"),
+        "required_deployed_tree_digest_mismatch",
+        binding.registry_path,
+    )
 
     executable_path = Path(binding.executable_path)
     executable = executable_path.is_file() and os.access(executable_path, os.X_OK)
-    _check_bool(checks, "executable", executable, "executable_unavailable", binding.executable_path, "unavailable", binding.executable_path)
-    resolved_executable = str(executable_path.resolve(strict=False)) if executable else None
-    _check_equal(checks, "executable-realpath", resolved_executable, binding.executable_resolved_path, "executable_realpath_mismatch", binding.executable_path)
-    executable_digest = _sha256_file(Path(resolved_executable)) if resolved_executable is not None else None
-    _check_equal(checks, "executable-digest", executable_digest, binding.executable_digest, "executable_digest_mismatch", binding.executable_path)
+    _check_bool(
+        checks,
+        "executable",
+        executable,
+        "executable_unavailable",
+        binding.executable_path,
+        "unavailable",
+        binding.executable_path,
+    )
+    resolved_executable = (
+        str(executable_path.resolve(strict=False)) if executable else None
+    )
+    _check_equal(
+        checks,
+        "executable-realpath",
+        resolved_executable,
+        binding.executable_resolved_path,
+        "executable_realpath_mismatch",
+        binding.executable_path,
+    )
+    executable_digest = (
+        _sha256_file(Path(resolved_executable))
+        if resolved_executable is not None
+        else None
+    )
+    _check_equal(
+        checks,
+        "executable-digest",
+        executable_digest,
+        binding.executable_digest,
+        "executable_digest_mismatch",
+        binding.executable_path,
+    )
     credential = _regular_file(Path(binding.credential_path), "credential", mode=0o600)
-    _check_bool(checks, "credential-file", credential, "credential_file_unsafe", "regular-non-symlink-0600", "unsafe-or-missing", binding.credential_path)
+    _check_bool(
+        checks,
+        "credential-file",
+        credential,
+        "credential_file_unsafe",
+        "regular-non-symlink-0600",
+        "unsafe-or-missing",
+        binding.credential_path,
+    )
     auth_manifest = _safe_json(Path(binding.auth_manifest_path), "auth manifest")
-    expected_credential_digest = _manifest_credential_digest(auth_manifest, binding.auth_manifest_key, binding.policy_family)
-    observed_credential_digest = _credential_value_digest(Path(binding.credential_path)) if credential else None
-    _check_equal(checks, "credential-identity", observed_credential_digest, expected_credential_digest, "credential_identity_mismatch", binding.auth_manifest_path)
+    expected_credential_digest = _manifest_credential_digest(
+        auth_manifest, binding.auth_manifest_key, binding.policy_family
+    )
+    observed_credential_digest = (
+        _credential_value_digest(Path(binding.credential_path)) if credential else None
+    )
+    _check_equal(
+        checks,
+        "credential-identity",
+        observed_credential_digest,
+        expected_credential_digest,
+        "credential_identity_mismatch",
+        binding.auth_manifest_path,
+    )
 
     schema_digest = _bundle_digest(tuple(Path(item) for item in binding.schema_paths))
-    _check_equal(checks, "schema-bundle-digest", schema_digest, binding.schema_bundle_digest, "schema_bundle_digest_mismatch", binding.registry_path)
-    _check_equal(checks, "server-schema-digest", endpoint.get("server_schema_digest"), binding.server_schema_digest, "server_schema_digest_mismatch", binding.registry_path)
+    _check_equal(
+        checks,
+        "schema-bundle-digest",
+        schema_digest,
+        binding.schema_bundle_digest,
+        "schema_bundle_digest_mismatch",
+        binding.registry_path,
+    )
+    _check_equal(
+        checks,
+        "server-schema-digest",
+        endpoint.get("server_schema_digest"),
+        binding.server_schema_digest,
+        "server_schema_digest_mismatch",
+        binding.registry_path,
+    )
     validator_ok = _regular_file(Path(binding.owner_validator_path), "owner validator")
-    _check_bool(checks, "owner-validator", validator_ok, "owner_validator_unavailable", binding.owner_validator_path, "unavailable", binding.owner_validator_path)
-    validator_digest = _sha256_file(Path(binding.owner_validator_path)) if validator_ok else None
-    _check_equal(checks, "owner-validator-digest", validator_digest, binding.owner_validator_digest, "owner_validator_digest_mismatch", binding.owner_validator_path)
+    _check_bool(
+        checks,
+        "owner-validator",
+        validator_ok,
+        "owner_validator_unavailable",
+        binding.owner_validator_path,
+        "unavailable",
+        binding.owner_validator_path,
+    )
+    validator_digest = (
+        _sha256_file(Path(binding.owner_validator_path)) if validator_ok else None
+    )
+    _check_equal(
+        checks,
+        "owner-validator-digest",
+        validator_digest,
+        binding.owner_validator_digest,
+        "owner_validator_digest_mismatch",
+        binding.owner_validator_path,
+    )
 
     unit_ok = _regular_file(Path(binding.unit_path), "unit")
-    _check_bool(checks, "unit-file", unit_ok, "unit_file_unavailable", binding.unit_path, "unavailable", binding.unit_path)
+    _check_bool(
+        checks,
+        "unit-file",
+        unit_ok,
+        "unit_file_unavailable",
+        binding.unit_path,
+        "unavailable",
+        binding.unit_path,
+    )
     unit_text = Path(binding.unit_path).read_text(encoding="utf-8") if unit_ok else ""
     for key, value in sorted(binding.required_environment.items()):
         needle = f"Environment={key}={value}"
-        _check_bool(checks, f"unit-env-{key.lower().replace('_', '-')}", needle in unit_text, "unit_environment_mismatch", needle, "absent", binding.unit_path)
-    _check_bool(checks, "unit-credential-binding", binding.unit_credential_binding in unit_text.splitlines(), "unit_credential_binding_mismatch", binding.unit_credential_binding, "absent", binding.unit_path)
+        _check_bool(
+            checks,
+            f"unit-env-{key.lower().replace('_', '-')}",
+            needle in unit_text,
+            "unit_environment_mismatch",
+            needle,
+            "absent",
+            binding.unit_path,
+        )
+    _check_bool(
+        checks,
+        "unit-credential-binding",
+        binding.unit_credential_binding in unit_text.splitlines(),
+        "unit_credential_binding_mismatch",
+        binding.unit_credential_binding,
+        "absent",
+        binding.unit_path,
+    )
+    exec_start_lines = tuple(
+        line for line in unit_text.splitlines() if line.startswith("ExecStart=")
+    )
+    _check_bool(
+        checks,
+        "unit-exec-start-binding",
+        exec_start_lines == (binding.unit_exec_start_binding,),
+        "unit_exec_start_binding_mismatch",
+        binding.unit_exec_start_binding,
+        _identity(exec_start_lines),
+        binding.unit_path,
+    )
 
     if binding.dependency_lock_path is not None:
         lock_path = Path(binding.dependency_lock_path)
         lock_ok = _regular_file(lock_path, "dependency lock")
-        _check_bool(checks, "dependency-lock", lock_ok, "dependency_lock_unavailable", str(lock_path), "unavailable", str(lock_path))
+        _check_bool(
+            checks,
+            "dependency-lock",
+            lock_ok,
+            "dependency_lock_unavailable",
+            str(lock_path),
+            "unavailable",
+            str(lock_path),
+        )
         expected_lock = service.get("dependency_lock_digest")
         observed_lock = _sha256_file(lock_path) if lock_ok else None
-        _check_equal(checks, "dependency-graph", observed_lock, expected_lock, "dependency_graph_mismatch", binding.deployment_manifest_path)
+        _check_equal(
+            checks,
+            "dependency-graph",
+            observed_lock,
+            expected_lock,
+            "dependency_graph_mismatch",
+            binding.deployment_manifest_path,
+        )
 
     reasons = tuple(
         dict.fromkeys(
@@ -260,11 +692,19 @@ def run_preflight(
 
 
 def load_catalog(path: Path) -> ManagedContourCatalog:
-    return ManagedContourCatalog.model_validate(_safe_json(path, "managed contour catalog"))
+    return ManagedContourCatalog.model_validate(
+        _safe_json(path, "managed contour catalog")
+    )
 
 
-def find_binding(catalog: ManagedContourCatalog, organ_id: str, contour_id: str) -> ManagedContourBinding:
-    matches = [item for item in catalog.contours if (item.organ_id, item.contour_id) == (organ_id, contour_id)]
+def find_binding(
+    catalog: ManagedContourCatalog, organ_id: str, contour_id: str
+) -> ManagedContourBinding:
+    matches = [
+        item
+        for item in catalog.contours
+        if (item.organ_id, item.contour_id) == (organ_id, contour_id)
+    ]
     if len(matches) != 1:
         raise PreflightError("managed contour binding is absent or ambiguous")
     return matches[0]
@@ -283,7 +723,12 @@ def publish_report(report: MCPPreflightReport, output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     if output.parent.is_symlink():
         raise PreflightError("preflight report directory cannot be a symlink")
-    payload = json.dumps(report.model_dump(mode="json"), ensure_ascii=True, indent=2, sort_keys=True).encode() + b"\n"
+    payload = (
+        json.dumps(
+            report.model_dump(mode="json"), ensure_ascii=True, indent=2, sort_keys=True
+        ).encode()
+        + b"\n"
+    )
     fd, temporary = tempfile.mkstemp(prefix=f".{output.name}.", dir=output.parent)
     try:
         os.fchmod(fd, 0o600)
@@ -300,23 +745,34 @@ def publish_report(report: MCPPreflightReport, output: Path) -> None:
             pass
 
 
-def _registry_contour(registry: dict[str, Any], organ_id: str, contour_id: str) -> dict[str, Any]:
+def _registry_contour(
+    registry: dict[str, Any], organ_id: str, contour_id: str
+) -> dict[str, Any]:
     for record in registry.get("records", []):
         if isinstance(record, dict) and record.get("organ_id") == organ_id:
             for contour in record.get("contours", []):
-                if isinstance(contour, dict) and contour.get("contour_id") == contour_id:
+                if (
+                    isinstance(contour, dict)
+                    and contour.get("contour_id") == contour_id
+                ):
                     return contour
     raise PreflightError("registry organ contour is absent")
 
 
 def _deployment_service(manifest: dict[str, Any], service_id: str) -> dict[str, Any]:
-    matches = [item for item in manifest.get("services", []) if isinstance(item, dict) and item.get("service_id") == service_id]
+    matches = [
+        item
+        for item in manifest.get("services", [])
+        if isinstance(item, dict) and item.get("service_id") == service_id
+    ]
     if len(matches) != 1:
         raise PreflightError("deployment service identity is absent or ambiguous")
     return matches[0]
 
 
-def _bounded_deployed_path(binding: ManagedContourBinding, service: dict[str, Any]) -> Path:
+def _bounded_deployed_path(
+    binding: ManagedContourBinding, service: dict[str, Any]
+) -> Path:
     root = Path(binding.deployed_root).absolute()
     relative = Path(str(service.get("deployed_path", "")))
     path = (root / relative).absolute()
@@ -339,7 +795,9 @@ def _safe_json(path: Path, label: str) -> dict[str, Any]:
     return payload
 
 
-def _regular_file(path: Path, label: str, *, mode: int | None = None, executable: bool = False) -> bool:
+def _regular_file(
+    path: Path, label: str, *, mode: int | None = None, executable: bool = False
+) -> bool:
     absolute = path.expanduser().absolute()
     for component in (*reversed(absolute.parents), absolute):
         if component.exists() or component.is_symlink():
@@ -362,24 +820,34 @@ def _tree_digest(root: Path) -> str:
     records: list[dict[str, Any]] = []
     for directory, names, files in os.walk(root, topdown=True, followlinks=False):
         current = Path(directory)
-        names[:] = sorted(name for name in names if name not in ignored_dirs and not name.endswith(".egg-info"))
+        names[:] = sorted(
+            name
+            for name in names
+            if name not in ignored_dirs and not name.endswith(".egg-info")
+        )
         for name in names:
             if (current / name).is_symlink():
                 raise PreflightError("deployed package contains a directory symlink")
         for name in sorted(files):
             path = current / name
             relative = path.relative_to(root)
-            if name == ".coverage" or path.suffix == ".pyc" or any(part in ignored_dirs for part in relative.parts):
+            if (
+                name == ".coverage"
+                or path.suffix == ".pyc"
+                or any(part in ignored_dirs for part in relative.parts)
+            ):
                 continue
             if path.is_symlink() or not path.is_file():
                 raise PreflightError("deployed package contains a non-regular file")
             metadata = path.stat()
-            records.append({
-                "path": relative.as_posix(),
-                "mode": f"{stat.S_IMODE(metadata.st_mode):04o}",
-                "size": metadata.st_size,
-                "sha256": _sha256_file(path),
-            })
+            records.append(
+                {
+                    "path": relative.as_posix(),
+                    "mode": f"{stat.S_IMODE(metadata.st_mode):04o}",
+                    "size": metadata.st_size,
+                    "sha256": _sha256_file(path),
+                }
+            )
     records.sort(key=lambda item: item["path"])
     return _digest(records)
 
@@ -393,7 +861,9 @@ def _bundle_digest(paths: tuple[Path, ...]) -> str:
     return _digest(records)
 
 
-def _manifest_credential_digest(manifest: dict[str, Any], key: str, policy_family: str) -> str | None:
+def _manifest_credential_digest(
+    manifest: dict[str, Any], key: str, policy_family: str
+) -> str | None:
     credentials = manifest.get("credentials")
     if isinstance(credentials, dict):
         item = credentials.get(key)
@@ -457,17 +927,54 @@ def _format_time(value: datetime) -> str:
 
 def _identity(value: Any) -> str:
     if isinstance(value, (dict, list, tuple)):
-        return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        return json.dumps(
+            value, ensure_ascii=True, sort_keys=True, separators=(",", ":")
+        )
     return str(value)
 
 
-def _check_equal(checks: list[PreflightCheck], check_id: str, observed: Any, expected: Any, reason: str, evidence: str) -> None:
-    matched = observed in expected if isinstance(expected, tuple) else observed == expected
-    checks.append(PreflightCheck(check_id=check_id, status="passed" if matched else "blocked", reason_code=None if matched else reason, expected_identity=_identity(expected), observed_identity=_identity(observed), evidence_ref=evidence))
+def _check_equal(
+    checks: list[PreflightCheck],
+    check_id: str,
+    observed: Any,
+    expected: Any,
+    reason: str,
+    evidence: str,
+) -> None:
+    matched = (
+        observed in expected if isinstance(expected, tuple) else observed == expected
+    )
+    checks.append(
+        PreflightCheck(
+            check_id=check_id,
+            status="passed" if matched else "blocked",
+            reason_code=None if matched else reason,
+            expected_identity=_identity(expected),
+            observed_identity=_identity(observed),
+            evidence_ref=evidence,
+        )
+    )
 
 
-def _check_bool(checks: list[PreflightCheck], check_id: str, matched: bool, reason: str, expected: str, observed: str, evidence: str) -> None:
-    checks.append(PreflightCheck(check_id=check_id, status="passed" if matched else "blocked", reason_code=None if matched else reason, expected_identity=expected, observed_identity=observed, evidence_ref=evidence))
+def _check_bool(
+    checks: list[PreflightCheck],
+    check_id: str,
+    matched: bool,
+    reason: str,
+    expected: str,
+    observed: str,
+    evidence: str,
+) -> None:
+    checks.append(
+        PreflightCheck(
+            check_id=check_id,
+            status="passed" if matched else "blocked",
+            reason_code=None if matched else reason,
+            expected_identity=expected,
+            observed_identity=observed,
+            evidence_ref=evidence,
+        )
+    )
 
 
 def main() -> int:

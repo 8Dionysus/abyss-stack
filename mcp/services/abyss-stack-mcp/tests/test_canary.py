@@ -10,7 +10,7 @@ import stat
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -22,6 +22,7 @@ import abyss_stack_mcp.canary as canary
 from abyss_stack_mcp.canary import (
     CANARY_PUBLIC_KEY_NAME,
     CANARY_SIGNING_KEY_NAME,
+    CanaryDeploymentBinding,
     CanaryInventoryCounts,
     CanaryProbeResult,
     CanaryRunnerError,
@@ -137,6 +138,39 @@ def target() -> RuntimeTarget:
     )
 
 
+def deployment_binding() -> CanaryDeploymentBinding:
+    return CanaryDeploymentBinding(
+        manifest_id="sha256:" + "1" * 64,
+        service_id="aoa-kag-mcp",
+        package_source_revision="a" * 40,
+        package_digest="sha256:" + "3" * 64,
+        deployed_tree_digest="sha256:" + "4" * 64,
+        deployed_at=NOW - timedelta(minutes=1),
+    )
+
+
+def write_deployment_manifest(tmp_path: Path) -> Path:
+    binding = deployment_binding()
+    return write_json(
+        tmp_path / "deployment.json",
+        {
+            "manifest_id": binding.manifest_id,
+            "parity_state": "exact",
+            "deployed_at": binding.deployed_at.isoformat(),
+            "services": [
+                {
+                    "service_id": binding.service_id,
+                    "package_source_revision": binding.package_source_revision,
+                    "package_digest": binding.package_digest,
+                    "deployed_tree": {
+                        "tree_digest": binding.deployed_tree_digest,
+                    },
+                }
+            ],
+        },
+    )
+
+
 def grounded_result() -> dict:
     return {
         "schema_version": "aoa-kag-mcp-capabilities-v1",
@@ -222,6 +256,7 @@ def test_receipt_is_content_addressed_and_preserves_claim_limit() -> None:
         observed_at=NOW,
         ttl_seconds=600,
         signing_key=SIGNING_KEY,
+        deployment=deployment_binding(),
     )
     payload = receipt.model_dump(mode="json")
     verify_signature(payload, "receipt_id")
@@ -248,6 +283,7 @@ def test_receipt_verification_requires_current_success_and_pinned_signer() -> No
         observed_at=NOW,
         ttl_seconds=600,
         signing_key=SIGNING_KEY,
+        deployment=deployment_binding(),
     )
     verified = verify_canary_receipt(
         receipt,
@@ -293,6 +329,22 @@ def test_receipt_verification_requires_current_success_and_pinned_signer() -> No
         )
 
 
+def test_receipt_cannot_predate_its_bound_deployment() -> None:
+    future_deployment = deployment_binding().model_copy(
+        update={"deployed_at": NOW + timedelta(seconds=1)}
+    )
+    with pytest.raises(CanaryRunnerError, match="must follow its exact deployment"):
+        build_receipt(
+            target=target(),
+            contract=canary_contract(),
+            probe=successful_probe(),
+            observed_at=NOW,
+            ttl_seconds=600,
+            signing_key=SIGNING_KEY,
+            deployment=future_deployment,
+        )
+
+
 def test_receipt_verification_rejects_nonmatching_read() -> None:
     probe = successful_probe().model_copy(
         update={"result": {**grounded_result(), "owners": []}}
@@ -304,6 +356,7 @@ def test_receipt_verification_rejects_nonmatching_read() -> None:
         observed_at=NOW,
         ttl_seconds=600,
         signing_key=SIGNING_KEY,
+        deployment=deployment_binding(),
     )
     with pytest.raises(CanaryRunnerError, match="successful matching read"):
         verify_canary_receipt(
@@ -322,6 +375,7 @@ def test_private_result_artifact_is_independently_content_addressed() -> None:
         observed_at=NOW,
         ttl_seconds=600,
         signing_key=SIGNING_KEY,
+        deployment=deployment_binding(),
     )
     artifact = build_result_artifact(
         receipt=receipt,
@@ -348,6 +402,7 @@ def test_overlay_does_not_infer_grounding_consumer_freshness_or_proof() -> None:
         observed_at=NOW,
         ttl_seconds=600,
         signing_key=SIGNING_KEY,
+        deployment=deployment_binding(),
     )
     receipt_ref = (
         "/srv/AbyssOS/abyss-stack/Logs/mcp/canaries/records/"
@@ -388,6 +443,7 @@ def test_contract_mismatch_remains_visible_without_positive_canary() -> None:
         observed_at=NOW,
         ttl_seconds=600,
         signing_key=SIGNING_KEY,
+        deployment=deployment_binding(),
     )
     overlay = build_overlay(
         receipt,
@@ -439,6 +495,7 @@ def test_run_canary_reads_one_owner_credential_and_writes_private_outputs(
             targets_path=targets_path,
             secret_dir=secret_dir,
             output_root=tmp_path / "private-output",
+            deployment_manifest_path=write_deployment_manifest(tmp_path),
             timeout_seconds=17,
             clock=lambda: NOW,
             probe_runner=fake_probe,
@@ -536,6 +593,7 @@ def test_last_known_good_canary_uses_distinct_committed_route(tmp_path: Path) ->
             targets_path=targets_path,
             secret_dir=secret_dir,
             output_root=tmp_path / "rollback-canary",
+            deployment_manifest_path=write_deployment_manifest(tmp_path),
             purpose="last-known-good",
             clock=lambda: NOW,
             probe_runner=fake_probe,
@@ -563,6 +621,7 @@ def test_canary_rejects_broad_or_symlinked_credential(tmp_path: Path) -> None:
                 targets_path=targets_path,
                 secret_dir=secret_dir,
                 output_root=tmp_path / "output",
+                deployment_manifest_path=write_deployment_manifest(tmp_path),
             )
         )
 
@@ -578,6 +637,7 @@ def test_canary_rejects_broad_or_symlinked_credential(tmp_path: Path) -> None:
                 targets_path=targets_path,
                 secret_dir=secret_dir,
                 output_root=tmp_path / "output",
+                deployment_manifest_path=write_deployment_manifest(tmp_path),
             )
         )
 
@@ -602,6 +662,7 @@ def test_canary_rejects_broad_or_symlinked_signing_key(tmp_path: Path) -> None:
                 targets_path=targets_path,
                 secret_dir=secret_dir,
                 output_root=tmp_path / "output",
+                deployment_manifest_path=write_deployment_manifest(tmp_path),
             )
         )
 
@@ -623,6 +684,7 @@ def test_canary_rejects_broad_or_symlinked_signing_key(tmp_path: Path) -> None:
                 targets_path=targets_path,
                 secret_dir=secret_dir,
                 output_root=tmp_path / "output",
+                deployment_manifest_path=write_deployment_manifest(tmp_path),
             )
         )
 

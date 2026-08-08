@@ -168,10 +168,18 @@ scripts/aoa-install-systemd --provision-abyss-stack-mcp-auth
 systemctl --user start abyss-stack-mcp-observation.service
 # Enable recurrence only after reviewing that first observation:
 systemctl --user enable --now abyss-stack-mcp-observation.timer
-# After an explicit one-owner legacy/new-unit switch, run only that reviewed
-# read canary; it does not start a unit or change/admit a consumer:
+# First admission only: manually start the bounded bootstrap peer. It has no
+# install target, never restarts, conflicts with production, and exits after
+# ten minutes. Do not enable it.
+systemctl --user start aoa-organ-mcp-read-bootstrap@aoa-kag.service
+# The canary binds the exact latest deployment manifest and does not admit a
+# consumer or start/stop a unit itself:
 /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/abyss-stack-mcp-canary \
   --organ aoa-kag
+systemctl --user stop aoa-organ-mcp-read-bootstrap@aoa-kag.service
+# Build and review owner registry admission and managed-contours.json, then use
+# only the normal preflight-gated unit:
+systemctl --user start aoa-organ-mcp-read@aoa-kag.service
 # Later standalone rotation, only with both stack MCP planes stopped:
 scripts/aoa-install-systemd --rotate-abyss-stack-mcp-auth
 scripts/aoa-install-systemd --install-mcp-http-codex-client
