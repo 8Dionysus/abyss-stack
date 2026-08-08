@@ -278,6 +278,7 @@ abyss_stack_mcp_read_credential_name="abyss-stack-mcp-read-bearer-token"
 abyss_stack_mcp_candidate_credential_name="abyss-stack-mcp-candidate-bearer-token"
 abyss_stack_mcp_internal_effect_credential_name="abyss-stack-mcp-internal-effect-bearer-token"
 abyss_stack_mcp_canary_signing_key_name="abyss-stack-mcp-canary-ed25519-private-key.pem"
+abyss_stack_mcp_canary_public_key_name="abyss-stack-mcp-canary-ed25519-public-key.pem"
 abyss_stack_mcp_auth_manifest_name="abyss-stack-mcp-auth-manifest.json"
 abyss_stack_mcp_auth_manifest_path="${mcp_http_secret_dir}/${abyss_stack_mcp_auth_manifest_name}"
 abyss_stack_mcp_service_root="${AOA_CONFIGS_ROOT}/mcp/services/abyss-stack-mcp"
@@ -291,6 +292,9 @@ abyss_stack_mcp_effect_root="${AOA_STACK_ROOT}/Logs/mcp/internal-effects/read-re
 abyss_stack_mcp_observation_root="${AOA_STACK_ROOT}/Logs/mcp/observations"
 abyss_stack_mcp_observation_path="${abyss_stack_mcp_observation_root}/current.json"
 abyss_stack_mcp_observation_overlay_path="${abyss_stack_mcp_observation_root}/evidence-overlay.json"
+abyss_stack_mcp_admission_root="${AOA_STACK_ROOT}/Logs/mcp/admission"
+abyss_stack_mcp_preflight_root="${AOA_STACK_ROOT}/Logs/mcp/preflight"
+abyss_stack_mcp_protocol_watch_root="${AOA_STACK_ROOT}/Logs/mcp/protocol-watch"
 abyss_stack_mcp_orchestration_root="${AOA_STACK_ROOT}/Logs/mcp/cross-organ-orchestrations"
 abyss_stack_mcp_source_lock_root="$(
   dirname -- "${AOA_CONFIGS_ROOT%/}"
@@ -413,6 +417,59 @@ aoa_provision_abyss_stack_mcp_canary_signing_key() {
   fi
   aoa_validate_abyss_stack_mcp_canary_signing_key "$key_path"
   aoa_note "abyss-stack MCP canary signing key already provisioned under the deployed Secrets root"
+}
+
+aoa_validate_abyss_stack_mcp_canary_public_key() {
+  local key_path="$1"
+
+  [[ -f "$key_path" && ! -L "$key_path" ]] || \
+    aoa_die "existing abyss-stack MCP canary public key must be a regular non-symlink file"
+  [[ "$(stat -c '%a' "$key_path")" == "600" ]] || \
+    aoa_die "existing abyss-stack MCP canary public key must have mode 0600"
+  [[ "$(stat -c '%u' "$key_path")" == "$(id -u)" ]] || \
+    aoa_die "existing abyss-stack MCP canary public key must be owned by the current user"
+  if ! openssl pkey -pubin -in "$key_path" -pubout -out /dev/null 2>/dev/null; then
+    aoa_die "existing abyss-stack MCP canary public key must be a valid public key"
+  fi
+  if [[ "$(openssl pkey -pubin -in "$key_path" -text_pub -noout 2>/dev/null | head -n 1)" != "ED25519 Public-Key:" ]]; then
+    aoa_die "existing abyss-stack MCP canary public key must be Ed25519"
+  fi
+}
+
+aoa_provision_abyss_stack_mcp_canary_public_key() {
+  local private_path="${mcp_http_secret_dir}/${abyss_stack_mcp_canary_signing_key_name}"
+  local public_path="${mcp_http_secret_dir}/${abyss_stack_mcp_canary_public_key_name}"
+  local temp_path=""
+
+  aoa_validate_abyss_stack_mcp_canary_signing_key "$private_path"
+  temp_path="$(mktemp "${mcp_http_secret_dir}/.${abyss_stack_mcp_canary_public_key_name}.XXXXXX")"
+  chmod 0600 "$temp_path"
+  if ! openssl pkey -in "$private_path" -pubout -out "$temp_path" >/dev/null 2>&1; then
+    rm -f -- "$temp_path"
+    aoa_die "failed to derive the abyss-stack MCP canary public key"
+  fi
+  aoa_validate_abyss_stack_mcp_canary_public_key "$temp_path"
+  if [[ -e "$public_path" || -L "$public_path" ]]; then
+    aoa_validate_abyss_stack_mcp_canary_public_key "$public_path"
+    if ! cmp -s -- "$temp_path" "$public_path"; then
+      rm -f -- "$temp_path"
+      aoa_die "existing abyss-stack MCP canary public key conflicts with the signing key"
+    fi
+    rm -f -- "$temp_path"
+    aoa_note "abyss-stack MCP canary public key already pinned under the deployed Secrets root"
+    return 0
+  fi
+  if ln -- "$temp_path" "$public_path" 2>/dev/null; then
+    rm -f -- "$temp_path"
+    aoa_note "pinned abyss-stack MCP canary public key under the deployed Secrets root"
+    return 0
+  fi
+  rm -f -- "$temp_path"
+  if [[ ! -e "$public_path" && ! -L "$public_path" ]]; then
+    aoa_die "failed to atomically pin the abyss-stack MCP canary public key"
+  fi
+  aoa_validate_abyss_stack_mcp_canary_public_key "$public_path"
+  aoa_note "abyss-stack MCP canary public key already pinned under the deployed Secrets root"
 }
 
 aoa_provision_mcp_http_auth() {
@@ -728,6 +785,7 @@ aoa_provision_abyss_stack_mcp_auth() {
     "$abyss_stack_mcp_internal_effect_credential_name" \
     "abyss-stack MCP internal-effect bearer credential"
   aoa_provision_abyss_stack_mcp_canary_signing_key
+  aoa_provision_abyss_stack_mcp_canary_public_key
   read_token="$(<"$read_path")"
   candidate_token="$(<"$candidate_path")"
   effect_token="$(<"$effect_path")"
@@ -923,6 +981,23 @@ aoa_provision_abyss_stack_mcp_observation_root() {
       [[ -f "$parent" && ! -L "$parent" ]] || \
         aoa_die "abyss-stack MCP observation files must be regular non-symlink files"
     fi
+  done
+}
+
+aoa_provision_abyss_stack_mcp_admission_roots() {
+  local target=""
+
+  for target in \
+    "$abyss_stack_mcp_admission_root" \
+    "$abyss_stack_mcp_preflight_root" \
+    "$abyss_stack_mcp_protocol_watch_root"; do
+    if [[ -e "$target" || -L "$target" ]]; then
+      [[ -d "$target" && ! -L "$target" ]] || \
+        aoa_die "abyss-stack MCP admission runtime root must be a non-symlink directory"
+    else
+      install -d -m 0700 "$target"
+    fi
+    chmod 0700 "$target"
   done
 }
 
@@ -1549,6 +1624,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
   chmod 0600 "$abyss_stack_mcp_runtime_lock"
   aoa_provision_abyss_stack_mcp_audit_journals
   aoa_provision_abyss_stack_mcp_observation_root
+  aoa_provision_abyss_stack_mcp_admission_roots
   aoa_provision_abyss_stack_mcp_orchestration_root
   aoa_provision_abyss_stack_mcp_effect_root
 
@@ -1578,7 +1654,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
            "${abyss_stack_mcp_venv}/bin/python" -m pip check >/dev/null && \
        PYTHONDONTWRITEBYTECODE=1 \
          aoa_run_isolated_python "${abyss_stack_mcp_venv}/bin/python" -c \
-           'import abyss_stack_mcp, mcp, pydantic' >/dev/null; then
+           'import abyss_stack_mcp, aoa_sdk, mcp, pydantic; from importlib.metadata import version; assert version("aoa-sdk") == "0.10.0"' >/dev/null; then
       deployed_digest="$(
         aoa_digest_abyss_stack_mcp_package "$abyss_stack_mcp_service_root"
       )" || \
@@ -1663,7 +1739,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
          "${temp_venv}/bin/python" -m pip check >/dev/null || \
      ! PYTHONDONTWRITEBYTECODE=1 \
        aoa_run_isolated_python "${temp_venv}/bin/python" -c \
-         'import abyss_stack_mcp, mcp, pydantic' >/dev/null; then
+         'import abyss_stack_mcp, aoa_sdk, mcp, pydantic; from importlib.metadata import version; assert version("aoa-sdk") == "0.10.0"' >/dev/null; then
     rm -rf -- "$temp_venv"
     aoa_die "provisioned abyss-stack MCP runtime failed dependency verification"
   fi

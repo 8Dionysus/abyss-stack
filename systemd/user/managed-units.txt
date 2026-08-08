@@ -12,6 +12,15 @@ abyss-stack-mcp-candidate.service
 abyss-stack-mcp-internal-effect.service
 abyss-stack-mcp-observation.service
 abyss-stack-mcp-observation.timer
+abyss-mcp-preflight-sweep.service
+abyss-mcp-preflight-sweep.path
+abyss-mcp-preflight-sweep.timer
+abyss-mcp-admission-keeper.service
+abyss-mcp-admission-keeper.path
+abyss-mcp-admission-keeper.timer
+abyss-mcp-protocol-watch.service
+abyss-mcp-protocol-watch.path
+abyss-mcp-protocol-watch.timer
 ydotoold.service
 abyss-dictation-server.service
 abyss-tts-server.service

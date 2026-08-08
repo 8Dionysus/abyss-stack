@@ -1,0 +1,112 @@
+{
+  "$defs": {
+    "KeeperSpecBuildEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "already_expired": {
+          "title": "Already Expired",
+          "type": "boolean"
+        },
+        "contour_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Contour Id",
+          "type": "string"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "organ_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Organ Id",
+          "type": "string"
+        },
+        "spec_id": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Spec Id",
+          "type": "string"
+        },
+        "spec_path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Spec Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "organ_id",
+        "contour_id",
+        "spec_path",
+        "spec_id",
+        "expires_at",
+        "already_expired"
+      ],
+      "title": "KeeperSpecBuildEntry",
+      "type": "object"
+    }
+  },
+  "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/keeper-spec-build.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/KeeperSpecBuildEntry"
+      },
+      "minItems": 1,
+      "title": "Entries",
+      "type": "array"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "owner_evidence_fabricated": {
+      "const": false,
+      "default": false,
+      "title": "Owner Evidence Fabricated",
+      "type": "boolean"
+    },
+    "owner_tools_executed": {
+      "const": false,
+      "default": false,
+      "title": "Owner Tools Executed",
+      "type": "boolean"
+    },
+    "registry_digest": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Registry Digest",
+      "type": "string"
+    },
+    "registry_mutation_performed": {
+      "const": false,
+      "default": false,
+      "title": "Registry Mutation Performed",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "abyss_mcp_keeper_spec_build_v1",
+      "default": "abyss_mcp_keeper_spec_build_v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "generated_at",
+    "registry_digest",
+    "entries"
+  ],
+  "title": "KeeperSpecBuildStatus",
+  "type": "object"
+}

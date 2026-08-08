@@ -1,0 +1,36 @@
+{
+  "canary": {
+    "is_error": false,
+    "owner": "abyss-stack",
+    "result_schema": "aoa-kag-mcp-capabilities-v1",
+    "tool": "kag_discover"
+  },
+  "claim_limits": [
+    "This proves the existing stable 2025-11-25 registration remained callable after removal of the isolated modern lab contour.",
+    "It does not change the production protocol or admit a modern cutover.",
+    "KAG output remains derived navigation evidence rather than owner truth."
+  ],
+  "consumer": {
+    "actual_operator_config": true,
+    "binary_sha256": "cb0a15567e9a60a5820d54b0f6ae86d504dc3805c1eab21a47f70e3eb7b73a40",
+    "registration": "aoa_kag",
+    "version": "0.147.0"
+  },
+  "expires_at": "2026-08-15T08:33:46.547214Z",
+  "finished_at": "2026-08-08T08:33:53.059453Z",
+  "observation_id": "codex-0.147.0-stable-kag-post-rollback-20260808",
+  "observed_at": "2026-08-08T08:33:46.547214Z",
+  "private_receipt": {
+    "ref": "local:///srv/abyss-machine/cache/mcp-next-20260808/evidence/codex-0.147.0-stable-kag-post-rollback-private.json",
+    "sha256": "49c57de2652b0cbe656ea9278db77bc00b18f1f453fa007c209a415d02e415f3"
+  },
+  "process_stopped": true,
+  "schema_version": "abyss_mcp_stable_kag_post_rollback_observation_v1",
+  "secrets_included": false,
+  "stable_registration": {
+    "config_sha256_after": "8d6d38d17e52cb9fe5160270c41dac56a1b4191bcec76b8d5c9a0ce1e867d063",
+    "config_sha256_before": "8d6d38d17e52cb9fe5160270c41dac56a1b4191bcec76b8d5c9a0ce1e867d063",
+    "unchanged": true
+  },
+  "verdict": "stable_production_route_passed_after_lab_rollback"
+}

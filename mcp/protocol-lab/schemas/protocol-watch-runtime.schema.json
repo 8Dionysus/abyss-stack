@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os-abyss.dev/schemas/protocol-watch-runtime.schema.json",
+  "title": "Private OS Abyss MCP protocol watch runtime configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "abyss_mcp_protocol_watch_runtime_v1"},
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "step_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$"},
+          "argv": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+          "environment": {
+            "type": "object",
+            "propertyNames": {"pattern": "^[A-Z][A-Z0-9_]+$"},
+            "additionalProperties": {"type": "string"}
+          },
+          "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 7200}
+        },
+        "required": ["step_id", "argv", "environment", "timeout_seconds"]
+      }
+    },
+    "secret_files": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Z][A-Z0-9_]+$"},
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "protected_paths": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "required_receipts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "receipt_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$"},
+          "path": {"type": "string", "minLength": 1},
+          "visibility": {"enum": ["private", "public_safe"]}
+        },
+        "required": ["receipt_id", "path", "visibility"]
+      }
+    }
+  },
+  "required": ["schema_version", "steps", "secret_files", "protected_paths", "required_receipts"]
+}

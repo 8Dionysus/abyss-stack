@@ -1,0 +1,14 @@
+[Unit]
+Description=Periodic upstream and TTL backstop for the MCP protocol watcher
+Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/README.md
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1h
+AccuracySec=5min
+RandomizedDelaySec=3min
+Persistent=false
+Unit=abyss-mcp-protocol-watch.service
+
+[Install]
+WantedBy=timers.target

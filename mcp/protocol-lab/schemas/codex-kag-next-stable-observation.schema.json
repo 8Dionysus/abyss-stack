@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os-abyss.dev/schemas/codex-kag-next-stable-observation.schema.json",
+  "title": "Stable Codex KAG modern-pair observation",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "abyss_mcp_codex_kag_next_stable_observation_v1"},
+    "observation_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "verdict": {"const": "isolated_stable_pair_passed"},
+    "consumer": {
+      "const": {
+        "binary_sha256": "cb0a15567e9a60a5820d54b0f6ae86d504dc3805c1eab21a47f70e3eb7b73a40",
+        "feature": "mcp_2026_07_28",
+        "feature_default": false,
+        "production_authority": false,
+        "version": "0.147.0"
+      }
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "registration": {"const": "aoa_kag_next_lab"},
+        "endpoint": {"type": "string", "pattern": "^http://127\\.0\\.0\\.1:[0-9]+/mcp$"},
+        "python_mcp_version": {"const": "2.0.0"},
+        "credential_regular_non_symlink_0600": {"const": true},
+        "source_artifacts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "driver_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "adapter_harness_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "adapter_package_tree_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          },
+          "required": ["driver_sha256", "adapter_harness_sha256", "adapter_package_tree_sha256"]
+        },
+        "source_revisions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "abyss_stack": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+            "aoa_kag": {"const": "ba7805190527a635ff5c515701be29379af8277f"}
+          },
+          "required": ["abyss_stack", "aoa_kag"]
+        }
+      },
+      "required": ["registration", "endpoint", "python_mcp_version", "credential_regular_non_symlink_0600", "source_artifacts", "source_revisions"]
+    },
+    "wire": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {"const": "2026-07-28"},
+        "transport_response_mode": {"const": "sse_disconnect_cancellable"},
+        "server_discover_observed": {"const": true},
+        "initialize_observed": {"const": false},
+        "mcp_session_id_observed": {"const": false},
+        "tasks_extension_advertised": {"const": false},
+        "self_describing_requests": {"type": "integer", "minimum": 1},
+        "authenticated_principal": {"const": {"client_id": "https://os-abyss.invalid/codex-kag-next-lab.json", "issuer": "https://auth.os-abyss.invalid", "subject": "codex-kag-next-lab"}},
+        "trace_sent": {"type": "string", "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"},
+        "trace_observed": {"type": "string", "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"},
+        "tool_inventory": {"const": ["kag_discover"]},
+        "tool_schema_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "tool_call": {"const": "kag_discover"},
+        "owner": {"const": "abyss-stack"},
+        "result_schema": {"const": "aoa-kag-mcp-capabilities-v1"},
+        "request_bytes": {"type": "integer", "minimum": 1, "maximum": 16384},
+        "response_bytes": {"type": "integer", "minimum": 1, "maximum": 262144},
+        "input_limit_bytes": {"const": 16384},
+        "output_limit_bytes": {"const": 262144},
+        "oversized_input_denied_code": {"const": -32602},
+        "oversized_input_http_status": {"const": 400},
+        "wrong_bearer_http_status": {"const": 401}
+      },
+      "required": ["version", "transport_response_mode", "server_discover_observed", "initialize_observed", "mcp_session_id_observed", "tasks_extension_advertised", "self_describing_requests", "authenticated_principal", "trace_sent", "trace_observed", "tool_inventory", "tool_schema_sha256", "tool_call", "owner", "result_schema", "request_bytes", "response_bytes", "input_limit_bytes", "output_limit_bytes", "oversized_input_denied_code", "oversized_input_http_status", "wrong_bearer_http_status"]
+    },
+    "stable_registration": {"$ref": "#/$defs/config_unchanged"},
+    "rollback": {
+      "const": {"app_process_stopped": true, "credential_removed": true, "port_closed": true, "registration_removed": true, "server_process_stopped": true}
+    },
+    "private_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "normalized_from": {"type": "string", "pattern": "^local://"},
+        "raw_receipt_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "server_record_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "required": ["normalized_from", "raw_receipt_sha256", "server_record_sha256"]
+    },
+    "claim_limits": {"type": "array", "items": {"type": "string", "minLength": 3}, "minItems": 5}
+  },
+  "required": ["schema_version", "observation_id", "observed_at", "finished_at", "expires_at", "verdict", "consumer", "server", "wire", "stable_registration", "rollback", "private_evidence", "claim_limits"],
+  "$defs": {
+    "config_unchanged": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "config_sha256_before": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "config_sha256_after": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "unchanged": {"const": true}
+      },
+      "required": ["config_sha256_before", "config_sha256_after", "unchanged"]
+    }
+  }
+}

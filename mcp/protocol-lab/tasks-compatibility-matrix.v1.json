@@ -1,0 +1,276 @@
+{
+  "schema_version": "abyss_mcp_tasks_compatibility_matrix_v1",
+  "observed_at": "2026-08-08T09:52:33.467338Z",
+  "expires_at": "2026-08-15T09:52:33.467338Z",
+  "protocol_version": "2026-07-28",
+  "extension_id": "io.modelcontextprotocol/tasks",
+  "extension_maturity": "experimental",
+  "core_read_migration_independent": true,
+  "production_tasks_allowed": false,
+  "reference_pair": {
+    "consumer_id": "rust-rmcp",
+    "version": "3.1.2",
+    "verdict": "wire_pass",
+    "evidence_ref": "mcp/protocol-lab/fixtures/rmcp-3.1.2-tasks-adapter-pair-20260808.json"
+  },
+  "consumers": [
+    {
+      "consumer_id": "codex-cli",
+      "kind": "agent_consumer",
+      "version": "0.147.0",
+      "release_status": "stable",
+      "source_revision": null,
+      "artifact_digest": "sha256:cb0a15567e9a60a5820d54b0f6ae86d504dc3805c1eab21a47f70e3eb7b73a40",
+      "core_2026_07_28": "wire_pass",
+      "features": {
+        "advertisement": "wire_absent",
+        "create_task": "not_applicable",
+        "tasks_get": "not_applicable",
+        "tasks_update": "not_applicable",
+        "tasks_cancel": "not_applicable",
+        "input_required": "not_applicable",
+        "cancellation": "not_applicable",
+        "notifications": "not_applicable",
+        "restart_recovery": "not_applicable",
+        "auth_binding": "unproved",
+        "ttl_behavior": "not_applicable"
+      },
+      "evidence_level": "actual_modern_core_wire_tasks_capability_absent",
+      "verdict": "ineligible",
+      "evidence_refs": [
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json"
+      ],
+      "removal_conditions": [
+        "A released Codex request must carry _meta.io.modelcontextprotocol/clientCapabilities.extensions.io.modelcontextprotocol/tasks on the actual wire.",
+        "That exact Codex and server pair must pass the Tasks lifecycle and rollback matrix."
+      ]
+    },
+    {
+      "consumer_id": "mcp-inspector",
+      "kind": "official_debug_client",
+      "version": "2.1.0",
+      "release_status": "stable",
+      "source_revision": "c7bccd477d38c2c17afb4878bcca8ee5f563c5d2",
+      "artifact_digest": null,
+      "core_2026_07_28": "wire_pass",
+      "features": {
+        "advertisement": "wire_pass",
+        "create_task": "wire_pass",
+        "tasks_get": "wire_blocked",
+        "tasks_update": "upstream_test_pass",
+        "tasks_cancel": "upstream_test_pass",
+        "input_required": "upstream_test_pass",
+        "cancellation": "upstream_test_pass",
+        "notifications": "unproved",
+        "restart_recovery": "unproved",
+        "auth_binding": "wire_pass",
+        "ttl_behavior": "upstream_test_pass"
+      },
+      "evidence_level": "published_client_self_pair_pass_strict_abyss_pair_blocked",
+      "verdict": "blocked",
+      "evidence_refs": [
+        "mcp/protocol-lab/fixtures/inspector-2.1.0-tasks-strict-pair-blocked-20260808.json",
+        "https://github.com/modelcontextprotocol/inspector/releases/tag/2.1.0"
+      ],
+      "removal_conditions": [
+        "Inspector raw tasks/get, tasks/update, and tasks/cancel requests must emit Mcp-Name equal to taskId.",
+        "The corrected published Inspector must pass the unchanged strict Abyss adapter pair."
+      ]
+    },
+    {
+      "consumer_id": "python-sdk",
+      "kind": "official_sdk",
+      "version": "2.0.0",
+      "release_status": "stable",
+      "source_revision": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
+      "artifact_digest": null,
+      "core_2026_07_28": "conformance_pass",
+      "features": {
+        "advertisement": "source_absent",
+        "create_task": "source_absent",
+        "tasks_get": "source_absent",
+        "tasks_update": "source_absent",
+        "tasks_cancel": "source_absent",
+        "input_required": "source_absent",
+        "cancellation": "source_absent",
+        "notifications": "source_absent",
+        "restart_recovery": "not_applicable",
+        "auth_binding": "not_applicable",
+        "ttl_behavior": "not_applicable"
+      },
+      "evidence_level": "released_source_explicit_non_support",
+      "verdict": "ineligible",
+      "evidence_refs": [
+        "https://github.com/modelcontextprotocol/python-sdk/blob/main/docs/migration.md"
+      ],
+      "removal_conditions": [
+        "A released Python SDK must implement SEP-2663 rather than only expose open extension types.",
+        "The released pair must pass official Tasks conformance and Abyss wire tests."
+      ]
+    },
+    {
+      "consumer_id": "typescript-sdk",
+      "kind": "official_sdk",
+      "version": "2.0.0",
+      "release_status": "stable",
+      "source_revision": "cc4b41617ce3601b1290d67216ea0b194a3cd9ac",
+      "artifact_digest": null,
+      "core_2026_07_28": "source_supported",
+      "features": {
+        "advertisement": "source_absent",
+        "create_task": "source_absent",
+        "tasks_get": "source_absent",
+        "tasks_update": "source_absent",
+        "tasks_cancel": "source_absent",
+        "input_required": "source_absent",
+        "cancellation": "source_absent",
+        "notifications": "source_absent",
+        "restart_recovery": "not_applicable",
+        "auth_binding": "not_applicable",
+        "ttl_behavior": "not_applicable"
+      },
+      "evidence_level": "released_source_modern_tasks_excluded",
+      "verdict": "ineligible",
+      "evidence_refs": [
+        "https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/migration/support-2026-07-28.md"
+      ],
+      "removal_conditions": [
+        "A released TypeScript SDK must implement the modern extension method maps and task result union.",
+        "Any temporary raw-wire workaround must be removable and pass strict header validation."
+      ]
+    },
+    {
+      "consumer_id": "go-sdk",
+      "kind": "official_sdk",
+      "version": "1.7.0",
+      "release_status": "stable",
+      "source_revision": "bc72835f62eb94d0fb484439f886b6885b075f36",
+      "artifact_digest": null,
+      "core_2026_07_28": "source_supported",
+      "features": {
+        "advertisement": "source_absent",
+        "create_task": "source_absent",
+        "tasks_get": "source_absent",
+        "tasks_update": "source_absent",
+        "tasks_cancel": "source_absent",
+        "input_required": "source_absent",
+        "cancellation": "source_absent",
+        "notifications": "source_absent",
+        "restart_recovery": "not_applicable",
+        "auth_binding": "not_applicable",
+        "ttl_behavior": "not_applicable"
+      },
+      "evidence_level": "release_and_main_source_no_sep_2663_surface_found",
+      "verdict": "ineligible",
+      "evidence_refs": [
+        "https://github.com/modelcontextprotocol/go-sdk/releases/tag/v1.7.0"
+      ],
+      "removal_conditions": [
+        "A released Go SDK must expose and test the SEP-2663 extension lifecycle.",
+        "The exact release must pass an Abyss strict pair."
+      ]
+    },
+    {
+      "consumer_id": "rust-rmcp",
+      "kind": "official_sdk",
+      "version": "3.1.2",
+      "release_status": "stable",
+      "source_revision": "02c62aef2e331e5cf79c06c744eb1eb052cc8ebd",
+      "artifact_digest": null,
+      "core_2026_07_28": "wire_pass",
+      "features": {
+        "advertisement": "wire_pass",
+        "create_task": "wire_pass",
+        "tasks_get": "wire_pass",
+        "tasks_update": "upstream_test_pass",
+        "tasks_cancel": "upstream_test_pass",
+        "input_required": "upstream_test_pass",
+        "cancellation": "upstream_test_pass",
+        "notifications": "unproved",
+        "restart_recovery": "unproved",
+        "auth_binding": "wire_pass",
+        "ttl_behavior": "wire_pass"
+      },
+      "evidence_level": "released_client_strict_abyss_wire_pass",
+      "verdict": "eligible_for_isolated_reference_pilots",
+      "evidence_refs": [
+        "mcp/protocol-lab/fixtures/rmcp-3.1.2-tasks-adapter-pair-20260808.json",
+        "https://github.com/modelcontextprotocol/rust-sdk/releases/tag/rmcp-v3.1.2"
+      ],
+      "removal_conditions": [
+        "Do not promote beyond isolated reference use until update, cancellation, notifications, restart, and auth-negative cases pass on the same pair.",
+        "Do not infer Codex compatibility from rmcp compatibility."
+      ]
+    },
+    {
+      "consumer_id": "csharp-sdk",
+      "kind": "official_sdk",
+      "version": "2.1.0",
+      "release_status": "stable",
+      "source_revision": "3be47ee31ede99ef9025af02d9eb37da938d7f05",
+      "artifact_digest": null,
+      "core_2026_07_28": "source_supported",
+      "features": {
+        "advertisement": "upstream_test_pass",
+        "create_task": "upstream_test_pass",
+        "tasks_get": "upstream_test_pass",
+        "tasks_update": "upstream_test_pass",
+        "tasks_cancel": "upstream_test_pass",
+        "input_required": "upstream_test_pass",
+        "cancellation": "upstream_test_pass",
+        "notifications": "upstream_test_pass",
+        "restart_recovery": "unproved",
+        "auth_binding": "upstream_test_pass",
+        "ttl_behavior": "upstream_test_pass"
+      },
+      "evidence_level": "published_release_upstream_tests_local_runtime_absent",
+      "verdict": "source_supported_unpaired",
+      "evidence_refs": [
+        "https://github.com/modelcontextprotocol/csharp-sdk/releases/tag/v2.1.0",
+        "https://www.nuget.org/packages/ModelContextProtocol.Extensions.Tasks/2.1.0"
+      ],
+      "removal_conditions": [
+        "Install or provide a bounded .NET runtime outside production and run the exact released package against the strict Abyss adapter.",
+        "Require local wire receipts before using this SDK as an Abyss reference pair."
+      ]
+    },
+    {
+      "consumer_id": "ext-tasks-reference",
+      "kind": "extension_reference_source",
+      "version": "0.1.0-private",
+      "release_status": "unreleased",
+      "source_revision": "2c1425d9a288b9b1f489430fe1e00bb392b47e48",
+      "artifact_digest": null,
+      "core_2026_07_28": "not_applicable",
+      "features": {
+        "advertisement": "source_present_unpaired",
+        "create_task": "source_present_unpaired",
+        "tasks_get": "source_present_unpaired",
+        "tasks_update": "source_present_unpaired",
+        "tasks_cancel": "source_present_unpaired",
+        "input_required": "source_present_unpaired",
+        "cancellation": "source_present_unpaired",
+        "notifications": "source_present_unpaired",
+        "restart_recovery": "unproved",
+        "auth_binding": "unproved",
+        "ttl_behavior": "source_present_unpaired"
+      },
+      "evidence_level": "pre_final_reference_schema_no_runtime_release",
+      "verdict": "reference_only",
+      "evidence_refs": [
+        "https://github.com/modelcontextprotocol/ext-tasks"
+      ],
+      "removal_conditions": [
+        "Refresh the reference source against the final extension text and publish a versioned release.",
+        "Never use schema presence as client or server runtime proof."
+      ]
+    }
+  ],
+  "known_risks": [
+    "Codex 0.147.0 still does not advertise the Tasks extension on real requests.",
+    "Inspector 2.1.0 omits the required Mcp-Name taskId header on raw modern tasks/get.",
+    "The Inspector lab dependency installs reported unresolved npm audit findings and are not production artifacts.",
+    "Notifications remain blocked until subscriptions/listen can carry and prove the extension filter end to end.",
+    "The Abyss poll limiter is process-local and resets after adapter restart; distributed enforcement is not proven."
+  ]
+}

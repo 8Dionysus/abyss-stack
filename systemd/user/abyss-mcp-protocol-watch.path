@@ -1,0 +1,16 @@
+[Unit]
+Description=Watch local MCP protocol-pair inputs for isolated revalidation
+Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/README.md
+
+[Path]
+PathChanged=%h/.local/bin/codex
+PathChanged=%h/.codex/config.toml
+PathChanged=/srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/protocol-watch-plan.v1.json
+PathChanged=/srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/generated/protocol-lab-status.json
+PathChanged=/srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/scripts/run_codex_kag_next_lab.py
+PathChanged=/srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/scripts/run_kag_next_pair.py
+PathChanged=/srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/scripts/protocol_watcher.py
+Unit=abyss-mcp-protocol-watch.service
+
+[Install]
+WantedBy=default.target

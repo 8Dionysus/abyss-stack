@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os-abyss.dev/schemas/tasks-adapter-pilot.schema.json",
+  "title": "OS Abyss MCP Tasks adapter public-safe pilot receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "abyss_mcp_tasks_pilot_v1"},
+    "run_id": {"type": "string", "pattern": "^[0-9]{8}T[0-9]{6}\\.[0-9]{6}Z$"},
+    "started_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "protocol_version": {"const": "2026-07-28"},
+    "extension_id": {"const": "io.modelcontextprotocol/tasks"},
+    "client_kind": {"const": "abyss-synthetic-capable-client"},
+    "adapter_feature_gate_enabled": {"const": true},
+    "production_enabled": {"const": false},
+    "codex_consumer_used": {"const": false},
+    "case_count": {"const": 11},
+    "all_cases_passed": {"const": true},
+    "cases": {
+      "type": "array",
+      "minItems": 11,
+      "maxItems": 11,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "case": {"type": "string", "minLength": 3},
+          "facts": {"type": "object"},
+          "passed": {"const": true}
+        },
+        "required": ["case", "facts", "passed"]
+      }
+    },
+    "notifications": {
+      "const": {
+        "reason": "subscriptions_listen_extension_filter_not_proven",
+        "tested": false
+      }
+    },
+    "owner_pilot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {"const": "abyss-stack"},
+        "operation": {"const": "bounded_diagnostic_snapshot"},
+        "effect_class": {"const": "observe"},
+        "command_returncode": {"type": "integer"},
+        "duration_ms": {"type": "integer", "minimum": 1},
+        "diagnostic_digest": {"$ref": "#/$defs/digest"},
+        "resumed_after_adapter_restart": {"const": true},
+        "owner_rerun_count": {"const": 0}
+      },
+      "required": ["owner", "operation", "effect_class", "command_returncode", "duration_ms", "diagnostic_digest", "resumed_after_adapter_restart", "owner_rerun_count"]
+    },
+    "claim_limits": {"type": "array", "minItems": 4, "items": {"type": "string", "minLength": 12}}
+  },
+  "required": ["schema_version", "run_id", "started_at", "finished_at", "protocol_version", "extension_id", "client_kind", "adapter_feature_gate_enabled", "production_enabled", "codex_consumer_used", "case_count", "all_cases_passed", "cases", "notifications", "owner_pilot", "claim_limits"],
+  "$defs": {"digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}
+}

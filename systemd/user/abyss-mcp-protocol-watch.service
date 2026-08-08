@@ -1,0 +1,35 @@
+[Unit]
+Description=Detect MCP ecosystem drift and run only the removable protocol lab
+Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/README.md
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/protocol-watch-plan.v1.json
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/generated/protocol-lab-status.json
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/scripts/protocol_watcher.py
+ConditionPathIsDirectory=/srv/AbyssOS/abyss-stack/Logs/mcp/protocol-watch
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONHOME=
+Environment=PYTHONPATH=
+ExecStart=/usr/bin/python3 -I -B /srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/scripts/protocol_watcher.py --plan /srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/protocol-watch-plan.v1.json --state-root /srv/AbyssOS/abyss-stack/Logs/mcp/protocol-watch --runtime-config /srv/AbyssOS/abyss-stack/Secrets/Configs/mcp-protocol-watch-runtime.json --execute
+Nice=10
+IOSchedulingClass=idle
+CPUWeight=20
+IOWeight=20
+TimeoutStartSec=2h
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/AbyssOS/abyss-stack/Logs/mcp/protocol-watch
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+UMask=0077
+StandardOutput=journal
+StandardError=journal

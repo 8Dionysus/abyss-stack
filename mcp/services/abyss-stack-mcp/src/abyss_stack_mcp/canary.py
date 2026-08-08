@@ -20,7 +20,11 @@ from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+    Ed25519PublicKey,
+)
 from pydantic import Field, ValidationError, field_validator, model_validator
 
 from .contracts import (
@@ -47,6 +51,7 @@ from .observation import (
 DEFAULT_SECRET_DIR = Path("/srv/AbyssOS/abyss-stack/Secrets/Configs")
 DEFAULT_OUTPUT_ROOT = Path("/srv/AbyssOS/abyss-stack/Logs/mcp/canaries")
 CANARY_SIGNING_KEY_NAME = "abyss-stack-mcp-canary-ed25519-private-key.pem"
+CANARY_PUBLIC_KEY_NAME = "abyss-stack-mcp-canary-ed25519-public-key.pem"
 MAX_CREDENTIAL_BYTES = 8 * 1024
 MAX_SIGNING_KEY_BYTES = 4 * 1024
 MAX_SCHEMA_BYTES = 2 * 1024 * 1024
@@ -166,9 +171,7 @@ class CanaryReceipt(StrictModel):
                 "and artifact ref"
             )
         if not self.call_succeeded and self.result_artifact_ref is not None:
-            raise ValueError(
-                "a failed canary call cannot publish a result artifact"
-            )
+            raise ValueError("a failed canary call cannot publish a result artifact")
         if self.result_digest is not None and self.result_artifact_ref is not None:
             expected_ref = (
                 f"results/{self.organ_id}/"
@@ -233,9 +236,7 @@ class CanaryResultArtifact(StrictModel):
     @model_validator(mode="after")
     def validate_result_digest(self) -> CanaryResultArtifact:
         if _digest(self.owner_payload) != self.result_digest:
-            raise ValueError(
-                "canary result artifact digest must match owner payload"
-            )
+            raise ValueError("canary result artifact digest must match owner payload")
         return self
 
 
@@ -258,11 +259,15 @@ def _base64url(value: bytes) -> str:
 
 
 def _signer_id(signing_key: Ed25519PrivateKey) -> str:
-    public_key = signing_key.public_key().public_bytes(
+    return _public_signer_id(signing_key.public_key())
+
+
+def _public_signer_id(public_key: Ed25519PublicKey) -> str:
+    raw = public_key.public_bytes(
         encoding=serialization.Encoding.Raw,
         format=serialization.PublicFormat.Raw,
     )
-    return "sha256:" + hashlib.sha256(public_key).hexdigest()
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
 def _signed_fields(
@@ -272,9 +277,7 @@ def _signed_fields(
     return {
         "signer_id": _signer_id(signing_key),
         "attestation_algorithm": "ed25519",
-        "attestation": _base64url(
-            signing_key.sign(canonical_json_bytes(payload))
-        ),
+        "attestation": _base64url(signing_key.sign(canonical_json_bytes(payload))),
     }
 
 
@@ -291,9 +294,7 @@ def _ensure_private_directory(path: Path) -> Path:
     absolute.mkdir(parents=True, exist_ok=True, mode=0o700)
     absolute = _require_no_symlink_components(absolute, "canary output root")
     if not absolute.is_dir():
-        raise CanaryRunnerError(
-            "canary output root must be a non-symlink directory"
-        )
+        raise CanaryRunnerError("canary output root must be a non-symlink directory")
     mode = stat.S_IMODE(absolute.stat().st_mode)
     if mode & 0o077:
         raise CanaryRunnerError("canary output root must not be group/world accessible")
@@ -304,9 +305,7 @@ def _write_private_json(path: Path, payload: dict[str, Any]) -> None:
     path = _require_no_symlink_components(path, "canary output")
     parent = _ensure_private_directory(path.parent)
     if path.exists() and (path.is_symlink() or not path.is_file()):
-        raise CanaryRunnerError(
-            "canary output must be a regular non-symlink file"
-        )
+        raise CanaryRunnerError("canary output must be a regular non-symlink file")
     content = (
         json.dumps(
             payload,
@@ -380,9 +379,7 @@ def _read_credential(path: Path) -> str:
     try:
         text = raw.decode("utf-8")
     except UnicodeError as exc:
-        raise CanaryRunnerError(
-            "canary read credential is not valid text"
-        ) from exc
+        raise CanaryRunnerError("canary read credential is not valid text") from exc
     value = text[:-1] if text.endswith("\n") else text
     if not value or value != value.strip() or any(char.isspace() for char in value):
         raise CanaryRunnerError(
@@ -444,6 +441,84 @@ def _read_signing_key(path: Path) -> Ed25519PrivateKey:
     if not isinstance(signing_key, Ed25519PrivateKey):
         raise CanaryRunnerError("canary signing key must be Ed25519")
     return signing_key
+
+
+def _read_public_key(path: Path) -> Ed25519PublicKey:
+    path = _require_no_symlink_components(path, "canary public key")
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+        try:
+            metadata = os.fstat(descriptor)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise CanaryRunnerError(
+                    "canary public key must be a regular non-symlink file"
+                )
+            if stat.S_IMODE(metadata.st_mode) not in {0o400, 0o600, 0o644}:
+                raise CanaryRunnerError(
+                    "canary public key must have mode 0400, 0600, or 0644"
+                )
+            if metadata.st_uid != os.geteuid():
+                raise CanaryRunnerError(
+                    "canary public key must be owned by the current user"
+                )
+            if not 1 <= metadata.st_size <= MAX_SIGNING_KEY_BYTES:
+                raise CanaryRunnerError("canary public key has an invalid bounded size")
+            raw = os.read(descriptor, MAX_SIGNING_KEY_BYTES + 1)
+        finally:
+            os.close(descriptor)
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise CanaryRunnerError(
+                "canary public key must be a regular non-symlink file"
+            ) from exc
+        raise CanaryRunnerError("canary public key is unavailable") from exc
+    if len(raw) > MAX_SIGNING_KEY_BYTES:
+        raise CanaryRunnerError("canary public key exceeds its size limit")
+    try:
+        public_key = serialization.load_pem_public_key(raw)
+    except (TypeError, ValueError) as exc:
+        raise CanaryRunnerError("canary public key is not valid PEM") from exc
+    if not isinstance(public_key, Ed25519PublicKey):
+        raise CanaryRunnerError("canary public key must be Ed25519")
+    return public_key
+
+
+def verify_canary_receipt(
+    receipt: CanaryReceipt,
+    public_key: Ed25519PublicKey,
+    *,
+    checked_at: datetime | None = None,
+    require_success: bool = False,
+) -> CanaryReceipt:
+    """Authenticate one content-addressed receipt against a pinned stack key."""
+
+    now = (checked_at or _now()).astimezone(timezone.utc)
+    if receipt.signer_id != _public_signer_id(public_key):
+        raise CanaryRunnerError(
+            "canary receipt signer conflicts with pinned public key"
+        )
+    signed_payload = receipt.model_dump(mode="json")
+    attestation = signed_payload.pop("attestation")
+    digest_payload = dict(signed_payload)
+    receipt_id = digest_payload.pop("receipt_id")
+    if receipt_id != _digest(digest_payload):
+        raise CanaryRunnerError("canary receipt identity does not address its content")
+    try:
+        signature = base64.urlsafe_b64decode(attestation + "==")
+        public_key.verify(signature, canonical_json_bytes(signed_payload))
+    except (InvalidSignature, ValueError) as exc:
+        raise CanaryRunnerError("canary receipt attestation did not verify") from exc
+    if receipt.observed_at > now + MAX_CANARY_FUTURE_SKEW:
+        raise CanaryRunnerError("canary receipt observation is in the future")
+    if receipt.expires_at <= now:
+        raise CanaryRunnerError("canary receipt is expired")
+    if require_success and (
+        not receipt.call_succeeded or not receipt.result_contract_matched
+    ):
+        raise CanaryRunnerError(
+            "canary receipt does not prove a successful matching read"
+        )
+    return receipt
 
 
 def _model_json(value: Any) -> Any:
@@ -558,7 +633,9 @@ async def live_probe(
         from mcp import ClientSession
         from mcp.client.streamable_http import streamable_http_client
     except ImportError as exc:
-        raise CanaryRunnerError("MCP canary runtime dependencies are unavailable") from exc
+        raise CanaryRunnerError(
+            "MCP canary runtime dependencies are unavailable"
+        ) from exc
 
     started = time.monotonic()
     request_timeout_seconds = await _wait_for_endpoint_listener(
@@ -641,13 +718,9 @@ async def live_probe(
                     result = await session.call_tool(
                         contract.tool_name,
                         contract.arguments,
-                        read_timeout_seconds=timedelta(
-                            seconds=request_timeout_seconds
-                        ),
+                        read_timeout_seconds=timedelta(seconds=request_timeout_seconds),
                     )
-                    call_latency_ms = int(
-                        (time.monotonic() - call_started) * 1000
-                    )
+                    call_latency_ms = int((time.monotonic() - call_started) * 1000)
                     payload = _structured_result(result)
                     call_succeeded = (
                         not bool(getattr(result, "isError", False))
@@ -680,17 +753,13 @@ async def live_probe(
                         call_succeeded=call_succeeded,
                         result=payload,
                         call_latency_ms=call_latency_ms,
-                        total_latency_ms=int(
-                            (time.monotonic() - started) * 1000
-                        ),
+                        total_latency_ms=int((time.monotonic() - started) * 1000),
                         reason_codes=reason_codes,
                     )
     except CanaryRunnerError:
         raise
     except Exception as exc:
-        raise CanaryRunnerError(
-            "authenticated MCP canary transport failed"
-        ) from exc
+        raise CanaryRunnerError("authenticated MCP canary transport failed") from exc
 
 
 _MISSING = object()
@@ -776,11 +845,9 @@ def _receipt_body(
     schema_identity: str | None = None
     result_digest: str | None = None
     if probe.result is not None:
-        contract_matched, contract_reasons, schema_identity = (
-            validate_result_contract(
-                probe.result,
-                contract,
-            )
+        contract_matched, contract_reasons, schema_identity = validate_result_contract(
+            probe.result,
+            contract,
         )
         result_digest = _bounded_digest(
             probe.result,
@@ -816,10 +883,7 @@ def _receipt_body(
         "result_schema_identity": schema_identity,
         "result_digest": result_digest,
         "result_artifact_ref": (
-            (
-                f"results/{target.organ_id}/"
-                f"{result_digest.removeprefix('sha256:')}.json"
-            )
+            (f"results/{target.organ_id}/{result_digest.removeprefix('sha256:')}.json")
             if probe.call_succeeded and result_digest is not None
             else None
         ),
@@ -1079,9 +1143,7 @@ async def run_canary(
     result_path: Path | None = None
     if receipt.call_succeeded:
         if probe.result is None or receipt.result_artifact_ref is None:
-            raise CanaryRunnerError(
-                "successful canary result artifact is unavailable"
-            )
+            raise CanaryRunnerError("successful canary result artifact is unavailable")
         result_artifact = build_result_artifact(
             receipt=receipt,
             owner_payload=probe.result,
@@ -1158,9 +1220,7 @@ def main() -> int:
                 "record_path": record_path.as_posix(),
                 "overlay_path": overlay_path.as_posix(),
                 "result_artifact_path": (
-                    result_path.as_posix()
-                    if result_path is not None
-                    else None
+                    result_path.as_posix() if result_path is not None else None
                 ),
                 "claim_limit": receipt.claim_limit,
             },

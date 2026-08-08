@@ -1,0 +1,59 @@
+{
+  "claim_limits": [
+    "This receipt proves requestState handle behavior for one isolated read-only KAG pair, not Codex next-wire support.",
+    "Same-request replay is deliberately allowed only because this lab tool is read-only and idempotent.",
+    "Effectful handle replay policy requires a separate gate and receipt.",
+    "Key retirement proves handle revocation after restart, not OAuth token revocation.",
+    "The adapter was not registered, deployed, admitted, or granted owner authority.",
+    "KAG remains evidence and navigation; owner sources retain authority."
+  ],
+  "finished_at": "2026-08-08T09:01:44.566506Z",
+  "handle_checks": {
+    "cross_request_replay": "denied",
+    "expiry": "denied",
+    "key_retirement_revocation": "denied",
+    "principal_isolation": "denied",
+    "same_request_replay": "allowed_read_only_idempotent",
+    "same_request_result_unchanged": true,
+    "tamper": "denied",
+    "valid_round_trip": "passed"
+  },
+  "handle_contract": {
+    "bearer_verified_each_request": true,
+    "opaque": true,
+    "plaintext_observed_on_wire": false,
+    "principal_binding": ["client_id", "issuer", "subject"],
+    "raw_tokens_recorded": false,
+    "ttl_seconds": 5.0
+  },
+  "observation_id": "aoa-kag-handle-pair-20260808",
+  "observed_at": "2026-08-08T09:01:30.248270Z",
+  "owner_canary": {
+    "freshness_state": "current",
+    "owner": "abyss-stack",
+    "projection_exact_state": "current",
+    "schema_version": "aoa-kag-mcp-capabilities-v1"
+  },
+  "python_sdk": {
+    "commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
+    "version": "2.0.0"
+  },
+  "raw_receipt": {
+    "mode": "0600",
+    "ref": "local:///srv/abyss-machine/cache/mcp-next-20260808/evidence/kag-handle-pair-20260808-private.json",
+    "sha256": "8750f245488d24d9a8ca8eb586bf41fec0a618d1da18b6f631053084b18a1cc2"
+  },
+  "rejection_shape": {
+    "code": -32602,
+    "data": {"reason": "invalid_request_state"},
+    "message": "Invalid or expired requestState"
+  },
+  "schema_version": "abyss_mcp_kag_handle_pair_observation_v1",
+  "source_revisions": {
+    "abyss_stack": "2bb043e160b6a2c001abad4f4de6969b35782466",
+    "aoa_kag": "ba7805190527a635ff5c515701be29379af8277f"
+  },
+  "stable_registration_unchanged": true,
+  "verdict": "handle_pair_passed",
+  "wire_version": "2026-07-28"
+}

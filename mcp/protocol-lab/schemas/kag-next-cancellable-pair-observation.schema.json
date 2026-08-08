@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os-abyss.dev/schemas/kag-next-cancellable-pair-observation.schema.json",
+  "title": "Cancellable KAG modern pair observation",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "abyss_mcp_kag_next_cancellable_pair_observation_v1"},
+    "observation_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "python_sdk": {"const": {"commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133", "version": "2.0.0"}},
+    "source_revisions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "abyss_stack": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "aoa_kag": {"const": "ba7805190527a635ff5c515701be29379af8277f"},
+        "stack_runtime_current_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      },
+      "required": ["abyss_stack", "aoa_kag", "stack_runtime_current_digest"]
+    },
+    "stable_registration": {"$ref": "#/$defs/config_unchanged"},
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "wire_version": {"const": "2026-07-28"},
+        "transport_response_mode": {"const": "sse_disconnect_cancellable"},
+        "server_discover_observed": {"const": true},
+        "supported_versions": {"const": ["2026-07-28"]},
+        "tool_inventory": {"const": ["kag_discover"]},
+        "resource_inventory": {"const": ["aoa-kag-next://capabilities"]},
+        "cache": {
+          "const": {"repeat_tools_list_wire_fetches": 1, "scope": "private", "ttl_ms": 30000}
+        },
+        "cancellation": {
+          "const": {"client_request_cancelled": true, "server_dispatch_cancelled": true, "server_dispatch_completed_after_client_cancel": false}
+        },
+        "independent_clients": {"const": 2},
+        "self_describing_dispatches": {"type": "integer", "minimum": 1},
+        "session_header_observed": {"const": false},
+        "server_request_backchannel_observed": {"const": false},
+        "trace_sent": {"type": "string", "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"},
+        "trace_observed": {"type": "string", "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"}
+      },
+      "required": ["wire_version", "transport_response_mode", "server_discover_observed", "supported_versions", "tool_inventory", "resource_inventory", "cache", "cancellation", "independent_clients", "self_describing_dispatches", "session_header_observed", "server_request_backchannel_observed", "trace_sent", "trace_observed"]
+    },
+    "denials": {"const": {"effect_like_tool_code": -32601, "legacy_client_code": -32022}},
+    "owner_canary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {"const": "abyss-stack"},
+        "schema_version": {"const": "aoa-kag-mcp-capabilities-v1"},
+        "runtime_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "freshness_state": {"const": "current"},
+        "projection_exact_state": {"const": "current"},
+        "degradation": {"const": []}
+      },
+      "required": ["owner", "schema_version", "runtime_source_digest", "freshness_state", "projection_exact_state", "degradation"]
+    },
+    "raw_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {"type": "string", "pattern": "^local://"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "mode": {"const": "0600"}
+      },
+      "required": ["ref", "sha256", "mode"]
+    },
+    "verdict": {"const": "adapter_pair_passed_with_cancellation"},
+    "claim_limits": {"type": "array", "items": {"type": "string", "minLength": 3}, "minItems": 5}
+  },
+  "required": ["schema_version", "observation_id", "observed_at", "finished_at", "python_sdk", "source_revisions", "stable_registration", "pair", "denials", "owner_canary", "raw_receipt", "verdict", "claim_limits"],
+  "$defs": {
+    "config_unchanged": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "config_digest_before": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "config_digest_after": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "unchanged": {"const": true}
+      },
+      "required": ["config_digest_before", "config_digest_after", "unchanged"]
+    }
+  }
+}

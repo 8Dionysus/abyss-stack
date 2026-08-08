@@ -3,7 +3,7 @@
 - Decision ID: ABYSS-STACK-D-0096
 - Status: accepted
 - Date: 2026-07-26
-- Last evidence refresh: 2026-08-01
+- Last evidence refresh: 2026-08-08
 - Owner surface: `mcp/protocol-lab/`
 
 ## Index Metadata
@@ -13,7 +13,7 @@
 - Stack lanes: MCP services, organ access fabric, validation
 - Mechanic parents: runtime-lifecycle
 - Guard families: exact pin, fail closed, dual support, read-only canary, rollback
-- Posture: accepted modern-lab proof with production cutover blocked
+- Posture: accepted stable modern-lab proof with independent production admission
 
 ## Context
 
@@ -25,36 +25,39 @@ SDK type, schema listing, process start, or one unqualified client call.
 
 The final specification is pinned at
 `5f5440bb26a62e2cf3440b92da5a667efa03b267`. Python MCP `2.0.0` and
-TypeScript client/server `2.0.0` are stable. Production Codex `0.146.0`
-remains on MCP `2025-11-25`; its earlier isolated Python `2.0.0` exchange
+TypeScript client/server `2.0.0` are stable. Stable Codex `0.147.0` is the
+current consumer, while the production registration remains on MCP
+`2025-11-25`; an earlier isolated Python `2.0.0` exchange
 fell back to `2025-06-18` and never sent `server/discover`.
 
 Current conformance source at exact commit
-`81eb1c3edaed87d7fd585d7b80186da7a2960660` changes the former green SDK
-observation. The Python `2.0.0` server fixture passed 40 checks in the twenty
-scenarios exposed by its SDK runner. The client fixture passed 372 checks and
-failed two because it does not recognize the newly added
-`json-schema-2020-12-preservation` scenario. The mismatch is a real blocker
-and is not hidden in an expected-failure baseline.
+`c321dd32035556e6769d3724a8ee97d87c3faaac` freezes requirements per
+specification revision. Against the requirements frozen for `2026-07-28`, the
+Python `2.0.0` client passed 372 scored checks in 32 scenarios and the server
+passed 119 scored checks in 37 scenarios, with zero scored failures. Later
+auth, JSON Schema, and Tasks scenarios still run for visibility; their
+failures remain explicit but do not redefine a released revision
+retroactively.
 
-An exact Codex `0.147.0-alpha.4` isolated contour has passed the actual
+An exact stable Codex `0.147.0` isolated contour has passed the actual
 registered modern read canary. With `mcp_2026_07_28` explicitly enabled, the separately named
 and credentialed `aoa_kag_next_lab` used `server/discover`, MCP
 `2026-07-28`, no legacy initialization, no MCP session header, and performed
 one exact `kag_discover` call with principal and trace evidence. A wrong bearer
 was rejected with HTTP `401`; an oversized request was rejected with MCP
-`-32602` under explicit input/output bounds. A separate direct Python MCP
-`2.0.0` cancellation probe then found that local client cancellation did not
-stop server dispatch: the client request was cancelled, but the server handler
-completed afterward. That is a failed pair property, not a passed canary fact.
+`-32602` under explicit input/output bounds. The modern endpoint uses the SSE
+response path so a disconnected Streamable HTTP request reaches the server
+worker: the client request and server dispatch were both cancelled, and the
+handler did not complete afterward. The Python `2.0.0` JSON-response shortcut
+is not generalized as equivalent cancellation evidence.
 
 Rollback removed only the lab app-server, MCP process, endpoint, credential,
 registration, and isolated `CODEX_HOME`. The operator config remained
-byte-identical, after which Codex `0.146.0` successfully called the existing
-`aoa_kag` registration through the actual operator config. Because the modern
-consumer is a prerelease, current conformance is red, and cancellation does
-not propagate, this closes the registered canary and rollback experiment but
-does not pass the complete lab pair or authorize production cutover. Python MCP `2.0.0` also does
+byte-identical, after which stable Codex `0.147.0` successfully called the
+existing `aoa_kag` registration through the actual operator config. Because
+the modern feature remains under development and the modern contour has not
+received production admission, this passes the isolated lab pair but does not
+authorize production cutover. Python MCP `2.0.0` also does
 not implement the final Tasks extension. Production services intentionally
 retain `mcp>=1.27.2,<2` and the `abyss-stack-mcp` exact `1.27.2` lock.
 
@@ -78,8 +81,9 @@ rollback.
 The first pilot is the compact read-only `aoa-kag` access plane. Its stable
 registration remains `aoa_kag`. The modern lab uses `aoa_kag_next_lab` with
 an independent process, endpoint, credential, runtime, exact consumer, and
-Codex home. A prerelease pair may pass the lab without acquiring production
-authority. Candidate and effect organs are excluded, and protocol migration
+Codex home. A stable pair with an explicitly enabled under-development feature
+may pass the lab without acquiring production authority. Candidate and effect
+organs are excluded, and protocol migration
 cannot be combined with an owner-authority move.
 
 The generated status reports separate:
@@ -91,7 +95,7 @@ The generated status reports separate:
 - `external_effect_migration_allowed`.
 
 P1-11 is Tasks-only and cannot block interpretation of the core-read gate. A
-passed prerelease pilot is reported separately from production eligibility.
+passed isolated pilot is reported separately from production eligibility.
 
 ## Rationale
 
@@ -105,26 +109,26 @@ behavior without durable memory, proof acceptance, source changes, or effects.
 
 ## Consequences
 
-- P1-03, P1-13, and P1-14 now pass on the actual prerelease canary and rollback.
-- P1-04 remains blocked on the current conformance fixture mismatch.
-- P1-05 remains blocked because client cancellation did not stop server
-  dispatch.
-- P1-11 remains independently blocked on Tasks; the other eleven gates pass.
-- Codex `0.146.0` remains the legacy production consumer; Codex
-  `0.147.0-alpha.4` is proven only as an isolated modern lab consumer.
-- Production cutover requires both a production-eligible modern Codex pair and
-  green current conformance.
+- P1-03 through P1-05, P1-13, and P1-14 pass on the stable modern canary,
+  frozen-revision conformance, propagated cancellation, and rollback.
+- P1-11 remains independently blocked on Tasks; the other thirteen gates pass.
+- Stable Codex `0.147.0` is proven as an isolated modern lab consumer while
+  its production registration remains on the legacy `2025-11-25` route.
+- Production cutover requires an independent admission, deployment canary,
+  registry refresh, observation window, and rollback for the production
+  contour.
 - Candidate, internal-effect, and external-effect migration remain false.
-- Every spec, SDK, conformance, Codex, transport, auth, source-artifact, or
-  registration drift requires a refreshed observation.
+- A content-addressed watcher observes exact upstream releases, conformance
+  main, Codex binary/features, local behavior sources, and evidence TTL. It may
+  invoke only a removable configured lab suite and never advances production.
 
 ## Claim limits
 
-This decision and its validators prove an exact prerelease modern Codex contour,
+This decision and its validators prove an exact stable modern Codex lab contour,
 a separately credentialed registered read canary, fail-closed auth and input
 bounds, lab removal, operator-config non-mutation, and stable-route recovery.
-They do not prove a production-eligible modern Codex pair, green current
-conformance, propagated cancellation, multi-replica invalidation, owner admission or acceptance, task
+They do not prove production admission or cutover, multi-replica invalidation,
+owner admission or acceptance, task
 benefit, candidate safety, or any effect migration.
 
 ## Source surfaces
@@ -136,9 +140,9 @@ benefit, candidate safety, or any effect migration.
 
 ## Follow-up route
 
-Refresh the exact lab whenever Codex, SDK, auth, schema, source artifacts, or
-transport changes. Repair or refresh the current conformance fixture pair,
-prove cancellation propagation, and wait for a production-eligible Codex
-modern pair before reopening core-read production cutover. Wait for an exact SDK implementation before reopening
-Tasks. Candidate and effect migration remain under later independent
-contracts.
+Let the watcher request a fresh exact lab whenever Codex, SDK, conformance,
+auth, schema, source artifacts, transport, behavior, or evidence TTL changes.
+Admit and deploy the production-shaped read contour only through its separate
+registry, canary, observation, and rollback transaction. Wait for an exact
+SDK/client extension pair before reopening Tasks. Candidate and effect
+migration remain under later independent contracts.

@@ -1,0 +1,688 @@
+{
+  "$defs": {
+    "AdmissionStatusAxis": {
+      "additionalProperties": false,
+      "properties": {
+        "admission_current": {
+          "title": "Admission Current",
+          "type": "boolean"
+        },
+        "blocked_stage_count": {
+          "minimum": 0,
+          "title": "Blocked Stage Count",
+          "type": "integer"
+        },
+        "blocker_codes": {
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "title": "Blocker Codes",
+          "type": "array"
+        },
+        "cost_weight_not_planned": {
+          "minimum": 0,
+          "title": "Cost Weight Not Planned",
+          "type": "integer"
+        },
+        "currentness": {
+          "items": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "title": "Currentness",
+          "type": "array"
+        },
+        "evidence_expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Expires At"
+        },
+        "full_refresh_cost": {
+          "minimum": 0,
+          "title": "Full Refresh Cost",
+          "type": "integer"
+        },
+        "last_good_present": {
+          "title": "Last Good Present",
+          "type": "boolean"
+        },
+        "last_good_state_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Good State Digest"
+        },
+        "last_good_state_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Good State Ref"
+        },
+        "next_safe_step": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Next Safe Step",
+          "type": "string"
+        },
+        "planned_refresh_cost": {
+          "minimum": 0,
+          "title": "Planned Refresh Cost",
+          "type": "integer"
+        },
+        "refresh_transaction_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Refresh Transaction Ref",
+          "type": "string"
+        },
+        "refreshed_stage_count": {
+          "minimum": 0,
+          "title": "Refreshed Stage Count",
+          "type": "integer"
+        },
+        "reused_stage_count": {
+          "minimum": 0,
+          "title": "Reused Stage Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "admission_current",
+        "currentness",
+        "last_good_present",
+        "blocker_codes",
+        "refresh_transaction_ref",
+        "full_refresh_cost",
+        "planned_refresh_cost",
+        "cost_weight_not_planned",
+        "reused_stage_count",
+        "refreshed_stage_count",
+        "blocked_stage_count",
+        "next_safe_step"
+      ],
+      "title": "AdmissionStatusAxis",
+      "type": "object"
+    },
+    "ContourSystemStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "admission": {
+          "$ref": "#/$defs/AdmissionStatusAxis"
+        },
+        "contour_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Contour Id",
+          "type": "string"
+        },
+        "organ_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Organ Id",
+          "type": "string"
+        },
+        "owner": {
+          "$ref": "#/$defs/OwnerStatusAxis"
+        },
+        "runtime": {
+          "$ref": "#/$defs/RuntimeStatusAxis"
+        }
+      },
+      "required": [
+        "organ_id",
+        "contour_id",
+        "runtime",
+        "admission",
+        "owner"
+      ],
+      "title": "ContourSystemStatus",
+      "type": "object"
+    },
+    "OwnerStatusAxis": {
+      "additionalProperties": false,
+      "properties": {
+        "owner_acceptance_inferred": {
+          "const": false,
+          "default": false,
+          "title": "Owner Acceptance Inferred",
+          "type": "boolean"
+        },
+        "owner_truth_inferred": {
+          "const": false,
+          "default": false,
+          "title": "Owner Truth Inferred",
+          "type": "boolean"
+        },
+        "owner_watermark": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner Watermark"
+        },
+        "owner_watermark_state": {
+          "enum": [
+            "observed",
+            "unobserved"
+          ],
+          "title": "Owner Watermark State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner_watermark_state"
+      ],
+      "title": "OwnerStatusAxis",
+      "type": "object"
+    },
+    "ProtocolSystemStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "blocker_codes": {
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "title": "Blocker Codes",
+          "type": "array"
+        },
+        "core_read_migration_allowed": {
+          "title": "Core Read Migration Allowed",
+          "type": "boolean"
+        },
+        "next_protocol": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Next Protocol",
+          "type": "string"
+        },
+        "production_protocol": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Production Protocol",
+          "type": "string"
+        },
+        "status_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Status Digest",
+          "type": "string"
+        },
+        "tasks_codex_consumer_eligible": {
+          "title": "Tasks Codex Consumer Eligible",
+          "type": "boolean"
+        },
+        "tasks_evidence_expires_at": {
+          "format": "date-time",
+          "title": "Tasks Evidence Expires At",
+          "type": "string"
+        },
+        "tasks_extension_allowed": {
+          "title": "Tasks Extension Allowed",
+          "type": "boolean"
+        },
+        "tasks_inspector_strict_pair_blocked": {
+          "title": "Tasks Inspector Strict Pair Blocked",
+          "type": "boolean"
+        },
+        "tasks_reference_consumer": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Tasks Reference Consumer",
+          "type": "string"
+        },
+        "tasks_reference_pair_passed": {
+          "title": "Tasks Reference Pair Passed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "production_protocol",
+        "next_protocol",
+        "core_read_migration_allowed",
+        "tasks_extension_allowed",
+        "tasks_reference_consumer",
+        "tasks_reference_pair_passed",
+        "tasks_inspector_strict_pair_blocked",
+        "tasks_codex_consumer_eligible",
+        "tasks_evidence_expires_at",
+        "blocker_codes",
+        "status_digest"
+      ],
+      "title": "ProtocolSystemStatus",
+      "type": "object"
+    },
+    "RuntimeStatusAxis": {
+      "additionalProperties": false,
+      "properties": {
+        "active_protocol": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Active Protocol",
+          "type": "string"
+        },
+        "blocker_codes": {
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "title": "Blocker Codes",
+          "type": "array"
+        },
+        "credential_class": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Credential Class",
+          "type": "string"
+        },
+        "credential_generation": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Credential Generation"
+        },
+        "credential_generation_state": {
+          "enum": [
+            "observed",
+            "unobserved"
+          ],
+          "title": "Credential Generation State",
+          "type": "string"
+        },
+        "live_evidence_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Live Evidence Ref"
+        },
+        "live_state": {
+          "enum": [
+            "observed",
+            "blocked",
+            "unobserved"
+          ],
+          "title": "Live State",
+          "type": "string"
+        },
+        "next_protocol": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Next Protocol",
+          "type": "string"
+        },
+        "preflight_eligible": {
+          "title": "Preflight Eligible",
+          "type": "boolean"
+        },
+        "schema_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Schema Digest",
+          "type": "string"
+        },
+        "source_runtime_parity": {
+          "enum": [
+            "exact",
+            "blocked"
+          ],
+          "title": "Source Runtime Parity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "live_state",
+        "source_runtime_parity",
+        "preflight_eligible",
+        "blocker_codes",
+        "active_protocol",
+        "next_protocol",
+        "credential_class",
+        "credential_generation_state",
+        "schema_digest"
+      ],
+      "title": "RuntimeStatusAxis",
+      "type": "object"
+    },
+    "TaskQuotaSystemStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "active_tasks": {
+          "minimum": 0,
+          "title": "Active Tasks",
+          "type": "integer"
+        },
+        "global_remaining": {
+          "minimum": 0,
+          "title": "Global Remaining",
+          "type": "integer"
+        },
+        "maximum_active_tasks": {
+          "minimum": 1,
+          "title": "Maximum Active Tasks",
+          "type": "integer"
+        },
+        "maximum_active_tasks_per_principal": {
+          "minimum": 1,
+          "title": "Maximum Active Tasks Per Principal",
+          "type": "integer"
+        },
+        "maximum_observed_active_per_principal": {
+          "minimum": 0,
+          "title": "Maximum Observed Active Per Principal",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "maximum_active_tasks",
+        "maximum_active_tasks_per_principal",
+        "active_tasks",
+        "maximum_observed_active_per_principal",
+        "global_remaining"
+      ],
+      "title": "TaskQuotaSystemStatus",
+      "type": "object"
+    },
+    "TaskSystemStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "active_count": {
+          "minimum": 0,
+          "title": "Active Count",
+          "type": "integer"
+        },
+        "admission_inferred": {
+          "const": false,
+          "default": false,
+          "title": "Admission Inferred",
+          "type": "boolean"
+        },
+        "contains_principal_identifiers": {
+          "const": false,
+          "default": false,
+          "title": "Contains Principal Identifiers",
+          "type": "boolean"
+        },
+        "contains_task_identifiers": {
+          "const": false,
+          "default": false,
+          "title": "Contains Task Identifiers",
+          "type": "boolean"
+        },
+        "expired_unpersisted_count": {
+          "minimum": 0,
+          "title": "Expired Unpersisted Count",
+          "type": "integer"
+        },
+        "next_expiry_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Expiry At"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "oldest_active_updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Oldest Active Updated At"
+        },
+        "orphan_after_seconds": {
+          "minimum": 60,
+          "title": "Orphan After Seconds",
+          "type": "integer"
+        },
+        "orphan_candidate_basis": {
+          "const": "pending_cancellation_without_terminal_transition",
+          "title": "Orphan Candidate Basis",
+          "type": "string"
+        },
+        "orphan_candidate_count": {
+          "minimum": 0,
+          "title": "Orphan Candidate Count",
+          "type": "integer"
+        },
+        "outstanding_input_count": {
+          "minimum": 0,
+          "title": "Outstanding Input Count",
+          "type": "integer"
+        },
+        "owner_execution_inferred": {
+          "const": false,
+          "default": false,
+          "title": "Owner Execution Inferred",
+          "type": "boolean"
+        },
+        "owner_transaction_survives_task_loss": {
+          "const": true,
+          "default": true,
+          "title": "Owner Transaction Survives Task Loss",
+          "type": "boolean"
+        },
+        "pending_cancellation_count": {
+          "minimum": 0,
+          "title": "Pending Cancellation Count",
+          "type": "integer"
+        },
+        "quota": {
+          "$ref": "#/$defs/TaskQuotaSystemStatus"
+        },
+        "record_count": {
+          "minimum": 0,
+          "title": "Record Count",
+          "type": "integer"
+        },
+        "schema_version": {
+          "const": "aoa_owner_task_store_status_v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status_counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Status Counts",
+          "type": "object"
+        },
+        "task_cancellation_erases_evidence": {
+          "const": false,
+          "default": false,
+          "title": "Task Cancellation Erases Evidence",
+          "type": "boolean"
+        },
+        "task_completion_implies_admission": {
+          "const": false,
+          "default": false,
+          "title": "Task Completion Implies Admission",
+          "type": "boolean"
+        },
+        "task_handle_is_admission_identity": {
+          "const": false,
+          "default": false,
+          "title": "Task Handle Is Admission Identity",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schema_version",
+        "observed_at",
+        "record_count",
+        "active_count",
+        "status_counts",
+        "outstanding_input_count",
+        "pending_cancellation_count",
+        "expired_unpersisted_count",
+        "orphan_candidate_count",
+        "orphan_after_seconds",
+        "orphan_candidate_basis",
+        "quota"
+      ],
+      "title": "TaskSystemStatus",
+      "type": "object"
+    }
+  },
+  "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/mcp-system-status.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "claim_limits": {
+      "items": {
+        "maxLength": 2048,
+        "minLength": 1,
+        "pattern": "\\S",
+        "type": "string"
+      },
+      "title": "Claim Limits",
+      "type": "array"
+    },
+    "contours": {
+      "items": {
+        "$ref": "#/$defs/ContourSystemStatus"
+      },
+      "title": "Contours",
+      "type": "array"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "next_safe_step": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Next Safe Step",
+      "type": "string"
+    },
+    "operational_health_admission_owner_truth_collapsed": {
+      "const": false,
+      "default": false,
+      "title": "Operational Health Admission Owner Truth Collapsed",
+      "type": "boolean"
+    },
+    "protocol": {
+      "$ref": "#/$defs/ProtocolSystemStatus"
+    },
+    "registry_mutation_performed": {
+      "const": false,
+      "default": false,
+      "title": "Registry Mutation Performed",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "abyss_mcp_system_status_v1",
+      "default": "abyss_mcp_system_status_v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "services_started_or_restarted": {
+      "const": false,
+      "default": false,
+      "title": "Services Started Or Restarted",
+      "type": "boolean"
+    },
+    "status_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Status Id",
+      "type": "string"
+    },
+    "tasks": {
+      "$ref": "#/$defs/TaskSystemStatus"
+    }
+  },
+  "required": [
+    "status_id",
+    "generated_at",
+    "contours",
+    "protocol",
+    "tasks",
+    "next_safe_step",
+    "claim_limits"
+  ],
+  "title": "MCPSystemStatus",
+  "type": "object"
+}

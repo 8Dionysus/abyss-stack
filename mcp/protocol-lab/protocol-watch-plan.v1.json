@@ -1,0 +1,118 @@
+{
+  "schema_version": "abyss_mcp_protocol_watch_plan_v1",
+  "plan_id": "os-abyss-mcp-next-watch",
+  "ttl_lead_seconds": 86400,
+  "ttl_source": {
+    "path": "generated/protocol-lab-status.json",
+    "pointer": "/evidence_expires_at"
+  },
+  "inputs": [
+    {
+      "input_id": "codex-consumer",
+      "kind": "executable",
+      "command": "codex",
+      "probe_argv": ["--version"],
+      "feature_argv": ["features", "list"],
+      "required": true
+    },
+    {
+      "input_id": "codex-registry-latest",
+      "kind": "https_json",
+      "url": "https://registry.npmjs.org/@openai%2fcodex/latest",
+      "select": ["/version", "/dist/integrity", "/dist/shasum"],
+      "required": true
+    },
+    {
+      "input_id": "mcp-spec-latest",
+      "kind": "https_json",
+      "url": "https://api.github.com/repos/modelcontextprotocol/modelcontextprotocol/releases/latest",
+      "select": ["/tag_name", "/target_commitish", "/published_at"],
+      "required": true
+    },
+    {
+      "input_id": "python-sdk-latest",
+      "kind": "https_json",
+      "url": "https://api.github.com/repos/modelcontextprotocol/python-sdk/releases/latest",
+      "select": ["/tag_name", "/target_commitish", "/published_at"],
+      "required": true
+    },
+    {
+      "input_id": "typescript-sdk-latest",
+      "kind": "https_json",
+      "url": "https://api.github.com/repos/modelcontextprotocol/typescript-sdk/releases/latest",
+      "select": ["/tag_name", "/target_commitish", "/published_at"],
+      "required": true
+    },
+    {
+      "input_id": "go-sdk-latest",
+      "kind": "https_json",
+      "url": "https://api.github.com/repos/modelcontextprotocol/go-sdk/releases/latest",
+      "select": ["/tag_name", "/target_commitish", "/published_at"],
+      "required": true
+    },
+    {
+      "input_id": "rust-sdk-latest",
+      "kind": "https_json",
+      "url": "https://api.github.com/repos/modelcontextprotocol/rust-sdk/releases/latest",
+      "select": ["/tag_name", "/target_commitish", "/published_at"],
+      "required": true
+    },
+    {
+      "input_id": "csharp-sdk-latest",
+      "kind": "https_json",
+      "url": "https://api.github.com/repos/modelcontextprotocol/csharp-sdk/releases/latest",
+      "select": ["/tag_name", "/target_commitish", "/published_at"],
+      "required": true
+    },
+    {
+      "input_id": "inspector-latest",
+      "kind": "https_json",
+      "url": "https://api.github.com/repos/modelcontextprotocol/inspector/releases/latest",
+      "select": ["/tag_name", "/target_commitish", "/published_at"],
+      "required": true
+    },
+    {
+      "input_id": "conformance-main",
+      "kind": "https_json",
+      "url": "https://api.github.com/repos/modelcontextprotocol/conformance/commits/main",
+      "select": ["/sha", "/commit/committer/date"],
+      "required": true
+    },
+    {
+      "input_id": "protocol-contract",
+      "kind": "tree",
+      "paths": [
+        "protocol-compatibility-matrix.v1.json",
+        "tasks-compatibility-matrix.v1.json",
+        "fixtures/current-pair-observation.json",
+        "fixtures/tasks-adapter-pilot-20260808.json",
+        "fixtures/rmcp-3.1.2-tasks-adapter-pair-20260808.json",
+        "fixtures/inspector-2.1.0-tasks-strict-pair-blocked-20260808.json",
+        "scripts/run_codex_kag_next_lab.py",
+        "scripts/run_kag_next_pair.py",
+        "scripts/run_kag_handle_pair.py",
+        "scripts/run_kag_cache_pair.py",
+        "scripts/run_frozen_conformance.py",
+        "scripts/run_tasks_adapter_pilot.py",
+        "scripts/run_rust_tasks_adapter_pair.py",
+        "scripts/run_inspector_tasks_adapter_pair.py",
+        "scripts/normalize_protocol_watch_run.py",
+        "scripts/protocol_watcher.py"
+      ],
+      "required": true
+    },
+    {
+      "input_id": "protocol-status",
+      "kind": "file",
+      "path": "generated/protocol-lab-status.json",
+      "required": true
+    }
+  ],
+  "claim_limits": [
+    "A detected upstream or local change requests a fresh isolated lab run; it does not authorize production migration.",
+    "Network metadata is a refresh signal and must be followed by exact source, package, binary and pair receipts.",
+    "Only a successful configured lab suite advances the last-success fingerprint.",
+    "Tasks ecosystem drift retriggers the lab but cannot block an otherwise independent core-read migration verdict.",
+    "The watcher never edits, starts, stops, restarts or re-registers a production MCP contour."
+  ]
+}

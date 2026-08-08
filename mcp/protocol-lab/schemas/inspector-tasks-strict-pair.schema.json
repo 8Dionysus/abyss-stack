@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os-abyss.dev/schemas/inspector-tasks-strict-pair.schema.json",
+  "title": "Inspector modern Tasks strict-pair blocker",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "abyss_inspector_tasks_strict_pair_v1"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "protocol_version": {"const": "2026-07-28"},
+    "extension_id": {"const": "io.modelcontextprotocol/tasks"},
+    "inspector": {
+      "const": {
+        "version": "2.1.0",
+        "commit": "c7bccd477d38c2c17afb4878bcca8ee5f563c5d2",
+        "published_release": true,
+        "uses_raw_wire_workaround": true,
+        "self_integration_tests": {"passed": 11, "failed": 0}
+      }
+    },
+    "strict_pair": {
+      "const": {
+        "task_create_reached": true,
+        "tasks_get_reached": true,
+        "extension_on_tasks_get": true,
+        "mcp_method_on_tasks_get": true,
+        "mcp_name_on_tasks_get": false
+      }
+    },
+    "adapter_response": {
+      "const": {
+        "error_code": -32020,
+        "http_status": 400,
+        "strict_boundary_retained": true
+      }
+    },
+    "verdict": {"const": "blocked_missing_mcp_name_on_raw_tasks_get"},
+    "claim_limits": {"type": "array", "minItems": 4, "items": {"type": "string", "minLength": 12}}
+  },
+  "required": ["schema_version", "observed_at", "protocol_version", "extension_id", "inspector", "strict_pair", "adapter_response", "verdict", "claim_limits"]
+}

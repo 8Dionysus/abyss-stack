@@ -1,0 +1,108 @@
+{
+  "acceptance_asserted": false,
+  "admission_asserted": false,
+  "contains_secrets": false,
+  "contours": [
+    {
+      "authority_class": "candidate",
+      "capabilities": [
+        {
+          "capability_id": "stack-access-plan",
+          "credential_class": "abyss-stack-candidate",
+          "eval_refs": [
+            "eval://aoa-organ-access-admission-integrity"
+          ],
+          "owner_payload_schema_ref": "repo://abyss-stack/mcp/services/abyss-stack-mcp/schemas/runtime-plan-candidate.schema.json",
+          "policy_family": "candidate",
+          "primitives": [
+            {
+              "annotations_are_security_enforcement": false,
+              "approval_required": false,
+              "effect_class": "prepare_candidate",
+              "idempotency": "idempotent",
+              "input_schema_ref": "owner://abyss-stack/mcp/stack_prepare_runtime_plan/input",
+              "kind": "tool",
+              "maximum_blast_radius": "one non-executing expiring runtime plan candidate",
+              "mcp_name": "stack_prepare_runtime_plan",
+              "output_schema_ref": "repo://abyss-stack/mcp/services/abyss-stack-mcp/schemas/runtime-plan-candidate.schema.json",
+              "policy_family": "candidate",
+              "primitive_id": "prepare-runtime-plan",
+              "rollback_route": "owner://abyss-stack/rollback/candidate"
+            }
+          ],
+          "summary": "Prepare one expiring content-addressed runtime plan candidate without executing it.",
+          "task_intent_terms": [
+            "runtime",
+            "plan",
+            "restart",
+            "rollback"
+          ]
+        }
+      ],
+      "contour_id": "candidate",
+      "credential_class": "abyss-stack-candidate",
+      "observation_route": "owner://abyss-stack/observation/candidate",
+      "policy_family": "candidate",
+      "principal_id": "abyss-stack-candidate-principal",
+      "rollback_route": "owner://abyss-stack/rollback/candidate"
+    },
+    {
+      "authority_class": "internal_effect",
+      "capabilities": [
+        {
+          "capability_id": "exact-read-restart-pilot",
+          "credential_class": "abyss-stack-internal-effect",
+          "eval_refs": [
+            "eval://aoa-organ-access-admission-integrity"
+          ],
+          "owner_payload_schema_ref": "repo://abyss-stack/mcp/services/abyss-stack-mcp/schemas/internal-effect-receipt.schema.json",
+          "policy_family": "internal_effect",
+          "primitives": [
+            {
+              "annotations_are_security_enforcement": false,
+              "approval_owner": "abyss-stack",
+              "approval_required": true,
+              "effect_class": "apply_runtime",
+              "idempotency": "idempotent",
+              "input_schema_ref": "owner://abyss-stack/mcp/stack_execute_approved_read_restart_pilot/input",
+              "kind": "tool",
+              "maximum_blast_radius": "two serialized restarts of abyss-stack-mcp-read.service: the approved pilot transition and mandatory rollback restart",
+              "mcp_name": "stack_execute_approved_read_restart_pilot",
+              "output_schema_ref": "repo://abyss-stack/mcp/services/abyss-stack-mcp/schemas/internal-effect-receipt.schema.json",
+              "policy_family": "internal_effect",
+              "primitive_id": "execute-approved-read-restart-pilot",
+              "rollback_route": "owner://abyss-stack/internal-effect/read-restart-pilot-v1"
+            }
+          ],
+          "summary": "Execute and immediately roll back one approved content-addressed restart of the exact stack MCP read unit, with authenticated canaries after both transitions.",
+          "task_intent_terms": [
+            "runtime",
+            "approved",
+            "restart",
+            "canary",
+            "rollback"
+          ]
+        }
+      ],
+      "contour_id": "internal-effect",
+      "credential_class": "abyss-stack-internal-effect",
+      "observation_route": "owner://abyss-stack/observation/internal_effect",
+      "policy_family": "internal_effect",
+      "principal_id": "abyss-stack-internal-effect-principal",
+      "rollback_route": "owner://abyss-stack/rollback/internal_effect"
+    }
+  ],
+  "organ_id": "abyss-stack",
+  "owner_decision_ref": "owner://abyss-stack/decision/ABYSS-STACK-D-0105",
+  "proof_asserted": false,
+  "runtime_identity_asserted": false,
+  "schema_version": "aoa_organ_contour_supplement_v1",
+  "source_evidence": {
+    "evidence_ref": "repo://abyss-stack/mcp/services/abyss-stack-mcp/organ-access.v1.json",
+    "observed_at": "2026-08-08T08:03:38Z",
+    "owner": "abyss-stack",
+    "revision": "sha256:43df76b369a10b69ba21a5c05c3b8aa4d7fd8177b0083f87bb97412cfc1542bf"
+  },
+  "source_owner": "abyss-stack",
+  "supplement_id": "abyss-stack-additional-contours-v1"
+}

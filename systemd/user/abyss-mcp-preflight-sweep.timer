@@ -1,0 +1,14 @@
+[Unit]
+Description=Periodic backstop for managed MCP preflight reports
+Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/README.md
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+RandomizedDelaySec=20s
+Persistent=false
+Unit=abyss-mcp-preflight-sweep.service
+
+[Install]
+WantedBy=timers.target

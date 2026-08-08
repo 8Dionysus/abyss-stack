@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os-abyss.dev/schemas/protocol-frozen-conformance-observation.schema.json",
+  "title": "Frozen MCP revision conformance observation",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "abyss_mcp_protocol_frozen_conformance_observation_v1"},
+    "observation_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "spec_version": {"const": "2026-07-28"},
+    "requirements_revision": {"const": "2026-07-28"},
+    "conformance_harness": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "commit": {"const": "c321dd32035556e6769d3724a8ee97d87c3faaac"},
+        "package_version": {"const": "0.2.0-alpha.11"},
+        "requirements_commit": {"const": "232a9014457eaf4c59559916e3d616d2f7f28f05"},
+        "requirements_anchor": {"const": "0.2.0-alpha.10"},
+        "source_checkout_clean": {"const": true}
+      },
+      "required": ["commit", "package_version", "requirements_commit", "requirements_anchor", "source_checkout_clean"]
+    },
+    "python_sdk": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {"const": "2.0.0"},
+        "commit": {"const": "6f69a3758ebf2ee55ce050f58b470ce11af71133"},
+        "source_checkout_clean": {"const": true}
+      },
+      "required": ["version", "commit", "source_checkout_clean"]
+    },
+    "directions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "client": {"$ref": "#/$defs/direction"},
+        "server": {"$ref": "#/$defs/direction"}
+      },
+      "required": ["client", "server"]
+    },
+    "verdict": {"const": "sdk_pair_passed_frozen_2026_07_28_requirements"},
+    "claim_limits": {"type": "array", "items": {"type": "string", "minLength": 3}, "minItems": 5}
+  },
+  "required": ["schema_version", "observation_id", "observed_at", "finished_at", "spec_version", "requirements_revision", "conformance_harness", "python_sdk", "directions", "verdict", "claim_limits"],
+  "$defs": {
+    "direction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "suite": {"const": "requirements:2026-07-28"},
+        "scored_scenario_count": {"type": "integer", "minimum": 1},
+        "scored_success_checks": {"type": "integer", "minimum": 1},
+        "scored_failed_checks": {"const": 0},
+        "scored_failure_ids": {"const": []},
+        "info_checks": {"type": "integer", "minimum": 0},
+        "skipped_checks": {"type": "integer", "minimum": 0},
+        "status": {"const": "passed"},
+        "visibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "not_scored_scenario_count": {"type": "integer", "minimum": 0},
+            "success_checks": {"type": "integer", "minimum": 0},
+            "failed_checks": {"type": "integer", "minimum": 0},
+            "failure_scenarios": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+          },
+          "required": ["not_scored_scenario_count", "success_checks", "failed_checks", "failure_scenarios"]
+        },
+        "raw_result_ref": {"type": "string", "pattern": "^local://"},
+        "manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "required": ["suite", "scored_scenario_count", "scored_success_checks", "scored_failed_checks", "scored_failure_ids", "info_checks", "skipped_checks", "status", "visibility", "raw_result_ref", "manifest_sha256"]
+    }
+  }
+}

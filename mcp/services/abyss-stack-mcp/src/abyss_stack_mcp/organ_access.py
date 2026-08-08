@@ -47,6 +47,7 @@ class OrganAccessPrimitive(StrictModel):
     idempotency: Literal["read_only", "idempotent"]
     maximum_blast_radius: NonEmpty
     approval_required: bool = False
+    approval_owner: Identifier | None = None
     annotations_are_security_enforcement: Literal[False] = False
     rollback_route: NonEmpty | None = None
 
@@ -61,6 +62,8 @@ class OrganAccessPrimitive(StrictModel):
             raise ValueError("organ primitive effect does not match its policy family")
         if self.policy_family == "read" and self.idempotency != "read_only":
             raise ValueError("read primitive must be read_only")
+        if self.policy_family in {"read", "candidate"} and self.approval_owner is not None:
+            raise ValueError("read and candidate primitives cannot name approval authority")
         if self.policy_family == "candidate" and self.rollback_route is None:
             raise ValueError("candidate primitive requires a rollback route")
         if self.policy_family == "internal_effect":
@@ -68,6 +71,8 @@ class OrganAccessPrimitive(StrictModel):
                 raise ValueError("internal-effect primitive requires explicit approval")
             if self.rollback_route is None:
                 raise ValueError("internal-effect primitive requires a rollback route")
+            if self.approval_owner != "abyss-stack":
+                raise ValueError("internal-effect primitive requires stack-owner approval")
         return self
 
 

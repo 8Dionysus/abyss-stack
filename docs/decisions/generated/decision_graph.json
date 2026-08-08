@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 106,
-  "edge_count": 2388,
+  "decision_count": 107,
+  "edge_count": 2413,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 911,
-    "DATED": 106,
-    "GUARDED_BY": 313,
-    "HAS_STATUS": 106,
-    "HAS_SURFACE_CLASS": 276,
-    "IN_STACK_LANE": 239,
-    "NEXT_DECISION": 105,
-    "OWNED_BY_SURFACE": 112,
-    "OWNS_DECISION": 106,
+    "CITES_SOURCE_SURFACE": 919,
+    "DATED": 107,
+    "GUARDED_BY": 318,
+    "HAS_STATUS": 107,
+    "HAS_SURFACE_CLASS": 279,
+    "IN_STACK_LANE": 242,
+    "NEXT_DECISION": 106,
+    "OWNED_BY_SURFACE": 113,
+    "OWNS_DECISION": 107,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 112
+    "UNDER_MECHANIC_PARENT": 113
   },
   "edges": [
     {
@@ -11418,11 +11418,131 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0106",
+      "target": "decision:ABYSS-STACK-D-0107",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0106",
       "target": "owner_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/effect.py",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0106",
+      "target": "mechanic_parent:runtime-lifecycle",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "source_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/admission_automation.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "source_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/managed_catalog.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "source_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/managed_topology.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "source_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/preflight.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "source_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/runtime_overlay.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "source_surface:systemd/user/abyss-mcp-admission-keeper.%2A",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "source_surface:systemd/user/abyss-stack-mcp-%2A.service",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "source_surface:systemd/user/aoa-organ-mcp-read%40.service",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "date:2026-08-08",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "guard_family:contour%20isolation",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "guard_family:exact%20identity",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "guard_family:fail%20closed",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "guard_family:immutable%20evidence",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "guard_family:periodic%20backstop",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "surface_class:MCP%20access%20plane",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "surface_class:operational%20evidence",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "surface_class:runtime%20admission",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "stack_lane:MCP%20services",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "stack_lane:organ%20access%20fabric",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "stack_lane:runtime%20lifecycle",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
+      "target": "owner_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/admission_automation.py",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
       "target": "mechanic_parent:runtime-lifecycle",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -11955,21 +12075,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0106",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0107",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1059,
+  "node_count": 1075,
   "node_type_counts": {
-    "date": 31,
-    "decision": 106,
-    "guard_family": 155,
+    "date": 32,
+    "decision": 107,
+    "guard_family": 159,
     "mechanic_parent": 10,
-    "owner_surface": 58,
+    "owner_surface": 59,
     "repo": 1,
-    "source_surface": 541,
+    "source_surface": 548,
     "stack_lane": 45,
     "status": 3,
-    "surface_class": 109
+    "surface_class": 111
   },
   "nodes": [
     {
@@ -12125,6 +12250,11 @@
     {
       "id": "date:2026-08-02",
       "label": "2026-08-02",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-08-08",
+      "label": "2026-08-08",
       "type": "date"
     },
     {
@@ -13082,7 +13212,7 @@
       "id": "decision:ABYSS-STACK-D-0096",
       "label": "ABYSS-STACK-D-0096",
       "path": "docs/decisions/ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md",
-      "posture": "accepted modern-lab proof with production cutover blocked",
+      "posture": "accepted stable modern-lab proof with independent production admission",
       "status": "accepted",
       "title": "ABYSS-STACK-D-0096 Fail-Closed MCP Protocol Migration Lab",
       "type": "decision"
@@ -13185,6 +13315,16 @@
       "posture": "accepted bounded internal-effect pilot",
       "status": "accepted",
       "title": "ABYSS-STACK-D-0106 Admit One Exact Stack MCP Read Restart Pilot",
+      "type": "decision"
+    },
+    {
+      "date": "2026-08-08",
+      "id": "decision:ABYSS-STACK-D-0107",
+      "label": "ABYSS-STACK-D-0107",
+      "path": "docs/decisions/ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md",
+      "posture": "accepted bounded admission maintenance",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0107 Fail Closed MCP Admission Maintenance",
       "type": "decision"
     },
     {
@@ -13323,6 +13463,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:contour%20isolation",
+      "label": "contour isolation",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:coverage",
       "label": "coverage",
       "type": "guard_family"
@@ -13415,6 +13560,11 @@
     {
       "id": "guard_family:exact%20delivery",
       "label": "exact delivery",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:exact%20identity",
+      "label": "exact identity",
       "type": "guard_family"
     },
     {
@@ -13515,6 +13665,11 @@
     {
       "id": "guard_family:host-visible%20receipt",
       "label": "host-visible receipt",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:immutable%20evidence",
+      "label": "immutable evidence",
       "type": "guard_family"
     },
     {
@@ -13680,6 +13835,11 @@
     {
       "id": "guard_family:per-owner%20canary",
       "label": "per-owner canary",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:periodic%20backstop",
+      "label": "periodic backstop",
       "type": "guard_family"
     },
     {
@@ -14065,6 +14225,11 @@
     {
       "id": "owner_surface:mcp/services/abyss-stack-mcp/organ-access.v1.json",
       "label": "mcp/services/abyss-stack-mcp/organ-access.v1.json",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/admission_automation.py",
+      "label": "mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/admission_automation.py",
       "type": "owner_surface"
     },
     {
@@ -15234,6 +15399,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/admission_automation.py",
+      "label": "mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/admission_automation.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/effect.py",
       "label": "mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/effect.py",
       "type": "source_surface"
@@ -15244,8 +15414,28 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/managed_catalog.py",
+      "label": "mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/managed_catalog.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/managed_topology.py",
+      "label": "mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/managed_topology.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/organ_access.py",
       "label": "mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/organ_access.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/preflight.py",
+      "label": "mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/preflight.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/runtime_overlay.py",
+      "label": "mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/runtime_overlay.py",
       "type": "source_surface"
     },
     {
@@ -16784,6 +16974,16 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:systemd/user/abyss-mcp-admission-keeper.%2A",
+      "label": "systemd/user/abyss-mcp-admission-keeper.*",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:systemd/user/abyss-stack-mcp-%2A.service",
+      "label": "systemd/user/abyss-stack-mcp-*.service",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:systemd/user/abyss-stack-mcp-internal-effect.service",
       "label": "systemd/user/abyss-stack-mcp-internal-effect.service",
       "type": "source_surface"
@@ -17584,6 +17784,11 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:operational%20evidence",
+      "label": "operational evidence",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:organ%20portfolio",
       "label": "organ portfolio",
       "type": "surface_class"
@@ -17661,6 +17866,11 @@
     {
       "id": "surface_class:route-api%20bridge",
       "label": "route-api bridge",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:runtime%20admission",
+      "label": "runtime admission",
       "type": "surface_class"
     },
     {
