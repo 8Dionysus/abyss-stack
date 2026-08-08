@@ -241,6 +241,94 @@ def test_dirty_source_requires_explicit_admission_and_preserves_rollback(tmp_pat
     assert json.loads((runtime_root / "active.json").read_text())["release_id"] == first["active"]["release_id"]
 
 
+@pytest.mark.parametrize("index_flag", ["--assume-unchanged", "--skip-worktree"])
+def test_hidden_index_posture_requires_explicit_source_admission(
+    tmp_path: Path,
+    index_flag: str,
+) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    controller = (
+        source
+        / "mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py"
+    )
+    git("update-index", index_flag, str(controller.relative_to(source)), cwd=source)
+    controller.write_text(controller.read_text() + "# hidden change\n", encoding="utf-8")
+
+    with pytest.raises(runtime_install.InstallError, match="--allow-dirty-source"):
+        runtime_install.install(
+            source,
+            sdk,
+            agents,
+            skills,
+            tmp_path / "runtime",
+            tmp_path / "bin",
+            Path(sys.executable),
+            allow_dirty_source=False,
+            allow_dirty_sdk=False,
+            allow_dirty_agents=False,
+            allow_dirty_skills=False,
+        )
+
+    receipt = runtime_install.install(
+        source,
+        sdk,
+        agents,
+        skills,
+        tmp_path / "runtime",
+        tmp_path / "bin",
+        Path(sys.executable),
+        allow_dirty_source=True,
+        allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
+    )
+    assert receipt["active"]["nonproduction_dirty_source"] is True
+    assert receipt["active"]["source"]["packaged_index_flag_count"] == 1
+
+
+def test_ignored_packaged_sdk_file_requires_explicit_admission(tmp_path: Path) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    (sdk / ".gitignore").write_text("src/aoa_sdk/local_generated.py\n", encoding="utf-8")
+    commit_all(sdk)
+    ignored = sdk / "src/aoa_sdk/local_generated.py"
+    ignored.write_text("LOCAL = True\n", encoding="utf-8")
+
+    with pytest.raises(runtime_install.InstallError, match="--allow-dirty-sdk"):
+        runtime_install.install(
+            source,
+            sdk,
+            agents,
+            skills,
+            tmp_path / "runtime",
+            tmp_path / "bin",
+            Path(sys.executable),
+            allow_dirty_source=False,
+            allow_dirty_sdk=False,
+            allow_dirty_agents=False,
+            allow_dirty_skills=False,
+        )
+
+    receipt = runtime_install.install(
+        source,
+        sdk,
+        agents,
+        skills,
+        tmp_path / "runtime",
+        tmp_path / "bin",
+        Path(sys.executable),
+        allow_dirty_source=False,
+        allow_dirty_sdk=True,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
+    )
+    assert receipt["active"]["nonproduction_dirty_source"] is True
+    assert receipt["active"]["sdk"]["ignored_packaged_file_count"] == 1
+    assert (
+        Path(receipt["active"]["release_root"])
+        / "sdk/src/aoa_sdk/local_generated.py"
+    ).is_file()
+
+
 def test_install_rejects_owner_contract_outside_runtime_profile_pin(
     tmp_path: Path,
 ) -> None:
@@ -311,6 +399,53 @@ def test_install_and_status_reject_non_executable_python(tmp_path: Path) -> None
     )
 
     with pytest.raises(runtime_install.InstallError, match="not executable"):
+        runtime_install.status(runtime_root, bin_dir)
+
+
+def test_install_and_status_reject_executable_non_python(tmp_path: Path) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    runtime_root = tmp_path / "runtime"
+    bin_dir = tmp_path / "bin"
+    non_python = Path("/bin/true")
+
+    with pytest.raises(runtime_install.InstallError, match="compatibility probe"):
+        runtime_install.install(
+            source,
+            sdk,
+            agents,
+            skills,
+            runtime_root,
+            bin_dir,
+            non_python,
+            allow_dirty_source=False,
+            allow_dirty_sdk=False,
+            allow_dirty_agents=False,
+            allow_dirty_skills=False,
+        )
+    assert not (runtime_root / "active.json").exists()
+
+    runtime_install.install(
+        source,
+        sdk,
+        agents,
+        skills,
+        runtime_root,
+        bin_dir,
+        Path(sys.executable),
+        allow_dirty_source=False,
+        allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
+    )
+    active_path = runtime_root / "active.json"
+    active = json.loads(active_path.read_text(encoding="utf-8"))
+    active["python_executable"] = str(non_python)
+    active_path.write_text(
+        json.dumps(active, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(runtime_install.InstallError, match="compatibility probe"):
         runtime_install.status(runtime_root, bin_dir)
 
 

@@ -82,6 +82,42 @@ def require_python_executable(path: Path) -> Path:
     candidate = require_regular_file(path.resolve(), "Python executable")
     if not os.access(candidate, os.X_OK):
         raise InstallError(f"Python executable is not executable: {candidate}")
+    probe = (
+        "import json,platform,sys;"
+        "print(json.dumps({'implementation':platform.python_implementation(),"
+        "'version':[sys.version_info.major,sys.version_info.minor]},"
+        "sort_keys=True,separators=(',',':')))"
+    )
+    try:
+        completed = subprocess.run(
+            [str(candidate), "-I", "-c", probe],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise InstallError(f"Python executable compatibility probe failed: {candidate}") from exc
+    expected = '{"implementation":"CPython","version":[3,11]}'
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise InstallError(f"Python executable compatibility probe failed: {candidate}") from exc
+    version = payload.get("version") if isinstance(payload, dict) else None
+    if (
+        completed.returncode != 0
+        or not isinstance(payload, dict)
+        or payload.get("implementation") != "CPython"
+        or not isinstance(version, list)
+        or len(version) != 2
+        or not all(isinstance(item, int) for item in version)
+        or tuple(version) < (3, 11)
+    ):
+        raise InstallError(
+            "Python executable must be compatible CPython 3.11 or newer: "
+            f"{candidate}; expected at least {expected}"
+        )
     return candidate
 
 
@@ -91,7 +127,10 @@ def require_regular_file(path: Path, label: str) -> Path:
     return path
 
 
-def git_posture(root: Path) -> dict[str, object]:
+def git_posture(
+    root: Path,
+    packaged_files: Iterable[Path] = (),
+) -> dict[str, object]:
     def run(*args: str) -> str:
         completed = subprocess.run(
             ["git", "-C", str(root), *args],
@@ -102,17 +141,67 @@ def git_posture(root: Path) -> dict[str, object]:
         )
         return completed.stdout.strip()
 
+    packaged_relatives = {
+        path.relative_to(root).as_posix()
+        for path in packaged_files
+    }
     try:
         head = run("rev-parse", "HEAD")
         status = run("status", "--porcelain=v1", "--untracked-files=all")
+        flagged = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-v", "-z"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        ).stdout
+        ignored = subprocess.run(
+            ["git", "-C", str(root), "check-ignore", "-z", "--stdin"],
+            check=False,
+            input=b"".join(
+                relative.encode("utf-8") + b"\0"
+                for relative in sorted(packaged_relatives)
+            ),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
     except (OSError, subprocess.CalledProcessError) as exc:
         raise InstallError(f"cannot inspect Git posture for {root}: {exc}") from exc
+    if ignored.returncode not in {0, 1}:
+        raise InstallError(
+            f"cannot inspect ignored packaged files for {root}: "
+            f"{ignored.stderr.decode('utf-8', errors='replace').strip()}"
+        )
+    index_flagged_paths: list[str] = []
+    for record in flagged.split(b"\0"):
+        if not record:
+            continue
+        if len(record) < 3 or record[1:2] != b" ":
+            raise InstallError(f"invalid git ls-files record for {root}")
+        tag = chr(record[0])
+        relative = record[2:].decode("utf-8", errors="surrogateescape")
+        if relative in packaged_relatives and (tag.islower() or tag.upper() == "S"):
+            index_flagged_paths.append(relative)
+    ignored_packaged_paths = [
+        record.decode("utf-8", errors="surrogateescape")
+        for record in ignored.stdout.split(b"\0")
+        if record
+    ]
+    hidden_posture = sorted(set(index_flagged_paths))
+    ignored_posture = sorted(set(ignored_packaged_paths))
     return {
         "root": str(root),
         "head": head,
-        "dirty": bool(status),
+        "dirty": bool(status or hidden_posture or ignored_posture),
         "status_sha256": sha256_bytes(status.encode("utf-8")),
         "status_entry_count": len(status.splitlines()) if status else 0,
+        "packaged_index_flag_count": len(hidden_posture),
+        "packaged_index_flags_sha256": sha256_bytes(
+            canonical_bytes(hidden_posture)
+        ),
+        "ignored_packaged_file_count": len(ignored_posture),
+        "ignored_packaged_files_sha256": sha256_bytes(
+            canonical_bytes(ignored_posture)
+        ),
     }
 
 
@@ -374,10 +463,23 @@ def install(
     runtime_root = runtime_root.resolve()
     bin_dir = bin_dir.resolve()
     python_executable = require_python_executable(python_executable)
-    source_posture = git_posture(source_root)
-    sdk_posture = git_posture(sdk_root)
-    agents_posture = git_posture(agents_root)
-    skills_posture = git_posture(skills_root)
+    files = source_files(source_root, sdk_root, agents_root, skills_root)
+    source_posture = git_posture(
+        source_root,
+        (source for source, _ in files if source.is_relative_to(source_root)),
+    )
+    sdk_posture = git_posture(
+        sdk_root,
+        (source for source, _ in files if source.is_relative_to(sdk_root)),
+    )
+    agents_posture = git_posture(
+        agents_root,
+        (source for source, _ in files if source.is_relative_to(agents_root)),
+    )
+    skills_posture = git_posture(
+        skills_root,
+        (source for source, _ in files if source.is_relative_to(skills_root)),
+    )
     if source_posture["dirty"] and not allow_dirty_source:
         raise InstallError("abyss-stack source is dirty; pass --allow-dirty-source explicitly")
     if sdk_posture["dirty"] and not allow_dirty_sdk:
@@ -391,7 +493,6 @@ def install(
             "aoa-skills source is dirty; pass --allow-dirty-skills explicitly"
         )
 
-    files = source_files(source_root, sdk_root, agents_root, skills_root)
     manifest = release_manifest(files)
     release_root, created = materialize_release(files, manifest, runtime_root / "releases")
     previous_active = None

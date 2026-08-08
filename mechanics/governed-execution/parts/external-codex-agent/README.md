@@ -168,8 +168,12 @@ directory and manifest identity remain inside the release root. Installation
 also verifies that the packaged `aoa-agents` and `aoa-skills` schema bytes have
 the exact digests pinned by the runtime profile. Install, activation, and
 status also require the recorded Python coordinate to remain a regular
-executable file. Dirty worktree installation is rejected unless every dirty source
-posture is explicitly admitted; such an active receipt is marked
+executable compatible CPython 3.11-or-newer interpreter, proven by an isolated
+probe rather than the executable bit alone. Dirty worktree installation is
+rejected unless every dirty source posture is explicitly admitted. This
+includes index-hidden packaged files marked assume-unchanged or skip-worktree
+and ignored files that would enter the packaged SDK; their path sets are
+counted and digested in the source posture. Such an active receipt is marked
 `nonproduction_dirty_source=true` and is machine-local evidence, not a landed
 or remotely reproducible release. Installation requires clean exact
 `abyss-stack`, `aoa-sdk`, `aoa-agents`, and `aoa-skills` source roots unless

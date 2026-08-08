@@ -82,7 +82,11 @@ admission, recovery of a valid event append that preceded its
 state save, recovery of the completed semantic turn when its event preceded
 the state save, false-event filtering with no second parent turn, and exact-thread parent re-entry with a distilled
 return. The fake Codex fixture exercises both filtered and wake branches;
-separate live receipts are required for the installed product surface.
+separate live receipts are required for the installed product surface. The
+installer suite additionally proves that index-hidden packaged source and
+ignored files entering the packaged SDK require explicit dirty-source
+admission, and that activation plus status reject an executable which cannot
+pass the isolated compatible-CPython probe.
 
 It also proves role-scoped MCP argv isolation: the selected AoA server alone is
 configured, its exact token is required but never exposed in argv or the model

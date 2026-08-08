@@ -41,7 +41,13 @@ preparer's exact non-Python contract reads. Stable wrappers consult a regular-fi
 receipt and execute a release-local bootstrap with Python isolated mode; they
 do not follow a mutable source checkout, import ambient `PYTHONPATH`, or use a
 symlinked `current` directory. The selected and recorded Python coordinate must
-be a regular executable file at install, activation, and status time.
+be a regular executable compatible CPython 3.11-or-newer interpreter at
+install, activation, and status time; executable-bit presence alone is not
+admission. Before packaging, every selected source file hidden by
+assume-unchanged or skip-worktree and every ignored selected file must make its
+owner checkout dirty, with the classified path set counted and digested in the
+receipt. Such bytes require the matching explicit dirty-source admission and
+must never be represented as a clean production source posture.
 `install_external_codex_runtime.py status`
 re-hashes the release and wrappers before availability may be claimed.
 Activation rollback changes only the active receipt while retaining immutable
