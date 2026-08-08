@@ -108,6 +108,13 @@ class RerankRequest(BaseModel):
         return self
 
 
+class MemoryReliefRequest(BaseModel):
+    action: str
+    action_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    owner: str
+    workload_id: str
+
+
 @dataclass(frozen=True)
 class DocumentEnvelope:
     index: int
@@ -223,6 +230,7 @@ class LazyScorer:
         self._last_unload_epoch: float | None = None
         self._last_unload_reason: str | None = None
         self._active_requests = 0
+        self._relief_results: dict[str, dict[str, Any]] = {}
 
     @property
     def loaded(self) -> bool:
@@ -297,6 +305,62 @@ class LazyScorer:
         if exit_process and was_loaded:
             threading.Timer(0.2, lambda: os._exit(0)).start()
         return response
+
+    def owner_memory_relief(self, req: MemoryReliefRequest) -> dict[str, Any]:
+        with self._lock:
+            if req.action_id in self._relief_results:
+                return dict(self._relief_results[req.action_id])
+            if req.action != "relieve_memory" or req.owner != "abyss-stack" or req.workload_id != "rerank-api:qwen3-0.6b":
+                return {
+                    "ok": False,
+                    "action_id": req.action_id,
+                    "reason": "owner_contract_mismatch",
+                    "loaded": self._scorer is not None,
+                    "owner_gate": {
+                        "active_requests_at_action": self._active_requests,
+                        "data_risk": False,
+                    },
+                }
+            if self._active_requests != 0:
+                return {
+                    "ok": False,
+                    "action_id": req.action_id,
+                    "reason": "active_requests",
+                    "loaded": self._scorer is not None,
+                    "owner_gate": {
+                        "active_requests_at_action": self._active_requests,
+                        "data_risk": False,
+                    },
+                }
+            was_loaded = self._scorer is not None
+            load_ms = self.load_ms
+            self._scorer = None
+            self._loaded_at_epoch = None
+            self._last_unload_epoch = time.time()
+            self._last_unload_reason = "owner_memory_relief"
+            if was_loaded:
+                gc.collect()
+                heap_trimmed = trim_process_heap()
+            else:
+                heap_trimmed = False
+            result = {
+                "ok": True,
+                "action_id": req.action_id,
+                "unloaded": was_loaded,
+                "reason": "owner_memory_relief",
+                "load_ms": load_ms,
+                "loaded": False,
+                "owner_gate": {
+                    "active_requests_at_action": 0,
+                    "data_risk": False,
+                },
+                "resume": "lazy_load_on_next_rerank",
+                "heap_trimmed": heap_trimmed,
+            }
+            self._relief_results[req.action_id] = dict(result)
+            while len(self._relief_results) > 32:
+                self._relief_results.pop(next(iter(self._relief_results)))
+            return result
 
     def unload_if_idle(self, idle_unload_sec: int) -> dict[str, Any]:
         if idle_unload_sec <= 0:
@@ -392,6 +456,11 @@ def health() -> dict[str, Any]:
 @app.post("/admin/unload")
 def unload(exit_process: bool = False) -> dict[str, Any]:
     return scorer.unload("admin_request", exit_process=exit_process)
+
+
+@app.post("/admin/memory-relief")
+def memory_relief(req: MemoryReliefRequest) -> dict[str, Any]:
+    return scorer.owner_memory_relief(req)
 
 
 @app.post("/v3/rerank")

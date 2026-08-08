@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import importlib.util
+import os
+import sys
+from types import SimpleNamespace
 import unittest
+from unittest import mock
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +17,7 @@ MODULE_DIR = REPO_ROOT / "compose" / "modules"
 PROFILE_DIR = REPO_ROOT / "compose" / "profiles"
 RAG_CONFIG_DIR = REPO_ROOT / "config-templates" / "Configs" / "rag"
 MACHINE_BRIDGE_BACKEND = REPO_ROOT / "mechanics" / "machine-fit" / "parts" / "machine-bridge" / "aoa_machine_bridge.py"
+RERANK_BACKEND = REPO_ROOT / "config-templates" / "Services" / "rerank-api" / "app" / "main.py"
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
@@ -35,6 +40,19 @@ def module_services(module_name: str) -> dict[str, Any]:
 
 
 class RagBridgeContractsTests(unittest.TestCase):
+    @staticmethod
+    def load_rerank_backend() -> Any:
+        existing = sys.modules.get("rerank_api_under_test")
+        if existing is not None:
+            return existing
+        spec = importlib.util.spec_from_file_location("rerank_api_under_test", RERANK_BACKEND)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        with mock.patch.dict(os.environ, {"AOA_RERANK_FAKE": "1"}):
+            spec.loader.exec_module(module)
+        return module
+
     def test_rag_profile_contains_dependency_modules_before_rag_api(self) -> None:
         modules = profile_modules("rag")
 
@@ -89,6 +107,45 @@ class RagBridgeContractsTests(unittest.TestCase):
         self.assertNotIn("cpus", rerank)
         self.assertTrue(any("/srv/abyss-machine/cache/ai/qwen3-reranker" in volume for volume in volumes))
         self.assertTrue(any("/srv/abyss-machine/cache/ai/openvino/qwen3-reranker" in volume for volume in volumes))
+
+    def test_rerank_owner_memory_relief_is_atomic_and_idempotent(self) -> None:
+        backend = self.load_rerank_backend()
+        scorer = backend.LazyScorer()
+        scorer._scorer = SimpleNamespace(load_ms=1.0)
+        request = backend.MemoryReliefRequest(
+            action="relieve_memory",
+            action_id="a" * 32,
+            owner="abyss-stack",
+            workload_id="rerank-api:qwen3-0.6b",
+        )
+
+        first = scorer.owner_memory_relief(request)
+        replay = scorer.owner_memory_relief(request)
+
+        self.assertTrue(first["ok"])
+        self.assertTrue(first["unloaded"])
+        self.assertFalse(first["loaded"])
+        self.assertEqual(first["owner_gate"]["active_requests_at_action"], 0)
+        self.assertEqual(replay, first)
+
+    def test_rerank_owner_memory_relief_refuses_active_request(self) -> None:
+        backend = self.load_rerank_backend()
+        scorer = backend.LazyScorer()
+        scorer._scorer = SimpleNamespace(load_ms=1.0)
+        scorer.begin_request()
+        request = backend.MemoryReliefRequest(
+            action="relieve_memory",
+            action_id="b" * 32,
+            owner="abyss-stack",
+            workload_id="rerank-api:qwen3-0.6b",
+        )
+
+        result = scorer.owner_memory_relief(request)
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["reason"], "active_requests")
+        self.assertEqual(result["owner_gate"]["active_requests_at_action"], 1)
+        self.assertTrue(result["loaded"])
 
     def test_rag_manifests_exist_and_are_json_objects(self) -> None:
         for name in ("sources.json", "agentic-graph.v1.json", "dag-jobs.v1.json"):

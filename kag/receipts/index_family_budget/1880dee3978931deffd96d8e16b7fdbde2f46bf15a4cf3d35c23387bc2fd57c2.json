@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 4980138,
+  "allowed_tracked_bytes": 30767236,
+  "approved_by": "repository-owner",
+  "base_ref": "e690b4153e5ecc682d21825d92cc18d482a42f86",
+  "changed_generated_bytes": 4980138,
+  "changed_generated_files": 57,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "1880dee3978931deffd96d8e16b7fdbde2f46bf15a4cf3d35c23387bc2fd57c2",
+  "reason": "Refresh the exact owner family for atomic reranker memory relief and its fail-closed inflight/idempotency contract without raising standing budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 30767236,
+  "tracked_bytes_max": 24117248
+}
