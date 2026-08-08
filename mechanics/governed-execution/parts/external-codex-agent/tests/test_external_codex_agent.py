@@ -414,6 +414,27 @@ if "FAKE_GIT_ALIAS_INDIRECTION" in task["objective"]:
         "status": "completed",
         "exit_code": 0,
     }})
+if "FAKE_SOURCE_INDIRECTION" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/bash -lc 'source scripts/helper.sh'",
+        "status": "completed",
+        "exit_code": 0,
+    }})
+if "FAKE_GIT_LOCAL_CONFIG_WRITE" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/git config --local core.hooksPath /tmp/hooks",
+        "status": "completed",
+        "exit_code": 0,
+    }})
+if "FAKE_DIRECT_SECRET_ENCODER" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/base64 /home/operator/.ssh/id_rsa",
+        "status": "completed",
+        "exit_code": 0,
+    }})
 if "FAKE_STARTED_FORBIDDEN_COMMAND" in task["objective"]:
     emit({"type": "item.started", "item": {
         "id": "fixture-command-started-before-interruption",
@@ -1691,6 +1712,94 @@ def test_process_identity_receipt_retries_partial_kernel_writes(
     }
 
 
+def test_supervisor_executes_verified_open_inode_after_path_replacement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    executable = tmp_path / "codex"
+    output = tmp_path / "observed.txt"
+    executable.write_text(
+        "#!/usr/bin/python3\n"
+        "import pathlib, sys\n"
+        "pathlib.Path(sys.argv[1]).write_text('verified-open-inode\\n')\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o700)
+    expected_digest = _digest_path(executable)
+    original_open = SUPERVISOR._open_verified_executable
+
+    def replace_after_verified_open(path: str, digest: str) -> int:
+        descriptor = original_open(path, digest)
+        replacement = tmp_path / "replacement"
+        replacement.write_text(
+            "#!/usr/bin/python3\n"
+            "import pathlib, sys\n"
+            "pathlib.Path(sys.argv[1]).write_text('replacement-path\\n')\n",
+            encoding="utf-8",
+        )
+        replacement.chmod(0o700)
+        replacement.replace(executable)
+        return descriptor
+
+    monkeypatch.setattr(
+        SUPERVISOR,
+        "_open_verified_executable",
+        replace_after_verified_open,
+    )
+
+    process = SUPERVISOR._launch_verified_command(
+        [str(executable), str(output)],
+        expected_digest,
+    )
+
+    assert process.wait(timeout=5) == 0
+    assert output.read_text(encoding="utf-8") == "verified-open-inode\n"
+
+
+def test_supervisor_rejects_executable_digest_drift(tmp_path: Path) -> None:
+    executable = tmp_path / "codex"
+    executable.write_text("#!/usr/bin/python3\n", encoding="utf-8")
+    executable.chmod(0o700)
+
+    with pytest.raises(SUPERVISOR.SupervisorError, match="digest changed"):
+        SUPERVISOR._open_verified_executable(executable.as_posix(), ZERO_DIGEST)
+
+
+def test_preflight_rejects_path_replacement_after_controller_digest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path)
+    runtime = fixture["runtime"]
+    original_containment_command = runtime._containment_command
+    replaced = [False]
+
+    def replace_before_supervisor_open(
+        command: Any,
+        *,
+        executable_digest: str,
+        identity_path: Path | None = None,
+    ) -> list[str]:
+        if not replaced[0] and command[0] == fixture["launch"]["codex_executable"]:
+            replacement = tmp_path / "replacement-codex"
+            replacement.write_text("#!/usr/bin/python3\n", encoding="utf-8")
+            replacement.chmod(0o700)
+            replacement.replace(Path(command[0]))
+            replaced[0] = True
+        return original_containment_command(
+            command,
+            executable_digest=executable_digest,
+            identity_path=identity_path,
+        )
+
+    monkeypatch.setattr(runtime, "_containment_command", replace_before_supervisor_open)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.preflight(fixture["launch_path"])
+
+    assert exc_info.value.code == "codex_preflight_failed"
+
+
 @pytest.mark.parametrize("supervisor_return_code", (0, 17))
 def test_completed_supervisor_preserves_terminal_child_identity_receipt(
     tmp_path: Path,
@@ -1805,6 +1914,9 @@ def test_preflight_and_separate_process_return_structured_result(tmp_path: Path)
     )
     assert argv[1] == str(PART_ROOT / "external_codex_supervisor.py")
     assert "--parent-pid" in argv
+    assert argv[argv.index("--executable-digest") + 1] == (
+        fixture["launch"]["codex_executable_digest"]
+    )
     assert "/usr/bin/unshare" not in argv
     assert "/usr/bin/setpriv" not in argv
     assert "exec" in argv
@@ -3218,6 +3330,17 @@ def test_build_and_task_runners_are_fail_closed(command: str) -> None:
 @pytest.mark.parametrize(
     "command",
     (
+        "/usr/bin/bash -lc 'source scripts/helper.sh'",
+        "/usr/bin/bash -lc '. scripts/helper.sh'",
+    ),
+)
+def test_sourced_shell_bodies_are_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
         "/usr/bin/git -c alias.leak='!cat /home/operator/.ssh/id_rsa' leak",
         "/usr/bin/git -calias.leak='!cat /home/operator/.ssh/id_rsa' leak",
         "/usr/bin/git --config-env=alias.leak=LEAK_COMMAND leak",
@@ -3235,9 +3358,62 @@ def test_git_config_and_external_dispatch_are_fail_closed(command: str) -> None:
 @pytest.mark.parametrize(
     "command",
     (
+        "/usr/bin/git config --local core.hooksPath /tmp/hooks",
+        "/usr/bin/git config --worktree core.hooksPath /tmp/hooks",
+        "/usr/bin/git config --add core.hooksPath /tmp/hooks",
+        "/usr/bin/git config set core.hooksPath /tmp/hooks",
+    ),
+)
+def test_git_repository_config_writes_are_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+def test_direct_secret_file_encoder_is_classified() -> None:
+    assert RUNTIME._command_effects(
+        "/usr/bin/base64 /home/operator/.ssh/id_rsa"
+    ) == {"secret_access"}
+
+
+def test_runtime_forbidden_effects_do_not_trust_a_task_subset() -> None:
+    assert RUNTIME.ExternalCodexRuntime._forbidden_effects(
+        None,
+        [
+            {
+                "command": "/usr/bin/base64 /home/operator/.ssh/id_rsa",
+                "status": "completed",
+                "exit_code": 0,
+            }
+        ],
+        {"forbidden_effects": ["commit"]},
+    ) == ["secret_access"]
+
+
+def test_task_schema_requires_the_complete_runtime_forbidden_set(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path)
+    task = json.loads(fixture["task_path"].read_text(encoding="utf-8"))
+    task["forbidden_effects"].remove("secret_access")
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.validate_json(
+            task,
+            RUNTIME.TASK_SCHEMA_PATH,
+            label="external Codex task",
+        )
+
+    assert exc_info.value.code == "schema_validation_failed"
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
         "/usr/bin/git status --short",
         "/usr/bin/git diff --check",
         "/usr/bin/git --version",
+        "/usr/bin/git config core.hooksPath",
+        "/usr/bin/git config --local --get core.hooksPath",
+        "/usr/bin/git config get core.hooksPath",
     ),
 )
 def test_direct_git_builtins_remain_classifiable(command: str) -> None:
@@ -3273,19 +3449,32 @@ def test_started_command_survives_interruption_and_blocks_authority(
 
 
 @pytest.mark.parametrize(
-    "objective_marker",
+    ("objective_marker", "expected_effects"),
     (
-        "FAKE_OPAQUE_INDIRECT_COMMAND",
-        "FAKE_OPAQUE_LAUNCH_WRAPPER",
-        "FAKE_DEEP_SHELL_NESTING",
-        "FAKE_COMMAND_SUBSTITUTION",
-        "FAKE_OPAQUE_BUILD_RUNNER",
-        "FAKE_GIT_ALIAS_INDIRECTION",
+        ("FAKE_OPAQUE_INDIRECT_COMMAND", ["unclassified_indirect_effect"]),
+        (
+            "FAKE_OPAQUE_LAUNCH_WRAPPER",
+            ["secret_access", "unclassified_indirect_effect"],
+        ),
+        ("FAKE_DEEP_SHELL_NESTING", ["unclassified_indirect_effect"]),
+        (
+            "FAKE_COMMAND_SUBSTITUTION",
+            ["secret_access", "unclassified_indirect_effect"],
+        ),
+        ("FAKE_OPAQUE_BUILD_RUNNER", ["unclassified_indirect_effect"]),
+        (
+            "FAKE_GIT_ALIAS_INDIRECTION",
+            ["secret_access", "unclassified_indirect_effect"],
+        ),
+        ("FAKE_SOURCE_INDIRECTION", ["unclassified_indirect_effect"]),
+        ("FAKE_GIT_LOCAL_CONFIG_WRITE", ["unclassified_indirect_effect"]),
+        ("FAKE_DIRECT_SECRET_ENCODER", ["secret_access"]),
     ),
 )
 def test_opaque_command_authority_blocks_terminal_result(
     tmp_path: Path,
     objective_marker: str,
+    expected_effects: list[str],
 ) -> None:
     fixture = _fixture(tmp_path, objective_marker=objective_marker)
     runtime = fixture["runtime"]
@@ -3302,9 +3491,58 @@ def test_opaque_command_authority_blocks_terminal_result(
     assert terminal["status"] == "authority_blocked"
     assert result is not None
     assert result["failure_code"] == "authority_boundary_crossed"
-    assert validation_events[-1]["payload"]["detected_forbidden_effects"] == [
-        "unclassified_indirect_effect"
-    ]
+    assert validation_events[-1]["payload"]["detected_forbidden_effects"] == (
+        expected_effects
+    )
+
+
+@pytest.mark.parametrize(
+    "drift_kind",
+    ("ignored", "assume-unchanged", "skip-worktree"),
+)
+def test_clean_required_rechecks_hidden_bytes_after_worker_preflight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    drift_kind: str,
+) -> None:
+    fixture = _fixture(tmp_path, ignored_baseline=drift_kind == "ignored")
+    runtime = fixture["runtime"]
+    original_preflight = runtime._codex_preflight
+    calls = [0]
+
+    def mutate_after_worker_preflight(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        result = original_preflight(*args, **kwargs)
+        calls[0] += 1
+        if calls[0] == 2:
+            if drift_kind == "ignored":
+                target = fixture["workspace"] / "cache" / "output.txt"
+            else:
+                target = fixture["workspace"] / "README.md"
+                _git(
+                    fixture["workspace"],
+                    "update-index",
+                    f"--{drift_kind}",
+                    "README.md",
+                )
+            target.write_text("drift during worker preflight\n", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(runtime, "_codex_preflight", mutate_after_worker_preflight)
+    runtime.start(fixture["launch_path"])
+
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "failed"
+    assert result is not None
+    assert result["failure_code"] == "workspace_manifest_drift"
+    assert result["thread_id"] is None
+    assert not (
+        runtime._session_dir(fixture["session_id"])
+        / "attempts"
+        / "001"
+        / "model-report.json"
+    ).exists()
 
 
 def test_ignored_workspace_bytes_are_manifested_and_drift_is_blocked(

@@ -43,7 +43,11 @@ read-only drift containment including every tracked byte,
 assume-unchanged/skip-worktree mutations, and ignored bytes,
 tracked-submodule, untracked-embedded-repository, and outward-symlink refusal, a foreground `run-to-terminal` lifecycle for transient cgroup launchers without execution
 ceilings, secret-shaped ignored
-input refusal, exclusive same-workspace active-attempt admission across distinct
+input refusal, complete runtime-wide forbidden-set admission plus subset-resistant
+terminal classification, direct secret-path encoder classification, exact-open-inode
+Codex preflight and inference execution across a pathname replacement plus
+pre-exec digest-drift refusal,
+exclusive same-workspace active-attempt admission across distinct
 session identities, wrapped effect-family observation, exact validation-claim
 binding to final workspace bytes, authority-blocked failure closeout when the
 final manifest is unobservable, streaming rejection of an unterminated
@@ -82,9 +86,9 @@ exemption, fail-closed `env --split-string` handling, value-aware `timeout`
 wrapper parsing, opaque process-launch-wrapper refusal,
 attached-redirection observation, fail-closed shell nesting at the inspection
 limit, command/backtick/process-substitution refusal, opaque build/package/test
-runner refusal, Git alias/config/external-subcommand refusal, ambient
+runner refusal, sourced-shell refusal, Git alias/config-write/external-subcommand refusal, ambient
 environment-assignment refusal, Git-invisible FIFO and Unix-socket refusal,
-final-manifest tamper refusal,
+post-preflight full-manifest drift refusal, final-manifest tamper refusal,
 provenance checks for all loaded `aoa_sdk` modules in the study preparer plus a
 post-compilation persisted
 path inventory, produced-artifact admission, source-evidence file/line

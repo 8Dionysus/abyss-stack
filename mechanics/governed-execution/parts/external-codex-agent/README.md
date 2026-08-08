@@ -19,6 +19,9 @@ The controller:
 - verifies the exact `RunPlan`, incarnation binding, task, role, model
   realization, runtime/tool profile, result schema, workspace HEAD, immutable
   inputs, Codex binary digest/version, ChatGPT login, and live model catalog;
+- requires every task to preserve the complete runtime-wide forbidden-effect
+  set, while terminal classification independently applies that set instead of
+  trusting a caller-supplied subset;
 - keeps the SDK `summon-request-v4` as the typed active
   `AgentIncarnationBinding.task_request_ref`, while binding the richer
   runtime-owner task separately as an exact snapshot/continuation-pinned
@@ -63,7 +66,10 @@ The controller:
   parent-death/subreaper supervisor that
   adopts and cleans detached descendants without placing an outer namespace in
   front of Codex's own sandbox, while retaining exact PGID/SID TERM/KILL
-  observation;
+  observation; every Codex preflight probe and inference launch goes through a
+  supervisor which opens and re-hashes the executable immediately before exec
+  and executes that verified open inode through procfs, so a pathname
+  replacement cannot substitute different Codex bytes;
 - keeps read-only target-workspace authority while running Codex from a distinct
   runtime-created attempt-local execution root; Codex's internal
   `workspace-write` sandbox can write only that execution root and its
@@ -85,16 +91,21 @@ The controller:
   observer, value-taking `timeout` options cannot hide the wrapped command,
   shell nesting that exceeds the bounded inspection depth fails opaque,
   command/backtick/process substitutions remain opaque executable indirection,
+  sourced shell bodies through `source` or `.` remain opaque,
   build/package/test/task runners remain opaque unless they are an exact
   owner-fixed validation,
-  Git config/alias/external-subcommand dispatch and ambient environment
-  assignment fail closed,
+  Git config writes plus alias/external-subcommand dispatch and ambient
+  environment assignment fail closed,
+  any command carrying a secret-shaped path is classified as secret access,
   and commands are durably observed
   from `item.started` rather than only after completion, while exact task validation
   argv remain admitted by their owner-supplied identity;
 - cross-checks Git with a non-following filesystem inventory, so a FIFO,
   Unix-domain socket, device, or other Git-invisible special entry cannot evade
   baseline or final workspace observation;
+- rebuilds that full manifest after worker preflight and before inference for
+  every workspace posture, so ignored or index-hidden drift cannot enter a
+  clean-required launch through the preflight window;
 - constrains every `immutable:` evidence reference in the session-local output
   schema to the exact materialized input identities, so a plausible alias is
   rejected during structured decoding as well as by post-output byte checks;

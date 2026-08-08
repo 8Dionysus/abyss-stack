@@ -120,7 +120,9 @@ Before launch the controller verifies:
    exact fixed command sequence with a non-empty evidence reference for every
    passed, failed, or skipped claim; each claimed status must equal the final
    runtime-observed exit state of an exact argv execution;
-11. `transport_study_fixture` is admitted only as bounded compatibility
+11. the task carries the complete runtime-wide forbidden-effect set; terminal
+    classification applies that same set independently of task input;
+12. `transport_study_fixture` is admitted only as bounded compatibility
     evidence. `owner_contour` additionally requires a separate exact
     `aoa-agents` `summon-request-v3`, validated against its runtime-profile-
     pinned owner bytes, whose obligation, mandate, ready task-local DAG,
@@ -199,7 +201,13 @@ does not create an outer user or PID namespace. This leaves Codex's own
 `codex-linux-sandbox`/bubblewrap namespace construction intact. Before it
 launches Codex, the supervisor verifies the exact worker PPID, enables
 `PR_SET_CHILD_SUBREAPER`, requests `SIGTERM` through `PR_SET_PDEATHSIG`, and
-checks the PPID again to close the parent-death setup race.
+checks the PPID again to close the parent-death setup race. It then opens the
+resolved executable without following symlinks, re-hashes that exact file
+descriptor against the admitted digest, checks that the inode did not change
+during hashing, and executes `/proc/self/fd/<fd>` with the descriptor inherited.
+The version, auth, and model-catalog preflight probes use the same verified-fd
+route. A later replacement of the original pathname therefore cannot change
+the bytes selected for `exec` or receive the preflight environment.
 
 On normal exit, controlled termination, or worker death, the supervisor adopts
 or enumerates the exact descendant closure in `/proc`, checks PID start ticks,
@@ -289,6 +297,9 @@ configuration command families. Non-owner-fixed interpreter or script bodies,
 and authority-block the terminal result; exact fixed validation argv are
 separately admitted by their owner identity. The sandbox remains the primary effect
 boundary, and command observation is retained as auditable counterevidence.
+Any command argument that names a secret-shaped path is classified as secret
+access regardless of the executable name; this prevents an unenumerated direct
+reader or encoder from weakening the runtime-wide secret stop-line.
 GNU `env -S`/`--split-string` remains opaque instead of being mistaken for an
 executable, value-taking `timeout` signal/kill options are consumed before the
 wrapped command is classified, and shell control or redirection punctuation is
@@ -305,10 +316,18 @@ command substitution, backticks, and process substitution likewise fail closed
 instead of being treated as inert command arguments. Build, package, test, and
 task runners that may execute manifest-, plugin-, or project-defined commands
 are opaque for model-issued commands; only an exact owner-fixed validation argv
-receives the fixed-validation exemption. Git global options that can inject
+receives the fixed-validation exemption. Shell `source` and `.` bodies remain
+opaque because the observed argv does not expose the sourced commands. Git
+configuration writes, including repository-local and per-worktree writes, and
+Git global options that can inject
 configuration, redirect repository coordinates, select an exec path, or enable
 pagination are likewise opaque, as are unknown/external Git subcommands and
 ambient environment assignment. Direct known Git builtins remain classifiable.
+
+After the worker repeats executable/model/tool preflight, it rebuilds the full
+workspace manifest and requires exact equality with the admission baseline for
+every initial posture before launching Codex. This second byte gate covers
+ignored and index-hidden files that HEAD and porcelain checks cannot observe.
 
 Any model evidence reference beginning with `source:` is semantic, not opaque
 prose. It must resolve to a regular non-symlink file inside the exact workspace

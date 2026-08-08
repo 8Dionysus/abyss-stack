@@ -137,29 +137,20 @@ SECRET_FILE_TOKEN_RE = re.compile(
     r"password|passwd|secret|secrets|token|tokens)(?:[._-]|$)",
     re.I,
 )
-READ_CAPABLE_COMMANDS = {
-    "awk",
-    "cat",
-    "cp",
-    "cut",
-    "dd",
-    "find",
-    "grep",
-    "head",
-    "jq",
-    "less",
-    "more",
-    "perl",
-    "python",
-    "python3",
-    "rg",
-    "ruby",
-    "sed",
-    "strings",
-    "tail",
-    "tar",
-    "tee",
-}
+RUNTIME_WIDE_FORBIDDEN_EFFECTS = frozenset(
+    {
+        "commit",
+        "push",
+        "pull_request",
+        "merge",
+        "tag",
+        "release",
+        "publication",
+        "service_mutation",
+        "secret_access",
+        "global_config_mutation",
+    }
+)
 OPAQUE_EFFECT_EXECUTABLES = {
     "deno",
     "lua",
@@ -1456,9 +1447,45 @@ def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
             return True
         if not token.startswith("-"):
             break
-    subcommand, _ = _git_subcommand(tokens)
+    subcommand, git_args = _git_subcommand(tokens)
     if subcommand is None:
         return not any(token in {"--help", "--version"} for token in tokens[1:])
+    if subcommand == "config":
+        mutation_options = {
+            "--add",
+            "--edit",
+            "-e",
+            "--rename-section",
+            "--remove-section",
+            "--replace-all",
+            "--unset",
+            "--unset-all",
+        }
+        mutation_subcommands = {
+            "edit",
+            "rename-section",
+            "remove-section",
+            "set",
+            "unset",
+            "unset-all",
+        }
+        if any(value.lower() in mutation_options for value in git_args):
+            return True
+        positional = tuple(
+            value.lower() for value in git_args if not value.startswith("-")
+        )
+        if positional[:1] and positional[0] in mutation_subcommands:
+            return True
+        # The traditional `git config <name> <value>` form writes even when
+        # --local/--worktree is omitted.  A single name is a direct read.
+        if len(positional) > 1 and positional[0] not in {
+            "get",
+            "get-all",
+            "get-regexp",
+            "get-urlmatch",
+            "list",
+        }:
+            return True
     return subcommand not in GIT_DIRECT_BUILTIN_SUBCOMMANDS
 
 
@@ -1656,7 +1683,7 @@ def _command_effects(command: str) -> set[str]:
                 and any("secret" in value for value in args)
             ) or executable in {"printenv"}:
                 detected.add("secret_access")
-            if executable in READ_CAPABLE_COMMANDS and any(
+            if any(
                 _secret_shaped_path(value)
                 for value in segment[1:]
                 if "/" in value or value.startswith(".")
@@ -1722,6 +1749,8 @@ def _command_has_unclassified_indirection(command: str) -> bool:
                 return True
             executable = Path(segment[0]).name.lower()
             args = tuple(value.lower() for value in segment[1:])
+            if segment[0] == "." or executable == "source":
+                return True
             if executable in (
                 OPAQUE_EFFECT_EXECUTABLES
                 | OPAQUE_PROCESS_LAUNCH_WRAPPERS
@@ -2828,7 +2857,10 @@ class ExternalCodexRuntime:
         for label, command in probes:
             try:
                 completed = subprocess.run(
-                    command,
+                    self._containment_command(
+                        command,
+                        executable_digest=executable_digest,
+                    ),
                     text=True,
                     capture_output=True,
                     check=False,
@@ -2879,7 +2911,8 @@ class ExternalCodexRuntime:
                 f"{model_slug} effort {reasoning_effort} is absent from the live catalog",
             )
         containment_probe = self._containment_command(
-            [str(containment_paths["probe_executable"])]
+            [str(containment_paths["probe_executable"])],
+            executable_digest=sha256_file(containment_paths["probe_executable"]),
         )
         try:
             contained = subprocess.run(
@@ -2912,6 +2945,7 @@ class ExternalCodexRuntime:
         self,
         command: Sequence[str],
         *,
+        executable_digest: str,
         identity_path: Path | None = None,
     ) -> list[str]:
         containment = self.profile["process_containment"]
@@ -2929,6 +2963,8 @@ class ExternalCodexRuntime:
             str(containment["term_timeout_seconds"]),
             "--kill-timeout-seconds",
             str(containment["kill_timeout_seconds"]),
+            "--executable-digest",
+            executable_digest,
         ]
         if identity_path is not None:
             if not identity_path.is_absolute():
@@ -2989,6 +3025,11 @@ class ExternalCodexRuntime:
         assert_agent_incarnation_binding_matches_plan(binding, plan)
         task = coordinates["task"][2]
         validate_json(task, TASK_SCHEMA_PATH, label="external Codex task")
+        if set(task["forbidden_effects"]) != RUNTIME_WIDE_FORBIDDEN_EFFECTS:
+            raise ExternalCodexRuntimeError(
+                "task_forbidden_effects_incomplete",
+                "task must preserve the complete runtime-wide forbidden-effect set",
+            )
         validation_command_ids = [
             str(item["command_id"]) for item in task["validation_commands"]
         ]
@@ -4578,6 +4619,17 @@ Runtime session identity: {state['session_id']}
                 str(state["reasoning_effort"]),
                 tool_entry,
             )
+            current_manifest = build_workspace_manifest(state["workspace_path"])
+            if current_manifest != state["workspace_manifest_baseline"]:
+                self._worker_failure_locked(
+                    state,
+                    attempt_id=attempt_id,
+                    code="workspace_manifest_drift",
+                    message=(
+                        "workspace bytes changed between admission and Codex launch"
+                    ),
+                )
+                return
             codex_execution_root = (
                 execution_root
                 if tool_entry["codex_execution_root"] == "attempt-local"
@@ -4626,6 +4678,7 @@ Runtime session identity: {state['session_id']}
             process_identity_path = attempt_dir / "process-identity.json"
             command = self._containment_command(
                 codex_command,
+                executable_digest=str(launch["codex_executable_digest"]),
                 identity_path=process_identity_path,
             )
             attempt = state["attempts"][attempt_number - 1]
@@ -5464,11 +5517,10 @@ Runtime session identity: {state['session_id']}
         commands: Sequence[Mapping[str, Any]],
         task: Mapping[str, Any],
     ) -> list[str]:
-        forbidden = set(task["forbidden_effects"])
         detected: set[str] = set()
         for item in commands:
             command = str(item.get("command") or "")
-            detected.update(_command_effects(command) & forbidden)
+            detected.update(_command_effects(command) & RUNTIME_WIDE_FORBIDDEN_EFFECTS)
             if (
                 item.get("validation_command_id") is None
                 and _command_has_unclassified_indirection(command)
@@ -7448,7 +7500,12 @@ class ExternalCodexParentReentry:
             return [*base, *common, "--color", "never", "-"]
         return [*base, "resume", *common, thread_id, "-"]
 
-    def _containment_command(self, command: Sequence[str], identity_path: Path) -> list[str]:
+    def _containment_command(
+        self,
+        command: Sequence[str],
+        identity_path: Path,
+        executable_digest: str,
+    ) -> list[str]:
         containment = self.profile["process_containment"]
         return [
             sys.executable,
@@ -7461,6 +7518,8 @@ class ExternalCodexParentReentry:
             str(containment["kill_timeout_seconds"]),
             "--identity-file",
             str(identity_path),
+            "--executable-digest",
+            executable_digest,
             "--",
             *command,
         ]
@@ -7648,6 +7707,7 @@ class ExternalCodexParentReentry:
                 thread_id=thread_id,
             ),
             identity_path,
+            str(obligation["codex_executable_digest"]),
         )
         started_at = iso_now()
         with (

@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import hashlib
 import json
 import os
 import select
 import signal
+import stat
 import subprocess
 import sys
 import time
@@ -29,6 +31,7 @@ SUPERVISOR_SETUP_FAILED = 125
 SUPERVISOR_CLEANUP_INCOMPLETE = 126
 POLL_INTERVAL_SECONDS = 0.05
 ADOPTED_REAP_INTERVAL_SECONDS = 1.0
+MAX_EXECUTABLE_BYTES = 512 * 1024 * 1024
 
 _termination_signal: int | None = None
 _child_state_changed = True
@@ -36,6 +39,78 @@ _child_state_changed = True
 
 class SupervisorError(RuntimeError):
     """One process-containment failure safe to expose on stderr."""
+
+
+def _open_verified_executable(path: str, expected_digest: str) -> int:
+    """Open and hash the exact executable inode that will be passed to exec."""
+
+    executable = Path(path)
+    if (
+        not executable.is_absolute()
+        or executable.resolve() != executable
+        or not expected_digest.startswith("sha256:")
+        or len(expected_digest) != 71
+    ):
+        raise SupervisorError("Codex executable identity is invalid")
+    flags = os.O_RDONLY | os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(executable, flags)
+    except OSError as exc:
+        raise SupervisorError("cannot open the exact Codex executable") from exc
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            raise SupervisorError("Codex executable is not a regular file")
+        digest = hashlib.sha256()
+        observed_bytes = 0
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            observed_bytes += len(chunk)
+            if observed_bytes > MAX_EXECUTABLE_BYTES:
+                raise SupervisorError("Codex executable exceeds the digest limit")
+            digest.update(chunk)
+        after = os.fstat(descriptor)
+        identity_fields = (
+            "st_dev",
+            "st_ino",
+            "st_mode",
+            "st_size",
+            "st_mtime_ns",
+            "st_ctime_ns",
+        )
+        if any(getattr(before, field) != getattr(after, field) for field in identity_fields):
+            raise SupervisorError("Codex executable changed while being verified")
+        actual_digest = "sha256:" + digest.hexdigest()
+        if actual_digest != expected_digest:
+            raise SupervisorError("Codex executable digest changed before exec")
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _launch_verified_command(
+    command: list[str],
+    expected_digest: str,
+) -> subprocess.Popen[bytes]:
+    """Execute the digest-verified open file, not a later pathname lookup."""
+
+    descriptor = _open_verified_executable(command[0], expected_digest)
+    try:
+        return subprocess.Popen(
+            command,
+            executable=f"/proc/self/fd/{descriptor}",
+            pass_fds=(descriptor,),
+        )
+    except OSError as exc:
+        raise SupervisorError("Codex launch failed") from exc
+    finally:
+        os.close(descriptor)
 
 
 @dataclass(frozen=True)
@@ -373,6 +448,7 @@ def _arguments(argv: list[str]) -> argparse.Namespace:
         required=True,
     )
     parser.add_argument("--identity-file", type=Path)
+    parser.add_argument("--executable-digest", required=True)
     parser.add_argument("command", nargs=argparse.REMAINDER)
     arguments = parser.parse_args(argv)
     if arguments.command[:1] == ["--"]:
@@ -416,9 +492,12 @@ def main(argv: list[str] | None = None) -> int:
         if os.getppid() != arguments.parent_pid or _termination_signal is not None:
             _fail("worker parent died during setup", SUPERVISOR_SETUP_FAILED)
         try:
-            process = subprocess.Popen(arguments.command)
-        except OSError as exc:
-            _fail(f"Codex launch failed: {exc}", SUPERVISOR_SETUP_FAILED)
+            process = _launch_verified_command(
+                arguments.command,
+                arguments.executable_digest,
+            )
+        except SupervisorError as exc:
+            _fail(str(exc), SUPERVISOR_SETUP_FAILED)
         if arguments.identity_file is not None:
             try:
                 _write_process_identity_receipt(arguments.identity_file, process)
