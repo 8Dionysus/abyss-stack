@@ -16,7 +16,11 @@ Tracking starts with the community-docs baseline for this repository.
   while one expired or invalid sibling canary blocks only its own contour
   instead of aborting the complete managed refresh. Admission now also keeps
   the live LKG PID observation distinct from the rollback target's verified
-  stable executable identity.
+  stable executable identity, rehashes that executable before admission, and
+  requires the signed canary observation to follow the currently observed
+  systemd process start. Runtime projection validates the complete
+  content-addressed deployment record, and a malformed sibling receipt is now
+  a contour-local skip rather than a sweep-wide parse failure.
 - Move the observation producer onto registry v2 and bind the managed
   admission Keeper to its provisioned private owner-evidence inbox, so the
   production units exercise the same v2 and incremental-refresh paths proven

@@ -189,9 +189,9 @@ def _inputs(tmp_path: Path) -> dict[str, Path]:
     lkg["deploy"]["tree_digest"] = rollback_target["deploy_tree_digest"]
     lkg["deploy"]["manifest_ref"] = rollback_target["deploy_manifest_ref"]
     lkg["deploy"]["manifest_digest"] = rollback_target["deploy_manifest_digest"]
-    lkg["deploy"]["evidence"]["evidence_refs"][0]["evidence_ref"] = (
-        rollback_target["deploy_manifest_ref"]
-    )
+    lkg["deploy"]["evidence"]["evidence_refs"][0]["evidence_ref"] = rollback_target[
+        "deploy_manifest_ref"
+    ]
     lkg["process"]["unit_name"] = rollback_target["unit_name"]
     lkg["process"]["executable_ref"] = rollback_target["executable_ref"]
     lkg["process"]["process_identity"] = rollback_target["process_identity"]
@@ -203,9 +203,9 @@ def _inputs(tmp_path: Path) -> dict[str, Path]:
     )
     lkg["canary"]["canary_route"] = rollback_target["canary_route"]
     lkg["canary"]["canary_ref"] = rollback_target["canary_ref"]
-    lkg["canary"]["evidence"]["evidence_refs"][0]["evidence_ref"] = (
-        lkg["canary"]["canary_ref"]
-    )
+    lkg["canary"]["evidence"]["evidence_refs"][0]["evidence_ref"] = lkg["canary"][
+        "canary_ref"
+    ]
     lkg["canary"]["evidence"]["evidence_refs"].append(
         {
             "owner": "aoa-kag",
@@ -215,9 +215,7 @@ def _inputs(tmp_path: Path) -> dict[str, Path]:
             "expires_at": (NOW + timedelta(hours=1)).isoformat(),
         }
     )
-    registry_path = _write(
-        tmp_path / "registry.json", registry.model_dump(mode="json")
-    )
+    registry_path = _write(tmp_path / "registry.json", registry.model_dump(mode="json"))
     current_path = _write(tmp_path / "current.json", observation(current))
     lkg_path = _write(tmp_path / "lkg.json", observation(lkg))
     contour_digest = sha256_digest(contour.model_dump(mode="json"))
@@ -251,6 +249,7 @@ def _compose(paths: dict[str, Path]):
         lkg_observation_path=paths["lkg"],
         operator_decision_path=paths["decision"],
         clock=lambda: NOW + timedelta(minutes=2),
+        file_digest=lambda path, label: DIGEST_A,
     )
 
 
@@ -294,11 +293,30 @@ def test_accepts_stable_executable_rollback_target_for_live_lkg_process(
     )
 
 
+def test_rejects_stable_rollback_target_without_matching_executable_bytes(
+    tmp_path: Path,
+) -> None:
+    paths = _inputs(tmp_path)
+    current = json.loads(paths["current"].read_text())
+    lkg = json.loads(paths["lkg"].read_text())
+    rollback = current["subjects"][0]["rollback"]
+    unit_name = rollback["proved_target"]["unit_name"]
+    stable_process = f"systemd-user:{unit_name}:executable:{DIGEST_B}"
+    rollback["proved_target"]["process_identity"] = stable_process
+    rollback["last_known_good_process_identity"] = stable_process
+    lkg["subjects"][0]["process"]["process_identity"] = (
+        f"systemd-user:{unit_name}:pid:321:start:654"
+    )
+    _write(paths["current"], current)
+    _write(paths["lkg"], lkg)
+
+    with pytest.raises(AdmissionRevisionError, match="rollback proof target"):
+        _compose(paths)
+
+
 def test_rejects_operator_decision_for_different_contour(tmp_path: Path) -> None:
     paths = _inputs(tmp_path)
-    registry = OrganRegistrySourceV2.model_validate_json(
-        paths["registry"].read_bytes()
-    )
+    registry = OrganRegistrySourceV2.model_validate_json(paths["registry"].read_bytes())
     decision = materialize_admission_decision(
         AdmissionDecisionStatement(
             candidate_id=DIGEST_A,
@@ -321,12 +339,12 @@ def test_rejects_reused_current_canary_as_last_known_good(tmp_path: Path) -> Non
     paths = _inputs(tmp_path)
     current = json.loads(paths["current"].read_text())
     lkg = json.loads(paths["lkg"].read_text())
-    lkg["subjects"][0]["canary"]["canary_ref"] = current["subjects"][0][
-        "canary"
-    ]["canary_ref"]
-    lkg["subjects"][0]["canary"]["evidence"]["evidence_refs"][0][
-        "evidence_ref"
-    ] = current["subjects"][0]["canary"]["canary_ref"]
+    lkg["subjects"][0]["canary"]["canary_ref"] = current["subjects"][0]["canary"][
+        "canary_ref"
+    ]
+    lkg["subjects"][0]["canary"]["evidence"]["evidence_refs"][0]["evidence_ref"] = (
+        current["subjects"][0]["canary"]["canary_ref"]
+    )
     _write(paths["lkg"], lkg)
 
     with pytest.raises(AdmissionRevisionError, match="exact and distinct"):

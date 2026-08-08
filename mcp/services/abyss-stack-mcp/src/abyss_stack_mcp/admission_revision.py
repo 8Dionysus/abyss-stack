@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -34,6 +34,7 @@ from .observation import (
     _read_json,
     _write_atomic,
 )
+from .rollback_candidate import _file_digest
 
 
 class AdmissionRevisionError(ObservationProducerError):
@@ -106,8 +107,7 @@ def _proof_and_acceptance_match_current(current: Any, consumer: Any) -> bool:
         and proof.proved_deploy_tree_digest == current.deploy.tree_digest
         and proof.proved_deploy_manifest_digest == current.deploy.manifest_digest
         and proof.proved_process_identity == current.process.process_identity
-        and proof.proved_server_schema_digest
-        == current.endpoint.server_schema_digest
+        and proof.proved_server_schema_digest == current.endpoint.server_schema_digest
         and proof.proved_consumer_registration_ref == consumer.registration_ref
         and proof.proved_canary_route == current.canary.canary_route
         and proof.proved_canary_ref == current.canary.canary_ref
@@ -116,7 +116,15 @@ def _proof_and_acceptance_match_current(current: Any, consumer: Any) -> bool:
     )
 
 
-def _lkg_matches_rollback_target(lkg: Any, current: Any) -> bool:
+FileDigest = Callable[[Path, str], str]
+
+
+def _lkg_matches_rollback_target(
+    lkg: Any,
+    current: Any,
+    *,
+    file_digest: FileDigest,
+) -> bool:
     target = current.rollback.proved_target
     if target is None:
         return False
@@ -136,26 +144,36 @@ def _lkg_matches_rollback_target(lkg: Any, current: Any) -> bool:
         live_process_identity,
     )
     exact_stable_target = re.fullmatch(
-        rf"systemd-user:{re.escape(target.unit_name)}:executable:sha256:[0-9a-f]{{64}}",
+        rf"systemd-user:{re.escape(target.unit_name)}:executable:(sha256:[0-9a-f]{{64}})",
         target.process_identity,
     )
-    process_target_matches = (
-        live_process_identity == target.process_identity
-        or exact_live_process is not None
-        and exact_stable_target is not None
-    )
-    return len(matching_consumers) == 1 and process_target_matches and (
-        lkg.package.artifact_digest == target.package_digest
-        and lkg.package.source_revision == target.deploy_revision
-        and lkg.deploy.revision == target.deploy_revision
-        and lkg.deploy.tree_digest == target.deploy_tree_digest
-        and lkg.deploy.manifest_ref == target.deploy_manifest_ref
-        and lkg.deploy.manifest_digest == target.deploy_manifest_digest
-        and lkg.process.unit_name == target.unit_name
-        and lkg.credential_class == target.credential_class
-        and lkg.process.executable_ref == target.executable_ref
-        and lkg.canary.canary_route == target.canary_route
-        and lkg.canary.canary_ref == target.canary_ref
+    process_target_matches = live_process_identity == target.process_identity
+    if not process_target_matches and exact_live_process and exact_stable_target:
+        try:
+            observed_executable_digest = file_digest(
+                Path(lkg.process.executable_ref), "LKG executable"
+            )
+        except (OSError, ValueError):
+            return False
+        process_target_matches = (
+            observed_executable_digest == exact_stable_target.group(1)
+        )
+    return (
+        len(matching_consumers) == 1
+        and process_target_matches
+        and (
+            lkg.package.artifact_digest == target.package_digest
+            and lkg.package.source_revision == target.deploy_revision
+            and lkg.deploy.revision == target.deploy_revision
+            and lkg.deploy.tree_digest == target.deploy_tree_digest
+            and lkg.deploy.manifest_ref == target.deploy_manifest_ref
+            and lkg.deploy.manifest_digest == target.deploy_manifest_digest
+            and lkg.process.unit_name == target.unit_name
+            and lkg.credential_class == target.credential_class
+            and lkg.process.executable_ref == target.executable_ref
+            and lkg.canary.canary_route == target.canary_route
+            and lkg.canary.canary_ref == target.canary_ref
+        )
     )
 
 
@@ -166,6 +184,7 @@ def compose_admission_revision(
     lkg_observation_path: Path,
     operator_decision_path: Path,
     clock: Any = _now,
+    file_digest: FileDigest = _file_digest,
 ) -> OrganContourAdmissionRevision:
     registry_payload, _ = _read_json(registry_path, "v2 organ registry")
     observation_payload, _ = _read_json(observation_path, "current observation")
@@ -184,11 +203,15 @@ def compose_admission_revision(
         lkg_observation = RuntimeObservation.model_validate(lkg_payload)
         decision = AdmissionDecisionReceipt.model_validate(decision_payload)
     except ValidationError as exc:
-        raise AdmissionRevisionError("admission input failed its owner contract") from exc
+        raise AdmissionRevisionError(
+            "admission input failed its owner contract"
+        ) from exc
     try:
         assert_admission_decision(decision)
     except OrganAdmissionError as exc:
-        raise AdmissionRevisionError("operator decision content address is invalid") from exc
+        raise AdmissionRevisionError(
+            "operator decision content address is invalid"
+        ) from exc
     records = [item for item in registry.records if item.organ_id == "aoa-kag"]
     if len(records) != 1:
         raise AdmissionRevisionError("registry lacks one KAG organ")
@@ -208,7 +231,9 @@ def compose_admission_revision(
         or decision.decision_artifact_digest != contour_digest
         or decision.registry_mutation_performed is not False
     ):
-        raise AdmissionRevisionError("operator decision does not bind the shadow contour")
+        raise AdmissionRevisionError(
+            "operator decision does not bind the shadow contour"
+        )
     current = _subject(observation)
     lkg = _subject(lkg_observation)
     now = clock().astimezone(timezone.utc)
@@ -257,7 +282,9 @@ def compose_admission_revision(
         or lkg.canary.canary_ref is None
         or lkg.canary.canary_ref == current.canary.canary_ref
     ):
-        raise AdmissionRevisionError("last-known-good contour is not exact and distinct")
+        raise AdmissionRevisionError(
+            "last-known-good contour is not exact and distinct"
+        )
     consumers = [
         item
         for item in current.consumers
@@ -274,17 +301,27 @@ def compose_admission_revision(
         raise AdmissionRevisionError(
             "proof or owner acceptance targets a different current contour"
         )
-    if not _lkg_matches_rollback_target(lkg, current):
+    if not _lkg_matches_rollback_target(lkg, current, file_digest=file_digest):
         raise AdmissionRevisionError(
             "last-known-good observation differs from the rollback proof target"
         )
     consumer_ref = _one_ref(consumer.evidence, "8Dionysus", "consumer")
     source_ref = _one_ref(current.source.evidence, record.owners.source_owner, "source")
-    runtime_ref = _one_ref(current.deploy.evidence, record.owners.runtime_owner, "deploy")
-    process_ref = _one_ref(current.process.evidence, record.owners.runtime_owner, "process")
-    endpoint_ref = _one_ref(current.endpoint.evidence, record.owners.runtime_owner, "endpoint")
-    registry_ref = _one_ref(current.registry.evidence, record.owners.control_owner, "registry")
-    canary_ref = _one_ref(current.canary.evidence, record.owners.runtime_owner, "canary")
+    runtime_ref = _one_ref(
+        current.deploy.evidence, record.owners.runtime_owner, "deploy"
+    )
+    process_ref = _one_ref(
+        current.process.evidence, record.owners.runtime_owner, "process"
+    )
+    endpoint_ref = _one_ref(
+        current.endpoint.evidence, record.owners.runtime_owner, "endpoint"
+    )
+    registry_ref = _one_ref(
+        current.registry.evidence, record.owners.control_owner, "registry"
+    )
+    canary_ref = _one_ref(
+        current.canary.evidence, record.owners.runtime_owner, "canary"
+    )
     freshness_ref = _one_ref(
         current.freshness, record.owners.acceptance_owner, "freshness"
     )
