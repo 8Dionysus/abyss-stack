@@ -118,8 +118,8 @@ class CanaryDeploymentBinding(StrictModel):
 
 
 class CanaryReceipt(StrictModel):
-    schema_version: Literal["abyss_stack_mcp_canary_receipt_v2"] = (
-        "abyss_stack_mcp_canary_receipt_v2"
+    schema_version: Literal["abyss_stack_mcp_canary_receipt_v3"] = (
+        "abyss_stack_mcp_canary_receipt_v3"
     )
     receipt_id: Digest
     signer_id: Digest
@@ -930,7 +930,7 @@ def _receipt_body(
     if probe.call_succeeded and not contract_matched and not reasons:
         reasons = ("mcp-canary-result-contract-mismatch",)
     return {
-        "schema_version": "abyss_stack_mcp_canary_receipt_v2",
+        "schema_version": "abyss_stack_mcp_canary_receipt_v3",
         "issuer": "abyss-stack",
         "consumer_id": "abyss-stack-mcp-canary",
         "organ_id": target.organ_id,

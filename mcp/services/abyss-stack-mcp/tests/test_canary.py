@@ -262,6 +262,7 @@ def test_receipt_is_content_addressed_and_preserves_claim_limit() -> None:
     verify_signature(payload, "receipt_id")
     receipt_id = payload.pop("receipt_id")
 
+    assert receipt.schema_version == "abyss_stack_mcp_canary_receipt_v3"
     assert receipt_id == canonical_digest(payload)
     assert receipt.call_succeeded is True
     assert receipt.result_contract_matched is True
