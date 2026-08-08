@@ -1,6 +1,7 @@
 [Unit]
 Description=abyss-stack MCP read observation plane
 Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/README.md
+Conflicts=abyss-stack-mcp-read-bootstrap.service
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.source-projection.lock
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock

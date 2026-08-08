@@ -1051,6 +1051,7 @@ aoa_require_abyss_stack_mcp_units_stopped_for_rotation() {
 
   for unit in \
     abyss-stack-mcp-read.service \
+    abyss-stack-mcp-read-bootstrap.service \
     abyss-stack-mcp-candidate.service \
     abyss-stack-mcp-internal-effect.service; do
     if ! active_state="$(
@@ -1185,12 +1186,15 @@ aoa_require_abyss_stack_mcp_units_stopped() {
   abyss_stack_mcp_units_error=""
   for unit in \
     abyss-stack-mcp-read.service \
+    abyss-stack-mcp-read-bootstrap.service \
     abyss-stack-mcp-candidate.service \
     abyss-stack-mcp-internal-effect.service; do
     unit_contour="${unit#abyss-stack-mcp-}"
     unit_contour="${unit_contour%.service}"
     if [[ "$unit_contour" == "internal-effect" ]]; then
       unit_contour="internal_effect"
+    elif [[ "$unit_contour" == "read-bootstrap" ]]; then
+      unit_contour="read"
     fi
     expected_unit_source="${AOA_CONFIGS_ROOT}/systemd/user/${unit}"
     expected_unit_target="${XDG_CONFIG_HOME:-${HOME}/.config}/systemd/user/${unit}"

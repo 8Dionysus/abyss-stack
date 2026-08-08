@@ -394,6 +394,12 @@ their complete content-addressed statement. Their public `signer_id` is the
 SHA-256 digest of the raw public key. A downstream owner must verify both
 attestations against an independently pinned public key before attributing the
 capture to `abyss-stack`; a caller-supplied key is not an authentication root.
+The signed body also binds the exact deployment manifest, service, source
+revision, package digest, deployed-tree digest, and deployment timestamp. The
+observation must occur after that deployment. Runtime-overlay construction and
+every production preflight re-authenticate the receipt, recheck its TTL, and
+compare those deployment fields against the current manifest; a copied,
+expired, predecessor, or post-catalog-tampered receipt cannot authorize start.
 
 The bounded timeout includes a listener-readiness window because a systemd
 `Type=simple` process can be active before Uvicorn has bound its socket. The
@@ -424,10 +430,24 @@ acceptance, admission, or rollback claim. A successful call and result-contract
 match therefore remain only inputs to the later pair-specific eval and owner
 review.
 
-After an explicit one-owner process switch, run:
+For a contour with no prior admission, use its manual bootstrap unit only long
+enough to issue the first receipt. The bootstrap unit has the exact production
+credential, endpoint, sandbox, and `ExecStart`, but no registry/catalog
+preflight; it conflicts with production, never restarts, has no `[Install]`
+section, and is killed after ten minutes. The complete first-admission sequence
+is: verify an exact deployment, start only the matching bootstrap unit, run the
+canary, stop bootstrap, build and review the registry/catalog transaction, then
+start the normal preflight-gated production unit. Bootstrap is not a general
+recovery bypass and must never be enabled.
+
+For example:
 
 ```bash
+systemctl --user start aoa-organ-mcp-read-bootstrap@aoa-kag.service
 abyss-stack-mcp-canary --organ aoa-kag
+systemctl --user stop aoa-organ-mcp-read-bootstrap@aoa-kag.service
+# Build/review admission and managed-contours.json before the next command.
+systemctl --user start aoa-organ-mcp-read@aoa-kag.service
 ```
 
 The stack auth provisioner creates the canary signing key once as a regular

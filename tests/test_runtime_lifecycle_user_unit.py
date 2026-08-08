@@ -31,6 +31,9 @@ STATS_PATH_UNIT = REPO_ROOT / "systemd" / "user" / "aoa-stats-live-refresh.path"
 STATS_SERVICE_UNIT = REPO_ROOT / "systemd" / "user" / "aoa-stats-live-refresh.service"
 MCP_HTTP_TEMPLATE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http@.service"
 ORGAN_MCP_READ_TEMPLATE = REPO_ROOT / "systemd" / "user" / "aoa-organ-mcp-read@.service"
+ORGAN_MCP_READ_BOOTSTRAP_TEMPLATE = (
+    REPO_ROOT / "systemd" / "user" / "aoa-organ-mcp-read-bootstrap@.service"
+)
 MEMO_MCP_CANDIDATE_UNIT = (
     REPO_ROOT / "systemd" / "user" / "aoa-memo-mcp-candidate.service"
 )
@@ -39,6 +42,9 @@ EVALS_MCP_CANDIDATE_UNIT = (
 )
 MCP_HTTP_BUNDLE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http.service"
 STACK_MCP_READ_UNIT = REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-read.service"
+STACK_MCP_READ_BOOTSTRAP_UNIT = (
+    REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-read-bootstrap.service"
+)
 STACK_MCP_CANDIDATE_UNIT = (
     REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-candidate.service"
 )
@@ -1031,8 +1037,12 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             systemctl.write_text(
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
-                "printf '%s\\n' "
-                '"${ABYSS_STACK_MCP_TEST_ACTIVE_STATE:-inactive}"\n',
+                'unit="${*: -1}"\n'
+                'if [[ "$unit" == "${ABYSS_STACK_MCP_TEST_ACTIVE_UNIT:-}" ]]; then\n'
+                "  printf '%s\\n' active\n"
+                "else\n"
+                "  printf '%s\\n' \"${ABYSS_STACK_MCP_TEST_ACTIVE_STATE:-inactive}\"\n"
+                "fi\n",
                 encoding="utf-8",
             )
             systemctl.chmod(0o755)
@@ -1116,13 +1126,22 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             blocked = subprocess.run(
                 ["bash", str(INSTALL_SYSTEMD), "--rotate-abyss-stack-mcp-auth"],
                 cwd=REPO_ROOT,
-                env={**env, "ABYSS_STACK_MCP_TEST_ACTIVE_STATE": "active"},
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_ACTIVE_UNIT": (
+                        "abyss-stack-mcp-read-bootstrap.service"
+                    ),
+                },
                 check=False,
                 capture_output=True,
                 text=True,
             )
             self.assertNotEqual(blocked.returncode, 0)
-            self.assertIn("refusing credential rotation while", blocked.stderr)
+            self.assertIn(
+                "refusing credential rotation while "
+                "abyss-stack-mcp-read-bootstrap.service is active",
+                blocked.stderr,
+            )
             for name, token in after.items():
                 self.assertEqual(
                     secret_dir.joinpath(name)
@@ -1257,6 +1276,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             unit_target_dir.mkdir(parents=True)
             for source_unit in (
                 STACK_MCP_READ_UNIT,
+                STACK_MCP_READ_BOOTSTRAP_UNIT,
                 STACK_MCP_CANDIDATE_UNIT,
                 STACK_MCP_INTERNAL_EFFECT_UNIT,
             ):
@@ -1285,6 +1305,8 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 'contour="${contour%.service}"\n'
                 'if [[ "$contour" == "internal-effect" ]]; then '
                 "contour=internal_effect; fi\n"
+                'if [[ "$contour" == "read-bootstrap" ]]; then '
+                "contour=read; fi\n"
                 "exec_path=/usr/bin/flock\n"
                 'exec_start="/usr/bin/flock --shared --no-fork '
                 "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/"
@@ -1856,6 +1878,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
 
             for active_unit in (
                 "abyss-stack-mcp-read.service",
+                "abyss-stack-mcp-read-bootstrap.service",
                 "abyss-stack-mcp-candidate.service",
                 "abyss-stack-mcp-internal-effect.service",
             ):
@@ -2406,9 +2429,11 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         }
         self.assertIn("aoa-mcp-http@.service", managed_units)
         self.assertIn("aoa-organ-mcp-read@.service", managed_units)
+        self.assertIn("aoa-organ-mcp-read-bootstrap@.service", managed_units)
         self.assertIn("aoa-memo-mcp-candidate.service", managed_units)
         self.assertIn("aoa-evals-mcp-candidate.service", managed_units)
         self.assertIn("aoa-mcp-http.service", managed_units)
+        self.assertIn("abyss-stack-mcp-read-bootstrap.service", managed_units)
         self.assertIn("abyss-stack-mcp-observation.service", managed_units)
         self.assertIn("abyss-stack-mcp-observation.timer", managed_units)
 
@@ -2449,6 +2474,69 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             evals_candidate,
         )
         self.assertNotIn("evals/suites/*.suite.json", evals_candidate)
+
+    def test_mcp_read_bootstrap_units_are_manual_bounded_and_disjoint(self) -> None:
+        organ_production = ORGAN_MCP_READ_TEMPLATE.read_text(encoding="utf-8")
+        organ_bootstrap = ORGAN_MCP_READ_BOOTSTRAP_TEMPLATE.read_text(encoding="utf-8")
+        stack_production = STACK_MCP_READ_UNIT.read_text(encoding="utf-8")
+        stack_bootstrap = STACK_MCP_READ_BOOTSTRAP_UNIT.read_text(encoding="utf-8")
+
+        self.assertIn(
+            "Conflicts=aoa-organ-mcp-read-bootstrap@%i.service",
+            organ_production,
+        )
+        self.assertIn(
+            "Conflicts=aoa-organ-mcp-read@%i.service",
+            organ_bootstrap,
+        )
+        self.assertIn(
+            "Conflicts=abyss-stack-mcp-read-bootstrap.service",
+            stack_production,
+        )
+        self.assertIn(
+            "Conflicts=abyss-stack-mcp-read.service",
+            stack_bootstrap,
+        )
+
+        for production, bootstrap in (
+            (organ_production, organ_bootstrap),
+            (stack_production, stack_bootstrap),
+        ):
+            production_lines = production.splitlines()
+            bootstrap_lines = bootstrap.splitlines()
+            self.assertEqual(
+                [line for line in bootstrap_lines if line.startswith("ExecStart=")],
+                [line for line in production_lines if line.startswith("ExecStart=")],
+            )
+            self.assertEqual(
+                [
+                    line
+                    for line in bootstrap_lines
+                    if line.startswith("LoadCredential=")
+                ],
+                [
+                    line
+                    for line in production_lines
+                    if line.startswith("LoadCredential=")
+                ],
+            )
+            self.assertIn("Restart=no", bootstrap_lines)
+            self.assertIn("RuntimeMaxSec=10min", bootstrap_lines)
+            self.assertNotIn("[Install]", bootstrap_lines)
+            self.assertFalse(
+                any(line.startswith("WantedBy=") for line in bootstrap_lines)
+            )
+            self.assertNotIn("abyss_stack_mcp.preflight", bootstrap)
+            self.assertNotIn("managed-contours.json", bootstrap)
+            self.assertNotIn("organ-registry.v2.source.json", bootstrap)
+
+        self.assertIn("ProtectSystem=strict", organ_bootstrap)
+        self.assertIn("ProtectHome=read-only", organ_bootstrap)
+        self.assertNotIn("ReadWritePaths=", organ_bootstrap)
+        self.assertIn("ProtectSystem=strict", stack_bootstrap)
+        self.assertIn("ProtectHome=read-only", stack_bootstrap)
+        self.assertIn("IPAddressDeny=any", stack_bootstrap)
+        self.assertIn("IPAddressAllow=localhost", stack_bootstrap)
 
     def test_stack_mcp_units_keep_all_contours_disjoint(self) -> None:
         read_unit = STACK_MCP_READ_UNIT.read_text(encoding="utf-8")

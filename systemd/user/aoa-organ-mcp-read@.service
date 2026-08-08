@@ -2,6 +2,7 @@
 Description=AoA owner-bounded MCP read contour (%i)
 Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/README.md
 PartOf=aoa-mcp-http.service
+Conflicts=aoa-organ-mcp-read-bootstrap@%i.service
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
 ConditionPathExists=/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/managed-contours.json

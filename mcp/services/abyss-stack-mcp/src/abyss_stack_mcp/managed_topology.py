@@ -27,7 +27,12 @@ def derive_managed_topology(
             raise PreflightError("runtime overlay contour must be an object")
         runtime = contour.get("runtime_identity")
         endpoint = contour.get("endpoint")
-        if not isinstance(runtime, dict) or not isinstance(endpoint, dict):
+        canary = contour.get("canary_evidence")
+        if (
+            not isinstance(runtime, dict)
+            or not isinstance(endpoint, dict)
+            or not isinstance(canary, dict)
+        ):
             raise PreflightError("runtime overlay contour is incomplete")
         service = _deployment_service(deployment, runtime.get("package_name"))
         package_root = _bounded_package_root(deployed_root, service)
@@ -48,25 +53,55 @@ def derive_managed_topology(
             unit_name = f"abyss-stack-mcp-{contour_id}.service"
             unit_path = deployed_root / "Configs/systemd/user" / unit_name
             credential_name = f"abyss-stack-mcp-{policy.replace('_', '-')}-bearer-token"
-            auth_manifest = deployed_root / "Secrets/Configs/abyss-stack-mcp-auth-manifest.json"
+            auth_manifest = (
+                deployed_root / "Secrets/Configs/abyss-stack-mcp-auth-manifest.json"
+            )
             auth_key = policy
             required_environment = {"ABYSS_STACK_MCP_POLICY_FAMILY": policy}
             unit_credential_binding = (
                 f"LoadCredential={credential_name}:"
                 f"{deployed_root / 'Secrets/Configs' / credential_name}"
             )
+            expected_executable = str(
+                deployed_root / "Services/abyss-stack-mcp/venv/bin/python"
+            )
+            if process_ref != expected_executable:
+                raise PreflightError(
+                    "stack unit executable conflicts with its launcher"
+                )
+            unit_exec_start_binding = (
+                "ExecStart=/usr/bin/flock --shared --no-fork "
+                f"{deployed_root}/Services/abyss-stack-mcp/.source-projection.lock "
+                "/usr/bin/flock --shared --no-fork "
+                f"{deployed_root}/Services/abyss-stack-mcp/.runtime-provision.lock "
+                f"/usr/bin/env {deployed_root}/Configs/scripts/aoa-install-systemd "
+                f"--launch-verified-abyss-stack-mcp={policy}"
+            )
         else:
             instance = "tos-corpus" if organ_id == "tree-of-sophia" else organ_id
             binding_id = f"{instance}-{contour_id}"
             unit_name = f"aoa-organ-mcp-{contour_id}@{instance}.service"
-            unit_path = deployed_root / "Configs/systemd/user/aoa-organ-mcp-read@.service"
+            unit_path = (
+                deployed_root / "Configs/systemd/user/aoa-organ-mcp-read@.service"
+            )
             credential_name = f"{instance}-mcp-{policy.replace('_', '-')}-bearer-token"
-            auth_manifest = deployed_root / "Secrets/Configs/organ-mcp-read-auth-manifest.json"
+            auth_manifest = (
+                deployed_root / "Secrets/Configs/organ-mcp-read-auth-manifest.json"
+            )
             auth_key = instance
             required_environment = {"AOA_MCP_POLICY_FAMILY": policy}
             unit_credential_binding = (
                 "LoadCredential=%i-mcp-read-bearer-token:"
                 f"{deployed_root}/Secrets/Configs/%i-mcp-read-bearer-token"
+            )
+            expected_executable = f"/srv/AbyssOS/.codex/bin/{instance}-mcp-server.py"
+            if process_ref != expected_executable:
+                raise PreflightError(
+                    "organ unit executable conflicts with its instance template"
+                )
+            unit_exec_start_binding = (
+                "ExecStart=/usr/bin/env python3 "
+                "/srv/AbyssOS/.codex/bin/%i-mcp-server.py"
             )
         dependency_lock = package_root / "requirements.lock"
         entries.append(
@@ -96,6 +131,15 @@ def derive_managed_topology(
                 owner_validator_digest=_sha256_file(validator),
                 required_environment=required_environment,
                 unit_credential_binding=unit_credential_binding,
+                unit_exec_start_binding=unit_exec_start_binding,
+                canary_receipt_path=_required(canary, "receipt_ref"),
+                canary_receipt_id=_required(canary, "receipt_id"),
+                canary_observed_at=_required(canary, "observed_at"),
+                canary_expires_at=_required(canary, "expires_at"),
+                canary_deployment_manifest_id=_required(
+                    canary, "deployment_manifest_id"
+                ),
+                canary_public_key_path=_required(canary, "public_key_ref"),
                 allowed_registry_states=("shadow", "admitted"),
             )
         )
@@ -162,7 +206,11 @@ def _required_from_registry_style(contour: dict[str, Any], contour_id: str) -> s
 
 def _single_protocol(endpoint: dict[str, Any]) -> str:
     values = endpoint.get("protocol_versions")
-    if not isinstance(values, list) or len(values) != 1 or not isinstance(values[0], str):
+    if (
+        not isinstance(values, list)
+        or len(values) != 1
+        or not isinstance(values[0], str)
+    ):
         raise PreflightError("managed endpoint must bind one protocol version")
     return values[0]
 

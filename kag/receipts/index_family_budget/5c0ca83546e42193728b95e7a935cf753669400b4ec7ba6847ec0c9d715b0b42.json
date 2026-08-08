@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 15395755,
+  "allowed_tracked_bytes": 30753159,
+  "approved_by": "repository-owner",
+  "base_ref": "93415d31bcd6e35559981c2a8eb125d907e24bed",
+  "changed_generated_bytes": 15395755,
+  "changed_generated_files": 182,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "5c0ca83546e42193728b95e7a935cf753669400b4ec7ba6847ec0c9d715b0b42",
+  "reason": "Refresh the current-main KAG family after closing reviewed MCP admission bootstrap, deployment-bound canary freshness, and exact ExecStart gaps without raising the standing budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 30753159,
+  "tracked_bytes_max": 24117248
+}
