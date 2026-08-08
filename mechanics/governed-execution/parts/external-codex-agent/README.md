@@ -34,7 +34,11 @@ The controller:
   the exact final workspace manifest, wake evaluation, and a typed terminal
   result beneath an explicit state root; each state save binds the normalized
   event-stream digest, and a complete append that precedes a crash is recovered
-  only as a strict, contiguous extension of that digest;
+  only as a strict, contiguous extension of that digest; event history is
+  verified incrementally with a per-record parser boundary rather than a
+  cumulative task budget, and an atomically written terminal result can repair
+  the final semantic state save only when its attempt, identity, event, and
+  evidence receipts remain exact;
 - exposes asynchronous `start` for durable owner-managed sessions and
   `run-to-terminal` for transient cgroup launchers that must keep their main
   process alive until the exact semantic terminal receipt, without adding a
@@ -92,7 +96,8 @@ The controller:
   SDK wake policy without model polling, and uses `codex exec resume` through
   `reenter-parent` only for the exact parent thread when one bound event is
   significant; the child result must match its canonical durable runtime
-  state/result/event receipt, and a crash after a valid re-entry event append
+  state/result/event receipt while the child session lock remains held through
+  the parent admission event, and a crash after a valid re-entry event append
   is recovered only as a strict extension of the previously digested stream,
   with recognized terminal events replaying their filtered, failed, or
   completed semantic state;

@@ -50,6 +50,9 @@ oversized protocol record, review-gate enforcement, TERM-resistant and unexpecte
 cleanup including a detached `setsid` descendant, high token/turn usage
 measurement without truncation, durable interrupt/resume on one thread,
 strict recovery of a complete main-session event append before state save,
+incremental recovery and observation of cumulative event history without an
+aggregate control-file read, recovery of an exact atomically written terminal
+result when the final state save is lost without fabricating worker death,
 partial-usage classification when interruption precedes Codex usage emission,
 immutable preservation of the interrupted receipt across ordinary resume,
 read-only target projection through a separately recorded attempt-local Codex
@@ -74,7 +77,8 @@ wake binding, failed-reviewer A2A refusal, absence of an outer namespace that
 would conflict with Codex sandboxing, and a separately bound review/A2A export.
 It also proves parent obligation admission, a completed yield turn followed by
 durable waiting, canonical child state/result/event receipt binding, rejection
-of a standalone result, recovery of a valid event append that preceded its
+of a standalone result, child-session locking through the durable parent event
+admission, recovery of a valid event append that preceded its
 state save, recovery of the completed semantic turn when its event preceded
 the state save, false-event filtering with no second parent turn, and exact-thread parent re-entry with a distilled
 return. The fake Codex fixture exercises both filtered and wake branches;

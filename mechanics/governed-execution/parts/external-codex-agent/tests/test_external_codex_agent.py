@@ -2254,6 +2254,40 @@ def test_main_runtime_recovers_event_append_before_state_save(
     assert [event["sequence"] for event in events] == list(range(len(events)))
 
 
+def test_main_event_recovery_streams_without_aggregate_control_file_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path)
+    runtime = fixture["runtime"]
+    monkeypatch.setattr(runtime, "_spawn_worker", lambda *args, **kwargs: None)
+    runtime.start(fixture["launch_path"])
+    with runtime._lock(fixture["session_id"]):
+        state = runtime._load_state(fixture["session_id"])
+        runtime._append_event(
+            state,
+            event_type="external_agent.streaming_recovery_fixture",
+            payload={"cause": "append-before-state-save"},
+            significance="trace",
+        )
+
+    events_path = runtime._events_path(fixture["session_id"])
+    original_read_bounded = RUNTIME.read_bounded
+
+    def reject_aggregate_event_read(path: Path, *args: Any, **kwargs: Any) -> bytes:
+        if Path(path) == events_path:
+            raise AssertionError("event history must not use a bounded aggregate read")
+        return original_read_bounded(path, *args, **kwargs)
+
+    monkeypatch.setattr(RUNTIME, "read_bounded", reject_aggregate_event_read)
+
+    recovered = runtime.status(fixture["session_id"])
+    events = runtime.events(fixture["session_id"], after_sequence=-1)
+
+    assert recovered["status"] == "prepared"
+    assert events[-1]["event_type"] == "external_agent.streaming_recovery_fixture"
+
+
 @pytest.mark.parametrize("mutation", ("missing-type", "unsupported-not"))
 def test_output_schema_subset_gate_fails_before_inference(mutation: str) -> None:
     schema = json.loads(REPORT_SCHEMA_PATH.read_text(encoding="utf-8"))
@@ -3346,6 +3380,43 @@ def test_unexpected_worker_death_cleans_codex_group_and_returns_failure(
     assert RUNTIME._process_start_ticks(descendant_pid) is None
 
 
+def test_terminal_result_recovers_when_final_state_save_is_lost(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path)
+    runtime = fixture["runtime"]
+    parent_pid = os.getpid()
+    original_save_state = runtime._save_state
+
+    def lose_worker_terminal_state_save(state: dict[str, Any]) -> None:
+        if (
+            os.getpid() != parent_pid
+            and state["status"] in {*RUNTIME.TERMINAL_STATES, "interrupted"}
+            and (runtime._session_dir(state["session_id"]) / "result.json").is_file()
+        ):
+            return
+        original_save_state(state)
+
+    monkeypatch.setattr(runtime, "_save_state", lose_worker_terminal_state_save)
+    runtime.start(fixture["launch_path"])
+
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+    event_types = [
+        item["event_type"]
+        for item in runtime.events(fixture["session_id"], after_sequence=-1)
+    ]
+
+    assert terminal["status"] == "completed"
+    assert result is not None and result["status"] == "completed"
+    assert "external_agent.worker_death_observed" not in event_types
+    persisted = runtime._load_state(fixture["session_id"])
+    assert persisted["result_digest"] == _digest_path(
+        runtime._session_dir(fixture["session_id"]) / "result.json"
+    )
+
+
 @pytest.mark.parametrize(
     ("mutator", "validate_request", "failure_code"),
     (
@@ -3827,6 +3898,58 @@ def test_parent_inference_yields_and_exact_authority_event_reenters_same_thread(
         "external_parent.reentry_started",
         "external_parent.reentry_completed",
     ]
+
+
+def test_parent_admits_child_event_while_canonical_child_lock_is_held(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_ambiguity_stop",
+        identity_suffix="luna-xhigh-child-lock",
+    )
+    reentry_id = "reentry:fixture:luna-xhigh-child-lock"
+    obligation_path = _parent_reentry_obligation(
+        tmp_path, fixture, reentry_id=reentry_id
+    )
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge.yield_parent(obligation_path)
+    assert fixture["runtime"].run_to_terminal(fixture["launch_path"])["status"] == (
+        "authority_blocked"
+    )
+    child_result_path = (
+        fixture["runtime"]._session_dir(fixture["session_id"]) / "result.json"
+    )
+
+    child_lock_active = False
+    original_child_lock = RUNTIME.ExternalCodexRuntime._lock
+
+    @RUNTIME.contextmanager
+    def observed_child_lock(runtime: Any, session_id: str) -> Any:
+        nonlocal child_lock_active
+        with original_child_lock(runtime, session_id):
+            child_lock_active = True
+            try:
+                yield
+            finally:
+                child_lock_active = False
+
+    original_parent_append = bridge._append_event
+
+    def require_child_lock_for_admission(*args: Any, **kwargs: Any) -> None:
+        if kwargs.get("event_type") == "external_parent.child_event_admitted":
+            assert child_lock_active is True
+        original_parent_append(*args, **kwargs)
+
+    monkeypatch.setattr(RUNTIME.ExternalCodexRuntime, "_lock", observed_child_lock)
+    monkeypatch.setattr(bridge, "_append_event", require_child_lock_for_admission)
+
+    reentered = bridge.reenter_parent(reentry_id, child_result_path)["state"]
+
+    assert reentered["status"] == "reentered"
+    assert child_lock_active is False
 
 
 def test_parent_reentry_rejects_standalone_child_result_without_runtime_state(

@@ -300,7 +300,20 @@ last sequence. If a process stops after fsync of one or more complete events
 but before saving state, the next locked load advances the cursor only when
 the previous digest matches an exact prefix and the remaining records are
 schema-valid, contiguous, and owned by the same session. Missing, truncated,
-rewritten, partial, duplicate-sequence, or foreign streams fail closed.
+rewritten, partial, duplicate-sequence, or foreign streams fail closed. The
+append-only history is hashed and validated incrementally: only one protocol
+record has a parser safety boundary, while the cumulative stream has no
+runtime-authored size budget.
+
+If the worker exits after atomically replacing the canonical terminal
+`result.json` but before the final state rewrite, worker-death observation first
+attempts a locked semantic recovery. Recovery requires the current attempt
+count, session/model/task/thread identities, terminal status, complete event
+digest, invocation identities, and every evidence digest to remain exact. A
+prior result deliberately left at the canonical path during resume has a lower
+attempt count and is not mistaken for the current terminal commit. Only when no
+current recoverable result exists does unexpected worker death produce its own
+typed failure receipt.
 
 Before every admitted resume, the controller validates the current terminal
 `result.json`, copies its exact bytes into the prior attempt directory, and
@@ -388,7 +401,8 @@ durable `state.json` result path/digest, terminal identity/status/thread, and
 canonical event path/terminal sequence. It then revalidates the child's task,
 incarnation, result schema, event-stream digest, evidence inclusion,
 continuation, return owner, deferred decisions, and status-selected SDK wake
-condition. Exactly one
+condition while holding the canonical child session lock through the durable
+parent `child_event_admitted` append. Exactly one
 `external_agent.wake_evaluated` event must match the runtime result. Failed,
 missing, false, duplicate, or non-parent events are preserved and filtered
 without a second Sol turn.

@@ -450,18 +450,50 @@ def _append_jsonl(path: Path, value: Any) -> None:
         json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
         + "\n"
     ).encode("utf-8")
+    if len(encoded) > MAX_EVENT_LINE_BYTES:
+        raise ExternalCodexRuntimeError(
+            "runtime_event_record_too_large",
+            "one normalized event exceeds the per-record safety boundary",
+        )
     with path.open("ab") as handle:
         handle.write(encoded)
         handle.flush()
         os.fsync(handle.fileno())
 
 
+def _iter_jsonl_bytes(
+    path: Path,
+    *,
+    failure_code: str,
+    label: str,
+) -> Iterator[tuple[int, bytes]]:
+    """Stream newline-delimited records with a per-record, not aggregate, cap."""
+
+    with path.open("rb") as handle:
+        line_number = 0
+        while True:
+            line = handle.readline(MAX_EVENT_LINE_BYTES + 1)
+            if not line:
+                return
+            line_number += 1
+            if len(line) > MAX_EVENT_LINE_BYTES:
+                raise ExternalCodexRuntimeError(
+                    failure_code,
+                    f"{label} line {line_number} exceeds the per-record safety boundary",
+                )
+            if not line.endswith(b"\n"):
+                raise ExternalCodexRuntimeError(
+                    failure_code,
+                    f"{label} ends with a partial record at line {line_number}",
+                )
+            yield line_number, line
+
+
 def _artifact_ref(path: Path, *, owner: str = "abyss-stack") -> dict[str, str]:
-    raw = read_bounded(path, limit=max(MAX_CONTROL_BYTES, path.stat().st_size))
     return {
         "owner_repo": owner,
         "artifact_ref": str(path),
-        "artifact_digest": sha256_bytes(raw),
+        "artifact_digest": sha256_file(path),
     }
 
 
@@ -1813,42 +1845,46 @@ class ExternalCodexRuntime:
                     "runtime_event_state_drift",
                     "runtime event stream is missing behind durable state",
                 )
-            raw = b""
-            lines: list[bytes] = []
-        else:
-            raw = read_bounded(path)
-            if raw and not raw.endswith(b"\n"):
-                raise ExternalCodexRuntimeError(
-                    "runtime_event_state_drift",
-                    "runtime event stream ends with a partial record",
-                )
-            lines = raw.splitlines(keepends=True)
-        for sequence, line in enumerate(lines):
-            try:
-                event = json.loads(line)
-            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-                raise ExternalCodexRuntimeError(
-                    "runtime_event_state_drift",
-                    f"runtime event line {sequence + 1} is invalid",
-                ) from exc
-            validate_json(event, EVENT_SCHEMA_PATH, label="normalized runtime event")
-            if (
-                event.get("sequence") != sequence
-                or event.get("session_id") != session_id
-            ):
-                raise ExternalCodexRuntimeError(
-                    "runtime_event_state_drift",
-                    f"runtime event line {sequence + 1} is not contiguous or owned",
-                )
         durable_count = last_sequence + 1
-        if len(lines) < durable_count:
+        digest = hashlib.sha256()
+        prefix_digest = sha256_bytes(b"") if durable_count == 0 else None
+        line_count = 0
+        if path.exists():
+            for line_number, line in _iter_jsonl_bytes(
+                path,
+                failure_code="runtime_event_state_drift",
+                label="runtime event stream",
+            ):
+                try:
+                    event = json.loads(line)
+                except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    raise ExternalCodexRuntimeError(
+                        "runtime_event_state_drift",
+                        f"runtime event line {line_number} is invalid",
+                    ) from exc
+                validate_json(
+                    event, EVENT_SCHEMA_PATH, label="normalized runtime event"
+                )
+                if (
+                    event.get("sequence") != line_count
+                    or event.get("session_id") != session_id
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "runtime_event_state_drift",
+                        f"runtime event line {line_number} is not contiguous or owned",
+                    )
+                digest.update(line)
+                line_count += 1
+                if line_count == durable_count:
+                    prefix_digest = "sha256:" + digest.hexdigest()
+        if line_count < durable_count:
             raise ExternalCodexRuntimeError(
                 "runtime_event_state_drift",
                 "runtime event stream was truncated behind durable state",
             )
-        current_digest = sha256_bytes(raw)
+        current_digest = "sha256:" + digest.hexdigest()
         recorded_digest = state.get("events_digest")
-        if len(lines) == durable_count:
+        if line_count == durable_count:
             if isinstance(recorded_digest, str) and recorded_digest != current_digest:
                 raise ExternalCodexRuntimeError(
                     "runtime_event_state_drift",
@@ -1862,14 +1898,13 @@ class ExternalCodexRuntime:
                     "runtime_event_state_drift",
                     "runtime event extension has no trusted durable prefix digest",
                 )
-            prefix = b"".join(lines[:durable_count])
-            if sha256_bytes(prefix) != recorded_digest:
+            if prefix_digest != recorded_digest:
                 raise ExternalCodexRuntimeError(
                     "runtime_event_state_drift",
                     "runtime event extension rewrites its durable prefix",
                 )
         recovered = dict(state)
-        recovered["last_event_sequence"] = len(lines) - 1
+        recovered["last_event_sequence"] = line_count - 1
         recovered["events_digest"] = current_digest
         validate_json(recovered, STATE_SCHEMA_PATH, label="recovered runtime state")
         _atomic_write_json(self._state_path(session_id), recovered)
@@ -4976,6 +5011,147 @@ Runtime session identity: {state['session_id']}
             ) + active_seconds
             return
 
+    def _recover_terminal_result_locked(self, state: dict[str, Any]) -> bool:
+        """Commit an atomically written terminal result after a lost state save."""
+
+        session_id = str(state["session_id"])
+        result_path = self._session_dir(session_id) / "result.json"
+        if not result_path.is_file() or result_path.is_symlink():
+            return False
+        result = load_json(result_path, label="recoverable runtime result")
+        validate_json(result, RESULT_SCHEMA_PATH, label="recoverable runtime result")
+
+        # A resumable session intentionally leaves the preceding result at this
+        # path until the next attempt commits. It is evidence, not the current
+        # attempt's terminal commit.
+        if result.get("attempt_count") != len(state["attempts"]):
+            return False
+
+        identity_pairs = (
+            ("session_id", session_id),
+            ("admission_class", state["admission_class"]),
+            ("incarnation_id", state["incarnation_id"]),
+            ("task_id", state["task_id"]),
+            ("task_family", state["task_family"]),
+            ("execution_posture", state["execution_posture"]),
+            ("model_slug", state["model_slug"]),
+            ("reasoning_effort", state["reasoning_effort"]),
+            ("started_at", state["started_at"]),
+        )
+        if (
+            result.get("status") not in {*TERMINAL_STATES, "interrupted"}
+            or not isinstance(result.get("finished_at"), str)
+            or any(result.get(key) != expected for key, expected in identity_pairs)
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_terminal_result_recovery_mismatch",
+                "terminal result does not match the active durable session identity",
+            )
+        if state.get("thread_id") is not None and (
+            result.get("thread_id") != state.get("thread_id")
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_terminal_result_recovery_mismatch",
+                "terminal result changed the durable Codex thread identity",
+            )
+
+        expected_events_path = self._events_path(session_id)
+        events_ref = result["events_ref"]
+        if (
+            events_ref not in result["evidence_refs"]
+            or events_ref.get("artifact_ref") != str(expected_events_path)
+            or events_ref.get("artifact_digest") != state.get("events_digest")
+            or _verified_artifact_ref_path(
+                events_ref, label="recoverable terminal event stream"
+            )
+            != expected_events_path
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_terminal_result_recovery_mismatch",
+                "terminal result does not bind the recovered normalized event stream",
+            )
+        for key in ("report_ref", "stderr_ref"):
+            if result[key] not in result["evidence_refs"]:
+                raise ExternalCodexRuntimeError(
+                    "runtime_terminal_result_recovery_mismatch",
+                    f"terminal result does not bind {key} as evidence",
+                )
+        for index, evidence_ref in enumerate(result["evidence_refs"]):
+            _verified_artifact_ref_path(
+                evidence_ref,
+                label=f"recoverable terminal evidence {index + 1}",
+            )
+
+        attempts_by_id = {
+            str(attempt["attempt_id"]): attempt for attempt in state["attempts"]
+        }
+        for invocation in result["codex_invocations"]:
+            attempt = attempts_by_id.get(str(invocation["attempt_id"]))
+            if (
+                attempt is None
+                or invocation["mode"] != attempt["mode"]
+                or invocation["worker_pid"] != attempt["worker_pid"]
+                or invocation["argv"] != attempt["codex_argv"]
+            ):
+                raise ExternalCodexRuntimeError(
+                    "runtime_terminal_result_recovery_mismatch",
+                    "terminal result changed a durable Codex invocation identity",
+                )
+            attempt["supervisor_pid"] = invocation.get("supervisor_pid")
+            attempt["supervisor_start_ticks"] = invocation.get("supervisor_start_ticks")
+            attempt["codex_pid"] = invocation.get("codex_pid")
+            attempt["codex_start_ticks"] = invocation.get("codex_start_ticks")
+            attempt["process_identity_ref"] = invocation.get("process_identity_ref")
+            attempt["thread_id"] = invocation.get("thread_id")
+            attempt["execution_root"] = invocation.get("execution_root")
+
+        terminal_attempt = state["attempts"][-1]
+        prior_attempts = state["attempts"][:-1]
+        terminal_attempt["status"] = result["status"]
+        terminal_attempt["finished_at"] = result["finished_at"]
+        terminal_attempt["exit_code"] = result["exit_code"]
+        terminal_attempt["thread_id"] = result["thread_id"]
+        terminal_attempt["output_bytes"] = max(
+            0,
+            int(result["output_bytes"])
+            - sum(int(item["output_bytes"]) for item in prior_attempts),
+        )
+        terminal_attempt["active_wall_seconds"] = max(
+            0.0,
+            float(result["active_wall_seconds"])
+            - sum(float(item["active_wall_seconds"]) for item in prior_attempts),
+        )
+        terminal_attempt["wall_time_accounted"] = True
+
+        state["status"] = result["status"]
+        state["finished_at"] = result["finished_at"]
+        state["thread_id"] = result["thread_id"]
+        state["usage"] = {
+            key: int(result["usage"][key])
+            for key in ("input_tokens", "cached_input_tokens", "output_tokens")
+        }
+        state["usage_observation_gaps"] = [
+            dict(item)
+            for item in result.get("usage_observation", {}).get("gap_reasons", [])
+        ]
+        state["turn_count"] = int(result["turn_count"])
+        state["output_bytes"] = int(result["output_bytes"])
+        state["active_wall_seconds"] = float(result["active_wall_seconds"])
+        state["executed_commands"] = list(result["executed_commands"])
+        state["changed_paths"] = list(result["changed_paths"])
+        state["wake_evaluation"] = dict(result["wake_evaluation"])
+        state["result_path"] = str(result_path)
+        state["result_digest"] = sha256_file(result_path)
+        state["active_attempt_id"] = None
+        state["worker_pid"] = None
+        state["worker_start_ticks"] = None
+        state["supervisor_pid"] = None
+        state["supervisor_start_ticks"] = None
+        state["codex_pid"] = None
+        state["codex_start_ticks"] = None
+        self._save_state(state)
+        return True
+
     def _refresh_interrupted_locked(self, state: dict[str, Any]) -> None:
         for attempt in state.get("attempts", []):
             _reap_owned_child(
@@ -4985,6 +5161,8 @@ Runtime session identity: {state['session_id']}
         if state["status"] != "running":
             return
         if _pid_matches(state.get("worker_pid"), state.get("worker_start_ticks")):
+            return
+        if self._recover_terminal_result_locked(state):
             return
         attempt_id = str(state.get("active_attempt_id") or "runtime")
         self._append_event(
@@ -5048,7 +5226,11 @@ Runtime session identity: {state['session_id']}
             path = self._events_path(session_id)
             events: list[dict[str, Any]] = []
             if path.is_file():
-                for line in path.read_text(encoding="utf-8").splitlines():
+                for _line_number, line in _iter_jsonl_bytes(
+                    path,
+                    failure_code="runtime_event_state_drift",
+                    label="runtime event stream",
+                ):
                     item = json.loads(line)
                     if int(item["sequence"]) > after_sequence:
                         events.append(item)
@@ -6360,12 +6542,54 @@ class ExternalCodexParentReentry:
         }.get(status, "result.unknown")
 
     @staticmethod
+    def _child_runtime_lock_target(
+        child_result_path: Path,
+    ) -> tuple[ExternalCodexRuntime, str]:
+        """Locate the canonical child lock; all authority checks repeat under it."""
+
+        if (
+            not child_result_path.is_absolute()
+            or child_result_path.name != "result.json"
+        ):
+            raise ExternalCodexRuntimeError(
+                "reentry_child_receipt_noncanonical",
+                "child result must be the canonical absolute runtime result path",
+            )
+        try:
+            resolved_result_path = child_result_path.resolve(strict=True)
+        except OSError as exc:
+            raise ExternalCodexRuntimeError(
+                "reentry_child_receipt_unavailable",
+                "canonical child runtime result is unavailable",
+            ) from exc
+        if resolved_result_path != child_result_path or child_result_path.is_symlink():
+            raise ExternalCodexRuntimeError(
+                "reentry_child_receipt_noncanonical",
+                "child result path contains a symbolic or non-canonical component",
+            )
+        candidate = load_json(child_result_path, label="child lock target result")
+        validate_json(candidate, RESULT_SCHEMA_PATH, label="child lock target result")
+        session_id = str(candidate["session_id"])
+        session_dir = child_result_path.parent
+        if session_dir.parent.name != "sessions" or session_dir.name != _session_token(
+            session_id
+        ):
+            raise ExternalCodexRuntimeError(
+                "reentry_child_receipt_noncanonical",
+                "child result is outside the canonical session identity directory",
+            )
+        return ExternalCodexRuntime(session_dir.parent.parent), session_id
+
+    @staticmethod
     def _canonical_child_runtime_receipt(
         child_result_path: Path,
     ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         """Load one terminal result through its canonical durable runtime state."""
 
-        if not child_result_path.is_absolute() or child_result_path.name != "result.json":
+        if (
+            not child_result_path.is_absolute()
+            or child_result_path.name != "result.json"
+        ):
             raise ExternalCodexRuntimeError(
                 "reentry_child_receipt_noncanonical",
                 "child result must be the canonical absolute runtime result path",
@@ -6432,8 +6656,15 @@ class ExternalCodexParentReentry:
                 "reentry_child_receipt_mismatch",
                 "child event receipt is outside its canonical session directory",
             )
-        event_lines = read_bounded(verified_events_path).splitlines()
-        if len(event_lines) != int(child_state["last_event_sequence"]) + 1:
+        event_count = sum(
+            1
+            for _line_number, _line in _iter_jsonl_bytes(
+                verified_events_path,
+                failure_code="reentry_child_receipt_mismatch",
+                label="canonical child event stream",
+            )
+        )
+        if event_count != int(child_state["last_event_sequence"]) + 1:
             raise ExternalCodexRuntimeError(
                 "reentry_child_receipt_mismatch",
                 "child event receipt differs from the durable terminal sequence",
@@ -6482,7 +6713,11 @@ class ExternalCodexParentReentry:
             result["events_ref"], label="child event stream"
         )
         matches: list[dict[str, Any]] = []
-        for line_number, line in enumerate(read_bounded(events_path).splitlines(), start=1):
+        for line_number, line in _iter_jsonl_bytes(
+            events_path,
+            failure_code="reentry_child_event_invalid",
+            label="child event stream",
+        ):
             try:
                 event = json.loads(line)
             except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -6604,30 +6839,36 @@ class ExternalCodexParentReentry:
             )
             task, binding, realization = self._validate_obligation(obligation)
             child_path = Path(child_result_path)
-            child_result, _child_state, child_ref = (
-                self._canonical_child_runtime_receipt(child_path)
+            child_runtime, child_session_id = self._child_runtime_lock_target(
+                child_path
             )
-            if (
-                child_result["task_id"] != state["child_task_id"]
-                or child_result["incarnation_id"] != state["child_incarnation_id"]
-                or child_result["task_id"] != task["task_id"]
-            ):
-                raise ExternalCodexRuntimeError(
-                    "reentry_child_identity_mismatch",
-                    "child terminal result belongs to another task or incarnation",
+            with child_runtime._lock(child_session_id):
+                child_result, _child_state, child_ref = (
+                    self._canonical_child_runtime_receipt(child_path)
                 )
-            wake, observed_event = self._verify_child_wake_event(child_result, binding)
-            self._append_event(
-                reentry_id,
-                event_type="external_parent.child_event_admitted",
-                payload={
-                    "child_result_digest": child_ref["artifact_digest"],
-                    "child_result_ref": child_ref,
-                    "observed_event_digest": canonical_digest(observed_event),
-                    "wake_evaluation": wake,
-                },
-                significance="parent_wake" if wake["wake_parent"] else "filtered",
-            )
+                if (
+                    child_result["task_id"] != state["child_task_id"]
+                    or child_result["incarnation_id"] != state["child_incarnation_id"]
+                    or child_result["task_id"] != task["task_id"]
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "reentry_child_identity_mismatch",
+                        "child terminal result belongs to another task or incarnation",
+                    )
+                wake, observed_event = self._verify_child_wake_event(
+                    child_result, binding
+                )
+                self._append_event(
+                    reentry_id,
+                    event_type="external_parent.child_event_admitted",
+                    payload={
+                        "child_result_digest": child_ref["artifact_digest"],
+                        "child_result_ref": child_ref,
+                        "observed_event_digest": canonical_digest(observed_event),
+                        "wake_evaluation": wake,
+                    },
+                    significance=("parent_wake" if wake["wake_parent"] else "filtered"),
+                )
             state["child_result_ref"] = child_ref
             state["wake_evaluation"] = wake
             expected = state["expected_wake"]
