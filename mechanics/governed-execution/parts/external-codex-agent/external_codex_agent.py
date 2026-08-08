@@ -1693,7 +1693,6 @@ class ExternalCodexRuntime:
         self.profile = load_json_bytes(self.profile_raw, label="runtime profile")
         validate_json(self.profile, PROFILE_SCHEMA_PATH, label="runtime profile")
         for label, values, key in (
-            ("model admission", self.profile["model_admission"], "model_slug"),
             ("tool profile", self.profile["tool_profiles"], "profile_id"),
         ):
             identities = [item[key] for item in values]
@@ -1829,11 +1828,296 @@ class ExternalCodexRuntime:
             )
         return path, raw, load_json_bytes(raw, label=key)
 
+    def _validate_owner_contour_admission(
+        self,
+        *,
+        owner_request_path: Path,
+        launch: Mapping[str, Any],
+        launch_raw: bytes,
+        coordinates: Mapping[str, tuple[Path, bytes, dict[str, Any]]],
+        plan: RunPlan,
+        binding: AgentIncarnationBinding,
+        task: Mapping[str, Any],
+        immutable_inputs: Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        request_schema_coordinate = launch["owner_execution_request_schema"]
+        dag_schema_coordinate = launch["task_local_dag_schema"]
+        for key, coordinate in (
+            ("owner_execution_request_schema", request_schema_coordinate),
+            ("task_local_dag_schema", dag_schema_coordinate),
+        ):
+            delivered_identity = {
+                field: coordinate[field]
+                for field in (
+                    "owner_repo",
+                    "artifact_ref",
+                    "source_ref",
+                    "digest",
+                    "schema_version",
+                )
+            }
+            if delivered_identity != self.profile["owner_contracts"][key]:
+                raise ExternalCodexRuntimeError(
+                    "owner_admission_schema_identity_invalid",
+                    "owner-contour schema differs from the runtime-profile-pinned owner source",
+                )
+        owner_request_raw = read_bounded(owner_request_path)
+        owner_request = load_json_bytes(
+            owner_request_raw, label="aoa-agents external execution request"
+        )
+        validate_json(
+            owner_request,
+            coordinates["owner_execution_request_schema"][0],
+            label="aoa-agents external execution request",
+        )
+        if (
+            owner_request.get("intent") != "execute"
+            or owner_request.get("summon_request", {}).get("transport_preference")
+            != "external_cli"
+        ):
+            raise ExternalCodexRuntimeError(
+                "owner_execution_request_not_executable",
+                "owner-contour admission requires an execute request for external_cli",
+            )
+        external = owner_request["external_incarnation"]
+        if (
+            external["runtime_interface"]
+            != "abyss_stack_external_codex_agent_v1"
+            or external["launches_separate_os_process"] is not True
+            or external["uses_builtin_codex_subagents"] is not False
+            or external["separate_cli_session"] is not True
+            or external["usage_metering"] != "observe_only_no_budget"
+        ):
+            raise ExternalCodexRuntimeError(
+                "owner_execution_runtime_mismatch",
+                "owner request does not admit this external process/session runtime",
+            )
+
+        def exact_input(content_ref: Mapping[str, Any], *, label: str) -> Mapping[str, Any]:
+            matches = [
+                item
+                for item in immutable_inputs
+                if item["provenance"].owner_repo == content_ref["owner_repo"]
+                and item["provenance"].artifact_ref == content_ref["object_id"]
+                and item["provenance"].schema_version == content_ref["schema_version"]
+                and item["provenance"].artifact_digest == content_ref["digest"]
+            ]
+            if len(matches) != 1:
+                raise ExternalCodexRuntimeError(
+                    "owner_content_ref_unbound",
+                    f"{label} is not one exact continuation-bound immutable input",
+                )
+            return matches[0]
+
+        obligation_input = exact_input(
+            external["obligation_ref"], label="agent obligation"
+        )
+        mandate_input = exact_input(
+            external["actor_mandate_ref"], label="actor mandate"
+        )
+        dag_input = exact_input(external["task_local_dag_ref"], label="task-local DAG")
+        transfer_input = exact_input(
+            external["responsibility_transfer_ref"],
+            label="responsibility transfer",
+        )
+        for index, procedure_ref in enumerate(external["domain_procedure_refs"]):
+            exact_input(procedure_ref, label=f"domain procedure {index + 1}")
+
+        dag = load_json_bytes(dag_input["raw"], label="task-local DAG")
+        validate_json(
+            dag,
+            coordinates["task_local_dag_schema"][0],
+            label="task-local DAG",
+        )
+        if dag.get("status") != "ready" or dag.get("authority") is not False:
+            raise ExternalCodexRuntimeError(
+                "task_local_dag_not_ready",
+                "owner-contour launch requires a ready non-authoritative task-local DAG",
+            )
+
+        transfer = load_json_bytes(
+            transfer_input["raw"], label="responsibility transfer"
+        )
+        transfer_holders = transfer.get("holder_ids")
+        if transfer_holders is None:
+            transfer_holders = [
+                transfer.get("prior_holder"),
+                transfer.get("current_holder"),
+            ]
+        if (
+            transfer.get("schema_version") != "responsibility-transfer-v1"
+            or transfer.get("state")
+            != external["responsibility_transfer_ref"]["admitted_state"]
+            or transfer_holders
+            != external["responsibility_transfer_ref"]["holder_ids"]
+            or transfer.get("obligation_ref")
+            != external["obligation_ref"]["object_id"]
+            or transfer.get("mandate_ref")
+            != external["actor_mandate_ref"]["object_id"]
+            or transfer.get("task_local_dag_ref")
+            != external["task_local_dag_ref"]["object_id"]
+            or transfer.get("return_owner") != owner_request["return_owner"]
+        ):
+            raise ExternalCodexRuntimeError(
+                "responsibility_transfer_content_mismatch",
+                "responsibility-transfer bytes do not prove the admitted holder transition",
+            )
+
+        obligation = load_json_bytes(
+            obligation_input["raw"], label="agent obligation"
+        )
+        if (
+            obligation.get("schema_version") != "agent-obligation-v1"
+            or obligation.get("obligation_id")
+            != external["obligation_ref"]["object_id"]
+            or obligation.get("goal_anchor") != task["parent_task_id"]
+            or obligation.get("domain_owner") != task["target_owner"]
+            or obligation.get("current_holder") != transfer_holders[0]
+            or obligation.get("return_owner") != owner_request["return_owner"]
+        ):
+            raise ExternalCodexRuntimeError(
+                "agent_obligation_content_mismatch",
+                "agent-obligation bytes differ from the admitted duty and transfer",
+            )
+
+        mandate = load_json_bytes(mandate_input["raw"], label="actor mandate")
+        if (
+            mandate.get("schema_version") != "actor-mandate-v1"
+            or mandate.get("mandate_id")
+            != external["actor_mandate_ref"]["object_id"]
+            or mandate.get("role_id") != binding.role_id
+            or mandate.get("obligation_ref")
+            != external["obligation_ref"]["object_id"]
+            or mandate.get("domain_procedure_refs")
+            != [
+                item["object_id"]
+                for item in external["domain_procedure_refs"]
+            ]
+            or mandate.get("return_owner") != owner_request["return_owner"]
+            or mandate.get("stop_line") != owner_request["child_stop_line"]
+        ):
+            raise ExternalCodexRuntimeError(
+                "actor_mandate_content_mismatch",
+                "actor-mandate bytes differ from the admitted obligation, role, or procedure",
+            )
+
+        mandate_ref = external["actor_mandate_ref"]
+        if (
+            mandate_input["raw"] != coordinates["role_contract"][1]
+            or binding.role_contract_ref.owner_repo != "aoa-agents"
+            or binding.role_contract_ref.artifact_ref != mandate_ref["object_id"]
+            or binding.role_contract_ref.schema_version != "actor-mandate-v1"
+            or launch["role_contract"]["digest"] != mandate_ref["digest"]
+        ):
+            raise ExternalCodexRuntimeError(
+                "actor_mandate_binding_mismatch",
+                "incarnation role contract is not the exact admitted actor mandate",
+            )
+
+        incarnation_ref = external["incarnation_binding_ref"]
+        if (
+            incarnation_ref["object_id"] != binding.provenance.artifact_ref
+            or incarnation_ref["digest"] != launch["incarnation_binding"]["digest"]
+        ):
+            raise ExternalCodexRuntimeError(
+                "owner_incarnation_binding_mismatch",
+                "owner request names another incarnation binding",
+            )
+        sdk_request_ref = external["sdk_summon_request_ref"]
+        if (
+            sdk_request_ref["object_id"] != binding.task_request_ref.artifact_ref
+            or sdk_request_ref["digest"] != binding.task_request_ref.artifact_digest
+            or sdk_request_ref["schema_version"]
+            != binding.task_request_ref.schema_version
+        ):
+            raise ExternalCodexRuntimeError(
+                "owner_sdk_request_mismatch",
+                "owner request names another canonical SDK summon request",
+            )
+        sdk_decision_ref = external["sdk_summon_decision_ref"]
+        decision_matches = [
+            item
+            for item in plan.snapshot.source_refs
+            if item.owner_repo == sdk_decision_ref["owner_repo"]
+            and item.artifact_ref == sdk_decision_ref["object_id"]
+            and item.schema_version == sdk_decision_ref["schema_version"]
+            and item.artifact_digest == sdk_decision_ref["digest"]
+        ]
+        if len(decision_matches) != 1:
+            raise ExternalCodexRuntimeError(
+                "owner_sdk_decision_mismatch",
+                "owner request names no exact plan-bound SDK summon decision",
+            )
+        exact_input(sdk_decision_ref, label="SDK summon decision")
+
+        runtime_launch_ref = external["runtime_launch_ref"]
+        if (
+            runtime_launch_ref["object_id"] != launch["launch_id"]
+            or runtime_launch_ref["digest"] != sha256_bytes(launch_raw)
+        ):
+            raise ExternalCodexRuntimeError(
+                "owner_runtime_launch_mismatch",
+                "owner request does not bind these exact launch bytes",
+            )
+        continuity_ref = external["continuity_ref"]
+        continuity_is_binding = (
+            continuity_ref["object_id"] == binding.continuation.continuation_id
+            and continuity_ref["digest"] == launch["incarnation_binding"]["digest"]
+        )
+        if not continuity_is_binding:
+            exact_input(continuity_ref, label="continuity")
+        event_ref = external["return_event_schema_ref"]
+        if (
+            event_ref["digest"] != sha256_bytes(read_bounded(EVENT_SCHEMA_PATH))
+            or event_ref["schema_version"] != "abyss_stack_external_codex_event_v1"
+        ):
+            raise ExternalCodexRuntimeError(
+                "owner_return_event_schema_mismatch",
+                "owner request names another runtime return-event ABI",
+            )
+        if (
+            owner_request["summon_request"].get("desired_role")
+            not in {None, binding.role_id}
+            or owner_request["summon_request"].get("child_agent_id")
+            not in {None, binding.incarnation_id}
+            or owner_request["summon_request"].get("parent_task_id")
+            not in {None, task["parent_task_id"]}
+        ):
+            raise ExternalCodexRuntimeError(
+                "owner_request_identity_mismatch",
+                "owner request role, child, or parent identity differs from the incarnation",
+            )
+        child_scope = owner_request["child_scope"]
+        expected_outputs = set(str(item) for item in owner_request["expected_outputs"])
+        if (
+            child_scope["task"] != task["objective"]
+            or set(child_scope["allowed_tools"])
+            != set(binding.tool_profile.required_tool_ids)
+            or child_scope["allowed_effects"] != [task["allowed_effect_class"]]
+            or "external_codex_agent_result" not in expected_outputs
+            or not set(task["expected_artifacts"]).issubset(expected_outputs)
+        ):
+            raise ExternalCodexRuntimeError(
+                "owner_request_scope_mismatch",
+                "owner request task, tools, effects, or named outputs differ from the bound duty",
+            )
+        return {
+            "path": owner_request_path,
+            "raw": owner_request_raw,
+            "request": owner_request,
+            "request_digest": sha256_bytes(owner_request_raw),
+            "obligation_ref": external["obligation_ref"],
+            "mandate_ref": mandate_ref,
+            "dag_ref": external["task_local_dag_ref"],
+            "transfer_ref": external["responsibility_transfer_ref"],
+        }
+
     def _codex_preflight(
         self,
         launch: Mapping[str, Any],
         model_slug: str,
         reasoning_effort: str,
+        tool_entry: Mapping[str, Any],
     ) -> dict[str, Any]:
         executable = Path(str(launch["codex_executable"]))
         if not executable.is_absolute() or not executable.is_file():
@@ -1872,7 +2156,7 @@ class ExternalCodexRuntime:
                 "process_containment_unavailable",
                 "runtime profile selected an unexpected supervisor source",
             )
-        env = self._codex_environment(launch, self.state_root)
+        env = self._codex_environment(launch, self.state_root, tool_entry)
         probes: list[tuple[str, list[str]]] = [
             ("version", [str(executable), "--version"]),
             ("login", [str(executable), "login", "status"]),
@@ -1899,10 +2183,16 @@ class ExternalCodexRuntime:
                 )
             results[label] = completed
         version = results["version"].stdout.strip()
-        if version != self.profile["codex_cli"]["required_version"]:
+        expected_version = (
+            "codex-cli " + self.profile["model_admission"]["runtime_version"]
+        )
+        if (
+            self.profile["codex_cli"]["required_version"] != expected_version
+            or version != expected_version
+        ):
             raise ExternalCodexRuntimeError(
                 "codex_version_mismatch",
-                f"runtime requires {self.profile['codex_cli']['required_version']}, got {version}",
+                f"runtime requires {expected_version}, got {version}",
             )
         login_output = results["login"].stdout + results["login"].stderr
         if "Logged in using ChatGPT" not in login_output:
@@ -1987,17 +2277,30 @@ class ExternalCodexRuntime:
             supervisor_argv.extend(("--identity-file", str(identity_path)))
         return [*supervisor_argv, "--", *command]
 
-    def _validate_launch(self, launch_path: Path) -> dict[str, Any]:
+    def _validate_launch(
+        self,
+        launch_path: Path,
+        *,
+        owner_request_path: Path | None = None,
+    ) -> dict[str, Any]:
         launch_raw = read_bounded(launch_path)
         launch = load_json_bytes(launch_raw, label="external Codex launch")
-        validate_json(launch, LAUNCH_SCHEMA_PATH, label="external Codex launch")
-        if launch["admission_class"] != "transport_study_fixture":
+        if launch.get("admission_class") == "owner_contour" and owner_request_path is None:
             raise ExternalCodexRuntimeError(
                 "owner_contour_admission_unbound",
-                "owner_contour requires a separate owner-semantic admission signal",
+                "owner_contour requires the separate aoa-agents execution request",
+            )
+        validate_json(launch, LAUNCH_SCHEMA_PATH, label="external Codex launch")
+        if (
+            launch["admission_class"] == "transport_study_fixture"
+            and owner_request_path is not None
+        ):
+            raise ExternalCodexRuntimeError(
+                "fixture_owner_admission_forbidden",
+                "transport fixtures cannot be promoted by attaching an owner request",
             )
         coordinates: dict[str, tuple[Path, bytes, dict[str, Any]]] = {}
-        for key in (
+        coordinate_keys = [
             "plan",
             "incarnation_binding",
             "model_realization",
@@ -2005,7 +2308,12 @@ class ExternalCodexRuntime:
             "runtime_profile",
             "role_contract",
             "result_schema",
-        ):
+        ]
+        if launch["admission_class"] == "owner_contour":
+            coordinate_keys.extend(
+                ("owner_execution_request_schema", "task_local_dag_schema")
+            )
+        for key in coordinate_keys:
             coordinates[key] = self._load_coordinate(launch, key)
 
         if coordinates["runtime_profile"][1] != self.profile_raw:
@@ -2158,7 +2466,7 @@ class ExternalCodexRuntime:
         ]
         expected_request_input_id = (
             "review-summon-request"
-            if task["task_family"] == "landing_review"
+            if task["execution_posture"] == "independent_review"
             else "summon-request"
         )
         if (
@@ -2168,6 +2476,28 @@ class ExternalCodexRuntime:
             raise ExternalCodexRuntimeError(
                 "incarnation_task_request_unbound",
                 "incarnation task request is not the exact canonical immutable summon input",
+            )
+
+        owner_admission = None
+        if owner_request_path is not None:
+            if (
+                not owner_request_path.is_absolute()
+                or not owner_request_path.is_file()
+                or owner_request_path.is_symlink()
+            ):
+                raise ExternalCodexRuntimeError(
+                    "owner_execution_request_unavailable",
+                    "owner execution request must be an absolute regular non-symlink file",
+                )
+            owner_admission = self._validate_owner_contour_admission(
+                owner_request_path=owner_request_path,
+                launch=launch,
+                launch_raw=launch_raw,
+                coordinates=coordinates,
+                plan=plan,
+                binding=binding,
+                task=task,
+                immutable_inputs=immutable_inputs,
             )
 
         if (
@@ -2189,27 +2519,23 @@ class ExternalCodexRuntime:
             )
         model_slug = str(runtime.get("model_slug"))
         effort = str(configuration.get("reasoning_effort"))
+        model_admission = self.profile["model_admission"]
         if (
-            runtime.get("product") != "codex-cli"
-            or runtime.get("version") != "0.146.0"
-            or runtime.get("transport") != "exec-jsonl"
-            or access.get("auth_regime") != "chatgpt_login"
-            or access.get("billing_regime") != "chatgpt_quota"
+            runtime.get("product") != model_admission["runtime_product"]
+            or runtime.get("version") != model_admission["runtime_version"]
+            or runtime.get("transport") != model_admission["transport"]
+            or access.get("auth_regime") != model_admission["auth_regime"]
+            or access.get("billing_regime") != model_admission["billing_regime"]
+            or realization.get("lifecycle_state")
+            not in model_admission["allowed_lifecycle_states"]
         ):
             raise ExternalCodexRuntimeError(
                 "model_realization_unsupported", "model realization is not the admitted Codex lane"
             )
-        model_entry = next(
-            (
-                item
-                for item in self.profile["model_admission"]
-                if item["model_slug"] == model_slug
-            ),
-            None,
-        )
-        if model_entry is None or effort not in model_entry["reasoning_efforts"]:
+        if not model_slug or not effort:
             raise ExternalCodexRuntimeError(
-                "model_realization_unsupported", "model and effort are not admitted"
+                "model_realization_unsupported",
+                "model realization must name a model and reasoning effort",
             )
         tool_entry = next(
             (
@@ -2222,6 +2548,14 @@ class ExternalCodexRuntime:
         if tool_entry is None:
             raise ExternalCodexRuntimeError(
                 "tool_profile_unavailable", "incarnation tool profile is not admitted"
+            )
+        mcp_configs = tool_entry["mcp_server_configs"]
+        if [item["server_id"] for item in mcp_configs] != list(
+            binding.tool_profile.required_mcp_server_ids
+        ):
+            raise ExternalCodexRuntimeError(
+                "mcp_profile_mismatch",
+                "runtime MCP configs differ from the incarnation MCP profile",
             )
         realization_sandbox_mode = {
             "read_only": "read-only",
@@ -2250,9 +2584,10 @@ class ExternalCodexRuntime:
                 "incarnation_profile_mismatch",
                 "model, tool, and permission profiles are not exact",
             )
-        if task["task_family"] not in self.profile["task_families"]:
+        if task["execution_posture"] not in self.profile["execution_postures"]:
             raise ExternalCodexRuntimeError(
-                "task_family_unsupported", "task family is not runtime-admitted"
+                "execution_posture_unsupported",
+                "execution posture is not runtime-admitted",
             )
         expected_effect = (
             "repo_mutation"
@@ -2322,7 +2657,7 @@ class ExternalCodexRuntime:
             raise ExternalCodexRuntimeError(
                 "codex_home_unavailable", "explicit Codex home is unavailable"
             )
-        preflight = self._codex_preflight(launch, model_slug, effort)
+        preflight = self._codex_preflight(launch, model_slug, effort, tool_entry)
         return {
             "launch": launch,
             "launch_raw": launch_raw,
@@ -2340,10 +2675,21 @@ class ExternalCodexRuntime:
             "workspace_manifest_baseline": workspace_manifest_baseline,
             "preflight": preflight,
             "immutable_inputs": immutable_inputs,
+            "owner_admission": owner_admission,
         }
 
-    def preflight(self, launch_path: str | Path) -> dict[str, Any]:
-        validated = self._validate_launch(Path(launch_path))
+    def preflight(
+        self,
+        launch_path: str | Path,
+        *,
+        owner_request_path: str | Path | None = None,
+    ) -> dict[str, Any]:
+        validated = self._validate_launch(
+            Path(launch_path),
+            owner_request_path=(
+                Path(owner_request_path) if owner_request_path is not None else None
+            ),
+        )
         binding: AgentIncarnationBinding = validated["binding"]
         return {
             "admitted": True,
@@ -2356,11 +2702,26 @@ class ExternalCodexRuntime:
             "workspace_head": validated["launch"]["workspace_expected_head"],
             "tool_profile_id": binding.tool_profile.profile_id,
             "external_effects": False,
+            "owner_admission_digest": (
+                validated["owner_admission"]["request_digest"]
+                if validated["owner_admission"] is not None
+                else None
+            ),
             "preflight": validated["preflight"],
         }
 
-    def start(self, launch_path: str | Path) -> dict[str, Any]:
-        validated = self._validate_launch(Path(launch_path))
+    def start(
+        self,
+        launch_path: str | Path,
+        *,
+        owner_request_path: str | Path | None = None,
+    ) -> dict[str, Any]:
+        validated = self._validate_launch(
+            Path(launch_path),
+            owner_request_path=(
+                Path(owner_request_path) if owner_request_path is not None else None
+            ),
+        )
         launch = validated["launch"]
         session_id = str(launch["session_id"])
         session_dir = self._session_dir(session_id)
@@ -2381,6 +2742,14 @@ class ExternalCodexRuntime:
                 target = inputs_dir / f"{key}{suffix}"
                 _atomic_write_bytes(target, raw, mode=0o400)
                 materialized[key] = str(target)
+            if validated["owner_admission"] is not None:
+                owner_request_target = inputs_dir / "owner-execution-request.json"
+                _atomic_write_bytes(
+                    owner_request_target,
+                    validated["owner_admission"]["raw"],
+                    mode=0o400,
+                )
+                materialized["owner_execution_request"] = str(owner_request_target)
             execution_result_schema_path = inputs_dir / "execution-result-schema.json"
             execution_result_schema = specialize_report_schema(
                 validated["coordinates"]["result_schema"][2],
@@ -2422,9 +2791,15 @@ class ExternalCodexRuntime:
                 "launch_digest": validated["launch_digest"],
                 "status": "prepared",
                 "admission_class": launch["admission_class"],
+                "owner_admission_digest": (
+                    validated["owner_admission"]["request_digest"]
+                    if validated["owner_admission"] is not None
+                    else None
+                ),
                 "incarnation_id": validated["binding"].incarnation_id,
                 "task_id": validated["task"]["task_id"],
                 "task_family": validated["task"]["task_family"],
+                "execution_posture": validated["task"]["execution_posture"],
                 "model_slug": validated["model_slug"],
                 "reasoning_effort": validated["reasoning_effort"],
                 "tool_profile_id": validated["binding"].tool_profile.profile_id,
@@ -2588,7 +2963,12 @@ class ExternalCodexRuntime:
         os.write(write_fd, b"1")
         os.close(write_fd)
 
-    def run_to_terminal(self, launch_path: str | Path) -> dict[str, Any]:
+    def run_to_terminal(
+        self,
+        launch_path: str | Path,
+        *,
+        owner_request_path: str | Path | None = None,
+    ) -> dict[str, Any]:
         """Keep the caller alive until the exact started session is terminal.
 
         This operation is the lifecycle-compatible entry point for transient
@@ -2597,7 +2977,10 @@ class ExternalCodexRuntime:
         resource budget; semantic terminal state remains owned by the runtime.
         """
 
-        state = self.start(launch_path)
+        state = self.start(
+            launch_path,
+            owner_request_path=owner_request_path,
+        )
         session_id = str(state["session_id"])
         while str(state["status"]) not in TERMINAL_STATES:
             time.sleep(FOREGROUND_OBSERVATION_INTERVAL_SECONDS)
@@ -2608,6 +2991,7 @@ class ExternalCodexRuntime:
         self,
         launch: Mapping[str, Any],
         scratch_root: Path,
+        tool_entry: Mapping[str, Any],
     ) -> dict[str, str]:
         environment: dict[str, str] = {}
         for key in launch.get("environment_allowlist", []):
@@ -2622,6 +3006,15 @@ class ExternalCodexRuntime:
         environment.setdefault("LANG", "C.UTF-8")
         environment["TMPDIR"] = str(scratch_root)
         environment["NO_COLOR"] = "1"
+        for server in tool_entry["mcp_server_configs"]:
+            token_name = str(server["bearer_token_env_var"])
+            token = os.environ.get(token_name)
+            if not token:
+                raise ExternalCodexRuntimeError(
+                    "mcp_credential_unavailable",
+                    f"required role-scoped MCP credential is unavailable: {token_name}",
+                )
+            environment[token_name] = token
         return environment
 
     def _materialized_payloads(
@@ -2651,7 +3044,12 @@ class ExternalCodexRuntime:
                 Path(path_value),
                 limit=MAX_ROLE_BYTES if key == "role_contract" else MAX_CONTROL_BYTES,
             )
-            if sha256_bytes(raw) != launch[key]["digest"]:
+            expected_digest = (
+                state["owner_admission_digest"]
+                if key == "owner_execution_request"
+                else launch[key]["digest"]
+            )
+            if sha256_bytes(raw) != expected_digest:
                 raise ExternalCodexRuntimeError(
                     "materialized_input_drift",
                     f"durable {key} bytes changed after admission",
@@ -2948,6 +3346,21 @@ class ExternalCodexRuntime:
                 references.append(_artifact_ref(path))
         return references
 
+    def _owner_admission_ref(
+        self, state: Mapping[str, Any]
+    ) -> dict[str, Any] | None:
+        path_value = state["materialized_inputs"].get("owner_execution_request")
+        if path_value is None:
+            return None
+        path = Path(str(path_value))
+        reference = _artifact_ref(path, owner="aoa-agents")
+        if reference["artifact_digest"] != state.get("owner_admission_digest"):
+            raise ExternalCodexRuntimeError(
+                "materialized_input_drift",
+                "durable owner execution request changed after admission",
+            )
+        return reference
+
     def _attempt_has_completed_usage_event(
         self,
         state: Mapping[str, Any],
@@ -3110,8 +3523,8 @@ Hard stop-lines:
   service, inspect secrets, or change global configuration.
 - When task.review_required is true, do not return status=completed; preserve
   the independent-review gate with review_required, authority_blocked, or failed.
-- A non-review writer that reaches its review gate uses
-  review_required/submit_for_review. A landing_review reviewer uses
+- A non-review actor that reaches its review gate uses
+  review_required/submit_for_review. An independent-review actor uses
   completed/proceed when no blocker remains or
   review_required/return_for_repair when one is confirmed. Any other terminal
   execution failure uses failed/stop; return_for_repair is not a generic retry
@@ -3178,6 +3591,16 @@ Runtime session identity: {state['session_id']}
             "-o",
             str(output_message),
         ]
+        for server in reversed(tool_entry["mcp_server_configs"]):
+            server_id = str(server["server_id"])
+            server_config = (
+                "{url=\""
+                + str(server["url"])
+                + "\",bearer_token_env_var=\""
+                + str(server["bearer_token_env_var"])
+                + "\",enabled=true,required=true}"
+            )
+            common[0:0] = ["-c", f"mcp_servers.{server_id}={server_config}"]
         if execution_root_mode == "attempt-local":
             common.insert(0, "--skip-git-repo-check")
         if tool_entry["codex_sandbox"] == "workspace-write":
@@ -3251,15 +3674,16 @@ Runtime session identity: {state['session_id']}
                     message="workspace changed between admission and Codex launch",
                 )
                 return
-            self._codex_preflight(
-                launch,
-                str(state["model_slug"]),
-                str(state["reasoning_effort"]),
-            )
             tool_entry = next(
                 item
                 for item in self.profile["tool_profiles"]
                 if item["profile_id"] == state["tool_profile_id"]
+            )
+            self._codex_preflight(
+                launch,
+                str(state["model_slug"]),
+                str(state["reasoning_effort"]),
+                tool_entry,
             )
             codex_execution_root = (
                 execution_root
@@ -3321,7 +3745,7 @@ Runtime session identity: {state['session_id']}
 
         raw_events_path = attempt_dir / "codex-events.jsonl"
         stderr_path = attempt_dir / "codex-stderr.log"
-        environment = self._codex_environment(launch, scratch)
+        environment = self._codex_environment(launch, scratch, tool_entry)
         started = utc_now()
         runtime_failure_code: str | None = None
         terminate_requested = False
@@ -3695,7 +4119,7 @@ Runtime session identity: {state['session_id']}
             "completed": "proceed",
             "review_required": (
                 "return_for_repair"
-                if task["task_family"] == "landing_review"
+                if task["execution_posture"] == "independent_review"
                 else "submit_for_review"
             ),
             "authority_blocked": "escalate",
@@ -3846,7 +4270,7 @@ Runtime session identity: {state['session_id']}
             expected_to_status = expected["target_status"]
             if (
                 report["status"] == "review_required"
-                and task["task_family"] == "landing_review"
+                and task["execution_posture"] == "independent_review"
             ):
                 expected_to_status = expected["review_required_status"]
             if transition["to_status"] != expected_to_status:
@@ -4093,6 +4517,9 @@ Runtime session identity: {state['session_id']}
         ]
         if workspace_manifest_ref is not None:
             evidence_refs.append(workspace_manifest_ref)
+        owner_admission_ref = self._owner_admission_ref(state)
+        if owner_admission_ref is not None:
+            evidence_refs.append(owner_admission_ref)
         evidence_refs.extend(self._preserved_result_refs(state))
         result = {
             "schema_version": "abyss_stack_external_codex_result_v1",
@@ -4101,6 +4528,7 @@ Runtime session identity: {state['session_id']}
             "incarnation_id": state["incarnation_id"],
             "task_id": state["task_id"],
             "task_family": state["task_family"],
+            "execution_posture": state["execution_posture"],
             "status": status,
             "failure_code": failure_code,
             "thread_id": state.get("thread_id"),
@@ -4121,6 +4549,7 @@ Runtime session identity: {state['session_id']}
             "changed_paths": changed_paths,
             "workspace_manifest_match": workspace_manifest_match,
             "workspace_manifest_ref": workspace_manifest_ref,
+            "owner_admission_ref": owner_admission_ref,
             "report_ref": evidence_refs[0],
             "events_ref": evidence_refs[1],
             "stderr_ref": evidence_refs[2],
@@ -4253,6 +4682,9 @@ Runtime session identity: {state['session_id']}
         ]
         if workspace_manifest_ref is not None:
             evidence_refs.append(workspace_manifest_ref)
+        owner_admission_ref = self._owner_admission_ref(state)
+        if owner_admission_ref is not None:
+            evidence_refs.append(owner_admission_ref)
         evidence_refs.extend(self._preserved_result_refs(state))
         result = {
             "schema_version": "abyss_stack_external_codex_result_v1",
@@ -4261,6 +4693,7 @@ Runtime session identity: {state['session_id']}
             "incarnation_id": state["incarnation_id"],
             "task_id": state["task_id"],
             "task_family": state["task_family"],
+            "execution_posture": state["execution_posture"],
             "status": status,
             "failure_code": code,
             "thread_id": state.get("thread_id"),
@@ -4286,6 +4719,7 @@ Runtime session identity: {state['session_id']}
             "changed_paths": changed_paths,
             "workspace_manifest_match": workspace_manifest_match,
             "workspace_manifest_ref": workspace_manifest_ref,
+            "owner_admission_ref": owner_admission_ref,
             "report_ref": evidence_refs[0],
             "events_ref": evidence_refs[1],
             "stderr_ref": evidence_refs[2],
@@ -4381,6 +4815,7 @@ Runtime session identity: {state['session_id']}
             "incarnation_id": state["incarnation_id"],
             "task_id": state["task_id"],
             "task_family": state["task_family"],
+            "execution_posture": state["execution_posture"],
             "model_slug": state["model_slug"],
             "reasoning_effort": state["reasoning_effort"],
             "thread_id": state.get("thread_id"),
@@ -4529,7 +4964,7 @@ Runtime session identity: {state['session_id']}
                     )
                 if (
                     task is None
-                    or task.get("task_family") != "landing_review"
+                    or task.get("execution_posture") != "independent_review"
                     or task.get("allowed_effect_class") != "read_only"
                     or previous_result.get("failure_code")
                     not in REVIEW_REPORT_RECOVERY_FAILURES
@@ -4751,7 +5186,7 @@ Runtime session identity: {state['session_id']}
             writer.get("thread_id") is None
             or reviewer.get("thread_id") is None
             or writer["thread_id"] == reviewer["thread_id"]
-            or reviewer.get("task_family") != "landing_review"
+            or reviewer.get("execution_posture") != "independent_review"
         ):
             raise ExternalCodexRuntimeError(
                 "a2a_review_not_independent", "A2A export requires a separate review thread"
@@ -5870,6 +6305,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--state-root", required=True)
     parser.add_argument("--profile", default=str(PROFILE_PATH))
     parser.add_argument("--launch")
+    parser.add_argument("--owner-execution-request")
     parser.add_argument("--session-id")
     parser.add_argument("--after-sequence", type=int, default=-1)
     parser.add_argument("--resume-request")
@@ -5929,11 +6365,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             runtime = ExternalCodexRuntime(args.state_root, profile_path=args.profile)
             if args.operation == "preflight":
-                result = runtime.preflight(_require(args.launch, "--launch"))
+                result = runtime.preflight(
+                    _require(args.launch, "--launch"),
+                    owner_request_path=args.owner_execution_request,
+                )
             elif args.operation == "start":
-                result = runtime.start(_require(args.launch, "--launch"))
+                result = runtime.start(
+                    _require(args.launch, "--launch"),
+                    owner_request_path=args.owner_execution_request,
+                )
             elif args.operation == "run-to-terminal":
-                result = runtime.run_to_terminal(_require(args.launch, "--launch"))
+                result = runtime.run_to_terminal(
+                    _require(args.launch, "--launch"),
+                    owner_request_path=args.owner_execution_request,
+                )
             elif args.operation == "status":
                 result = runtime.status(_require(args.session_id, "--session-id"))
             elif args.operation == "events":

@@ -4,7 +4,7 @@
   "title": "Runtime-observed external Codex agent result",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "session_id", "admission_class", "incarnation_id", "task_id", "task_family", "status", "thread_id", "model_slug", "reasoning_effort", "started_at", "finished_at", "duration_seconds", "attempt_count", "turn_count", "output_bytes", "active_wall_seconds", "exit_code", "usage", "codex_invocations", "executed_commands", "changed_paths", "workspace_manifest_ref", "report_ref", "events_ref", "stderr_ref", "wake_evaluation", "evidence_refs"],
+  "required": ["schema_version", "session_id", "admission_class", "incarnation_id", "task_id", "task_family", "execution_posture", "status", "thread_id", "model_slug", "reasoning_effort", "started_at", "finished_at", "duration_seconds", "attempt_count", "turn_count", "output_bytes", "active_wall_seconds", "exit_code", "usage", "codex_invocations", "executed_commands", "changed_paths", "workspace_manifest_ref", "owner_admission_ref", "report_ref", "events_ref", "stderr_ref", "wake_evaluation", "evidence_refs"],
   "properties": {
     "schema_version": {"const": "abyss_stack_external_codex_result_v1"},
     "session_id": {"type": "string", "minLength": 1},
@@ -12,6 +12,7 @@
     "incarnation_id": {"type": "string", "minLength": 1},
     "task_id": {"type": "string", "minLength": 1},
     "task_family": {"type": "string", "minLength": 1},
+    "execution_posture": {"enum": ["bounded_execution", "independent_review", "closeout", "ambiguity_stop"]},
     "status": {"enum": ["completed", "failed", "interrupted", "paused", "review_required", "authority_blocked"]},
     "failure_code": {"type": ["string", "null"]},
     "thread_id": {"type": ["string", "null"]},
@@ -81,6 +82,12 @@
     "changed_paths": {"type": "array", "items": {"type": "object", "required": ["path", "status"], "properties": {"path": {"type": "string", "minLength": 1}, "status": {"type": "string", "minLength": 1}}, "additionalProperties": false}},
     "workspace_manifest_match": {"type": ["boolean", "null"]},
     "workspace_manifest_ref": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/evidenceRef"}
+      ]
+    },
+    "owner_admission_ref": {
       "oneOf": [
         {"type": "null"},
         {"$ref": "#/$defs/evidenceRef"}

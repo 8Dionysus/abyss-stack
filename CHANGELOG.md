@@ -31,11 +31,16 @@ Tracking starts with the community-docs baseline for this repository.
   release (`v0.1.16`) from the exact tested `0.2.0-alpha.10` next-wire package;
   migration to `2026-07-28` remains fail-closed.
 
-- A source-local external Codex incarnation runtime now binds exact `aoa-sdk`
-  plans, `aoa-agents` roles, and `aoa-models` realizations to separate
-  OS-process landing-readiness, preparation, review, closeout, and
-  ambiguity-stop tasks without using built-in Codex subagents. Its initial
-  admission is transport-fixture-only: exact byte manifests include ignored
+- A source-local external Codex incarnation runtime now admits a task-family-
+  neutral owner contour: exact `aoa-agents` obligation, mandate, accepted
+  responsibility transfer, domain procedure, and ready `aoa-skills` task-local
+  DAG precede the `aoa-models` realization and `aoa-sdk` post-compile binding.
+  A model-neutral non-starting binder creates the exact separate OS-process
+  launch without using built-in Codex subagents; the semantic execution request
+  remains a separate owner artifact. Eval, stats, memo, and landing can use
+  exact role-scoped profiles, including one named loopback AoA MCP whose token
+  is withheld from the model shell. Transport fixtures remain bounded
+  compatibility evidence. Exact byte manifests include ignored
   workspace content while refusing secret-shaped ignored inputs, validation
   claims bind to observed argv/exit states, required review cannot close as
   completed, produced-artifact and status-selected wake claims fail closed,

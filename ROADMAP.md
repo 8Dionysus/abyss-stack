@@ -81,9 +81,12 @@ The current direction is:
 - admit `aoa-sdk` Agent OS plans only through an explicit runtime-owned
   compatibility profile, exact snapshot observation, and governed approval
   boundaries
-- keep external Codex model incarnations behind exact post-compile bindings,
-  separate process/session evidence, event-filtered re-entry, independent
-  review, and disabled external effects until comparative proof exists
+- keep external Codex incarnations role-first: `aoa-agents` must supply the
+  obligation, mandate, responsibility transfer, domain procedure, and ready
+  task-local DAG before a model-neutral binder may create the exact external
+  process/session launch; retain event-filtered re-entry, independent review,
+  observe-only usage accounting, and disabled external effects until useful
+  owner-local proof exists
 - keep diagnostic spine and antifragility repair posture as evidence and packet
   routes before live mutation or authority promotion
 - keep release history in `CHANGELOG.md`; the current `v0.4.0` contour remains

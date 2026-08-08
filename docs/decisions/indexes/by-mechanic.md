@@ -77,6 +77,7 @@
 - [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
 - [ABYSS-STACK-D-0101 Retire Routing Predecessor Checkout Consumers](../ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md) (`docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md`)
 - [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md`)
 
 ## inference-pilots
 

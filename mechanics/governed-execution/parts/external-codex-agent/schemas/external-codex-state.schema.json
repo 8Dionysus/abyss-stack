@@ -13,11 +13,21 @@
         "required": ["schema_version"]
       },
       "then": {"required": ["failure_closeout"]}
+    },
+    {
+      "if": {
+        "properties": {"admission_class": {"const": "owner_contour"}},
+        "required": ["admission_class"]
+      },
+      "then": {
+        "required": ["owner_admission_digest"],
+        "properties": {"owner_admission_digest": {"$ref": "#/$defs/digest"}}
+      }
     }
   ],
   "required": [
     "schema_version", "session_id", "launch_id", "launch_digest", "admission_class", "status",
-    "incarnation_id", "task_id", "task_family", "model_slug",
+    "incarnation_id", "task_id", "task_family", "execution_posture", "model_slug",
     "reasoning_effort", "tool_profile_id", "workspace_path",
     "workspace_expected_head", "workspace_baseline", "workspace_manifest_baseline",
     "materialized_inputs",
@@ -34,10 +44,15 @@
     "launch_id": {"type": "string", "minLength": 1},
     "launch_digest": {"$ref": "#/$defs/digest"},
     "admission_class": {"enum": ["owner_contour", "transport_study_fixture"]},
+    "owner_admission_digest": {
+      "type": ["string", "null"],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
     "status": {"$ref": "#/$defs/status"},
     "incarnation_id": {"type": "string", "minLength": 1},
     "task_id": {"type": "string", "minLength": 1},
     "task_family": {"type": "string", "minLength": 1},
+    "execution_posture": {"enum": ["bounded_execution", "independent_review", "closeout", "ambiguity_stop"]},
     "model_slug": {"type": "string", "minLength": 1},
     "reasoning_effort": {"enum": ["low", "medium", "high", "xhigh", "max"]},
     "tool_profile_id": {"type": "string", "minLength": 1},
@@ -59,7 +74,10 @@
         "task": {"type": "string", "pattern": "^/"},
         "runtime_profile": {"type": "string", "pattern": "^/"},
         "role_contract": {"type": "string", "pattern": "^/"},
-        "result_schema": {"type": "string", "pattern": "^/"}
+        "result_schema": {"type": "string", "pattern": "^/"},
+        "owner_execution_request_schema": {"type": "string", "pattern": "^/"},
+        "task_local_dag_schema": {"type": "string", "pattern": "^/"},
+        "owner_execution_request": {"type": "string", "pattern": "^/"}
       }
     },
     "execution_result_schema_ref": {"$ref": "#/$defs/artifactRef"},

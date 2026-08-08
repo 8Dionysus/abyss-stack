@@ -21,13 +21,14 @@
     "codex_cli",
     "model_admission",
     "tool_profiles",
-    "task_families",
+    "execution_postures",
+    "owner_contracts",
     "result_schema_ref",
     "boundaries"
   ],
   "properties": {
     "$schema": {"type": "string", "minLength": 1},
-    "schema_version": {"const": "abyss_stack_external_codex_runtime_profile_v1"},
+    "schema_version": {"const": "abyss_stack_external_codex_runtime_profile_v2"},
     "profile_id": {"const": "runtime-profile:abyss-stack-external-codex-agent-v1"},
     "runtime_owner": {"const": "abyss-stack"},
     "adapter_id": {"const": "abyss_stack_external_codex_agent_v1"},
@@ -66,16 +67,19 @@
       }
     },
     "model_admission": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["model_slug", "reasoning_efforts"],
-        "properties": {
-          "model_slug": {"type": "string", "minLength": 1},
-          "reasoning_efforts": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["low", "medium", "high", "xhigh", "max"]}}
-        }
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_repo", "schema_version", "runtime_product", "runtime_version", "transport", "auth_regime", "billing_regime", "allowed_lifecycle_states", "requires_live_catalog_match"],
+      "properties": {
+        "owner_repo": {"const": "aoa-models"},
+        "schema_version": {"const": "aoa_model_realization_v1"},
+        "runtime_product": {"const": "codex-cli"},
+        "runtime_version": {"type": "string", "minLength": 1},
+        "transport": {"const": "exec-jsonl"},
+        "auth_regime": {"const": "chatgpt_login"},
+        "billing_regime": {"const": "chatgpt_quota"},
+        "allowed_lifecycle_states": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "requires_live_catalog_match": {"const": true}
       }
     },
     "tool_profiles": {
@@ -104,7 +108,7 @@
             }
           }
         ],
-        "required": ["profile_id", "sandbox_mode", "codex_sandbox", "codex_execution_root", "approval_policy", "allowed_effect_classes", "required_tool_ids", "required_mcp_server_ids", "network_access", "external_effects"],
+        "required": ["profile_id", "sandbox_mode", "codex_sandbox", "codex_execution_root", "approval_policy", "allowed_effect_classes", "required_tool_ids", "required_mcp_server_ids", "mcp_server_configs", "network_access", "external_effects"],
         "properties": {
           "profile_id": {"type": "string", "minLength": 1},
           "sandbox_mode": {"enum": ["read_only", "workspace_write"]},
@@ -113,13 +117,36 @@
           "approval_policy": {"const": "never"},
           "allowed_effect_classes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["read_only", "repo_mutation"]}},
           "required_tool_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
-          "required_mcp_server_ids": {"type": "array", "maxItems": 0},
+          "required_mcp_server_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "mcp_server_configs": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["server_id", "url", "bearer_token_env_var"],
+              "properties": {
+                "server_id": {"enum": ["aoa_evals", "aoa_stats", "aoa_memo"]},
+                "url": {"type": "string", "pattern": "^http://127\\.0\\.0\\.1:[0-9]+/mcp$"},
+                "bearer_token_env_var": {"enum": ["AOA_EVALS_MCP_READ_BEARER_TOKEN", "AOA_STATS_MCP_READ_BEARER_TOKEN", "AOA_MEMO_MCP_READ_BEARER_TOKEN"]}
+              }
+            }
+          },
           "network_access": {"const": "disabled"},
           "external_effects": {"const": false}
         }
       }
     },
-    "task_families": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "execution_postures": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["bounded_execution", "independent_review", "closeout", "ambiguity_stop"]}},
+    "owner_contracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_execution_request_schema", "task_local_dag_schema"],
+      "properties": {
+        "owner_execution_request_schema": {"$ref": "#/$defs/ownerContract"},
+        "task_local_dag_schema": {"$ref": "#/$defs/ownerContract"}
+      }
+    },
     "result_schema_ref": {"type": "string", "minLength": 1},
     "boundaries": {
       "type": "object",
@@ -139,6 +166,20 @@
         "push_effect_enabled": {"const": false},
         "merge_effect_enabled": {"const": false},
         "release_effect_enabled": {"const": false}
+      }
+    }
+  },
+  "$defs": {
+    "ownerContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_repo", "artifact_ref", "source_ref", "digest", "schema_version"],
+      "properties": {
+        "owner_repo": {"type": "string", "minLength": 1},
+        "artifact_ref": {"type": "string", "minLength": 1},
+        "source_ref": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "schema_version": {"type": "string", "minLength": 1}
       }
     }
   }

@@ -979,6 +979,7 @@ def _verified_launch_coordinate(
 def _adapt_plan_for_reviewer(
     base: RunPlan,
     *,
+    reviewer_role_id: str,
     old_task_ref: ProvenanceRef,
     task_ref: ProvenanceRef,
     old_summon_request_ref: ProvenanceRef,
@@ -1018,7 +1019,17 @@ def _adapt_plan_for_reviewer(
     )
     steps = tuple(
         step.model_copy(
-            update={"input_refs": tuple(replace(item) for item in step.input_refs)}
+            update={
+                "input_refs": tuple(replace(item) for item in step.input_refs),
+                **(
+                    {"effect_class": "read_only"}
+                    if any(
+                        item.agent_id == reviewer_role_id
+                        for item in step.agent_refs
+                    )
+                    else {}
+                ),
+            }
         )
         for step in base.steps
     )
@@ -1335,6 +1346,13 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
             "continuation_id": continuation_id,
             "expected_incarnation_id": incarnation_id,
             "task_family": packet["task_family"],
+            "execution_posture": (
+                "ambiguity_stop"
+                if packet["task_family"] == "landing_ambiguity_stop"
+                else "closeout"
+                if packet["task_family"] == "landing_closeout"
+                else "bounded_execution"
+            ),
             "parent_task_id": packet["parent_task_id"],
             "objective": packet["objective"],
             "transition": {
@@ -1971,11 +1989,11 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         raise StudyPreparationError("writer launch or result is unavailable")
 
     writer_launch = load_json(writer_launch_path, label="writer launch")
-    validate_json(writer_launch, LAUNCH_SCHEMA_PATH, label="writer launch")
     if writer_launch.get("admission_class") != "transport_study_fixture":
         raise StudyPreparationError(
             "review preparation accepts only a transport_study_fixture writer"
         )
+    validate_json(writer_launch, LAUNCH_SCHEMA_PATH, label="writer launch")
     coordinate_paths = {
         key: _verified_launch_coordinate(writer_launch, key)
         for key in (
@@ -2492,6 +2510,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         "continuation_id": continuation_id,
         "expected_incarnation_id": incarnation_id,
         "task_family": "landing_review",
+        "execution_posture": "independent_review",
         "parent_task_id": writer_task["task_id"],
         "objective": (
             "Проведи независимый read-only review точного terminal writer result и "
@@ -2557,6 +2576,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     )
     review_plan = _adapt_plan_for_reviewer(
         base_plan,
+        reviewer_role_id="reviewer",
         old_task_ref=writer_task_ref,
         task_ref=task_ref,
         old_summon_request_ref=writer_summon_ref,

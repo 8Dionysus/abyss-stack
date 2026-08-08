@@ -23,7 +23,7 @@ jobs:
         run: |
           git init "$RUNNER_TEMP/aoa-sdk-source"
           git -C "$RUNNER_TEMP/aoa-sdk-source" remote add origin https://github.com/8Dionysus/aoa-sdk
-          git -C "$RUNNER_TEMP/aoa-sdk-source" fetch --depth 1 origin 8e25d77d24bc163cd6ebf32a695379b40b8d7ef3
+          git -C "$RUNNER_TEMP/aoa-sdk-source" fetch --depth 1 origin 284a8d4612c351b627f671089fee37150178e87b
           git -C "$RUNNER_TEMP/aoa-sdk-source" checkout --detach FETCH_HEAD
 
       - name: Clone abyss-machine verifier
@@ -67,6 +67,8 @@ jobs:
           scripts/aoa-agent-os-runtime
           mechanics/governed-execution/parts/agent-os-adapter/aoa_agent_os_runtime.py
           scripts/aoa-external-codex-agent
+          scripts/aoa-external-actor-bind
+          mechanics/governed-execution/parts/external-codex-agent/bind_external_actor_launch.py
           mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py
           mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py
           mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py

@@ -5,6 +5,8 @@ Run the paired source proof with the exact `aoa-sdk` checkout that owns
 
 ```bash
 AOA_SDK_SOURCE_ROOT=/absolute/path/to/aoa-sdk \
+AOA_AGENTS_SOURCE_ROOT=/absolute/path/to/aoa-agents \
+AOA_SKILLS_SOURCE_ROOT=/absolute/path/to/aoa-skills \
 PYTHONPATH=/absolute/path/to/aoa-sdk/src \
 python -m pytest -q \
   mechanics/governed-execution/parts/external-codex-agent/tests
@@ -12,6 +14,8 @@ python -m pytest -q \
 PYTHONPATH=/absolute/path/to/aoa-sdk/src \
 python -m py_compile \
   scripts/aoa-external-codex-agent \
+  scripts/aoa-external-actor-bind \
+  mechanics/governed-execution/parts/external-codex-agent/bind_external_actor_launch.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py \
   mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py \
@@ -30,7 +34,10 @@ python scripts/validate_nested_agents.py
 ```
 
 The focused suite uses disposable Git repositories and a fake Codex-compatible
-binary. It proves exact fixture-only admission, a distinct OS process,
+binary. It proves exact fixture admission plus separate owner-contour semantic
+admission against pinned `aoa-agents` and `aoa-skills` schemas, a neutral
+non-starting binder, accepted responsibility transfer with two exact holders,
+a ready task-local DAG and exact domain procedure refs, a distinct OS process,
 structured events and output, no built-in multi-agent flag, byte-aware
 read-only drift containment including ignored bytes, a foreground
 `run-to-terminal` lifecycle for transient cgroup launchers without execution
@@ -67,7 +74,11 @@ no second parent turn, and exact-thread parent re-entry with a distilled
 return. The fake Codex fixture exercises both filtered and wake branches;
 separate live receipts are required for the installed product surface.
 
+It also proves role-scoped MCP argv isolation: the selected AoA server alone is
+configured, its exact token is required but never exposed in argv or the model
+shell, and ambient/other MCPs are absent.
+
 That suite does not prove the installed Codex binary, ChatGPT quota behavior,
-Luna quality, comparative net benefit, productive landing work, packaged SDK
-compatibility, or live deployment. Those require separate real-model and
-packaged-source receipts.
+Luna role performance, comparative net benefit, productive eval/stats/memo or
+landing work, packaged four-owner compatibility, or live deployment. Those
+require separate real-model and clean packaged-source receipts.

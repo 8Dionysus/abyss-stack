@@ -370,6 +370,7 @@
 ## exact binding
 
 - [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md`)
 
 ## exact delivery
 
@@ -545,6 +546,10 @@
 
 - [ABYSS-STACK-D-0095 Cross-Organ Orchestration Host Boundary](../ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md) (`docs/decisions/ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md`)
 
+## observe-only usage
+
+- [ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md`)
+
 ## overlay skill install
 
 - [ABYSS-STACK-D-0062 Agent Skill Projection Validator Module](../ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md`)
@@ -581,6 +586,7 @@
 ## owner provenance
 
 - [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md`)
 
 ## owner skill package
 
@@ -675,6 +681,10 @@
 ## return-policy
 
 - [ABYSS-STACK-D-0053 Return Policy Validator Module](../ABYSS-STACK-D-0053-return-policy-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0053-return-policy-validator-module.md`)
+
+## role-scoped MCP
+
+- [ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md`)
 
 ## rollback
 
@@ -808,6 +818,10 @@
 ## sync parity
 
 - [ABYSS-STACK-D-0064 Federation Effective Runtime Inputs](../ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md) (`docs/decisions/ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md`)
+
+## task-local DAG
+
+- [ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md`)
 
 ## test topology
 

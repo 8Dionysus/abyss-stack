@@ -1,10 +1,10 @@
 # Suspension and rollback
 
 Suspension is an owner-controlled runtime transition, not a model decision and
-not deletion of evidence. The current implementation is a source and
-`transport_study_fixture` candidate only: it is not installed in the deployed
-mirror, registered as a service, admitted as model fit, or authorized for an
-external effect.
+not deletion of evidence. The current source supports exact `owner_contour`
+admission as well as bounded `transport_study_fixture` compatibility evidence;
+it is not yet a clean installed release, a model-fit verdict, or authority for
+an external effect.
 
 ## Suspend new work
 
@@ -82,9 +82,10 @@ If this source candidate later lands and must be rolled back, the source owner
 reverts the exact landed change through its normal reviewed route and the
 consumer/registration owner restores its prior runtime adapter or leaves the
 lane unregistered. Runtime state remains evidence and is not rolled back with
-the code. Because no deployment or registration occurred in the current
-contour, the present rollback posture is simply non-activation plus preservation
-of the isolated worktrees and receipts.
+the code. Before clean activation, rollback is non-activation plus preservation
+of the isolated worktrees and receipts. After activation, restore the prior
+immutable release through `install_external_codex_runtime.py activate`; do not
+delete the later release or runtime evidence.
 
 ## Suspension triggers
 

@@ -17,6 +17,8 @@
     "runtime_profile": {"$ref": "#/$defs/artifactCoordinate"},
     "role_contract": {"$ref": "#/$defs/artifactCoordinate"},
     "result_schema": {"$ref": "#/$defs/artifactCoordinate"},
+    "owner_execution_request_schema": {"$ref": "#/$defs/ownedArtifactCoordinate"},
+    "task_local_dag_schema": {"$ref": "#/$defs/ownedArtifactCoordinate"},
     "workspace_path": {"type": "string", "pattern": "^/"},
     "workspace_expected_head": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "workspace_initial_posture": {"enum": ["clean_required", "exact_baseline"]},
@@ -26,6 +28,25 @@
     "codex_home": {"type": "string", "pattern": "^/"},
     "environment_allowlist": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["HOME", "LANG", "LC_ALL", "PATH", "SSL_CERT_FILE", "SSL_CERT_DIR", "TERM"]}}
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"admission_class": {"const": "owner_contour"}},
+        "required": ["admission_class"]
+      },
+      "then": {
+        "required": ["owner_execution_request_schema", "task_local_dag_schema"]
+      },
+      "else": {
+        "not": {
+          "anyOf": [
+            {"required": ["owner_execution_request_schema"]},
+            {"required": ["task_local_dag_schema"]}
+          ]
+        }
+      }
+    }
+  ],
   "$defs": {
     "artifactCoordinate": {
       "type": "object",
@@ -34,6 +55,19 @@
       "properties": {
         "path": {"type": "string", "pattern": "^/"},
         "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "ownedArtifactCoordinate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest", "owner_repo", "artifact_ref", "source_ref", "schema_version"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^/"},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "owner_repo": {"type": "string", "minLength": 1},
+        "artifact_ref": {"type": "string", "minLength": 1},
+        "source_ref": {"type": "string", "minLength": 1},
+        "schema_version": {"type": "string", "minLength": 1}
       }
     }
   }

@@ -14,6 +14,12 @@
 - Guard families: exact binding, owner provenance, process isolation, effect ceiling, durable resume, independent review
 - Posture: accepted source-local runtime with reviewed nonproduction machine-local vertical proof; model fit and production admission remain external
 
+Decision [ABYSS-STACK-D-0109](ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md)
+extends this process-boundary decision and supersedes only its fixture-only,
+landing-first admission posture. The external process/session boundary remains
+accepted; current owner admission law lives at the source surfaces named by
+D-0109.
+
 ## Context
 
 The SDK can describe a model-neutral plan and now bind one exact post-compile

@@ -2,35 +2,41 @@
 
 ## Current admission
 
-Keep the first lane small enough to compare honestly:
+The runtime is the physical body of an already formed actor, not the place
+where an actor is invented. The current source admits a task-family-neutral
+owner contour only after `aoa-agents` has named the obligation, mandate,
+responsibility transfer, domain procedure, and ready task-local DAG;
+`aoa-models` has supplied one exact current realization; and `aoa-sdk` has
+bound the execution posture, tools, effects, continuation, and wake policy.
 
-- exact Luna max, Luna xhigh, and Sol max realizations selected by each
-  immutable study's explicit non-empty arm order rather than runtime code;
-- a fixed landing fixture and fixed role/task/result contracts;
-- read-only readiness and independent review first;
-- bounded workspace-write preparation only after the read-only lane stays
-  fail-closed;
-- no external landing effect.
+Luna max/xhigh is the first economical incarnation, not the public surface.
+Eval, stats, memo, and landing are the first real obligation families on which
+to prove useful responsibility and handoff. Their domain procedures remain at
+their owners. Read-only and role-scoped MCP work should establish trust under
+real load; bounded repo-write preparation follows with independent review.
+Commit, push, merge, release, publication, and general network effects remain
+outside the initial contour.
 
 ## Proof sequence
 
-1. Maintain source-local schema, digest, process, drift, resume, and independent
-   review fixtures.
-2. Run the same owner-pinned landing packet through Sol max, Luna max, and Luna
-   xhigh in clean isolated worktrees.
-3. Preserve full runtime receipts and submit only comparable evidence to
-   `aoa-evals`; do not infer fit from one attractive answer.
+1. Maintain source-local schema, owner-admission, binder, process, drift,
+   role-MCP, resume, and independent-review fixtures.
+2. Land the SDK/runtime/model/skill sources and install one clean,
+   content-addressed, rollback-capable host release.
+3. Run real Luna max/xhigh eval, stats, memo, and landing obligations in clean
+   task-local worktrees with their actual owner procedures. Prove that each
+   actor holds and returns its role; do not turn preliminary proof into a broad
+   capability leaderboard.
 4. Preserve the now-proven controlled L2 yield: the parent obligation survives
    after Sol inference/process exit, non-significant events remain filtered,
    and only a configured event resumes the exact parent thread.
-5. Admit a workspace-write landing-preparation realization only for exact
-   allowed paths and validations.
-6. Keep the first globally callable host contour content-addressed,
-   receipt-bound, rollback-capable, and explicitly nonproduction while its
-   runtime and SDK source are dirty.
-7. Revisit center integration only after useful owner-local proof and explicit
-   human review. Push, merge, release, publication, and global runtime changes
-   remain separate approvals.
+5. Admit workspace-write only for exact paths/effects and a distinct
+   independent-review return.
+6. Prove that two fresh Codex sessions can discover `aoa-agents-skills`, route
+   through `aoa-summon`, and invoke the installed external contour without
+   built-in spawn or a model-named command.
+7. Feed observed usage, rework, handoff quality, and failures to stats/evals;
+   keep initiative unconstrained by runtime-authored token budgets.
 
 The first live L2 ambiguity-stop pair established transport behavior, not
 admission. Version 1 retained a semantically safe Luna escalation whose invalid

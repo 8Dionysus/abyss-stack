@@ -32,17 +32,24 @@ cards, then this part's `README.md`, `CONTRACT.md`, `DIRECTION.md`,
   an exact runtime-admitted child event; never keep Sol alive to poll or use a
   failed/non-significant event as a wake substitute.
 - Do not enable commit, push, PR, merge, release, publication, service, secret,
-  global-config, or network effects in the first landing contour.
+  global-config, or general network effects in the first owner contour. An
+  exact role profile may expose only its named loopback AoA MCP; that transport
+  does not grant the model shell network or access to other MCP servers.
 
 ## Validation
 
 Run:
 
 ```bash
-AOA_SDK_SOURCE_ROOT=/absolute/path/to/aoa-sdk python -m pytest -q \
+AOA_SDK_SOURCE_ROOT=/absolute/path/to/aoa-sdk \
+AOA_AGENTS_SOURCE_ROOT=/absolute/path/to/aoa-agents \
+AOA_SKILLS_SOURCE_ROOT=/absolute/path/to/aoa-skills \
+python -m pytest -q \
   mechanics/governed-execution/parts/external-codex-agent/tests
 python -m py_compile \
   scripts/aoa-external-codex-agent \
+  scripts/aoa-external-actor-bind \
+  mechanics/governed-execution/parts/external-codex-agent/bind_external_actor_launch.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py \
   mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py \

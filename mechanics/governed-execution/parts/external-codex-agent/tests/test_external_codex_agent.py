@@ -50,6 +50,8 @@ pytestmark = pytest.mark.skipif(
 
 PART_ROOT = Path(__file__).resolve().parents[1]
 SDK_ROOT = Path(os.environ.get("AOA_SDK_SOURCE_ROOT", "/unavailable"))
+AGENTS_ROOT = Path(os.environ.get("AOA_AGENTS_SOURCE_ROOT", "/unavailable"))
+SKILLS_ROOT = Path(os.environ.get("AOA_SKILLS_SOURCE_ROOT", "/unavailable"))
 PLAN_FIXTURE = (
     SDK_ROOT
     / "mechanics/boundary-bridge/parts/plan-compilation-control-plane/examples"
@@ -67,7 +69,12 @@ SUMMON_REQUEST_SCHEMA_REF = (
     "summon-request-v4.schema.json"
 )
 SUMMON_REQUEST_SCHEMA_VERSION = "urn:aoa-sdk:a2a:summon-request:v4"
+OWNER_EXECUTION_REQUEST_SCHEMA_PATH = (
+    AGENTS_ROOT / "skills/aoa-summon/references/summon-request-v3.schema.json"
+)
+TASK_LOCAL_DAG_SCHEMA_PATH = SKILLS_ROOT / "schemas/task_local_dag_v2.schema.json"
 CONTROLLER_PATH = PART_ROOT / "external_codex_agent.py"
+BINDER_PATH = PART_ROOT / "bind_external_actor_launch.py"
 PREPARER_PATH = PART_ROOT / "prepare_landing_study.py"
 SUPERVISOR_PATH = PART_ROOT / "external_codex_supervisor.py"
 ZERO_DIGEST = "sha256:" + "0" * 64
@@ -88,6 +95,7 @@ def _load_module(name: str, path: Path) -> ModuleType:
 
 
 RUNTIME = _load_module("abyss_stack_external_codex_agent_under_test", CONTROLLER_PATH)
+BINDER = _load_module("abyss_stack_external_actor_launch_binder", BINDER_PATH)
 PREPARER = _load_module("abyss_stack_external_codex_study_preparer", PREPARER_PATH)
 SUPERVISOR = _load_module(
     "abyss_stack_external_codex_supervisor_under_test",
@@ -111,11 +119,23 @@ def _write_json(path: Path, value: Any) -> None:
     )
 
 
-def _write_model_realization(path: Path, *, workspace_write: bool) -> None:
+def _write_model_realization(
+    path: Path,
+    *,
+    workspace_write: bool,
+    role_mcp: str | None = None,
+) -> None:
+    mcp_profiles = {
+        "aoa_evals": "abyss-stack:external_codex_agent/eval-reader-v1",
+        "aoa_stats": "abyss-stack:external_codex_agent/stats-reader-v1",
+        "aoa_memo": "abyss-stack:external_codex_agent/memo-reader-v1",
+    }
     profile_id = (
-        "abyss-stack:external_codex_agent/luna-landing-workspace-write-v1"
+        mcp_profiles[role_mcp]
+        if role_mcp is not None
+        else "abyss-stack:external_codex_agent/bounded-repo-write-v1"
         if workspace_write
-        else "abyss-stack:external_codex_agent/luna-landing-readonly-v1"
+        else "abyss-stack:external_codex_agent/bounded-source-readonly-v1"
     )
     required_tools = (
         ["shell-read", "workspace-write"]
@@ -128,6 +148,7 @@ def _write_model_realization(path: Path, *, workspace_write: bool) -> None:
             "$schema": "https://schemas.aoa.local/models/model-realization.schema.json",
             "schema_version": "aoa_model_realization_v1",
             "kind": "ModelRealization",
+            "lifecycle_state": "declared",
             "model_realization_id": (
                 "model-realization:transport-fixture/luna/max/"
                 + ("workspace-write" if workspace_write else "read-only")
@@ -139,7 +160,7 @@ def _write_model_realization(path: Path, *, workspace_write: bool) -> None:
                 },
                 "runtime": {
                     "product": "codex-cli",
-                    "version": "0.146.0",
+                    "version": "0.147.0",
                     "transport": "exec-jsonl",
                     "model_slug": "gpt-5.6-luna",
                 },
@@ -147,7 +168,9 @@ def _write_model_realization(path: Path, *, workspace_write: bool) -> None:
                 "tools": {
                     "profile_ref": profile_id,
                     "required_tools": required_tools,
-                    "required_mcp_servers": [],
+                    "required_mcp_servers": (
+                        [role_mcp] if role_mcp is not None else []
+                    ),
                     "inheritance_allowed": False,
                 },
                 "permissions": {
@@ -208,7 +231,7 @@ from pathlib import Path
 
 args = sys.argv[1:]
 if args == ["--version"]:
-    print("codex-cli 0.146.0")
+    print("codex-cli 0.147.0")
     raise SystemExit(0)
 if args[:2] == ["login", "status"]:
     print("Logged in using ChatGPT", file=sys.stderr)
@@ -522,6 +545,7 @@ def _adapt_plan(
     summon_request_ref: ProvenanceRef,
     role_id: str,
     role_ref: ProvenanceRef,
+    role_effect_class: str,
     workspace_ref: ProvenanceRef,
     immutable_refs: tuple[ProvenanceRef, ...],
     report_schema_ref: ProvenanceRef,
@@ -582,6 +606,11 @@ def _adapt_plan(
                     for item in step.agent_refs
                 ),
                 "input_refs": tuple(replace_ref(item) for item in step.input_refs),
+                **(
+                    {"effect_class": role_effect_class}
+                    if any(item.agent_id == role_id for item in step.agent_refs)
+                    else {}
+                ),
             }
         )
         for step in base.steps
@@ -652,7 +681,19 @@ def _fixture(
     source_evidence_paths: tuple[str, ...] | None = None,
     summon_request_mutator: Callable[[dict[str, Any]], None] | None = None,
     validate_summon_request: bool = True,
+    owner_contour: bool = False,
+    role_mcp: str | None = None,
+    responsibility_transfer_mutator: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
+    if role_mcp is not None and workspace_write:
+        raise AssertionError("role-scoped MCP fixtures are read-only")
+    if owner_contour and (
+        not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
+        or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file()
+    ):
+        raise AssertionError(
+            "owner-contour fixture requires exact aoa-agents and aoa-skills source roots"
+        )
     tmp_path.mkdir(parents=True, exist_ok=True)
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -679,16 +720,35 @@ def _fixture(
     role_path = tmp_path / "role.json"
     _write_json(
         role_path,
-        {
-            "schema_version": "fixture-role-v1",
-            "role_id": role_id,
-            "obligation": "Return a bounded landing assessment without owner claims.",
-        },
+        (
+            {
+                "schema_version": "actor-mandate-v1",
+                "mandate_id": f"mandate:fixture:{role_id}",
+                "role_id": role_id,
+                "obligation_ref": "obligation:fixture:bounded-duty",
+                "authority": ["bounded owner-local evidence and effects only"],
+                "domain_procedure_refs": ["procedure:fixture:bounded-duty"],
+                "continuity_posture": "role-continuity",
+                "return_owner": "actor://fixture-goal-owner",
+                "stop_line": "Stop before any undelegated or external effect.",
+            }
+            if owner_contour
+            else {
+                "schema_version": "fixture-role-v1",
+                "role_id": role_id,
+                "obligation": "Return a bounded landing assessment without owner claims.",
+            }
+        ),
     )
     role_ref = _provenance(
         "aoa-agents",
-        f"generated/agent_catalog.min.json#agents/{role_id}",
+        (
+            f"mandate:fixture:{role_id}"
+            if owner_contour
+            else f"generated/agent_catalog.min.json#agents/{role_id}"
+        ),
         digest=_digest_path(role_path),
+        schema_version=("actor-mandate-v1" if owner_contour else "fixture-v1"),
     )
     extra_role_refs: tuple[tuple[str, ProvenanceRef], ...] = ()
     reviewer_role_path: Path | None = None
@@ -748,6 +808,111 @@ def _fixture(
         schema_version="abyss_stack_external_codex_report_v1",
     )
     fixture_extra_inputs = list(extra_immutable_inputs)
+    obligation_ref: ProvenanceRef | None = None
+    dag_ref: ProvenanceRef | None = None
+    transfer_ref: ProvenanceRef | None = None
+    procedure_ref: ProvenanceRef | None = None
+    if owner_contour:
+        obligation_path = tmp_path / "agent-obligation.json"
+        _write_json(
+            obligation_path,
+            {
+                "schema_version": "agent-obligation-v1",
+                "obligation_id": "obligation:fixture:bounded-duty",
+                "goal_anchor": parent_task_id,
+                "phase": "execution",
+                "duty": "Perform one independently held bounded owner duty.",
+                "domain_owner": "fixture-target",
+                "current_holder": "actor://fixture-goal-owner",
+                "trigger_strength": "master_decision",
+                "return_owner": "actor://fixture-goal-owner",
+                "stop_line": "Stop before undelegated effects.",
+            },
+        )
+        obligation_ref = _provenance(
+            "aoa-agents",
+            "obligation:fixture:bounded-duty",
+            digest=_digest_path(obligation_path),
+            schema_version="agent-obligation-v1",
+        )
+        dag_path = tmp_path / "task-local-dag.json"
+        _write_json(
+            dag_path,
+            {
+                "schema_version": "aoa-task-local-dag-v2",
+                "authority": False,
+                "plan_id": "dag-0123456789abcdef",
+                "request": {"query": "Perform the admitted bounded duty."},
+                "source_graph": {"path": "generated/capability_graph.json", "content_hash": "0" * 64},
+                "status": "ready",
+                "selected_capabilities": ["mode.agents.transfer-responsibility"],
+                "nodes": [],
+                "edges": [],
+                "external_inputs": [],
+                "execution_stages": [["mode.agents.transfer-responsibility"]],
+                "checkpoints": [],
+                "terminal": {
+                    "lifetime": "task-local",
+                    "success_condition": "all selected nodes reached verified terminal conditions",
+                },
+                "warnings": [],
+                "blockers": [],
+            },
+        )
+        dag_ref = _provenance(
+            "aoa-skills",
+            "dag:fixture:bounded-duty",
+            digest=_digest_path(dag_path),
+            schema_version="aoa-task-local-dag-v2",
+        )
+        transfer_path = tmp_path / "responsibility-transfer.json"
+        responsibility_transfer = {
+                "schema_version": "responsibility-transfer-v1",
+                "transfer_id": "transfer:fixture:goal-owner-to-actor",
+                "state": "accepted",
+                "holder_ids": [
+                    "actor://fixture-goal-owner",
+                    f"actor://fixture/{role_id}",
+                ],
+                "obligation_ref": obligation_ref.artifact_ref,
+                "mandate_ref": role_ref.artifact_ref,
+                "task_local_dag_ref": dag_ref.artifact_ref,
+                "return_owner": "actor://fixture-goal-owner",
+            }
+        if responsibility_transfer_mutator is not None:
+            responsibility_transfer_mutator(responsibility_transfer)
+        _write_json(transfer_path, responsibility_transfer)
+        transfer_ref = _provenance(
+            "aoa-agents",
+            "transfer:fixture:goal-owner-to-actor",
+            digest=_digest_path(transfer_path),
+            schema_version="responsibility-transfer-v1",
+        )
+        procedure_path = tmp_path / "domain-procedure.json"
+        _write_json(
+            procedure_path,
+            {
+                "schema_version": "owner-procedure-v1",
+                "procedure_id": "procedure:fixture:bounded-duty",
+                "owner": "fixture-target",
+                "instruction": "Inspect exact inputs and return the named output.",
+            },
+        )
+        procedure_ref = _provenance(
+            "fixture-target",
+            "procedure:fixture:bounded-duty",
+            digest=_digest_path(procedure_path),
+            schema_version="owner-procedure-v1",
+        )
+        fixture_extra_inputs.extend(
+            (
+                ("agent-obligation", obligation_path, obligation_ref),
+                ("actor-mandate", role_path, role_ref),
+                ("task-local-dag", dag_path, dag_ref),
+                ("responsibility-transfer", transfer_path, transfer_ref),
+                ("domain-procedure", procedure_path, procedure_ref),
+            )
+        )
     if exact_baseline:
         manifest_path = tmp_path / "workspace-manifest.json"
         _write_json(manifest_path, RUNTIME.build_workspace_manifest(workspace))
@@ -827,13 +992,35 @@ def _fixture(
             label="fixture canonical summon request",
         )
     summon_request_ref = _provenance(
-        "abyss-stack",
+        "aoa-sdk" if owner_contour else "abyss-stack",
         f"runtime-studies/fixtures/{identity_suffix}/summon-request.json",
         digest=_digest_path(summon_request_path),
         source_ref="fixture-a2a-summon-source",
         schema_ref=SUMMON_REQUEST_SCHEMA_REF,
         schema_version=SUMMON_REQUEST_SCHEMA_VERSION,
     )
+    summon_decision_ref: ProvenanceRef | None = None
+    if owner_contour:
+        summon_decision_path = tmp_path / "summon-decision.json"
+        _write_json(
+            summon_decision_path,
+            {
+                "schema_version": "urn:aoa-sdk:a2a:summon-result:v4",
+                "allowed": True,
+                "execution_surface": "external_cli",
+                "request_artifact_digest": summon_request_ref.artifact_digest,
+            },
+        )
+        summon_decision_ref = _provenance(
+            "aoa-sdk",
+            f"runtime-studies/fixtures/{identity_suffix}/summon-decision.json",
+            digest=_digest_path(summon_decision_path),
+            source_ref=summon_request_ref.artifact_digest,
+            schema_version="urn:aoa-sdk:a2a:summon-result:v4",
+        )
+        fixture_extra_inputs.append(
+            ("summon-decision", summon_decision_path, summon_decision_ref)
+        )
     summon_request_schema_ref = _provenance(
         "aoa-sdk",
         SUMMON_REQUEST_SCHEMA_REF,
@@ -884,6 +1071,11 @@ def _fixture(
         "continuation_id": continuation_id,
         "expected_incarnation_id": incarnation_id,
         "task_family": task_family,
+        "execution_posture": (
+            "independent_review"
+            if task_family == "landing_review"
+            else "bounded_execution"
+        ),
         "parent_task_id": parent_task_id,
         "objective": f"Inspect the exact landing fixture. {objective_marker}".strip(),
         "transition": {
@@ -942,6 +1134,7 @@ def _fixture(
         summon_request_ref=summon_request_ref,
         role_id=role_id,
         role_ref=role_ref,
+        role_effect_class="repo_mutation" if workspace_write else "read_only",
         workspace_ref=workspace_ref,
         immutable_refs=(
             immutable_ref,
@@ -955,7 +1148,11 @@ def _fixture(
     plan_path = tmp_path / "plan.json"
     _write_json(plan_path, plan.model_dump(mode="json"))
     realization_path = tmp_path / "model-realization.json"
-    _write_model_realization(realization_path, workspace_write=workspace_write)
+    _write_model_realization(
+        realization_path,
+        workspace_write=workspace_write,
+        role_mcp=role_mcp,
+    )
     model_ref = load_model_realization_ref(
         realization_path,
         artifact_ref=(
@@ -1049,23 +1246,30 @@ def _fixture(
             sandbox_mode="workspace_write" if workspace_write else "read_only",
             approval_policy="never",
             allowed_effect_classes=(
-                ("read_only", "repo_mutation")
-                if workspace_write
-                else ("read_only",)
+                ("repo_mutation",) if workspace_write else ("read_only",)
             ),
             network_access="disabled",
         ),
         tool_profile=IncarnationToolProfile(
             profile_id=(
-                "abyss-stack:external_codex_agent/luna-landing-workspace-write-v1"
+                {
+                    "aoa_evals": "abyss-stack:external_codex_agent/eval-reader-v1",
+                    "aoa_stats": "abyss-stack:external_codex_agent/stats-reader-v1",
+                    "aoa_memo": "abyss-stack:external_codex_agent/memo-reader-v1",
+                }[role_mcp]
+                if role_mcp is not None
+                else "abyss-stack:external_codex_agent/bounded-repo-write-v1"
                 if workspace_write
-                else "abyss-stack:external_codex_agent/luna-landing-readonly-v1"
+                else "abyss-stack:external_codex_agent/bounded-source-readonly-v1"
             ),
             profile_ref=plan.runtime_profile.provenance,
             required_tool_ids=(
                 ("shell-read", "workspace-write")
                 if workspace_write
                 else ("shell-read",)
+            ),
+            required_mcp_server_ids=(
+                (role_mcp,) if role_mcp is not None else ()
             ),
         ),
         usage_metering=IncarnationUsageMetering(
@@ -1100,7 +1304,9 @@ def _fixture(
         "schema_version": "abyss_stack_external_codex_launch_v1",
         "launch_id": f"launch:fixture:{identity_suffix}",
         "session_id": session_id,
-        "admission_class": "transport_study_fixture",
+        "admission_class": (
+            "owner_contour" if owner_contour else "transport_study_fixture"
+        ),
         "plan": {"path": str(plan_path), "digest": _digest_path(plan_path)},
         "incarnation_binding": {
             "path": str(binding_path),
@@ -1120,6 +1326,28 @@ def _fixture(
             "path": str(REPORT_SCHEMA_PATH),
             "digest": _digest_path(REPORT_SCHEMA_PATH),
         },
+        **(
+            {
+                "owner_execution_request_schema": {
+                    "path": str(OWNER_EXECUTION_REQUEST_SCHEMA_PATH),
+                    "digest": _digest_path(OWNER_EXECUTION_REQUEST_SCHEMA_PATH),
+                    "owner_repo": "aoa-agents",
+                    "artifact_ref": "skills/aoa-summon/references/summon-request-v3.schema.json",
+                    "source_ref": "84321efcb463b44a3491bdc1bbe825bf576886e7",
+                    "schema_version": "summon-request-v3",
+                },
+                "task_local_dag_schema": {
+                    "path": str(TASK_LOCAL_DAG_SCHEMA_PATH),
+                    "digest": _digest_path(TASK_LOCAL_DAG_SCHEMA_PATH),
+                    "owner_repo": "aoa-skills",
+                    "artifact_ref": "schemas/task_local_dag_v2.schema.json",
+                    "source_ref": "6515f35dd89c7902830aeac305da312d258da6ba",
+                    "schema_version": "aoa-task-local-dag-v2",
+                },
+            }
+            if owner_contour
+            else {}
+        ),
         "workspace_path": str(workspace),
         "workspace_expected_head": head,
         "workspace_initial_posture": (
@@ -1133,6 +1361,115 @@ def _fixture(
     }
     launch_path = tmp_path / "launch.json"
     _write_json(launch_path, launch)
+    owner_execution_request_path: Path | None = None
+    if owner_contour:
+        assert obligation_ref is not None
+        assert dag_ref is not None
+        assert transfer_ref is not None
+        assert procedure_ref is not None
+        assert summon_decision_ref is not None
+
+        def content_ref(
+            provenance: ProvenanceRef,
+            *,
+            digest: str | None = None,
+            schema_version: str | None = None,
+            object_id: str | None = None,
+        ) -> dict[str, str]:
+            return {
+                "object_id": object_id or provenance.artifact_ref,
+                "owner_repo": provenance.owner_repo,
+                "schema_version": schema_version or provenance.schema_version,
+                "digest": digest or provenance.artifact_digest,
+            }
+
+        owner_execution_request = {
+            "quest_passport": {
+                "difficulty": "d2_slice",
+                "risk": "r1_repo_local" if workspace_write else "r0_readonly",
+                "control_mode": "codex_supervised",
+                "delegate_tier": "executor",
+                "route_anchor": parent_task_id,
+                "expected_artifacts": [
+                    "external_codex_agent_result",
+                    *task["expected_artifacts"],
+                ],
+                "self_agent": False,
+            },
+            "summon_request": {
+                "desired_role": role_id,
+                "child_agent_id": incarnation_id,
+                "transport_preference": "external_cli",
+                "parent_task_id": parent_task_id,
+                "session_ref": session_id,
+                "require_progression": False,
+            },
+            "expected_outputs": [
+                "external_codex_agent_result",
+                *task["expected_artifacts"],
+            ],
+            "intent": "execute",
+            "request_ref": f"task://fixture/{identity_suffix}/owner-execution-request",
+            "request_digest": ZERO_DIGEST,
+            "return_owner": "actor://fixture-goal-owner",
+            "child_scope": {
+                "task": task["objective"],
+                "allowed_tools": list(binding.tool_profile.required_tool_ids),
+                "allowed_effects": [task["allowed_effect_class"]],
+                "authority_limit": "No undelegated or external effect.",
+            },
+            "child_stop_line": "Stop before any undelegated or external effect.",
+            "child_inputs": [],
+            "external_incarnation": {
+                "obligation_ref": content_ref(obligation_ref),
+                "actor_mandate_ref": content_ref(role_ref),
+                "task_local_dag_ref": content_ref(dag_ref),
+                "incarnation_binding_ref": content_ref(
+                    binding.provenance,
+                    digest=_digest_path(binding_path),
+                    schema_version="aoa_agent_incarnation_binding_v1",
+                ),
+                "sdk_summon_request_ref": content_ref(summon_request_ref),
+                "sdk_summon_decision_ref": content_ref(summon_decision_ref),
+                "runtime_launch_ref": {
+                    "object_id": launch["launch_id"],
+                    "owner_repo": "abyss-stack",
+                    "schema_version": "abyss_stack_external_codex_launch_v1",
+                    "digest": _digest_path(launch_path),
+                },
+                "runtime_interface": "abyss_stack_external_codex_agent_v1",
+                "responsibility_transfer_ref": {
+                    **content_ref(transfer_ref),
+                    "admitted_state": "accepted",
+                    "holder_ids": [
+                        "actor://fixture-goal-owner",
+                        f"actor://fixture/{role_id}",
+                    ],
+                },
+                "domain_procedure_refs": [content_ref(procedure_ref)],
+                "continuity_ref": {
+                    "object_id": continuation_id,
+                    "owner_repo": "aoa-sdk",
+                    "schema_version": "continuation-obligation-v1",
+                    "digest": _digest_path(binding_path),
+                },
+                "return_event_schema_ref": {
+                    "object_id": (
+                        "mechanics/governed-execution/parts/external-codex-agent/"
+                        "schemas/external-codex-event.schema.json"
+                    ),
+                    "owner_repo": "abyss-stack",
+                    "schema_version": "abyss_stack_external_codex_event_v1",
+                    "digest": _digest_path(RUNTIME.EVENT_SCHEMA_PATH),
+                },
+                "launches_separate_os_process": True,
+                "uses_builtin_codex_subagents": False,
+                "separate_cli_session": True,
+                "usage_metering": "observe_only_no_budget",
+            },
+        }
+        owner_execution_request_path = tmp_path / "owner-execution-request.json"
+        _write_json(owner_execution_request_path, owner_execution_request)
     return {
         "runtime": RUNTIME.ExternalCodexRuntime(state_root or (tmp_path / "state")),
         "launch_path": launch_path,
@@ -1145,6 +1482,7 @@ def _fixture(
         "session_id": launch["session_id"],
         "task_id": task["task_id"],
         "summon_request_path": summon_request_path,
+        "owner_execution_request_path": owner_execution_request_path,
         "reviewer_role_path": reviewer_role_path,
         "reviewer_realization_path": reviewer_realization_path,
     }
@@ -1384,6 +1722,57 @@ def test_preflight_and_separate_process_return_structured_result(tmp_path: Path)
     assert json.loads(PROFILE_PATH.read_text())["boundaries"][
         "uses_builtin_codex_subagents"
     ] is False
+
+
+def test_role_scoped_mcp_requires_only_its_exact_credential(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        task_family="eval_application",
+        role_mcp="aoa_evals",
+    )
+    monkeypatch.delenv("AOA_EVALS_MCP_READ_BEARER_TOKEN", raising=False)
+    monkeypatch.setenv("AOA_STATS_MCP_READ_BEARER_TOKEN", "wrong-role-token")
+    monkeypatch.setenv("AOA_MEMO_MCP_READ_BEARER_TOKEN", "wrong-role-token")
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        fixture["runtime"].preflight(fixture["launch_path"])
+
+    assert exc_info.value.code == "mcp_credential_unavailable"
+
+
+def test_role_scoped_mcp_injects_only_selected_server_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        task_family="eval_application",
+        role_mcp="aoa_evals",
+    )
+    monkeypatch.setenv("AOA_EVALS_MCP_READ_BEARER_TOKEN", "eval-token")
+    monkeypatch.setenv("AOA_STATS_MCP_READ_BEARER_TOKEN", "stats-token")
+    monkeypatch.setenv("AOA_MEMO_MCP_READ_BEARER_TOKEN", "memo-token")
+
+    fixture["runtime"].start(fixture["launch_path"])
+    terminal = _wait_terminal(fixture["runtime"], fixture["session_id"])
+    assert terminal["status"] == "completed"
+    state = fixture["runtime"]._load_state(fixture["session_id"])
+    argv = state["attempts"][0]["codex_argv"]
+    rendered = "\n".join(argv)
+    assert "mcp_servers.aoa_evals=" in rendered
+    assert "AOA_EVALS_MCP_READ_BEARER_TOKEN" in rendered
+    assert "aoa_stats" not in rendered
+    assert "aoa_memo" not in rendered
+    assert "eval-token" not in rendered
+
+
+def test_runtime_tool_profile_ids_are_model_neutral() -> None:
+    profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+    profile_ids = [item["profile_id"] for item in profile["tool_profiles"]]
+    assert all("luna" not in item and "sol" not in item for item in profile_ids)
 
 
 def test_run_to_terminal_keeps_caller_until_terminal_receipt(tmp_path: Path) -> None:
@@ -1673,6 +2062,138 @@ def test_owner_contour_requires_separate_semantic_admission(tmp_path: Path) -> N
         fixture["runtime"].preflight(fixture["launch_path"])
 
     assert exc_info.value.code == "owner_contour_admission_unbound"
+
+
+@pytest.mark.skipif(
+    not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
+    or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file(),
+    reason="paired owner-contour proof requires aoa-agents and aoa-skills source roots",
+)
+def test_neutral_binder_reproduces_exact_owner_contour_launch(tmp_path: Path) -> None:
+    fixture = _fixture(tmp_path / "fixture", owner_contour=True)
+    launch = fixture["launch"]
+    manifest = {
+        "schema_version": "abyss_stack_external_actor_launch_manifest_v1",
+        "launch_id": launch["launch_id"],
+        "session_id": launch["session_id"],
+        "artifacts": {
+            key: launch[key]["path"]
+            for key in BINDER.COORDINATE_KEYS
+        },
+        "owner_contract_paths": {
+            "owner_execution_request_schema": launch[
+                "owner_execution_request_schema"
+            ]["path"],
+            "task_local_dag_schema": launch["task_local_dag_schema"]["path"],
+        },
+        "workspace_path": launch["workspace_path"],
+        "workspace_initial_posture": launch["workspace_initial_posture"],
+        "workspace_manifest_input_id": launch["workspace_manifest_input_id"],
+        "codex_executable": launch["codex_executable"],
+        "codex_home": launch["codex_home"],
+        "environment_allowlist": launch["environment_allowlist"],
+    }
+    manifest_path = tmp_path / "launch-manifest.json"
+    output_path = tmp_path / "bound-launch.json"
+    _write_json(manifest_path, manifest)
+
+    response = BINDER.bind(manifest_path, output_path)
+
+    assert response["bound"] is True
+    assert response["started"] is False
+    assert response["next_route"] == (
+        "aoa-agents:aoa-summon/form-owner-execution-request"
+    )
+    assert json.loads(output_path.read_text(encoding="utf-8")) == launch
+    assert response["launch_ref"]["digest"] == _digest_path(output_path)
+
+
+@pytest.mark.skipif(
+    not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
+    or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file(),
+    reason="paired owner-contour proof requires aoa-agents and aoa-skills source roots",
+)
+def test_owner_contour_admits_exact_role_first_request_and_runs_separate_process(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True)
+    owner_request_path = fixture["owner_execution_request_path"]
+    assert owner_request_path is not None
+
+    preflight = fixture["runtime"].preflight(
+        fixture["launch_path"],
+        owner_request_path=owner_request_path,
+    )
+    assert preflight["admitted"] is True
+    assert preflight["admission_class"] == "owner_contour"
+    assert preflight["owner_admission_digest"] == _digest_path(owner_request_path)
+
+    started = fixture["runtime"].start(
+        fixture["launch_path"],
+        owner_request_path=owner_request_path,
+    )
+    terminal = _wait_terminal(fixture["runtime"], started["session_id"])
+    assert terminal["status"] == "completed"
+    result = fixture["runtime"].result(started["session_id"])
+    assert result["admission_class"] == "owner_contour"
+    assert result["owner_admission_ref"]["artifact_digest"] == _digest_path(
+        owner_request_path
+    )
+    assert result["usage"]["input_tokens"] == 120
+
+
+@pytest.mark.skipif(
+    not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
+    or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file(),
+    reason="paired owner-contour proof requires aoa-agents and aoa-skills source roots",
+)
+def test_owner_contour_rejects_request_that_changes_responsibility_holders(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True)
+    owner_request_path = fixture["owner_execution_request_path"]
+    assert owner_request_path is not None
+    request = json.loads(owner_request_path.read_text(encoding="utf-8"))
+    request["external_incarnation"]["responsibility_transfer_ref"]["holder_ids"] = [
+        "actor://fixture-goal-owner",
+        "actor://different-holder",
+    ]
+    _write_json(owner_request_path, request)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        fixture["runtime"].preflight(
+            fixture["launch_path"],
+            owner_request_path=owner_request_path,
+        )
+
+    assert exc_info.value.code == "responsibility_transfer_content_mismatch"
+
+
+@pytest.mark.skipif(
+    not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
+    or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file(),
+    reason="paired owner-contour proof requires aoa-agents and aoa-skills source roots",
+)
+def test_owner_contour_rejects_internally_inconsistent_transfer(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        responsibility_transfer_mutator=lambda value: value.update(
+            {"obligation_ref": "obligation:unrelated"}
+        ),
+    )
+    owner_request_path = fixture["owner_execution_request_path"]
+    assert owner_request_path is not None
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        fixture["runtime"].preflight(
+            fixture["launch_path"],
+            owner_request_path=owner_request_path,
+        )
+
+    assert exc_info.value.code == "responsibility_transfer_content_mismatch"
 
 
 def test_durable_state_requires_exact_workspace_manifest(tmp_path: Path) -> None:

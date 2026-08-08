@@ -7,6 +7,8 @@ meaning into `abyss-stack`:
 |---|---|---|
 | `RunPlan` and `AgentIncarnationBinding` | `aoa-sdk` | validate plan, role/task participation, permission/continuation boundaries, and observe-only usage metering |
 | role contract | `aoa-agents` | deliver the exact bounded role text |
+| owner execution request, obligation, mandate, responsibility transfer, and domain procedure refs | `aoa-agents` and domain owners | admit the external incarnation only after responsibility has actually moved |
+| task-local DAG | `aoa-skills` | prove the actor node is ready and remains a non-authoritative local projection of the goal |
 | model realization | `aoa-models` | select only the caller-named model/effort/configuration |
 | runtime/tool profile | `abyss-stack` | constrain Codex argv, tools, sandbox, network and effects |
 | task and workspace sources | target/request owners | bind objective, transition, mutation/artifact paths, distinct source-evidence paths, and immutable inputs |
@@ -21,6 +23,11 @@ runtime-owned root. The model realization and binding continue to describe the
 semantic target-workspace posture as `read-only`; the runtime profile records
 the implementation projection without converting it into task mutation
 authority or `allowed_paths`.
+
+The neutral binder consumes already selected coordinates and writes only the
+runtime launch. Its response explicitly returns to `aoa-agents` to form the
+separate owner execution request; it cannot choose the obligation, role,
+model, domain procedure, or responsibility holder.
 
 The live Codex bundled model catalog and executable digest are currentness
 checks, not replacements for `aoa-models`. Runtime receipts are execution
@@ -73,10 +80,11 @@ reviewer scripts remain trial provenance, not the source contract for future
 candidates.
 
 Machine-local deployment preserves this split by copying exact runtime-owner
-files, the exact SDK package, and the exact SDK incarnation/summon schemas into separate release subtrees under one
+files, the exact SDK package, the exact SDK incarnation/summon schemas, and the
+pinned `aoa-agents`/`aoa-skills` owner schemas into separate release subtrees under one
 content-addressed manifest. The release identity is a canonical digest over
 every delivered path, size, and byte digest. The active receipt additionally
-records both Git HEADs, dirty postures, status digests, Python executable, and
+records all four Git HEADs and dirty postures, status digests, Python executable, and
 the prior active release. This proves which local bytes a wrapper can execute;
 it does not turn dirty source into a landed SDK/runtime release or substitute
 for remote CI.

@@ -323,6 +323,7 @@
 ## review
 
 - [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md`)
 
 ## runtime
 
@@ -330,6 +331,7 @@
 - [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
 - [ABYSS-STACK-D-0104 Bind KAG Owner Coverage to the Admitted Bundle](../ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md) (`docs/decisions/ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md`)
 - [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md`)
 
 ## runtime access plane
 
@@ -365,6 +367,7 @@
 - [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
 - [ABYSS-STACK-D-0104 Bind KAG Owner Coverage to the Admitted Bundle](../ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md) (`docs/decisions/ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md`)
 - [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md`)
 
 ## source validation
 

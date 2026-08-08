@@ -25,6 +25,7 @@ DEFAULT_RUNTIME_ROOT = Path(
 )
 DEFAULT_BIN_DIR = Path.home() / ".local/bin"
 RUNTIME_FILES = (
+    "bind_external_actor_launch.py",
     "external_codex_agent.py",
     "external_codex_supervisor.py",
     "prepare_landing_study.py",
@@ -34,6 +35,13 @@ SDK_CONTRACT_FILES = (
     "mechanics/boundary-bridge/parts/agent-incarnation-binding/schemas/agent-incarnation-binding.schema.json",
     "mechanics/checkpoint/parts/child-task-reentry/schemas/summon-request-v4.schema.json",
     "mechanics/checkpoint/parts/child-task-reentry/schemas/summon-result-v4.schema.json",
+)
+OWNER_CONTRACT_FILES = (
+    (
+        "aoa-agents",
+        "skills/aoa-summon/references/summon-request-v3.schema.json",
+    ),
+    ("aoa-skills", "schemas/task_local_dag_v2.schema.json"),
 )
 
 
@@ -101,7 +109,12 @@ def git_posture(root: Path) -> dict[str, object]:
     }
 
 
-def source_files(source_root: Path, sdk_root: Path) -> list[tuple[Path, Path]]:
+def source_files(
+    source_root: Path,
+    sdk_root: Path,
+    agents_root: Path,
+    skills_root: Path,
+) -> list[tuple[Path, Path]]:
     part = source_root / "mechanics/governed-execution/parts/external-codex-agent"
     rows: list[tuple[Path, Path]] = []
     for name in RUNTIME_FILES:
@@ -131,6 +144,13 @@ def source_files(source_root: Path, sdk_root: Path) -> list[tuple[Path, Path]]:
     for relative in SDK_CONTRACT_FILES:
         src = require_regular_file(sdk_root / relative, f"aoa_sdk contract {relative}")
         rows.append((src, Path("sdk") / relative))
+    owner_roots = {"aoa-agents": agents_root, "aoa-skills": skills_root}
+    for owner, relative in OWNER_CONTRACT_FILES:
+        src = require_regular_file(
+            owner_roots[owner] / relative,
+            f"{owner} contract {relative}",
+        )
+        rows.append((src, Path("owners") / owner / relative))
     return rows
 
 
@@ -189,6 +209,7 @@ def release_manifest(files: Iterable[tuple[Path, Path]]) -> dict[str, object]:
     ]
     entrypoints = {
         "agent-entrypoint.py": entrypoint_text("external_codex_agent.py"),
+        "bind-entrypoint.py": entrypoint_text("bind_external_actor_launch.py"),
         "study-entrypoint.py": entrypoint_text("prepare_landing_study.py"),
     }
     for path, text in entrypoints.items():
@@ -263,6 +284,7 @@ def materialize_release(
             os.chmod(target, 0o444)
         for name, target in (
             ("agent-entrypoint.py", "external_codex_agent.py"),
+            ("bind-entrypoint.py", "bind_external_actor_launch.py"),
             ("study-entrypoint.py", "prepare_landing_study.py"),
         ):
             path = staging / name
@@ -299,26 +321,42 @@ def backup_existing_wrapper(path: Path, runtime_root: Path) -> str | None:
 def install(
     source_root: Path,
     sdk_root: Path,
+    agents_root: Path,
+    skills_root: Path,
     runtime_root: Path,
     bin_dir: Path,
     python_executable: Path,
     *,
     allow_dirty_source: bool,
     allow_dirty_sdk: bool,
+    allow_dirty_agents: bool,
+    allow_dirty_skills: bool,
 ) -> dict[str, object]:
     source_root = require_absolute_directory(source_root, "abyss-stack source root")
     sdk_root = require_absolute_directory(sdk_root, "aoa-sdk source root")
+    agents_root = require_absolute_directory(agents_root, "aoa-agents source root")
+    skills_root = require_absolute_directory(skills_root, "aoa-skills source root")
     runtime_root = runtime_root.resolve()
     bin_dir = bin_dir.resolve()
     python_executable = require_regular_file(python_executable.resolve(), "Python executable")
     source_posture = git_posture(source_root)
     sdk_posture = git_posture(sdk_root)
+    agents_posture = git_posture(agents_root)
+    skills_posture = git_posture(skills_root)
     if source_posture["dirty"] and not allow_dirty_source:
         raise InstallError("abyss-stack source is dirty; pass --allow-dirty-source explicitly")
     if sdk_posture["dirty"] and not allow_dirty_sdk:
         raise InstallError("aoa-sdk source is dirty; pass --allow-dirty-sdk explicitly")
+    if agents_posture["dirty"] and not allow_dirty_agents:
+        raise InstallError(
+            "aoa-agents source is dirty; pass --allow-dirty-agents explicitly"
+        )
+    if skills_posture["dirty"] and not allow_dirty_skills:
+        raise InstallError(
+            "aoa-skills source is dirty; pass --allow-dirty-skills explicitly"
+        )
 
-    files = source_files(source_root, sdk_root)
+    files = source_files(source_root, sdk_root, agents_root, skills_root)
     manifest = release_manifest(files)
     release_root, created = materialize_release(files, manifest, runtime_root / "releases")
     previous_active = None
@@ -330,6 +368,7 @@ def install(
     wrapper_backups: dict[str, str | None] = {}
     wrappers = {
         "aoa-external-codex-agent": "agent-entrypoint.py",
+        "aoa-external-actor-bind": "bind-entrypoint.py",
         "aoa-external-codex-study": "study-entrypoint.py",
     }
     for name, entrypoint in wrappers.items():
@@ -350,9 +389,16 @@ def install(
         "python_executable": str(python_executable),
         "source": source_posture,
         "sdk": sdk_posture,
+        "agents": agents_posture,
+        "skills": skills_posture,
         "installed_at": now,
         "previous_release_id": previous_active.get("release_id") if previous_active else None,
-        "nonproduction_dirty_source": bool(source_posture["dirty"] or sdk_posture["dirty"]),
+        "nonproduction_dirty_source": bool(
+            source_posture["dirty"]
+            or sdk_posture["dirty"]
+            or agents_posture["dirty"]
+            or skills_posture["dirty"]
+        ),
     }
     atomic_write(
         active_path,
@@ -373,7 +419,7 @@ def install(
                 "external-codex-agent/install_external_codex_runtime.py activate "
                 f"--runtime-root {runtime_root} --bin-dir {bin_dir} "
                 f"--release-id {previous_active.get('release_id')}"
-            ) if previous_active else "Remove the two newly created wrappers and active.json after operator review; the immutable release may be retained.",
+            ) if previous_active else "Remove the three newly created wrappers and active.json after operator review; the immutable release may be retained.",
         },
     }
     receipts = runtime_root / "receipts"
@@ -400,6 +446,7 @@ def activate(
     previous = json.loads(active_path.read_text(encoding="utf-8")) if active_path.exists() else None
     for name, entrypoint in {
         "aoa-external-codex-agent": "agent-entrypoint.py",
+        "aoa-external-actor-bind": "bind-entrypoint.py",
         "aoa-external-codex-study": "study-entrypoint.py",
     }.items():
         atomic_write(
@@ -443,6 +490,7 @@ def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
     wrapper_status = {}
     for name, entrypoint in {
         "aoa-external-codex-agent": "agent-entrypoint.py",
+        "aoa-external-actor-bind": "bind-entrypoint.py",
         "aoa-external-codex-study": "study-entrypoint.py",
     }.items():
         path = require_regular_file(bin_dir.resolve() / name, f"wrapper {name}")
@@ -470,11 +518,15 @@ def parser() -> argparse.ArgumentParser:
     install_parser = subparsers.add_parser("install")
     install_parser.add_argument("--source-root", type=Path, required=True)
     install_parser.add_argument("--sdk-root", type=Path, required=True)
+    install_parser.add_argument("--agents-root", type=Path, required=True)
+    install_parser.add_argument("--skills-root", type=Path, required=True)
     install_parser.add_argument("--runtime-root", type=Path, default=DEFAULT_RUNTIME_ROOT)
     install_parser.add_argument("--bin-dir", type=Path, default=DEFAULT_BIN_DIR)
     install_parser.add_argument("--python", type=Path, default=Path(sys.executable))
     install_parser.add_argument("--allow-dirty-source", action="store_true")
     install_parser.add_argument("--allow-dirty-sdk", action="store_true")
+    install_parser.add_argument("--allow-dirty-agents", action="store_true")
+    install_parser.add_argument("--allow-dirty-skills", action="store_true")
     status_parser = subparsers.add_parser("status")
     status_parser.add_argument("--runtime-root", type=Path, default=DEFAULT_RUNTIME_ROOT)
     status_parser.add_argument("--bin-dir", type=Path, default=DEFAULT_BIN_DIR)
@@ -493,11 +545,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             payload = install(
                 args.source_root,
                 args.sdk_root,
+                args.agents_root,
+                args.skills_root,
                 args.runtime_root,
                 args.bin_dir,
                 args.python,
                 allow_dirty_source=args.allow_dirty_source,
                 allow_dirty_sdk=args.allow_dirty_sdk,
+                allow_dirty_agents=args.allow_dirty_agents,
+                allow_dirty_skills=args.allow_dirty_skills,
             )
         elif args.command == "activate":
             payload = activate(args.runtime_root, args.bin_dir, args.release_id, args.python)

@@ -6,11 +6,13 @@ built-in subagent transport, a TUI-injection layer, a model router, or an
 authority for role meaning, model fit, eval verdicts, owner acceptance, or
 landing effects.
 
-The first admitted family is deliberately narrow: landing readiness,
-preparation, independent review, closeout, and ambiguity-stop work. Exact
-`gpt-5.6-luna` max/xhigh and a `gpt-5.6-sol` max comparison baseline may enter
-only through owner-qualified `aoa-models` realizations and a post-compile
-`aoa-sdk` `AgentIncarnationBinding`.
+The production-shaped admission is role-first and task-family neutral. A goal
+first produces an independently owned obligation and `aoa-agents` mandate;
+only then may `aoa-models` supply a current realization and `aoa-sdk` bind its
+tools, effects, continuation, wake policy, and execution posture. Eval, stats,
+memo, and landing are initial useful obligations, not runtime-owned families.
+Today an exact `gpt-5.6-luna` max/xhigh realization may satisfy some of those
+roles, but no stable command or profile is named after Luna.
 
 The controller:
 
@@ -23,7 +25,8 @@ The controller:
   runtime constraint;
 - launches `codex exec --json` in a distinct process with user config and exec
   rules ignored, `multi_agent` disabled, explicit sandbox/approval/cwd/model
-  settings, no inherited MCP servers, no network in the admitted tool profiles,
+  settings, no inherited MCP servers, only the exact role-profile MCP when one
+  is required, no model-shell network in the admitted tool profiles,
   and a structured final-output schema whose session-local derivative fixes the
   exact task and incarnation identities before inference;
 - persists normalized events, exact thread identity, attempts, PIDs/start
@@ -68,8 +71,10 @@ The controller:
   `submit_for_review` handoff from a reviewer's `return_for_repair` verdict,
   binds each negative review to a separate task-owned outcome status,
   binds model re-entry to the status-selected wake condition, admits only
-  genuinely produced workspace artifacts, and rejects unbound `owner_contour`
-  labels;
+  genuinely produced workspace artifacts, and admits `owner_contour` only with
+  a separate exact `aoa-agents` execution request, ready task-local DAG,
+  accepted responsibility transfer, domain procedure refs, and pinned owner
+  schemas;
 - exports an A2A-compatible child result only after a different incarnation
   and different Codex thread reviewed the exact writer runtime result, and
   only when the supplied writer summon request matches the admitted immutable
@@ -86,8 +91,17 @@ work: the result marks `usage_observation.status=partial` and retains the exact
 attempt/reason/event gap. A later exact-thread continuation adds newly observed
 usage but does not fabricate the missing interrupted-attempt tokens.
 
-`prepare_landing_study.py prepare-reviewer` is the canonical non-starting
-review preparation path. It accepts an exact terminal read-only or bounded
+`aoa-external-actor-bind` is the normal non-starting physical binding leaf. It
+accepts already selected owner/SDK/model/runtime artifact paths, verifies the
+runtime-profile-pinned owner schema bytes, hashes the workspace, Codex binary,
+and every coordinate, writes one immutable `owner_contour` launch, and returns
+control to `aoa-agents`. It does not detect an obligation, choose a role or
+model, form the owner execution request, or start the actor. `aoa-summon` then
+forms the separate semantic request and calls `preflight`, `start`, or
+`run-to-terminal` with both exact paths.
+
+`prepare_landing_study.py prepare-reviewer` remains the canonical non-starting
+transport-study review preparation path. It accepts an exact terminal read-only or bounded
 repo-mutation writer, verifies the runtime-owned final workspace manifest,
 forwards every original immutable input under the same stable ID, and adds the
 exact result, report, and a distinct post-writer manifest. A mutation writer
@@ -114,25 +128,29 @@ or net benefit.
 ## Machine-local installation
 
 `install_external_codex_runtime.py` installs exact runtime bytes, the
-`aoa_sdk` Python package, and the SDK-owned incarnation plus summon v4 schema
-closure as one immutable content-addressed release below
+`aoa_sdk` Python package, SDK-owned incarnation plus summon v4 schemas, and the
+pinned `aoa-agents` execution-request plus `aoa-skills` task-local-DAG schemas
+as one immutable content-addressed release below
 `/srv/abyss-machine/runtimes/abyss-stack/external-codex-agent/releases/`.
-It atomically updates a regular-file `active.json` receipt and two stable
+It atomically updates a regular-file `active.json` receipt and three stable
 non-symlink wrappers in `~/.local/bin`:
 
 - `aoa-external-codex-agent` for the runtime controller;
+- `aoa-external-actor-bind` for model-neutral launch binding;
 - `aoa-external-codex-study` for the canonical study preparer.
 
 Each wrapper launches Python in isolated mode through a release-local
 entrypoint that inserts only the packaged SDK source before entering the
 runtime. The packaged SDK subtree is also a valid `--aoa-sdk-root` for study
 preparation because it carries the exact non-Python contracts consumed there.
-`status` re-hashes every released file and verifies both wrappers.
+`status` re-hashes every released file and verifies all three wrappers.
 `activate --release-id ...` provides release rollback without deleting later
-releases. Dirty worktree installation is rejected unless both dirty source
-postures are explicitly admitted; such an active receipt is marked
+releases. Dirty worktree installation is rejected unless every dirty source
+posture is explicitly admitted; such an active receipt is marked
 `nonproduction_dirty_source=true` and is machine-local evidence, not a landed
-or remotely reproducible release.
+or remotely reproducible release. Installation requires clean exact
+`abyss-stack`, `aoa-sdk`, `aoa-agents`, and `aoa-skills` source roots unless
+each dirty posture is admitted explicitly.
 
 See [CONTRACT.md](CONTRACT.md), [DIRECTION.md](DIRECTION.md),
 [PROVENANCE.md](PROVENANCE.md), [SUSPENSION.md](SUSPENSION.md), and

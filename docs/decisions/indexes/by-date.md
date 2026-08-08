@@ -205,3 +205,4 @@
 ## 2026-08-08
 
 - [ABYSS-STACK-D-0107 Fail Closed MCP Admission Maintenance](../ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md) (`docs/decisions/ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md`)
+- [ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md`)

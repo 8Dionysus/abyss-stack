@@ -30,8 +30,10 @@ Production callers bind an installed compatible `aoa-sdk` explicitly:
 shebang is not proof of the SDK ABI used in production.
 
 The machine-local installed contour instead uses one content-addressed release
-containing the exact controller, supervisor, preparer, schemas, runtime
-profile, `aoa_sdk` package, and SDK-owned incarnation/summon schema closure.
+containing the exact controller, neutral launch binder, supervisor, study
+preparer, schemas, runtime profile, `aoa_sdk` package, SDK-owned
+incarnation/summon schema closure, and the runtime-profile-pinned
+`aoa-agents` owner execution request plus `aoa-skills` task-local DAG schemas.
 The packaged SDK root must therefore satisfy both isolated imports and the
 preparer's exact non-Python contract reads. Stable wrappers consult a regular-file active
 receipt and execute a release-local bootstrap with Python isolated mode; they
@@ -43,6 +45,8 @@ releases.
 
 Operations are:
 
+- `aoa-external-actor-bind --manifest <absolute json> --output <absolute launch>`
+  binds already owner-selected artifacts and starts nothing;
 - `preflight --launch <absolute launch.json>`;
 - `start --launch <absolute launch.json>`;
 - `run-to-terminal --launch <absolute launch.json>`;
@@ -76,7 +80,7 @@ Before launch the controller verifies:
    identities match across their owner objects;
 4. task correlation, continuation, and expected incarnation IDs match the
    binding without relying on filenames;
-5. the model realization names Codex CLI `0.146.0`, ChatGPT quota/login,
+5. the model realization names Codex CLI `0.147.0`, ChatGPT quota/login,
    `exec-jsonl`, one admitted model/effort, and the exact runtime tool profile;
 6. the resolved Codex executable digest, reported version, auth status, and
    bundled live model catalog match the binding;
@@ -91,9 +95,13 @@ Before launch the controller verifies:
    exact fixed command sequence with a non-empty evidence reference for every
    passed, failed, or skipped claim; each claimed status must equal the final
    runtime-observed exit state of an exact argv execution;
-11. the initial admission is explicitly `transport_study_fixture`.
-    `owner_contour` remains schema-visible but fails closed until a separate
-    owner-semantic admission signal exists.
+11. `transport_study_fixture` is admitted only as bounded compatibility
+    evidence. `owner_contour` additionally requires a separate exact
+    `aoa-agents` `summon-request-v3`, validated against its runtime-profile-
+    pinned owner bytes, whose obligation, mandate, ready task-local DAG,
+    accepted responsibility transfer, domain procedure refs, child scope,
+    external-process/session posture, and observe-only usage semantics match
+    the launch and continuation exactly.
 
 The two request-shaped objects are intentionally not collapsed. The
 `AgentIncarnationBinding.task_request_ref` is the canonical schema-valid SDK
@@ -105,7 +113,7 @@ exact SDK schema as immutable inputs. This preserves SDK transport meaning
 without asking the generic summon schema to own runtime paths, validation
 commands, permission scope, stop policy, or return-owner meaning.
 
-The preparer does not hard-code a Sol/Luna sequence. It accepts only the
+The study preparer does not hard-code a Sol/Luna sequence. It accepts only the
 non-empty unique arm order fixed by the exact `aoa-models` study and requires
 the delivered realization list to match that order exactly.
 
@@ -133,8 +141,13 @@ sandbox, `--ignore-user-config`, `--ignore-rules`, `--strict-config`, and
 environment; secret-shaped variable names are excluded again from the Codex
 shell environment. No TUI or built-in `spawn_agent` surface participates.
 
-Initial semantic profiles admit only `read-only` or bounded `workspace-write`
-with network disabled. For `read-only`, the runtime does not make the target
+Semantic profiles admit only `read-only` or bounded `workspace-write` target
+authority with model-shell network disabled. A role-scoped read profile may
+configure exactly one loopback AoA MCP (`aoa_evals`, `aoa_stats`, or
+`aoa_memo`) from its own required bearer-token environment variable. The
+token is passed to the Codex MCP client configuration but excluded from the
+model shell; ambient MCPs and the other role servers remain absent. For
+`read-only`, the runtime does not make the target
 checkout the Codex writable root. It creates a distinct attempt-local execution
 root, launches Codex's internal `workspace-write` sandbox there, and sets
 `TMPDIR` to the sibling attempt-local scratch directory. The target checkout is
@@ -255,7 +268,7 @@ closed.
 
 The terminal decision names the direction of the handoff rather than collapsing
 writer and reviewer authority. A non-review writer at the mandatory review gate
-returns `review_required/submit_for_review`. Only a `landing_review` reviewer
+returns `review_required/submit_for_review`. Only an `independent_review` posture
 that confirms a blocker may return `review_required/return_for_repair`. Other
 terminal execution failures use `failed/stop`; their residual and re-entry
 fields may describe a repair route without changing reviewer authority.
@@ -277,7 +290,7 @@ match exactly. This prevents a continued result from erasing the checkpoint,
 interruption, or review receipt that justified re-entry.
 
 A failed session is not generally resumable. The sole initial exception is an
-explicit `review_followup` for a read-only `landing_review` rejected only as
+explicit `review_followup` for a read-only `independent_review` incarnation rejected only as
 `model_report_identity_mismatch`, with no changed paths and an exact matching
 final workspace manifest. The request must also bind the prior `result.json`
 digest, session, thread, and event cursor. Before continuing the same Codex

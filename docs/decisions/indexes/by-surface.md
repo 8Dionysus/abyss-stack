@@ -248,6 +248,10 @@
 
 - [ABYSS-STACK-D-0061 Active Topology Language Validator Module](../ABYSS-STACK-D-0061-active-topology-language-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0061-active-topology-language-validator-module.md`)
 
+## actor admission
+
+- [ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md`)
+
 ## agent guidance
 
 - [ABYSS-STACK-D-0055 Root Routes Validator Module](../ABYSS-STACK-D-0055-root-routes-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0055-root-routes-validator-module.md`)
@@ -451,6 +455,10 @@
 
 - [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
 
+## model-neutral invocation
+
+- [ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md`)
+
 ## operational evidence
 
 - [ABYSS-STACK-D-0107 Fail Closed MCP Admission Maintenance](../ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md) (`docs/decisions/ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md`)
@@ -506,6 +514,10 @@
 
 - [ABYSS-STACK-D-0044 Sync Parity Validator Module](../ABYSS-STACK-D-0044-sync-parity-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0044-sync-parity-validator-module.md`)
 
+## responsibility transfer
+
+- [ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md`)
+
 ## retrieval eval
 
 - [ABYSS-STACK-D-0104 Bind KAG Owner Coverage to the Admitted Bundle](../ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md) (`docs/decisions/ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md`)
@@ -525,6 +537,7 @@
 ## runtime boundary
 
 - [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md`)
 
 ## runtime contract
 

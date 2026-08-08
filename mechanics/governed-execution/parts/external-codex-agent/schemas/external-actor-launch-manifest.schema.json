@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-actor-launch-manifest.schema.json",
+  "title": "Non-semantic input manifest for one owner-contour launch binding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "launch_id", "session_id", "artifacts", "owner_contract_paths", "workspace_path", "workspace_initial_posture", "workspace_manifest_input_id", "codex_executable", "codex_home", "environment_allowlist"],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_external_actor_launch_manifest_v1"},
+    "launch_id": {"type": "string", "minLength": 1},
+    "session_id": {"type": "string", "minLength": 1},
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan", "incarnation_binding", "model_realization", "task", "runtime_profile", "role_contract", "result_schema"],
+      "properties": {
+        "plan": {"$ref": "#/$defs/path"},
+        "incarnation_binding": {"$ref": "#/$defs/path"},
+        "model_realization": {"$ref": "#/$defs/path"},
+        "task": {"$ref": "#/$defs/path"},
+        "runtime_profile": {"$ref": "#/$defs/path"},
+        "role_contract": {"$ref": "#/$defs/path"},
+        "result_schema": {"$ref": "#/$defs/path"}
+      }
+    },
+    "owner_contract_paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_execution_request_schema", "task_local_dag_schema"],
+      "properties": {
+        "owner_execution_request_schema": {"$ref": "#/$defs/path"},
+        "task_local_dag_schema": {"$ref": "#/$defs/path"}
+      }
+    },
+    "workspace_path": {"$ref": "#/$defs/path"},
+    "workspace_initial_posture": {"enum": ["clean_required", "exact_baseline"]},
+    "workspace_manifest_input_id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "maxLength": 96},
+    "codex_executable": {"$ref": "#/$defs/path"},
+    "codex_home": {"$ref": "#/$defs/path"},
+    "environment_allowlist": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["HOME", "LANG", "LC_ALL", "PATH", "SSL_CERT_FILE", "SSL_CERT_DIR", "TERM"]}}
+  },
+  "$defs": {
+    "path": {"type": "string", "pattern": "^/"}
+  }
+}

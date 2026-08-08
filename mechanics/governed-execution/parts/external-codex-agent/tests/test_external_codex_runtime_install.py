@@ -35,16 +35,24 @@ def commit_all(path: Path) -> None:
     git("commit", "-qm", "fixture", cwd=path)
 
 
-def make_sources(tmp_path: Path) -> tuple[Path, Path]:
+def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
     source = tmp_path / "abyss-stack"
     sdk = tmp_path / "aoa-sdk"
+    agents = tmp_path / "aoa-agents"
+    skills = tmp_path / "aoa-skills"
     make_repo(source)
     make_repo(sdk)
+    make_repo(agents)
+    make_repo(skills)
     part = source / "mechanics/governed-execution/parts/external-codex-agent"
     schemas = part / "schemas"
     schemas.mkdir(parents=True)
     (part / "external_codex_agent.py").write_text(
         "import aoa_sdk\nprint('agent:' + aoa_sdk.MARKER)\n",
+        encoding="utf-8",
+    )
+    (part / "bind_external_actor_launch.py").write_text(
+        "import aoa_sdk\nprint('bind:' + aoa_sdk.MARKER)\n",
         encoding="utf-8",
     )
     (part / "prepare_landing_study.py").write_text(
@@ -63,24 +71,35 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path]:
         contract = sdk / relative
         contract.parent.mkdir(parents=True, exist_ok=True)
         contract.write_text("{}\n", encoding="utf-8")
+    owner_roots = {"aoa-agents": agents, "aoa-skills": skills}
+    for owner, relative in runtime_install.OWNER_CONTRACT_FILES:
+        contract = owner_roots[owner] / relative
+        contract.parent.mkdir(parents=True, exist_ok=True)
+        contract.write_text("{}\n", encoding="utf-8")
     commit_all(source)
     commit_all(sdk)
-    return source, sdk
+    commit_all(agents)
+    commit_all(skills)
+    return source, sdk, agents, skills
 
 
 def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> None:
-    source, sdk = make_sources(tmp_path)
+    source, sdk, agents, skills = make_sources(tmp_path)
     runtime_root = tmp_path / "runtime"
     bin_dir = tmp_path / "bin"
 
     receipt = runtime_install.install(
         source,
         sdk,
+        agents,
+        skills,
         runtime_root,
         bin_dir,
         Path(sys.executable),
         allow_dirty_source=False,
         allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
     )
 
     active = receipt["active"]
@@ -91,6 +110,8 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
     assert runtime_install.status(runtime_root, bin_dir)["healthy"] is True
     for relative in runtime_install.SDK_CONTRACT_FILES:
         assert (release_root / "sdk" / relative).is_file()
+    for owner, relative in runtime_install.OWNER_CONTRACT_FILES:
+        assert (release_root / "owners" / owner / relative).is_file()
     completed = subprocess.run(
         [str(bin_dir / "aoa-external-codex-agent")],
         check=True,
@@ -98,6 +119,13 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
         text=True,
     )
     assert completed.stdout == "agent:exact-sdk\n"
+    bound = subprocess.run(
+        [str(bin_dir / "aoa-external-actor-bind")],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert bound.stdout == "bind:exact-sdk\n"
     study = subprocess.run(
         [str(bin_dir / "aoa-external-codex-study")],
         check=True,
@@ -109,28 +137,36 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
     repeated = runtime_install.install(
         source,
         sdk,
+        agents,
+        skills,
         runtime_root,
         bin_dir,
         Path(sys.executable),
         allow_dirty_source=False,
         allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
     )
     assert repeated["release_created"] is False
     assert repeated["active"]["release_id"] == active["release_id"]
 
 
 def test_dirty_source_requires_explicit_admission_and_preserves_rollback(tmp_path: Path) -> None:
-    source, sdk = make_sources(tmp_path)
+    source, sdk, agents, skills = make_sources(tmp_path)
     runtime_root = tmp_path / "runtime"
     bin_dir = tmp_path / "bin"
     first = runtime_install.install(
         source,
         sdk,
+        agents,
+        skills,
         runtime_root,
         bin_dir,
         Path(sys.executable),
         allow_dirty_source=False,
         allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
     )
     controller = (
         source
@@ -142,21 +178,29 @@ def test_dirty_source_requires_explicit_admission_and_preserves_rollback(tmp_pat
         runtime_install.install(
             source,
             sdk,
+            agents,
+            skills,
             runtime_root,
             bin_dir,
             Path(sys.executable),
             allow_dirty_source=False,
             allow_dirty_sdk=False,
+            allow_dirty_agents=False,
+            allow_dirty_skills=False,
         )
 
     second = runtime_install.install(
         source,
         sdk,
+        agents,
+        skills,
         runtime_root,
         bin_dir,
         Path(sys.executable),
         allow_dirty_source=True,
         allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
     )
     assert second["active"]["nonproduction_dirty_source"] is True
     assert second["active"]["previous_release_id"] == first["active"]["release_id"]

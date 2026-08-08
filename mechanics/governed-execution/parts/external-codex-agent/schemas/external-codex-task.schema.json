@@ -4,14 +4,15 @@
   "title": "Bounded external Codex agent task",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "task_id", "correlation_id", "continuation_id", "expected_incarnation_id", "task_family", "parent_task_id", "objective", "transition", "target_owner", "authority_scope", "allowed_effect_class", "allowed_paths", "immutable_inputs", "done_state", "validation_commands", "expected_artifacts", "forbidden_effects", "ambiguity_policy", "review_required", "return_owner"],
+  "required": ["schema_version", "task_id", "correlation_id", "continuation_id", "expected_incarnation_id", "task_family", "execution_posture", "parent_task_id", "objective", "transition", "target_owner", "authority_scope", "allowed_effect_class", "allowed_paths", "immutable_inputs", "done_state", "validation_commands", "expected_artifacts", "forbidden_effects", "ambiguity_policy", "review_required", "return_owner"],
   "properties": {
     "schema_version": {"const": "abyss_stack_external_codex_task_v1"},
     "task_id": {"type": "string", "minLength": 1},
     "correlation_id": {"type": "string", "minLength": 1},
     "continuation_id": {"type": "string", "minLength": 1},
     "expected_incarnation_id": {"type": "string", "minLength": 1},
-    "task_family": {"enum": ["landing_readiness", "landing_preparation", "landing_review", "landing_closeout", "landing_ambiguity_stop"]},
+    "task_family": {"type": "string", "pattern": "^[a-z][a-z0-9_]{2,63}$"},
+    "execution_posture": {"enum": ["bounded_execution", "independent_review", "closeout", "ambiguity_stop"]},
     "parent_task_id": {"type": "string", "minLength": 1},
     "objective": {"type": "string", "minLength": 1},
     "transition": {
@@ -68,8 +69,8 @@
   "allOf": [
     {
       "if": {
-        "properties": {"task_family": {"const": "landing_review"}},
-        "required": ["task_family"]
+        "properties": {"execution_posture": {"const": "independent_review"}},
+        "required": ["execution_posture"]
       },
       "then": {
         "properties": {
