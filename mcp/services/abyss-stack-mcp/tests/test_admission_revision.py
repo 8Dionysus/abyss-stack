@@ -181,10 +181,28 @@ def _inputs(tmp_path: Path) -> dict[str, Path]:
     )
     current["registry"]["registry_id"] = registry.registry_id
     lkg = json.loads(json.dumps(current))
-    lkg["canary"]["canary_route"] = contour.observation_route + "/last-known-good"
-    lkg["canary"]["canary_ref"] = (
-        "/private/rollback-canaries/records/aoa-kag/lkg.json"
+    rollback_target = current["rollback"]["proved_target"]
+    lkg["credential_class"] = rollback_target["credential_class"]
+    lkg["package"]["artifact_digest"] = rollback_target["package_digest"]
+    lkg["package"]["source_revision"] = rollback_target["deploy_revision"]
+    lkg["deploy"]["revision"] = rollback_target["deploy_revision"]
+    lkg["deploy"]["tree_digest"] = rollback_target["deploy_tree_digest"]
+    lkg["deploy"]["manifest_ref"] = rollback_target["deploy_manifest_ref"]
+    lkg["deploy"]["manifest_digest"] = rollback_target["deploy_manifest_digest"]
+    lkg["deploy"]["evidence"]["evidence_refs"][0]["evidence_ref"] = (
+        rollback_target["deploy_manifest_ref"]
     )
+    lkg["process"]["unit_name"] = rollback_target["unit_name"]
+    lkg["process"]["executable_ref"] = rollback_target["executable_ref"]
+    lkg["process"]["process_identity"] = rollback_target["process_identity"]
+    lkg["consumers"][0]["registration_ref"] = rollback_target[
+        "consumer_registration_ref"
+    ]
+    lkg["consumers"][0]["evidence"]["evidence_refs"][0]["evidence_ref"] = (
+        rollback_target["consumer_registration_ref"]
+    )
+    lkg["canary"]["canary_route"] = rollback_target["canary_route"]
+    lkg["canary"]["canary_ref"] = rollback_target["canary_ref"]
     lkg["canary"]["evidence"]["evidence_refs"][0]["evidence_ref"] = (
         lkg["canary"]["canary_ref"]
     )
@@ -286,4 +304,98 @@ def test_rejects_reused_current_canary_as_last_known_good(tmp_path: Path) -> Non
     _write(paths["lkg"], lkg)
 
     with pytest.raises(AdmissionRevisionError, match="exact and distinct"):
+        _compose(paths)
+
+
+@pytest.mark.parametrize(
+    ("section", "field", "value"),
+    (
+        ("source", "tree_digest", DIGEST_D),
+        ("package", "name", "different-mcp"),
+        ("package", "version", "9.9.9"),
+        ("package", "source_revision", "different-deploy-rev"),
+        ("deploy", "revision", "different-deploy-rev"),
+        ("deploy", "tree_digest", DIGEST_A),
+        ("process", "executable_ref", "/srv/AbyssOS/bin/different-mcp"),
+        ("process", "process_identity", "different-mcp/9.9.9"),
+    ),
+)
+def test_rejects_partial_registry_runtime_identity_match(
+    tmp_path: Path, section: str, field: str, value: str
+) -> None:
+    paths = _inputs(tmp_path)
+    current = json.loads(paths["current"].read_text())
+    current["subjects"][0][section][field] = value
+    _write(paths["current"], current)
+
+    with pytest.raises(AdmissionRevisionError, match="registry contour"):
+        _compose(paths)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("proved_source_revision", "different-source-rev"),
+        ("proved_source_tree_digest", DIGEST_D),
+        ("proved_package_digest", DIGEST_A),
+        ("proved_deploy_revision", "different-deploy-rev"),
+        ("proved_deploy_tree_digest", DIGEST_A),
+        ("proved_deploy_manifest_digest", DIGEST_A),
+        ("proved_process_identity", "different-mcp/9.9.9"),
+        ("proved_server_schema_digest", DIGEST_A),
+        ("proved_consumer_registration_ref", "config://codex/different"),
+        ("proved_canary_route", "runbook://canary/different"),
+        ("proved_canary_ref", "receipt://runtime/different-canary"),
+    ),
+)
+def test_rejects_central_proof_for_different_current_contour(
+    tmp_path: Path, field: str, value: str
+) -> None:
+    paths = _inputs(tmp_path)
+    current = json.loads(paths["current"].read_text())
+    current["subjects"][0]["proof"][field] = value
+    _write(paths["current"], current)
+
+    with pytest.raises(AdmissionRevisionError, match="different current contour"):
+        _compose(paths)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("accepted_source_revision", "different-source-rev"),
+        ("accepted_package_digest", DIGEST_A),
+    ),
+)
+def test_rejects_owner_acceptance_for_different_current_contour(
+    tmp_path: Path, field: str, value: str
+) -> None:
+    paths = _inputs(tmp_path)
+    current = json.loads(paths["current"].read_text())
+    current["subjects"][0]["acceptance"][field] = value
+    _write(paths["current"], current)
+
+    with pytest.raises(AdmissionRevisionError, match="different current contour"):
+        _compose(paths)
+
+
+@pytest.mark.parametrize(
+    ("section", "field", "value"),
+    (
+        ("package", "artifact_digest", DIGEST_A),
+        ("deploy", "revision", "different-deploy-rev"),
+        ("process", "unit_name", "aoa-organ-mcp-read@different.service"),
+        ("process", "executable_ref", "/srv/AbyssOS/bin/different-mcp"),
+        ("process", "process_identity", "different-mcp/9.9.9"),
+    ),
+)
+def test_rejects_lkg_observation_for_different_rollback_target(
+    tmp_path: Path, section: str, field: str, value: str
+) -> None:
+    paths = _inputs(tmp_path)
+    lkg = json.loads(paths["lkg"].read_text())
+    lkg["subjects"][0][section][field] = value
+    _write(paths["lkg"], lkg)
+
+    with pytest.raises(AdmissionRevisionError, match="rollback proof target"):
         _compose(paths)

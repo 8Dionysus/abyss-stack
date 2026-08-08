@@ -653,6 +653,17 @@ def test_keeper_inbox_rejects_symlink_root(tmp_path: Path) -> None:
         _keeper_inbox_paths(linked, organ_id="demo", contour_id="read")
 
 
+def test_keeper_inbox_rejects_symlinked_organ_directory(tmp_path: Path) -> None:
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    outside = tmp_path / "outside"
+    (outside / "read").mkdir(parents=True)
+    (inbox / "demo").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(PreflightError, match="organ inbox"):
+        _keeper_inbox_paths(inbox, organ_id="demo", contour_id="read")
+
+
 def test_system_status_keeps_runtime_admission_owner_protocol_and_tasks_distinct(
     tmp_path: Path,
 ) -> None:

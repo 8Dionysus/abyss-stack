@@ -195,6 +195,10 @@ Provisioning also creates the private non-symlink
 `${AOA_STACK_ROOT}/Logs/mcp/admission/keeper-inbox` directory. The admission
 keeper consumes independently issued `(organ_id)/(contour_id)/*.json` nodes
 from that root; provisioning neither issues nor copies owner evidence.
+`abyss-mcp-admission-keeper.path` lists every consumed contour directory from
+the runtime target catalog explicitly because `systemd.path` does not watch
+nested file replacement recursively; the periodic timer remains the bounded
+backstop for missed or coalesced events.
 Enable `abyss-stack-mcp-observation.timer` only as a separate reviewed rollout
 step. Its process has no bearer credential, no network address family, and no
 writable path outside that observation directory.

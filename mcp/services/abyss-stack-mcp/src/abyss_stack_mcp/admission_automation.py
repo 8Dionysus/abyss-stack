@@ -242,11 +242,25 @@ def _keeper_inbox_paths(
     root = Path(inbox_root)
     if root.is_symlink() or not root.is_dir():
         raise PreflightError("keeper inbox root must be a non-symlink directory")
-    contour_root = root / organ_id / contour_id
+    root_resolved = root.resolve(strict=True)
+    organ_root = root / organ_id
+    if not organ_root.exists():
+        return ()
+    if organ_root.is_symlink() or not organ_root.is_dir():
+        raise PreflightError("keeper organ inbox must be a non-symlink directory")
+    try:
+        organ_root.resolve(strict=True).relative_to(root_resolved)
+    except (OSError, ValueError) as exc:
+        raise PreflightError("keeper organ inbox escapes the inbox root") from exc
+    contour_root = organ_root / contour_id
     if not contour_root.exists():
         return ()
     if contour_root.is_symlink() or not contour_root.is_dir():
         raise PreflightError("keeper contour inbox must be a non-symlink directory")
+    try:
+        contour_root.resolve(strict=True).relative_to(root_resolved)
+    except (OSError, ValueError) as exc:
+        raise PreflightError("keeper contour inbox escapes the inbox root") from exc
     paths = tuple(sorted(contour_root.glob("*.json")))
     if any(path.is_symlink() or not path.is_file() for path in paths):
         raise PreflightError("keeper inbox nodes must be regular non-symlink files")

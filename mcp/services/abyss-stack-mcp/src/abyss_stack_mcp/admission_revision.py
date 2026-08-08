@@ -72,6 +72,79 @@ def _subject(observation: RuntimeObservation) -> Any:
     return matches[0]
 
 
+def _registry_runtime_matches(current: Any, contour: Any) -> bool:
+    identity = contour.runtime_identity
+    return (
+        current.source.revision == identity.source_revision
+        and current.source.tree_digest == identity.source_tree_digest
+        and current.package.name == identity.package_name
+        and current.package.version == identity.package_version
+        and current.package.artifact_digest == identity.package_digest
+        and current.package.source_revision == identity.deployment_revision
+        and current.deploy.revision == identity.deployment_revision
+        and current.deploy.manifest_ref == identity.deployment_manifest_ref
+        and current.deploy.manifest_digest == identity.deployment_manifest_digest
+        and current.deploy.tree_digest == identity.deployed_tree_digest
+        and current.process.executable_ref == identity.process_ref
+        and current.process.process_identity == identity.process_identity
+        and current.endpoint.endpoint_ref == contour.endpoint.endpoint_ref
+        and current.endpoint.server_schema_digest
+        == contour.endpoint.server_schema_digest
+    )
+
+
+def _proof_and_acceptance_match_current(current: Any, consumer: Any) -> bool:
+    proof = current.proof
+    acceptance = current.acceptance
+    return (
+        proof.proved_source_revision == current.source.revision
+        and proof.proved_source_tree_digest == current.source.tree_digest
+        and proof.proved_package_digest == current.package.artifact_digest
+        and current.package.source_revision == current.deploy.revision
+        and proof.proved_deploy_revision == current.deploy.revision
+        and proof.proved_deploy_tree_digest == current.deploy.tree_digest
+        and proof.proved_deploy_manifest_digest == current.deploy.manifest_digest
+        and proof.proved_process_identity == current.process.process_identity
+        and proof.proved_server_schema_digest
+        == current.endpoint.server_schema_digest
+        and proof.proved_consumer_registration_ref == consumer.registration_ref
+        and proof.proved_canary_route == current.canary.canary_route
+        and proof.proved_canary_ref == current.canary.canary_ref
+        and acceptance.accepted_source_revision == current.source.revision
+        and acceptance.accepted_package_digest == current.package.artifact_digest
+    )
+
+
+def _lkg_matches_rollback_target(lkg: Any, current: Any) -> bool:
+    target = current.rollback.proved_target
+    if target is None:
+        return False
+    matching_consumers = [
+        consumer
+        for consumer in lkg.consumers
+        if consumer.registered
+        and consumer.registration_ref == target.consumer_registration_ref
+        and consumer.observed_schema_digest == lkg.endpoint.server_schema_digest
+        and set(consumer.observed_protocol_versions)
+        & set(lkg.endpoint.protocol_versions)
+        and consumer.evidence.state == "exact"
+    ]
+    return len(matching_consumers) == 1 and (
+        lkg.package.artifact_digest == target.package_digest
+        and lkg.package.source_revision == target.deploy_revision
+        and lkg.deploy.revision == target.deploy_revision
+        and lkg.deploy.tree_digest == target.deploy_tree_digest
+        and lkg.deploy.manifest_ref == target.deploy_manifest_ref
+        and lkg.deploy.manifest_digest == target.deploy_manifest_digest
+        and lkg.process.unit_name == target.unit_name
+        and lkg.credential_class == target.credential_class
+        and lkg.process.executable_ref == target.executable_ref
+        and lkg.process.process_identity == target.process_identity
+        and lkg.canary.canary_route == target.canary_route
+        and lkg.canary.canary_ref == target.canary_ref
+    )
+
+
 def compose_admission_revision(
     *,
     registry_path: Path,
@@ -142,12 +215,7 @@ def compose_admission_revision(
     if (
         current.registry.registry_digest != contour_digest
         or lkg.registry.registry_digest != contour_digest
-        or current.source.revision != contour.runtime_identity.source_revision
-        or current.package.artifact_digest != contour.runtime_identity.package_digest
-        or current.deploy.tree_digest != contour.runtime_identity.deployed_tree_digest
-        or current.endpoint.endpoint_ref != contour.endpoint.endpoint_ref
-        or current.endpoint.server_schema_digest
-        != contour.endpoint.server_schema_digest
+        or not _registry_runtime_matches(current, contour)
     ):
         raise AdmissionRevisionError("live evidence differs from the registry contour")
     if (
@@ -188,6 +256,14 @@ def compose_admission_revision(
     if len(consumers) != 1:
         raise AdmissionRevisionError("current contour lacks one compatible consumer")
     consumer = consumers[0]
+    if not _proof_and_acceptance_match_current(current, consumer):
+        raise AdmissionRevisionError(
+            "proof or owner acceptance targets a different current contour"
+        )
+    if not _lkg_matches_rollback_target(lkg, current):
+        raise AdmissionRevisionError(
+            "last-known-good observation differs from the rollback proof target"
+        )
     consumer_ref = _one_ref(consumer.evidence, "8Dionysus", "consumer")
     source_ref = _one_ref(current.source.evidence, record.owners.source_owner, "source")
     runtime_ref = _one_ref(current.deploy.evidence, record.owners.runtime_owner, "deploy")
