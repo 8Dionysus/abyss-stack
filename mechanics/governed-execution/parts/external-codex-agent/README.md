@@ -32,7 +32,9 @@ The controller:
 - persists normalized events, exact thread identity, attempts, PIDs/start
   ticks, argv, usage, active wall time, output bytes, workspace changes,
   the exact final workspace manifest, wake evaluation, and a typed terminal
-  result beneath an explicit state root;
+  result beneath an explicit state root; each state save binds the normalized
+  event-stream digest, and a complete append that precedes a crash is recovered
+  only as a strict, contiguous extension of that digest;
 - exposes asynchronous `start` for durable owner-managed sessions and
   `run-to-terminal` for transient cgroup launchers that must keep their main
   process alive until the exact semantic terminal receipt, without adding a
@@ -81,7 +83,9 @@ The controller:
 - exports an A2A-compatible child result only after a different incarnation
   and different Codex thread reviewed the exact writer runtime result, and
   only when the supplied writer summon request matches the admitted immutable
-  bytes and both writer/reviewer SDK request semantics and outputs.
+  bytes and both writer/reviewer SDK request semantics and outputs; the
+  reviewer state digest must still equal the exact result bytes initially
+  admitted by the exporter, so a concurrent resume cannot mix verdicts.
 - records a digest-bound parent continuation with `yield-parent`, ends the
   external Sol inference and process, evaluates the child result against the
   SDK wake policy without model polling, and uses `codex exec resume` through
@@ -154,7 +158,9 @@ preparation because it carries the exact non-Python contracts consumed there.
 releases; release IDs must be exact SHA-256 identifiers whose resolved
 directory and manifest identity remain inside the release root. Installation
 also verifies that the packaged `aoa-agents` and `aoa-skills` schema bytes have
-the exact digests pinned by the runtime profile. Dirty worktree installation is rejected unless every dirty source
+the exact digests pinned by the runtime profile. Install, activation, and
+status also require the recorded Python coordinate to remain a regular
+executable file. Dirty worktree installation is rejected unless every dirty source
 posture is explicitly admitted; such an active receipt is marked
 `nonproduction_dirty_source=true` and is machine-local evidence, not a landed
 or remotely reproducible release. Installation requires clean exact

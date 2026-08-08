@@ -2225,6 +2225,35 @@ def test_durable_state_requires_exact_workspace_manifest(tmp_path: Path) -> None
     assert exc_info.value.code == "schema_validation_failed"
 
 
+def test_main_runtime_recovers_event_append_before_state_save(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path)
+    runtime = fixture["runtime"]
+    monkeypatch.setattr(runtime, "_spawn_worker", lambda *args, **kwargs: None)
+    prepared = runtime.start(fixture["launch_path"])
+    assert prepared["status"] == "prepared"
+    with runtime._lock(fixture["session_id"]):
+        state = runtime._load_state(fixture["session_id"])
+        old_digest = state["events_digest"]
+        runtime._append_event(
+            state,
+            event_type="external_agent.recovery_fixture",
+            payload={"cause": "crash-before-state-save"},
+            significance="trace",
+        )
+
+    recovered = runtime.status(fixture["session_id"])
+    durable_state = runtime._load_state(fixture["session_id"])
+    events = runtime.events(fixture["session_id"], after_sequence=-1)
+
+    assert recovered["status"] == "prepared"
+    assert durable_state["events_digest"] != old_digest
+    assert durable_state["last_event_sequence"] == len(events) - 1
+    assert [event["sequence"] for event in events] == list(range(len(events)))
+
+
 @pytest.mark.parametrize("mutation", ("missing-type", "unsupported-not"))
 def test_output_schema_subset_gate_fails_before_inference(mutation: str) -> None:
     schema = json.loads(REPORT_SCHEMA_PATH.read_text(encoding="utf-8"))
@@ -3330,7 +3359,10 @@ def test_a2a_summon_request_validation_fails_closed(
     assert exc_info.value.code == failure_code
 
 
-def test_a2a_export_requires_exact_independent_review_result(tmp_path: Path) -> None:
+def test_a2a_export_requires_exact_independent_review_result(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     shared_state = tmp_path / "shared-state"
     writer = _fixture(
         tmp_path / "writer",
@@ -3422,6 +3454,40 @@ def test_a2a_export_requires_exact_independent_review_result(tmp_path: Path) -> 
         == str(writer_result_path)
     )
     assert output_path.is_file()
+
+    reviewer_result_path = runtime._session_dir(reviewer["session_id"]) / "result.json"
+    reviewer_state_path = runtime._state_path(reviewer["session_id"])
+    original_reviewer_result = reviewer_result_path.read_bytes()
+    original_reviewer_state = reviewer_state_path.read_bytes()
+    stale_reviewer = runtime.result(reviewer["session_id"])
+    assert stale_reviewer is not None
+    changed_reviewer = json.loads(original_reviewer_result)
+    changed_reviewer["duration_seconds"] = float(
+        changed_reviewer["duration_seconds"]
+    ) + 1.0
+    _write_json(reviewer_result_path, changed_reviewer)
+    changed_state = json.loads(original_reviewer_state)
+    changed_state["result_digest"] = _digest_path(reviewer_result_path)
+    _write_json(reviewer_state_path, changed_state)
+    original_result_method = runtime.result
+
+    def stale_result(session_id: str) -> dict[str, Any] | None:
+        if session_id == reviewer["session_id"]:
+            return stale_reviewer
+        return original_result_method(session_id)
+
+    monkeypatch.setattr(runtime, "result", stale_result)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.export_a2a_result(
+            writer["session_id"],
+            reviewer_session_id=reviewer["session_id"],
+            summon_request_path=summon_path,
+            output_path=tmp_path / "raced-reviewer-result.json",
+        )
+    assert exc_info.value.code == "a2a_review_state_unbound"
+    monkeypatch.setattr(runtime, "result", original_result_method)
+    reviewer_result_path.write_bytes(original_reviewer_result)
+    reviewer_state_path.write_bytes(original_reviewer_state)
 
     mismatched_manifest_path = tmp_path / "mismatched-review-workspace-manifest.json"
     mismatched_manifest = json.loads(
@@ -3592,7 +3658,6 @@ def test_a2a_export_requires_exact_independent_review_result(tmp_path: Path) -> 
         )
     assert exc_info.value.code == "a2a_review_runtime_failed"
 
-    reviewer_result_path = runtime._session_dir(reviewer["session_id"]) / "result.json"
     failed_reviewer_result = runtime.result(reviewer["session_id"])
     assert failed_reviewer_result is not None
     failed_reviewer_result["status"] = "failed"

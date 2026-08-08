@@ -40,7 +40,9 @@ The packaged SDK root must therefore satisfy both isolated imports and the
 preparer's exact non-Python contract reads. Stable wrappers consult a regular-file active
 receipt and execute a release-local bootstrap with Python isolated mode; they
 do not follow a mutable source checkout, import ambient `PYTHONPATH`, or use a
-symlinked `current` directory. `install_external_codex_runtime.py status`
+symlinked `current` directory. The selected and recorded Python coordinate must
+be a regular executable file at install, activation, and status time.
+`install_external_codex_runtime.py status`
 re-hashes the release and wrappers before availability may be claimed.
 Activation rollback changes only the active receipt while retaining immutable
 releases. An install, status, or activation target is admitted only as an exact
@@ -291,6 +293,13 @@ observed status to the binding's event-filtered wake policy; the model cannot
 decide whether the parent wakes. Its proposed action must exactly match the
 selected bound wake condition.
 
+Every main-session state save binds the normalized event-stream digest and
+last sequence. If a process stops after fsync of one or more complete events
+but before saving state, the next locked load advances the cursor only when
+the previous digest matches an exact prefix and the remaining records are
+schema-valid, contiguous, and owned by the same session. Missing, truncated,
+rewritten, partial, duplicate-sequence, or foreign streams fail closed.
+
 Before every admitted resume, the controller validates the current terminal
 `result.json`, copies its exact bytes into the prior attempt directory, and
 adds that immutable reference to the continuation's event/evidence chain. A
@@ -328,6 +337,10 @@ the writer request remains immutable review evidence. A2A export verifies the
 materialized request/schema bytes, typed plan binding, role/incarnation/task
 semantics, requested outputs, and the caller-supplied writer request digest
 before it can emit a child result.
+The exporter also serializes the initially loaded reviewer result to its exact
+artifact digest and requires the later locked durable state to retain that
+same digest. A reviewer continuation racing the export therefore aborts the
+export instead of pairing a stale verdict with a newer receipt.
 
 The reviewer task does not require a third review by default. It may return
 `completed/proceed` when no blocker remains or

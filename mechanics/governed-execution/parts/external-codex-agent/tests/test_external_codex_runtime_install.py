@@ -265,6 +265,55 @@ def test_install_rejects_owner_contract_outside_runtime_profile_pin(
         )
 
 
+def test_install_and_status_reject_non_executable_python(tmp_path: Path) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    runtime_root = tmp_path / "runtime"
+    bin_dir = tmp_path / "bin"
+    non_executable = tmp_path / "python-without-execute-bit"
+    non_executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    non_executable.chmod(0o644)
+
+    with pytest.raises(runtime_install.InstallError, match="not executable"):
+        runtime_install.install(
+            source,
+            sdk,
+            agents,
+            skills,
+            runtime_root,
+            bin_dir,
+            non_executable,
+            allow_dirty_source=False,
+            allow_dirty_sdk=False,
+            allow_dirty_agents=False,
+            allow_dirty_skills=False,
+        )
+    assert not (runtime_root / "active.json").exists()
+
+    runtime_install.install(
+        source,
+        sdk,
+        agents,
+        skills,
+        runtime_root,
+        bin_dir,
+        Path(sys.executable),
+        allow_dirty_source=False,
+        allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
+    )
+    active_path = runtime_root / "active.json"
+    active = json.loads(active_path.read_text(encoding="utf-8"))
+    active["python_executable"] = str(non_executable)
+    active_path.write_text(
+        json.dumps(active, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(runtime_install.InstallError, match="not executable"):
+        runtime_install.status(runtime_root, bin_dir)
+
+
 @pytest.mark.parametrize("release_id", ["../../outside", "sha256-" + "g" * 64])
 def test_activate_rejects_non_content_addressed_release_id(
     tmp_path: Path,

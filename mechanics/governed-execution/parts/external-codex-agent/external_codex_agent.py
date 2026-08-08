@@ -1775,11 +1775,100 @@ class ExternalCodexRuntime:
             raise ExternalCodexRuntimeError(
                 "runtime_state_invalid", "external Codex state identity is invalid"
             )
-        return state
+        return self._recover_or_verify_event_state(state)
+
+    def _recover_or_verify_event_state(
+        self, state: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Verify the normalized stream or recover one strict append extension."""
+
+        session_id = str(state["session_id"])
+        path = self._events_path(session_id)
+        last_sequence = int(state["last_event_sequence"])
+        if not path.exists():
+            if last_sequence != -1:
+                raise ExternalCodexRuntimeError(
+                    "runtime_event_state_drift",
+                    "runtime event stream is missing behind durable state",
+                )
+            raw = b""
+            lines: list[bytes] = []
+        else:
+            raw = read_bounded(path)
+            if raw and not raw.endswith(b"\n"):
+                raise ExternalCodexRuntimeError(
+                    "runtime_event_state_drift",
+                    "runtime event stream ends with a partial record",
+                )
+            lines = raw.splitlines(keepends=True)
+        for sequence, line in enumerate(lines):
+            try:
+                event = json.loads(line)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ExternalCodexRuntimeError(
+                    "runtime_event_state_drift",
+                    f"runtime event line {sequence + 1} is invalid",
+                ) from exc
+            validate_json(event, EVENT_SCHEMA_PATH, label="normalized runtime event")
+            if (
+                event.get("sequence") != sequence
+                or event.get("session_id") != session_id
+            ):
+                raise ExternalCodexRuntimeError(
+                    "runtime_event_state_drift",
+                    f"runtime event line {sequence + 1} is not contiguous or owned",
+                )
+        durable_count = last_sequence + 1
+        if len(lines) < durable_count:
+            raise ExternalCodexRuntimeError(
+                "runtime_event_state_drift",
+                "runtime event stream was truncated behind durable state",
+            )
+        current_digest = sha256_bytes(raw)
+        recorded_digest = state.get("events_digest")
+        if len(lines) == durable_count:
+            if isinstance(recorded_digest, str) and recorded_digest != current_digest:
+                raise ExternalCodexRuntimeError(
+                    "runtime_event_state_drift",
+                    "runtime event bytes differ from their durable state digest",
+                )
+            if recorded_digest == current_digest:
+                return dict(state)
+        else:
+            if not isinstance(recorded_digest, str):
+                raise ExternalCodexRuntimeError(
+                    "runtime_event_state_drift",
+                    "runtime event extension has no trusted durable prefix digest",
+                )
+            prefix = b"".join(lines[:durable_count])
+            if sha256_bytes(prefix) != recorded_digest:
+                raise ExternalCodexRuntimeError(
+                    "runtime_event_state_drift",
+                    "runtime event extension rewrites its durable prefix",
+                )
+        recovered = dict(state)
+        recovered["last_event_sequence"] = len(lines) - 1
+        recovered["events_digest"] = current_digest
+        validate_json(recovered, STATE_SCHEMA_PATH, label="recovered runtime state")
+        _atomic_write_json(self._state_path(session_id), recovered)
+        return recovered
 
     def _save_state(self, state: Mapping[str, Any]) -> None:
-        validate_json(state, STATE_SCHEMA_PATH, label="runtime state")
-        _atomic_write_json(self._state_path(str(state["session_id"])), state)
+        candidate = dict(state)
+        events_path = self._events_path(str(candidate["session_id"]))
+        if events_path.exists():
+            candidate["events_digest"] = sha256_file(events_path)
+        elif int(candidate["last_event_sequence"]) == -1:
+            candidate["events_digest"] = sha256_bytes(b"")
+        else:
+            raise ExternalCodexRuntimeError(
+                "runtime_event_state_drift",
+                "cannot save runtime state without its normalized event stream",
+            )
+        validate_json(candidate, STATE_SCHEMA_PATH, label="runtime state")
+        _atomic_write_json(
+            self._state_path(str(candidate["session_id"])), candidate
+        )
 
     def _failure_closeout_context(
         self,
@@ -5254,6 +5343,17 @@ Runtime session identity: {state['session_id']}
             raise ExternalCodexRuntimeError(
                 "a2a_review_incomplete", "writer and reviewer runtime results are required"
             )
+        reviewer_receipt_digest = sha256_bytes(
+            (
+                json.dumps(
+                    reviewer,
+                    ensure_ascii=True,
+                    sort_keys=True,
+                    indent=2,
+                )
+                + "\n"
+            ).encode("utf-8")
+        )
         if (
             writer.get("admission_class") != "transport_study_fixture"
             or reviewer.get("admission_class") != "transport_study_fixture"
@@ -5336,6 +5436,8 @@ Runtime session identity: {state['session_id']}
                 )
                 or reviewer_state.get("result_digest")
                 != sha256_file(Path(str(reviewer_state["result_path"])))
+                or reviewer_state.get("result_digest")
+                != reviewer_receipt_digest
                 or reviewer_state.get("incarnation_id")
                 != reviewer_binding.incarnation_id
             ):
@@ -6249,6 +6351,8 @@ class ExternalCodexParentReentry:
             or child_state.get("result_path") != str(child_result_path)
             or child_state.get("result_digest") != result_digest
             or events_ref.get("artifact_ref") != str(expected_events_path)
+            or child_state.get("events_digest")
+            != events_ref.get("artifact_digest")
         ):
             raise ExternalCodexRuntimeError(
                 "reentry_child_receipt_mismatch",

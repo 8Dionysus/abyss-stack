@@ -49,6 +49,7 @@ final manifest is unobservable, streaming rejection of an unterminated
 oversized protocol record, review-gate enforcement, TERM-resistant and unexpected-worker-death
 cleanup including a detached `setsid` descendant, high token/turn usage
 measurement without truncation, durable interrupt/resume on one thread,
+strict recovery of a complete main-session event append before state save,
 partial-usage classification when interruption precedes Codex usage emission,
 immutable preservation of the interrupted receipt across ordinary resume,
 read-only target projection through a separately recorded attempt-local Codex
@@ -62,7 +63,7 @@ identity typo while preserving the failed result,
 canonical non-starting reviewer preparation with stable forwarded input IDs,
 an explicit workspace-write coder to read-only reviewer transition with a
 post-write manifest and reviewed A2A return, exact review-input-to-writer-final
-manifest binding, wrapper-delimiter effect observation, final-manifest tamper refusal,
+manifest binding, reviewer-result race refusal, wrapper-delimiter effect observation, final-manifest tamper refusal,
 provenance checks for all loaded `aoa_sdk` modules in the study preparer plus a
 post-compilation persisted
 path inventory, produced-artifact admission, source-evidence file/line

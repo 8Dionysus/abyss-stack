@@ -121,6 +121,10 @@
     "codex_pid": {"$ref": "#/$defs/pid"},
     "codex_start_ticks": {"$ref": "#/$defs/ticks"},
     "last_event_sequence": {"type": "integer", "minimum": -1},
+    "events_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
     "usage": {"$ref": "#/$defs/usage"},
     "usage_observation_gaps": {
       "type": "array",

@@ -78,6 +78,13 @@ def require_absolute_directory(path: Path, label: str) -> Path:
     return path.resolve()
 
 
+def require_python_executable(path: Path) -> Path:
+    candidate = require_regular_file(path.resolve(), "Python executable")
+    if not os.access(candidate, os.X_OK):
+        raise InstallError(f"Python executable is not executable: {candidate}")
+    return candidate
+
+
 def require_regular_file(path: Path, label: str) -> Path:
     if path.is_symlink() or not path.is_file():
         raise InstallError(f"{label} must be a regular non-symlink file: {path}")
@@ -366,7 +373,7 @@ def install(
     skills_root = require_absolute_directory(skills_root, "aoa-skills source root")
     runtime_root = runtime_root.resolve()
     bin_dir = bin_dir.resolve()
-    python_executable = require_regular_file(python_executable.resolve(), "Python executable")
+    python_executable = require_python_executable(python_executable)
     source_posture = git_posture(source_root)
     sdk_posture = git_posture(sdk_root)
     agents_posture = git_posture(agents_root)
@@ -484,7 +491,7 @@ def activate(
     manifest = verify_release(release_root)
     if manifest["release_id"] != release_id:
         raise InstallError("requested release id differs from verified manifest")
-    python_executable = require_regular_file(python_executable.resolve(), "Python executable")
+    python_executable = require_python_executable(python_executable)
     active_path = runtime_root / "active.json"
     previous = json.loads(active_path.read_text(encoding="utf-8")) if active_path.exists() else None
     for name, entrypoint in {
@@ -524,6 +531,10 @@ def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
     active = json.loads(active_path.read_text(encoding="utf-8"))
     if active.get("schema_version") != ACTIVE_SCHEMA_VERSION:
         raise InstallError("active release schema mismatch")
+    python_value = active.get("python_executable")
+    if not isinstance(python_value, str):
+        raise InstallError("active Python executable is invalid")
+    require_python_executable(Path(python_value))
     release_id = active.get("release_id")
     if not isinstance(release_id, str):
         raise InstallError("active release id is invalid")
