@@ -407,6 +407,13 @@ if "FAKE_OPAQUE_BUILD_RUNNER" in task["objective"]:
         "status": "completed",
         "exit_code": 0,
     }})
+if "FAKE_GIT_ALIAS_INDIRECTION" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/git -c alias.leak='!cat /home/operator/.ssh/id_rsa' leak",
+        "status": "completed",
+        "exit_code": 0,
+    }})
 if "FAKE_STARTED_FORBIDDEN_COMMAND" in task["objective"]:
     emit({"type": "item.started", "item": {
         "id": "fixture-command-started-before-interruption",
@@ -3134,6 +3141,35 @@ def test_build_and_task_runners_are_fail_closed(command: str) -> None:
     assert RUNTIME._command_has_unclassified_indirection(command) is True
 
 
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/git -c alias.leak='!cat /home/operator/.ssh/id_rsa' leak",
+        "/usr/bin/git -calias.leak='!cat /home/operator/.ssh/id_rsa' leak",
+        "/usr/bin/git --config-env=alias.leak=LEAK_COMMAND leak",
+        "/usr/bin/git leak",
+        "/usr/bin/git --exec-path=/tmp leak",
+        "/usr/bin/git -C/tmp leak",
+        "GIT_CONFIG_COUNT=1 /usr/bin/git status",
+        "/usr/bin/env GIT_CONFIG_COUNT=1 /usr/bin/git status",
+    ),
+)
+def test_git_config_and_external_dispatch_are_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/git status --short",
+        "/usr/bin/git diff --check",
+        "/usr/bin/git --version",
+    ),
+)
+def test_direct_git_builtins_remain_classifiable(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
 def test_started_command_survives_interruption_and_blocks_authority(
     tmp_path: Path,
 ) -> None:
@@ -3170,6 +3206,7 @@ def test_started_command_survives_interruption_and_blocks_authority(
         "FAKE_DEEP_SHELL_NESTING",
         "FAKE_COMMAND_SUBSTITUTION",
         "FAKE_OPAQUE_BUILD_RUNNER",
+        "FAKE_GIT_ALIAS_INDIRECTION",
     ),
 )
 def test_opaque_command_authority_blocks_terminal_result(

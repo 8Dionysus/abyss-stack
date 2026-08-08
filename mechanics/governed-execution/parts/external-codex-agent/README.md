@@ -87,6 +87,8 @@ The controller:
   command/backtick/process substitutions remain opaque executable indirection,
   build/package/test/task runners remain opaque unless they are an exact
   owner-fixed validation,
+  Git config/alias/external-subcommand dispatch and ambient environment
+  assignment fail closed,
   and commands are durably observed
   from `item.started` rather than only after completion, while exact task validation
   argv remain admitted by their owner-supplied identity;

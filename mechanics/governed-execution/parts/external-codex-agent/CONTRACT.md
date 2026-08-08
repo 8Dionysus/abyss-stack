@@ -305,7 +305,10 @@ command substitution, backticks, and process substitution likewise fail closed
 instead of being treated as inert command arguments. Build, package, test, and
 task runners that may execute manifest-, plugin-, or project-defined commands
 are opaque for model-issued commands; only an exact owner-fixed validation argv
-receives the fixed-validation exemption.
+receives the fixed-validation exemption. Git global options that can inject
+configuration, redirect repository coordinates, select an exec path, or enable
+pagination are likewise opaque, as are unknown/external Git subcommands and
+ambient environment assignment. Direct known Git builtins remain classifiable.
 
 Any model evidence reference beginning with `source:` is semantic, not opaque
 prose. It must resolve to a regular non-symlink file inside the exact workspace

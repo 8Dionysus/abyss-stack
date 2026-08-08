@@ -217,6 +217,87 @@ OPAQUE_BUILD_AND_TASK_RUNNERS = {
     "uv",
     "yarn",
 }
+GIT_DIRECT_BUILTIN_SUBCOMMANDS = {
+    "add",
+    "am",
+    "apply",
+    "bisect",
+    "blame",
+    "branch",
+    "cat-file",
+    "check-attr",
+    "check-ignore",
+    "check-ref-format",
+    "checkout",
+    "cherry",
+    "cherry-pick",
+    "clean",
+    "clone",
+    "commit",
+    "config",
+    "describe",
+    "diff",
+    "diff-files",
+    "diff-index",
+    "diff-tree",
+    "fetch",
+    "for-each-ref",
+    "format-patch",
+    "fsck",
+    "grep",
+    "hash-object",
+    "init",
+    "log",
+    "ls-files",
+    "ls-remote",
+    "ls-tree",
+    "merge",
+    "merge-base",
+    "merge-tree",
+    "mktree",
+    "mv",
+    "name-rev",
+    "notes",
+    "pull",
+    "push",
+    "range-diff",
+    "read-tree",
+    "rebase",
+    "reflog",
+    "remote",
+    "reset",
+    "restore",
+    "rev-list",
+    "rev-parse",
+    "rm",
+    "show",
+    "show-branch",
+    "show-ref",
+    "sparse-checkout",
+    "status",
+    "switch",
+    "symbolic-ref",
+    "tag",
+    "update-index",
+    "update-ref",
+    "verify-commit",
+    "verify-pack",
+    "verify-tag",
+    "worktree",
+    "write-tree",
+}
+GIT_OPAQUE_GLOBAL_OPTIONS = {
+    "-C",
+    "-c",
+    "-p",
+    "--config-env",
+    "--exec-path",
+    "--git-dir",
+    "--namespace",
+    "--paginate",
+    "--super-prefix",
+    "--work-tree",
+}
 SYSTEM_PATH_PREFIXES = ("/etc", "/opt", "/usr", "/var/lib", "/var/run")
 
 
@@ -1351,6 +1432,30 @@ def _git_subcommand(tokens: Sequence[str]) -> tuple[str | None, tuple[str, ...]]
     return None, ()
 
 
+def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
+    """Reject config-driven aliases and external git-subcommand dispatch."""
+
+    for token in tokens[1:]:
+        if token == "--":
+            break
+        if token in GIT_OPAQUE_GLOBAL_OPTIONS:
+            return True
+        if token.startswith(("-C", "-c")) and token not in {"-C", "-c"}:
+            return True
+        if any(
+            token.startswith(option + "=")
+            for option in GIT_OPAQUE_GLOBAL_OPTIONS
+            if option.startswith("--")
+        ):
+            return True
+        if not token.startswith("-"):
+            break
+    subcommand, _ = _git_subcommand(tokens)
+    if subcommand is None:
+        return not any(token in {"--help", "--version"} for token in tokens[1:])
+    return subcommand not in GIT_DIRECT_BUILTIN_SUBCOMMANDS
+
+
 def _command_matches_argv(command: str, expected: Sequence[str]) -> bool:
     expected_tokens = tuple(str(value) for value in expected)
     for tokens in _shell_tokenizations(command):
@@ -1594,6 +1699,8 @@ def _command_has_unclassified_indirection(command: str) -> bool:
             if not raw_segment:
                 continue
             raw_executable = Path(raw_segment[0]).name.lower()
+            if raw_executable == "env" or ENV_ASSIGNMENT_RE.match(raw_segment[0]):
+                return True
             if raw_executable in OPAQUE_BUILD_AND_TASK_RUNNERS:
                 return True
             if raw_executable in SHELL_NAMES:
@@ -1614,6 +1721,8 @@ def _command_has_unclassified_indirection(command: str) -> bool:
                 | OPAQUE_PROCESS_LAUNCH_WRAPPERS
                 | OPAQUE_BUILD_AND_TASK_RUNNERS
             ):
+                return True
+            if executable == "git" and _git_has_opaque_dispatch(segment):
                 return True
             if executable == "find" and any(
                 value in {"-exec", "-execdir", "-ok", "-okdir"}
