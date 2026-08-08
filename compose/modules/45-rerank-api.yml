@@ -14,6 +14,8 @@ services:
       AOA_RERANK_IDLE_UNLOAD_SEC: "${AOA_RERANK_IDLE_UNLOAD_SEC:-900}"
       AOA_RERANK_IDLE_UNLOAD_CHECK_SEC: "${AOA_RERANK_IDLE_UNLOAD_CHECK_SEC:-60}"
       AOA_RERANK_EXIT_AFTER_IDLE_UNLOAD: "${AOA_RERANK_EXIT_AFTER_IDLE_UNLOAD:-true}"
+      AOA_RERANK_EXIT_AFTER_MEMORY_RELIEF: "${AOA_RERANK_EXIT_AFTER_MEMORY_RELIEF:-true}"
+      AOA_RERANK_RELIEF_RECEIPT_PATH: /state/memory-relief-receipts.json
       HF_HOME: /cache/hf
       TRANSFORMERS_CACHE: /cache/hf/transformers
       HUGGINGFACE_HUB_CACHE: /cache/hf/hub
@@ -25,6 +27,7 @@ services:
       - "${AOA_QWEN3_RERANKER_MODEL_HOST_PATH:-/srv/abyss-machine/cache/ai/qwen3-reranker-0.6b-int8-ov}:/models/qwen3-reranker:ro,Z"
       - "${AOA_QWEN3_RERANKER_CACHE_HOST_PATH:-/srv/abyss-machine/cache/ai/openvino/qwen3-reranker-0.6b-int8-ov}:/cache/openvino:Z"
       - "${AOA_QWEN3_RERANKER_HF_CACHE_HOST_PATH:-/srv/abyss-machine/cache/ai/huggingface}:/cache/hf:Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Logs/rerank-api:/state:Z"
     devices:
       - /dev/dri:/dev/dri
     ports:

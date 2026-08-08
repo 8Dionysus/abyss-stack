@@ -15,6 +15,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Added
 
+- Reranker owner memory relief now uses a separate
+  `AOA_RERANK_EXIT_AFTER_MEMORY_RELIEF` switch, atomically drains new requests
+  before a clean container restart, and commits one of up to 32 action-ID
+  receipts under `Logs/rerank-api` before releasing the model so retries remain
+  idempotent across that restart.
+
 - Decision `ABYSS-STACK-D-0106` and a third, separately credentialed
   `abyss-stack-mcp` process admit one exact internal-effect pilot on loopback
   port `5439`. Its only tool consumes a content-addressed read-service restart

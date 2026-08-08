@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import sys
+import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest import mock
@@ -102,11 +104,20 @@ class RagBridgeContractsTests(unittest.TestCase):
 
         self.assertIn("AOA_RERANK_IDLE_UNLOAD_SEC", env)
         self.assertEqual(env.get("AOA_RERANK_EXIT_AFTER_IDLE_UNLOAD"), "${AOA_RERANK_EXIT_AFTER_IDLE_UNLOAD:-true}")
+        self.assertEqual(
+            env.get("AOA_RERANK_EXIT_AFTER_MEMORY_RELIEF"),
+            "${AOA_RERANK_EXIT_AFTER_MEMORY_RELIEF:-true}",
+        )
+        self.assertEqual(
+            env.get("AOA_RERANK_RELIEF_RECEIPT_PATH"),
+            "/state/memory-relief-receipts.json",
+        )
         self.assertNotIn("mem_limit", rerank)
         self.assertNotIn("mem_reservation", rerank)
         self.assertNotIn("cpus", rerank)
         self.assertTrue(any("/srv/abyss-machine/cache/ai/qwen3-reranker" in volume for volume in volumes))
         self.assertTrue(any("/srv/abyss-machine/cache/ai/openvino/qwen3-reranker" in volume for volume in volumes))
+        self.assertTrue(any("/Logs/rerank-api:/state:Z" in volume for volume in volumes))
 
     def test_rerank_owner_memory_relief_is_atomic_and_idempotent(self) -> None:
         backend = self.load_rerank_backend()
@@ -146,6 +157,132 @@ class RagBridgeContractsTests(unittest.TestCase):
         self.assertEqual(result["reason"], "active_requests")
         self.assertEqual(result["owner_gate"]["active_requests_at_action"], 1)
         self.assertTrue(result["loaded"])
+
+    def test_rerank_owner_memory_relief_exits_only_after_loaded_release(self) -> None:
+        backend = self.load_rerank_backend()
+        scorer = backend.LazyScorer()
+        scorer._scorer = SimpleNamespace(load_ms=1.0)
+        request = backend.MemoryReliefRequest(
+            action="relieve_memory",
+            action_id="c" * 32,
+            owner="abyss-stack",
+            workload_id="rerank-api:qwen3-0.6b",
+        )
+
+        with mock.patch.object(backend.threading, "Timer") as timer:
+            result = scorer.owner_memory_relief(request, exit_process=True)
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["exit_process"])
+        self.assertTrue(scorer.draining)
+        self.assertFalse(scorer.begin_request())
+        timer.assert_called_once()
+        timer.return_value.start.assert_called_once_with()
+
+    def test_rerank_owner_memory_relief_replays_after_process_restart(self) -> None:
+        backend = self.load_rerank_backend()
+        request = backend.MemoryReliefRequest(
+            action="relieve_memory",
+            action_id="d" * 32,
+            owner="abyss-stack",
+            workload_id="rerank-api:qwen3-0.6b",
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            receipt_path = Path(tmpdir) / "receipts.json"
+            first_process = backend.LazyScorer(receipt_path)
+            first_process._scorer = SimpleNamespace(load_ms=1.0)
+            with mock.patch.object(backend.threading, "Timer"):
+                first = first_process.owner_memory_relief(request, exit_process=True)
+
+            second_process = backend.LazyScorer(receipt_path)
+            with mock.patch.object(backend.threading, "Timer") as timer:
+                replay = second_process.owner_memory_relief(request, exit_process=True)
+
+        self.assertEqual(replay, first)
+        self.assertFalse(second_process.draining)
+        timer.assert_not_called()
+
+    def test_rerank_owner_memory_relief_fails_closed_on_malformed_receipt(self) -> None:
+        backend = self.load_rerank_backend()
+        request = backend.MemoryReliefRequest(
+            action="relieve_memory",
+            action_id="e" * 32,
+            owner="abyss-stack",
+            workload_id="rerank-api:qwen3-0.6b",
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            receipt_path = Path(tmpdir) / "receipts.json"
+            receipt_path.write_text("null", encoding="utf-8")
+            scorer = backend.LazyScorer(receipt_path)
+            scorer._scorer = SimpleNamespace(load_ms=1.0)
+            result = scorer.owner_memory_relief(request, exit_process=True)
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["reason"], "receipt_store_unavailable")
+        self.assertTrue(result["loaded"])
+        self.assertFalse(scorer.draining)
+
+    def test_rerank_owner_memory_relief_preserves_model_when_receipt_commit_fails(self) -> None:
+        backend = self.load_rerank_backend()
+        scorer = backend.LazyScorer()
+        loaded_scorer = SimpleNamespace(load_ms=1.0)
+        scorer._scorer = loaded_scorer
+        request = backend.MemoryReliefRequest(
+            action="relieve_memory",
+            action_id="f" * 32,
+            owner="abyss-stack",
+            workload_id="rerank-api:qwen3-0.6b",
+        )
+
+        with (
+            mock.patch.object(scorer, "_persist_relief_results", side_effect=OSError("read-only state")),
+            mock.patch.object(backend, "trim_process_heap") as trim_heap,
+            mock.patch.object(backend.threading, "Timer") as timer,
+        ):
+            result = scorer.owner_memory_relief(request, exit_process=True)
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["reason"], "receipt_store_unavailable")
+        self.assertTrue(result["loaded"])
+        self.assertIs(scorer._scorer, loaded_scorer)
+        self.assertNotIn(request.action_id, scorer._relief_results)
+        self.assertFalse(scorer.draining)
+        trim_heap.assert_not_called()
+        timer.assert_not_called()
+
+    def test_rerank_receipt_eviction_preserves_age_across_restarts(self) -> None:
+        backend = self.load_rerank_backend()
+        action_ids = [f"{index:032x}" for index in reversed(range(32))]
+        results = {action_id: {"ok": True, "action_id": action_id} for action_id in action_ids}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            receipt_path = Path(tmpdir) / "receipts.json"
+            receipt_path.write_text(json.dumps({"results": results}), encoding="utf-8")
+            first_process = backend.LazyScorer(receipt_path)
+            first_process.owner_memory_relief(
+                backend.MemoryReliefRequest(
+                    action="relieve_memory",
+                    action_id="a" * 32,
+                    owner="abyss-stack",
+                    workload_id="rerank-api:qwen3-0.6b",
+                )
+            )
+            second_process = backend.LazyScorer(receipt_path)
+            second_process.owner_memory_relief(
+                backend.MemoryReliefRequest(
+                    action="relieve_memory",
+                    action_id="b" * 32,
+                    owner="abyss-stack",
+                    workload_id="rerank-api:qwen3-0.6b",
+                )
+            )
+            final_process = backend.LazyScorer(receipt_path)
+
+        self.assertNotIn(action_ids[0], final_process._relief_results)
+        self.assertNotIn(action_ids[1], final_process._relief_results)
+        self.assertIn(action_ids[-1], final_process._relief_results)
 
     def test_rag_manifests_exist_and_are_json_objects(self) -> None:
         for name in ("sources.json", "agentic-graph.v1.json", "dag-jobs.v1.json"):
