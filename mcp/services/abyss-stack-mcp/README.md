@@ -24,7 +24,18 @@ authorizes either contour:
 - `abyss-stack-mcp-admission-automation` derives an evidence-bound runtime
   overlay, managed topology and catalog, runs the complete sweep, builds
   per-contour Keeper specs, and asks the exact compatible `aoa-sdk` Keeper to
-  publish a private CAS state projection;
+  publish a private CAS state projection. An optional contour-scoped private
+  inbox imports independently issued immutable owner nodes; repeated cycles
+  import each node once, reuse only still-compatible nodes, and report both
+  avoided refresh cost and the exact invalidated stages. The managed keeper
+  consumes the provisioned mode-`0700`
+  `${AOA_STACK_ROOT}/Logs/mcp/admission/keeper-inbox` root, shaped as
+  `(organ_id)/(contour_id)/*.json`;
+- `abyss-stack-mcp-admission-revision` composes one non-publishing registry-v2
+  contour revision only after exact current and last-known-good observations,
+  central proof, KAG owner acceptance, consumer compatibility, rollback
+  readiness, and a separately issued operator decision all bind the same
+  shadow predecessor;
 - `abyss-stack-mcp-system-status` combines that private projection with the
   managed catalog, owner registry, protocol-lab verdict, and aggregate SDK
   TaskStore state into one private, content-addressed read model.
@@ -642,6 +653,11 @@ Provisioning also creates the mode-`0700`
 `${AOA_STACK_ROOT}/Logs/mcp/observations` root without creating or rewriting
 evidence. The producer receives that directory as its only writable stack path
 and atomically publishes mode-`0600` `current.json`.
+It also creates the non-symlink mode-`0700`
+`${AOA_STACK_ROOT}/Logs/mcp/admission/keeper-inbox` root. Provisioning writes no
+owner evidence into it; independent owners stage immutable evidence nodes in
+the matching contour directory and the Keeper validates every node before
+import.
 Provisioning creates a separate mode-`0700`
 `${AOA_STACK_ROOT}/Logs/mcp/internal-effects/read-restart-pilot` root for the
 effect process. It does not stage a plan, issue approval, start a unit, or
@@ -649,9 +665,9 @@ authorize an effect.
 
 Runtime dependencies and the build backend are exact pins in
 `requirements.constraints`; the one direct artifact requirement is the immutable
-`aoa-sdk v0.10.0` GitHub Release wheel. The committed `requirements.lock` binds
+`aoa-sdk v0.10.1` GitHub Release wheel. The committed `requirements.lock` binds
 that public release to SHA-256
-`0d41d53e3aafdcdb9d63b24b40fa8038051f8037e9508e54e216c6076863e764`
+`7222d373044506d0e79175c364b64e3a6ed6a164650af0db54dcce1fcf67f6ad`
 and carries hashes for the entire resolved closure. The validator rejects any
 other SDK URL or digest. Regenerate the lock from the repository root with
 `pip-tools==7.6.0`:

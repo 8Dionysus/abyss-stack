@@ -52,6 +52,24 @@ events are primary; a five-minute timer is only a backstop. The automation does
 not start services, mutate registry source, extend evidence, issue proof, or
 infer acceptance.
 
+The operator may expose an explicit private inbox shaped as
+`(organ_id, contour_id)/*.json`. The Keeper validates and imports each
+owner-issued content-addressed node once, then reports reuse count, planned
+refresh cost, and avoided full-refresh cost. A changed stage subject or
+dependency invalidates that stage and its dependents instead of replaying
+unrelated owner work. The managed unit binds this input to the provisioned
+`Logs/mcp/admission/keeper-inbox` root. Provisioning creates only the private
+directory and never manufactures owner evidence. Symlinked roots, contours,
+and node files fail closed.
+
+When all stronger owners have independently issued exact current evidence, the
+stack may compose `aoa_organ_contour_admission_revision_v1` for one KAG read
+contour. Composition validates the registry-v2 predecessor, current and
+distinct last-known-good observations, consumer registration, central proof,
+KAG acceptance, rollback readiness, freshness, and a separately issued
+operator decision. It remains a proposal: the SDK performs the contour CAS,
+and a later operator-controlled publication performs the production write.
+
 ## Rationale
 
 Runtime identity belongs to the stack, but organ source, proof, acceptance, and
@@ -74,6 +92,9 @@ explicit instead of green.
   process is active and all lower runtime identities match.
 - The Keeper runtime requires an exact compatible `aoa-sdk` artifact before
   deployment; source presence alone is not that artifact proof.
+- Admission-revision composition neither issues owner evidence nor writes the
+  registry and fixes effect, rollback execution, and cross-organ authority to
+  false.
 
 ## Source surfaces
 
@@ -82,6 +103,7 @@ explicit instead of green.
 - `mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/managed_catalog.py`
 - `mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/managed_topology.py`
 - `mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/runtime_overlay.py`
+- `mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/admission_revision.py`
 - `systemd/user/abyss-mcp-admission-keeper.*`
 - `systemd/user/aoa-organ-mcp-read@.service`
 - `systemd/user/abyss-stack-mcp-*.service`

@@ -241,6 +241,12 @@ runtime, source-checkout success is not deployment readiness. File events and
 the timer can also only detect inputs they explicitly watch; the periodic full
 sweep bounds but does not eliminate that detection delay.
 
+The registry-v2 admission composer is not a registry writer. It accepts only a
+content-addressed operator decision for the exact shadow predecessor and exact
+current owner-qualified evidence, emits a content-addressed proposal, and
+cannot set effect, rollback-execution, or cross-organ authority. Publication
+and its postcondition remain a separate operator transaction.
+
 A same-UID process that can read the deployed Secrets tree remains outside the
 protection offered by bearer authentication. Stronger OS-user or container
 isolation remains desirable for broader effects. The admitted pilot therefore

@@ -15,6 +15,8 @@
 - exact managed-contour topology and source/runtime preflight observations;
 - event-driven, timer-backed orchestration of SDK Admission Keeper planning
   and private state publication.
+- non-publishing composition of one SDK-validated registry-v2 contour
+  admission revision from independently issued exact evidence.
 - private bounded projection of separate runtime, admission, owner, protocol,
   and aggregate TaskStore operational axes.
 
@@ -33,6 +35,8 @@
   or registry operator;
 - service start/restart, registry mutation, TTL extension, or admission from
   the admission-maintenance runner.
+- proof, acceptance, consumer, rollback, or operator evidence issuance by the
+  admission-revision composer.
 - task or principal enumeration, owner-run execution, or any conversion from a
   Task terminal state into proof, acceptance, admission, or effect authority.
 

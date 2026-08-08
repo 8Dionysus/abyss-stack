@@ -12,6 +12,21 @@ PathChanged=/srv/AbyssOS/abyss-stack/Secrets/Configs/organ-mcp-candidate-auth-ma
 PathChanged=/srv/AbyssOS/abyss-stack/Secrets/Configs/abyss-stack-mcp-auth-manifest.json
 PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json
 PathChanged=/srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/generated/protocol-lab-status.json
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox/aoa-kag/read
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox/aoa-stats/read
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox/aoa-decisions/read
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox/abyss-stack/read
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox/abyss-machine/read
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox/tree-of-sophia/read
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox/aoa-session-memory/read
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox/aoa-memo/read
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox/aoa-evals/read
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox/aoa-4pda-connector/read
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox/aoa-telegram-connector/read
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox/aoa-discord-connector/read
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox/aoa-course-connector/read
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox/aoa-stackoverflow-connector/read
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox/aoa-xda-connector/read
 Unit=abyss-mcp-admission-keeper.service
 
 [Install]
