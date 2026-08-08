@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 28393245,
+  "allowed_tracked_bytes": 32289958,
+  "approved_by": "repository-owner",
+  "base_ref": "63ab4efd013e02fe59cd5949d202a0b470d14cb1",
+  "changed_generated_bytes": 28393245,
+  "changed_generated_files": 520,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "c6077020e8fabd611f6865d93ab3b8b9f80ca0f3e9ab042c83e4e4ba27b31455",
+  "reason": "Refresh derived actor-runtime projections after fail-closed process-wrapper handling.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 32289958,
+  "tracked_bytes_max": 24117248
+}
