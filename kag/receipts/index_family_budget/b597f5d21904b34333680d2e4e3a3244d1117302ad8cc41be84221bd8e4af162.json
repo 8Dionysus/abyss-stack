@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26304296,
+  "allowed_tracked_bytes": 31918952,
+  "approved_by": "repository-owner",
+  "base_ref": "e690b4153e5ecc682d21825d92cc18d482a42f86",
+  "changed_generated_bytes": 26304296,
+  "changed_generated_files": 328,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "b597f5d21904b34333680d2e4e3a3244d1117302ad8cc41be84221bd8e4af162",
+  "reason": "Role-first external actor admission adds owner-pinned contracts, model-neutral binding, role-scoped MCP profiles, lifecycle validation, and full release-proof coverage; retain the complete generated family after integrating current MCP admission main.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 31918952,
+  "tracked_bytes_max": 24117248
+}
