@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 7664633,
+  "allowed_tracked_bytes": 30951371,
+  "approved_by": "repository-owner",
+  "base_ref": "7ab5d1273e1185e495af7b7d12ca0ab717fe1b1a",
+  "changed_generated_bytes": 7664633,
+  "changed_generated_files": 88,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "63c00322ca54d474d40868d0dac4d31cfc6a2280c1550621d3c1d3851b3ec314",
+  "reason": "Refresh the portable owner index family after binding admission canaries and rollback targets to the exact live process and executable bytes; preserve full source coverage and record the generated-size exception explicitly.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 30951371,
+  "tracked_bytes_max": 24117248
+}
