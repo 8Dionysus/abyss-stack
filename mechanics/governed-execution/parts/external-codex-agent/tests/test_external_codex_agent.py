@@ -256,6 +256,13 @@ if parent_match is not None:
     thread_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, parent["reentry_id"]))
     print(json.dumps({"type": "thread.started", "thread_id": thread_id}), flush=True)
     print(json.dumps({"type": "turn.started"}), flush=True)
+    if "parent-tool-event" in parent["reentry_id"]:
+        print(json.dumps({"type": "item.completed", "item": {
+            "type": "command_execution",
+            "command": "/usr/bin/true",
+            "status": "completed",
+            "exit_code": 0,
+        }}), flush=True)
     if "distilled_child_return" in parent:
         distilled = parent["distilled_child_return"]
         child_ref = distilled["child_result_ref"]
@@ -3001,6 +3008,31 @@ def test_attached_shell_separator_does_not_hide_forbidden_effect() -> None:
     assert "push" in RUNTIME._command_effects(command)
 
 
+def test_env_split_string_is_opaque_and_cannot_hide_secret_access() -> None:
+    command = "/usr/bin/env -S 'cat /home/fixture/.ssh/id_rsa'"
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+    assert "secret_access" in RUNTIME._command_effects(command)
+
+
+def test_attached_redirection_cannot_hide_git_commit() -> None:
+    command = "/usr/bin/bash -lc 'git commit>/tmp/log -am bounded'"
+    assert "commit" in RUNTIME._command_effects(command)
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/timeout -s TERM 30 /usr/bin/git push",
+        "/usr/bin/timeout --signal=TERM 30 /usr/bin/git push",
+        "/usr/bin/timeout -k 5 30 /usr/bin/git push",
+        "/usr/bin/timeout --kill-after 5 30 /usr/bin/git push",
+    ),
+)
+def test_timeout_value_options_cannot_hide_git_push(command: str) -> None:
+    assert "push" in RUNTIME._command_effects(command)
+
+
 def test_started_command_survives_interruption_and_blocks_authority(
     tmp_path: Path,
 ) -> None:
@@ -4211,6 +4243,10 @@ def test_parent_inference_yields_and_exact_authority_event_reenters_same_thread(
     }
     assert reentered["wake_evaluation"]["event_kind"] == "run.authority_required"
     assert reentered["wake_evaluation"]["wake_parent"] is True
+    admitted_result_path = Path(reentered["child_result_ref"]["artifact_ref"])
+    assert admitted_result_path != child_result_path
+    assert admitted_result_path.parent.parent.name == "attempts"
+    assert admitted_result_path.name.startswith("runtime-result")
     reentry_output = RUNTIME._load_verified_json_ref(
         reentered["reentry_result_ref"], label="test re-entry result"
     )
@@ -4229,6 +4265,146 @@ def test_parent_inference_yields_and_exact_authority_event_reenters_same_thread(
         "external_parent.reentry_started",
         "external_parent.reentry_completed",
     ]
+
+
+def test_parent_yield_rejects_any_tool_event(tmp_path: Path) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_ambiguity_stop",
+        identity_suffix="luna-xhigh-parent-tool-event",
+    )
+    reentry_id = "reentry:fixture:parent-tool-event"
+    obligation_path = _parent_reentry_obligation(
+        tmp_path, fixture, reentry_id=reentry_id
+    )
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        bridge.yield_parent(obligation_path)
+
+    assert exc_info.value.code == "reentry_parent_tool_event_forbidden"
+    assert bridge.status(reentry_id)["state"]["status"] == "yielding"
+
+
+def test_parent_reentry_recovers_admitted_snapshot_without_live_child_result(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_ambiguity_stop",
+        identity_suffix="luna-xhigh-admission-crash",
+    )
+    reentry_id = "reentry:fixture:luna-xhigh-admission-crash"
+    obligation_path = _parent_reentry_obligation(
+        tmp_path, fixture, reentry_id=reentry_id
+    )
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge.yield_parent(obligation_path)
+    assert fixture["runtime"].run_to_terminal(fixture["launch_path"])["status"] == (
+        "authority_blocked"
+    )
+    child_result_path = (
+        fixture["runtime"]._session_dir(fixture["session_id"]) / "result.json"
+    )
+    original_append = bridge._append_event
+    crashed = False
+
+    def crash_after_child_admission(*args: Any, **kwargs: Any) -> Any:
+        nonlocal crashed
+        event = original_append(*args, **kwargs)
+        if (
+            kwargs.get("event_type") == "external_parent.child_event_admitted"
+            and not crashed
+        ):
+            crashed = True
+            raise KeyboardInterrupt("fixture crash after immutable admission")
+        return event
+
+    monkeypatch.setattr(bridge, "_append_event", crash_after_child_admission)
+    with pytest.raises(KeyboardInterrupt, match="immutable admission"):
+        bridge.reenter_parent(reentry_id, child_result_path)
+
+    admitted = bridge.status(reentry_id)["state"]
+    admitted_path = Path(admitted["child_result_ref"]["artifact_ref"])
+    assert admitted["status"] == "waiting"
+    assert admitted_path != child_result_path
+    assert admitted_path.parent.parent.name == "attempts"
+
+    monkeypatch.setattr(bridge, "_append_event", original_append)
+
+    def forbid_live_child_lookup(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("admitted retry consulted the mutable child result")
+
+    monkeypatch.setattr(bridge, "_child_runtime_lock_target", forbid_live_child_lookup)
+    recovered = bridge.reenter_parent(reentry_id, child_result_path)["state"]
+    events = [
+        json.loads(line)
+        for line in bridge._events_path(reentry_id).read_text(encoding="utf-8").splitlines()
+    ]
+
+    assert recovered["status"] == "reentered"
+    assert recovered["child_result_ref"] == admitted["child_result_ref"]
+    assert [event["event_type"] for event in events].count(
+        "external_parent.child_event_admitted"
+    ) == 1
+
+
+def test_parent_reentry_recovers_started_event_before_state_save(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_ambiguity_stop",
+        identity_suffix="luna-xhigh-start-event-crash",
+    )
+    reentry_id = "reentry:fixture:luna-xhigh-start-event-crash"
+    obligation_path = _parent_reentry_obligation(
+        tmp_path, fixture, reentry_id=reentry_id
+    )
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge.yield_parent(obligation_path)
+    assert fixture["runtime"].run_to_terminal(fixture["launch_path"])["status"] == (
+        "authority_blocked"
+    )
+    child_result_path = (
+        fixture["runtime"]._session_dir(fixture["session_id"]) / "result.json"
+    )
+    original_save = bridge._save_state
+    crashed = False
+
+    def crash_before_reentering_state_save(state: dict[str, Any]) -> None:
+        nonlocal crashed
+        if state["status"] == "reentering" and not crashed:
+            crashed = True
+            raise KeyboardInterrupt("fixture crash after re-entry start event")
+        original_save(state)
+
+    monkeypatch.setattr(bridge, "_save_state", crash_before_reentering_state_save)
+    with pytest.raises(KeyboardInterrupt, match="start event"):
+        bridge.reenter_parent(reentry_id, child_result_path)
+
+    recovered_start = bridge.status(reentry_id)["state"]
+    assert recovered_start["status"] == "reentering"
+
+    monkeypatch.setattr(bridge, "_save_state", original_save)
+    completed = bridge.reenter_parent(reentry_id, child_result_path)["state"]
+    events = [
+        json.loads(line)
+        for line in bridge._events_path(reentry_id).read_text(encoding="utf-8").splitlines()
+    ]
+
+    assert completed["status"] == "reentered"
+    assert [event["event_type"] for event in events].count(
+        "external_parent.child_event_admitted"
+    ) == 1
+    assert [event["event_type"] for event in events].count(
+        "external_parent.reentry_started"
+    ) == 1
 
 
 def test_parent_yield_retries_from_durable_state_without_rewriting_partial_attempt(

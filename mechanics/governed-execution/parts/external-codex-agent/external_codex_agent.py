@@ -93,6 +93,8 @@ SOURCE_LINE_ANCHOR_RE = re.compile(r"^L(?P<start>[1-9][0-9]*)(?:-L(?P<end>[1-9][
 INPUT_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SHELL_NAMES = {"bash", "dash", "sh", "zsh"}
 SHELL_SEPARATORS = {"&", "&&", ";", "|", "||"}
+SHELL_REDIRECTION_CHARS = frozenset("<>")
+PARENT_PASSIVE_ITEM_TYPES = {"agent_message", "reasoning"}
 ENV_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=.*$", re.S)
 SECRET_PATH_PARTS = {
     ".aws",
@@ -1159,7 +1161,7 @@ def _shell_tokenizations(command: str) -> tuple[tuple[str, ...], ...]:
             continue
         seen.add(raw)
         try:
-            lexer = shlex.shlex(raw, posix=True, punctuation_chars=";&|")
+            lexer = shlex.shlex(raw, posix=True, punctuation_chars=";&|<>")
             lexer.whitespace_split = True
             lexer.commenters = ""
             tokens = tuple(lexer)
@@ -1205,6 +1207,10 @@ def _unwrap_command(segment: Sequence[str]) -> tuple[str, ...]:
             index = 1
             while index < len(values):
                 token = values[index]
+                if token in {"-S", "--split-string"} or token.startswith(
+                    "--split-string="
+                ):
+                    return ()
                 if ENV_ASSIGNMENT_RE.match(token):
                     index += 1
                     continue
@@ -1224,10 +1230,30 @@ def _unwrap_command(segment: Sequence[str]) -> tuple[str, ...]:
             continue
         if executable == "timeout":
             index = 1
-            while index < len(values) and values[index].startswith("-"):
-                index += 1
-            if index < len(values):
-                index += 1
+            while index < len(values):
+                token = values[index]
+                if token == "--":
+                    index += 1
+                    break
+                if token in {"-k", "--kill-after", "-s", "--signal"}:
+                    if index + 1 >= len(values):
+                        return ()
+                    index += 2
+                    continue
+                if token.startswith(("--kill-after=", "--signal=")) or re.fullmatch(
+                    r"-(?:k|s).+", token
+                ):
+                    index += 1
+                    continue
+                if token in {"--foreground", "--preserve-status", "--verbose"}:
+                    index += 1
+                    continue
+                if token.startswith("-"):
+                    return ()
+                break
+            if index >= len(values):
+                return ()
+            index += 1
             values = values[index:]
             continue
         break
@@ -1497,6 +1523,12 @@ def _command_has_unclassified_indirection(command: str) -> bool:
     if not tokenizations:
         return True
     for tokenization in tokenizations:
+        if any(
+            token not in SHELL_SEPARATORS
+            and any(character in token for character in SHELL_REDIRECTION_CHARS)
+            for token in tokenization
+        ):
+            return True
         for raw_segment in _command_segments(tokenization):
             if not raw_segment:
                 continue
@@ -6819,8 +6851,11 @@ class ExternalCodexParentReentry:
             elif event_type == "external_parent.child_event_admitted":
                 child_result_ref = payload.get("child_result_ref")
                 wake_evaluation = payload.get("wake_evaluation")
-                if not isinstance(child_result_ref, dict) or not isinstance(
-                    wake_evaluation, dict
+                if (
+                    recovered.get("status") != "waiting"
+                    or recovered.get("child_result_ref") is not None
+                    or not isinstance(child_result_ref, dict)
+                    or not isinstance(wake_evaluation, dict)
                 ):
                     raise ExternalCodexRuntimeError(
                         "reentry_event_recovery_failed",
@@ -6829,8 +6864,63 @@ class ExternalCodexParentReentry:
                 _verified_artifact_ref_path(
                     child_result_ref, label="recovered child result"
                 )
+                if wake_evaluation.get("wake_parent") is True:
+                    distilled_return_ref = payload.get("distilled_return_ref")
+                    if not isinstance(distilled_return_ref, dict):
+                        raise ExternalCodexRuntimeError(
+                            "reentry_event_recovery_failed",
+                            "waking child event lacks its immutable distilled return",
+                        )
+                    distilled_path = _verified_artifact_ref_path(
+                        distilled_return_ref,
+                        label="recovered distilled child return",
+                    )
+                    if distilled_path != (
+                        self._reentry_dir(reentry_id)
+                        / "distilled-child-return.json"
+                    ):
+                        raise ExternalCodexRuntimeError(
+                            "reentry_event_recovery_failed",
+                            "waking child event names a non-canonical distilled return",
+                        )
                 recovered["child_result_ref"] = child_result_ref
                 recovered["wake_evaluation"] = wake_evaluation
+                child_result = self._load_admitted_child_snapshot(recovered)
+                if wake_evaluation.get("wake_parent") is True:
+                    self._load_admitted_distilled_return(
+                        reentry_id,
+                        recovered,
+                        child_result,
+                    )
+            elif event_type == "external_parent.reentry_started":
+                distilled_return_ref = payload.get("distilled_return_ref")
+                wake_evaluation = recovered.get("wake_evaluation")
+                if (
+                    recovered.get("status") != "waiting"
+                    or not isinstance(recovered.get("child_result_ref"), dict)
+                    or not isinstance(wake_evaluation, dict)
+                    or wake_evaluation.get("wake_parent") is not True
+                    or payload.get("parent_thread_id")
+                    != recovered.get("parent_thread_id")
+                    or not isinstance(distilled_return_ref, dict)
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "reentry_event_recovery_failed",
+                        "re-entry start event differs from the admitted parent wake",
+                    )
+                distilled_path = _verified_artifact_ref_path(
+                    distilled_return_ref,
+                    label="recovered re-entry distilled return",
+                )
+                if distilled_path != (
+                    self._reentry_dir(reentry_id)
+                    / "distilled-child-return.json"
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "reentry_event_recovery_failed",
+                        "re-entry start names a non-canonical distilled return",
+                    )
+                recovered["status"] = "reentering"
             elif event_type == "external_parent.wake_filtered":
                 recovered["status"] = "filtered"
             elif event_type == "external_parent.reentry_failed":
@@ -7163,6 +7253,16 @@ class ExternalCodexParentReentry:
                     "reentry_codex_protocol_invalid",
                     f"parent turn JSONL line {line_number} is not an object",
                 )
+            if str(record.get("type") or "").startswith("item."):
+                item = record.get("item")
+                if (
+                    not isinstance(item, dict)
+                    or item.get("type") not in PARENT_PASSIVE_ITEM_TYPES
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "reentry_parent_tool_event_forbidden",
+                        "parent yield and re-entry turns admit no tool event",
+                    )
             records.append(record)
         thread_ids = {
             str(record["thread_id"])
@@ -7590,6 +7690,7 @@ class ExternalCodexParentReentry:
 
     @staticmethod
     def _canonical_child_runtime_receipt(
+        child_runtime: ExternalCodexRuntime,
         child_result_path: Path,
     ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         """Load one terminal result through its canonical durable runtime state."""
@@ -7677,7 +7778,37 @@ class ExternalCodexParentReentry:
                 "reentry_child_receipt_mismatch",
                 "child event receipt differs from the durable terminal sequence",
             )
-        return child_result, child_state, _artifact_ref(child_result_path)
+        attempt_dir = (
+            session_dir
+            / "attempts"
+            / f"{int(child_result['attempt_count']):03d}"
+        )
+        result_candidates = [attempt_dir / "runtime-result.json"]
+        result_candidates.extend(
+            sorted(attempt_dir.glob("runtime-result-revision-*.json"))
+        )
+        preserved_path = next(
+            (
+                candidate
+                for candidate in result_candidates
+                if candidate.is_file()
+                and not candidate.is_symlink()
+                and sha256_file(candidate) == result_digest
+            ),
+            None,
+        )
+        if preserved_path is None:
+            raise ExternalCodexRuntimeError(
+                "reentry_child_snapshot_missing",
+                "child terminal result has no immutable attempt snapshot",
+            )
+        preserved_ref = _artifact_ref(preserved_path)
+        child_runtime._verified_preserved_result_closure_ref_locked(
+            previous_result=child_result,
+            preserved_result_ref=preserved_ref,
+            preserved_result_path=preserved_path,
+        )
+        return child_result, child_state, preserved_ref
 
     @staticmethod
     def _verify_child_wake_event(
@@ -7784,6 +7915,123 @@ class ExternalCodexParentReentry:
         }
 
     @staticmethod
+    def _load_admitted_child_snapshot(
+        state: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Load only the immutable attempt result already admitted by the parent."""
+
+        child_ref = state.get("child_result_ref")
+        if not isinstance(child_ref, dict):
+            raise ExternalCodexRuntimeError(
+                "reentry_admitted_child_missing",
+                "parent state has no admitted child result snapshot",
+            )
+        snapshot_path = _verified_artifact_ref_path(
+            child_ref,
+            label="admitted child result snapshot",
+        )
+        if (
+            snapshot_path.parent.parent.name != "attempts"
+            or not snapshot_path.parent.name.isdigit()
+            or (
+                snapshot_path.name != "runtime-result.json"
+                and not re.fullmatch(
+                    r"runtime-result-revision-[0-9]{3}\.json",
+                    snapshot_path.name,
+                )
+            )
+        ):
+            raise ExternalCodexRuntimeError(
+                "reentry_child_snapshot_noncanonical",
+                "admitted child result is not an immutable attempt snapshot",
+            )
+        result = load_json(snapshot_path, label="admitted child result snapshot")
+        validate_json(result, RESULT_SCHEMA_PATH, label="admitted child result snapshot")
+        if (
+            result.get("task_id") != state["child_task_id"]
+            or result.get("incarnation_id") != state["child_incarnation_id"]
+            or result.get("wake_evaluation") != state.get("wake_evaluation")
+        ):
+            raise ExternalCodexRuntimeError(
+                "reentry_recovery_input_drift",
+                "admitted child snapshot differs from the durable parent state",
+            )
+        return result
+
+    def _load_admitted_distilled_return(
+        self,
+        reentry_id: str,
+        state: Mapping[str, Any],
+        child_result: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Load the parent-local return bound by the child-admission event."""
+
+        admitted_payloads: list[dict[str, Any]] = []
+        for line_number, line in _iter_jsonl_bytes(
+            self._events_path(reentry_id),
+            failure_code="reentry_recovery_input_drift",
+            label="parent re-entry event stream",
+        ):
+            try:
+                event = json.loads(line)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ExternalCodexRuntimeError(
+                    "reentry_recovery_input_drift",
+                    f"parent re-entry event line {line_number} is invalid",
+                ) from exc
+            if (
+                isinstance(event, dict)
+                and event.get("event_type")
+                == "external_parent.child_event_admitted"
+                and isinstance(event.get("payload"), dict)
+            ):
+                admitted_payloads.append(event["payload"])
+        if len(admitted_payloads) != 1:
+            raise ExternalCodexRuntimeError(
+                "reentry_recovery_input_drift",
+                "parent event stream does not bind exactly one child admission",
+            )
+        payload = admitted_payloads[0]
+        distilled_ref = payload.get("distilled_return_ref")
+        if (
+            payload.get("child_result_ref") != state.get("child_result_ref")
+            or payload.get("wake_evaluation") != state.get("wake_evaluation")
+            or not isinstance(distilled_ref, dict)
+        ):
+            raise ExternalCodexRuntimeError(
+                "reentry_recovery_input_drift",
+                "child admission event differs from the durable parent state",
+            )
+        distilled_path = _verified_artifact_ref_path(
+            distilled_ref,
+            label="admitted distilled child return",
+        )
+        if distilled_path != (
+            self._reentry_dir(reentry_id) / "distilled-child-return.json"
+        ):
+            raise ExternalCodexRuntimeError(
+                "reentry_recovery_input_drift",
+                "child admission event names a non-canonical distilled return",
+            )
+        distilled = load_json(distilled_path, label="admitted distilled child return")
+        if (
+            distilled.get("child_result_ref") != state.get("child_result_ref")
+            or distilled.get("child_task_id") != state["child_task_id"]
+            or distilled.get("child_incarnation_id")
+            != state["child_incarnation_id"]
+            or distilled.get("child_status") != child_result.get("status")
+            or distilled.get("child_thread_id") != child_result.get("thread_id")
+            or distilled.get("wake_evaluation") != state.get("wake_evaluation")
+            or distilled.get("observed_event_digest")
+            != payload.get("observed_event_digest")
+        ):
+            raise ExternalCodexRuntimeError(
+                "reentry_recovery_input_drift",
+                "distilled return differs from its admitted child event",
+            )
+        return distilled
+
+    @staticmethod
     def _reentry_prompt(
         obligation: Mapping[str, Any],
         state: Mapping[str, Any],
@@ -7847,33 +8095,68 @@ class ExternalCodexParentReentry:
                 schema_path=PARENT_OBLIGATION_SCHEMA_PATH,
             )
             task, binding, realization = self._validate_obligation(obligation)
-            child_path = Path(child_result_path)
-            child_runtime, child_session_id = self._child_runtime_lock_target(
-                child_path
-            )
-            with child_runtime._lock(child_session_id):
-                child_result, _child_state, child_ref = (
-                    self._canonical_child_runtime_receipt(child_path)
-                )
-                if (
-                    child_result["task_id"] != state["child_task_id"]
-                    or child_result["incarnation_id"] != state["child_incarnation_id"]
-                    or child_result["task_id"] != task["task_id"]
-                ):
+            already_admitted = isinstance(state.get("child_result_ref"), dict)
+            distilled: dict[str, Any] | None = None
+            if already_admitted:
+                child_result = self._load_admitted_child_snapshot(state)
+                child_ref = state["child_result_ref"]
+                wake = state["wake_evaluation"]
+                if not isinstance(wake, dict):
                     raise ExternalCodexRuntimeError(
-                        "reentry_child_identity_mismatch",
-                        "child terminal result belongs to another task or incarnation",
+                        "reentry_recovery_input_drift",
+                        "admitted child snapshot has no durable wake evaluation",
                     )
-                wake, observed_event = self._verify_child_wake_event(
-                    child_result, binding
+                if wake.get("wake_parent") is True:
+                    distilled = self._load_admitted_distilled_return(
+                        reentry_id,
+                        state,
+                        child_result,
+                    )
+            else:
+                child_path = Path(child_result_path)
+                child_runtime, child_session_id = self._child_runtime_lock_target(
+                    child_path
                 )
-                if not recovering:
+                with child_runtime._lock(child_session_id):
+                    child_result, _child_state, child_ref = (
+                        self._canonical_child_runtime_receipt(
+                            child_runtime,
+                            child_path,
+                        )
+                    )
+                    if (
+                        child_result["task_id"] != state["child_task_id"]
+                        or child_result["incarnation_id"]
+                        != state["child_incarnation_id"]
+                        or child_result["task_id"] != task["task_id"]
+                    ):
+                        raise ExternalCodexRuntimeError(
+                            "reentry_child_identity_mismatch",
+                            "child terminal result belongs to another task or incarnation",
+                        )
+                    wake, observed_event = self._verify_child_wake_event(
+                        child_result, binding
+                    )
+                    distilled_ref: dict[str, Any] | None = None
+                    if wake["wake_parent"]:
+                        distilled = self._distilled_child_return(
+                            child_result,
+                            child_ref,
+                            observed_event,
+                        )
+                        distilled_path = (
+                            self._reentry_dir(reentry_id)
+                            / "distilled-child-return.json"
+                        )
+                        _atomic_write_json(distilled_path, distilled, mode=0o400)
+                        distilled_ref = _artifact_ref(distilled_path)
                     self._append_event(
                         reentry_id,
                         event_type="external_parent.child_event_admitted",
                         payload={
                             "child_result_digest": child_ref["artifact_digest"],
                             "child_result_ref": child_ref,
+                            "distilled_return_ref": distilled_ref,
                             "observed_event_digest": canonical_digest(observed_event),
                             "wake_evaluation": wake,
                         },
@@ -7881,16 +8164,6 @@ class ExternalCodexParentReentry:
                             "parent_wake" if wake["wake_parent"] else "filtered"
                         ),
                     )
-            if recovering:
-                if (
-                    state.get("child_result_ref") != child_ref
-                    or state.get("wake_evaluation") != wake
-                ):
-                    raise ExternalCodexRuntimeError(
-                        "reentry_recovery_input_drift",
-                        "re-entry recovery input differs from the admitted child event",
-                    )
-            else:
                 state["child_result_ref"] = child_ref
                 state["wake_evaluation"] = wake
             expected = state["expected_wake"]
@@ -7916,22 +8189,13 @@ class ExternalCodexParentReentry:
                 self._save_state(state)
                 return self._status_locked(reentry_id)
 
-            distilled = self._distilled_child_return(
-                child_result, child_ref, observed_event
-            )
             distilled_path = self._reentry_dir(reentry_id) / "distilled-child-return.json"
-            if recovering:
-                recovered_distilled = load_json(
-                    distilled_path,
-                    label="durable distilled child return",
+            if distilled is None:
+                raise ExternalCodexRuntimeError(
+                    "reentry_recovery_input_drift",
+                    "exact child wake has no admitted distilled return",
                 )
-                if recovered_distilled != distilled or distilled_path.is_symlink():
-                    raise ExternalCodexRuntimeError(
-                        "reentry_recovery_input_drift",
-                        "durable distilled return differs from the admitted child event",
-                    )
-            else:
-                _atomic_write_json(distilled_path, distilled, mode=0o400)
+            if not recovering:
                 state["status"] = "reentering"
                 self._append_event(
                     reentry_id,

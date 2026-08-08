@@ -278,7 +278,12 @@ configuration command families. Non-owner-fixed interpreter or script bodies,
 and authority-block the terminal result; exact fixed validation argv are
 separately admitted by their owner identity. The sandbox remains the primary effect
 boundary, and command observation is retained as auditable counterevidence.
-Shell control punctuation is tokenized even when attached to an argument, and
+GNU `env -S`/`--split-string` remains opaque instead of being mistaken for an
+executable, value-taking `timeout` signal/kill options are consumed before the
+wrapped command is classified, and shell control or redirection punctuation is
+tokenized even when attached to an argument. Redirection remains an
+unclassified authority signal even when the underlying command family is also
+recognized. In addition,
 `item.started` command evidence is durable before completion; a controller or
 worker loss therefore cannot erase an effect that began without emitting
 `item.completed`.
@@ -442,7 +447,7 @@ multi-agent behavior disabled and requires one structured yield report. After
 thread and a `waiting` state. No model inference or model-driven polling remains
 alive while the child works.
 
-`reenter-parent` admits only the exact terminal child result named by the
+`reenter-parent` initially admits only the exact terminal child result named by the
 obligation and binding. The supplied absolute `result.json` must occupy the
 canonical `sessions/<hash(session_id)>/` directory and match the sibling
 durable `state.json` result path/digest, terminal identity/status/thread, and
@@ -450,7 +455,12 @@ canonical event path/terminal sequence. It then revalidates the child's task,
 incarnation, result schema, event-stream digest, evidence inclusion,
 continuation, return owner, deferred decisions, and status-selected SDK wake
 condition while holding the canonical child session lock through the durable
-parent `child_event_admitted` append. Exactly one
+parent `child_event_admitted` append. Before that append, the runtime selects
+the matching immutable `attempts/<number>/runtime-result*.json` snapshot,
+verifies its complete evidence closure, and binds that snapshot—not the mutable
+canonical `result.json`—as the admitted parent input. For a waking event it also
+materializes and digest-binds the parent-local distilled return before the
+admission event. Exactly one
 `external_agent.wake_evaluated` event must match the runtime result. Failed,
 missing, false, duplicate, or non-parent events are preserved and filtered
 without a second Sol turn.
@@ -468,9 +478,11 @@ yield turn and registered wait, admitted child receipt and wake evaluation,
 filtered or failed status, or the exact completed parent turn and result reference. Event recovery therefore
 cannot leave a successful re-entry stranded as `reentering`.
 
-The admitted child event, wake evaluation, and distilled return are saved
-before the state becomes `reentering`. A replacement controller may resume
-that exact state with the same canonical child receipt. Re-entry turns use
+The admitted child event, wake evaluation, immutable attempt snapshot, and
+distilled return are saved before the state becomes `reentering`. A replacement
+controller recovering either `waiting` after the admission append or
+`reentering` after the start append reloads only those already admitted bytes;
+it does not consult the live canonical child result again. Re-entry turns use
 numbered, process-contained attempt directories: a live prior supervisor
 blocks overlap, an incomplete dead attempt is preserved before retry, and a
 digest-bound completed-turn receipt is reloaded without a second inference.
@@ -480,7 +492,10 @@ When and only when the admitted event selects `wake_parent`, the controller
 builds a compact return bound to the child-result and observed-event digests,
 then invokes `codex exec resume <exact-parent-thread-id>`. The resumed Sol must
 return a typed parent-reentry report whose identities and authority action
-match that return. A successful cycle therefore has two completed turns on one
+match that return. Both the initial yield and resumed parent turn admit only
+passive reasoning or agent-message items; any command execution, MCP call, file
+change, or other tool item fails the parent turn instead of broadening its
+authority. A successful cycle therefore has two completed turns on one
 parent thread with an inference-free durable wait between them. Re-entry
 validation failure is terminal evidence; only a contained controller/process
 interruption without a terminal re-entry verdict is recoverable or retryable.

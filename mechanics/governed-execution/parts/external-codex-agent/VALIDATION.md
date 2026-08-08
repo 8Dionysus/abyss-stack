@@ -77,7 +77,8 @@ an explicit workspace-write coder to read-only reviewer transition with a
 post-write manifest and reviewed A2A return, exact review-input-to-writer-final
 manifest binding, reviewer-result race refusal, wrapper-delimiter effect observation,
 unclassified non-validation interpreter indirection with exact fixed-validation
-exemption, final-manifest tamper refusal,
+exemption, fail-closed `env --split-string` handling, value-aware `timeout`
+wrapper parsing, attached-redirection observation, final-manifest tamper refusal,
 provenance checks for all loaded `aoa_sdk` modules in the study preparer plus a
 post-compilation persisted
 path inventory, produced-artifact admission, source-evidence file/line
@@ -95,8 +96,10 @@ admission, recovery of a valid event append that preceded its
 state save, recovery of the completed semantic turn when its event preceded
 the state save, locked status observation, re-entry recovery after a crash
 before turn materialization, completed-turn recovery without a second
-inference, false-event filtering with no second parent turn, and exact-thread parent re-entry with a distilled
-return. The fake Codex fixture exercises both filtered and wake branches;
+inference, immutable child-attempt admission independent of later canonical
+child-result changes, rejection of tool events in parent turns, false-event
+filtering with no second parent turn, and exact-thread parent re-entry with a
+distilled return. The fake Codex fixture exercises both filtered and wake branches;
 separate live receipts are required for the installed product surface. The
 installer suite additionally proves that index-hidden packaged source and
 ignored files entering the packaged SDK require explicit dirty-source

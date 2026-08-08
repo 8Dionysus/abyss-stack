@@ -79,7 +79,10 @@ The controller:
   non-owner-fixed interpreter, script, `find -exec`, `eval`, and `xargs`
   commands whose indirect effects cannot be classified are retained as
   counterevidence and authority-block the result, shell separators remain
-  visible even when attached to arguments, and commands are durably observed
+  visible even when attached to arguments, redirection remains an opaque
+  authority signal, `env --split-string` cannot smuggle an executable past the
+  observer, value-taking `timeout` options cannot hide the wrapped command,
+  and commands are durably observed
   from `item.started` rather than only after completion, while exact task validation
   argv remain admitted by their owner-supplied identity;
 - constrains every `immutable:` evidence reference in the session-local output
@@ -116,7 +119,11 @@ The controller:
   `reenter-parent` only for the exact parent thread when one bound event is
   significant; the child result must match its canonical durable runtime
   state/result/event receipt while the child session lock remains held through
-  the parent admission event, and a crash after a valid re-entry event append
+  the parent admission event, but the admitted reference is its verified
+  immutable attempt snapshot plus a pre-materialized digest-bound distilled
+  return rather than the mutable canonical result; recovery uses only those
+  admitted bytes. Parent yield and resume turns reject every tool item, and a
+  crash after a valid re-entry event append
   is recovered only as a strict extension of the previously digested stream,
   with recognized terminal events replaying their filtered, failed, or
   completed semantic state; a pre-turn `reentering` crash resumes the same
