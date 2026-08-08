@@ -13,6 +13,10 @@ from typing import Any
 LAB_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = LAB_ROOT.parents[1]
 BUILDER_PATH = LAB_ROOT / "scripts" / "build_protocol_lab_status.py"
+WATCH_PLAN_PATH = LAB_ROOT / "protocol-watch-plan.v1.json"
+WATCH_PLAN_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-watch-plan.schema.json"
+TASKS_MATRIX_PATH = LAB_ROOT / "tasks-compatibility-matrix.v1.json"
+TASKS_MATRIX_SCHEMA_PATH = LAB_ROOT / "schemas" / "tasks-compatibility-matrix.schema.json"
 EXPECTED_GATE_IDS = tuple(f"P1-{index:02d}" for index in range(1, 15))
 FIXTURES = {
     "wire": (
@@ -24,28 +28,44 @@ FIXTURES = {
         "protocol-production-pair-observation.schema.json",
     ),
     "conformance": (
-        "python-mcp-2.0.0-conformance-observation.json",
-        "protocol-conformance-observation.schema.json",
+        "python-mcp-2.0.0-frozen-conformance-observation.json",
+        "protocol-frozen-conformance-observation.schema.json",
     ),
     "adapter": (
-        "kag-next-pair-observation.json",
-        "kag-next-pair-observation.schema.json",
+        "kag-next-cancellable-pair-observation.json",
+        "kag-next-cancellable-pair-observation.schema.json",
     ),
     "handle": (
-        "kag-handle-pair-observation.json",
-        "kag-handle-pair-observation.schema.json",
+        "kag-handle-pair-current-observation.json",
+        "kag-handle-pair-current-observation.schema.json",
     ),
     "cache": (
-        "kag-cache-pair-observation.json",
-        "kag-cache-pair-observation.schema.json",
+        "kag-cache-pair-current-observation.json",
+        "kag-cache-pair-current-observation.schema.json",
     ),
     "codex_lab": (
-        "codex-0.147.0-alpha.4-kag-next-lab-observation.json",
-        "codex-kag-next-lab-observation.schema.json",
+        "codex-0.147.0-stable-kag-next-lab-observation.json",
+        "codex-kag-next-stable-observation.schema.json",
     ),
     "stable_rollback": (
-        "codex-0.146.0-stable-kag-post-rollback-observation.json",
-        "stable-kag-post-rollback-observation.schema.json",
+        "codex-0.147.0-stable-kag-post-rollback-observation.json",
+        "stable-kag-post-rollback-current-observation.schema.json",
+    ),
+    "watch_run": (
+        "protocol-watch-run-verdict-20260808.json",
+        "protocol-watch-run-verdict.schema.json",
+    ),
+    "tasks_pilot": (
+        "tasks-adapter-pilot-20260808.json",
+        "tasks-adapter-pilot.schema.json",
+    ),
+    "rmcp_tasks_pair": (
+        "rmcp-3.1.2-tasks-adapter-pair-20260808.json",
+        "rmcp-tasks-adapter-pair.schema.json",
+    ),
+    "inspector_tasks_blocker": (
+        "inspector-2.1.0-tasks-strict-pair-blocked-20260808.json",
+        "inspector-tasks-strict-pair.schema.json",
     ),
 }
 
@@ -82,9 +102,13 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     checked_at = checked_at or datetime.now(UTC)
     builder = _load_builder()
     matrix = _load(builder.MATRIX_PATH)
+    tasks_matrix = _load(TASKS_MATRIX_PATH)
     observation = _load(builder.OBSERVATION_PATH)
+    watch_plan = _load(WATCH_PLAN_PATH)
     fixtures: dict[str, dict[str, Any]] = {}
     try:
+        builder.validate_payload(watch_plan, WATCH_PLAN_SCHEMA_PATH)
+        builder.validate_payload(tasks_matrix, TASKS_MATRIX_SCHEMA_PATH)
         for name, (fixture_name, schema_name) in FIXTURES.items():
             payload = _load(LAB_ROOT / "fixtures" / fixture_name)
             builder.validate_payload(payload, LAB_ROOT / "schemas" / schema_name)
@@ -101,8 +125,9 @@ def validate(checked_at: datetime | None = None) -> list[str]:
 
     for label, payload in (
         ("protocol compatibility matrix", matrix),
-        ("Codex prerelease lab observation", fixtures["codex_lab"]),
+        ("Codex stable modern lab observation", fixtures["codex_lab"]),
         ("stable KAG post-rollback observation", fixtures["stable_rollback"]),
+        ("Tasks compatibility matrix", tasks_matrix),
     ):
         expiry = _expiry_error(label, payload, checked_at)
         if expiry is not None:
@@ -111,6 +136,7 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         matrix["expires_at"],
         fixtures["codex_lab"]["expires_at"],
         fixtures["stable_rollback"]["expires_at"],
+        tasks_matrix["expires_at"],
     ):
         errors.append("generated status lost the earliest current evidence expiry")
 
@@ -121,13 +147,50 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     if tuple(gate["gate_id"] for gate in matrix["migration_gates"]) != EXPECTED_GATE_IDS:
         errors.append("P1 gates must remain ordered P1-01 through P1-14")
     gate_status = {gate["gate_id"]: gate["status"] for gate in matrix["migration_gates"]}
-    if {gate_id for gate_id, state in gate_status.items() if state == "blocked"} != {"P1-04", "P1-05", "P1-11"}:
-        errors.append("current conformance, cancellation pair proof, and Tasks must remain blocked")
+    if {gate_id for gate_id, state in gate_status.items() if state == "blocked"} != {"P1-11"}:
+        errors.append("frozen core conformance and cancellation must pass while Tasks remains separate")
     p113 = next(gate for gate in matrix["migration_gates"] if gate["gate_id"] == "P1-13")
     if p113["evidence_refs"] != [
-        "mcp/protocol-lab/fixtures/codex-0.147.0-alpha.4-kag-next-lab-observation.json"
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json"
     ]:
         errors.append("P1-13 text and evidence must bind the actual modern Codex canary")
+
+    watch_ids = [item["input_id"] for item in watch_plan["inputs"]]
+    if len(watch_ids) != len(set(watch_ids)):
+        errors.append("protocol watcher input IDs must be unique")
+    expected_watch_ids = {
+        "codex-consumer",
+        "codex-registry-latest",
+        "mcp-spec-latest",
+        "python-sdk-latest",
+        "typescript-sdk-latest",
+        "go-sdk-latest",
+        "rust-sdk-latest",
+        "csharp-sdk-latest",
+        "inspector-latest",
+        "conformance-main",
+        "protocol-contract",
+        "protocol-status",
+    }
+    if set(watch_ids) != expected_watch_ids:
+        errors.append("protocol watcher lost an exact local or upstream refresh input")
+    watch_by_id = {item["input_id"]: item for item in watch_plan["inputs"]}
+    tasks_watch_paths = {
+        "tasks-compatibility-matrix.v1.json",
+        "fixtures/tasks-adapter-pilot-20260808.json",
+        "fixtures/rmcp-3.1.2-tasks-adapter-pair-20260808.json",
+        "fixtures/inspector-2.1.0-tasks-strict-pair-blocked-20260808.json",
+        "scripts/run_tasks_adapter_pilot.py",
+        "scripts/run_rust_tasks_adapter_pair.py",
+        "scripts/run_inspector_tasks_adapter_pair.py",
+    }
+    if not tasks_watch_paths.issubset(set(watch_by_id["protocol-contract"]["paths"])):
+        errors.append("protocol watcher lost a Tasks matrix, pair fixture, or runner")
+    if watch_plan["ttl_source"] != {
+        "path": "generated/protocol-lab-status.json",
+        "pointer": "/evidence_expires_at",
+    }:
+        errors.append("protocol watcher must consume the derived earliest evidence expiry")
 
     next_spec = matrix["next_spec"]
     if next_spec != {
@@ -149,37 +212,37 @@ def validate(checked_at: datetime | None = None) -> list[str]:
 
     conformance = fixtures["conformance"]
     if (
-        matrix["official_conformance"]["commit"] != "81eb1c3edaed87d7fd585d7b80186da7a2960660"
+        matrix["official_conformance"]["commit"] != "c321dd32035556e6769d3724a8ee97d87c3faaac"
         or conformance["conformance_harness"]["commit"] != matrix["official_conformance"]["commit"]
-        or conformance["directions"]["client"]["scenario_count"] != 33
-        or conformance["directions"]["client"]["success_checks"] != 372
-        or conformance["directions"]["client"]["failed_checks"] != 2
-        or conformance["directions"]["client"]["failure_ids"]
-        != [
-            "json-schema-2020-12-client-echo-completed",
-            "json-schema-2020-12-client-tool-found",
-        ]
-        or conformance["directions"]["server"]["scenario_count"] != 20
-        or conformance["directions"]["server"]["success_checks"] != 40
-        or conformance["directions"]["server"]["failed_checks"] != 0
-        or conformance["verdict"] != "sdk_pair_blocked_current_harness_fixture_mismatch"
+        or conformance["requirements_revision"] != "2026-07-28"
+        or conformance["directions"]["client"]["scored_scenario_count"] != 32
+        or conformance["directions"]["client"]["scored_success_checks"] != 372
+        or conformance["directions"]["client"]["scored_failed_checks"] != 0
+        or conformance["directions"]["server"]["scored_scenario_count"] != 37
+        or conformance["directions"]["server"]["scored_success_checks"] != 119
+        or conformance["directions"]["server"]["scored_failed_checks"] != 0
+        or conformance["verdict"] != "sdk_pair_passed_frozen_2026_07_28_requirements"
     ):
-        errors.append("current conformance observation or its explicit blocker drifted")
+        errors.append("frozen 2026-07-28 conformance observation drifted")
 
     stable = _consumer(matrix, "codex-cli")
-    lab = _consumer(matrix, "codex-cli-prerelease-lab")
-    if stable["version"] != "0.146.0" or stable["next_wire_pair_observed"] or stable["server_discover_observed"]:
+    lab = _consumer(matrix, "codex-cli-stable-modern-lab")
+    if stable["version"] != "0.147.0" or stable["next_wire_pair_observed"] or stable["server_discover_observed"]:
         errors.append("stable Codex must remain a legacy production pair")
     if (
-        lab["version"] != "0.147.0-alpha.4"
+        lab["version"] != "0.147.0"
         or not lab["next_wire_pair_observed"]
         or not lab["server_discover_observed"]
         or lab["tasks_wire_pair_observed"]
     ):
-        errors.append("prerelease Codex lab pair facts drifted")
+        errors.append("stable Codex modern lab pair facts drifted")
 
     codex_lab = fixtures["codex_lab"]
     stable_rollback = fixtures["stable_rollback"]
+    watch_run = fixtures["watch_run"]
+    tasks_pilot = fixtures["tasks_pilot"]
+    rmcp_tasks_pair = fixtures["rmcp_tasks_pair"]
+    inspector_tasks_blocker = fixtures["inspector_tasks_blocker"]
     if (
         codex_lab["wire"]["version"] != "2026-07-28"
         or not codex_lab["wire"]["server_discover_observed"]
@@ -193,11 +256,13 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or codex_lab["wire"]["oversized_input_denied_code"] != -32602
         or codex_lab["server"]["source_artifacts"]
         != {
-            "adapter_harness_sha256": "530066f8098b28f188fff6c2af87a63f0f7bfd6f145f96e018311b019a0b362c",
+            "adapter_harness_sha256": "c2bff51463f47d526993a8096867e88ff1fe4ae47f51d22067bfd301883b1bbb",
             "adapter_package_tree_sha256": "92dc85946802fc917bc832c9ab59d78a08494c5819b2e22abca769223d754cd3",
-            "driver_sha256": "7c272928384bc1d9afb0ad3c0492808d25cc7c0a00a863805be378e9db8fb4dd",
+            "driver_sha256": "7c4d0ea5e0393314cfda5bcb0c59ffb8c34632df19e03f85ba9b933f75e43677",
         }
         or not codex_lab["stable_registration"]["unchanged"]
+        or codex_lab["wire"]["tasks_extension_advertised"]
+        or codex_lab["wire"]["transport_response_mode"] != "sse_disconnect_cancellable"
         or not all(codex_lab["rollback"].values())
     ):
         errors.append("isolated Codex KAG modern-pair proof drifted")
@@ -208,6 +273,85 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or stable_rollback["secrets_included"]
     ):
         errors.append("stable post-rollback canary proof drifted")
+    if (
+        watch_run["verdict"] != "compatible_for_lab_and_read_canary"
+        or not watch_run["facts"]["frozen_core_conformance_passed"]
+        or not watch_run["facts"]["modern_cancellation_propagated"]
+        or not watch_run["facts"]["stable_modern_codex_lab_passed"]
+        or not watch_run["facts"]["stable_post_rollback_canary_passed"]
+        or not watch_run["facts"]["client_extension_capability_absent"]
+        or watch_run["facts"]["production_cutover_allowed"]
+    ):
+        errors.append("orchestrated protocol watcher run verdict drifted")
+    task_cases = {item["case"]: item for item in tasks_pilot["cases"]}
+    expected_task_cases = {
+        "short_sync_fallback",
+        "long_task_poll_complete",
+        "jsonrpc_failure_inlined",
+        "input_required_partial_duplicate_resume",
+        "cooperative_cancellation",
+        "cancellation_completion_race",
+        "worker_and_client_restart_resume",
+        "ttl_expiry_and_cleanup",
+        "wrong_principal_and_unknown_are_indistinguishable",
+        "quota_rate_and_payload_policy",
+        "useful_read_only_owner_diagnostic",
+    }
+    if (
+        set(task_cases) != expected_task_cases
+        or tasks_pilot["case_count"] != len(task_cases)
+        or not tasks_pilot["all_cases_passed"]
+        or not all(item["passed"] for item in task_cases.values())
+        or tasks_pilot["production_enabled"]
+        or tasks_pilot["codex_consumer_used"]
+        or tasks_pilot["notifications"]["tested"]
+        or not tasks_pilot["owner_pilot"]["resumed_after_adapter_restart"]
+        or tasks_pilot["owner_pilot"]["owner_rerun_count"] != 0
+    ):
+        errors.append("bounded Tasks adapter pilot evidence drifted")
+    tasks_by_id = {item["consumer_id"]: item for item in tasks_matrix["consumers"]}
+    expected_tasks_consumers = {
+        "codex-cli",
+        "mcp-inspector",
+        "python-sdk",
+        "typescript-sdk",
+        "go-sdk",
+        "rust-rmcp",
+        "csharp-sdk",
+        "ext-tasks-reference",
+    }
+    if set(tasks_by_id) != expected_tasks_consumers:
+        errors.append("Tasks compatibility matrix lost an exact consumer row")
+    elif (
+        tasks_matrix["production_tasks_allowed"]
+        or not tasks_matrix["core_read_migration_independent"]
+        or tasks_by_id["codex-cli"]["features"]["advertisement"] != "wire_absent"
+        or tasks_by_id["codex-cli"]["verdict"] != "ineligible"
+        or tasks_by_id["mcp-inspector"]["features"]["tasks_get"] != "wire_blocked"
+        or tasks_by_id["mcp-inspector"]["verdict"] != "blocked"
+        or tasks_by_id["rust-rmcp"]["features"]["tasks_get"] != "wire_pass"
+        or tasks_by_id["rust-rmcp"]["verdict"]
+        != "eligible_for_isolated_reference_pilots"
+        or tasks_by_id["csharp-sdk"]["verdict"] != "source_supported_unpaired"
+    ):
+        errors.append("Tasks compatibility verdicts drifted from exact pair evidence")
+    if (
+        rmcp_tasks_pair["verdict"]
+        != "released_rmcp_passed_feature_gated_abyss_adapter"
+        or not all(rmcp_tasks_pair["wire"].values())
+        or rmcp_tasks_pair["adapter"]["production_enabled"]
+        or rmcp_tasks_pair["owner_result"]["owner_rerun_count"] != 0
+        or inspector_tasks_blocker["verdict"]
+        != "blocked_missing_mcp_name_on_raw_tasks_get"
+        or inspector_tasks_blocker["strict_pair"]["mcp_name_on_tasks_get"]
+        or inspector_tasks_blocker["adapter_response"]
+        != {
+            "error_code": -32020,
+            "http_status": 400,
+            "strict_boundary_retained": True,
+        }
+    ):
+        errors.append("reference-client Tasks pair or Inspector blocker drifted")
 
     handle = fixtures["handle"]
     cache = fixtures["cache"]
@@ -226,15 +370,15 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or adapter["pair"]["cancellation"]
         != {
             "client_request_cancelled": True,
-            "server_dispatch_cancelled": False,
-            "server_dispatch_completed_after_client_cancel": True,
+            "server_dispatch_cancelled": True,
+            "server_dispatch_completed_after_client_cancel": False,
         }
     ):
-        errors.append("current owner freshness or cancellation negative proof drifted")
+        errors.append("current owner freshness or cancellation propagation proof drifted")
 
     if (
-        observation["official_conformance"]["status"] != "blocked"
-        or observation["abyss_pair_conformance"]["status"] != "blocked"
+        observation["official_conformance"]["status"] != "passed"
+        or observation["abyss_pair_conformance"]["status"] != "passed"
         or observation["read_only_canary"]["status"] != "passed"
         or observation["dual_support"]["status"] != "passed"
         or observation["rollback"]["status"] != "passed"
@@ -243,7 +387,7 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     ):
         errors.append("current pair observation lost its bounded pilot/production split")
     if (
-        status["read_only_pilot_allowed"]
+        not status["read_only_pilot_allowed"]
         or not status["read_only_pilot_completed"]
         or status["core_read_migration_allowed"]
         or status["tasks_extension_allowed"]
@@ -252,12 +396,10 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or status["external_effect_migration_allowed"]
     ):
         errors.append("split migration verdicts no longer match exact evidence")
-    if status["remaining_core_gate_ids"] != ["P1-04", "P1-05"] or status["remaining_tasks_gate_ids"] != ["P1-11"]:
+    if status["remaining_core_gate_ids"] != [] or status["remaining_tasks_gate_ids"] != ["P1-11"]:
         errors.append("Tasks must remain independent from the core-read blocker list")
     if status["production_cutover_blockers"] != [
-        "stable_codex_modern_pair_unavailable",
-        "current_conformance_fixture_mismatch",
-        "modern_cancellation_not_propagated",
+        "production_modern_pair_not_admitted",
     ]:
         errors.append("production cutover blockers drifted")
 
@@ -280,9 +422,9 @@ def main() -> int:
             print(f"- {error}")
         return 1
     print(
-        "MCP protocol lab validation passed: the prerelease registered read canary and rollback "
-        "are proven; current conformance, cancellation propagation, and production-eligible "
-        "Codex still block core migration."
+        "MCP protocol lab validation passed: frozen core conformance, cancellation, stable "
+        "modern read canary and rollback are proven; production admission and Tasks remain "
+        "separate gates."
     )
     return 0
 

@@ -98,6 +98,7 @@
           "idempotency": "idempotent",
           "maximum_blast_radius": "two serialized restarts of abyss-stack-mcp-read.service: the approved pilot transition and mandatory rollback restart",
           "approval_required": true,
+          "approval_owner": "abyss-stack",
           "annotations_are_security_enforcement": false,
           "rollback_route": "owner://abyss-stack/internal-effect/read-restart-pilot-v1"
         }

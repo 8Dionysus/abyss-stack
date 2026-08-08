@@ -1,0 +1,34 @@
+[Unit]
+Description=Refresh fail-closed preflight reports for managed MCP contours
+Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/README.md
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/managed-contours.json
+ConditionPathIsDirectory=/srv/AbyssOS/abyss-stack/Logs/mcp/preflight
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONHOME=
+Environment=PYTHONPATH=
+ExecStart=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -I -B -m abyss_stack_mcp.preflight_sweep --catalog /srv/AbyssOS/abyss-stack/Logs/mcp/admission/managed-contours.json --output-root /srv/AbyssOS/abyss-stack/Logs/mcp/preflight
+Nice=10
+IOSchedulingClass=idle
+CPUWeight=20
+IOWeight=20
+TimeoutStartSec=90s
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/AbyssOS/abyss-stack/Logs/mcp/preflight
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX
+UMask=0077
+StandardOutput=journal
+StandardError=journal

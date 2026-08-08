@@ -36,10 +36,24 @@ from abyss_stack_mcp.rollback_projection import RollbackProjectionError  # noqa:
 
 
 PIN_RE = re.compile(r"^(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==(?P<version>[^\s\\]+)$")
+DIRECT_URL_RE = re.compile(
+    r"^(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)\s+@\s+(?P<url>https://[^\s\\]+)$"
+)
 LOCK_PIN_RE = re.compile(
     r"^(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==(?P<version>[^\s\\]+)\s+\\$"
 )
+LOCK_DIRECT_URL_RE = re.compile(
+    r"^(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)\s+@\s+"
+    r"(?P<url>https://[^\s\\]+)\s+\\$"
+)
 HASH_RE = re.compile(r"--hash=sha256:[0-9a-f]{64}$")
+AOA_SDK_WHEEL_URL = (
+    "https://github.com/8Dionysus/aoa-sdk/releases/download/v0.10.0/"
+    "aoa_sdk-0.10.0-py3-none-any.whl"
+)
+AOA_SDK_WHEEL_HASH = (
+    "--hash=sha256:0d41d53e3aafdcdb9d63b24b40fa8038051f8037e9508e54e216c6076863e764"
+)
 
 
 def normalized_package(name: str) -> str:
@@ -63,15 +77,25 @@ def validate_runtime_lock() -> None:
         if not line or line.startswith("#"):
             continue
         match = PIN_RE.fullmatch(line)
-        if match is None:
+        direct_match = DIRECT_URL_RE.fullmatch(line)
+        if match is None and direct_match is None:
             raise SystemExit(
-                "requirements.constraints must contain only exact pins; "
+                "requirements.constraints must contain only exact pins or the "
+                "approved aoa-sdk release wheel; "
                 f"line {line_number} is invalid"
             )
-        name = normalized_package(match.group("name"))
+        selected = match or direct_match
+        assert selected is not None
+        name = normalized_package(selected.group("name"))
         if name in constraints:
             raise SystemExit(f"duplicate constraint pin: {name}")
-        constraints[name] = match.group("version")
+        if direct_match is not None:
+            url = direct_match.group("url")
+            if name != "aoa-sdk" or url != AOA_SDK_WHEEL_URL:
+                raise SystemExit("only the approved aoa-sdk release wheel is allowed")
+            constraints[name] = url
+        else:
+            constraints[name] = match.group("version")
 
     lock_text = lock_path.read_text(encoding="utf-8")
     if any(prefix in lock_text for prefix in ("/home/", "/srv/", "/tmp/")):
@@ -82,12 +106,16 @@ def validate_runtime_lock() -> None:
         if not raw_line or raw_line[0].isspace() or raw_line.startswith("#"):
             continue
         match = LOCK_PIN_RE.fullmatch(raw_line)
-        if match is None:
+        direct_match = LOCK_DIRECT_URL_RE.fullmatch(raw_line)
+        if match is None and direct_match is None:
             raise SystemExit(
-                "requirements.lock must contain only exact, continued pins; "
+                "requirements.lock must contain only exact, continued pins or "
+                "the approved aoa-sdk release wheel; "
                 f"line {index + 1} is invalid"
             )
-        name = normalized_package(match.group("name"))
+        selected = match or direct_match
+        assert selected is not None
+        name = normalized_package(selected.group("name"))
         if name in locked:
             raise SystemExit(f"duplicate lock pin: {name}")
         hashes: list[str] = []
@@ -103,7 +131,17 @@ def validate_runtime_lock() -> None:
                 hashes.append(stripped)
         if not hashes or any(HASH_RE.fullmatch(value) is None for value in hashes):
             raise SystemExit(f"lock pin {name} is missing a valid sha256 hash")
-        locked[name] = match.group("version")
+        if direct_match is not None:
+            url = direct_match.group("url")
+            if (
+                name != "aoa-sdk"
+                or url != AOA_SDK_WHEEL_URL
+                or hashes != [AOA_SDK_WHEEL_HASH]
+            ):
+                raise SystemExit("aoa-sdk lock must bind the approved wheel and digest")
+            locked[name] = url
+        else:
+            locked[name] = match.group("version")
 
     if locked != constraints:
         missing = sorted(set(constraints) - set(locked))
@@ -125,13 +163,24 @@ def validate_runtime_lock() -> None:
     ]
     for requirement in declared:
         match = PIN_RE.fullmatch(requirement)
-        if match is None:
+        direct_match = DIRECT_URL_RE.fullmatch(requirement)
+        if match is None and direct_match is None:
             raise SystemExit(f"pyproject dependency must be exact: {requirement}")
-        name = normalized_package(match.group("name"))
-        version = match.group("version")
-        if constraints.get(name) != version:
+        selected = match or direct_match
+        assert selected is not None
+        name = normalized_package(selected.group("name"))
+        value = (
+            direct_match.group("url")
+            if direct_match is not None
+            else match.group("version")
+        )
+        if direct_match is not None and (
+            name != "aoa-sdk" or value != AOA_SDK_WHEEL_URL
+        ):
+            raise SystemExit("pyproject aoa-sdk dependency is not the approved wheel")
+        if constraints.get(name) != value:
             raise SystemExit(
-                f"pyproject dependency {name}=={version} is absent from exact closure"
+                f"pyproject dependency {requirement} is absent from exact closure"
             )
 
 
@@ -190,6 +239,11 @@ def main() -> int:
         != "abyss_stack_mcp.observation:main"
     ):
         raise SystemExit("runtime observation producer entry point is unavailable")
+    if (
+        pyproject["project"]["scripts"].get("abyss-stack-mcp-system-status")
+        != "abyss_stack_mcp.system_status:main"
+    ):
+        raise SystemExit("bounded MCP system status entry point is unavailable")
     if (
         pyproject["project"]["scripts"].get("abyss-stack-mcp-overlay-compose")
         != "abyss_stack_mcp.overlay:main"

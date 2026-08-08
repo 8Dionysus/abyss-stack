@@ -94,6 +94,14 @@ class AccessRecorder:
         raw_params = ctx.params if isinstance(ctx.params, Mapping) else {}
         raw_meta = raw_params.get("_meta")
         meta = dict(raw_meta) if isinstance(raw_meta, Mapping) else {}
+        client_capabilities = meta.get(
+            "io.modelcontextprotocol/clientCapabilities"
+        )
+        capability_extensions = (
+            client_capabilities.get("extensions")
+            if isinstance(client_capabilities, Mapping)
+            else None
+        )
         request = ctx.request
         headers = getattr(request, "headers", {})
         record = {
@@ -105,6 +113,7 @@ class AccessRecorder:
             "has_client_capabilities": (
                 "io.modelcontextprotocol/clientCapabilities" in meta
             ),
+            "client_capability_extensions": capability_extensions,
             "traceparent": meta.get("traceparent"),
             "protocol_header": headers.get("mcp-protocol-version"),
             "session_header_present": "mcp-session-id" in headers,
@@ -136,6 +145,11 @@ class AccessRecorder:
                 message="The isolated KAG next request exceeds its byte limit.",
                 data={"limit_bytes": MAX_INPUT_BYTES},
             )
+        # Publish the bounded record before an await that may be cancelled.
+        # The same object is updated in place, so the observer can prove that
+        # dispatch was entered and then cancelled instead of mistaking the
+        # absence of a post-await append for an unobserved worker.
+        self.records.append(record)
         cancel_delay_ms = meta.get(CANCELLATION_META_KEY)
         if cancel_delay_ms is not None:
             if not isinstance(cancel_delay_ms, int) or not 1 <= cancel_delay_ms <= 10_000:
@@ -149,7 +163,6 @@ class AccessRecorder:
             except anyio.get_cancelled_exc_class():
                 record["outcome"] = "cancelled"
                 raise
-        self.records.append(record)
 
         if ctx.method == "initialize":
             record["outcome"] = "denied_legacy"
@@ -309,7 +322,12 @@ async def _exercise_pair(
 ) -> dict[str, Any]:
     app = server.streamable_http_app(
         streamable_http_path="/mcp",
-        json_response=True,
+        # The 2026-07-28 transport expresses cancellation by closing the
+        # request's SSE response stream. Python MCP 2.0.0 can return JSON, but
+        # that shortcut has no disconnect watcher and therefore lets the
+        # dispatch continue after a client gives up. Keep the modern contour
+        # on SSE so disconnect reaches the handler/worker cancel scope.
+        json_response=False,
         stateless_http=True,
         host="127.0.0.1",
     )
@@ -577,6 +595,7 @@ async def _exercise_pair(
                 cancellation_record["outcome"] == "passed"
             ),
         },
+        "transport_response_mode": "sse_disconnect_cancellable",
         "request_dispatch_records": recorder.records,
     }
 

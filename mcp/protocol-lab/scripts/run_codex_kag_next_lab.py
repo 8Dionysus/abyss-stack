@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one removable Codex prerelease -> KAG modern-MCP lab contour.
+"""Run one removable stable Codex -> KAG modern-MCP lab contour.
 
 The runner creates an isolated CODEX_HOME, credential and loopback server,
 calls the server through the Codex app-server API, then removes only the lab
@@ -49,8 +49,8 @@ CLIENT_ID = "https://os-abyss.invalid/codex-kag-next-lab.json"
 ISSUER = "https://auth.os-abyss.invalid"
 SUBJECT = "codex-kag-next-lab"
 TRACEPARENT = "00-7d6f4bfe66cc42c7be4dfe186f08bd47-e0ad439d3c018890-01"
-CODEX_VERSION = "codex-cli 0.147.0-alpha.4"
-CODEX_SHA256 = "8185beb794bf7374ecac1a5db7ff06611c708e4806b8b85d3b1f7cdbd7aa2826"
+CODEX_VERSION = "codex-cli 0.147.0"
+CODEX_SHA256 = "cb0a15567e9a60a5820d54b0f6ae86d504dc3805c1eab21a47f70e3eb7b73a40"
 PYTHON_MCP_VERSION = "2.0.0"
 
 
@@ -198,7 +198,7 @@ def _serve(args: argparse.Namespace) -> int:
     )
     app = server.streamable_http_app(
         streamable_http_path="/mcp",
-        json_response=True,
+        json_response=False,
         stateless_http=True,
         host="127.0.0.1",
     )
@@ -586,6 +586,12 @@ def _run(args: argparse.Namespace) -> int:
     principal = call_records[0].get("authenticated_principal")
     if principal != {"client_id": CLIENT_ID, "issuer": ISSUER, "subject": SUBJECT}:
         raise RuntimeError("Codex bearer principal identity drifted")
+    task_extension_advertised = any(
+        isinstance(item.get("client_capability_extensions"), dict)
+        and "io.modelcontextprotocol/tasks"
+        in item["client_capability_extensions"]
+        for item in modern
+    )
 
     stable_after = _sha256(args.stable_codex_config)
     if stable_after != stable_before:
@@ -599,10 +605,10 @@ def _run(args: argparse.Namespace) -> int:
     credential_removed = not credential.exists()
     receipt = {
         "schema_version": "abyss_mcp_codex_kag_next_lab_observation_v1",
-        "observation_id": "codex-0.147.0-alpha.4-kag-next-lab-20260801",
+        "observation_id": "codex-0.147.0-stable-kag-next-lab-20260808",
         "observed_at": started_at,
         "finished_at": _utc_now(),
-        "verdict": "isolated_prerelease_pair_passed",
+        "verdict": "isolated_stable_pair_passed",
         "consumer": {
             "version": observed_version,
             "sha256": CODEX_SHA256,
@@ -636,6 +642,7 @@ def _run(args: argparse.Namespace) -> int:
         },
         "wire": {
             "version": WIRE_VERSION,
+            "transport_response_mode": "sse_disconnect_cancellable",
             "server_discover_observed": True,
             "initialize_observed": any(item.get("method") == "initialize" for item in record["records"]),
             "mcp_session_id_observed": False,
@@ -643,6 +650,7 @@ def _run(args: argparse.Namespace) -> int:
                 bool(item.get("has_client_info") and item.get("has_client_capabilities"))
                 for item in modern
             ),
+            "tasks_extension_advertised": task_extension_advertised,
             "authenticated_principal": principal,
             "trace_sent": TRACEPARENT,
             "trace_observed": call_records[0]["traceparent"],
@@ -679,8 +687,8 @@ def _run(args: argparse.Namespace) -> int:
         },
         "secrets_included": False,
         "claim_limits": [
-            "This proves one isolated prerelease Codex pair, not a production Codex cutover.",
-            "The current conformance-suite mismatch remains an independent migration blocker.",
+            "This proves one isolated stable Codex pair, not a production Codex cutover.",
+            "Frozen official conformance and cancellation remain independently evidenced gates.",
             "Existing handle and cache receipts remain separate evidence for requestState and subscription semantics.",
             "The KAG result is navigation evidence and does not move owner authority.",
             "No candidate, effect, memory acceptance, proof verdict, source mutation, or production registration occurred.",
@@ -780,7 +788,7 @@ def _stable_canary(args: argparse.Namespace) -> int:
         raise RuntimeError("stable Codex config changed during post-rollback canary")
     receipt = {
         "schema_version": "abyss_mcp_stable_kag_post_rollback_observation_v1",
-        "observation_id": "codex-0.146.0-stable-kag-post-rollback-20260801",
+        "observation_id": "codex-0.147.0-stable-kag-post-rollback-20260808",
         "observed_at": started_at,
         "finished_at": _utc_now(),
         "verdict": "stable_production_route_passed_after_lab_rollback",

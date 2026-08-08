@@ -67,12 +67,14 @@ def test_current_status_is_deterministic_and_blocks_migration(
     second = builder.build_status(copy.deepcopy(matrix), copy.deepcopy(observation))
 
     assert first == second
-    assert first["evidence_expires_at"] == "2026-08-09T00:05:07Z"
-    assert first["gate_counts"] == {"passed": 11, "blocked": 3, "pending": 0}
+    assert first["evidence_expires_at"] == "2026-08-15T08:33:46.547214Z"
+    assert first["gate_counts"] == {"passed": 13, "blocked": 1, "pending": 0}
     assert first["passed_gate_ids"] == [
         "P1-01",
         "P1-02",
         "P1-03",
+        "P1-04",
+        "P1-05",
         "P1-06",
         "P1-07",
         "P1-08",
@@ -83,13 +85,20 @@ def test_current_status_is_deterministic_and_blocks_migration(
         "P1-14",
     ]
     assert first["core_read_migration_allowed"] is False
-    assert first["read_only_pilot_allowed"] is False
+    assert first["read_only_pilot_allowed"] is True
     assert first["read_only_pilot_completed"] is True
     assert first["tasks_extension_allowed"] is False
+    assert first["tasks_evidence_expires_at"] == "2026-08-15T09:52:33.467338Z"
+    assert first["tasks_reference_consumer"] == "rust-rmcp-3.1.2"
+    assert first["tasks_reference_pair_passed"] is True
+    assert first["tasks_inspector_strict_pair_blocked"] is True
+    assert first["tasks_codex_consumer_eligible"] is False
+    assert first["tasks_production_enabled"] is False
+    assert "inspector_task_name_header_missing" in first["tasks_blockers"]
     assert first["candidate_migration_allowed"] is False
     assert first["internal_effect_migration_allowed"] is False
     assert first["external_effect_migration_allowed"] is False
-    assert first["remaining_core_gate_ids"] == ["P1-04", "P1-05"]
+    assert first["remaining_core_gate_ids"] == []
     assert first["remaining_tasks_gate_ids"] == ["P1-11"]
     assert first["stable_registration_retained"] is True
 
@@ -102,7 +111,7 @@ def test_final_spec_and_stable_sdks_cannot_enable_migration(
     status = builder.build_status(copy.deepcopy(matrix), observation)
 
     assert status["core_read_migration_allowed"] is False
-    assert status["read_only_pilot_allowed"] is False
+    assert status["read_only_pilot_allowed"] is True
 
 
 def test_consumer_literals_are_not_wire_pair_evidence(
@@ -115,7 +124,7 @@ def test_consumer_literals_are_not_wire_pair_evidence(
     status = builder.build_status(matrix, observation)
 
     assert matrix["consumer_pairs"][0]["capability_posture"] == "blocked"
-    assert "stable_codex_modern_cutover_blocked" in status["reason_codes"]
+    assert "production_modern_pair_not_admitted" in status["reason_codes"]
     assert status["core_read_migration_allowed"] is False
 
 
@@ -146,7 +155,7 @@ def test_production_pair_is_distinct_from_next_sdk_fallback(
     assert matrix["production_protocol"] == "2025-11-25"
     assert matrix["stable_spec"]["wire_version"] == "2025-11-25"
     assert consumer["production_protocol_versions_observed"] == ["2025-11-25"]
-    assert consumer["isolated_next_sdk_fallback_protocol"] == "2025-06-18"
+    assert consumer["isolated_next_sdk_fallback_protocol"] == "2025-11-25"
 
 
 def test_production_pair_receipt_is_public_safe_and_bounded(builder: Any) -> None:
@@ -187,30 +196,31 @@ def test_expired_production_pair_receipt_is_rejected() -> None:
     )
 
 
-def test_official_conformance_receipt_is_sdk_scoped(builder: Any) -> None:
+def test_official_frozen_conformance_receipt_is_sdk_scoped(builder: Any) -> None:
     conformance_path = (
-        LAB_ROOT / "fixtures" / "python-mcp-2.0.0-conformance-observation.json"
+        LAB_ROOT / "fixtures" / "python-mcp-2.0.0-frozen-conformance-observation.json"
     )
     conformance_schema_path = (
-        LAB_ROOT / "schemas" / "protocol-conformance-observation.schema.json"
+        LAB_ROOT / "schemas" / "protocol-frozen-conformance-observation.schema.json"
     )
     conformance = _load(conformance_path)
 
     builder.validate_payload(conformance, conformance_schema_path)
 
     assert conformance["spec_version"] == "2026-07-28"
-    assert conformance["directions"]["server"]["success_checks"] == 40
-    assert conformance["directions"]["client"]["success_checks"] == 372
-    assert conformance["directions"]["server"]["failed_checks"] == 0
-    assert conformance["directions"]["client"]["failed_checks"] == 2
-    assert conformance["verdict"] == "sdk_pair_blocked_current_harness_fixture_mismatch"
+    assert conformance["requirements_revision"] == "2026-07-28"
+    assert conformance["directions"]["server"]["scored_success_checks"] == 119
+    assert conformance["directions"]["client"]["scored_success_checks"] == 372
+    assert conformance["directions"]["server"]["scored_failed_checks"] == 0
+    assert conformance["directions"]["client"]["scored_failed_checks"] == 0
+    assert conformance["verdict"] == "sdk_pair_passed_frozen_2026_07_28_requirements"
     assert "Codex" in " ".join(conformance["claim_limits"])
 
 
-def test_kag_next_pair_is_adapter_scoped(builder: Any) -> None:
-    pair_path = LAB_ROOT / "fixtures" / "kag-next-pair-observation.json"
+def test_kag_next_cancellable_pair_is_adapter_scoped(builder: Any) -> None:
+    pair_path = LAB_ROOT / "fixtures" / "kag-next-cancellable-pair-observation.json"
     pair_schema_path = (
-        LAB_ROOT / "schemas" / "kag-next-pair-observation.schema.json"
+        LAB_ROOT / "schemas" / "kag-next-cancellable-pair-observation.schema.json"
     )
     pair = _load(pair_path)
 
@@ -227,18 +237,18 @@ def test_kag_next_pair_is_adapter_scoped(builder: Any) -> None:
     assert pair["owner_canary"]["freshness_state"] == "current"
     assert pair["pair"]["cancellation"] == {
         "client_request_cancelled": True,
-        "server_dispatch_cancelled": False,
-        "server_dispatch_completed_after_client_cancel": True,
+        "server_dispatch_cancelled": True,
+        "server_dispatch_completed_after_client_cancel": False,
     }
     assert "Codex" in " ".join(pair["claim_limits"])
 
 
 def test_kag_request_state_handles_are_read_scoped(builder: Any) -> None:
     handle_path = (
-        LAB_ROOT / "fixtures" / "kag-handle-pair-observation.json"
+        LAB_ROOT / "fixtures" / "kag-handle-pair-current-observation.json"
     )
     handle_schema_path = (
-        LAB_ROOT / "schemas" / "kag-handle-pair-observation.schema.json"
+        LAB_ROOT / "schemas" / "kag-handle-pair-current-observation.schema.json"
     )
     handle = _load(handle_path)
 
@@ -265,9 +275,9 @@ def test_kag_request_state_handles_are_read_scoped(builder: Any) -> None:
 def test_kag_catalog_cache_is_bounded_and_non_authoritative(
     builder: Any,
 ) -> None:
-    cache_path = LAB_ROOT / "fixtures" / "kag-cache-pair-observation.json"
+    cache_path = LAB_ROOT / "fixtures" / "kag-cache-pair-current-observation.json"
     cache_schema_path = (
-        LAB_ROOT / "schemas" / "kag-cache-pair-observation.schema.json"
+        LAB_ROOT / "schemas" / "kag-cache-pair-current-observation.schema.json"
     )
     cache = _load(cache_path)
 
@@ -293,6 +303,73 @@ def test_kag_catalog_cache_is_bounded_and_non_authoritative(
     assert "never grants tool authorization" in " ".join(
         cache["claim_limits"]
     )
+
+
+def test_tasks_adapter_pilot_is_feature_gated_and_bounded(builder: Any) -> None:
+    receipt_path = LAB_ROOT / "fixtures" / "tasks-adapter-pilot-20260808.json"
+    schema_path = LAB_ROOT / "schemas" / "tasks-adapter-pilot.schema.json"
+    receipt = _load(receipt_path)
+
+    builder.validate_payload(receipt, schema_path)
+
+    assert receipt["protocol_version"] == "2026-07-28"
+    assert receipt["extension_id"] == "io.modelcontextprotocol/tasks"
+    assert receipt["adapter_feature_gate_enabled"] is True
+    assert receipt["production_enabled"] is False
+    assert receipt["codex_consumer_used"] is False
+    assert receipt["all_cases_passed"] is True
+    assert receipt["case_count"] == 11
+    assert receipt["notifications"]["tested"] is False
+    assert receipt["owner_pilot"]["resumed_after_adapter_restart"] is True
+    assert receipt["owner_pilot"]["owner_rerun_count"] == 0
+    assert "does not imply repair" in " ".join(receipt["claim_limits"])
+
+
+def test_tasks_compatibility_matrix_keeps_pair_evidence_distinct(builder: Any) -> None:
+    matrix = _load(LAB_ROOT / "tasks-compatibility-matrix.v1.json")
+    schema = LAB_ROOT / "schemas" / "tasks-compatibility-matrix.schema.json"
+    builder.validate_payload(matrix, schema)
+    rows = {item["consumer_id"]: item for item in matrix["consumers"]}
+
+    assert matrix["production_tasks_allowed"] is False
+    assert matrix["core_read_migration_independent"] is True
+    assert rows["codex-cli"]["features"]["advertisement"] == "wire_absent"
+    assert rows["mcp-inspector"]["features"]["create_task"] == "wire_pass"
+    assert rows["mcp-inspector"]["features"]["tasks_get"] == "wire_blocked"
+    assert rows["rust-rmcp"]["features"]["tasks_get"] == "wire_pass"
+    assert rows["csharp-sdk"]["verdict"] == "source_supported_unpaired"
+    assert rows["ext-tasks-reference"]["verdict"] == "reference_only"
+
+
+def test_reference_tasks_pair_and_strict_inspector_blocker_are_bounded(
+    builder: Any,
+) -> None:
+    rmcp = _load(
+        LAB_ROOT / "fixtures" / "rmcp-3.1.2-tasks-adapter-pair-20260808.json"
+    )
+    inspector = _load(
+        LAB_ROOT
+        / "fixtures"
+        / "inspector-2.1.0-tasks-strict-pair-blocked-20260808.json"
+    )
+    builder.validate_payload(
+        rmcp,
+        LAB_ROOT / "schemas" / "rmcp-tasks-adapter-pair.schema.json",
+    )
+    builder.validate_payload(
+        inspector,
+        LAB_ROOT / "schemas" / "inspector-tasks-strict-pair.schema.json",
+    )
+
+    assert all(rmcp["wire"].values())
+    assert rmcp["adapter"]["production_enabled"] is False
+    assert rmcp["owner_result"]["owner_rerun_count"] == 0
+    assert inspector["strict_pair"]["mcp_name_on_tasks_get"] is False
+    assert inspector["adapter_response"] == {
+        "error_code": -32020,
+        "http_status": 400,
+        "strict_boundary_retained": True,
+    }
 
 
 def test_effectful_first_pilot_is_schema_rejected(

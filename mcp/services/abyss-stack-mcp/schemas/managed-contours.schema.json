@@ -1,0 +1,338 @@
+{
+  "$defs": {
+    "ManagedContourBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_mcp_names": {
+          "items": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Allowed Mcp Names",
+          "type": "array"
+        },
+        "allowed_registry_states": {
+          "default": [
+            "admitted"
+          ],
+          "items": {
+            "enum": [
+              "shadow",
+              "admitted"
+            ],
+            "type": "string"
+          },
+          "title": "Allowed Registry States",
+          "type": "array"
+        },
+        "auth_manifest_key": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Auth Manifest Key",
+          "type": "string"
+        },
+        "auth_manifest_path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Auth Manifest Path",
+          "type": "string"
+        },
+        "authority_class": {
+          "enum": [
+            "read",
+            "candidate",
+            "proof_result",
+            "internal_effect",
+            "external_effect"
+          ],
+          "title": "Authority Class",
+          "type": "string"
+        },
+        "binding_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Binding Id",
+          "type": "string"
+        },
+        "contour_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Contour Id",
+          "type": "string"
+        },
+        "credential_class": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Credential Class",
+          "type": "string"
+        },
+        "credential_path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Credential Path",
+          "type": "string"
+        },
+        "dependency_lock_path": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dependency Lock Path"
+        },
+        "deployed_root": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Deployed Root",
+          "type": "string"
+        },
+        "deployment_manifest_path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Deployment Manifest Path",
+          "type": "string"
+        },
+        "endpoint_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Endpoint Ref",
+          "type": "string"
+        },
+        "executable_digest": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Executable Digest",
+          "type": "string"
+        },
+        "executable_path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Executable Path",
+          "type": "string"
+        },
+        "executable_resolved_path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Executable Resolved Path",
+          "type": "string"
+        },
+        "observation_route": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Observation Route",
+          "type": "string"
+        },
+        "organ_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Organ Id",
+          "type": "string"
+        },
+        "owner_validator_digest": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Owner Validator Digest",
+          "type": "string"
+        },
+        "owner_validator_path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Owner Validator Path",
+          "type": "string"
+        },
+        "policy_family": {
+          "enum": [
+            "read",
+            "candidate",
+            "internal_effect",
+            "external_effect"
+          ],
+          "title": "Policy Family",
+          "type": "string"
+        },
+        "principal_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Principal Id",
+          "type": "string"
+        },
+        "protocol_version": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Protocol Version",
+          "type": "string"
+        },
+        "registry_path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Registry Path",
+          "type": "string"
+        },
+        "required_environment": {
+          "patternProperties": {
+            "^[A-Za-z0-9][A-Za-z0-9._-]*$": {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 160,
+            "minLength": 1
+          },
+          "title": "Required Environment",
+          "type": "object"
+        },
+        "rollback_route": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Rollback Route",
+          "type": "string"
+        },
+        "schema_bundle_digest": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Schema Bundle Digest",
+          "type": "string"
+        },
+        "schema_paths": {
+          "items": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Schema Paths",
+          "type": "array"
+        },
+        "server_schema_digest": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Server Schema Digest",
+          "type": "string"
+        },
+        "service_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Service Id",
+          "type": "string"
+        },
+        "unit_credential_binding": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Unit Credential Binding",
+          "type": "string"
+        },
+        "unit_name": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Unit Name",
+          "type": "string"
+        },
+        "unit_path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Unit Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "binding_id",
+        "organ_id",
+        "contour_id",
+        "policy_family",
+        "authority_class",
+        "service_id",
+        "unit_name",
+        "unit_path",
+        "endpoint_ref",
+        "protocol_version",
+        "credential_class",
+        "principal_id",
+        "credential_path",
+        "auth_manifest_path",
+        "auth_manifest_key",
+        "executable_path",
+        "executable_resolved_path",
+        "executable_digest",
+        "deployment_manifest_path",
+        "deployed_root",
+        "registry_path",
+        "schema_paths",
+        "schema_bundle_digest",
+        "server_schema_digest",
+        "owner_validator_path",
+        "owner_validator_digest",
+        "observation_route",
+        "rollback_route",
+        "required_environment",
+        "unit_credential_binding",
+        "allowed_mcp_names"
+      ],
+      "title": "ManagedContourBinding",
+      "type": "object"
+    }
+  },
+  "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/managed-contours.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "contours": {
+      "items": {
+        "$ref": "#/$defs/ManagedContourBinding"
+      },
+      "minItems": 1,
+      "title": "Contours",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "abyss_mcp_managed_contours_v1",
+      "default": "abyss_mcp_managed_contours_v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "contours"
+  ],
+  "title": "ManagedContourCatalog",
+  "type": "object"
+}

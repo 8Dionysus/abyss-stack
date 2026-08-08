@@ -1,0 +1,149 @@
+{
+  "$defs": {
+    "PreflightSweepEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "binding_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Binding Id",
+          "type": "string"
+        },
+        "contour_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Contour Id",
+          "type": "string"
+        },
+        "eligible_to_start": {
+          "title": "Eligible To Start",
+          "type": "boolean"
+        },
+        "organ_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Organ Id",
+          "type": "string"
+        },
+        "reason_codes": {
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "report_id": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Report Id",
+          "type": "string"
+        },
+        "report_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Report Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "binding_id",
+        "organ_id",
+        "contour_id",
+        "report_id",
+        "report_ref",
+        "eligible_to_start",
+        "reason_codes"
+      ],
+      "title": "PreflightSweepEntry",
+      "type": "object"
+    }
+  },
+  "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/mcp-preflight-sweep.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "all_eligible": {
+      "title": "All Eligible",
+      "type": "boolean"
+    },
+    "blocked_count": {
+      "minimum": 0,
+      "title": "Blocked Count",
+      "type": "integer"
+    },
+    "contains_secrets": {
+      "const": false,
+      "default": false,
+      "title": "Contains Secrets",
+      "type": "boolean"
+    },
+    "contour_count": {
+      "minimum": 0,
+      "title": "Contour Count",
+      "type": "integer"
+    },
+    "eligible_count": {
+      "minimum": 0,
+      "title": "Eligible Count",
+      "type": "integer"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/PreflightSweepEntry"
+      },
+      "title": "Entries",
+      "type": "array"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "next_safe_step": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Next Safe Step",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "abyss_mcp_preflight_sweep_v1",
+      "default": "abyss_mcp_preflight_sweep_v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "services_started_or_restarted": {
+      "const": false,
+      "default": false,
+      "title": "Services Started Or Restarted",
+      "type": "boolean"
+    },
+    "status_id": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Status Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status_id",
+    "generated_at",
+    "contour_count",
+    "eligible_count",
+    "blocked_count",
+    "all_eligible",
+    "entries",
+    "next_safe_step"
+  ],
+  "title": "MCPPreflightSweepStatus",
+  "type": "object"
+}

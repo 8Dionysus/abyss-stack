@@ -1,0 +1,82 @@
+{
+  "claim_limits": [
+    "This proves one isolated stable Codex pair, not a production Codex cutover.",
+    "The under-development feature was enabled only in a removable isolated CODEX_HOME.",
+    "Codex did not advertise io.modelcontextprotocol/tasks on the real request wire.",
+    "The KAG result is navigation evidence and does not move owner authority.",
+    "No candidate, effect, memory acceptance, proof verdict, source mutation, or production registration occurred."
+  ],
+  "consumer": {
+    "binary_sha256": "cb0a15567e9a60a5820d54b0f6ae86d504dc3805c1eab21a47f70e3eb7b73a40",
+    "feature": "mcp_2026_07_28",
+    "feature_default": false,
+    "production_authority": false,
+    "version": "0.147.0"
+  },
+  "expires_at": "2026-08-15T08:35:20.113167Z",
+  "finished_at": "2026-08-08T08:35:36.009899Z",
+  "observation_id": "codex-0.147.0-stable-kag-next-lab-20260808",
+  "observed_at": "2026-08-08T08:35:20.113167Z",
+  "private_evidence": {
+    "normalized_from": "local:///srv/abyss-machine/cache/mcp-next-20260808/evidence/codex-0.147.0-stable-kag-next-sse-private.json",
+    "raw_receipt_sha256": "4c0c5e3a8a59cd681b14ee83426c5860c82c1157b40a81a0db25e2f8adeac1cc",
+    "server_record_sha256": "fc7c5223ddffe2cb4c72672194609696ff83cce03bd6220c5e448c3fb8c40122"
+  },
+  "rollback": {
+    "app_process_stopped": true,
+    "credential_removed": true,
+    "port_closed": true,
+    "registration_removed": true,
+    "server_process_stopped": true
+  },
+  "schema_version": "abyss_mcp_codex_kag_next_stable_observation_v1",
+  "server": {
+    "credential_regular_non_symlink_0600": true,
+    "endpoint": "http://127.0.0.1:5445/mcp",
+    "python_mcp_version": "2.0.0",
+    "registration": "aoa_kag_next_lab",
+    "source_artifacts": {
+      "adapter_harness_sha256": "c2bff51463f47d526993a8096867e88ff1fe4ae47f51d22067bfd301883b1bbb",
+      "adapter_package_tree_sha256": "92dc85946802fc917bc832c9ab59d78a08494c5819b2e22abca769223d754cd3",
+      "driver_sha256": "7c4d0ea5e0393314cfda5bcb0c59ffb8c34632df19e03f85ba9b933f75e43677"
+    },
+    "source_revisions": {
+      "abyss_stack": "2bb043e160b6a2c001abad4f4de6969b35782466",
+      "aoa_kag": "ba7805190527a635ff5c515701be29379af8277f"
+    }
+  },
+  "stable_registration": {
+    "config_sha256_after": "8d6d38d17e52cb9fe5160270c41dac56a1b4191bcec76b8d5c9a0ce1e867d063",
+    "config_sha256_before": "8d6d38d17e52cb9fe5160270c41dac56a1b4191bcec76b8d5c9a0ce1e867d063",
+    "unchanged": true
+  },
+  "verdict": "isolated_stable_pair_passed",
+  "wire": {
+    "authenticated_principal": {
+      "client_id": "https://os-abyss.invalid/codex-kag-next-lab.json",
+      "issuer": "https://auth.os-abyss.invalid",
+      "subject": "codex-kag-next-lab"
+    },
+    "initialize_observed": false,
+    "input_limit_bytes": 16384,
+    "mcp_session_id_observed": false,
+    "output_limit_bytes": 262144,
+    "oversized_input_denied_code": -32602,
+    "oversized_input_http_status": 400,
+    "owner": "abyss-stack",
+    "request_bytes": 45,
+    "response_bytes": 7660,
+    "result_schema": "aoa-kag-mcp-capabilities-v1",
+    "self_describing_requests": 9,
+    "server_discover_observed": true,
+    "tasks_extension_advertised": false,
+    "tool_call": "kag_discover",
+    "tool_inventory": ["kag_discover"],
+    "tool_schema_sha256": "745e6e7999cadc40804772b40a52e29df3c5cee13459324e21518e585612ba0c",
+    "trace_observed": "00-7d6f4bfe66cc42c7be4dfe186f08bd47-e0ad439d3c018890-01",
+    "trace_sent": "00-7d6f4bfe66cc42c7be4dfe186f08bd47-e0ad439d3c018890-01",
+    "transport_response_mode": "sse_disconnect_cancellable",
+    "version": "2026-07-28",
+    "wrong_bearer_http_status": 401
+  }
+}

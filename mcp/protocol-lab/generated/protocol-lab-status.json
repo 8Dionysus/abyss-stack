@@ -9,26 +9,29 @@
     "A registered alias does not prove schema observation or a grounded call.",
     "Final publication and stable SDKs never authorize production migration without exact pair receipts."
   ],
-  "codex_lab_observation_digest": "sha256:269fac4eacfa622a8e1aa3e7bdf44f4da001d2db9da926e36e7f83f3803a0ae5",
+  "codex_lab_observation_digest": "sha256:edcfc2a5765f0b14d18bc72e8cb5ae03f9f7b60e9187beec242a7b0e93be1998",
   "core_read_migration_allowed": false,
-  "evaluated_at": "2026-08-02T00:05:44Z",
-  "evidence_expires_at": "2026-08-09T00:05:07Z",
+  "evaluated_at": "2026-08-08T08:35:36.009899Z",
+  "evidence_expires_at": "2026-08-15T08:33:46.547214Z",
   "external_effect_migration_allowed": false,
   "gate_counts": {
-    "blocked": 3,
-    "passed": 11,
+    "blocked": 1,
+    "passed": 13,
     "pending": 0
   },
+  "inspector_tasks_blocker_digest": "sha256:c169b672bb7be2ab0e24da24cb22c14e6c2ff9bb450b746974644612e1217d07",
   "internal_effect_migration_allowed": false,
-  "matrix_digest": "sha256:ccd81d70333a2716bb2a0d196b15aeec8361af2fe25d38a422f63b2c7c631b95",
-  "next_action": "Retain the stable 2025-11-25 route; repair or refresh the current conformance fixture pair, prove cancellation propagation, and wait for a production-eligible Codex modern pair before any core-read cutover.",
+  "matrix_digest": "sha256:90304f1643d1f19c18aa97524941ed517e143aa6123fb3e51586c661be324fee",
+  "next_action": "Retain the stable 2025-11-25 route while the exact production contour receives independent admission, deployment canary, cutover and registry refresh; keep the Tasks extension on its separate adapter gate.",
   "next_protocol": "2026-07-28",
   "next_release_status": "final",
-  "observation_digest": "sha256:bf927cfadd8c57746f81f4191f184cdd4af6fb09b9ca47a6b7efa7c6916a24d9",
+  "observation_digest": "sha256:737fff896dabca43848efee94790b6c1419a4d51c6f208cd00c3374128514056",
   "passed_gate_ids": [
     "P1-01",
     "P1-02",
     "P1-03",
+    "P1-04",
+    "P1-05",
     "P1-06",
     "P1-07",
     "P1-08",
@@ -39,37 +42,48 @@
     "P1-14"
   ],
   "production_cutover_blockers": [
-    "stable_codex_modern_pair_unavailable",
-    "current_conformance_fixture_mismatch",
-    "modern_cancellation_not_propagated"
+    "production_modern_pair_not_admitted"
   ],
   "production_protocol": "2025-11-25",
-  "read_only_pilot_allowed": false,
+  "read_only_pilot_allowed": true,
   "read_only_pilot_completed": true,
   "reason_codes": [
-    "production_pair_remains_2025-11-25",
-    "prerelease_modern_canary_passed",
-    "current_conformance_fixture_mismatch",
-    "stable_codex_modern_cutover_blocked",
-    "tasks_extension_unavailable",
+    "production_registration_remains_2025-11-25",
+    "stable_modern_lab_canary_passed",
+    "frozen_core_conformance_passed",
+    "modern_cancellation_propagated",
+    "tasks_client_extension_capability_absent",
     "candidate_and_effect_migration_independent",
-    "modern_cancellation_not_propagated"
+    "production_modern_pair_not_admitted"
   ],
-  "remaining_core_gate_ids": [
-    "P1-04",
-    "P1-05"
-  ],
+  "remaining_core_gate_ids": [],
   "remaining_gate_ids": [
-    "P1-04",
-    "P1-05",
     "P1-11"
   ],
   "remaining_tasks_gate_ids": [
     "P1-11"
   ],
+  "rmcp_tasks_pair_digest": "sha256:ada33eff1464ec37517a16634cf6edc6d364d096aeb1da709c11c2231267b2d7",
   "schema_version": "abyss_mcp_protocol_lab_status_v2",
   "stable_registration_retained": true,
-  "stable_rollback_observation_digest": "sha256:a229143346e7c59631d03fe8e81f6836883eb21bc84a271d7f9cce0608acbaa6",
-  "status_digest": "sha256:e480aa9617933f9be276db0c952b454c9d810de034a9634b45e8040f70e48590",
-  "tasks_extension_allowed": false
+  "stable_rollback_observation_digest": "sha256:eeba4f8f37eacf249d3ead0e9552eaa68a05848a86f51f1fc50304210295ed1f",
+  "status_digest": "sha256:42b42872cd4fbfd3db0578417dec6de65da28e5ec5b4df9c57b2260264a723c7",
+  "tasks_blockers": [
+    "codex_tasks_capability_absent",
+    "inspector_task_name_header_missing",
+    "tasks_notifications_unproved",
+    "distributed_poll_limit_unproved",
+    "production_tasks_disabled"
+  ],
+  "tasks_codex_consumer_eligible": false,
+  "tasks_evidence_expires_at": "2026-08-15T09:52:33.467338Z",
+  "tasks_extension_allowed": false,
+  "tasks_extension_maturity": "experimental",
+  "tasks_inspector_strict_pair_blocked": true,
+  "tasks_matrix_digest": "sha256:63d225d41159afb86ea98b04ffe0ba5f342d760578f0aee9df74d5ce8fa0d300",
+  "tasks_notifications_proven": false,
+  "tasks_pilot_digest": "sha256:dfa97a26a89b3278e465f718a6f524095f8c14d6952c8f4b7f746fb907b4f876",
+  "tasks_production_enabled": false,
+  "tasks_reference_consumer": "rust-rmcp-3.1.2",
+  "tasks_reference_pair_passed": true
 }

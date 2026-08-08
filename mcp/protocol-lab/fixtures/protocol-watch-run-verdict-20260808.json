@@ -1,0 +1,30 @@
+{
+  "claim_limits": [
+    "This verdict admits only a removable lab and bounded read canary, not production cutover.",
+    "The missing Tasks client capability remains an independent extension blocker.",
+    "Candidate and effect contours cannot inherit this read-only result.",
+    "Owner acceptance, registry admission, deployment and observation remain separate transactions."
+  ],
+  "facts": {
+    "auth_schema_trace_limits_passed": true,
+    "cache_refresh_and_removal_revocation_passed": true,
+    "client_extension_capability_absent": true,
+    "frozen_core_conformance_passed": true,
+    "modern_cancellation_propagated": true,
+    "production_cutover_allowed": false,
+    "request_state_isolation_passed": true,
+    "stable_modern_codex_lab_passed": true,
+    "stable_post_rollback_canary_passed": true
+  },
+  "observed_at": "2026-08-08T09:12:20.493453Z",
+  "receipt_digests": {
+    "adapter": "sha256:bc0f402692ddffec168f92d7d29c25be28da134d3b2e5915c268b91534ab7b54",
+    "cache": "sha256:60f990ede9882ddcc28dccc5743f3005d70897a26c524f580db67bd3780b1131",
+    "codex": "sha256:c15b387e2957de078b139b7b2dd0fb4236c2bbffb1d650d84fed3815118397ac",
+    "conformance": "sha256:d1b3b0cb1cef514c476e0516928f4280593fdebed1c2b646b568f8993b289ffc",
+    "handle": "sha256:14aff046bb1b662dd95f047ffc93fbfa1106d543103b82f37c72021cb46051b9",
+    "rollback": "sha256:f90805237de0cf26a39d583c096e9f8ea46e97b4af359bec3171e28d2c99da77"
+  },
+  "schema_version": "abyss_mcp_protocol_watch_run_verdict_v1",
+  "verdict": "compatible_for_lab_and_read_canary"
+}

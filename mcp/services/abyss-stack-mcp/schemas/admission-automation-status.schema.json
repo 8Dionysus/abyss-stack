@@ -1,0 +1,510 @@
+{
+  "$defs": {
+    "KeeperContourStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "admission_current": {
+          "title": "Admission Current",
+          "type": "boolean"
+        },
+        "blocked_stage_count": {
+          "minimum": 0,
+          "title": "Blocked Stage Count",
+          "type": "integer"
+        },
+        "blocker_codes": {
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "title": "Blocker Codes",
+          "type": "array"
+        },
+        "contour_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Contour Id",
+          "type": "string"
+        },
+        "currentness": {
+          "items": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "title": "Currentness",
+          "type": "array"
+        },
+        "evidence_expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Expires At"
+        },
+        "full_refresh_cost": {
+          "minimum": 0,
+          "title": "Full Refresh Cost",
+          "type": "integer"
+        },
+        "last_good_state_digest": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Good State Digest"
+        },
+        "last_good_state_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Good State Ref"
+        },
+        "next_safe_stage": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Safe Stage"
+        },
+        "organ_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Organ Id",
+          "type": "string"
+        },
+        "planned_refresh_cost": {
+          "minimum": 0,
+          "title": "Planned Refresh Cost",
+          "type": "integer"
+        },
+        "refreshed_stage_count": {
+          "minimum": 0,
+          "title": "Refreshed Stage Count",
+          "type": "integer"
+        },
+        "reused_stage_count": {
+          "minimum": 0,
+          "title": "Reused Stage Count",
+          "type": "integer"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "stage_states": {
+          "items": {
+            "$ref": "#/$defs/KeeperStageOperationalStatus"
+          },
+          "title": "Stage States",
+          "type": "array"
+        },
+        "state_id": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "State Id",
+          "type": "string"
+        },
+        "transaction_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Transaction Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "organ_id",
+        "contour_id",
+        "state_id",
+        "revision",
+        "admission_current",
+        "currentness",
+        "blocker_codes",
+        "transaction_ref",
+        "full_refresh_cost",
+        "planned_refresh_cost",
+        "reused_stage_count",
+        "refreshed_stage_count",
+        "blocked_stage_count",
+        "stage_states"
+      ],
+      "title": "KeeperContourStatus",
+      "type": "object"
+    },
+    "KeeperStageOperationalStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "current": {
+          "title": "Current",
+          "type": "boolean"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        },
+        "node_id": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Node Id"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "enum": [
+                "passed",
+                "blocked",
+                "rejected",
+                "revoked"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Outcome"
+        },
+        "reason_codes": {
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "stage": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Stage",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage",
+        "current",
+        "reason_codes"
+      ],
+      "title": "KeeperStageOperationalStatus",
+      "type": "object"
+    },
+    "MCPPreflightSweepStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "all_eligible": {
+          "title": "All Eligible",
+          "type": "boolean"
+        },
+        "blocked_count": {
+          "minimum": 0,
+          "title": "Blocked Count",
+          "type": "integer"
+        },
+        "contains_secrets": {
+          "const": false,
+          "default": false,
+          "title": "Contains Secrets",
+          "type": "boolean"
+        },
+        "contour_count": {
+          "minimum": 0,
+          "title": "Contour Count",
+          "type": "integer"
+        },
+        "eligible_count": {
+          "minimum": 0,
+          "title": "Eligible Count",
+          "type": "integer"
+        },
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/PreflightSweepEntry"
+          },
+          "title": "Entries",
+          "type": "array"
+        },
+        "generated_at": {
+          "format": "date-time",
+          "title": "Generated At",
+          "type": "string"
+        },
+        "next_safe_step": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Next Safe Step",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "abyss_mcp_preflight_sweep_v1",
+          "default": "abyss_mcp_preflight_sweep_v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "services_started_or_restarted": {
+          "const": false,
+          "default": false,
+          "title": "Services Started Or Restarted",
+          "type": "boolean"
+        },
+        "status_id": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Status Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status_id",
+        "generated_at",
+        "contour_count",
+        "eligible_count",
+        "blocked_count",
+        "all_eligible",
+        "entries",
+        "next_safe_step"
+      ],
+      "title": "MCPPreflightSweepStatus",
+      "type": "object"
+    },
+    "PreflightSweepEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "binding_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Binding Id",
+          "type": "string"
+        },
+        "contour_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Contour Id",
+          "type": "string"
+        },
+        "eligible_to_start": {
+          "title": "Eligible To Start",
+          "type": "boolean"
+        },
+        "organ_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Organ Id",
+          "type": "string"
+        },
+        "reason_codes": {
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "report_id": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Report Id",
+          "type": "string"
+        },
+        "report_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Report Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "binding_id",
+        "organ_id",
+        "contour_id",
+        "report_id",
+        "report_ref",
+        "eligible_to_start",
+        "reason_codes"
+      ],
+      "title": "PreflightSweepEntry",
+      "type": "object"
+    }
+  },
+  "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/admission-automation-status.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "keepers": {
+      "items": {
+        "$ref": "#/$defs/KeeperContourStatus"
+      },
+      "title": "Keepers",
+      "type": "array"
+    },
+    "managed_contour_count": {
+      "minimum": 0,
+      "title": "Managed Contour Count",
+      "type": "integer"
+    },
+    "next_safe_step": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Next Safe Step",
+      "type": "string"
+    },
+    "overlay_contour_count": {
+      "minimum": 0,
+      "title": "Overlay Contour Count",
+      "type": "integer"
+    },
+    "overlay_skips": {
+      "items": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "title": "Overlay Skips",
+      "type": "array"
+    },
+    "owner_acceptance_inferred": {
+      "const": false,
+      "default": false,
+      "title": "Owner Acceptance Inferred",
+      "type": "boolean"
+    },
+    "owner_transaction_survives_task_loss": {
+      "const": true,
+      "default": true,
+      "title": "Owner Transaction Survives Task Loss",
+      "type": "boolean"
+    },
+    "preflight": {
+      "$ref": "#/$defs/MCPPreflightSweepStatus"
+    },
+    "proof_verdict_inferred": {
+      "const": false,
+      "default": false,
+      "title": "Proof Verdict Inferred",
+      "type": "boolean"
+    },
+    "registry_mutation_performed": {
+      "const": false,
+      "default": false,
+      "title": "Registry Mutation Performed",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "abyss_mcp_admission_automation_v1",
+      "default": "abyss_mcp_admission_automation_v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "services_started_or_restarted": {
+      "const": false,
+      "default": false,
+      "title": "Services Started Or Restarted",
+      "type": "boolean"
+    },
+    "task_cancellation_erases_evidence": {
+      "const": false,
+      "default": false,
+      "title": "Task Cancellation Erases Evidence",
+      "type": "boolean"
+    },
+    "task_completion_implies_admission": {
+      "const": false,
+      "default": false,
+      "title": "Task Completion Implies Admission",
+      "type": "boolean"
+    },
+    "task_handle_is_admission_identity": {
+      "const": false,
+      "default": false,
+      "title": "Task Handle Is Admission Identity",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "generated_at",
+    "overlay_contour_count",
+    "overlay_skips",
+    "managed_contour_count",
+    "preflight",
+    "keepers",
+    "next_safe_step"
+  ],
+  "title": "AdmissionAutomationStatus",
+  "type": "object"
+}

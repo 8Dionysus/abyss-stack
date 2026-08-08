@@ -16,14 +16,22 @@ MATRIX_PATH = LAB_ROOT / "protocol-compatibility-matrix.v1.json"
 OBSERVATION_PATH = LAB_ROOT / "fixtures" / "current-pair-observation.json"
 OUTPUT_PATH = LAB_ROOT / "generated" / "protocol-lab-status.json"
 PRODUCTION_OBSERVATION_PATH = LAB_ROOT / "fixtures" / "codex-0.146.0-production-pair-observation.json"
-CODEX_LAB_OBSERVATION_PATH = LAB_ROOT / "fixtures" / "codex-0.147.0-alpha.4-kag-next-lab-observation.json"
-STABLE_ROLLBACK_OBSERVATION_PATH = LAB_ROOT / "fixtures" / "codex-0.146.0-stable-kag-post-rollback-observation.json"
+CODEX_LAB_OBSERVATION_PATH = LAB_ROOT / "fixtures" / "codex-0.147.0-stable-kag-next-lab-observation.json"
+STABLE_ROLLBACK_OBSERVATION_PATH = LAB_ROOT / "fixtures" / "codex-0.147.0-stable-kag-post-rollback-observation.json"
+TASKS_MATRIX_PATH = LAB_ROOT / "tasks-compatibility-matrix.v1.json"
+TASKS_PILOT_PATH = LAB_ROOT / "fixtures" / "tasks-adapter-pilot-20260808.json"
+RMCP_TASKS_PAIR_PATH = LAB_ROOT / "fixtures" / "rmcp-3.1.2-tasks-adapter-pair-20260808.json"
+INSPECTOR_TASKS_BLOCKER_PATH = LAB_ROOT / "fixtures" / "inspector-2.1.0-tasks-strict-pair-blocked-20260808.json"
 MATRIX_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-compatibility-matrix.schema.json"
 OBSERVATION_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-pair-observation.schema.json"
 STATUS_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-lab-status.schema.json"
 PRODUCTION_OBSERVATION_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-production-pair-observation.schema.json"
-CODEX_LAB_OBSERVATION_SCHEMA_PATH = LAB_ROOT / "schemas" / "codex-kag-next-lab-observation.schema.json"
-STABLE_ROLLBACK_OBSERVATION_SCHEMA_PATH = LAB_ROOT / "schemas" / "stable-kag-post-rollback-observation.schema.json"
+CODEX_LAB_OBSERVATION_SCHEMA_PATH = LAB_ROOT / "schemas" / "codex-kag-next-stable-observation.schema.json"
+STABLE_ROLLBACK_OBSERVATION_SCHEMA_PATH = LAB_ROOT / "schemas" / "stable-kag-post-rollback-current-observation.schema.json"
+TASKS_MATRIX_SCHEMA_PATH = LAB_ROOT / "schemas" / "tasks-compatibility-matrix.schema.json"
+TASKS_PILOT_SCHEMA_PATH = LAB_ROOT / "schemas" / "tasks-adapter-pilot.schema.json"
+RMCP_TASKS_PAIR_SCHEMA_PATH = LAB_ROOT / "schemas" / "rmcp-tasks-adapter-pair.schema.json"
+INSPECTOR_TASKS_BLOCKER_SCHEMA_PATH = LAB_ROOT / "schemas" / "inspector-tasks-strict-pair.schema.json"
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -73,16 +81,30 @@ def build_status(
     production_observation: dict[str, Any] | None = None,
     codex_lab_observation: dict[str, Any] | None = None,
     stable_rollback_observation: dict[str, Any] | None = None,
+    tasks_matrix: dict[str, Any] | None = None,
+    tasks_pilot: dict[str, Any] | None = None,
+    rmcp_tasks_pair: dict[str, Any] | None = None,
+    inspector_tasks_blocker: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     production_observation = production_observation or load_json(PRODUCTION_OBSERVATION_PATH)
     codex_lab_observation = codex_lab_observation or load_json(CODEX_LAB_OBSERVATION_PATH)
     stable_rollback_observation = stable_rollback_observation or load_json(STABLE_ROLLBACK_OBSERVATION_PATH)
+    tasks_matrix = tasks_matrix or load_json(TASKS_MATRIX_PATH)
+    tasks_pilot = tasks_pilot or load_json(TASKS_PILOT_PATH)
+    rmcp_tasks_pair = rmcp_tasks_pair or load_json(RMCP_TASKS_PAIR_PATH)
+    inspector_tasks_blocker = inspector_tasks_blocker or load_json(
+        INSPECTOR_TASKS_BLOCKER_PATH
+    )
     for payload, schema in (
         (matrix, MATRIX_SCHEMA_PATH),
         (observation, OBSERVATION_SCHEMA_PATH),
         (production_observation, PRODUCTION_OBSERVATION_SCHEMA_PATH),
         (codex_lab_observation, CODEX_LAB_OBSERVATION_SCHEMA_PATH),
         (stable_rollback_observation, STABLE_ROLLBACK_OBSERVATION_SCHEMA_PATH),
+        (tasks_matrix, TASKS_MATRIX_SCHEMA_PATH),
+        (tasks_pilot, TASKS_PILOT_SCHEMA_PATH),
+        (rmcp_tasks_pair, RMCP_TASKS_PAIR_SCHEMA_PATH),
+        (inspector_tasks_blocker, INSPECTOR_TASKS_BLOCKER_SCHEMA_PATH),
     ):
         validate_payload(payload, schema)
     if observation["matrix_version"] != matrix["schema_version"]:
@@ -103,14 +125,14 @@ def build_status(
         for sdk in matrix["sdk_lines"]
     )
     production_consumer = _consumer(matrix, "codex-cli")
-    lab_consumer = _consumer(matrix, "codex-cli-prerelease-lab")
+    lab_consumer = _consumer(matrix, "codex-cli-stable-modern-lab")
     lab_canary_completed = all(
         (
             matrix["next_spec"]["final_published"],
             next_sdk_ready,
             lab_consumer["next_wire_pair_observed"],
             lab_consumer["server_discover_observed"],
-            codex_lab_observation["verdict"] == "isolated_prerelease_pair_passed",
+            codex_lab_observation["verdict"] == "isolated_stable_pair_passed",
             codex_lab_observation["wire"]["version"] == next_version,
             not codex_lab_observation["consumer"]["production_authority"],
             _passed(observation, "read_only_canary"),
@@ -122,6 +144,7 @@ def build_status(
     )
     lab_pair_ready = bool(
         lab_canary_completed
+        and observation["official_conformance"]["status"] == "passed"
         and _passed(observation, "abyss_pair_conformance")
         and matrix["pilot"]["state"] == "passed"
     )
@@ -146,7 +169,7 @@ def build_status(
     )
     production_cutover_blockers: list[str] = []
     if not production_consumer["next_wire_pair_observed"]:
-        production_cutover_blockers.append("stable_codex_modern_pair_unavailable")
+        production_cutover_blockers.append("production_modern_pair_not_admitted")
     if observation["official_conformance"]["status"] != "passed":
         production_cutover_blockers.append("current_conformance_fixture_mismatch")
     if observation["abyss_pair_conformance"]["status"] != "passed":
@@ -159,11 +182,17 @@ def build_status(
             matrix["expires_at"],
             codex_lab_observation["expires_at"],
             stable_rollback_observation["expires_at"],
+            tasks_matrix["expires_at"],
         ),
         "matrix_digest": canonical_digest(matrix),
         "observation_digest": canonical_digest(observation),
         "codex_lab_observation_digest": canonical_digest(codex_lab_observation),
         "stable_rollback_observation_digest": canonical_digest(stable_rollback_observation),
+        "tasks_matrix_digest": canonical_digest(tasks_matrix),
+        "tasks_pilot_digest": canonical_digest(tasks_pilot),
+        "rmcp_tasks_pair_digest": canonical_digest(rmcp_tasks_pair),
+        "inspector_tasks_blocker_digest": canonical_digest(inspector_tasks_blocker),
+        "tasks_evidence_expires_at": tasks_matrix["expires_at"],
         "production_protocol": matrix["production_protocol"],
         "next_protocol": next_version,
         "next_release_status": matrix["next_spec"]["release_status"],
@@ -171,6 +200,29 @@ def build_status(
         "read_only_pilot_completed": lab_canary_completed,
         "core_read_migration_allowed": production_pair_ready,
         "tasks_extension_allowed": tasks_extension_allowed,
+        "tasks_extension_maturity": tasks_matrix["extension_maturity"],
+        "tasks_reference_consumer": (
+            f"{tasks_matrix['reference_pair']['consumer_id']}-"
+            f"{tasks_matrix['reference_pair']['version']}"
+        ),
+        "tasks_reference_pair_passed": (
+            rmcp_tasks_pair["verdict"]
+            == "released_rmcp_passed_feature_gated_abyss_adapter"
+        ),
+        "tasks_inspector_strict_pair_blocked": (
+            inspector_tasks_blocker["verdict"]
+            == "blocked_missing_mcp_name_on_raw_tasks_get"
+        ),
+        "tasks_codex_consumer_eligible": False,
+        "tasks_production_enabled": tasks_matrix["production_tasks_allowed"],
+        "tasks_notifications_proven": tasks_pilot["notifications"]["tested"],
+        "tasks_blockers": [
+            "codex_tasks_capability_absent",
+            "inspector_task_name_header_missing",
+            "tasks_notifications_unproved",
+            "distributed_poll_limit_unproved",
+            "production_tasks_disabled",
+        ],
         "candidate_migration_allowed": False,
         "internal_effect_migration_allowed": False,
         "external_effect_migration_allowed": False,
@@ -188,10 +240,9 @@ def build_status(
         "production_cutover_blockers": production_cutover_blockers,
         "reason_codes": observation["reason_codes"],
         "next_action": (
-            "Retain the stable 2025-11-25 route; repair or refresh the current "
-            "conformance fixture pair, prove cancellation propagation, and wait "
-            "for a production-eligible Codex modern pair before any core-read "
-            "cutover."
+            "Retain the stable 2025-11-25 route while the exact production contour "
+            "receives independent admission, deployment canary, cutover and registry "
+            "refresh; keep the Tasks extension on its separate adapter gate."
         ),
         "claim_limits": matrix["claim_limits"],
     }

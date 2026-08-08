@@ -92,6 +92,21 @@
           "title": "Annotations Are Security Enforcement",
           "type": "boolean"
         },
+        "approval_owner": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approval Owner"
+        },
         "approval_required": {
           "default": false,
           "title": "Approval Required",

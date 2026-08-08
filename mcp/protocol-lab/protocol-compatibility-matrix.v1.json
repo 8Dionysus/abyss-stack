@@ -9,7 +9,7 @@
     },
     {
       "capability": "server_discover",
-      "notes": "The isolated Python MCP 2.0.0 KAG adapter served server/discover; Codex 0.146.0 was still observed sending initialize instead.",
+      "notes": "The isolated Python MCP 2.0.0 KAG adapter and stable Codex 0.147.0 lab pair served server/discover; the production registration remains on 2025-11-25.",
       "production_use": "forbidden",
       "stable": "not_applicable",
       "next": "final_defined"
@@ -77,14 +77,14 @@
       "capability_posture": "blocked",
       "consumer_id": "codex-cli",
       "evidence": [
-        "local command: codex --version -> codex-cli 0.146.0",
+        "local command: codex --version -> codex-cli 0.147.0",
         "local binary contains 2026-07-28 and Tasks type literals",
-        "mcp/protocol-lab/fixtures/codex-0.146.0-production-pair-observation.json",
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-post-rollback-observation.json",
         "isolated stdio pair with Python MCP 2.0.0 offered and selected 2025-06-18",
         "observed method sequence begins initialize, notifications/initialized, and tools/list",
         "mcp/protocol-lab/fixtures/codex-0.146.0-wire-observation.json"
       ],
-      "isolated_next_sdk_fallback_protocol": "2025-06-18",
+      "isolated_next_sdk_fallback_protocol": "2025-11-25",
       "next_protocol_literal_present": true,
       "next_wire_pair_observed": false,
       "production_protocol_versions_observed": [
@@ -93,14 +93,14 @@
       "server_discover_observed": false,
       "stable_pair_observed": true,
       "tasks_wire_pair_observed": false,
-      "version": "0.146.0"
+      "version": "0.147.0"
     },
     {
       "capability_posture": "supported",
-      "consumer_id": "codex-cli-prerelease-lab",
+      "consumer_id": "codex-cli-stable-modern-lab",
       "evidence": [
-        "mcp/protocol-lab/fixtures/codex-0.147.0-alpha.4-kag-next-lab-observation.json",
-        "isolated binary sha256:8185beb794bf7374ecac1a5db7ff06611c708e4806b8b85d3b1f7cdbd7aa2826",
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json",
+        "isolated binary sha256:cb0a15567e9a60a5820d54b0f6ae86d504dc3805c1eab21a47f70e3eb7b73a40",
         "mcp_2026_07_28 was explicitly enabled only for the removable lab contour"
       ],
       "isolated_next_sdk_fallback_protocol": "2026-07-28",
@@ -112,7 +112,7 @@
       "server_discover_observed": true,
       "stable_pair_observed": false,
       "tasks_wire_pair_observed": false,
-      "version": "0.147.0-alpha.4"
+      "version": "0.147.0"
     }
   ],
   "dual_support": {
@@ -122,7 +122,7 @@
     "shared_credential_forbidden": true,
     "stable_registration_retained": true
   },
-  "expires_at": "2026-08-09T00:05:07Z",
+  "expires_at": "2026-08-15T08:33:46.547214Z",
   "migration_gates": [
     {
       "evidence_refs": [
@@ -145,32 +145,31 @@
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/codex-0.147.0-alpha.4-kag-next-lab-observation.json"
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json"
       ],
       "gate_id": "P1-03",
-      "reason": "An exact isolated Codex 0.147.0-alpha.4 pair used server/discover and MCP 2026-07-28 with the feature explicitly enabled; this proves prerelease lab support, not production eligibility.",
+      "reason": "An exact isolated stable Codex 0.147.0 pair used server/discover and MCP 2026-07-28 with the under-development feature explicitly enabled; this proves removable lab support, not production admission.",
       "requirement": "Prove Codex next-protocol capabilities.",
       "status": "passed"
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/python-mcp-2.0.0-conformance-observation.json"
+        "mcp/protocol-lab/fixtures/python-mcp-2.0.0-frozen-conformance-observation.json"
       ],
       "gate_id": "P1-04",
-      "reason": "Current conformance source at 81eb1c3 adds json-schema-2020-12-preservation, but the released Python 2.0.0 client fixture does not recognize that scenario and failed two checks; the mismatch is not baselined away.",
+      "reason": "Official conformance commit c321dd3 freezes requirements per specification revision; Python MCP 2.0.0 passed every scored client and server check for 2026-07-28, while later extension and pending failures remain visible and unscored.",
       "requirement": "Run official conformance against the exact pair.",
-      "status": "blocked"
+      "status": "passed"
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/codex-0.146.0-production-pair-observation.json",
-        "mcp/protocol-lab/fixtures/kag-next-pair-observation.json",
-        "mcp/protocol-lab/fixtures/codex-0.147.0-alpha.4-kag-next-lab-observation.json"
+        "mcp/protocol-lab/fixtures/kag-next-cancellable-pair-observation.json",
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json"
       ],
       "gate_id": "P1-05",
-      "reason": "The isolated KAG pair passed discovery, stateless, auth, limits and read behavior, but client cancellation did not stop the server dispatch; exact pair-conformance remains blocked on propagation.",
+      "reason": "The isolated KAG pair passed discovery, stateless, auth, limits and read behavior; SSE disconnect cancellation reached the server dispatch and the cancelled operation did not complete afterward.",
       "requirement": "Run Abyss pair-conformance.",
-      "status": "blocked"
+      "status": "passed"
     },
     {
       "evidence_refs": [
@@ -183,9 +182,8 @@
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/codex-0.146.0-production-pair-observation.json",
-        "mcp/protocol-lab/fixtures/kag-next-pair-observation.json",
-        "mcp/protocol-lab/fixtures/codex-0.147.0-alpha.4-kag-next-lab-observation.json"
+        "mcp/protocol-lab/fixtures/kag-next-cancellable-pair-observation.json",
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json"
       ],
       "gate_id": "P1-07",
       "reason": "The isolated KAG pair used two independent clients with self-describing requests, no protocol session header, and no server-request backchannel.",
@@ -194,7 +192,7 @@
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/kag-handle-pair-observation.json"
+        "mcp/protocol-lab/fixtures/kag-handle-pair-current-observation.json"
       ],
       "gate_id": "P1-08",
       "reason": "The isolated read-only KAG pair proved opaque requestState round trips, bearer principal isolation, expiry, cross-request replay denial, tamper denial, and key-retirement revocation; same-request replay remained safe and idempotent.",
@@ -203,19 +201,19 @@
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/kag-next-pair-observation.json",
-        "mcp/protocol-lab/fixtures/kag-handle-pair-observation.json"
+        "mcp/protocol-lab/fixtures/kag-next-cancellable-pair-observation.json",
+        "mcp/protocol-lab/fixtures/kag-handle-pair-current-observation.json"
       ],
       "gate_id": "P1-09",
-      "reason": "The isolated Python MCP 2.0.0 KAG adapter served server/discover at 2026-07-28; Codex consumer support remains independently blocked by P1-03.",
+      "reason": "The isolated Python MCP 2.0.0 KAG adapter and stable Codex 0.147.0 lab pair served server/discover at 2026-07-28.",
       "requirement": "Verify server/discover.",
       "status": "passed"
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/kag-next-pair-observation.json",
-        "mcp/protocol-lab/fixtures/kag-cache-pair-observation.json",
-        "mcp/protocol-lab/fixtures/codex-0.147.0-alpha.4-kag-next-lab-observation.json"
+        "mcp/protocol-lab/fixtures/kag-next-cancellable-pair-observation.json",
+        "mcp/protocol-lab/fixtures/kag-cache-pair-current-observation.json",
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json"
       ],
       "gate_id": "P1-10",
       "reason": "The isolated KAG pair preserved trace context and proved private TTL hits, exact-expiry refetch, subscription invalidation, removal revocation, bounded stale-catalog behavior, and explicit refresh.",
@@ -227,7 +225,7 @@
         "https://github.com/modelcontextprotocol/python-sdk/blob/6f69a3758ebf2ee55ce050f58b470ce11af71133/docs/migration.md#experimental-tasks-support-removed"
       ],
       "gate_id": "P1-11",
-      "reason": "Python MCP 2.0.0 documents the 2026-07-28 Tasks extension but does not implement it; no exact Abyss Tasks pair can be formed on this SDK line.",
+      "reason": "Python MCP 2.0.0 does not implement the 2026-07-28 Tasks extension, and stable Codex 0.147.0 did not advertise the Tasks capability on the real modern request wire; an Abyss-owned adapter remains separately required.",
       "requirement": "Verify the Tasks extension separately.",
       "status": "blocked"
     },
@@ -242,18 +240,18 @@
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/codex-0.147.0-alpha.4-kag-next-lab-observation.json"
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json"
       ],
       "gate_id": "P1-13",
-      "reason": "The separately named and credentialed aoa_kag_next_lab registration performed one exact kag_discover call through Codex 0.147.0-alpha.4 on MCP 2026-07-28.",
+      "reason": "The separately named and credentialed aoa_kag_next_lab registration performed one exact kag_discover call through stable Codex 0.147.0 on MCP 2026-07-28.",
       "requirement": "Run one compact read-only canary.",
       "status": "passed"
     },
     {
       "evidence_refs": [
         "mcp/protocol-lab/protocol-compatibility-matrix.v1.json",
-        "mcp/protocol-lab/fixtures/codex-0.147.0-alpha.4-kag-next-lab-observation.json",
-        "mcp/protocol-lab/fixtures/codex-0.146.0-stable-kag-post-rollback-observation.json"
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json",
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-post-rollback-observation.json"
       ],
       "gate_id": "P1-14",
       "reason": "The isolated process, endpoint, credential, registration and CODEX_HOME were removed; the operator config remained byte-identical and the production aoa_kag registration passed a real post-rollback canary.",
@@ -271,9 +269,9 @@
     "tag": "2026-07-28",
     "wire_version": "2026-07-28"
   },
-  "observed_at": "2026-08-02T00:05:44Z",
+  "observed_at": "2026-08-08T08:35:36.009899Z",
   "official_conformance": {
-    "commit": "81eb1c3edaed87d7fd585d7b80186da7a2960660",
+    "commit": "c321dd32035556e6769d3724a8ee97d87c3faaac",
     "latest_public_release": {
       "commit": "21a9a2febd7100d7c17ac1021ee7f2ed9f66a1e0",
       "next_protocol_scenarios_observed": false,
@@ -282,10 +280,10 @@
     },
     "next_suite_executed": true,
     "receipt_refs": [
-      "mcp/protocol-lab/fixtures/python-mcp-2.0.0-conformance-observation.json"
+      "mcp/protocol-lab/fixtures/python-mcp-2.0.0-frozen-conformance-observation.json"
     ],
     "repository": "https://github.com/modelcontextprotocol/conformance",
-    "version": "0.2.0-alpha.10"
+    "version": "0.2.0-alpha.11"
   },
   "pilot": {
     "effectful": false,
@@ -299,7 +297,7 @@
       "Re-run the stable read canary and compare its schema digest."
     ],
     "stable_registration": "aoa_kag",
-    "state": "blocked"
+    "state": "passed"
   },
   "production_protocol": "2025-11-25",
   "refresh_triggers": [

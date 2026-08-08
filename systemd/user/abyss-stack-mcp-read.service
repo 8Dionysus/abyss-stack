@@ -6,6 +6,8 @@ ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.source-pr
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/audit/policy-read.jsonl
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json
+ConditionPathExists=/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/managed-contours.json
 StartLimitIntervalSec=60
 StartLimitBurst=3
 
@@ -28,6 +30,7 @@ LoadCredential=abyss-stack-mcp-read-bearer-token:/srv/AbyssOS/abyss-stack/Secret
 LoadCredential=abyss-stack-mcp-auth-manifest.json:/srv/AbyssOS/abyss-stack/Secrets/Configs/abyss-stack-mcp-auth-manifest.json
 ExecCondition=/usr/bin/test -x /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
 ExecCondition=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --verify-abyss-stack-mcp-runtime=read
+ExecCondition=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -I -B -m abyss_stack_mcp.preflight --catalog /srv/AbyssOS/abyss-stack/Logs/mcp/admission/managed-contours.json --binding-id abyss-stack-read
 ExecStart=/usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.source-projection.lock /usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock /usr/bin/env /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --launch-verified-abyss-stack-mcp=read
 Restart=on-failure
 RestartSec=2

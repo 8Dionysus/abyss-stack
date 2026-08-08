@@ -1,0 +1,14 @@
+[Unit]
+Description=Periodic backstop for OS Abyss MCP admission maintenance
+Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/README.md
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+RandomizedDelaySec=20s
+Persistent=false
+Unit=abyss-mcp-admission-keeper.service
+
+[Install]
+WantedBy=timers.target

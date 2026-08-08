@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from datetime import datetime, timedelta, timezone
@@ -24,6 +25,17 @@ from abyss_stack_mcp.effect import (  # noqa: E402
     InternalEffectRecoveryReceipt,
     InternalEffectReceipt,
 )
+from abyss_stack_mcp.preflight import (  # noqa: E402
+    MCPPreflightReport,
+    ManagedContourCatalog,
+)
+from abyss_stack_mcp.preflight_sweep import MCPPreflightSweepStatus  # noqa: E402
+from abyss_stack_mcp.managed_catalog import ManagedContourTopology  # noqa: E402
+from abyss_stack_mcp.keeper_specs import KeeperSpecBuildStatus  # noqa: E402
+from abyss_stack_mcp.admission_automation import (  # noqa: E402
+    AdmissionAutomationStatus,
+)
+from abyss_stack_mcp.system_status import MCPSystemStatus  # noqa: E402
 
 
 NOW = datetime(2026, 7, 25, 12, 0, tzinfo=timezone.utc)
@@ -273,6 +285,52 @@ def schema(filename: str, model: type) -> str:
     return json.dumps(payload, indent=2, sort_keys=True) + "\n"
 
 
+def contour_supplement() -> dict[str, Any]:
+    manifest_path = SERVICE_ROOT / "organ-access.v1.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    source_digest = "sha256:" + hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    by_policy = {item["policy_family"]: item for item in manifest["capabilities"]}
+    contours = []
+    for policy in ("candidate", "internal_effect"):
+        capability = by_policy[policy]
+        contours.append(
+            {
+                "contour_id": policy.replace("_", "-"),
+                "authority_class": policy,
+                "policy_family": policy,
+                "credential_class": capability["credential_class"],
+                "principal_id": f"abyss-stack-{policy.replace('_', '-')}-principal",
+                "capabilities": [capability],
+                "observation_route": f"owner://abyss-stack/observation/{policy}",
+                "rollback_route": f"owner://abyss-stack/rollback/{policy}",
+            }
+        )
+    return {
+        "schema_version": "aoa_organ_contour_supplement_v1",
+        "supplement_id": "abyss-stack-additional-contours-v1",
+        "organ_id": "abyss-stack",
+        "source_owner": "abyss-stack",
+        "source_evidence": {
+            "owner": "abyss-stack",
+            "evidence_ref": (
+                "repo://abyss-stack/mcp/services/abyss-stack-mcp/"
+                "organ-access.v1.json"
+            ),
+            "revision": source_digest,
+            "observed_at": "2026-08-08T08:03:38Z",
+        },
+        "owner_decision_ref": (
+            "owner://abyss-stack/decision/ABYSS-STACK-D-0105"
+        ),
+        "contours": contours,
+        "admission_asserted": False,
+        "proof_asserted": False,
+        "acceptance_asserted": False,
+        "runtime_identity_asserted": False,
+        "contains_secrets": False,
+    }
+
+
 def rendered_outputs() -> dict[Path, str]:
     return {
         SERVICE_ROOT / "schemas" / "runtime-observation.schema.json": schema(
@@ -303,6 +361,34 @@ def rendered_outputs() -> dict[Path, str]:
             "internal-effect-recovery-receipt.schema.json",
             InternalEffectRecoveryReceipt,
         ),
+        SERVICE_ROOT / "schemas" / "managed-contours.schema.json": schema(
+            "managed-contours.schema.json",
+            ManagedContourCatalog,
+        ),
+        SERVICE_ROOT / "schemas" / "mcp-preflight-report.schema.json": schema(
+            "mcp-preflight-report.schema.json",
+            MCPPreflightReport,
+        ),
+        SERVICE_ROOT / "schemas" / "mcp-preflight-sweep.schema.json": schema(
+            "mcp-preflight-sweep.schema.json",
+            MCPPreflightSweepStatus,
+        ),
+        SERVICE_ROOT / "schemas" / "managed-contour-topology.schema.json": schema(
+            "managed-contour-topology.schema.json",
+            ManagedContourTopology,
+        ),
+        SERVICE_ROOT / "schemas" / "keeper-spec-build.schema.json": schema(
+            "keeper-spec-build.schema.json",
+            KeeperSpecBuildStatus,
+        ),
+        SERVICE_ROOT / "schemas" / "admission-automation-status.schema.json": schema(
+            "admission-automation-status.schema.json",
+            AdmissionAutomationStatus,
+        ),
+        SERVICE_ROOT / "schemas" / "mcp-system-status.schema.json": schema(
+            "mcp-system-status.schema.json",
+            MCPSystemStatus,
+        ),
         SERVICE_ROOT / "examples" / "runtime-observation.public.example.json": (
             json.dumps(
                 RuntimeObservation.model_validate(observation_example()).model_dump(
@@ -312,6 +398,9 @@ def rendered_outputs() -> dict[Path, str]:
                 sort_keys=True,
             )
             + "\n"
+        ),
+        SERVICE_ROOT / "organ-contour-supplement.v1.json": (
+            json.dumps(contour_supplement(), indent=2, sort_keys=True) + "\n"
         ),
     }
 

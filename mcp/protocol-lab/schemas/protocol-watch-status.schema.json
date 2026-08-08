@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os-abyss.dev/schemas/protocol-watch-status.schema.json",
+  "title": "OS Abyss MCP protocol watcher status",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "abyss_mcp_protocol_watch_status_v1"},
+    "plan_id": {"type": "string", "minLength": 1},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "input_snapshot_digest": {"$ref": "#/$defs/digest"},
+    "private_observation_ref": {"type": "string", "pattern": "^(local|private)://"},
+    "private_observation_sha256": {"$ref": "#/$defs/digest"},
+    "previous_success_digest": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+    "observation_ready": {"type": "boolean"},
+    "triggered": {"type": "boolean"},
+    "trigger_reasons": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "execution_state": {"enum": ["no_change", "trigger_pending", "observation_blocked", "awaiting_runtime_config", "lab_passed", "lab_failed"]},
+    "run_id": {"type": ["string", "null"]},
+    "inputs": {"type": "array", "items": {"type": "object"}},
+    "ttl": {"type": "object"},
+    "verdicts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "compatible_for_lab": {"type": "boolean"},
+        "eligible_for_read_canary": {"type": "boolean"},
+        "eligible_for_core_read": {"type": "boolean"},
+        "blocked_on_conformance": {"type": "boolean"},
+        "blocked_on_cancellation": {"type": "boolean"},
+        "blocked_on_auth": {"type": "boolean"},
+        "client_extension_capability_absent": {"type": "boolean"},
+        "production_cutover_allowed": {"type": "boolean"}
+      },
+      "required": ["compatible_for_lab", "eligible_for_read_canary", "eligible_for_core_read", "blocked_on_conformance", "blocked_on_cancellation", "blocked_on_auth", "client_extension_capability_absent", "production_cutover_allowed"]
+    },
+    "production_automatically_changed": {"const": false},
+    "protected_paths_unchanged": {"type": ["boolean", "null"]},
+    "receipts": {"type": "array", "items": {"type": "object"}},
+    "failures": {"type": "array", "items": {"type": "string"}},
+    "claim_limits": {"type": "array", "minItems": 3, "items": {"type": "string", "minLength": 3}},
+    "status_digest": {"$ref": "#/$defs/digest"}
+  },
+  "required": ["schema_version", "plan_id", "observed_at", "input_snapshot_digest", "private_observation_ref", "private_observation_sha256", "previous_success_digest", "observation_ready", "triggered", "trigger_reasons", "execution_state", "run_id", "inputs", "ttl", "verdicts", "production_automatically_changed", "protected_paths_unchanged", "receipts", "failures", "claim_limits", "status_digest"],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

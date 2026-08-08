@@ -1,0 +1,133 @@
+{
+  "adapter_feature_gate_enabled": true,
+  "all_cases_passed": true,
+  "case_count": 11,
+  "cases": [
+    {
+      "case": "short_sync_fallback",
+      "facts": {
+        "result_type": "complete",
+        "task_created": false
+      },
+      "passed": true
+    },
+    {
+      "case": "long_task_poll_complete",
+      "facts": {
+        "create_result_type": "task",
+        "task_id_digest": "sha256:ec7d5fc8cbfd19a1ac698d85a4dc22d992a08c8d8f70ca3301e664fa63c2ce86",
+        "terminal_status": "completed"
+      },
+      "passed": true
+    },
+    {
+      "case": "jsonrpc_failure_inlined",
+      "facts": {
+        "error_code": -32603,
+        "terminal_status": "failed"
+      },
+      "passed": true
+    },
+    {
+      "case": "input_required_partial_duplicate_resume",
+      "facts": {
+        "duplicate_ack": true,
+        "initial_inputs": 2,
+        "remaining_after_partial": 1
+      },
+      "passed": true
+    },
+    {
+      "case": "cooperative_cancellation",
+      "facts": {
+        "cancellation_intent_persisted": true,
+        "owner_acknowledged": true
+      },
+      "passed": true
+    },
+    {
+      "case": "cancellation_completion_race",
+      "facts": {
+        "cancellation_sink_called": false,
+        "terminal_cancel_idempotent": true
+      },
+      "passed": true
+    },
+    {
+      "case": "worker_and_client_restart_resume",
+      "facts": {
+        "durable_handle_reopened": true,
+        "owner_run_ref_retained": true
+      },
+      "passed": true
+    },
+    {
+      "case": "ttl_expiry_and_cleanup",
+      "facts": {
+        "removed_records": 1,
+        "wire_status": "failed"
+      },
+      "passed": true
+    },
+    {
+      "case": "wrong_principal_and_unknown_are_indistinguishable",
+      "facts": {
+        "disclosure": "collapsed",
+        "error_code": -32602
+      },
+      "passed": true
+    },
+    {
+      "case": "quota_rate_and_payload_policy",
+      "facts": {
+        "active_task_quota": 1,
+        "maximum_input_response_bytes": 64,
+        "oversized_input_rejected": true,
+        "poll_rate_limited": true
+      },
+      "passed": true
+    },
+    {
+      "case": "useful_read_only_owner_diagnostic",
+      "facts": {
+        "authority": "diagnostic_session_v1",
+        "command_returncode": 1,
+        "diagnostic_digest": "sha256:fc34e9efc43f87c46269cc9b254f6ff5fafcb2c5c78d0a04964c6f2d4650fadd",
+        "owner": "abyss-stack",
+        "owner_duration_ms": 20134,
+        "owner_rerun_count": 0,
+        "task_resumed_after_adapter_restart": true
+      },
+      "passed": true
+    }
+  ],
+  "claim_limits": [
+    "The adapter preserved one read-only abyss-stack diagnostic result across adapter restart without rerunning owner work.",
+    "The task terminal state reflects owner-issued bytes; it does not imply repair, admission, proof, acceptance, or effect authority.",
+    "Codex was not the Tasks consumer in this pilot; current Codex remains ineligible until it advertises the extension on the real request wire.",
+    "Notifications were not tested because current subscriptions/listen support cannot yet carry the extension filter end to end."
+  ],
+  "client_kind": "abyss-synthetic-capable-client",
+  "codex_consumer_used": false,
+  "extension_id": "io.modelcontextprotocol/tasks",
+  "finished_at": "2026-08-08T09:29:30.388226Z",
+  "notifications": {
+    "reason": "subscriptions_listen_extension_filter_not_proven",
+    "tested": false
+  },
+  "owner_pilot": {
+    "command_returncode": 1,
+    "diagnostic_digest": "sha256:fc34e9efc43f87c46269cc9b254f6ff5fafcb2c5c78d0a04964c6f2d4650fadd",
+    "duration_ms": 20134,
+    "effect_class": "observe",
+    "operation": "bounded_diagnostic_snapshot",
+    "owner": "abyss-stack",
+    "owner_rerun_count": 0,
+    "resumed_after_adapter_restart": true
+  },
+  "production_enabled": false,
+  "protocol_version": "2026-07-28",
+  "run_id": "20260808T092910.053280Z",
+  "schema_version": "abyss_mcp_tasks_pilot_v1",
+  "started_at": "2026-08-08T09:29:10.053280Z"
+}

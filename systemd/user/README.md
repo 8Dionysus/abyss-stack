@@ -21,6 +21,8 @@ This directory stores user-unit skeletons for the deployed runtime.
 - `abyss-stack-mcp-observation.service` and
   `abyss-stack-mcp-observation.timer`, the bounded five-minute observation
   producer and two-minute refresh schedule
+- `abyss-mcp-protocol-watch.service`, `.path`, and `.timer`, the removable
+  protocol-lab drift/TTL detector with an hourly upstream backstop
 - `managed-units.txt` allowlists the host-local user units that can be linked
   from the deployed Configs mirror.
 
@@ -99,6 +101,10 @@ The current allowlist covers the local working surface:
   only the exact deployment record, private registry projection, committed
   target catalog, named unit state, and an optional typed evidence overlay;
   its timer is linked but never enabled by the installer
+- the credential-free protocol watcher, which records exact local/upstream
+  identities and runs no child lab without a separate private mode `0600`
+  runtime plan; it cannot start, stop, restart, register, or migrate a
+  production contour
 - warm dictation and TTS services, plus the `gemma4.spark` stack endpoint
   bridge
 - TTS keep-warm timer that periodically exercises the protected warm server

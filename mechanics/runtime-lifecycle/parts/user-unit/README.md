@@ -56,6 +56,24 @@ files fail closed. Install never starts or restarts an owner. Canary and
 restart each instance separately after source/deployed parity so one failed
 owner cannot hide behind bundle state.
 
+Managed MCP starts also execute an exact fail-closed preflight condition. The
+event-driven `abyss-mcp-preflight-sweep.path` and
+`abyss-mcp-admission-keeper.path` units react to registry, deployment, canary,
+credential-manifest, observation, and protocol-status changes; paired timers
+run as five-minute backstops. These units only publish private machine-readable
+reports. They do not start/restart MCP processes or issue owner proof,
+acceptance, or admission. A failed preflight leaves the target inactive with an
+expected/observed reason instead of entering a restart loop.
+
+The separately linked `abyss-mcp-protocol-watch.path` reacts to Codex and
+protocol-lab source changes; its hourly timer observes new upstream
+specification, SDK, conformance, and Codex identities and evidence TTL. The
+watcher writes only `${AOA_STACK_ROOT}/Logs/mcp/protocol-watch`, preserves
+immutable private observations, and requires an operator-private mode `0600`
+runtime plan before executing a removable lab suite. Missing config is a
+visible pending trigger, not permission to improvise. Neither linking nor a
+green lab mutates production registration or admission.
+
 Use `aoa-install-systemd --install-mcp-http-codex-client` once for the target
 user after the MCP package has been projected into deployed `Configs`. The
 action validates or provisions the legacy credential plus the fourteen

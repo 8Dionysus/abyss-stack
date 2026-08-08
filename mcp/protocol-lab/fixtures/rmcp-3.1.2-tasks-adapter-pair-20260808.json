@@ -1,0 +1,49 @@
+{
+  "adapter": {
+    "feature_gate_enabled": true,
+    "production_enabled": false,
+    "protocol_independent_store": true
+  },
+  "claim_limits": [
+    "This proves released rmcp 3.1.2 create/get/completed-result behavior over Streamable HTTP against the Abyss adapter.",
+    "The owner diagnostic was reused by digest and was not rerun; its tool-level error remains visible inside a completed task.",
+    "The adapter feature gate was enabled only in the isolated lab and remains disabled in production.",
+    "Input update, cancellation, notifications, distributed poll limits, and Codex Tasks consumption require independent pair evidence."
+  ],
+  "client": {
+    "commit": "02c62aef2e331e5cf79c06c744eb1eb052cc8ebd",
+    "implementation": "rmcp",
+    "published_release": true,
+    "tasks_extension_declared": true,
+    "version": "3.1.2"
+  },
+  "extension_id": "io.modelcontextprotocol/tasks",
+  "observed_at": "2026-08-08T09:51:33.512394Z",
+  "owner_result": {
+    "authority": "diagnostic_session_v1",
+    "diagnostic_digest": "sha256:fc34e9efc43f87c46269cc9b254f6ff5fafcb2c5c78d0a04964c6f2d4650fadd",
+    "owner": "abyss-stack",
+    "owner_rerun_count": 0,
+    "tool_error_preserved": true
+  },
+  "protocol_version": "2026-07-28",
+  "schema_version": "abyss_rmcp_tasks_adapter_pair_v1",
+  "store": {
+    "audit_actions": [
+      "complete",
+      "create",
+      "get"
+    ],
+    "durable_before_handle": true,
+    "task_id_digest": "sha256:c3d227364f3cb5f57917ef71d121bd420cfc69e29fce4efa85ba3aeabacb68b1"
+  },
+  "verdict": "released_rmcp_passed_feature_gated_abyss_adapter",
+  "wire": {
+    "completed_result_received": true,
+    "extension_on_every_task_request": true,
+    "method_headers_match": true,
+    "name_headers_present": true,
+    "task_created": true,
+    "unknown_task_rejected": true
+  }
+}

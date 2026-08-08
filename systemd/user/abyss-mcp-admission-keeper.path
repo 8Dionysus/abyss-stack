@@ -1,0 +1,17 @@
+[Unit]
+Description=Watch exact MCP evidence inputs for admission invalidation
+Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/README.md
+
+[Path]
+PathChanged=/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/deployments/latest.json
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/canaries/latest
+PathChanged=/srv/AbyssOS/abyss-stack/Secrets/Configs/organ-mcp-read-auth-manifest.json
+PathChanged=/srv/AbyssOS/abyss-stack/Secrets/Configs/organ-mcp-candidate-auth-manifest.json
+PathChanged=/srv/AbyssOS/abyss-stack/Secrets/Configs/abyss-stack-mcp-auth-manifest.json
+PathChanged=/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json
+PathChanged=/srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/generated/protocol-lab-status.json
+Unit=abyss-mcp-admission-keeper.service
+
+[Install]
+WantedBy=default.target

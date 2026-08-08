@@ -12,8 +12,30 @@
 - the internal-effect credential cannot select another unit, action, tool, or
   lasting applied state;
 - a denied or incomplete effect attempt cannot disappear without a receipt.
+- a live but source-drifted or expired process cannot be reported as current
+  admission;
+- read evidence cannot authorize a candidate or effect contour;
+- event-driven maintenance cannot manufacture a stronger-owner verdict or
+  hide an incomplete refresh.
+- a completed, cancelled, expired, or lost Task handle cannot replace the
+  owner transaction or silently upgrade admission.
 
 ## Controls
+
+- every managed start has a fail-closed preflight condition over exact
+  registry contour, deployment/source/package/runtime/schema identity,
+  credential binding, validator, policy, observation, and rollback routes;
+- standard executable symlinks are accepted only with pinned resolved path and
+  bytes, while credentials remain regular non-symlink owner-only files;
+- admission maintenance writes only private bounded status/evidence state,
+  uses immutable SDK nodes and CAS publication, preserves last-good state, and
+  neither starts services nor edits owner registry/proof/acceptance records;
+- the unified private status requires exact contour coverage, keeps runtime,
+  admission, owner, protocol, and task axes distinct, emits no task/principal
+  identifiers, and reports missing credential generation or watermark as
+  unobserved;
+- owner supplements are forced shadow/unknown and runtime overlays are barred
+  from refreshing currentness, expiry, proof, acceptance, or admission;
 
 - a separate credential for each read, candidate, and internal-effect process, alongside
   separate ports, tools, scopes, and client identities, with equal bearer
@@ -212,6 +234,12 @@ or owner-tool name. Discovery therefore cannot turn this service into a
 confused deputy for sibling authority.
 
 ## Residual risk
+
+Admission Keeper execution depends on an exact compatible `aoa-sdk` artifact.
+Until that artifact is built, trusted, installed, and measured in the managed
+runtime, source-checkout success is not deployment readiness. File events and
+the timer can also only detect inputs they explicitly watch; the periodic full
+sweep bounds but does not eliminate that detection delay.
 
 A same-UID process that can read the deployed Secrets tree remains outside the
 protection offered by bearer authentication. Stronger OS-user or container

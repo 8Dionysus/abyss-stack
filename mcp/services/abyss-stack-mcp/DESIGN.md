@@ -117,6 +117,53 @@ The MCP stable production line remains `2025-11-25`. These contracts are
 protocol-independent so a future adapter can coexist without changing runtime
 authority.
 
+## Bounded system status
+
+The private system status composes five explicitly separate axes: runtime
+liveness/parity, admission/currentness/last-good, owner watermark, protocol
+compatibility, and aggregate TaskStore operations. It requires exact contour
+coverage across the managed catalog, preflight sweep, Keeper state, and owner
+registry; partial coverage fails closed. Process-stage evidence may report
+`observed`, but does not set `admission_current`. Missing credential generation
+or owner watermark remains `unobserved` rather than inferred from a credential
+file, process, or task.
+
+Task status contains counts, quotas, outstanding input, pending cancellation,
+unpersisted expiry, and bounded orphan candidates. It deliberately excludes
+task and principal identifiers. The owner transaction ref remains the resume
+identity for admission maintenance: task loss does not erase it, task
+cancellation does not erase immutable evidence, and task completion cannot
+issue admission.
+
+## Preflight and Admission Keeper
+
+Before any managed organ process starts, a private catalog pins the registry
+contour, protocol and authority, deployment manifest, source/package/runtime
+tree digests, schema bundle, owner validator, exact systemd credential line,
+and executable original path, resolved path, and digest. The executable may be
+a standard virtual-environment symlink only when the resolved bytes are pinned;
+the credential itself must remain a regular non-symlink owner-only file.
+Failures return typed expected/observed identities and leave the unit inactive.
+
+Admission maintenance is a projection pipeline, not a new authority owner:
+
+```text
+deployment + canary evidence
+  -> non-admitting runtime overlay
+  -> exact managed topology/catalog
+  -> preflight sweep
+  -> dependency-ordered Keeper specs
+  -> immutable SDK evidence plan/state
+  -> bounded current status
+```
+
+File/path changes trigger the pipeline; a timer only recovers missed events.
+The Keeper reuses still-valid identical nodes and invalidates dependents, but
+owner grounding, central proof, acceptance, consumer observation, and registry
+admission require their own issuers. Expiry immediately remains fail-closed.
+The pipeline never mutates the services it observes, so protocol cutover and
+Tasks adapters retain independent admission and rollback boundaries.
+
 Codex integration consumes this observation through the owner-composed handoff
 in `docs/CODEX_CONSUMER_HANDOFF.md`. The stack may issue canary and runtime
 rollback-target evidence and carry foreign receipt refs. It never edits the

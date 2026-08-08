@@ -291,6 +291,9 @@ abyss_stack_mcp_effect_root="${AOA_STACK_ROOT}/Logs/mcp/internal-effects/read-re
 abyss_stack_mcp_observation_root="${AOA_STACK_ROOT}/Logs/mcp/observations"
 abyss_stack_mcp_observation_path="${abyss_stack_mcp_observation_root}/current.json"
 abyss_stack_mcp_observation_overlay_path="${abyss_stack_mcp_observation_root}/evidence-overlay.json"
+abyss_stack_mcp_admission_root="${AOA_STACK_ROOT}/Logs/mcp/admission"
+abyss_stack_mcp_preflight_root="${AOA_STACK_ROOT}/Logs/mcp/preflight"
+abyss_stack_mcp_protocol_watch_root="${AOA_STACK_ROOT}/Logs/mcp/protocol-watch"
 abyss_stack_mcp_orchestration_root="${AOA_STACK_ROOT}/Logs/mcp/cross-organ-orchestrations"
 abyss_stack_mcp_source_lock_root="$(
   dirname -- "${AOA_CONFIGS_ROOT%/}"
@@ -926,6 +929,23 @@ aoa_provision_abyss_stack_mcp_observation_root() {
   done
 }
 
+aoa_provision_abyss_stack_mcp_admission_roots() {
+  local target=""
+
+  for target in \
+    "$abyss_stack_mcp_admission_root" \
+    "$abyss_stack_mcp_preflight_root" \
+    "$abyss_stack_mcp_protocol_watch_root"; do
+    if [[ -e "$target" || -L "$target" ]]; then
+      [[ -d "$target" && ! -L "$target" ]] || \
+        aoa_die "abyss-stack MCP admission runtime root must be a non-symlink directory"
+    else
+      install -d -m 0700 "$target"
+    fi
+    chmod 0700 "$target"
+  done
+}
+
 aoa_provision_abyss_stack_mcp_orchestration_root() {
   local parent=""
 
@@ -1549,6 +1569,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
   chmod 0600 "$abyss_stack_mcp_runtime_lock"
   aoa_provision_abyss_stack_mcp_audit_journals
   aoa_provision_abyss_stack_mcp_observation_root
+  aoa_provision_abyss_stack_mcp_admission_roots
   aoa_provision_abyss_stack_mcp_orchestration_root
   aoa_provision_abyss_stack_mcp_effect_root
 
@@ -1578,7 +1599,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
            "${abyss_stack_mcp_venv}/bin/python" -m pip check >/dev/null && \
        PYTHONDONTWRITEBYTECODE=1 \
          aoa_run_isolated_python "${abyss_stack_mcp_venv}/bin/python" -c \
-           'import abyss_stack_mcp, mcp, pydantic' >/dev/null; then
+           'import abyss_stack_mcp, aoa_sdk, mcp, pydantic; from importlib.metadata import version; assert version("aoa-sdk") == "0.10.0"' >/dev/null; then
       deployed_digest="$(
         aoa_digest_abyss_stack_mcp_package "$abyss_stack_mcp_service_root"
       )" || \
@@ -1663,7 +1684,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
          "${temp_venv}/bin/python" -m pip check >/dev/null || \
      ! PYTHONDONTWRITEBYTECODE=1 \
        aoa_run_isolated_python "${temp_venv}/bin/python" -c \
-         'import abyss_stack_mcp, mcp, pydantic' >/dev/null; then
+         'import abyss_stack_mcp, aoa_sdk, mcp, pydantic; from importlib.metadata import version; assert version("aoa-sdk") == "0.10.0"' >/dev/null; then
     rm -rf -- "$temp_venv"
     aoa_die "provisioned abyss-stack MCP runtime failed dependency verification"
   fi

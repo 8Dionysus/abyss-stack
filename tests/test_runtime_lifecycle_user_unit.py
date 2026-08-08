@@ -51,6 +51,15 @@ STACK_MCP_OBSERVATION_UNIT = (
 STACK_MCP_OBSERVATION_TIMER = (
     REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-observation.timer"
 )
+MCP_PROTOCOL_WATCH_UNIT = (
+    REPO_ROOT / "systemd" / "user" / "abyss-mcp-protocol-watch.service"
+)
+MCP_PROTOCOL_WATCH_PATH = (
+    REPO_ROOT / "systemd" / "user" / "abyss-mcp-protocol-watch.path"
+)
+MCP_PROTOCOL_WATCH_TIMER = (
+    REPO_ROOT / "systemd" / "user" / "abyss-mcp-protocol-watch.timer"
+)
 STACK_RUNTIME_UNIT = REPO_ROOT / "systemd" / "user" / "podman-compose-abyss.service"
 STACK_RUNTIME_DROPIN = (
     REPO_ROOT
@@ -1131,6 +1140,11 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             installer,
         )
 
+    def test_stack_mcp_runtime_requires_the_released_aoa_sdk(self) -> None:
+        installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")
+        self.assertIn("import abyss_stack_mcp, aoa_sdk, mcp, pydantic", installer)
+        self.assertIn('version("aoa-sdk") == "0.10.0"', installer)
+
     @unittest.skipIf(
         hasattr(os, "geteuid") and os.geteuid() == 0,
         "abyss-stack MCP runtime provisioning intentionally rejects root",
@@ -1417,6 +1431,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             read_audit_journal = audit_root / "policy-read.jsonl"
             candidate_audit_journal = audit_root / "policy-candidate.jsonl"
             observation_root = stack_root / "Logs" / "mcp" / "observations"
+            protocol_watch_root = stack_root / "Logs" / "mcp" / "protocol-watch"
             first_identity = marker.read_text(encoding="utf-8").strip()
             self.assertRegex(first_identity, r"\A[0-9a-f]{64}:[0-9a-f]{64}\Z")
             first_content_digest = content_marker.read_text(encoding="utf-8").strip()
@@ -1478,6 +1493,10 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             self.assertNotEqual(read_audit_journal, candidate_audit_journal)
             self.assertEqual(
                 observation_root.stat().st_mode & 0o777,
+                0o700,
+            )
+            self.assertEqual(
+                protocol_watch_root.stat().st_mode & 0o777,
                 0o700,
             )
             self.assertIn("provisioned abyss-stack MCP runtime", first.stdout)
@@ -2358,6 +2377,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertIn("IPAddressDeny=any", organ_read_template)
         self.assertIn("IPAddressAllow=localhost", organ_read_template)
         self.assertNotIn("ReadWritePaths=", organ_read_template)
+        self.assertIn(" -m abyss_stack_mcp.preflight ", organ_read_template)
         self.assertNotIn(
             "Environment=AOA_MCP_HTTP_BEARER_TOKEN",
             organ_read_template,
@@ -2674,6 +2694,50 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertIn("OnUnitActiveSec=2min", timer)
         self.assertIn("Persistent=false", timer)
         self.assertIn("Unit=abyss-stack-mcp-observation.service", timer)
+
+    def test_protocol_watcher_is_removable_private_and_never_a_production_lifecycle_unit(
+        self,
+    ) -> None:
+        unit = MCP_PROTOCOL_WATCH_UNIT.read_text(encoding="utf-8")
+        path = MCP_PROTOCOL_WATCH_PATH.read_text(encoding="utf-8")
+        timer = MCP_PROTOCOL_WATCH_TIMER.read_text(encoding="utf-8")
+
+        self.assertIn("Type=oneshot", unit)
+        self.assertIn("scripts/protocol_watcher.py", unit)
+        self.assertIn("--execute", unit)
+        self.assertIn(
+            "--state-root /srv/AbyssOS/abyss-stack/Logs/mcp/protocol-watch",
+            unit,
+        )
+        self.assertIn(
+            "--runtime-config /srv/AbyssOS/abyss-stack/Secrets/Configs/"
+            "mcp-protocol-watch-runtime.json",
+            unit,
+        )
+        self.assertIn("ProtectSystem=strict", unit)
+        self.assertIn("ProtectHome=read-only", unit)
+        self.assertIn(
+            "ReadWritePaths=/srv/AbyssOS/abyss-stack/Logs/mcp/protocol-watch",
+            unit,
+        )
+        self.assertNotIn("systemctl", unit)
+        self.assertNotIn("LoadCredential=", unit)
+        self.assertIn("PathChanged=%h/.local/bin/codex", path)
+        self.assertIn("OnUnitActiveSec=1h", timer)
+        self.assertIn("Persistent=false", timer)
+
+        managed_units = {
+            line.split("#", 1)[0].strip()
+            for line in MANAGED_USER_UNITS.read_text(encoding="utf-8").splitlines()
+            if line.split("#", 1)[0].strip()
+        }
+        self.assertTrue(
+            {
+                MCP_PROTOCOL_WATCH_UNIT.name,
+                MCP_PROTOCOL_WATCH_PATH.name,
+                MCP_PROTOCOL_WATCH_TIMER.name,
+            }.issubset(managed_units)
+        )
 
 
 class McpLoopbackLifecycleTests(unittest.TestCase):

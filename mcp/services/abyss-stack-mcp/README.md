@@ -9,6 +9,45 @@ It is not a gateway, does not proxy owner tools, does not flatten nested state
 into `healthy`, and does not own proof, memory, source truth, or owner
 acceptance.
 
+## Admission maintenance
+
+Managed organ processes now have two fail-closed control surfaces below any
+owner admission decision:
+
+- `abyss-stack-mcp-preflight` verifies the exact contour registry entry,
+  source/package/deployment tree, measured executable target and digest,
+  credential identity and permissions, schema set, unit binding, policy,
+  validator, observation, dependency, and rollback routes before launch;
+- `abyss-stack-mcp-admission-automation` derives an evidence-bound runtime
+  overlay, managed topology and catalog, runs the complete sweep, builds
+  per-contour Keeper specs, and asks the exact compatible `aoa-sdk` Keeper to
+  publish a private CAS state projection;
+- `abyss-stack-mcp-system-status` combines that private projection with the
+  managed catalog, owner registry, protocol-lab verdict, and aggregate SDK
+  TaskStore state into one private, content-addressed read model.
+
+Path events are primary and a five-minute timer is the backstop. Neither
+surface starts or restarts a service, edits the owner registry, extends a TTL,
+or issues proof or acceptance. The unified status keeps runtime liveness,
+preflight parity, admission currentness, last-good state, blockers, and next
+safe steps separate. It also reports protocol pair, credential-generation
+observation state, schema digest, owner watermark, refresh transaction/cost,
+task quotas, pending cancellation and bounded orphan candidates. Missing live,
+credential-generation, or owner-watermark evidence stays `unobserved`. An
+active endpoint whose owner registry has expired is therefore reported as live
+but blocked, never current; a completed Task likewise never becomes admission.
+
+The current evidence-shaped run covers nine read contours and correctly
+reports all nine blocked on the expired registry snapshot, with runtime
+liveness unobserved, zero current admissions, one completed owner pilot Task,
+and production Tasks disabled. That is an operationally useful mixed status,
+not a failed attempt to manufacture a green aggregate.
+
+The generated `organ-contour-supplement.v1.json` adds stack candidate and
+internal-effect contours only as shadow shapes. Read admission never transfers
+to them. Deployment of the Keeper additionally requires an exact trusted SDK
+artifact; an ambient checkout or editable import is not dependency evidence.
+
 For the exact boundary between stack runtime receipts and the source-owned
 Codex organ-fabric projection, read
 [`docs/CODEX_CONSUMER_HANDOFF.md`](docs/CODEX_CONSUMER_HANDOFF.md). Service
@@ -585,9 +624,13 @@ effect process. It does not stage a plan, issue approval, start a unit, or
 authorize an effect.
 
 Runtime dependencies and the build backend are exact pins in
-`requirements.constraints`; the committed `requirements.lock` carries the
-resolved closure and artifact hashes. Regenerate it from the repository root
-with the reviewed `pip-tools` version:
+`requirements.constraints`; the one direct artifact requirement is the immutable
+`aoa-sdk v0.10.0` GitHub Release wheel. The committed `requirements.lock` binds
+that public release to SHA-256
+`0d41d53e3aafdcdb9d63b24b40fa8038051f8037e9508e54e216c6076863e764`
+and carries hashes for the entire resolved closure. The validator rejects any
+other SDK URL or digest. Regenerate the lock from the repository root with
+`pip-tools==7.6.0`:
 
 ```bash
 pip-compile --generate-hashes --resolver=backtracking --strip-extras \

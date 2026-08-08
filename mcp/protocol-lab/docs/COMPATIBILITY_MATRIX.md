@@ -5,62 +5,67 @@ The authoritative machine-readable comparison is
 
 ## Current decision
 
-Production stays on MCP `2025-11-25` with Codex `0.146.0`. The modern
-`2026-07-28` registered read canary has now been exercised, but only through the exact
-isolated prerelease Codex `0.147.0-alpha.4` binary with
-`mcp_2026_07_28` explicitly enabled. This is a successful registered canary,
-not a complete successful pair or a production cutover.
+Production stays on MCP `2025-11-25`. Stable Codex `0.147.0` is current, but
+its production `aoa_kag` registration has not been moved. With
+`mcp_2026_07_28` enabled only in an isolated `CODEX_HOME`, the same exact
+binary passed the separately named `aoa_kag_next_lab` contour on the real
+`2026-07-28` wire. That is stable-client lab compatibility, not production
+admission.
 
-The separately named `aoa_kag_next_lab` contour used:
+The removable contour used an independent process, loopback endpoint,
+generated mode `0600` credential, registration, Codex home, Python MCP `2.0.0`
+runtime, and exact source-artifact digests. The wire showed
+`server/discover`, self-describing requests, no legacy `initialize`, no
+`Mcp-Session-Id`, the expected authenticated principal, trace propagation, one
+exact KAG tool/schema inventory, wrong-bearer `401`, explicit input/output
+bounds, and oversized-input denial.
 
-- a dedicated process and `127.0.0.1:5441` endpoint;
-- a generated regular non-symlink `0600` bearer credential;
-- an isolated `CODEX_HOME` and registration;
-- Python MCP `2.0.0` and exact source-artifact digests;
-- one exposed tool, `kag_discover`, with a deterministic schema digest.
+The modern server uses the SSE response path. A client disconnect cancelled
+the client request and the actual server dispatch, and the worker did not
+complete afterward. This receipt does not generalize to the Python `2.0.0`
+JSON-response shortcut, whose handler path does not watch disconnects.
 
-The actual wire showed `server/discover`, protocol `2026-07-28`, no legacy
-`initialize`, no `Mcp-Session-Id`, self-describing request envelopes, the
-expected authenticated principal, and preserved trace context. A wrong bearer
-received HTTP `401`. The server enforces a 16 KiB input bound and a 256 KiB
-output bound; the oversized-input probe was rejected with MCP `-32602`.
+Rollback removed the lab app-server, MCP process, port, credential,
+registration, and isolated Codex home. The operator config remained
+byte-identical, after which stable Codex `0.147.0` called the unchanged
+production `aoa_kag` registration successfully.
 
-Rollback stopped the Codex app-server and KAG lab server, closed the port, and
-removed the lab registration, credential, and isolated `CODEX_HOME`. The
-operator config digest remained byte-identical. Codex `0.146.0` then called
-the existing `aoa_kag` registration successfully through the actual operator
-config.
+## Frozen conformance
 
-A separate direct Python MCP `2.0.0` cancellation probe did not preserve the
-required lifecycle property. Local client cancellation occurred, but it did
-not cancel the server dispatch, which completed afterward. P1-05 therefore
-remains blocked even though the registered read call and rollback passed.
+Official conformance commit
+`c321dd32035556e6769d3724a8ee97d87c3faaac` adds requirements frozen per
+specification revision. Against `--requirements 2026-07-28`, Python MCP
+`2.0.0` passed all 372 scored client checks across 32 scenarios and all 119
+scored server checks across 37 scenarios. There is no expected-failure
+baseline.
 
-## Independent blockers
+Seven later client scenarios and thirteen later server scenarios also ran for
+visibility. Their auth, JSON Schema, and Tasks failures remain explicit and
+unscored because they were added after the frozen release requirements. This
+classification removes the former false retroactive blocker without hiding
+future work.
 
-The current conformance checkout is exact commit
-`81eb1c3edaed87d7fd585d7b80186da7a2960660`, newer than the still-public
-`v0.1.16` release. Its Python `2.0.0` server SDK runner exposed twenty server
-scenarios and passed 40 checks. The client fixture ran 33 scenarios, passed
-372 checks, and failed these two new checks:
+## Independent gates
 
-- `json-schema-2020-12-client-tool-found`;
-- `json-schema-2020-12-client-echo-completed`.
+P1-01 through P1-10 and P1-12 through P1-14 pass. P1-11 remains blocked
+independently:
 
-The released Python fixture reports the scenario as unknown. The gap is kept
-red rather than hidden in an expected-failure baseline. This current
-conformance mismatch, failed cancellation propagation, and the absence of a
-production-eligible modern Codex pair independently block core-read production
-migration.
+- Python MCP `2.0.0` does not implement the Tasks extension;
+- stable Codex `0.147.0` did not advertise
+  `_meta.io.modelcontextprotocol/clientCapabilities.extensions["io.modelcontextprotocol/tasks"]`
+  on the real request wire;
+- an owner-bounded replacement adapter and its own compatibility proof are
+  still required.
 
-Python MCP `2.0.0` also does not implement the `2026-07-28` Tasks extension.
-Tasks is therefore blocked separately and does not contaminate the core-read
-gate. Candidate, internal-effect, and external-effect migration remain false
-because the read pilot has no authority to advance them.
+The isolated read-only pilot is allowed and complete. Production core-read
+migration remains false until the exact production contour receives its own
+admission transaction, deployment canary, registry refresh, observation
+window, and rollback. Candidate, internal-effect, and external-effect
+contours cannot inherit the read result.
 
 ## Supporting behavior receipts
 
-The earlier exact Python adapter receipts remain relevant and independent:
+The exact isolated receipts separately prove:
 
 - stateless `server/discover` and self-describing requests;
 - principal-bound opaque `requestState`, expiry, tamper rejection,
@@ -71,20 +76,29 @@ The earlier exact Python adapter receipts remain relevant and independent:
 - explicit refresh after a disconnected listener.
 
 These are bounded single-process read proofs. They do not prove multi-replica
-fan-out, effectful replay safety, owner freshness, admission, or task benefit.
+fan-out, effectful replay safety, owner acceptance, production admission, or
+Tasks benefit.
 
-## Refresh workflow
+## Automated refresh workflow
 
-1. Recheck official specification and SDK tags against exact current commits.
-2. Recheck current conformance source, scenarios, and released fixture pair.
-3. Re-run the isolated exact Codex pair whenever Codex, SDK, auth, schema, or
-   transport changes.
-4. Keep stable and lab names, processes, credentials, endpoints, and homes
-   independent.
-5. Re-run the stable operator-config canary after every lab rollback.
-6. Update only receipt-backed gates and regenerate the status.
-7. Do not perform production cutover until a production-eligible Codex pair
-   has correct cancellation behavior and current conformance is green.
+`../protocol-watch-plan.v1.json` and `../scripts/protocol_watcher.py` observe:
 
-The matrix and current lab/rollback observations expire independently. The
-generated status exposes their earliest expiry as `evidence_expires_at`.
+1. exact Codex bytes, version, and feature output;
+2. latest published Codex, MCP specification, and Python/TypeScript SDK
+   identities;
+3. current conformance `main` commit;
+4. local auth, cancellation, cache, handle/MRTR, and extension behavior source;
+5. the matrix/status bytes and earliest evidence expiry.
+
+An identity change, absent successful baseline, or approaching TTL requests a
+new isolated lab. Required network or local input failure blocks the run. A
+private mode `0600` runtime plan may execute multiple exact argv steps inside a
+unique run root; no shell text is evaluated. The watcher hashes required
+receipts, prevents secret publication, compares protected production files
+before and after, and advances its baseline only after a fully successful
+suite.
+
+The event-driven path unit handles local changes. The hourly timer polls
+upstream identities and acts as a TTL backstop. Neither unit changes production
+automatically. Every successful lab still requires a separate owner/runtime
+admission before any production cutover.

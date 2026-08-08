@@ -1,0 +1,239 @@
+{
+  "$defs": {
+    "ManagedContourTopologyEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_registry_states": {
+          "default": [
+            "admitted"
+          ],
+          "items": {
+            "enum": [
+              "shadow",
+              "admitted"
+            ],
+            "type": "string"
+          },
+          "title": "Allowed Registry States",
+          "type": "array"
+        },
+        "auth_manifest_key": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Auth Manifest Key",
+          "type": "string"
+        },
+        "auth_manifest_path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Auth Manifest Path",
+          "type": "string"
+        },
+        "binding_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Binding Id",
+          "type": "string"
+        },
+        "contour_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Contour Id",
+          "type": "string"
+        },
+        "credential_path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Credential Path",
+          "type": "string"
+        },
+        "dependency_lock_path": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dependency Lock Path"
+        },
+        "endpoint_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Endpoint Ref",
+          "type": "string"
+        },
+        "executable_digest": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Executable Digest",
+          "type": "string"
+        },
+        "executable_path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Executable Path",
+          "type": "string"
+        },
+        "executable_resolved_path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Executable Resolved Path",
+          "type": "string"
+        },
+        "organ_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Organ Id",
+          "type": "string"
+        },
+        "owner_validator_digest": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Owner Validator Digest",
+          "type": "string"
+        },
+        "owner_validator_path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Owner Validator Path",
+          "type": "string"
+        },
+        "protocol_version": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Protocol Version",
+          "type": "string"
+        },
+        "required_environment": {
+          "patternProperties": {
+            "^[A-Za-z0-9][A-Za-z0-9._-]*$": {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 160,
+            "minLength": 1
+          },
+          "title": "Required Environment",
+          "type": "object"
+        },
+        "schema_bundle_digest": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Schema Bundle Digest",
+          "type": "string"
+        },
+        "schema_paths": {
+          "items": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Schema Paths",
+          "type": "array"
+        },
+        "service_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Service Id",
+          "type": "string"
+        },
+        "unit_credential_binding": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Unit Credential Binding",
+          "type": "string"
+        },
+        "unit_name": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Unit Name",
+          "type": "string"
+        },
+        "unit_path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Unit Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "binding_id",
+        "organ_id",
+        "contour_id",
+        "service_id",
+        "unit_name",
+        "unit_path",
+        "endpoint_ref",
+        "protocol_version",
+        "credential_path",
+        "auth_manifest_path",
+        "auth_manifest_key",
+        "executable_path",
+        "executable_resolved_path",
+        "executable_digest",
+        "schema_paths",
+        "schema_bundle_digest",
+        "owner_validator_path",
+        "owner_validator_digest",
+        "required_environment",
+        "unit_credential_binding"
+      ],
+      "title": "ManagedContourTopologyEntry",
+      "type": "object"
+    }
+  },
+  "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/managed-contour-topology.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "contours": {
+      "items": {
+        "$ref": "#/$defs/ManagedContourTopologyEntry"
+      },
+      "minItems": 1,
+      "title": "Contours",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "abyss_mcp_managed_contour_topology_v1",
+      "default": "abyss_mcp_managed_contour_topology_v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "contours"
+  ],
+  "title": "ManagedContourTopology",
+  "type": "object"
+}

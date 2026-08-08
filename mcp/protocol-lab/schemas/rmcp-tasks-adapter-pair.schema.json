@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os-abyss.dev/schemas/rmcp-tasks-adapter-pair.schema.json",
+  "title": "Released rmcp Tasks client against the Abyss adapter",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "abyss_rmcp_tasks_adapter_pair_v1"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "protocol_version": {"const": "2026-07-28"},
+    "extension_id": {"const": "io.modelcontextprotocol/tasks"},
+    "client": {
+      "const": {
+        "implementation": "rmcp",
+        "version": "3.1.2",
+        "commit": "02c62aef2e331e5cf79c06c744eb1eb052cc8ebd",
+        "published_release": true,
+        "tasks_extension_declared": true
+      }
+    },
+    "adapter": {
+      "const": {
+        "feature_gate_enabled": true,
+        "production_enabled": false,
+        "protocol_independent_store": true
+      }
+    },
+    "wire": {
+      "const": {
+        "task_created": true,
+        "completed_result_received": true,
+        "extension_on_every_task_request": true,
+        "method_headers_match": true,
+        "name_headers_present": true,
+        "unknown_task_rejected": true
+      }
+    },
+    "owner_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {"const": "abyss-stack"},
+        "authority": {"const": "diagnostic_session_v1"},
+        "diagnostic_digest": {"$ref": "#/$defs/digest"},
+        "owner_rerun_count": {"const": 0},
+        "tool_error_preserved": {"const": true}
+      },
+      "required": ["owner", "authority", "diagnostic_digest", "owner_rerun_count", "tool_error_preserved"]
+    },
+    "store": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "task_id_digest": {"$ref": "#/$defs/digest"},
+        "audit_actions": {"const": ["complete", "create", "get"]},
+        "durable_before_handle": {"const": true}
+      },
+      "required": ["task_id_digest", "audit_actions", "durable_before_handle"]
+    },
+    "verdict": {"const": "released_rmcp_passed_feature_gated_abyss_adapter"},
+    "claim_limits": {"type": "array", "minItems": 4, "items": {"type": "string", "minLength": 12}}
+  },
+  "required": ["schema_version", "observed_at", "protocol_version", "extension_id", "client", "adapter", "wire", "owner_result", "store", "verdict", "claim_limits"],
+  "$defs": {"digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}
+}

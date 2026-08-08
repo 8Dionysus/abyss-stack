@@ -1,0 +1,35 @@
+{
+  "adapter_response": {
+    "error_code": -32020,
+    "http_status": 400,
+    "strict_boundary_retained": true
+  },
+  "claim_limits": [
+    "Inspector 2.1.0 passed its own 11-test modern Tasks integration suite against its permissive test server.",
+    "The strict Abyss pair created a task but could not complete tasks/get because Inspector omitted Mcp-Name for its raw-wire request.",
+    "This is pair-level incompatibility evidence, not a claim that every Inspector Tasks path is broken.",
+    "The Abyss adapter was not weakened; a corrected Inspector raw-wire header path must be retested."
+  ],
+  "extension_id": "io.modelcontextprotocol/tasks",
+  "inspector": {
+    "commit": "c7bccd477d38c2c17afb4878bcca8ee5f563c5d2",
+    "published_release": true,
+    "self_integration_tests": {
+      "failed": 0,
+      "passed": 11
+    },
+    "uses_raw_wire_workaround": true,
+    "version": "2.1.0"
+  },
+  "observed_at": "2026-08-08T09:52:33.467338Z",
+  "protocol_version": "2026-07-28",
+  "schema_version": "abyss_inspector_tasks_strict_pair_v1",
+  "strict_pair": {
+    "extension_on_tasks_get": true,
+    "mcp_method_on_tasks_get": true,
+    "mcp_name_on_tasks_get": false,
+    "task_create_reached": true,
+    "tasks_get_reached": true
+  },
+  "verdict": "blocked_missing_mcp_name_on_raw_tasks_get"
+}

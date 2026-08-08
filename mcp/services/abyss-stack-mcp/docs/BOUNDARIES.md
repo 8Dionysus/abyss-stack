@@ -12,6 +12,11 @@
   snapshots;
 - compact runtime discovery and selected inspection;
 - non-executing runtime plan candidates.
+- exact managed-contour topology and source/runtime preflight observations;
+- event-driven, timer-backed orchestration of SDK Admission Keeper planning
+  and private state publication.
+- private bounded projection of separate runtime, admission, owner, protocol,
+  and aggregate TaskStore operational axes.
 
 ## Does not own
 
@@ -24,6 +29,12 @@
 - runtime execution approval;
 - bearer access, owner-endpoint probing, or sibling-workspace scanning by the
   observation producer.
+- Keeper evidence issuance for an owner, proof or acceptance owner, consumer,
+  or registry operator;
+- service start/restart, registry mutation, TTL extension, or admission from
+  the admission-maintenance runner.
+- task or principal enumeration, owner-run execution, or any conversion from a
+  Task terminal state into proof, acceptance, admission, or effect authority.
 
 The package may report explicit evidence issued by the named acceptance owner
 and bind it to the accepted source revision and package digest. It cannot infer
@@ -38,6 +49,11 @@ an authorized runtime effect.
 
 Direct owner adapters remain direct. This service is not a semantic proxy,
 universal bus, workflow engine, or authority merger.
+
+A runtime overlay can correct exact stack-owned deployment/process/endpoint
+identity only when its evidence refs are explicit. It cannot change the owner
+source claim, currentness, proof, acceptance, admission state, or expiry. A
+contour supplement can add only a shadow, unknown-currentness shape.
 
 Cross-organ host persistence does not change that rule. The stack can issue a
 receipt around an owner stage packet and persist the SDK-validated transition,
