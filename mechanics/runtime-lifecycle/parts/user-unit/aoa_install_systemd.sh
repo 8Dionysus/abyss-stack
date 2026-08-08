@@ -293,6 +293,7 @@ abyss_stack_mcp_observation_root="${AOA_STACK_ROOT}/Logs/mcp/observations"
 abyss_stack_mcp_observation_path="${abyss_stack_mcp_observation_root}/current.json"
 abyss_stack_mcp_observation_overlay_path="${abyss_stack_mcp_observation_root}/evidence-overlay.json"
 abyss_stack_mcp_admission_root="${AOA_STACK_ROOT}/Logs/mcp/admission"
+abyss_stack_mcp_keeper_inbox_root="${abyss_stack_mcp_admission_root}/keeper-inbox"
 abyss_stack_mcp_preflight_root="${AOA_STACK_ROOT}/Logs/mcp/preflight"
 abyss_stack_mcp_protocol_watch_root="${AOA_STACK_ROOT}/Logs/mcp/protocol-watch"
 abyss_stack_mcp_orchestration_root="${AOA_STACK_ROOT}/Logs/mcp/cross-organ-orchestrations"
@@ -989,6 +990,7 @@ aoa_provision_abyss_stack_mcp_admission_roots() {
 
   for target in \
     "$abyss_stack_mcp_admission_root" \
+    "$abyss_stack_mcp_keeper_inbox_root" \
     "$abyss_stack_mcp_preflight_root" \
     "$abyss_stack_mcp_protocol_watch_root"; do
     if [[ -e "$target" || -L "$target" ]]; then

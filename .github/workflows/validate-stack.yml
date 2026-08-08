@@ -14,7 +14,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Check repo-local KAG index family
-        uses: 8Dionysus/aoa-kag/.github/actions/repo-local-kag-index@58ab52ffc06bab5cc28842a0b4336c6efa16b6ff
+        uses: 8Dionysus/aoa-kag/.github/actions/repo-local-kag-index@eb0ce52401a8bf19b4ff6b617043f16c83842008
         with:
           history-ref: ${{ github.event.pull_request.base.sha || (github.ref == 'refs/heads/main' && github.event.before) || '' }}
           event-history-ref: ${{ github.event.pull_request.base.sha || (github.ref == 'refs/heads/main' && github.event.before) || '' }}
@@ -23,7 +23,7 @@ jobs:
         run: |
           git init "$RUNNER_TEMP/aoa-sdk-source"
           git -C "$RUNNER_TEMP/aoa-sdk-source" remote add origin https://github.com/8Dionysus/aoa-sdk
-          git -C "$RUNNER_TEMP/aoa-sdk-source" fetch --depth 1 origin 8e25d77d24bc163cd6ebf32a695379b40b8d7ef3
+          git -C "$RUNNER_TEMP/aoa-sdk-source" fetch --depth 1 origin 34ff083902a1a42d7f6eaeb4bc55542f1e4b77e0
           git -C "$RUNNER_TEMP/aoa-sdk-source" checkout --detach FETCH_HEAD
 
       - name: Clone abyss-machine verifier

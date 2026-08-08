@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Move the observation producer onto registry v2 and bind the managed
+  admission Keeper to its provisioned private owner-evidence inbox, so the
+  production units exercise the same v2 and incremental-refresh paths proven
+  by the package instead of leaving them CLI-only.
 - Align the `aoa-session-memory` runtime canary with its landed bounded
   `session-evidence-read` HTTP profile by probing the admitted literal-route
   planner instead of the deliberately hidden full-surface status tool.
@@ -20,7 +24,19 @@ Tracking starts with the community-docs baseline for this repository.
   before a clean container restart, and commits one of up to 32 action-ID
   receipts under `Logs/rerank-api` before releasing the model so retries remain
   idempotent across that restart.
-
+- `abyss-stack-mcp` 0.5.2 now consumes registry v2 observations and can compose
+  one content-addressed KAG read-contour admission revision from exact current
+  runtime, consumer, central-proof, owner-acceptance, freshness, rollback,
+  last-known-good, and separately issued operator evidence. It cannot publish
+  the registry, authorize an effect, or issue any stronger-owner receipt.
+- Registry-v2 rollback candidate generation now binds the exact read-contour
+  digest and contour credential contract instead of requiring a v1 organ-level
+  record, while observation output selects that same contour identity and
+  preserves absent contours as absent.
+- Admission automation can import contour-scoped immutable owner evidence from
+  a private non-symlink inbox, deduplicates it by content address, and reports
+  imported nodes plus avoided full-refresh cost so unchanged renewal benefit
+  is directly measurable without executing owner tools.
 - Decision `ABYSS-STACK-D-0106` and a third, separately credentialed
   `abyss-stack-mcp` process admit one exact internal-effect pilot on loopback
   port `5439`. Its only tool consumes a content-addressed read-service restart

@@ -1,9 +1,9 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 107,
-  "edge_count": 2413,
+  "edge_count": 2414,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 919,
+    "CITES_SOURCE_SURFACE": 920,
     "DATED": 107,
     "GUARDED_BY": 318,
     "HAS_STATUS": 107,
@@ -11438,6 +11438,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0107",
+      "target": "source_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/admission_revision.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0107",
       "target": "source_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/managed_catalog.py",
       "type": "CITES_SOURCE_SURFACE"
     },
@@ -12083,7 +12088,7 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1075,
+  "node_count": 1076,
   "node_type_counts": {
     "date": 32,
     "decision": 107,
@@ -12091,7 +12096,7 @@
     "mechanic_parent": 10,
     "owner_surface": 59,
     "repo": 1,
-    "source_surface": 548,
+    "source_surface": 549,
     "stack_lane": 45,
     "status": 3,
     "surface_class": 111
@@ -15401,6 +15406,11 @@
     {
       "id": "source_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/admission_automation.py",
       "label": "mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/admission_automation.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/admission_revision.py",
+      "label": "mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/admission_revision.py",
       "type": "source_surface"
     },
     {

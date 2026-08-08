@@ -51,6 +51,8 @@ class KeeperContourStatus(StrictModel):
     reused_stage_count: int = Field(ge=0)
     refreshed_stage_count: int = Field(ge=0)
     blocked_stage_count: int = Field(ge=0)
+    imported_node_count: int = Field(default=0, ge=0)
+    refresh_cost_avoided: int = Field(default=0, ge=0)
     stage_states: tuple[KeeperStageOperationalStatus, ...]
 
 
@@ -84,6 +86,7 @@ def run_admission_automation(
     canary_public_key_path: Path,
     deployed_root: Path,
     output_root: Path,
+    keeper_inbox_root: Path | None = None,
     generated_at: datetime | None = None,
 ) -> AdmissionAutomationStatus:
     now = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
@@ -130,6 +133,7 @@ def run_admission_automation(
     keepers = _run_keeper_cycles(
         spec_status.entries,
         output_root=output_root,
+        inbox_root=keeper_inbox_root,
         generated_at=now,
     )
     status = AdmissionAutomationStatus(
@@ -158,6 +162,7 @@ def _run_keeper_cycles(
     entries: tuple[Any, ...],
     *,
     output_root: Path,
+    inbox_root: Path | None = None,
     generated_at: datetime,
 ) -> tuple[KeeperContourStatus, ...]:
     try:
@@ -172,11 +177,17 @@ def _run_keeper_cycles(
         spec = AdmissionKeeperSpec.model_validate_json(
             Path(entry.spec_path).read_bytes()
         )
+        inbox_paths = _keeper_inbox_paths(
+            inbox_root,
+            organ_id=entry.organ_id,
+            contour_id=entry.contour_id,
+        )
         cycle = run_keeper_cycle(
             spec,
             store=KeeperEvidenceStore(
                 output_root / "keeper-state" / entry.organ_id / entry.contour_id
             ),
+            inbox_paths=inbox_paths,
             generated_at=generated_at,
         )
         statuses.append(
@@ -205,6 +216,10 @@ def _run_keeper_cycles(
                 reused_stage_count=cycle.plan.reused_stage_count,
                 refreshed_stage_count=cycle.plan.refreshed_stage_count,
                 blocked_stage_count=cycle.plan.blocked_stage_count,
+                imported_node_count=len(cycle.imported_node_ids),
+                refresh_cost_avoided=(
+                    cycle.plan.full_refresh_cost - cycle.plan.planned_refresh_cost
+                ),
                 stage_states=tuple(
                     KeeperStageOperationalStatus.model_validate(
                         stage.model_dump(mode="python")
@@ -216,6 +231,42 @@ def _run_keeper_cycles(
     return tuple(statuses)
 
 
+def _keeper_inbox_paths(
+    inbox_root: Path | None,
+    *,
+    organ_id: str,
+    contour_id: str,
+) -> tuple[Path, ...]:
+    if inbox_root is None:
+        return ()
+    root = Path(inbox_root)
+    if root.is_symlink() or not root.is_dir():
+        raise PreflightError("keeper inbox root must be a non-symlink directory")
+    root_resolved = root.resolve(strict=True)
+    organ_root = root / organ_id
+    if not organ_root.exists():
+        return ()
+    if organ_root.is_symlink() or not organ_root.is_dir():
+        raise PreflightError("keeper organ inbox must be a non-symlink directory")
+    try:
+        organ_root.resolve(strict=True).relative_to(root_resolved)
+    except (OSError, ValueError) as exc:
+        raise PreflightError("keeper organ inbox escapes the inbox root") from exc
+    contour_root = organ_root / contour_id
+    if not contour_root.exists():
+        return ()
+    if contour_root.is_symlink() or not contour_root.is_dir():
+        raise PreflightError("keeper contour inbox must be a non-symlink directory")
+    try:
+        contour_root.resolve(strict=True).relative_to(root_resolved)
+    except (OSError, ValueError) as exc:
+        raise PreflightError("keeper contour inbox escapes the inbox root") from exc
+    paths = tuple(sorted(contour_root.glob("*.json")))
+    if any(path.is_symlink() or not path.is_file() for path in paths):
+        raise PreflightError("keeper inbox nodes must be regular non-symlink files")
+    return paths
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="abyss-stack-mcp-admission-automation")
     parser.add_argument("--registry", type=Path, required=True)
@@ -225,6 +276,7 @@ def main() -> int:
     parser.add_argument("--canary-public-key", type=Path, required=True)
     parser.add_argument("--deployed-root", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--keeper-inbox-root", type=Path)
     args = parser.parse_args()
     try:
         status = run_admission_automation(
@@ -235,6 +287,7 @@ def main() -> int:
             canary_public_key_path=args.canary_public_key,
             deployed_root=args.deployed_root,
             output_root=args.output_root,
+            keeper_inbox_root=args.keeper_inbox_root,
         )
     except (OSError, ValueError) as exc:
         parser.error(str(exc))
