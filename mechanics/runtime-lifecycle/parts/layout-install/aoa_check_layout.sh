@@ -172,6 +172,7 @@ check_dir "${AOA_STACK_ROOT}/Logs/diagnostics/latest"
 check_dir "${AOA_STACK_ROOT}/Logs/diagnostics/records"
 check_dir "${AOA_STACK_ROOT}/Logs/rpg/latest"
 check_dir "${AOA_STACK_ROOT}/Logs/rpg/records"
+check_dir "${AOA_STACK_ROOT}/Logs/rerank-api"
 
 if ((selection_metadata_ready)) && has_module "41-agent-api.yml"; then
   aoa_note "selected runtime includes 41-agent-api.yml; checking return-policy contract"

@@ -51,6 +51,7 @@ mkdir -p \
   "${AOA_STACK_ROOT}/Logs/memo-exports/records" \
   "${AOA_STACK_ROOT}/Logs/rpg/latest" \
   "${AOA_STACK_ROOT}/Logs/rpg/records" \
+  "${AOA_STACK_ROOT}/Logs/rerank-api" \
   "${AOA_STACK_ROOT}/Logs/tos-graph" \
   "${AOA_STACK_ROOT}/Logs/returns" \
   "${AOA_STACK_ROOT}/Logs/tts" \

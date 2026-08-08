@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import ctypes
 import gc
+import json
 import math
 import os
 import re
+import signal
 import threading
 import time
 from dataclasses import dataclass
@@ -59,6 +61,18 @@ DEFAULT_TOP_N = env_int("AOA_RERANK_DEFAULT_TOP_N", "RERANK_DEFAULT_TOP_N", 5)
 IDLE_UNLOAD_SEC = env_int("AOA_RERANK_IDLE_UNLOAD_SEC", "RERANK_IDLE_UNLOAD_SEC", 900)
 IDLE_UNLOAD_CHECK_SEC = env_int("AOA_RERANK_IDLE_UNLOAD_CHECK_SEC", "RERANK_IDLE_UNLOAD_CHECK_SEC", 60)
 EXIT_AFTER_IDLE_UNLOAD = env_bool("AOA_RERANK_EXIT_AFTER_IDLE_UNLOAD", "RERANK_EXIT_AFTER_IDLE_UNLOAD", True)
+EXIT_AFTER_MEMORY_RELIEF = env_bool(
+    "AOA_RERANK_EXIT_AFTER_MEMORY_RELIEF",
+    "RERANK_EXIT_AFTER_MEMORY_RELIEF",
+    True,
+)
+RELIEF_RECEIPT_PATH = Path(
+    env_str(
+        "AOA_RERANK_RELIEF_RECEIPT_PATH",
+        "RERANK_RELIEF_RECEIPT_PATH",
+        "/state/memory-relief-receipts.json",
+    )
+)
 FAKE_MODE = env_bool("AOA_RERANK_FAKE", "RERANK_FAKE", False)
 
 
@@ -221,7 +235,7 @@ class Qwen3OpenVINOReranker:
 
 
 class LazyScorer:
-    def __init__(self) -> None:
+    def __init__(self, relief_receipt_path: Path | None = None) -> None:
         self._lock = threading.Lock()
         self._scorer: Qwen3OpenVINOReranker | None = None
         self._loaded_at_epoch: float | None = None
@@ -230,7 +244,54 @@ class LazyScorer:
         self._last_unload_epoch: float | None = None
         self._last_unload_reason: str | None = None
         self._active_requests = 0
-        self._relief_results: dict[str, dict[str, Any]] = {}
+        self._draining = False
+        self._relief_receipt_path = relief_receipt_path
+        self._relief_receipt_error: str | None = None
+        self._relief_results = self._load_relief_results()
+
+    def _load_relief_results(self) -> dict[str, dict[str, Any]]:
+        if self._relief_receipt_path is None or not self._relief_receipt_path.exists():
+            return {}
+        try:
+            payload = json.loads(self._relief_receipt_path.read_text(encoding="utf-8"))
+            results = payload.get("results") if isinstance(payload, dict) else None
+            if not isinstance(results, dict):
+                raise ValueError("results must be an object")
+            valid = {
+                action_id: dict(result)
+                for action_id, result in results.items()
+                if re.fullmatch(r"[a-f0-9]{32}", action_id) and isinstance(result, dict)
+            }
+            if len(valid) != len(results):
+                raise ValueError("receipt contains malformed action results")
+            return dict(list(valid.items())[-32:])
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            self._relief_receipt_error = f"{type(exc).__name__}: {exc}"
+            return {}
+
+    def _persist_relief_results(self, results: dict[str, dict[str, Any]]) -> None:
+        if self._relief_receipt_path is None:
+            return
+        path = self._relief_receipt_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        payload = json.dumps(
+            {"schema": "abyss_rerank_memory_relief_receipts_v1", "results": results},
+            sort_keys=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, path)
+        finally:
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
 
     @property
     def loaded(self) -> bool:
@@ -268,9 +329,16 @@ class LazyScorer:
     def active_requests(self) -> int:
         return self._active_requests
 
-    def begin_request(self) -> None:
+    @property
+    def draining(self) -> bool:
+        return self._draining
+
+    def begin_request(self) -> bool:
         with self._lock:
+            if self._draining:
+                return False
             self._active_requests += 1
+            return True
 
     def end_request(self) -> None:
         with self._lock:
@@ -306,10 +374,26 @@ class LazyScorer:
             threading.Timer(0.2, lambda: os._exit(0)).start()
         return response
 
-    def owner_memory_relief(self, req: MemoryReliefRequest) -> dict[str, Any]:
+    def owner_memory_relief(
+        self,
+        req: MemoryReliefRequest,
+        *,
+        exit_process: bool = False,
+    ) -> dict[str, Any]:
         with self._lock:
             if req.action_id in self._relief_results:
                 return dict(self._relief_results[req.action_id])
+            if self._relief_receipt_error is not None:
+                return {
+                    "ok": False,
+                    "action_id": req.action_id,
+                    "reason": "receipt_store_unavailable",
+                    "loaded": self._scorer is not None,
+                    "owner_gate": {
+                        "active_requests_at_action": self._active_requests,
+                        "data_risk": False,
+                    },
+                }
             if req.action != "relieve_memory" or req.owner != "abyss-stack" or req.workload_id != "rerank-api:qwen3-0.6b":
                 return {
                     "ok": False,
@@ -334,15 +418,7 @@ class LazyScorer:
                 }
             was_loaded = self._scorer is not None
             load_ms = self.load_ms
-            self._scorer = None
-            self._loaded_at_epoch = None
-            self._last_unload_epoch = time.time()
-            self._last_unload_reason = "owner_memory_relief"
-            if was_loaded:
-                gc.collect()
-                heap_trimmed = trim_process_heap()
-            else:
-                heap_trimmed = False
+            should_exit = exit_process and was_loaded
             result = {
                 "ok": True,
                 "action_id": req.action_id,
@@ -355,11 +431,36 @@ class LazyScorer:
                     "data_risk": False,
                 },
                 "resume": "lazy_load_on_next_rerank",
-                "heap_trimmed": heap_trimmed,
+                "exit_process": should_exit,
             }
-            self._relief_results[req.action_id] = dict(result)
-            while len(self._relief_results) > 32:
-                self._relief_results.pop(next(iter(self._relief_results)))
+            committed_results = dict(self._relief_results)
+            committed_results[req.action_id] = dict(result)
+            while len(committed_results) > 32:
+                committed_results.pop(next(iter(committed_results)))
+            try:
+                self._persist_relief_results(committed_results)
+            except OSError:
+                return {
+                    "ok": False,
+                    "action_id": req.action_id,
+                    "reason": "receipt_store_unavailable",
+                    "loaded": was_loaded,
+                    "owner_gate": {
+                        "active_requests_at_action": 0,
+                        "data_risk": False,
+                    },
+                }
+            self._relief_results = committed_results
+            self._scorer = None
+            self._loaded_at_epoch = None
+            self._last_unload_epoch = time.time()
+            self._last_unload_reason = "owner_memory_relief"
+            if was_loaded:
+                gc.collect()
+                trim_process_heap()
+            if should_exit:
+                self._draining = True
+                threading.Timer(1.0, lambda: os.kill(os.getpid(), signal.SIGTERM)).start()
             return result
 
     def unload_if_idle(self, idle_unload_sec: int) -> dict[str, Any]:
@@ -409,7 +510,7 @@ class LazyScorer:
             return self._scorer.score(query, documents, instruction)
 
 
-scorer = LazyScorer()
+scorer = LazyScorer(None if FAKE_MODE else RELIEF_RECEIPT_PATH)
 app = FastAPI(title="Abyss Stack Rerank API", version="0.1.0")
 
 
@@ -447,6 +548,7 @@ def health() -> dict[str, Any]:
         "idle_unload_check_sec": IDLE_UNLOAD_CHECK_SEC,
         "exit_after_idle_unload": EXIT_AFTER_IDLE_UNLOAD,
         "active_requests": scorer.active_requests,
+        "draining": scorer.draining,
         "last_unload_epoch": scorer.last_unload_epoch,
         "last_unload_reason": scorer.last_unload_reason,
         "fake_mode": FAKE_MODE,
@@ -460,12 +562,13 @@ def unload(exit_process: bool = False) -> dict[str, Any]:
 
 @app.post("/admin/memory-relief")
 def memory_relief(req: MemoryReliefRequest) -> dict[str, Any]:
-    return scorer.owner_memory_relief(req)
+    return scorer.owner_memory_relief(req, exit_process=EXIT_AFTER_MEMORY_RELIEF)
 
 
 @app.post("/v3/rerank")
 def rerank(req: RerankRequest) -> dict[str, Any]:
-    scorer.begin_request()
+    if not scorer.begin_request():
+        raise HTTPException(status_code=503, detail="reranker is draining for owner memory relief")
     started = now_ms()
     try:
         envelopes = [
