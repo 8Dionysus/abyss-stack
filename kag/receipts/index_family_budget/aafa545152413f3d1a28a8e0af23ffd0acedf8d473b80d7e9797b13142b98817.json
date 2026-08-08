@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26372630,
+  "allowed_tracked_bytes": 31990930,
+  "approved_by": "repository-owner",
+  "base_ref": "e690b4153e5ecc682d21825d92cc18d482a42f86",
+  "changed_generated_bytes": 26372630,
+  "changed_generated_files": 328,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "aafa545152413f3d1a28a8e0af23ffd0acedf8d473b80d7e9797b13142b98817",
+  "reason": "External actor review closure rejects unmanifested submodule worktrees and replays terminal re-entry semantics after an event-before-state crash; retain the complete generated family.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 31990930,
+  "tracked_bytes_max": 24117248
+}
