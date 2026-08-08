@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 25488734,
+  "allowed_tracked_bytes": 30677825,
+  "approved_by": "repository-owner",
+  "base_ref": "2bb043e160b6a2c001abad4f4de6969b35782466",
+  "changed_generated_bytes": 25488734,
+  "changed_generated_files": 362,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "df794f9b5b73bb650a928277ccf453bad6288e48de1a3cc1d0934f82862b739b",
+  "reason": "Bind the reviewed MCP-next admission automation, protocol watcher, unified status, Tasks lab evidence, and aoa-sdk v0.10.0 release artifact to one content-addressed abyss-stack family delta without raising standing budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 30677825,
+  "tracked_bytes_max": 24117248
+}
