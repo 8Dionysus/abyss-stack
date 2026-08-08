@@ -116,6 +116,16 @@ def source_files(
     skills_root: Path,
 ) -> list[tuple[Path, Path]]:
     part = source_root / "mechanics/governed-execution/parts/external-codex-agent"
+    profile_path = require_regular_file(
+        part / "runtime-profile.v1.json", "runtime profile"
+    )
+    try:
+        profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise InstallError("runtime profile is not valid JSON") from exc
+    owner_contracts = profile.get("owner_contracts")
+    if not isinstance(owner_contracts, dict):
+        raise InstallError("runtime profile has no owner_contracts")
     rows: list[tuple[Path, Path]] = []
     for name in RUNTIME_FILES:
         src = require_regular_file(part / name, f"runtime source {name}")
@@ -145,11 +155,22 @@ def source_files(
         src = require_regular_file(sdk_root / relative, f"aoa_sdk contract {relative}")
         rows.append((src, Path("sdk") / relative))
     owner_roots = {"aoa-agents": agents_root, "aoa-skills": skills_root}
+    profile_keys = {
+        "aoa-agents": "owner_execution_request_schema",
+        "aoa-skills": "task_local_dag_schema",
+    }
     for owner, relative in OWNER_CONTRACT_FILES:
         src = require_regular_file(
             owner_roots[owner] / relative,
             f"{owner} contract {relative}",
         )
+        contract = owner_contracts.get(profile_keys[owner])
+        if not isinstance(contract, dict):
+            raise InstallError(f"runtime profile has no pinned {owner} contract")
+        if contract.get("owner_repo") != owner or contract.get("artifact_ref") != relative:
+            raise InstallError(f"runtime profile {owner} contract coordinate mismatch")
+        if contract.get("digest") != sha256_file(src):
+            raise InstallError(f"{owner} contract differs from runtime profile pin")
         rows.append((src, Path("owners") / owner / relative))
     return rows
 
@@ -183,15 +204,22 @@ RUNTIME_ROOT = Path({str(active_path.parent)!r})
 if ACTIVE.is_symlink() or not ACTIVE.is_file():
     raise SystemExit(f"external Codex active release is unavailable: {{ACTIVE}}")
 record = json.loads(ACTIVE.read_text(encoding="utf-8"))
-release_root = Path(record["release_root"])
+release_id = record["release_id"]
+if not isinstance(release_id, str) or not release_id.startswith("sha256-") or len(release_id) != 71 or any(character not in "0123456789abcdef" for character in release_id[7:]):
+    raise SystemExit(f"external Codex release id is invalid: {{release_id}}")
+raw_release_root = Path(record["release_root"])
+if raw_release_root.is_symlink() or not raw_release_root.is_dir():
+    raise SystemExit(f"external Codex release is unavailable: {{raw_release_root}}")
+release_root = raw_release_root.resolve()
+releases_root = (RUNTIME_ROOT / "releases").resolve()
 try:
-    release_root.relative_to(RUNTIME_ROOT / "releases")
+    release_root.relative_to(releases_root)
 except ValueError as exc:
     raise SystemExit(f"external Codex release escapes runtime root: {{release_root}}") from exc
+if release_root.parent != releases_root or release_root.name != release_id:
+    raise SystemExit(f"external Codex release coordinate is invalid: {{release_root}}")
 entrypoint = release_root / {entrypoint_name!r}
 python = Path(record["python_executable"])
-if release_root.is_symlink() or not release_root.is_dir():
-    raise SystemExit(f"external Codex release is unavailable: {{release_root}}")
 if entrypoint.is_symlink() or not entrypoint.is_file():
     raise SystemExit(f"external Codex entrypoint is unavailable: {{entrypoint}}")
 os.execv(str(python), [str(python), "-I", str(entrypoint), *sys.argv[1:]])
@@ -439,8 +467,23 @@ def activate(
     python_executable: Path,
 ) -> dict[str, object]:
     runtime_root = runtime_root.resolve()
-    release_root = runtime_root / "releases" / release_id
+    if (
+        not release_id.startswith("sha256-")
+        or len(release_id) != 71
+        or any(character not in "0123456789abcdef" for character in release_id[7:])
+    ):
+        raise InstallError("release id must be one exact sha256 content address")
+    releases_root = (runtime_root / "releases").resolve()
+    release_root = (releases_root / release_id).resolve()
+    try:
+        release_root.relative_to(releases_root)
+    except ValueError as exc:
+        raise InstallError("release activation escapes releases root") from exc
+    if release_root.parent != releases_root or release_root.name != release_id:
+        raise InstallError("release activation coordinate is invalid")
     manifest = verify_release(release_root)
+    if manifest["release_id"] != release_id:
+        raise InstallError("requested release id differs from verified manifest")
     python_executable = require_regular_file(python_executable.resolve(), "Python executable")
     active_path = runtime_root / "active.json"
     previous = json.loads(active_path.read_text(encoding="utf-8")) if active_path.exists() else None
@@ -481,12 +524,23 @@ def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
     active = json.loads(active_path.read_text(encoding="utf-8"))
     if active.get("schema_version") != ACTIVE_SCHEMA_VERSION:
         raise InstallError("active release schema mismatch")
-    release_root = Path(active["release_root"])
+    release_id = active.get("release_id")
+    if not isinstance(release_id, str):
+        raise InstallError("active release id is invalid")
+    raw_release_root = Path(active["release_root"])
+    if raw_release_root.is_symlink():
+        raise InstallError("active release root must not be a symlink")
+    release_root = raw_release_root.resolve()
+    releases_root = (runtime_root / "releases").resolve()
     try:
-        release_root.relative_to(runtime_root / "releases")
+        release_root.relative_to(releases_root)
     except ValueError as exc:
         raise InstallError("active release escapes runtime root") from exc
+    if release_root.parent != releases_root or release_root.name != release_id:
+        raise InstallError("active release coordinate is invalid")
     manifest = verify_release(release_root)
+    if manifest["release_id"] != release_id:
+        raise InstallError("active release id differs from verified manifest")
     wrapper_status = {}
     for name, entrypoint in {
         "aoa-external-codex-agent": "agent-entrypoint.py",

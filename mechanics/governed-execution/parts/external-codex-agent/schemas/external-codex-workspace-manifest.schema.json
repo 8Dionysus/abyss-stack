@@ -38,7 +38,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["path", "kind", "size_bytes", "sha256"],
+        "required": ["path", "kind", "size_bytes", "sha256", "index_flags"],
         "properties": {
           "path": {"$ref": "#/$defs/relativePath"},
           "kind": {"enum": ["file", "symlink", "directory", "missing"]},
@@ -48,6 +48,13 @@
               {"$ref": "#/$defs/digest"},
               {"type": "null"}
             ]
+          },
+          "index_flags": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": ["assume_unchanged", "skip_worktree"]
+            }
           }
         }
       }

@@ -1454,8 +1454,34 @@ def _nul_paths(payload: bytes, *, label: str) -> tuple[str, ...]:
     return tuple(values)
 
 
+def _tracked_index_flags(workspace: Path) -> dict[str, tuple[str, ...]]:
+    flags: dict[str, tuple[str, ...]] = {}
+    for raw in _git_bytes(workspace, "ls-files", "-v", "-z").split(b"\0"):
+        if not raw:
+            continue
+        if len(raw) < 3 or raw[1:2] != b" ":
+            raise ExternalCodexRuntimeError(
+                "workspace_manifest_failed",
+                "git ls-files returned an invalid tracked-path record",
+            )
+        tag = chr(raw[0])
+        paths = _nul_paths(raw[2:] + b"\0", label="tracked files")
+        if len(paths) != 1:
+            raise ExternalCodexRuntimeError(
+                "workspace_manifest_failed",
+                "git ls-files returned an invalid tracked path",
+            )
+        values: list[str] = []
+        if tag.islower():
+            values.append("assume_unchanged")
+        if tag.upper() == "S":
+            values.append("skip_worktree")
+        flags[paths[0]] = tuple(values)
+    return flags
+
+
 def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
-    """Describe exact HEAD plus every changed, untracked, or ignored byte."""
+    """Describe exact HEAD plus every tracked, untracked, or ignored byte."""
 
     location = Path(workspace).resolve()
     if not location.is_dir():
@@ -1495,6 +1521,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
         ),
         label="ignored files",
     )
+    tracked_flags = _tracked_index_flags(location)
     for relative in sorted(set(untracked) | set(ignored)):
         if _secret_shaped_path(relative):
             raise ExternalCodexRuntimeError(
@@ -1502,8 +1529,10 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
                 "workspace contains an untracked or ignored secret-shaped path",
             )
     entries: list[dict[str, Any]] = []
-    for relative in sorted(set(changed) | set(untracked) | set(ignored)):
+    all_paths = set(tracked_flags) | set(changed) | set(untracked) | set(ignored)
+    for relative in sorted(all_paths):
         path = location / relative
+        index_flags = list(tracked_flags.get(relative, ()))
         if path.is_symlink():
             target = os.readlink(path).encode("utf-8")
             entries.append(
@@ -1512,6 +1541,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
                     "kind": "symlink",
                     "size_bytes": len(target),
                     "sha256": sha256_bytes(target),
+                    "index_flags": index_flags,
                 }
             )
         elif path.is_file():
@@ -1529,6 +1559,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
                     "kind": "file",
                     "size_bytes": path.stat().st_size,
                     "sha256": sha256_file(resolved),
+                    "index_flags": index_flags,
                 }
             )
         elif path.is_dir():
@@ -1538,6 +1569,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
                     "kind": "directory",
                     "size_bytes": 0,
                     "sha256": None,
+                    "index_flags": index_flags,
                 }
             )
         else:
@@ -1547,6 +1579,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
                     "kind": "missing",
                     "size_bytes": 0,
                     "sha256": None,
+                    "index_flags": index_flags,
                 }
             )
     status = _git_status(location)
@@ -3883,6 +3916,16 @@ Runtime session identity: {state['session_id']}
                                     supervisor_start_ticks,
                                 )
                                 break
+                        if (
+                            not terminate_requested
+                            and len(stdout_buffer) > MAX_EVENT_LINE_BYTES
+                        ):
+                            runtime_failure_code = "codex_event_too_large"
+                            terminate_requested = True
+                            self._terminate_supervised_process(
+                                process,
+                                supervisor_start_ticks,
+                            )
                     if terminate_requested:
                         break
                 if terminate_requested:
@@ -4034,14 +4077,29 @@ Runtime session identity: {state['session_id']}
             if source_type == "item.completed" and isinstance(item, dict):
                 if item.get("type") == "command_execution":
                     command = _command_text(item)
-                    state["executed_commands"].append(
-                        {
-                            "attempt_id": attempt_id,
-                            "command": command or "<unavailable>",
-                            "status": str(item.get("status") or "unknown"),
-                            "exit_code": item.get("exit_code"),
-                        }
-                    )
+                    record = {
+                        "attempt_id": attempt_id,
+                        "command": command or "<unavailable>",
+                        "status": str(item.get("status") or "unknown"),
+                        "exit_code": item.get("exit_code"),
+                    }
+                    if command:
+                        task = load_json(
+                            Path(state["materialized_inputs"]["task"]),
+                            label="materialized task",
+                        )
+                        wrappers = (
+                            _validation_wrapper_argv(state["workspace_path"], spec)
+                            for spec in task["validation_commands"]
+                        )
+                        if any(
+                            _command_matches_argv(command, wrapper)
+                            for wrapper in wrappers
+                        ):
+                            record["workspace_manifest_digest"] = canonical_digest(
+                                build_workspace_manifest(state["workspace_path"])
+                            )
+                    state["executed_commands"].append(record)
             significance: Literal[
                 "trace", "progress", "checkpoint", "review", "authority", "parent_wake", "terminal"
             ] = "progress" if source_type in {"thread.started", "turn.started", "turn.completed"} else "trace"
@@ -4100,6 +4158,7 @@ Runtime session identity: {state['session_id']}
         task: Mapping[str, Any],
         binding: AgentIncarnationBinding,
         runtime_evidence_paths: Mapping[str, Path],
+        final_workspace_manifest_digest: str | None,
     ) -> None:
         def require_text(value: Any, label: str) -> None:
             if not isinstance(value, str) or not value.strip():
@@ -4242,6 +4301,15 @@ Runtime session identity: {state['session_id']}
                     "fixed validation command has no exact argv/cwd execution receipt",
                 )
             last_execution = executions[-1]
+            if (
+                not isinstance(final_workspace_manifest_digest, str)
+                or last_execution.get("workspace_manifest_digest")
+                != final_workspace_manifest_digest
+            ):
+                raise ExternalCodexRuntimeError(
+                    "model_report_validation_workspace_unbound",
+                    "fixed validation command was not observed against final workspace bytes",
+                )
             observed_status = (
                 "passed"
                 if last_execution.get("status") == "completed"
@@ -4348,6 +4416,7 @@ Runtime session identity: {state['session_id']}
         manifest_baseline = state["workspace_manifest_baseline"]
         workspace_manifest_match: bool | None = None
         workspace_manifest_ref: dict[str, Any] | None = None
+        final_workspace_manifest_digest: str | None = None
         manifest_observation_gap = False
         head_drift = False
         try:
@@ -4358,6 +4427,7 @@ Runtime session identity: {state['session_id']}
             )
             _atomic_write_json(final_manifest_path, current_manifest)
             workspace_manifest_ref = _artifact_ref(final_manifest_path)
+            final_workspace_manifest_digest = canonical_digest(current_manifest)
             workspace_manifest_match = current_manifest == manifest_baseline
             changed_paths = compare_workspace_manifest(
                 manifest_baseline,
@@ -4394,6 +4464,7 @@ Runtime session identity: {state['session_id']}
                         if workspace_manifest_ref is not None
                         else {}
                     ),
+                    final_workspace_manifest_digest=final_workspace_manifest_digest,
                 )
             except ExternalCodexRuntimeError as exc:
                 failure_code = exc.code
@@ -4629,29 +4700,8 @@ Runtime session identity: {state['session_id']}
                 "legacy_failure_closeout_unavailable",
                 "legacy runtime state has no admission-time failure closeout envelope",
             )
-        wake_evaluations = closeout.get("wake_evaluations")
-        wake = (
-            wake_evaluations.get(status)
-            if isinstance(wake_evaluations, dict)
-            else None
-        )
-        if not isinstance(wake, dict):
-            raise ExternalCodexRuntimeError(
-                "runtime_state_invalid",
-                f"failure closeout has no persisted wake evaluation for {status}",
-            )
         session_dir = self._session_dir(str(state["session_id"]))
         failure_path = session_dir / "runtime-failure.json"
-        _atomic_write_json(
-            failure_path,
-            {
-                "schema_version": "abyss_stack_external_codex_failure_v1",
-                "failure_code": code,
-                "status": status,
-                "attempt_id": attempt_id,
-                "message": message,
-            },
-        )
         events_path = self._events_path(str(state["session_id"]))
         attempt_number = max(1, len(state["attempts"]))
         worker_log_path = session_dir / "attempts" / f"{attempt_number:03d}" / "worker.log"
@@ -4669,8 +4719,46 @@ Runtime session identity: {state['session_id']}
                 baseline_manifest, current_manifest
             )
             workspace_manifest_match = current_manifest == baseline_manifest
-        except ExternalCodexRuntimeError:
+        except ExternalCodexRuntimeError as exc:
             changed_paths = []
+            status = "authority_blocked"
+            message = (
+                f"original failure {code}: {message}; workspace manifest "
+                f"observation failed: {exc.code}: {exc}"
+            )
+            code = "workspace_manifest_observation_gap"
+            state["status"] = status
+            for attempt in state["attempts"]:
+                if attempt["attempt_id"] == attempt_id:
+                    attempt["status"] = status
+            self._append_event(
+                state,
+                event_type="external_agent.failure_manifest_unobserved",
+                payload={"failure_code": code, "message": message},
+                attempt_id=attempt_id,
+                significance="authority",
+            )
+        wake_evaluations = closeout.get("wake_evaluations")
+        wake = (
+            wake_evaluations.get(status)
+            if isinstance(wake_evaluations, dict)
+            else None
+        )
+        if not isinstance(wake, dict):
+            raise ExternalCodexRuntimeError(
+                "runtime_state_invalid",
+                f"failure closeout has no persisted wake evaluation for {status}",
+            )
+        _atomic_write_json(
+            failure_path,
+            {
+                "schema_version": "abyss_stack_external_codex_failure_v1",
+                "failure_code": code,
+                "status": status,
+                "attempt_id": attempt_id,
+                "message": message,
+            },
+        )
         state["changed_paths"] = changed_paths
         state["wake_evaluation"] = dict(wake)
         evidence_refs = [
@@ -5524,8 +5612,94 @@ class ExternalCodexParentReentry:
             raise ExternalCodexRuntimeError(
                 "reentry_state_invalid", "parent re-entry state identity differs"
             )
-        _verified_artifact_ref_path(state["events_ref"], label="re-entry event stream")
+        expected_events_path = self._events_path(reentry_id)
+        recorded_events_path = Path(str(state["events_ref"]["artifact_ref"]))
+        if recorded_events_path != expected_events_path:
+            raise ExternalCodexRuntimeError(
+                "reentry_state_invalid",
+                "parent re-entry state points outside its canonical event stream",
+            )
+        try:
+            _verified_artifact_ref_path(
+                state["events_ref"], label="re-entry event stream"
+            )
+        except ExternalCodexRuntimeError as exc:
+            if exc.code != "a2a_artifact_drift":
+                raise
+            state = self._recover_appended_events(state)
         return state
+
+    def _recover_appended_events(
+        self, state: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Recover a crash between one durable event append and state save.
+
+        Recovery admits only an intact, digest-matching prior JSONL prefix plus
+        one or more structurally valid, contiguous events for this re-entry.
+        Rewrites, truncation, partial records, or another identity still fail
+        closed.
+        """
+
+        reentry_id = str(state["reentry_id"])
+        path = self._events_path(reentry_id)
+        raw = read_bounded(path)
+        if not raw.endswith(b"\n"):
+            raise ExternalCodexRuntimeError(
+                "reentry_event_recovery_failed",
+                "re-entry event stream ends with a partial record",
+            )
+        lines = raw.splitlines(keepends=True)
+        recorded_digest = str(state["events_ref"]["artifact_digest"])
+        prefix_count: int | None = None
+        prefix = b""
+        for index, line in enumerate(lines):
+            prefix += line
+            if sha256_bytes(prefix) == recorded_digest:
+                prefix_count = index + 1
+        if prefix_count is None or prefix_count >= len(lines):
+            raise ExternalCodexRuntimeError(
+                "reentry_event_recovery_failed",
+                "re-entry event stream is not a strict extension of its recorded prefix",
+            )
+        for sequence, line in enumerate(lines):
+            try:
+                event = json.loads(line)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ExternalCodexRuntimeError(
+                    "reentry_event_recovery_failed",
+                    f"re-entry event line {sequence + 1} is invalid",
+                ) from exc
+            if (
+                not isinstance(event, dict)
+                or event.get("schema_version")
+                != "abyss_stack_external_codex_reentry_event_v1"
+                or event.get("sequence") != sequence
+                or event.get("reentry_id") != reentry_id
+                or not isinstance(event.get("event_type"), str)
+                or not event["event_type"]
+                or not isinstance(event.get("significance"), str)
+                or not event["significance"]
+                or not isinstance(event.get("payload"), dict)
+            ):
+                raise ExternalCodexRuntimeError(
+                    "reentry_event_recovery_failed",
+                    f"re-entry event line {sequence + 1} is not a contiguous owned event",
+                )
+            try:
+                parse_timestamp(str(event["observed_at"]))
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ExternalCodexRuntimeError(
+                    "reentry_event_recovery_failed",
+                    f"re-entry event line {sequence + 1} has no valid observation time",
+                ) from exc
+        recovered = dict(state)
+        recovered["updated_at"] = iso_now()
+        recovered["events_ref"] = _artifact_ref(path)
+        validate_json(
+            recovered, REENTRY_STATE_SCHEMA_PATH, label="recovered parent re-entry state"
+        )
+        _atomic_write_json(self._state_path(reentry_id), recovered, mode=0o600)
+        return recovered
 
     def _save_state(self, state: Mapping[str, Any]) -> None:
         candidate = dict(state)
@@ -6018,6 +6192,85 @@ class ExternalCodexParentReentry:
         }.get(status, "result.unknown")
 
     @staticmethod
+    def _canonical_child_runtime_receipt(
+        child_result_path: Path,
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+        """Load one terminal result through its canonical durable runtime state."""
+
+        if not child_result_path.is_absolute() or child_result_path.name != "result.json":
+            raise ExternalCodexRuntimeError(
+                "reentry_child_receipt_noncanonical",
+                "child result must be the canonical absolute runtime result path",
+            )
+        try:
+            resolved_result_path = child_result_path.resolve(strict=True)
+        except OSError as exc:
+            raise ExternalCodexRuntimeError(
+                "reentry_child_receipt_unavailable",
+                "canonical child runtime result is unavailable",
+            ) from exc
+        if resolved_result_path != child_result_path or child_result_path.is_symlink():
+            raise ExternalCodexRuntimeError(
+                "reentry_child_receipt_noncanonical",
+                "child result path contains a symbolic or non-canonical component",
+            )
+        child_result = load_json(child_result_path, label="child terminal result")
+        validate_json(child_result, RESULT_SCHEMA_PATH, label="child terminal result")
+        session_id = str(child_result["session_id"])
+        session_dir = child_result_path.parent
+        if (
+            session_dir.parent.name != "sessions"
+            or session_dir.name != _session_token(session_id)
+        ):
+            raise ExternalCodexRuntimeError(
+                "reentry_child_receipt_noncanonical",
+                "child result is outside the canonical session identity directory",
+            )
+        state_path = session_dir / "state.json"
+        if not state_path.is_file() or state_path.is_symlink():
+            raise ExternalCodexRuntimeError(
+                "reentry_child_state_missing",
+                "canonical child runtime state receipt is unavailable",
+            )
+        child_state = load_json(state_path, label="child runtime state receipt")
+        validate_json(child_state, STATE_SCHEMA_PATH, label="child runtime state receipt")
+        result_digest = sha256_file(child_result_path)
+        expected_events_path = session_dir / "events.jsonl"
+        events_ref = child_result["events_ref"]
+        if (
+            child_state.get("schema_version") != STATE_SCHEMA_VERSION
+            or child_state.get("session_id") != session_id
+            or child_state.get("status") != child_result["status"]
+            or child_state.get("status")
+            not in {*TERMINAL_STATES, "interrupted"}
+            or child_state.get("incarnation_id") != child_result["incarnation_id"]
+            or child_state.get("task_id") != child_result["task_id"]
+            or child_state.get("thread_id") != child_result["thread_id"]
+            or child_state.get("result_path") != str(child_result_path)
+            or child_state.get("result_digest") != result_digest
+            or events_ref.get("artifact_ref") != str(expected_events_path)
+        ):
+            raise ExternalCodexRuntimeError(
+                "reentry_child_receipt_mismatch",
+                "child durable state does not bind the supplied terminal result",
+            )
+        verified_events_path = _verified_artifact_ref_path(
+            events_ref, label="canonical child event stream"
+        )
+        if verified_events_path != expected_events_path:
+            raise ExternalCodexRuntimeError(
+                "reentry_child_receipt_mismatch",
+                "child event receipt is outside its canonical session directory",
+            )
+        event_lines = read_bounded(verified_events_path).splitlines()
+        if len(event_lines) != int(child_state["last_event_sequence"]) + 1:
+            raise ExternalCodexRuntimeError(
+                "reentry_child_receipt_mismatch",
+                "child event receipt differs from the durable terminal sequence",
+            )
+        return child_result, child_state, _artifact_ref(child_result_path)
+
+    @staticmethod
     def _verify_child_wake_event(
         result: Mapping[str, Any], binding: AgentIncarnationBinding
     ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -6181,9 +6434,9 @@ class ExternalCodexParentReentry:
             )
             task, binding, realization = self._validate_obligation(obligation)
             child_path = Path(child_result_path)
-            child_result = load_json(child_path, label="child terminal result")
-            validate_json(child_result, RESULT_SCHEMA_PATH, label="child terminal result")
-            child_ref = _artifact_ref(child_path)
+            child_result, _child_state, child_ref = (
+                self._canonical_child_runtime_receipt(child_path)
+            )
             if (
                 child_result["task_id"] != state["child_task_id"]
                 or child_result["incarnation_id"] != state["child_incarnation_id"]

@@ -60,7 +60,7 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         encoding="utf-8",
     )
     (part / "external_codex_supervisor.py").write_text("PASS = True\n", encoding="utf-8")
-    (part / "runtime-profile.v1.json").write_text("{}\n", encoding="utf-8")
+    profile_path = part / "runtime-profile.v1.json"
     (schemas / "external-codex-test.schema.json").write_text("{}\n", encoding="utf-8")
     package = sdk / "src/aoa_sdk"
     (package / "contracts").mkdir(parents=True)
@@ -76,6 +76,31 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         contract = owner_roots[owner] / relative
         contract.parent.mkdir(parents=True, exist_ok=True)
         contract.write_text("{}\n", encoding="utf-8")
+    profile_path.write_text(
+        json.dumps(
+            {
+                "owner_contracts": {
+                    "owner_execution_request_schema": {
+                        "owner_repo": "aoa-agents",
+                        "artifact_ref": runtime_install.OWNER_CONTRACT_FILES[0][1],
+                        "digest": runtime_install.sha256_file(
+                            agents / runtime_install.OWNER_CONTRACT_FILES[0][1]
+                        ),
+                    },
+                    "task_local_dag_schema": {
+                        "owner_repo": "aoa-skills",
+                        "artifact_ref": runtime_install.OWNER_CONTRACT_FILES[1][1],
+                        "digest": runtime_install.sha256_file(
+                            skills / runtime_install.OWNER_CONTRACT_FILES[1][1]
+                        ),
+                    },
+                }
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     commit_all(source)
     commit_all(sdk)
     commit_all(agents)
@@ -214,3 +239,44 @@ def test_dirty_source_requires_explicit_admission_and_preserves_rollback(tmp_pat
     )
     assert restored["active"]["release_id"] == first["active"]["release_id"]
     assert json.loads((runtime_root / "active.json").read_text())["release_id"] == first["active"]["release_id"]
+
+
+def test_install_rejects_owner_contract_outside_runtime_profile_pin(
+    tmp_path: Path,
+) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    contract = agents / runtime_install.OWNER_CONTRACT_FILES[0][1]
+    contract.write_text('{"changed":true}\n', encoding="utf-8")
+    commit_all(agents)
+
+    with pytest.raises(runtime_install.InstallError, match="runtime profile pin"):
+        runtime_install.install(
+            source,
+            sdk,
+            agents,
+            skills,
+            tmp_path / "runtime",
+            tmp_path / "bin",
+            Path(sys.executable),
+            allow_dirty_source=False,
+            allow_dirty_sdk=False,
+            allow_dirty_agents=False,
+            allow_dirty_skills=False,
+        )
+
+
+@pytest.mark.parametrize("release_id", ["../../outside", "sha256-" + "g" * 64])
+def test_activate_rejects_non_content_addressed_release_id(
+    tmp_path: Path,
+    release_id: str,
+) -> None:
+    runtime_root = tmp_path / "runtime"
+    (runtime_root / "releases").mkdir(parents=True)
+
+    with pytest.raises(runtime_install.InstallError, match="content address"):
+        runtime_install.activate(
+            runtime_root,
+            tmp_path / "bin",
+            release_id,
+            Path(sys.executable),
+        )

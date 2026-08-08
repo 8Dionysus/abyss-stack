@@ -37,7 +37,9 @@ The controller:
   `run-to-terminal` for transient cgroup launchers that must keep their main
   process alive until the exact semantic terminal receipt, without adding a
   time, token, turn, output, command, cost, or memory budget;
-- rebuilds the exact byte-level workspace manifest at finalization, drains a
+- rebuilds the exact byte-level workspace manifest for every tracked,
+  untracked, and ignored path at finalization, records assume-unchanged and
+  skip-worktree index flags, drains a
   terminal process stream before finalization, counts tokens/turns/time/output
   without imposing execution budgets, includes ignored workspace bytes without
   reading secret-shaped ignored inputs, and runs Codex beneath a Linux
@@ -66,7 +68,8 @@ The controller:
   `source_evidence_paths`, with a backward-compatible fallback for older task
   packets, and binds claims about post-exit workspace state through the single
   controller-owned `runtime:workspace-final-manifest#...` evidence identity;
-- binds every validation claim to an exact observed argv/exit state, preserves
+- binds every validation claim to an exact observed argv/exit state and the
+  workspace-manifest digest observed when that command completed, preserves
   `review_required` as a real gate, distinguishes a non-review writer's
   `submit_for_review` handoff from a reviewer's `return_for_repair` verdict,
   binds each negative review to a separate task-owned outcome status,
@@ -83,7 +86,10 @@ The controller:
   external Sol inference and process, evaluates the child result against the
   SDK wake policy without model polling, and uses `codex exec resume` through
   `reenter-parent` only for the exact parent thread when one bound event is
-  significant; `reentry-status` observes the durable wait without inference.
+  significant; the child result must match its canonical durable runtime
+  state/result/event receipt, and a crash after a valid re-entry event append
+  is recovered only as a strict extension of the previously digested stream;
+  `reentry-status` observes the durable wait without inference.
 
 Token counters contain only usage actually emitted by Codex. A controlled
 interruption before `turn.completed` is therefore not represented as zero
@@ -145,7 +151,10 @@ runtime. The packaged SDK subtree is also a valid `--aoa-sdk-root` for study
 preparation because it carries the exact non-Python contracts consumed there.
 `status` re-hashes every released file and verifies all three wrappers.
 `activate --release-id ...` provides release rollback without deleting later
-releases. Dirty worktree installation is rejected unless every dirty source
+releases; release IDs must be exact SHA-256 identifiers whose resolved
+directory and manifest identity remain inside the release root. Installation
+also verifies that the packaged `aoa-agents` and `aoa-skills` schema bytes have
+the exact digests pinned by the runtime profile. Dirty worktree installation is rejected unless every dirty source
 posture is explicitly admitted; such an active receipt is marked
 `nonproduction_dirty_source=true` and is machine-local evidence, not a landed
 or remotely reproducible release. Installation requires clean exact

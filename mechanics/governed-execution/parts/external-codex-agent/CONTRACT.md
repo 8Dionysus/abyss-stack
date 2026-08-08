@@ -34,6 +34,8 @@ containing the exact controller, neutral launch binder, supervisor, study
 preparer, schemas, runtime profile, `aoa_sdk` package, SDK-owned
 incarnation/summon schema closure, and the runtime-profile-pinned
 `aoa-agents` owner execution request plus `aoa-skills` task-local DAG schemas.
+The installer must recompute those two owner-schema digests and match the
+profile pins before packaging them.
 The packaged SDK root must therefore satisfy both isolated imports and the
 preparer's exact non-Python contract reads. Stable wrappers consult a regular-file active
 receipt and execute a release-local bootstrap with Python isolated mode; they
@@ -41,7 +43,9 @@ do not follow a mutable source checkout, import ambient `PYTHONPATH`, or use a
 symlinked `current` directory. `install_external_codex_runtime.py status`
 re-hashes the release and wrappers before availability may be claimed.
 Activation rollback changes only the active receipt while retaining immutable
-releases.
+releases. An install, status, or activation target is admitted only as an exact
+SHA-256 release ID whose resolved directory and manifest identity remain one
+direct child of the configured release root.
 
 Operations are:
 
@@ -227,13 +231,18 @@ trustworthy. The bounded maximum size of one JSONL protocol record is a parser
 safety invariant, not a task or research budget.
 
 Finalization rebuilds and durably records the full workspace manifest rather
-than comparing only
-porcelain status. Same-status byte changes, ignored and untracked bytes, path
-kind, symlink target, size, binary diff, and HEAD drift therefore remain
-observable. An untracked or ignored secret-shaped path blocks admission before
+than comparing only porcelain status. Every tracked path is hashed even when
+Git marks it assume-unchanged or skip-worktree, and those index flags are
+recorded explicitly. Same-status byte changes, ignored and untracked bytes,
+path kind, symlink target, size, binary diff, and HEAD drift therefore remain
+observable. The receipt recorded for each exact validation command carries the
+workspace-manifest digest observed at command completion; report admission
+requires the final manifest to retain that digest. An untracked or ignored secret-shaped path blocks admission before
 its content is hashed. Read-only manifest drift, HEAD drift, an out-of-scope
 write, or a command event whose command text is unavailable fails closed as
-`authority_blocked` evidence. The command observer recognizes wrapped/scoped
+`authority_blocked` evidence. If a failure closeout cannot observe the final
+manifest, it becomes `workspace_manifest_observation_gap/authority_blocked`
+rather than emitting a false ordinary failure receipt. The command observer recognizes wrapped/scoped
 Git and GitHub effects plus publication, service, secret-access, and global
 configuration command families; the sandbox remains the primary effect
 boundary, and command observation is retained as auditable counterevidence.
@@ -358,12 +367,23 @@ thread and a `waiting` state. No model inference or model-driven polling remains
 alive while the child works.
 
 `reenter-parent` admits only the exact terminal child result named by the
-obligation and binding. It revalidates the child's task, incarnation, result
-schema, event-stream digest, evidence inclusion, continuation, return owner,
-deferred decisions, and status-selected SDK wake condition. Exactly one
+obligation and binding. The supplied absolute `result.json` must occupy the
+canonical `sessions/<hash(session_id)>/` directory and match the sibling
+durable `state.json` result path/digest, terminal identity/status/thread, and
+canonical event path/terminal sequence. It then revalidates the child's task,
+incarnation, result schema, event-stream digest, evidence inclusion,
+continuation, return owner, deferred decisions, and status-selected SDK wake
+condition. Exactly one
 `external_agent.wake_evaluated` event must match the runtime result. Failed,
 missing, false, duplicate, or non-parent events are preserved and filtered
 without a second Sol turn.
+
+The re-entry event stream and state digest form a recoverable pair. If the
+controller stops after fsync of a complete event but before the state rewrite,
+the next load may advance `events_ref` only when the current JSONL bytes are a
+strict extension of the previously recorded digest and every event remains a
+contiguous record for the same re-entry identity. Rewrites, truncation,
+partial records, and foreign identities remain fail-closed drift.
 
 When and only when the admitted event selects `wake_parent`, the controller
 builds a compact return bound to the child-result and observed-event digests,

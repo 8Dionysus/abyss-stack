@@ -317,6 +317,10 @@ emit({"type": "turn.started"})
 if "FAKE_INVALID_JSONL" in task["objective"]:
     print("{not-json", flush=True)
     time.sleep(60)
+if "FAKE_OVERSIZED_UNTERMINATED_EVENT" in task["objective"]:
+    sys.stdout.write("x" * 65536)
+    sys.stdout.flush()
+    time.sleep(60)
 if "FAKE_SPAWN_DESCENDANT" in task["objective"] and not resume:
     ignore_term = "FAKE_TERM_RESISTANT_DESCENDANT" in task["objective"]
     child_code = (
@@ -365,6 +369,11 @@ for validation in task["validation_commands"]:
         "status": "completed",
         "exit_code": 0,
     }})
+if "FAKE_MUTATE_AFTER_VALIDATION" in task["objective"]:
+    time.sleep(1.5)
+    (workspace / "landing-note.md").write_text(
+        "mutation after validation receipt\n", encoding="utf-8"
+    )
 
 report_status = "review_required" if task["review_required"] else "completed"
 report = {
@@ -2761,6 +2770,43 @@ def test_secret_shaped_ignored_path_blocks_manifest_without_hashing(
     assert exc_info.value.code == "workspace_secret_path_present"
 
 
+@pytest.mark.parametrize("index_flag", ["--assume-unchanged", "--skip-worktree"])
+def test_workspace_manifest_hashes_tracked_bytes_hidden_by_index_flags(
+    tmp_path: Path,
+    index_flag: str,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    tracked = workspace / "tracked.txt"
+    tracked.write_text("baseline\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    _git(workspace, "commit", "-m", "fixture")
+    baseline = RUNTIME.build_workspace_manifest(workspace)
+
+    _git(workspace, "update-index", index_flag, "tracked.txt")
+    tracked.write_text("hidden mutation\n", encoding="utf-8")
+    current = RUNTIME.build_workspace_manifest(workspace)
+
+    baseline_entry = next(
+        item
+        for item in baseline["content_entries"]
+        if item["path"] == "tracked.txt"
+    )
+    current_entry = next(
+        item
+        for item in current["content_entries"]
+        if item["path"] == "tracked.txt"
+    )
+    assert current_entry["sha256"] != baseline_entry["sha256"]
+    assert current_entry["index_flags"]
+    assert RUNTIME.compare_workspace_manifest(baseline, current) == [
+        {"path": "tracked.txt", "status": "content_changed"}
+    ]
+
+
 @pytest.mark.parametrize(
     "relative_path",
     (
@@ -2813,6 +2859,69 @@ def test_invalid_jsonl_protocol_record_is_typed_terminal_failure(
     )
 
 
+def test_unterminated_oversized_event_is_stopped_while_streaming(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(RUNTIME, "MAX_EVENT_LINE_BYTES", 1024)
+    fixture = _fixture(
+        tmp_path,
+        objective_marker="FAKE_OVERSIZED_UNTERMINATED_EVENT",
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "failed"
+    assert result is not None
+    assert result["failure_code"] == "codex_event_too_large"
+
+
+def test_failure_closeout_blocks_when_workspace_manifest_is_unobservable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path)
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+
+    def fail_manifest(_workspace: str | Path) -> dict[str, Any]:
+        raise RUNTIME.ExternalCodexRuntimeError(
+            "workspace_secret_path_present",
+            "manifest bytes cannot be observed",
+        )
+
+    monkeypatch.setattr(RUNTIME, "build_workspace_manifest", fail_manifest)
+    with runtime._lock(fixture["session_id"]):
+        state = runtime._load_state(fixture["session_id"])
+        attempt_id = state["attempts"][-1]["attempt_id"]
+        state["status"] = "failed"
+        state["finished_at"] = RUNTIME.iso_now()
+        runtime._write_failure_result_locked(
+            state,
+            attempt_id=attempt_id,
+            code="unexpected_worker_failure",
+            message="worker failed before closeout",
+        )
+        runtime._save_state(state)
+
+    result = runtime.result(fixture["session_id"])
+
+    assert runtime.status(fixture["session_id"])["status"] == "authority_blocked"
+    assert result is not None
+    assert result["status"] == "authority_blocked"
+    assert result["failure_code"] == "workspace_manifest_observation_gap"
+    assert result["workspace_manifest_match"] is None
+    assert result["workspace_manifest_ref"] is None
+    assert any(
+        event["event_type"] == "external_agent.failure_manifest_unobserved"
+        for event in runtime.events(fixture["session_id"], after_sequence=-1)
+    )
+
+
 def test_unavailable_command_observation_is_authority_blocked(tmp_path: Path) -> None:
     fixture = _fixture(tmp_path, objective_marker="FAKE_UNKNOWN_COMMAND")
     runtime = fixture["runtime"]
@@ -2824,6 +2933,23 @@ def test_unavailable_command_observation_is_authority_blocked(tmp_path: Path) ->
     assert terminal["status"] == "authority_blocked"
     assert result is not None
     assert result["failure_code"] == "command_observation_gap"
+
+
+def test_validation_receipt_must_match_final_workspace_bytes(tmp_path: Path) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker="FAKE_MUTATE_AFTER_VALIDATION",
+        workspace_write=True,
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "failed"
+    assert result is not None
+    assert result["failure_code"] == "model_report_validation_workspace_unbound"
 
 
 def test_high_token_use_is_counted_without_truncating_agent_work(tmp_path: Path) -> None:
@@ -3605,13 +3731,82 @@ def test_parent_inference_yields_and_exact_authority_event_reenters_same_thread(
     ]
 
 
-def test_non_parent_child_event_is_filtered_without_second_sol_turn(
+def test_parent_reentry_rejects_standalone_child_result_without_runtime_state(
     tmp_path: Path,
 ) -> None:
     fixture = _fixture(
         tmp_path / "child",
         role_id="architect",
         task_family="landing_ambiguity_stop",
+        identity_suffix="luna-xhigh-standalone-result",
+    )
+    reentry_id = "reentry:fixture:luna-xhigh-standalone-result"
+    obligation_path = _parent_reentry_obligation(
+        tmp_path, fixture, reentry_id=reentry_id
+    )
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge.yield_parent(obligation_path)
+    assert fixture["runtime"].run_to_terminal(fixture["launch_path"])["status"] == (
+        "authority_blocked"
+    )
+    source_result_path = (
+        fixture["runtime"]._session_dir(fixture["session_id"]) / "result.json"
+    )
+    standalone_dir = (
+        tmp_path
+        / "standalone"
+        / "sessions"
+        / RUNTIME._session_token(fixture["session_id"])
+    )
+    standalone_dir.mkdir(parents=True)
+    standalone_result_path = standalone_dir / "result.json"
+    standalone_result_path.write_bytes(source_result_path.read_bytes())
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        bridge.reenter_parent(reentry_id, standalone_result_path)
+
+    assert exc_info.value.code == "reentry_child_state_missing"
+
+
+def test_parent_reentry_recovers_valid_event_appended_before_state_save(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_ambiguity_stop",
+        identity_suffix="luna-xhigh-event-recovery",
+    )
+    reentry_id = "reentry:fixture:luna-xhigh-event-recovery"
+    obligation_path = _parent_reentry_obligation(
+        tmp_path, fixture, reentry_id=reentry_id
+    )
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    waiting = bridge.yield_parent(obligation_path)["state"]
+    old_digest = waiting["events_ref"]["artifact_digest"]
+    bridge._append_event(
+        reentry_id,
+        event_type="external_parent.recovery_fixture",
+        payload={"cause": "crash-before-state-save"},
+        significance="trace",
+    )
+
+    recovered = bridge.status(reentry_id)["state"]
+
+    assert recovered["status"] == "waiting"
+    assert recovered["events_ref"]["artifact_digest"] != old_digest
+    assert recovered["events_ref"]["artifact_digest"] == RUNTIME.sha256_file(
+        bridge._events_path(reentry_id)
+    )
+
+
+def test_non_parent_child_event_is_filtered_without_second_sol_turn(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_execution",
         identity_suffix="luna-xhigh-filtered",
     )
     reentry_id = "reentry:fixture:luna-xhigh-filtered"
@@ -3622,43 +3817,10 @@ def test_non_parent_child_event_is_filtered_without_second_sol_turn(
     bridge.yield_parent(obligation_path)
 
     child_terminal = fixture["runtime"].run_to_terminal(fixture["launch_path"])
-    assert child_terminal["status"] == "authority_blocked"
+    assert child_terminal["status"] == "completed"
     child_result_path = (
         fixture["runtime"]._session_dir(fixture["session_id"]) / "result.json"
     )
-    child_result = json.loads(child_result_path.read_text(encoding="utf-8"))
-    binding = RUNTIME.AgentIncarnationBinding.model_validate_json(
-        fixture["binding_path"].read_text(encoding="utf-8")
-    )
-    child_result["status"] = "completed"
-    child_result["wake_evaluation"] = {
-        "event_kind": "result.validated",
-        "condition_id": "result-ready",
-        "action": "activate_review_role",
-        "wake_parent": False,
-        "reason": next(
-            condition.description
-            for condition in binding.wake_policy.conditions
-            if condition.condition_id == "result-ready"
-        ),
-    }
-    events_path = Path(child_result["events_ref"]["artifact_ref"])
-    events = [json.loads(line) for line in events_path.read_text().splitlines()]
-    for event in events:
-        if event.get("event_type") == "external_agent.wake_evaluated":
-            event["payload"] = child_result["wake_evaluation"]
-    events_path.write_text(
-        "".join(json.dumps(event, sort_keys=True) + "\n" for event in events),
-        encoding="utf-8",
-    )
-    child_result["events_ref"]["artifact_digest"] = _digest_path(events_path)
-    for evidence_ref in child_result["evidence_refs"]:
-        if evidence_ref["artifact_ref"] == str(events_path):
-            evidence_ref["artifact_digest"] = child_result["events_ref"][
-                "artifact_digest"
-            ]
-    _write_json(child_result_path, child_result)
-
     filtered = bridge.reenter_parent(reentry_id, child_result_path)["state"]
     assert filtered["status"] == "filtered"
     assert len(filtered["turns"]) == 1
