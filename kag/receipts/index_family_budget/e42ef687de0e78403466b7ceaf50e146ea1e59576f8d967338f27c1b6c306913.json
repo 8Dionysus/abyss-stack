@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 15136791,
+  "allowed_tracked_bytes": 30754908,
+  "approved_by": "repository-owner",
+  "base_ref": "93415d31bcd6e35559981c2a8eb125d907e24bed",
+  "changed_generated_bytes": 15136791,
+  "changed_generated_files": 179,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "e42ef687de0e78403466b7ceaf50e146ea1e59576f8d967338f27c1b6c306913",
+  "reason": "Refresh the current-main KAG family after validating deployment content addresses and including bootstrap in credential and runtime lifecycle stop gates without raising the standing budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 30754908,
+  "tracked_bytes_max": 24117248
+}
