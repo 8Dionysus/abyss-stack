@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 15988990,
+  "allowed_tracked_bytes": 30926616,
+  "approved_by": "repository-owner",
+  "base_ref": "63ab4efd013e02fe59cd5949d202a0b470d14cb1",
+  "changed_generated_bytes": 15988990,
+  "changed_generated_files": 308,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "49ed58795f3f8282ba3011fe5616dc71bf93c8f77a90cde22b4f59c35823635c",
+  "reason": "MCP registry v2 admission automation and final KAG action pin",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 30926616,
+  "tracked_bytes_max": 24117248
+}
