@@ -78,7 +78,8 @@ post-write manifest and reviewed A2A return, exact review-input-to-writer-final
 manifest binding, reviewer-result race refusal, wrapper-delimiter effect observation,
 unclassified non-validation interpreter indirection with exact fixed-validation
 exemption, fail-closed `env --split-string` handling, value-aware `timeout`
-wrapper parsing, attached-redirection observation, final-manifest tamper refusal,
+wrapper parsing, opaque process-launch-wrapper refusal,
+attached-redirection observation, final-manifest tamper refusal,
 provenance checks for all loaded `aoa_sdk` modules in the study preparer plus a
 post-compilation persisted
 path inventory, produced-artifact admission, source-evidence file/line

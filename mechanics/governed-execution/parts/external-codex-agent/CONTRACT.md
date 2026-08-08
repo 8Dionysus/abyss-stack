@@ -274,7 +274,8 @@ manifest, it becomes `workspace_manifest_observation_gap/authority_blocked`
 rather than emitting a false ordinary failure receipt. The command observer recognizes wrapped/scoped
 Git and GitHub effects plus publication, service, secret-access, and global
 configuration command families. Non-owner-fixed interpreter or script bodies,
-`find -exec`, `eval`, and `xargs` are treated as unclassified indirect effects
+`find -exec`, `eval`, `xargs`, and process-launch wrappers such as `nice`,
+`nohup`, `setsid`, and `stdbuf` are treated as unclassified indirect effects
 and authority-block the terminal result; exact fixed validation argv are
 separately admitted by their owner identity. The sandbox remains the primary effect
 boundary, and command observation is retained as auditable counterevidence.

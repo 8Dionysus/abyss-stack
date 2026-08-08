@@ -169,6 +169,18 @@ OPAQUE_EFFECT_EXECUTABLES = {
     "python3",
     "ruby",
 }
+OPAQUE_PROCESS_LAUNCH_WRAPPERS = {
+    "chrt",
+    "ionice",
+    "nice",
+    "nohup",
+    "nsenter",
+    "prlimit",
+    "setsid",
+    "stdbuf",
+    "taskset",
+    "unshare",
+}
 SYSTEM_PATH_PREFIXES = ("/etc", "/opt", "/usr", "/var/lib", "/var/run")
 
 
@@ -1546,7 +1558,9 @@ def _command_has_unclassified_indirection(command: str) -> bool:
                 return True
             executable = Path(segment[0]).name.lower()
             args = tuple(value.lower() for value in segment[1:])
-            if executable in OPAQUE_EFFECT_EXECUTABLES:
+            if executable in (
+                OPAQUE_EFFECT_EXECUTABLES | OPAQUE_PROCESS_LAUNCH_WRAPPERS
+            ):
                 return True
             if executable == "find" and any(
                 value in {"-exec", "-execdir", "-ok", "-okdir"}

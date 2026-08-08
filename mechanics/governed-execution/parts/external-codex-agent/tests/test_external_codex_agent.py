@@ -371,6 +371,13 @@ if "FAKE_OPAQUE_INDIRECT_COMMAND" in task["objective"]:
         "status": "completed",
         "exit_code": 0,
     }})
+if "FAKE_OPAQUE_LAUNCH_WRAPPER" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/nice /usr/bin/cat /home/fixture/.ssh/id_rsa",
+        "status": "completed",
+        "exit_code": 0,
+    }})
 if "FAKE_STARTED_FORBIDDEN_COMMAND" in task["objective"]:
     emit({"type": "item.started", "item": {
         "id": "fixture-command-started-before-interruption",
@@ -3033,6 +3040,19 @@ def test_timeout_value_options_cannot_hide_git_push(command: str) -> None:
     assert "push" in RUNTIME._command_effects(command)
 
 
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/nice /usr/bin/cat /home/fixture/.ssh/id_rsa",
+        "/usr/bin/nohup /usr/bin/git push",
+        "/usr/bin/setsid /usr/bin/systemctl restart fixture.service",
+        "/usr/bin/stdbuf -oL /usr/bin/git commit -m bounded",
+    ),
+)
+def test_process_launch_wrappers_are_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
 def test_started_command_survives_interruption_and_blocks_authority(
     tmp_path: Path,
 ) -> None:
@@ -3061,8 +3081,15 @@ def test_started_command_survives_interruption_and_blocks_authority(
     )
 
 
-def test_opaque_indirect_command_authority_blocks_terminal_result(tmp_path: Path) -> None:
-    fixture = _fixture(tmp_path, objective_marker="FAKE_OPAQUE_INDIRECT_COMMAND")
+@pytest.mark.parametrize(
+    "objective_marker",
+    ("FAKE_OPAQUE_INDIRECT_COMMAND", "FAKE_OPAQUE_LAUNCH_WRAPPER"),
+)
+def test_opaque_command_authority_blocks_terminal_result(
+    tmp_path: Path,
+    objective_marker: str,
+) -> None:
+    fixture = _fixture(tmp_path, objective_marker=objective_marker)
     runtime = fixture["runtime"]
     runtime.start(fixture["launch_path"])
 

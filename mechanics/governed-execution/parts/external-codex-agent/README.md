@@ -76,7 +76,8 @@ The controller:
   directory before any admitted continuation;
 - turns read-only drift, out-of-scope paths, forbidden effects, identity drift,
   or report-contract drift into typed failure or authority-blocked evidence;
-  non-owner-fixed interpreter, script, `find -exec`, `eval`, and `xargs`
+  non-owner-fixed interpreter, script, process-launch wrapper, `find -exec`,
+  `eval`, and `xargs`
   commands whose indirect effects cannot be classified are retained as
   counterevidence and authority-block the result, shell separators remain
   visible even when attached to arguments, redirection remains an opaque
