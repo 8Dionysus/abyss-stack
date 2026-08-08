@@ -85,6 +85,8 @@ The controller:
   observer, value-taking `timeout` options cannot hide the wrapped command,
   shell nesting that exceeds the bounded inspection depth fails opaque,
   command/backtick/process substitutions remain opaque executable indirection,
+  build/package/test/task runners remain opaque unless they are an exact
+  owner-fixed validation,
   and commands are durably observed
   from `item.started` rather than only after completion, while exact task validation
   argv remain admitted by their owner-supplied identity;
@@ -214,7 +216,11 @@ includes index-hidden packaged files marked assume-unchanged or skip-worktree
 and ignored files that would enter the packaged SDK; their path sets are
 counted and digested in the source posture. Such an active receipt is marked
 `nonproduction_dirty_source=true` and is machine-local evidence, not a landed
-or remotely reproducible release. Installation requires clean exact
+or remotely reproducible release. Before activating any materialized release,
+the installer re-enumerates the selected inputs, requires unchanged Git
+postures, and re-hashes every source byte against the release manifest; a
+checkout race therefore fails before wrapper or active-receipt mutation.
+Installation requires clean exact
 `abyss-stack`, `aoa-sdk`, `aoa-agents`, and `aoa-skills` source roots unless
 each dirty posture is admitted explicitly.
 

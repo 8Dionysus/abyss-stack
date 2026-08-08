@@ -180,6 +180,71 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
     assert repeated["active"]["release_id"] == active["release_id"]
 
 
+def test_install_refuses_clean_checkout_race_before_activation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    old_head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=source,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    controller = (
+        source
+        / "mechanics/governed-execution/parts/external-codex-agent/"
+        "external_codex_agent.py"
+    )
+    controller.write_text(
+        controller.read_text(encoding="utf-8") + "# competing clean revision\n",
+        encoding="utf-8",
+    )
+    commit_all(source)
+    new_head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=source,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    git("checkout", "-q", old_head, cwd=source)
+    original_release_manifest = runtime_install.release_manifest
+
+    def release_manifest_after_checkout(
+        files: list[tuple[Path, Path]],
+    ) -> dict[str, object]:
+        git("checkout", "-q", new_head, cwd=source)
+        return original_release_manifest(files)
+
+    monkeypatch.setattr(
+        runtime_install,
+        "release_manifest",
+        release_manifest_after_checkout,
+    )
+    runtime_root = tmp_path / "runtime"
+    bin_dir = tmp_path / "bin"
+
+    with pytest.raises(runtime_install.InstallError, match="Git posture changed"):
+        runtime_install.install(
+            source,
+            sdk,
+            agents,
+            skills,
+            runtime_root,
+            bin_dir,
+            Path(sys.executable),
+            allow_dirty_source=False,
+            allow_dirty_sdk=False,
+            allow_dirty_agents=False,
+            allow_dirty_skills=False,
+        )
+
+    assert not (runtime_root / "active.json").exists()
+    assert not bin_dir.exists()
+
+
 def test_release_verification_rejects_unmanifested_importable_file(
     tmp_path: Path,
 ) -> None:

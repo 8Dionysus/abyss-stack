@@ -50,6 +50,11 @@ assume-unchanged or skip-worktree and every ignored selected file must make its
 owner checkout dirty, with the classified path set counted and digested in the
 receipt. Such bytes require the matching explicit dirty-source admission and
 must never be represented as a clean production source posture.
+After materialization and before wrapper or active-receipt mutation, the
+installer re-enumerates every selected input, requires all four Git posture
+snapshots to remain exact, and re-hashes every source byte against the release
+manifest. A checkout or byte race may leave an unactivated content-addressed
+release, but it cannot publish a falsely attributed active release.
 `install_external_codex_runtime.py status`
 requires the release tree to contain exactly the manifest files and their
 necessary parent directories, rejects every symlink or extra entry, and
@@ -297,7 +302,10 @@ Nested shell bodies are inspected only to a fixed parser-safety depth; any
 still-pending or syntactically unparsed body at that boundary is itself an
 unclassified authority signal rather than an implicitly safe command. Shell
 command substitution, backticks, and process substitution likewise fail closed
-instead of being treated as inert command arguments.
+instead of being treated as inert command arguments. Build, package, test, and
+task runners that may execute manifest-, plugin-, or project-defined commands
+are opaque for model-issued commands; only an exact owner-fixed validation argv
+receives the fixed-validation exemption.
 
 Any model evidence reference beginning with `source:` is semantic, not opaque
 prose. It must resolve to a regular non-symlink file inside the exact workspace

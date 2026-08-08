@@ -271,6 +271,66 @@ def source_files(
     return rows
 
 
+def source_postures(
+    files: Sequence[tuple[Path, Path]],
+    source_root: Path,
+    sdk_root: Path,
+    agents_root: Path,
+    skills_root: Path,
+) -> dict[str, dict[str, object]]:
+    roots = {
+        "source": source_root,
+        "sdk": sdk_root,
+        "agents": agents_root,
+        "skills": skills_root,
+    }
+    return {
+        label: git_posture(
+            root,
+            (source for source, _ in files if source.is_relative_to(root)),
+        )
+        for label, root in roots.items()
+    }
+
+
+def assert_release_inputs_unchanged(
+    original_files: Sequence[tuple[Path, Path]],
+    current_files: Sequence[tuple[Path, Path]],
+    manifest: dict[str, object],
+) -> None:
+    """Bind the materialized bytes to the exact source coordinates re-observed."""
+
+    coordinates = tuple(
+        (str(source), destination.as_posix())
+        for source, destination in original_files
+    )
+    current_coordinates = tuple(
+        (str(source), destination.as_posix())
+        for source, destination in current_files
+    )
+    if current_coordinates != coordinates:
+        raise InstallError("release input coordinates changed during installation")
+    rows = manifest.get("files")
+    if not isinstance(rows, list):
+        raise InstallError("release manifest files are invalid")
+    rows_by_path = {
+        str(row.get("path")): row
+        for row in rows
+        if isinstance(row, dict)
+    }
+    for source, destination in current_files:
+        require_regular_file(source, f"release source {source}")
+        row = rows_by_path.get(destination.as_posix())
+        if (
+            row is None
+            or source.stat().st_size != row.get("size")
+            or sha256_file(source) != row.get("sha256")
+        ):
+            raise InstallError(
+                f"release input changed during installation: {source}"
+            )
+
+
 def entrypoint_text(target: str) -> str:
     return f'''#!/usr/bin/env python3
 from __future__ import annotations
@@ -483,22 +543,17 @@ def install(
     bin_dir = bin_dir.resolve()
     python_executable = require_python_executable(python_executable)
     files = source_files(source_root, sdk_root, agents_root, skills_root)
-    source_posture = git_posture(
+    postures = source_postures(
+        files,
         source_root,
-        (source for source, _ in files if source.is_relative_to(source_root)),
-    )
-    sdk_posture = git_posture(
         sdk_root,
-        (source for source, _ in files if source.is_relative_to(sdk_root)),
-    )
-    agents_posture = git_posture(
         agents_root,
-        (source for source, _ in files if source.is_relative_to(agents_root)),
-    )
-    skills_posture = git_posture(
         skills_root,
-        (source for source, _ in files if source.is_relative_to(skills_root)),
     )
+    source_posture = postures["source"]
+    sdk_posture = postures["sdk"]
+    agents_posture = postures["agents"]
+    skills_posture = postures["skills"]
     if source_posture["dirty"] and not allow_dirty_source:
         raise InstallError("abyss-stack source is dirty; pass --allow-dirty-source explicitly")
     if sdk_posture["dirty"] and not allow_dirty_sdk:
@@ -514,6 +569,17 @@ def install(
 
     manifest = release_manifest(files)
     release_root, created = materialize_release(files, manifest, runtime_root / "releases")
+    current_files = source_files(source_root, sdk_root, agents_root, skills_root)
+    current_postures = source_postures(
+        current_files,
+        source_root,
+        sdk_root,
+        agents_root,
+        skills_root,
+    )
+    if current_postures != postures:
+        raise InstallError("source Git posture changed during installation")
+    assert_release_inputs_unchanged(files, current_files, manifest)
     previous_active = None
     active_path = runtime_root / "active.json"
     if active_path.exists():

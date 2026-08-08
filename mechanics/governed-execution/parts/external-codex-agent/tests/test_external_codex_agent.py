@@ -400,6 +400,13 @@ if "FAKE_COMMAND_SUBSTITUTION" in task["objective"]:
         "status": "completed",
         "exit_code": 0,
     }})
+if "FAKE_OPAQUE_BUILD_RUNNER" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/make -f /tmp/leak.mk leak",
+        "status": "completed",
+        "exit_code": 0,
+    }})
 if "FAKE_STARTED_FORBIDDEN_COMMAND" in task["objective"]:
     emit({"type": "item.started", "item": {
         "id": "fixture-command-started-before-interruption",
@@ -3115,6 +3122,18 @@ def test_shell_command_substitution_is_fail_closed(command: str) -> None:
     assert RUNTIME._command_has_unclassified_indirection(command) is True
 
 
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/make -f /tmp/leak.mk leak",
+        "/usr/bin/npm run leak",
+        "/usr/bin/cargo build",
+    ),
+)
+def test_build_and_task_runners_are_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
 def test_started_command_survives_interruption_and_blocks_authority(
     tmp_path: Path,
 ) -> None:
@@ -3150,6 +3169,7 @@ def test_started_command_survives_interruption_and_blocks_authority(
         "FAKE_OPAQUE_LAUNCH_WRAPPER",
         "FAKE_DEEP_SHELL_NESTING",
         "FAKE_COMMAND_SUBSTITUTION",
+        "FAKE_OPAQUE_BUILD_RUNNER",
     ),
 )
 def test_opaque_command_authority_blocks_terminal_result(

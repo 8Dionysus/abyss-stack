@@ -182,6 +182,41 @@ OPAQUE_PROCESS_LAUNCH_WRAPPERS = {
     "taskset",
     "unshare",
 }
+OPAQUE_BUILD_AND_TASK_RUNNERS = {
+    "ant",
+    "bazel",
+    "buck",
+    "bundle",
+    "cargo",
+    "cmake",
+    "composer",
+    "ctest",
+    "dotnet",
+    "gmake",
+    "go",
+    "gradle",
+    "gradlew",
+    "just",
+    "make",
+    "meson",
+    "mvn",
+    "mvnw",
+    "ninja",
+    "nox",
+    "npm",
+    "npx",
+    "pip",
+    "pip3",
+    "pnpm",
+    "poetry",
+    "pre-commit",
+    "pytest",
+    "rake",
+    "task",
+    "tox",
+    "uv",
+    "yarn",
+}
 SYSTEM_PATH_PREFIXES = ("/etc", "/opt", "/usr", "/var/lib", "/var/run")
 
 
@@ -1559,6 +1594,8 @@ def _command_has_unclassified_indirection(command: str) -> bool:
             if not raw_segment:
                 continue
             raw_executable = Path(raw_segment[0]).name.lower()
+            if raw_executable in OPAQUE_BUILD_AND_TASK_RUNNERS:
+                return True
             if raw_executable in SHELL_NAMES:
                 has_inline_body = any(
                     token in {"-c", "-lc"}
@@ -1573,7 +1610,9 @@ def _command_has_unclassified_indirection(command: str) -> bool:
             executable = Path(segment[0]).name.lower()
             args = tuple(value.lower() for value in segment[1:])
             if executable in (
-                OPAQUE_EFFECT_EXECUTABLES | OPAQUE_PROCESS_LAUNCH_WRAPPERS
+                OPAQUE_EFFECT_EXECUTABLES
+                | OPAQUE_PROCESS_LAUNCH_WRAPPERS
+                | OPAQUE_BUILD_AND_TASK_RUNNERS
             ):
                 return True
             if executable == "find" and any(
