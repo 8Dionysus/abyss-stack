@@ -380,16 +380,26 @@
       "family": "mcp-protocol-lab-scripts",
       "paths": [
         "mcp/protocol-lab/scripts/build_protocol_lab_status.py",
+        "mcp/protocol-lab/scripts/inspector_tasks_adapter_client.ts",
+        "mcp/protocol-lab/scripts/normalize_protocol_watch_run.py",
+        "mcp/protocol-lab/scripts/protocol_watcher.py",
         "mcp/protocol-lab/scripts/run_codex_kag_next_lab.py",
+        "mcp/protocol-lab/scripts/run_frozen_conformance.py",
+        "mcp/protocol-lab/scripts/run_inspector_tasks_adapter_pair.py",
         "mcp/protocol-lab/scripts/run_kag_cache_pair.py",
         "mcp/protocol-lab/scripts/run_kag_handle_pair.py",
         "mcp/protocol-lab/scripts/run_kag_next_pair.py",
+        "mcp/protocol-lab/scripts/run_rust_tasks_adapter_pair.py",
+        "mcp/protocol-lab/scripts/run_tasks_adapter_pilot.py",
+        "mcp/protocol-lab/scripts/rust_tasks_adapter_client.rs",
         "mcp/protocol-lab/scripts/validate_protocol_lab.py"
       ],
       "organ_lane": "MCP protocol compatibility gate",
       "owner_surface": "mcp/protocol-lab/AGENTS.md",
       "source_truth": [
         "mcp/protocol-lab/protocol-compatibility-matrix.v1.json",
+        "mcp/protocol-lab/tasks-compatibility-matrix.v1.json",
+        "mcp/protocol-lab/protocol-watch-plan.v1.json",
         "mcp/protocol-lab/fixtures/current-pair-observation.json"
       ],
       "reads": [
@@ -404,7 +414,7 @@
       "side_effects": "source-local generation and validation, plus bounded loopback client/server pair runs; no registration, global credential, service, or owner-truth mutation",
       "validation_lane": "mcp-services/release",
       "ci_inclusion": "mcp-services lane and default pytest collection",
-      "test_target": "mcp/protocol-lab/tests/test_protocol_lab.py",
+      "test_target": "mcp/protocol-lab/tests/test_protocol_lab.py mcp/protocol-lab/tests/test_protocol_watcher.py",
       "disposition": "keep"
     },
     {
