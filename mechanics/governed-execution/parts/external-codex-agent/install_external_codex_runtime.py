@@ -379,13 +379,32 @@ def verify_release(release_root: Path) -> dict[str, object]:
         raise InstallError("release manifest digest mismatch")
     if manifest.get("release_id") != expected.replace("sha256:", "sha256-"):
         raise InstallError("release id mismatch")
+    expected_files = {Path("release-manifest.json")}
+    expected_directories: set[Path] = set()
     for row in manifest["files"]:
         relative = Path(row["path"])
         if relative.is_absolute() or ".." in relative.parts:
             raise InstallError(f"unsafe release path: {relative}")
+        expected_files.add(relative)
+        expected_directories.update(relative.parents)
         path = require_regular_file(release_root / relative, f"release file {relative}")
         if path.stat().st_size != row["size"] or sha256_file(path) != row["sha256"]:
             raise InstallError(f"release file drift: {relative}")
+    expected_directories.discard(Path("."))
+    actual_files: set[Path] = set()
+    actual_directories: set[Path] = set()
+    for path in release_root.rglob("*"):
+        relative = path.relative_to(release_root)
+        if path.is_symlink():
+            raise InstallError(f"release contains a symbolic link: {relative}")
+        if path.is_file():
+            actual_files.add(relative)
+        elif path.is_dir():
+            actual_directories.add(relative)
+        else:
+            raise InstallError(f"release contains an unsupported entry: {relative}")
+    if actual_files != expected_files or actual_directories != expected_directories:
+        raise InstallError("release manifest closure mismatch")
     return manifest
 
 

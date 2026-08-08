@@ -1159,7 +1159,10 @@ def _shell_tokenizations(command: str) -> tuple[tuple[str, ...], ...]:
             continue
         seen.add(raw)
         try:
-            tokens = tuple(shlex.split(raw, posix=True))
+            lexer = shlex.shlex(raw, posix=True, punctuation_chars=";&|")
+            lexer.whitespace_split = True
+            lexer.commenters = ""
+            tokens = tuple(lexer)
         except ValueError:
             continue
         if not tokens:
@@ -1721,6 +1724,15 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
         path = location / relative
         index_flags = list(tracked_flags.get(relative, ()))
         if path.is_symlink():
+            try:
+                resolved_target = path.resolve(strict=True)
+                resolved_target.relative_to(location)
+            except (OSError, ValueError) as exc:
+                raise ExternalCodexRuntimeError(
+                    "workspace_symlink_target_unsupported",
+                    "workspace manifest does not admit a symbolic link whose "
+                    "target is absent or outside the exact workspace",
+                ) from exc
             target = os.readlink(path).encode("utf-8")
             entries.append(
                 {
@@ -4641,7 +4653,7 @@ Runtime session identity: {state['session_id']}
         command_record: dict[str, Any] | None = None
         item = payload.get("item")
         if (
-            source_type == "item.completed"
+            source_type in {"item.started", "item.completed"}
             and isinstance(item, dict)
             and item.get("type") == "command_execution"
         ):
@@ -4649,10 +4661,20 @@ Runtime session identity: {state['session_id']}
             command_record = {
                 "attempt_id": attempt_id,
                 "command": command or "<unavailable>",
-                "status": str(item.get("status") or "unknown"),
-                "exit_code": item.get("exit_code"),
+                "status": str(
+                    item.get("status")
+                    or ("started" if source_type == "item.started" else "unknown")
+                ),
+                "exit_code": (
+                    None if source_type == "item.started" else item.get("exit_code")
+                ),
             }
-            if command:
+            item_id = item.get("id")
+            if isinstance(item_id, str) and item_id:
+                command_record["item_id"] = item_id
+            if source_type == "item.started":
+                command_record["event_phase"] = "started"
+            if source_type == "item.completed" and command:
                 task = load_json(
                     Path(state["materialized_inputs"]["task"]),
                     label="materialized task",
@@ -4772,7 +4794,7 @@ Runtime session identity: {state['session_id']}
 
         item = source_payload.get("item")
         source_is_command = (
-            source_type == "item.completed"
+            source_type in {"item.started", "item.completed"}
             and isinstance(item, dict)
             and item.get("type") == "command_execution"
         )
@@ -4787,9 +4809,19 @@ Runtime session identity: {state['session_id']}
             expected_record = {
                 "attempt_id": attempt_id,
                 "command": command or "<unavailable>",
-                "status": str(item.get("status") or "unknown"),
-                "exit_code": item.get("exit_code"),
+                "status": str(
+                    item.get("status")
+                    or ("started" if source_type == "item.started" else "unknown")
+                ),
+                "exit_code": (
+                    None if source_type == "item.started" else item.get("exit_code")
+                ),
             }
+            item_id = item.get("id")
+            if isinstance(item_id, str) and item_id:
+                expected_record["item_id"] = item_id
+            if source_type == "item.started":
+                expected_record["event_phase"] = "started"
             if any(command_record.get(key) != value for key, value in expected_record.items()):
                 raise ExternalCodexRuntimeError(
                     "runtime_event_semantic_recovery_invalid",
@@ -4804,7 +4836,7 @@ Runtime session identity: {state['session_id']}
                 Path(state["materialized_inputs"]["task"]),
                 label="materialized task",
             )
-            is_fixed_validation = bool(command) and any(
+            is_fixed_validation = source_type == "item.completed" and bool(command) and any(
                 _command_matches_argv(
                     command,
                     _validation_wrapper_argv(state["workspace_path"], spec),
@@ -4820,7 +4852,24 @@ Runtime session identity: {state['session_id']}
                     "runtime_event_semantic_recovery_invalid",
                     "Codex command delta has no exact fixed-validation manifest digest",
                 )
-            state["executed_commands"].append(dict(command_record))
+            replacement_index: int | None = None
+            if source_type == "item.completed" and isinstance(item_id, str) and item_id:
+                replacement_index = next(
+                    (
+                        index
+                        for index in range(len(state["executed_commands"]) - 1, -1, -1)
+                        if state["executed_commands"][index].get("attempt_id")
+                        == attempt_id
+                        and state["executed_commands"][index].get("item_id") == item_id
+                        and state["executed_commands"][index].get("event_phase")
+                        == "started"
+                    ),
+                    None,
+                )
+            if replacement_index is None:
+                state["executed_commands"].append(dict(command_record))
+            else:
+                state["executed_commands"][replacement_index] = dict(command_record)
         elif command_record is not None:
             raise ExternalCodexRuntimeError(
                 "runtime_event_semantic_recovery_invalid",
@@ -7057,6 +7106,99 @@ class ExternalCodexParentReentry:
             *command,
         ]
 
+    def _load_parent_turn_result(
+        self,
+        turn_root: Path,
+        *,
+        kind: Literal["yield", "reentry"],
+        thread_id: str | None,
+        prompt: str,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        completion_path = turn_root / "turn-completion.json"
+        completion = load_json(completion_path, label=f"parent {kind} turn completion")
+        if set(completion) != {
+            "schema_version",
+            "kind",
+            "started_at",
+            "finished_at",
+            "exit_code",
+            "prompt_sha256",
+        } or (
+            completion.get("schema_version")
+            != "abyss_stack_external_codex_parent_turn_completion_v1"
+            or completion.get("kind") != kind
+            or completion.get("prompt_sha256")
+            != sha256_bytes(prompt.encode("utf-8"))
+            or not isinstance(completion.get("exit_code"), int)
+            or isinstance(completion.get("exit_code"), bool)
+        ):
+            raise ExternalCodexRuntimeError(
+                "reentry_parent_turn_completion_invalid",
+                f"parent {kind} completion receipt differs from the requested turn",
+            )
+        try:
+            parse_timestamp(str(completion["started_at"]))
+            parse_timestamp(str(completion["finished_at"]))
+        except ValueError as exc:
+            raise ExternalCodexRuntimeError(
+                "reentry_parent_turn_completion_invalid",
+                f"parent {kind} completion receipt has invalid timestamps",
+            ) from exc
+        events_path = turn_root / "codex-events.jsonl"
+        output_path = turn_root / "model-output.json"
+        raw_events = read_bounded(events_path)
+        records: list[dict[str, Any]] = []
+        for line_number, line in enumerate(raw_events.splitlines(), start=1):
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ExternalCodexRuntimeError(
+                    "reentry_codex_protocol_invalid",
+                    f"parent turn JSONL line {line_number} is invalid",
+                ) from exc
+            if not isinstance(record, dict):
+                raise ExternalCodexRuntimeError(
+                    "reentry_codex_protocol_invalid",
+                    f"parent turn JSONL line {line_number} is not an object",
+                )
+            records.append(record)
+        thread_ids = {
+            str(record["thread_id"])
+            for record in records
+            if record.get("type") == "thread.started"
+            and isinstance(record.get("thread_id"), str)
+        }
+        exit_code = int(completion["exit_code"])
+        if exit_code != 0 or len(thread_ids) != 1 or not output_path.is_file():
+            raise ExternalCodexRuntimeError(
+                "reentry_parent_turn_failed",
+                f"parent {kind} turn failed before a unique structured result",
+            )
+        observed_thread = next(iter(thread_ids))
+        if thread_id is not None and observed_thread != thread_id:
+            raise ExternalCodexRuntimeError(
+                "reentry_parent_thread_drift",
+                "parent resume returned another thread identity",
+            )
+        output_schema = (
+            PARENT_YIELD_SCHEMA_PATH if kind == "yield" else PARENT_REENTRY_SCHEMA_PATH
+        )
+        output = load_json(output_path, label=f"parent {kind} output")
+        validate_json(output, output_schema, label=f"parent {kind} output")
+        turn = {
+            "kind": kind,
+            "started_at": completion["started_at"],
+            "finished_at": completion["finished_at"],
+            "exit_code": exit_code,
+            "thread_id": observed_thread,
+            "events_ref": _artifact_ref(events_path),
+            "output_ref": _artifact_ref(output_path),
+            "usage": self._codex_usage(records),
+        }
+        return turn, output
+
     def _run_parent_turn(
         self,
         obligation: Mapping[str, Any],
@@ -7067,51 +7209,56 @@ class ExternalCodexParentReentry:
         thread_id: str | None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         reentry_id = str(obligation["reentry_id"])
-        index = 1 if kind == "yield" else 2
         turns_root = self._reentry_dir(reentry_id) / "turns"
+        turns_root.mkdir(parents=True, exist_ok=True, mode=0o700)
         if kind == "yield":
-            turns_root.mkdir(parents=True, exist_ok=True, mode=0o700)
-            numbered_attempts = sorted(
-                (
-                    int(match.group(1)),
-                    candidate,
-                )
-                for candidate in turns_root.glob("001-yield-attempt-*")
-                if (
-                    match := re.fullmatch(
-                        r"001-yield-attempt-([0-9]{3,})", candidate.name
-                    )
-                )
+            attempt_pattern = "001-yield-attempt-*"
+            attempt_name = "001-yield-attempt-{number:03d}"
+            attempt_regex = r"001-yield-attempt-([0-9]{3,})"
+            active_code = "reentry_parent_yield_still_active"
+        else:
+            attempt_pattern = "002-reentry-attempt-*"
+            attempt_name = "002-reentry-attempt-{number:03d}"
+            attempt_regex = r"002-reentry-attempt-([0-9]{3,})"
+            active_code = "reentry_parent_turn_still_active"
+        numbered_attempts = sorted(
+            (
+                int(match.group(1)),
+                candidate,
             )
-            prior_attempts = [candidate for _, candidate in numbered_attempts]
-            for prior in prior_attempts:
-                identity_path = prior / "process-identity.json"
-                if not identity_path.is_file() or identity_path.is_symlink():
-                    continue
+            for candidate in turns_root.glob(attempt_pattern)
+            if (match := re.fullmatch(attempt_regex, candidate.name))
+        )
+        prior_attempts = [candidate for _, candidate in numbered_attempts]
+        for prior in prior_attempts:
+            identity_path = prior / "process-identity.json"
+            if identity_path.is_file() and not identity_path.is_symlink():
                 try:
                     identity = load_json(
                         identity_path,
-                        label="prior parent yield process identity",
+                        label=f"prior parent {kind} process identity",
                     )
                 except ExternalCodexRuntimeError:
-                    continue
+                    identity = {}
                 if _pid_matches(
                     identity.get("supervisor_pid"),
                     identity.get("supervisor_start_ticks"),
                 ):
                     raise ExternalCodexRuntimeError(
-                        "reentry_parent_yield_still_active",
-                        "a prior parent yield attempt is still being contained",
+                        active_code,
+                        f"a prior parent {kind} attempt is still being contained",
                     )
-            next_attempt = numbered_attempts[-1][0] + 1 if numbered_attempts else 1
-            turn_root = turns_root / f"001-yield-attempt-{next_attempt:03d}"
-        else:
-            turn_root = turns_root / f"{index:03d}-{kind}"
-            if turn_root.exists():
-                raise ExternalCodexRuntimeError(
-                    "reentry_turn_already_materialized",
-                    f"parent {kind} turn already has durable bytes",
+        if kind == "reentry" and prior_attempts:
+            latest = prior_attempts[-1]
+            if (latest / "turn-completion.json").is_file():
+                return self._load_parent_turn_result(
+                    latest,
+                    kind=kind,
+                    thread_id=thread_id,
+                    prompt=prompt,
                 )
+        next_attempt = numbered_attempts[-1][0] + 1 if numbered_attempts else 1
+        turn_root = turns_root / attempt_name.format(number=next_attempt)
         scratch = turn_root / "scratch"
         scratch.mkdir(parents=True, exist_ok=False, mode=0o700)
         prompt_path = turn_root / "prompt.txt"
@@ -7158,54 +7305,24 @@ class ExternalCodexParentReentry:
                     process.wait()
                 raise
         finished_at = iso_now()
-        raw_events = read_bounded(events_path)
-        records: list[dict[str, Any]] = []
-        for line_number, line in enumerate(raw_events.splitlines(), start=1):
-            if not line.strip():
-                continue
-            try:
-                record = json.loads(line)
-            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-                raise ExternalCodexRuntimeError(
-                    "reentry_codex_protocol_invalid",
-                    f"parent turn JSONL line {line_number} is invalid",
-                ) from exc
-            if not isinstance(record, dict):
-                raise ExternalCodexRuntimeError(
-                    "reentry_codex_protocol_invalid",
-                    f"parent turn JSONL line {line_number} is not an object",
-                )
-            records.append(record)
-        thread_ids = {
-            str(record["thread_id"])
-            for record in records
-            if record.get("type") == "thread.started"
-            and isinstance(record.get("thread_id"), str)
-        }
-        if exit_code != 0 or len(thread_ids) != 1 or not output_path.is_file():
-            raise ExternalCodexRuntimeError(
-                "reentry_parent_turn_failed",
-                f"parent {kind} turn failed before a unique structured result",
-            )
-        observed_thread = next(iter(thread_ids))
-        if thread_id is not None and observed_thread != thread_id:
-            raise ExternalCodexRuntimeError(
-                "reentry_parent_thread_drift",
-                "parent resume returned another thread identity",
-            )
-        output = load_json(output_path, label=f"parent {kind} output")
-        validate_json(output, output_schema, label=f"parent {kind} output")
-        turn = {
-            "kind": kind,
-            "started_at": started_at,
-            "finished_at": finished_at,
-            "exit_code": exit_code,
-            "thread_id": observed_thread,
-            "events_ref": _artifact_ref(events_path),
-            "output_ref": _artifact_ref(output_path),
-            "usage": self._codex_usage(records),
-        }
-        return turn, output
+        _atomic_write_json(
+            turn_root / "turn-completion.json",
+            {
+                "schema_version": "abyss_stack_external_codex_parent_turn_completion_v1",
+                "kind": kind,
+                "started_at": started_at,
+                "finished_at": finished_at,
+                "exit_code": exit_code,
+                "prompt_sha256": sha256_bytes(prompt.encode("utf-8")),
+            },
+            mode=0o400,
+        )
+        return self._load_parent_turn_result(
+            turn_root,
+            kind=kind,
+            thread_id=thread_id,
+            prompt=prompt,
+        )
 
     @staticmethod
     def _yield_prompt(
@@ -7419,7 +7536,7 @@ class ExternalCodexParentReentry:
             )
             state["status"] = "waiting"
             self._save_state(state)
-            return self.status(reentry_id)
+            return self._status_locked(reentry_id)
 
     @staticmethod
     def _status_event_kind(status: str) -> str:
@@ -7718,10 +7835,11 @@ class ExternalCodexParentReentry:
     ) -> dict[str, Any]:
         with self._lock(reentry_id):
             state = self._load_state(reentry_id)
-            if state["status"] != "waiting":
+            recovering = state["status"] == "reentering"
+            if state["status"] not in {"waiting", "reentering"}:
                 raise ExternalCodexRuntimeError(
                     "reentry_state_not_waiting",
-                    f"parent re-entry is not waiting: {state['status']}",
+                    f"parent re-entry cannot admit or recover a wake: {state['status']}",
                 )
             obligation = _load_verified_json_ref(
                 state["obligation_ref"],
@@ -7749,19 +7867,32 @@ class ExternalCodexParentReentry:
                 wake, observed_event = self._verify_child_wake_event(
                     child_result, binding
                 )
-                self._append_event(
-                    reentry_id,
-                    event_type="external_parent.child_event_admitted",
-                    payload={
-                        "child_result_digest": child_ref["artifact_digest"],
-                        "child_result_ref": child_ref,
-                        "observed_event_digest": canonical_digest(observed_event),
-                        "wake_evaluation": wake,
-                    },
-                    significance=("parent_wake" if wake["wake_parent"] else "filtered"),
-                )
-            state["child_result_ref"] = child_ref
-            state["wake_evaluation"] = wake
+                if not recovering:
+                    self._append_event(
+                        reentry_id,
+                        event_type="external_parent.child_event_admitted",
+                        payload={
+                            "child_result_digest": child_ref["artifact_digest"],
+                            "child_result_ref": child_ref,
+                            "observed_event_digest": canonical_digest(observed_event),
+                            "wake_evaluation": wake,
+                        },
+                        significance=(
+                            "parent_wake" if wake["wake_parent"] else "filtered"
+                        ),
+                    )
+            if recovering:
+                if (
+                    state.get("child_result_ref") != child_ref
+                    or state.get("wake_evaluation") != wake
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "reentry_recovery_input_drift",
+                        "re-entry recovery input differs from the admitted child event",
+                    )
+            else:
+                state["child_result_ref"] = child_ref
+                state["wake_evaluation"] = wake
             expected = state["expected_wake"]
             exact_expected_wake = (
                 wake["condition_id"] == expected["condition_id"]
@@ -7770,6 +7901,11 @@ class ExternalCodexParentReentry:
                 and wake["wake_parent"] is True
             )
             if not exact_expected_wake:
+                if recovering:
+                    raise ExternalCodexRuntimeError(
+                        "reentry_recovery_input_drift",
+                        "re-entering state no longer has its exact admitted wake",
+                    )
                 state["status"] = "filtered"
                 self._append_event(
                     reentry_id,
@@ -7778,24 +7914,35 @@ class ExternalCodexParentReentry:
                     significance="terminal",
                 )
                 self._save_state(state)
-                return self.status(reentry_id)
+                return self._status_locked(reentry_id)
 
             distilled = self._distilled_child_return(
                 child_result, child_ref, observed_event
             )
             distilled_path = self._reentry_dir(reentry_id) / "distilled-child-return.json"
-            _atomic_write_json(distilled_path, distilled, mode=0o400)
-            state["status"] = "reentering"
-            self._append_event(
-                reentry_id,
-                event_type="external_parent.reentry_started",
-                payload={
-                    "parent_thread_id": state["parent_thread_id"],
-                    "distilled_return_ref": _artifact_ref(distilled_path),
-                },
-                significance="reentry",
-            )
-            self._save_state(state)
+            if recovering:
+                recovered_distilled = load_json(
+                    distilled_path,
+                    label="durable distilled child return",
+                )
+                if recovered_distilled != distilled or distilled_path.is_symlink():
+                    raise ExternalCodexRuntimeError(
+                        "reentry_recovery_input_drift",
+                        "durable distilled return differs from the admitted child event",
+                    )
+            else:
+                _atomic_write_json(distilled_path, distilled, mode=0o400)
+                state["status"] = "reentering"
+                self._append_event(
+                    reentry_id,
+                    event_type="external_parent.reentry_started",
+                    payload={
+                        "parent_thread_id": state["parent_thread_id"],
+                        "distilled_return_ref": _artifact_ref(distilled_path),
+                    },
+                    significance="reentry",
+                )
+                self._save_state(state)
             try:
                 turn, output = self._run_parent_turn(
                     obligation,
@@ -7806,6 +7953,11 @@ class ExternalCodexParentReentry:
                 )
                 self._validate_reentry_output(output, state, distilled)
             except Exception as exc:
+                if (
+                    isinstance(exc, ExternalCodexRuntimeError)
+                    and exc.code == "reentry_parent_turn_still_active"
+                ):
+                    raise
                 state["status"] = "failed"
                 self._append_event(
                     reentry_id,
@@ -7831,14 +7983,18 @@ class ExternalCodexParentReentry:
                 significance="authority",
             )
             self._save_state(state)
-            return self.status(reentry_id)
+            return self._status_locked(reentry_id)
 
-    def status(self, reentry_id: str) -> dict[str, Any]:
-        state = self._load_state(reentry_id)
+    def _status_locked(self, reentry_id: str) -> dict[str, Any]:
+        current = self._load_state(reentry_id)
         return {
-            "state": state,
+            "state": current,
             "state_ref": _artifact_ref(self._state_path(reentry_id)),
         }
+
+    def status(self, reentry_id: str) -> dict[str, Any]:
+        with self._lock(reentry_id):
+            return self._status_locked(reentry_id)
 
 
 def build_parser() -> argparse.ArgumentParser:

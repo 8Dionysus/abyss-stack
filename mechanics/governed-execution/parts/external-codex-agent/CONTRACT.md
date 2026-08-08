@@ -49,6 +49,8 @@ owner checkout dirty, with the classified path set counted and digested in the
 receipt. Such bytes require the matching explicit dirty-source admission and
 must never be represented as a clean production source posture.
 `install_external_codex_runtime.py status`
+requires the release tree to contain exactly the manifest files and their
+necessary parent directories, rejects every symlink or extra entry, and
 re-hashes the release and wrappers before availability may be claimed.
 Activation rollback changes only the active receipt while retaining immutable
 releases. An install, status, or activation target is admitted only as an exact
@@ -260,7 +262,9 @@ with its own `.git` administrative marker likewise fails as
 `workspace_embedded_repository_unsupported`; a digestless directory entry may
 not conceal a separately governed repository. Same-status byte changes, ignored and untracked bytes,
 path kind, symlink target, size, binary diff, and HEAD drift therefore remain
-observable. The receipt recorded for each exact validation command carries the
+observable. Every workspace symlink must resolve to an existing target inside
+the exact checkout; an absent or outward target fails admission as
+`workspace_symlink_target_unsupported`. The receipt recorded for each exact validation command carries the
 workspace-manifest digest observed at command completion; report admission
 requires the final manifest to retain that digest. An untracked or ignored secret-shaped path blocks admission before
 its content is hashed. Read-only manifest drift, HEAD drift, an out-of-scope
@@ -274,6 +278,10 @@ configuration command families. Non-owner-fixed interpreter or script bodies,
 and authority-block the terminal result; exact fixed validation argv are
 separately admitted by their owner identity. The sandbox remains the primary effect
 boundary, and command observation is retained as auditable counterevidence.
+Shell control punctuation is tokenized even when attached to an argument, and
+`item.started` command evidence is durable before completion; a controller or
+worker loss therefore cannot erase an effect that began without emitting
+`item.completed`.
 
 Any model evidence reference beginning with `source:` is semantic, not opaque
 prose. It must resolve to a regular non-symlink file inside the exact workspace
@@ -451,12 +459,22 @@ The re-entry event stream and state digest form a recoverable pair. If the
 controller stops after fsync of a complete event but before the state rewrite,
 the next load may advance `events_ref` only when the current JSONL bytes are a
 strict extension of the previously recorded digest and every event remains a
-contiguous record for the same re-entry identity. Rewrites, truncation,
+contiguous record for the same re-entry identity. Public status reads acquire
+the same re-entry lock as state transitions, so recovery cannot overwrite a
+newer concurrent state. Rewrites, truncation,
 partial records, and foreign identities remain fail-closed drift.
 Recognized appended events also replay their semantic state delta: the complete
 yield turn and registered wait, admitted child receipt and wake evaluation,
 filtered or failed status, or the exact completed parent turn and result reference. Event recovery therefore
 cannot leave a successful re-entry stranded as `reentering`.
+
+The admitted child event, wake evaluation, and distilled return are saved
+before the state becomes `reentering`. A replacement controller may resume
+that exact state with the same canonical child receipt. Re-entry turns use
+numbered, process-contained attempt directories: a live prior supervisor
+blocks overlap, an incomplete dead attempt is preserved before retry, and a
+digest-bound completed-turn receipt is reloaded without a second inference.
+The child admission and `reentry_started` events are never appended twice.
 
 When and only when the admitted event selects `wake_parent`, the controller
 builds a compact return bound to the child-result and observed-event digests,
@@ -464,7 +482,8 @@ then invokes `codex exec resume <exact-parent-thread-id>`. The resumed Sol must
 return a typed parent-reentry report whose identities and authority action
 match that return. A successful cycle therefore has two completed turns on one
 parent thread with an inference-free durable wait between them. Re-entry
-failure is terminal evidence and is never automatically retried.
+validation failure is terminal evidence; only a contained controller/process
+interruption without a terminal re-entry verdict is recoverable or retryable.
 
 This use of the current Codex exact-thread resume surface proves the product
 transport needed by L2; it does not make Codex the owner of wait significance,

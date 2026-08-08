@@ -176,6 +176,36 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
     assert repeated["active"]["release_id"] == active["release_id"]
 
 
+def test_release_verification_rejects_unmanifested_importable_file(
+    tmp_path: Path,
+) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    runtime_root = tmp_path / "runtime"
+    bin_dir = tmp_path / "bin"
+    receipt = runtime_install.install(
+        source,
+        sdk,
+        agents,
+        skills,
+        runtime_root,
+        bin_dir,
+        Path(sys.executable),
+        allow_dirty_source=False,
+        allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
+    )
+    release_root = Path(receipt["active"]["release_root"])
+    injected = release_root / "sdk/src/jsonschema.py"
+    injected.parent.chmod(0o755)
+    injected.write_text("raise RuntimeError('unmanifested import')\n", encoding="utf-8")
+
+    with pytest.raises(runtime_install.InstallError, match="manifest closure"):
+        runtime_install.verify_release(release_root)
+    with pytest.raises(runtime_install.InstallError, match="manifest closure"):
+        runtime_install.status(runtime_root, bin_dir)
+
+
 def test_dirty_source_requires_explicit_admission_and_preserves_rollback(tmp_path: Path) -> None:
     source, sdk, agents, skills = make_sources(tmp_path)
     runtime_root = tmp_path / "runtime"

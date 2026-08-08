@@ -364,6 +364,14 @@ if "FAKE_OPAQUE_INDIRECT_COMMAND" in task["objective"]:
         "status": "completed",
         "exit_code": 0,
     }})
+if "FAKE_STARTED_FORBIDDEN_COMMAND" in task["objective"]:
+    emit({"type": "item.started", "item": {
+        "id": "fixture-command-started-before-interruption",
+        "type": "command_execution",
+        "command": "/usr/bin/git push; /usr/bin/true",
+        "status": "in_progress",
+    }})
+    time.sleep(60)
 for validation in task["validation_commands"]:
     validation_argv = validation["argv"]
     if "FAKE_UNBOUND_VALIDATION_CWD" not in task["objective"]:
@@ -2988,6 +2996,39 @@ def test_indirect_interpreter_effect_is_unclassified_but_fixed_validation_is_adm
     ) is False
 
 
+def test_attached_shell_separator_does_not_hide_forbidden_effect() -> None:
+    command = "/usr/bin/bash -lc '/usr/bin/git push; /usr/bin/true'"
+    assert "push" in RUNTIME._command_effects(command)
+
+
+def test_started_command_survives_interruption_and_blocks_authority(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, objective_marker="FAKE_STARTED_FORBIDDEN_COMMAND")
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        with runtime._lock(fixture["session_id"]):
+            state = runtime._load_state(fixture["session_id"])
+        if state["executed_commands"]:
+            break
+        time.sleep(0.05)
+    else:
+        pytest.fail("started command was not durably observed")
+
+    terminal = runtime.interrupt(fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "authority_blocked"
+    assert result is not None
+    assert result["status"] == "authority_blocked"
+    assert result["executed_commands"][0]["event_phase"] == "started"
+    assert "push" in runtime._failure_authority_effects(
+        result["executed_commands"]
+    )
+
+
 def test_opaque_indirect_command_authority_blocks_terminal_result(tmp_path: Path) -> None:
     fixture = _fixture(tmp_path, objective_marker="FAKE_OPAQUE_INDIRECT_COMMAND")
     runtime = fixture["runtime"]
@@ -3120,6 +3161,26 @@ def test_workspace_manifest_rejects_tracked_submodule_worktree(
         RUNTIME.build_workspace_manifest(workspace)
 
     assert exc_info.value.code == "workspace_submodule_unsupported"
+
+
+def test_workspace_manifest_rejects_symlink_target_outside_checkout(
+    tmp_path: Path,
+) -> None:
+    outside = tmp_path / "host-secret.txt"
+    outside.write_text("must remain outside actor reach\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "reference.txt").symlink_to(outside)
+    _git(workspace, "add", "reference.txt")
+    _git(workspace, "commit", "-m", "fixture")
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.build_workspace_manifest(workspace)
+
+    assert exc_info.value.code == "workspace_symlink_target_unsupported"
 
 
 @pytest.mark.parametrize("ignored", (False, True))
@@ -4290,6 +4351,109 @@ def test_parent_yield_recovers_completed_turn_event_without_second_inference(
     assert len(attempts) == 1
 
 
+def test_parent_reentry_resumes_after_crash_before_turn_materialization(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_ambiguity_stop",
+        identity_suffix="luna-xhigh-reentry-pre-turn-crash",
+    )
+    reentry_id = "reentry:fixture:luna-xhigh-reentry-pre-turn-crash"
+    obligation_path = _parent_reentry_obligation(
+        tmp_path, fixture, reentry_id=reentry_id
+    )
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge.yield_parent(obligation_path)
+    assert fixture["runtime"].run_to_terminal(fixture["launch_path"])["status"] == (
+        "authority_blocked"
+    )
+    child_result_path = (
+        fixture["runtime"]._session_dir(fixture["session_id"]) / "result.json"
+    )
+    original_run_parent_turn = bridge._run_parent_turn
+
+    def crash_before_reentry_turn(*args: Any, **kwargs: Any) -> Any:
+        if kwargs.get("kind") == "reentry":
+            raise KeyboardInterrupt("fixture controller crash")
+        return original_run_parent_turn(*args, **kwargs)
+
+    monkeypatch.setattr(bridge, "_run_parent_turn", crash_before_reentry_turn)
+    with pytest.raises(KeyboardInterrupt, match="fixture controller crash"):
+        bridge.reenter_parent(reentry_id, child_result_path)
+    assert bridge.status(reentry_id)["state"]["status"] == "reentering"
+
+    monkeypatch.setattr(bridge, "_run_parent_turn", original_run_parent_turn)
+    recovered = bridge.reenter_parent(reentry_id, child_result_path)["state"]
+    events = [
+        json.loads(line)
+        for line in bridge._events_path(reentry_id).read_text(encoding="utf-8").splitlines()
+    ]
+
+    assert recovered["status"] == "reentered"
+    assert [item["event_type"] for item in events].count(
+        "external_parent.child_event_admitted"
+    ) == 1
+    assert [item["event_type"] for item in events].count(
+        "external_parent.reentry_started"
+    ) == 1
+
+
+def test_parent_reentry_recovers_completed_turn_artifacts_without_second_inference(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_ambiguity_stop",
+        identity_suffix="luna-xhigh-reentry-turn-recovery",
+    )
+    reentry_id = "reentry:fixture:luna-xhigh-reentry-turn-recovery"
+    obligation_path = _parent_reentry_obligation(
+        tmp_path, fixture, reentry_id=reentry_id
+    )
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge.yield_parent(obligation_path)
+    assert fixture["runtime"].run_to_terminal(fixture["launch_path"])["status"] == (
+        "authority_blocked"
+    )
+    child_result_path = (
+        fixture["runtime"]._session_dir(fixture["session_id"]) / "result.json"
+    )
+    original_run_parent_turn = bridge._run_parent_turn
+
+    def crash_after_reentry_turn(*args: Any, **kwargs: Any) -> Any:
+        result = original_run_parent_turn(*args, **kwargs)
+        if kwargs.get("kind") == "reentry":
+            raise KeyboardInterrupt("fixture post-turn controller crash")
+        return result
+
+    monkeypatch.setattr(bridge, "_run_parent_turn", crash_after_reentry_turn)
+    with pytest.raises(KeyboardInterrupt, match="post-turn"):
+        bridge.reenter_parent(reentry_id, child_result_path)
+    attempts = list(
+        (bridge._reentry_dir(reentry_id) / "turns").glob(
+            "002-reentry-attempt-*"
+        )
+    )
+    assert len(attempts) == 1
+
+    monkeypatch.setattr(bridge, "_run_parent_turn", original_run_parent_turn)
+    recovered = bridge.reenter_parent(reentry_id, child_result_path)["state"]
+
+    assert recovered["status"] == "reentered"
+    assert len(
+        list(
+            (bridge._reentry_dir(reentry_id) / "turns").glob(
+                "002-reentry-attempt-*"
+            )
+        )
+    ) == 1
+
+
 def test_parent_admits_child_event_while_canonical_child_lock_is_held(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -4409,6 +4573,37 @@ def test_parent_reentry_recovers_valid_event_appended_before_state_save(
     assert recovered["events_ref"]["artifact_digest"] == RUNTIME.sha256_file(
         bridge._events_path(reentry_id)
     )
+
+
+def test_parent_reentry_status_uses_transition_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        identity_suffix="luna-xhigh-status-lock",
+    )
+    reentry_id = "reentry:fixture:luna-xhigh-status-lock"
+    obligation_path = _parent_reentry_obligation(
+        tmp_path, fixture, reentry_id=reentry_id
+    )
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge.yield_parent(obligation_path)
+    original_lock = bridge._lock
+    lock_entries = 0
+
+    @RUNTIME.contextmanager
+    def observed_lock(value: str) -> Any:
+        nonlocal lock_entries
+        lock_entries += 1
+        with original_lock(value):
+            yield
+
+    monkeypatch.setattr(bridge, "_lock", observed_lock)
+    observed = bridge.status(reentry_id)
+
+    assert observed["state"]["status"] == "waiting"
+    assert lock_entries == 1
 
 
 def test_parent_reentry_recovers_completed_semantic_state_after_event_append(

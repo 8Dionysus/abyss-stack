@@ -41,7 +41,7 @@ a ready task-local DAG and exact domain procedure refs, a distinct OS process,
 structured events and output, no built-in multi-agent flag, byte-aware
 read-only drift containment including every tracked byte,
 assume-unchanged/skip-worktree mutations, and ignored bytes,
-tracked-submodule and untracked-embedded-repository refusal, a foreground `run-to-terminal` lifecycle for transient cgroup launchers without execution
+tracked-submodule, untracked-embedded-repository, and outward-symlink refusal, a foreground `run-to-terminal` lifecycle for transient cgroup launchers without execution
 ceilings, secret-shaped ignored
 input refusal, exclusive same-workspace active-attempt admission across distinct
 session identities, wrapped effect-family observation, exact validation-claim
@@ -52,7 +52,9 @@ cleanup including a detached `setsid` descendant, high token/turn usage
 measurement without truncation, durable interrupt/resume on one thread,
 strict recovery of a complete main-session event append before state save,
 semantic replay of a lost thread, usage, turn, and indirect command state save,
-authority-blocked worker-death closeout after that recovered command, retry of
+authority-blocked interruption after a forbidden command was durably observed
+at `item.started`, attached shell-separator effect recognition,
+authority-blocked worker-death closeout after a recovered command, retry of
 a durable attempt-free `prepared` session after launch failure, and an exact
 pre-fork child launch gate,
 incremental recovery and observation of cumulative event history without an
@@ -91,13 +93,16 @@ by durable waiting, canonical child state/result/event receipt binding, rejectio
 of a standalone result, child-session locking through the durable parent event
 admission, recovery of a valid event append that preceded its
 state save, recovery of the completed semantic turn when its event preceded
-the state save, false-event filtering with no second parent turn, and exact-thread parent re-entry with a distilled
+the state save, locked status observation, re-entry recovery after a crash
+before turn materialization, completed-turn recovery without a second
+inference, false-event filtering with no second parent turn, and exact-thread parent re-entry with a distilled
 return. The fake Codex fixture exercises both filtered and wake branches;
 separate live receipts are required for the installed product surface. The
 installer suite additionally proves that index-hidden packaged source and
 ignored files entering the packaged SDK require explicit dirty-source
 admission, and that activation plus status reject an executable which cannot
-pass the isolated compatible-CPython probe.
+pass the isolated compatible-CPython probe. It also rejects an unmanifested
+importable file from an otherwise content-addressed release.
 
 It also proves role-scoped MCP argv isolation: the selected AoA server alone is
 configured, its exact token is required but never exposed in argv or the model

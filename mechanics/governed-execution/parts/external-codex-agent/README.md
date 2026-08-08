@@ -53,7 +53,8 @@ The controller:
   skip-worktree index flags, rejects tracked submodule worktrees until a
   recursive nested-byte contract exists, and rejects untracked or ignored
   embedded Git repositories rather than representing them as digestless
-  directories; drains a
+  directories; rejects any workspace symlink whose target is absent or outside
+  the exact checkout; drains a
   terminal process stream before finalization, counts tokens/turns/time/output
   without imposing execution budgets, includes ignored workspace bytes without
   reading secret-shaped ignored inputs, holds an inode-scoped exclusive lock
@@ -77,7 +78,9 @@ The controller:
   or report-contract drift into typed failure or authority-blocked evidence;
   non-owner-fixed interpreter, script, `find -exec`, `eval`, and `xargs`
   commands whose indirect effects cannot be classified are retained as
-  counterevidence and authority-block the result, while exact task validation
+  counterevidence and authority-block the result, shell separators remain
+  visible even when attached to arguments, and commands are durably observed
+  from `item.started` rather than only after completion, while exact task validation
   argv remain admitted by their owner-supplied identity;
 - constrains every `immutable:` evidence reference in the session-local output
   schema to the exact materialized input identities, so a plausible alias is
@@ -116,7 +119,9 @@ The controller:
   the parent admission event, and a crash after a valid re-entry event append
   is recovered only as a strict extension of the previously digested stream,
   with recognized terminal events replaying their filtered, failed, or
-  completed semantic state;
+  completed semantic state; a pre-turn `reentering` crash resumes the same
+  admitted child obligation, dead partial attempts are preserved before retry,
+  and a completed digest-bound turn is recovered without a second inference;
   `reentry-status` observes the durable wait without inference.
 
 Token counters contain only usage actually emitted by Codex. A controlled
@@ -177,7 +182,8 @@ Each wrapper launches Python in isolated mode through a release-local
 entrypoint that inserts only the packaged SDK source before entering the
 runtime. The packaged SDK subtree is also a valid `--aoa-sdk-root` for study
 preparation because it carries the exact non-Python contracts consumed there.
-`status` re-hashes every released file and verifies all three wrappers.
+`status` rejects extra files, directories, symlinks, or missing entries,
+re-hashes every released file, and verifies all three wrappers.
 `activate --release-id ...` provides release rollback without deleting later
 releases; release IDs must be exact SHA-256 identifiers whose resolved
 directory and manifest identity remain inside the release root. Installation
