@@ -151,24 +151,42 @@ def deployment_binding() -> CanaryDeploymentBinding:
 
 def write_deployment_manifest(tmp_path: Path) -> Path:
     binding = deployment_binding()
-    return write_json(
-        tmp_path / "deployment.json",
-        {
-            "manifest_id": binding.manifest_id,
-            "parity_state": "exact",
-            "deployed_at": binding.deployed_at.isoformat(),
-            "services": [
-                {
-                    "service_id": binding.service_id,
-                    "package_source_revision": binding.package_source_revision,
-                    "package_digest": binding.package_digest,
-                    "deployed_tree": {
-                        "tree_digest": binding.deployed_tree_digest,
-                    },
-                }
-            ],
-        },
+    body = {
+        "schema_version": "abyss_stack_mcp_deployment_manifest_v1",
+        "digest_scope": "abyss_stack_mcp_deployment_body_v1",
+        "provider": "abyss-stack",
+        "contains_secrets": False,
+        "parity_state": "exact",
+        "deployed_at": binding.deployed_at.isoformat(),
+        "source": {"revision": binding.package_source_revision},
+        "services": [
+            {
+                "service_id": binding.service_id,
+                "package_source_revision": binding.package_source_revision,
+                "package_digest": binding.package_digest,
+                "deployed_tree": {
+                    "tree_digest": binding.deployed_tree_digest,
+                },
+            }
+        ],
+    }
+    manifest_id = canonical_digest(body)
+    relative_record = (
+        "Logs/mcp/deployments/records/" + manifest_id.removeprefix("sha256:") + ".json"
     )
+    manifest = {
+        **body,
+        "manifest_id": manifest_id,
+        "record_ref": relative_record,
+        "latest_ref": "Logs/mcp/deployments/latest.json",
+    }
+    deployment_root = tmp_path / "Logs/mcp/deployments"
+    latest = write_json(deployment_root / "latest.json", manifest)
+    write_json(
+        deployment_root / "records" / Path(relative_record).name,
+        manifest,
+    )
+    return latest
 
 
 def grounded_result() -> dict:
@@ -522,6 +540,18 @@ def test_run_canary_reads_one_owner_credential_and_writes_private_outputs(
     result_artifact = json.loads(result_path.read_text(encoding="utf-8"))
     assert result_artifact["result_digest"] == receipt.result_digest
     assert result_artifact["owner_payload"] == grounded_result()
+
+
+def test_run_canary_rejects_tampered_claimed_deployment_manifest(
+    tmp_path: Path,
+) -> None:
+    manifest_path = write_deployment_manifest(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["services"][0]["package_digest"] = "sha256:" + "8" * 64
+    write_json(manifest_path, manifest)
+
+    with pytest.raises(CanaryRunnerError, match="content-address validation"):
+        canary._read_deployment_binding(manifest_path, target())
 
 
 def test_listener_wait_absorbs_only_bounded_startup_refusals(

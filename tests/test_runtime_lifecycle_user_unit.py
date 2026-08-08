@@ -1037,8 +1037,12 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             systemctl.write_text(
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
-                "printf '%s\\n' "
-                '"${ABYSS_STACK_MCP_TEST_ACTIVE_STATE:-inactive}"\n',
+                'unit="${*: -1}"\n'
+                'if [[ "$unit" == "${ABYSS_STACK_MCP_TEST_ACTIVE_UNIT:-}" ]]; then\n'
+                "  printf '%s\\n' active\n"
+                "else\n"
+                "  printf '%s\\n' \"${ABYSS_STACK_MCP_TEST_ACTIVE_STATE:-inactive}\"\n"
+                "fi\n",
                 encoding="utf-8",
             )
             systemctl.chmod(0o755)
@@ -1122,13 +1126,22 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             blocked = subprocess.run(
                 ["bash", str(INSTALL_SYSTEMD), "--rotate-abyss-stack-mcp-auth"],
                 cwd=REPO_ROOT,
-                env={**env, "ABYSS_STACK_MCP_TEST_ACTIVE_STATE": "active"},
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_ACTIVE_UNIT": (
+                        "abyss-stack-mcp-read-bootstrap.service"
+                    ),
+                },
                 check=False,
                 capture_output=True,
                 text=True,
             )
             self.assertNotEqual(blocked.returncode, 0)
-            self.assertIn("refusing credential rotation while", blocked.stderr)
+            self.assertIn(
+                "refusing credential rotation while "
+                "abyss-stack-mcp-read-bootstrap.service is active",
+                blocked.stderr,
+            )
             for name, token in after.items():
                 self.assertEqual(
                     secret_dir.joinpath(name)
@@ -1263,6 +1276,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             unit_target_dir.mkdir(parents=True)
             for source_unit in (
                 STACK_MCP_READ_UNIT,
+                STACK_MCP_READ_BOOTSTRAP_UNIT,
                 STACK_MCP_CANDIDATE_UNIT,
                 STACK_MCP_INTERNAL_EFFECT_UNIT,
             ):
@@ -1291,6 +1305,8 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 'contour="${contour%.service}"\n'
                 'if [[ "$contour" == "internal-effect" ]]; then '
                 "contour=internal_effect; fi\n"
+                'if [[ "$contour" == "read-bootstrap" ]]; then '
+                "contour=read; fi\n"
                 "exec_path=/usr/bin/flock\n"
                 'exec_start="/usr/bin/flock --shared --no-fork '
                 "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/"
@@ -1862,6 +1878,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
 
             for active_unit in (
                 "abyss-stack-mcp-read.service",
+                "abyss-stack-mcp-read-bootstrap.service",
                 "abyss-stack-mcp-candidate.service",
                 "abyss-stack-mcp-internal-effect.service",
             ):

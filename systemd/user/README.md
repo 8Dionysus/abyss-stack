@@ -189,7 +189,8 @@ Startup validates the complete bounded hash chain before bind.
 The same provision action creates the private
 `${AOA_STACK_ROOT}/Logs/mcp/observations` directory. It does not create a live
 claim. Start `abyss-stack-mcp-observation.service` once to atomically produce
-`current.json`; all three stack MCP units refuse to start without it.
+`current.json`; all stack MCP contour and bootstrap units refuse to start
+without it.
 Enable `abyss-stack-mcp-observation.timer` only as a separate reviewed rollout
 step. Its process has no bearer credential, no network address family, and no
 writable path outside that observation directory.

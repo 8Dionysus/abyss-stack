@@ -180,7 +180,7 @@ systemctl --user stop aoa-organ-mcp-read-bootstrap@aoa-kag.service
 # Build and review owner registry admission and managed-contours.json, then use
 # only the normal preflight-gated unit:
 systemctl --user start aoa-organ-mcp-read@aoa-kag.service
-# Later standalone rotation, only with both stack MCP planes stopped:
+# Later standalone rotation, only with every stack MCP plane and bootstrap stopped:
 scripts/aoa-install-systemd --rotate-abyss-stack-mcp-auth
 scripts/aoa-install-systemd --install-mcp-http-codex-client
 ```
@@ -515,8 +515,9 @@ credentials under `${AOA_STACK_ROOT}/Secrets/Configs`, keeps each file at mode
 `0600`, is idempotent, and never prints or replaces a valid existing value.
 It also compares the resulting values and fails closed if read and candidate
 would share one bearer.
-Use `--rotate-abyss-stack-mcp-auth` later as a standalone operation with both
-managed planes stopped. It rotates the pair and binding manifest together,
+Use `--rotate-abyss-stack-mcp-auth` later as a standalone operation with every
+managed plane and the read bootstrap stopped. It rotates all three credentials
+and the binding manifest together,
 does not print values or restart units, and requires consumer refresh before
 the next sequential canary.
 This action grants no runtime-effect authority: the candidate process only

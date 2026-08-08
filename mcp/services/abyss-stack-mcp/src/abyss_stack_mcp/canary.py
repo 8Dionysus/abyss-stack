@@ -40,10 +40,12 @@ from .contracts import (
 from .core import _reject_secret_material, canonical_json_bytes
 from .observation import (
     DEFAULT_TARGETS_PATH,
+    ObservationProducerError,
     RuntimeCanaryContract,
     RuntimeEvidenceOverlay,
     RuntimeEvidenceOverlaySubject,
     RuntimeTarget,
+    _load_deployment,
     _load_targets,
 )
 
@@ -567,17 +569,12 @@ def _read_deployment_binding(
     path: Path,
     target: RuntimeTarget,
 ) -> CanaryDeploymentBinding:
-    path = _require_no_symlink_components(path, "canary deployment manifest")
-    if not path.is_file() or path.stat().st_size > MAX_SCHEMA_BYTES:
-        raise CanaryRunnerError(
-            "canary deployment manifest must be a bounded regular non-symlink file"
-        )
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise CanaryRunnerError("canary deployment manifest is invalid") from exc
-    if not isinstance(payload, dict) or payload.get("parity_state") != "exact":
-        raise CanaryRunnerError("canary deployment manifest is not exact")
+        payload, _ = _load_deployment(path)
+    except ObservationProducerError as exc:
+        raise CanaryRunnerError(
+            "canary deployment manifest failed content-address validation"
+        ) from exc
     matches = [
         item
         for item in payload.get("services", [])
