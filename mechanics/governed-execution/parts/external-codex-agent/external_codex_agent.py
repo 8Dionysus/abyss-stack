@@ -945,10 +945,16 @@ def _wait_for_process_identity_receipt(
         or current[3] != supervisor_pid
         or current[4] != codex_start_ticks
     ):
-        raise ExternalCodexRuntimeError(
-            "codex_process_identity_invalid",
-            "live Codex identity differs from the supervisor receipt",
-        )
+        # A short-lived Codex may already have been reaped and its PID reused,
+        # or its terminal zombie may have been reparented, by the time the
+        # durable receipt becomes visible.  That is a valid terminal handoff
+        # only after the exact supervisor has itself completed.  A mismatched
+        # identity while that supervisor is still live remains fail-closed.
+        if process.poll() is None:
+            raise ExternalCodexRuntimeError(
+                "codex_process_identity_invalid",
+                "live Codex identity differs from the supervisor receipt",
+            )
     return receipt, _artifact_ref(path)
 
 

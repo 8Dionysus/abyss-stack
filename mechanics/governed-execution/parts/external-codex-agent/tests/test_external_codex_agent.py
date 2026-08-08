@@ -1691,6 +1691,80 @@ def test_process_identity_receipt_retries_partial_kernel_writes(
     }
 
 
+@pytest.mark.parametrize("supervisor_return_code", (0, 17))
+def test_completed_supervisor_preserves_terminal_child_identity_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    supervisor_return_code: int,
+) -> None:
+    class FakeProcess:
+        pid = 31337
+
+        def poll(self) -> int:
+            return supervisor_return_code
+
+    receipt_path = tmp_path / "process-identity.json"
+    receipt = {
+        "schema_version": "abyss_stack_external_codex_process_identity_v1",
+        "supervisor_pid": 31337,
+        "supervisor_start_ticks": 111,
+        "codex_pid": 4242,
+        "codex_start_ticks": 222,
+    }
+    _write_json(receipt_path, receipt)
+    monkeypatch.setattr(
+        RUNTIME,
+        "_process_parent_identity",
+        lambda _pid: ("S", 1, 9000, 9000, 333),
+    )
+
+    observed, artifact_ref = RUNTIME._wait_for_process_identity_receipt(
+        receipt_path,
+        process=FakeProcess(),
+        supervisor_start_ticks=111,
+    )
+
+    assert observed == receipt
+    assert artifact_ref["artifact_digest"] == _digest_path(receipt_path)
+
+
+def test_live_supervisor_rejects_mismatched_child_identity_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeProcess:
+        pid = 31337
+
+        def poll(self) -> None:
+            return None
+
+    receipt_path = tmp_path / "process-identity.json"
+    _write_json(
+        receipt_path,
+        {
+            "schema_version": "abyss_stack_external_codex_process_identity_v1",
+            "supervisor_pid": 31337,
+            "supervisor_start_ticks": 111,
+            "codex_pid": 4242,
+            "codex_start_ticks": 222,
+        },
+    )
+    monkeypatch.setattr(
+        RUNTIME,
+        "_process_parent_identity",
+        lambda _pid: ("S", 1, 9000, 9000, 333),
+    )
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME._wait_for_process_identity_receipt(
+            receipt_path,
+            process=FakeProcess(),
+            supervisor_start_ticks=111,
+        )
+
+    assert exc_info.value.code == "codex_process_identity_invalid"
+
+
 def test_preflight_and_separate_process_return_structured_result(tmp_path: Path) -> None:
     fixture = _fixture(tmp_path)
     runtime = fixture["runtime"]
