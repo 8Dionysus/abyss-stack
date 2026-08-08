@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 28358328,
+  "allowed_tracked_bytes": 32254140,
+  "approved_by": "repository-owner",
+  "base_ref": "63ab4efd013e02fe59cd5949d202a0b470d14cb1",
+  "changed_generated_bytes": 28358328,
+  "changed_generated_files": 520,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "16e96a82cf7ac4b763102b9c245bfb1741da6c228186178ffbd3125721fe1e07",
+  "reason": "Regenerate the exact combined external-actor and landed reranker source surface after merging current main with the CI-pinned aoa-kag generator; count projection growth without constraining actor work.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 32254140,
+  "tracked_bytes_max": 24117248
+}

@@ -121,9 +121,16 @@ This file maps the first migrated runtime modules to their intended services.
   (`AOA_RERANK_IDLE_UNLOAD_SEC=900`) so occasional reranking does not keep a
   multi-GB OpenVINO model resident forever; `POST /admin/unload` is available
   for explicit localhost memory relief
+- exposes `POST /admin/memory-relief` for automated owner-gated relief; the
+  endpoint atomically refuses inflight work, drains new requests before a
+  process exit, commits the action receipt before releasing the model, and
+  deduplicates an exact action ID across container restarts
 - exits after idle unload by default (`AOA_RERANK_EXIT_AFTER_IDLE_UNLOAD=true`)
   so Podman restarts a clean lightweight API process and returns allocator-held
   memory to the host
+- separately exits after successful owner relief by default
+  (`AOA_RERANK_EXIT_AFTER_MEMORY_RELIEF=true`) and keeps at most 32 atomic
+  action receipts under owner state in `Logs/rerank-api`
 - uses `/srv/abyss-machine/cache/ai` for the model and OpenVINO cache by
   default, not the limited system root
 

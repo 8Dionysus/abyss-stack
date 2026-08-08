@@ -111,6 +111,10 @@ Because the Python/OpenVINO allocator may retain freed pages inside the process,
 idle unload exits the rerank process by default
 (`AOA_RERANK_EXIT_AFTER_IDLE_UNLOAD=true`) and relies on the container restart
 policy to bring back a clean lightweight API.
+Owner-triggered relief uses the separate
+`AOA_RERANK_EXIT_AFTER_MEMORY_RELIEF` switch, drains new requests before the
+restart, and preserves a bounded action receipt under `Logs/rerank-api` so a
+retry cannot repeat or reinterpret the same action ID.
 
 The `rag` profile is the first promoted orchestration layer for RAG and
 Agentic-RAG preparation. It adds only `rag-api` on top of the existing storage,
