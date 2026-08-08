@@ -56,6 +56,7 @@ jobs:
           ABYSS_MACHINE_REPO_ROOT: ${{ runner.temp }}/abyss-machine-verifier
           AOA_SDK_SOURCE_ROOT: ${{ runner.temp }}/aoa-sdk-source
           AOA_STATS_ROOT: ${{ runner.temp }}/aoa-stats-validator
+          PYTHONPATH: ${{ runner.temp }}/aoa-sdk-source/src
         run: python scripts/ci_gate.py --mode release
 
       - name: Shellcheck scripts
