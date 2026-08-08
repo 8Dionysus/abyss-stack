@@ -57,6 +57,12 @@
           "title": "Full Refresh Cost",
           "type": "integer"
         },
+        "imported_node_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Imported Node Count",
+          "type": "integer"
+        },
         "last_good_state_digest": {
           "anyOf": [
             {
@@ -112,6 +118,12 @@
         "planned_refresh_cost": {
           "minimum": 0,
           "title": "Planned Refresh Cost",
+          "type": "integer"
+        },
+        "refresh_cost_avoided": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Refresh Cost Avoided",
           "type": "integer"
         },
         "refreshed_stage_count": {

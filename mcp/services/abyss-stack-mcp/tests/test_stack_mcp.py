@@ -3166,10 +3166,10 @@ def test_read_and_candidate_servers_expose_disjoint_tools(tmp_path: Path) -> Non
     path = write_observation(tmp_path / "observation.json")
     read = build_server(path, policy_family="read")
     candidate = build_server(path, policy_family="candidate")
-    assert read._mcp_server.create_initialization_options().server_version == "0.5.1"
+    assert read._mcp_server.create_initialization_options().server_version == "0.5.2"
     assert (
         candidate._mcp_server.create_initialization_options().server_version
-        == "0.5.1"
+        == "0.5.2"
     )
     read_tools = {tool.name for tool in asyncio.run(read.list_tools())}
     candidate_tools = {tool.name for tool in asyncio.run(candidate.list_tools())}

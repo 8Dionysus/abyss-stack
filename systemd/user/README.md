@@ -191,6 +191,10 @@ The same provision action creates the private
 claim. Start `abyss-stack-mcp-observation.service` once to atomically produce
 `current.json`; all stack MCP contour and bootstrap units refuse to start
 without it.
+Provisioning also creates the private non-symlink
+`${AOA_STACK_ROOT}/Logs/mcp/admission/keeper-inbox` directory. The admission
+keeper consumes independently issued `(organ_id)/(contour_id)/*.json` nodes
+from that root; provisioning neither issues nor copies owner evidence.
 Enable `abyss-stack-mcp-observation.timer` only as a separate reviewed rollout
 step. Its process has no bearer credential, no network address family, and no
 writable path outside that observation directory.

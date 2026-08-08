@@ -5,6 +5,7 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -43,6 +44,8 @@ from abyss_stack_mcp.admission_automation import (
     AdmissionAutomationStatus,
     KeeperContourStatus,
     KeeperStageOperationalStatus,
+    _keeper_inbox_paths,
+    _run_keeper_cycles,
 )
 from abyss_stack_mcp.system_status import build_system_status
 
@@ -534,6 +537,120 @@ def test_keeper_specs_bind_full_chain_and_fail_closed_expired_registry(
         item for item in spec["stages"] if item["stage"] == "central_proof"
     )["automatic_execution_allowed"]
     assert spec["spec_id"] == "sha256:" + "0" * 64
+
+
+def test_keeper_inbox_imports_once_and_reuses_unchanged_owner_evidence(
+    tmp_path: Path,
+) -> None:
+    from aoa_sdk.contracts.admission_keeper import (
+        AdmissionEvidenceNodeStatement,
+        AdmissionKeeperSpec,
+        KeeperStageSpec,
+    )
+    from aoa_sdk.contracts.control_plane import canonical_digest
+    from aoa_sdk.contracts.organs import QualifiedEvidenceRef
+    from aoa_sdk.organs import materialize_evidence_node, materialize_keeper_spec
+
+    stages = (
+        KeeperStageSpec(
+            stage="owner_source",
+            owner="demo-organ",
+            validator_ref="owner://demo-organ/source-validator",
+            validator_revision="source-v1",
+            validator_schema_digest="sha256:" + "1" * 64,
+            subject_digest="sha256:" + "2" * 64,
+            maximum_age_seconds=300,
+            cost_weight=5,
+        ),
+        KeeperStageSpec(
+            stage="package",
+            owner="abyss-stack",
+            validator_ref="owner://abyss-stack/package-validator",
+            validator_revision="package-v1",
+            validator_schema_digest="sha256:" + "3" * 64,
+            subject_digest="sha256:" + "4" * 64,
+            dependency_stages=("owner_source",),
+            maximum_age_seconds=300,
+            cost_weight=10,
+        ),
+    )
+    spec = materialize_keeper_spec(
+        AdmissionKeeperSpec(
+            spec_id="sha256:" + "0" * 64,
+            organ_id="demo-organ",
+            contour_id="read",
+            transaction_ref="owner://operator/admission/demo-read",
+            registry_anchor_digest="sha256:" + "5" * 64,
+            target_record_digest="sha256:" + "6" * 64,
+            authored_at=NOW - timedelta(minutes=1),
+            expires_at=NOW + timedelta(minutes=30),
+            stages=stages,
+        )
+    )
+    nodes = []
+    for stage in stages:
+        dependencies = () if not nodes else (nodes[-1].node_id,)
+        statement = AdmissionEvidenceNodeStatement(
+            spec_id=spec.spec_id,
+            organ_id=spec.organ_id,
+            contour_id=spec.contour_id,
+            stage=stage.stage,
+            stage_spec_digest=canonical_digest(stage),
+            dependency_node_ids=dependencies,
+            owner=stage.owner,
+            subject_digest=stage.subject_digest,
+            receipt=QualifiedEvidenceRef(
+                owner=stage.owner,
+                evidence_ref=f"owner://{stage.owner}/receipt/{stage.stage}",
+                revision=f"{stage.stage}-v1",
+                observed_at=NOW - timedelta(seconds=10),
+                expires_at=NOW + timedelta(minutes=20),
+            ),
+            observed_at=NOW - timedelta(seconds=10),
+            expires_at=NOW + timedelta(minutes=20),
+            outcome="passed",
+        )
+        nodes.append(materialize_evidence_node(statement, spec, nodes))
+
+    spec_path = tmp_path / "spec.json"
+    _json(spec_path, spec.model_dump(mode="json"))
+    inbox = tmp_path / "inbox" / "demo-organ" / "read"
+    for index, node in enumerate(nodes):
+        _json(inbox / f"{index:02d}.json", node.model_dump(mode="json"))
+    entry = SimpleNamespace(
+        organ_id="demo-organ",
+        contour_id="read",
+        spec_path=str(spec_path),
+    )
+
+    first = _run_keeper_cycles(
+        (entry,),
+        output_root=tmp_path / "runtime",
+        inbox_root=tmp_path / "inbox",
+        generated_at=NOW,
+    )[0]
+    second = _run_keeper_cycles(
+        (entry,),
+        output_root=tmp_path / "runtime",
+        inbox_root=tmp_path / "inbox",
+        generated_at=NOW + timedelta(seconds=10),
+    )[0]
+
+    assert first.imported_node_count == 2
+    assert second.imported_node_count == 0
+    assert second.reused_stage_count == 2
+    assert second.planned_refresh_cost == 0
+    assert second.refresh_cost_avoided == second.full_refresh_cost == 15
+    assert second.revision == first.revision + 1
+
+
+def test_keeper_inbox_rejects_symlink_root(tmp_path: Path) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    linked = tmp_path / "linked"
+    linked.symlink_to(real, target_is_directory=True)
+    with pytest.raises(PreflightError, match="non-symlink directory"):
+        _keeper_inbox_paths(linked, organ_id="demo", contour_id="read")
 
 
 def test_system_status_keeps_runtime_admission_owner_protocol_and_tasks_distinct(

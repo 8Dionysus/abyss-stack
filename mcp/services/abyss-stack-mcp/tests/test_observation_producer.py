@@ -15,6 +15,7 @@ from abyss_stack_mcp.observation import (
     RuntimeTargetCatalog,
     _load_targets,
     _packaged_targets_path,
+    _registry_declares_target,
     produce_observation,
 )
 
@@ -209,6 +210,29 @@ def registry() -> dict:
     }
 
 
+def registry_v2() -> dict:
+    source = registry()
+    record = source["records"][0]
+    source["schema_version"] = "aoa_organ_registry_source_v2"
+    source["records"] = [
+        {
+            "organ_id": record["organ_id"],
+            "owners": record["owners"],
+            "contours": [
+                {
+                    "contour_id": "read",
+                    "policy_family": "read",
+                    "credential_class": "kag-read-v2",
+                    "registry_state": "shadow",
+                    "revisions": record["revisions"],
+                    "maturity": record["maturity"],
+                }
+            ],
+        }
+    ]
+    return source
+
+
 def write_inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
     manifest = deployment_manifest()
     deployment_root = tmp_path / "deployments"
@@ -217,6 +241,12 @@ def write_inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
     write_json(record, manifest)
     registry_path = write_json(tmp_path / "registry.json", registry())
     targets_path = write_json(tmp_path / "targets.json", target_catalog())
+    return latest, registry_path, targets_path
+
+
+def write_v2_inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
+    latest, _, targets_path = write_inputs(tmp_path)
+    registry_path = write_json(tmp_path / "registry-v2.json", registry_v2())
     return latest, registry_path, targets_path
 
 
@@ -307,6 +337,68 @@ def test_producer_composes_explicit_live_axes_and_preserves_unknowns(
     loaded, loaded_digest = ObservationStore(output).load()
     assert loaded == observation
     assert loaded_digest == digest
+
+
+def test_producer_accepts_v2_registry_and_binds_exact_contour(
+    tmp_path: Path,
+) -> None:
+    latest, registry_path, targets_path = write_v2_inputs(tmp_path)
+    output = tmp_path / "observations" / "current.json"
+    output.parent.mkdir(mode=0o700)
+
+    observation, _ = produce_observation(
+        deployment_manifest_path=latest,
+        registry_path=registry_path,
+        output_path=output,
+        targets_path=targets_path,
+        overlay_path=None,
+        clock=lambda: NOW,
+        systemctl_runner=active_systemd,
+    )
+
+    subject = observation.subjects[0]
+    contour = registry_v2()["records"][0]["contours"][0]
+    assert subject.credential_class == "kag-read-v2"
+    assert subject.source.revision == OWNER_REVISION
+    assert subject.registry.registry_state == "shadow"
+    assert subject.registry.registry_digest == canonical_digest(contour)
+    assert subject.registry.evidence.evidence_refs[0].evidence_ref.startswith(
+        "aoa-sdk-registry:os-abyss-test-shadow:aoa-kag:read:"
+    )
+
+
+def test_v2_registry_rejects_ambiguous_contour_identity(tmp_path: Path) -> None:
+    latest, registry_path, targets_path = write_v2_inputs(tmp_path)
+    payload = registry_v2()
+    payload["records"][0]["contours"].append(
+        dict(payload["records"][0]["contours"][0])
+    )
+    write_json(registry_path, payload)
+    output = tmp_path / "observations" / "current.json"
+    output.parent.mkdir(mode=0o700)
+
+    with pytest.raises(
+        ObservationProducerError,
+        match="contour identities are ambiguous",
+    ):
+        produce_observation(
+            deployment_manifest_path=latest,
+            registry_path=registry_path,
+            output_path=output,
+            targets_path=targets_path,
+            overlay_path=None,
+            clock=lambda: NOW,
+            systemctl_runner=active_systemd,
+        )
+
+
+def test_v2_registry_omits_runtime_target_without_matching_contour() -> None:
+    payload = registry_v2()
+    payload["records"][0]["contours"][0]["contour_id"] = "candidate"
+    payload["records"][0]["contours"][0]["policy_family"] = "candidate"
+    target = RuntimeTargetCatalog.model_validate(target_catalog()).targets[0]
+
+    assert _registry_declares_target(payload, target) is False
 
 
 def test_inactive_owner_contour_is_an_exact_process_observation(

@@ -57,6 +57,9 @@ STACK_MCP_OBSERVATION_UNIT = (
 STACK_MCP_OBSERVATION_TIMER = (
     REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-observation.timer"
 )
+MCP_ADMISSION_KEEPER_UNIT = (
+    REPO_ROOT / "systemd" / "user" / "abyss-mcp-admission-keeper.service"
+)
 MCP_PROTOCOL_WATCH_UNIT = (
     REPO_ROOT / "systemd" / "user" / "abyss-mcp-protocol-watch.service"
 )
@@ -1458,6 +1461,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             read_audit_journal = audit_root / "policy-read.jsonl"
             candidate_audit_journal = audit_root / "policy-candidate.jsonl"
             observation_root = stack_root / "Logs" / "mcp" / "observations"
+            keeper_inbox_root = (
+                stack_root / "Logs" / "mcp" / "admission" / "keeper-inbox"
+            )
             protocol_watch_root = stack_root / "Logs" / "mcp" / "protocol-watch"
             first_identity = marker.read_text(encoding="utf-8").strip()
             self.assertRegex(first_identity, r"\A[0-9a-f]{64}:[0-9a-f]{64}\Z")
@@ -1520,6 +1526,10 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             self.assertNotEqual(read_audit_journal, candidate_audit_journal)
             self.assertEqual(
                 observation_root.stat().st_mode & 0o777,
+                0o700,
+            )
+            self.assertEqual(
+                keeper_inbox_root.stat().st_mode & 0o777,
                 0o700,
             )
             self.assertEqual(
@@ -2756,7 +2766,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             unit,
         )
         self.assertIn(
-            "--registry /srv/AbyssOS/.aoa/organ-access/organ-registry.source.json",
+            "--registry /srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json",
             unit,
         )
         self.assertIn(
@@ -2777,6 +2787,20 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertIn("OnUnitActiveSec=2min", timer)
         self.assertIn("Persistent=false", timer)
         self.assertIn("Unit=abyss-stack-mcp-observation.service", timer)
+
+    def test_mcp_admission_keeper_consumes_the_provisioned_private_inbox(
+        self,
+    ) -> None:
+        unit = MCP_ADMISSION_KEEPER_UNIT.read_text(encoding="utf-8")
+        inbox = "/srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox"
+
+        self.assertIn(f"ConditionPathIsDirectory={inbox}", unit)
+        self.assertIn(f"--keeper-inbox-root {inbox}", unit)
+        self.assertIn(
+            "ReadWritePaths=/srv/AbyssOS/abyss-stack/Logs/mcp/admission",
+            unit,
+        )
+        self.assertIn("ProtectSystem=strict", unit)
 
     def test_protocol_watcher_is_removable_private_and_never_a_production_lifecycle_unit(
         self,

@@ -406,8 +406,10 @@ def _load_deployment(path: Path) -> tuple[dict[str, Any], str]:
 
 def _load_registry(path: Path) -> tuple[dict[str, Any], str]:
     payload, _ = _read_json(path, "private organ registry")
+    schema_version = payload.get("schema_version")
     if (
-        payload.get("schema_version") != "aoa_organ_registry_source_v1"
+        schema_version
+        not in {"aoa_organ_registry_source_v1", "aoa_organ_registry_source_v2"}
         or payload.get("contains_secrets") is not False
         or payload.get("default_admission") != "deny"
     ):
@@ -422,6 +424,36 @@ def _load_registry(path: Path) -> tuple[dict[str, Any], str]:
     ]
     if len(organ_ids) != len(records) or len(organ_ids) != len(set(organ_ids)):
         raise ObservationProducerError("private organ registry identities are invalid")
+    if schema_version == "aoa_organ_registry_source_v2":
+        contour_keys: list[tuple[str, str]] = []
+        for record in records:
+            contours = record.get("contours") if isinstance(record, dict) else None
+            if not isinstance(contours, list) or not contours:
+                raise ObservationProducerError(
+                    "private v2 organ registry contours are invalid"
+                )
+            for contour in contours:
+                contour_id = (
+                    contour.get("contour_id") if isinstance(contour, dict) else None
+                )
+                policy_family = (
+                    contour.get("policy_family")
+                    if isinstance(contour, dict)
+                    else None
+                )
+                if (
+                    not isinstance(contour_id, str)
+                    or not contour_id
+                    or contour_id != policy_family
+                ):
+                    raise ObservationProducerError(
+                        "private v2 organ registry contour identity is invalid"
+                    )
+                contour_keys.append((record["organ_id"], contour_id))
+        if len(contour_keys) != len(set(contour_keys)):
+            raise ObservationProducerError(
+                "private v2 organ registry contour identities are ambiguous"
+            )
     return payload, _digest(payload)
 
 
@@ -614,7 +646,66 @@ def _registry_roles(record: dict[str, Any]) -> OwnerRoles:
         raise ObservationProducerError("registry owner roles are invalid") from exc
 
 
-def _credential_class(record: dict[str, Any]) -> str:
+def _registry_contour(
+    record: dict[str, Any],
+    *,
+    schema_version: str,
+    policy_family: str,
+) -> dict[str, Any] | None:
+    if schema_version == "aoa_organ_registry_source_v1":
+        return None
+    contours = record.get("contours")
+    matches = [
+        contour
+        for contour in contours
+        if isinstance(contour, dict)
+        and contour.get("contour_id") == policy_family
+        and contour.get("policy_family") == policy_family
+    ] if isinstance(contours, list) else []
+    if len(matches) != 1:
+        raise ObservationProducerError(
+            "target registry contour is absent or ambiguous"
+        )
+    return matches[0]
+
+
+def _registry_declares_target(
+    registry: dict[str, Any],
+    target: RuntimeTarget,
+) -> bool:
+    if registry.get("schema_version") == "aoa_organ_registry_source_v1":
+        return True
+    records = [
+        record
+        for record in registry["records"]
+        if record.get("organ_id") == target.registry_organ_id
+    ]
+    if len(records) > 1:
+        raise ObservationProducerError("target registry organ is ambiguous")
+    if not records:
+        return False
+    contours = records[0].get("contours")
+    if not isinstance(contours, list):
+        raise ObservationProducerError("target registry contours are invalid")
+    return any(
+        isinstance(contour, dict)
+        and contour.get("contour_id") == target.policy_family
+        and contour.get("policy_family") == target.policy_family
+        for contour in contours
+    )
+
+
+def _credential_class(
+    record: dict[str, Any],
+    contour: dict[str, Any] | None,
+) -> str:
+    if contour is not None:
+        value = contour.get("credential_class")
+        if isinstance(value, str) and value:
+            return value
+        raise ObservationProducerError(
+            "registry contour credential class is unavailable"
+        )
     contours = record.get("credential_contours")
     value = contours.get("read") if isinstance(contours, dict) else None
     if not isinstance(value, str) or not value:
@@ -645,13 +736,20 @@ def _build_subject(
         raise ObservationProducerError(
             f"target organ {target.registry_organ_id} is absent from private registry"
         )
+    schema_version = registry["schema_version"]
+    contour = _registry_contour(
+        record,
+        schema_version=schema_version,
+        policy_family=target.policy_family,
+    )
+    registry_subject = contour if contour is not None else record
     owners = _registry_roles(record)
     if owners.runtime_owner != "abyss-stack":
         raise ObservationProducerError("target runtime owner is not abyss-stack")
-    credential_class = _credential_class(record)
+    credential_class = _credential_class(record, contour)
 
     source_revision: str = "unobserved"
-    revisions = record.get("revisions")
+    revisions = registry_subject.get("revisions")
     source_revision_block = (
         revisions.get("source") if isinstance(revisions, dict) else None
     )
@@ -661,7 +759,7 @@ def _build_subject(
     ):
         source_revision = source_revision_block["revision"]
     source_refs = _source_evidence(
-        record,
+        registry_subject,
         observed_at=observed_at,
         expires_at=expires_at,
     )
@@ -762,12 +860,15 @@ def _build_subject(
         registry.get("expires_at"),
         "registry expires_at",
     )
-    record_digest = _digest(record)
+    record_digest = _digest(registry_subject)
+    registry_subject_ref = target.registry_organ_id
+    if contour is not None:
+        registry_subject_ref += f":{target.policy_family}"
     registry_ref = EvidenceRef(
         owner="aoa-sdk",
         evidence_ref=(
             f"aoa-sdk-registry:{registry['registry_id']}:"
-            f"{target.registry_organ_id}:{record_digest}"
+            f"{registry_subject_ref}:{record_digest}"
         ),
         revision=registry_digest,
         observed_at=_parse_timestamp(
@@ -776,7 +877,7 @@ def _build_subject(
         ),
         expires_at=registry_expiry,
     )
-    registry_state = record.get("registry_state")
+    registry_state = registry_subject.get("registry_state")
     allowed_registry_states = {
         "declared",
         "package_candidate",
@@ -1064,6 +1165,8 @@ def produce_observation(
     )
     subjects: list[RuntimeSubject] = []
     for target in catalog.targets:
+        if not _registry_declares_target(registry, target):
+            continue
         subject = _build_subject(
             target,
             manifest=manifest,

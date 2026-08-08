@@ -25,8 +25,8 @@ anyio==4.13.0 \
     #   mcp
     #   sse-starlette
     #   starlette
-aoa-sdk @ https://github.com/8Dionysus/aoa-sdk/releases/download/v0.10.0/aoa_sdk-0.10.0-py3-none-any.whl \
-    --hash=sha256:0d41d53e3aafdcdb9d63b24b40fa8038051f8037e9508e54e216c6076863e764
+aoa-sdk @ https://github.com/8Dionysus/aoa-sdk/releases/download/v0.10.1/aoa_sdk-0.10.1-py3-none-any.whl \
+    --hash=sha256:7222d373044506d0e79175c364b64e3a6ed6a164650af0db54dcce1fcf67f6ad
     # via
     #   -c mcp/services/abyss-stack-mcp/requirements.constraints
     #   abyss-stack-mcp (mcp/services/abyss-stack-mcp/pyproject.toml)

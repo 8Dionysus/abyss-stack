@@ -214,6 +214,54 @@ def _validate_manifest(payload: dict[str, Any], path: Path) -> dict[str, Any]:
     return payload
 
 
+def _registry_rollback_contour(
+    registry: dict[str, Any],
+    *,
+    expected_digest: str,
+) -> tuple[dict[str, Any], str]:
+    records = registry.get("records")
+    record = next(
+        (
+            item
+            for item in records
+            if isinstance(item, dict) and item.get("organ_id") == "aoa-kag"
+        ),
+        None,
+    ) if isinstance(records, list) else None
+    if record is None:
+        raise RollbackCandidateError("private registry lacks the KAG record")
+    if registry.get("schema_version") == "aoa_organ_registry_source_v2":
+        contours = record.get("contours")
+        matches = [
+            contour
+            for contour in contours
+            if isinstance(contour, dict)
+            and contour.get("contour_id") == "read"
+            and contour.get("policy_family") == "read"
+        ] if isinstance(contours, list) else []
+        if len(matches) != 1:
+            raise RollbackCandidateError(
+                "private registry lacks one exact KAG read contour"
+            )
+        selected = matches[0]
+        credential_class = selected.get("credential_class")
+    else:
+        selected = record
+        credential_contours = record.get("credential_contours")
+        credential_class = (
+            credential_contours.get("read")
+            if isinstance(credential_contours, dict)
+            else None
+        )
+    if _digest(selected) != expected_digest:
+        raise RollbackCandidateError(
+            "private registry contour differs from observation"
+        )
+    if not isinstance(credential_class, str) or not credential_class:
+        raise RollbackCandidateError("LKG read credential class is unavailable")
+    return selected, credential_class
+
+
 def build_rollback_candidate(
     *,
     observation_path: Path,
@@ -343,17 +391,10 @@ def build_rollback_candidate(
         raise RollbackCandidateError("LKG process target differs from the committed catalog")
     if not _credential_present(secret_dir, target.service_id):
         raise RollbackCandidateError("LKG credential file is unavailable or unsafe")
-    records = registry_payload.get("records")
-    record = next(
-        (item for item in records if isinstance(item, dict) and item.get("organ_id") == "aoa-kag"),
-        None,
-    ) if isinstance(records, list) else None
-    if record is None or _digest(record) != subject.registry.registry_digest:
-        raise RollbackCandidateError("private registry record differs from observation")
-    contours = record.get("credential_contours")
-    credential_class = contours.get("read") if isinstance(contours, dict) else None
-    if not isinstance(credential_class, str) or not credential_class:
-        raise RollbackCandidateError("LKG read credential class is unavailable")
+    _, credential_class = _registry_rollback_contour(
+        registry_payload,
+        expected_digest=subject.registry.registry_digest,
+    )
 
     expires_at = min(min(expiries), now + timedelta(seconds=ttl_seconds))
     if expires_at <= now:

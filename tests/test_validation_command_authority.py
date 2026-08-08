@@ -84,7 +84,7 @@ def test_workflow_routes_reusable_commands_through_ci_gate() -> None:
     assert "https://github.com/8Dionysus/aoa-sdk" in workflow
     assert (
         "git -C \"$RUNNER_TEMP/aoa-sdk-source\" fetch --depth 1 origin "
-        "8e25d77d24bc163cd6ebf32a695379b40b8d7ef3"
+        "34ff083902a1a42d7f6eaeb4bc55542f1e4b77e0"
     ) in workflow
     assert 'python -m pip install "$RUNNER_TEMP/aoa-sdk-source"' in workflow
     assert "AOA_SDK_SOURCE_ROOT: ${{ runner.temp }}/aoa-sdk-source" in workflow

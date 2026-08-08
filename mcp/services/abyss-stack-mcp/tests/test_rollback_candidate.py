@@ -207,6 +207,29 @@ def test_materializes_exact_non_executing_lkg_candidate(tmp_path: Path) -> None:
     assert output.stat().st_mode & 0o777 == 0o600
 
 
+def test_materializes_from_exact_v2_read_contour(tmp_path: Path) -> None:
+    paths = _inputs(tmp_path)
+    contour = {
+        "contour_id": "read",
+        "policy_family": "read",
+        "credential_class": "kag-read",
+    }
+    registry = {
+        "schema_version": "aoa_organ_registry_source_v2",
+        "records": [{"organ_id": "aoa-kag", "contours": [contour]}],
+        "contains_secrets": False,
+    }
+    _write(paths["registry"], registry)
+    payload = json.loads(paths["observation"].read_text(encoding="utf-8"))
+    payload["subjects"][0]["registry"]["registry_digest"] = _digest(contour)
+    _write(paths["observation"], payload)
+
+    candidate = _build(paths)
+
+    assert candidate["last_known_good"]["credential_class"] == "kag-read"
+    assert candidate["registry"]["registry_digest"] == _digest(contour)
+
+
 def test_rejects_current_canary_as_lkg(tmp_path: Path) -> None:
     paths = _inputs(tmp_path)
     payload = json.loads(paths["observation"].read_text(encoding="utf-8"))
