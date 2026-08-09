@@ -91,11 +91,14 @@ The controller:
   observer, value-taking `timeout` options cannot hide the wrapped command,
   shell nesting that exceeds the bounded inspection depth fails opaque,
   command/backtick/process substitutions remain opaque executable indirection,
-  active parameter, glob, brace, and tilde expansion remains opaque while
-  quoted or escaped literals stay classifiable,
+  active parameter, glob (including Bash extglob), brace, and tilde expansion
+  remains opaque while quoted or escaped literals stay classifiable,
   sourced shell bodies through `source` or `.` remain opaque,
-  directly selected relative, workspace, home, or temporary executable paths
-  remain opaque outside exact owner-fixed validation,
+  model-issued commands run with a fixed system-only `PATH`, and only an
+  explicit small set of system-resolved executables is directly classifiable;
+  unadmitted bare names, directly selected relative/workspace/home/temporary
+  paths, and opaque AWK program bodies remain authority-blocking outside exact
+  owner-fixed validation,
   build/package/test/task runners remain opaque unless they are an exact
   owner-fixed validation,
   Git config writes plus alias/external-subcommand dispatch and ambient

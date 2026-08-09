@@ -17,6 +17,7 @@ import os
 import re
 import selectors
 import shlex
+import shutil
 import signal
 import stat
 import subprocess
@@ -152,8 +153,12 @@ RUNTIME_WIDE_FORBIDDEN_EFFECTS = frozenset(
     }
 )
 OPAQUE_EFFECT_EXECUTABLES = {
+    "awk",
     "deno",
+    "gawk",
     "lua",
+    "mawk",
+    "nawk",
     "node",
     "perl",
     "php",
@@ -161,6 +166,55 @@ OPAQUE_EFFECT_EXECUTABLES = {
     "python3",
     "ruby",
 }
+CLASSIFIABLE_DIRECT_EXECUTABLES = frozenset(
+    {
+        "basename",
+        "bash",
+        "cat",
+        "chmod",
+        "cmp",
+        "command",
+        "cp",
+        "cut",
+        "date",
+        "diff",
+        "dirname",
+        "du",
+        "echo",
+        "env",
+        "exec",
+        "false",
+        "file",
+        "find",
+        "git",
+        "grep",
+        "head",
+        "jq",
+        "ls",
+        "mkdir",
+        "mv",
+        "printf",
+        "pwd",
+        "readlink",
+        "realpath",
+        "rg",
+        "rm",
+        "rmdir",
+        "sed",
+        "sh",
+        "sort",
+        "stat",
+        "tail",
+        "tee",
+        "timeout",
+        "touch",
+        "true",
+        "uname",
+        "uniq",
+        "wc",
+    }
+)
+CODEX_EXECUTABLE_PATH = "/usr/local/bin:/usr/bin:/bin"
 OPAQUE_PROCESS_LAUNCH_WRAPPERS = {
     "chrt",
     "ionice",
@@ -1356,6 +1410,8 @@ def _shell_has_active_expansion(command: str) -> bool:
             return True
         if character in "*?[":
             return True
+        if character in "@+!" and command[index + 1 : index + 2] == "(":
+            return True
         if character == "{" and "}" in command[index + 1 :]:
             body = command[index + 1 : command.index("}", index + 1)]
             if "," in body or ".." in body:
@@ -1371,11 +1427,19 @@ def _shell_has_active_expansion(command: str) -> bool:
 
 
 def _executable_path_is_opaque(value: str) -> bool:
-    """Reject model-selected executable files outside stable system bin roots."""
+    """Admit only explicit, system-resolved model command executables."""
 
-    if "/" not in value:
-        return False
-    candidate = Path(value)
+    executable = Path(value).name.lower()
+    if executable not in CLASSIFIABLE_DIRECT_EXECUTABLES:
+        return True
+    resolved_value = (
+        value
+        if "/" in value
+        else shutil.which(value, path=CODEX_EXECUTABLE_PATH)
+    )
+    if not resolved_value:
+        return True
+    candidate = Path(resolved_value)
     if not candidate.is_absolute() or ".." in candidate.parts:
         return True
     return not any(candidate.is_relative_to(root) for root in TRUSTED_EXECUTABLE_PREFIXES)
@@ -3827,7 +3891,7 @@ class ExternalCodexRuntime:
                 environment[str(key)] = value
         environment["CODEX_HOME"] = str(launch["codex_home"])
         environment.setdefault("HOME", os.environ.get("HOME", "/nonexistent"))
-        environment.setdefault("PATH", "/usr/local/bin:/usr/bin:/bin")
+        environment["PATH"] = CODEX_EXECUTABLE_PATH
         environment.setdefault("LANG", "C.UTF-8")
         environment["TMPDIR"] = str(scratch_root)
         environment["NO_COLOR"] = "1"

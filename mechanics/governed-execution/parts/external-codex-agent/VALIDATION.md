@@ -87,7 +87,9 @@ wrapper parsing, opaque process-launch-wrapper refusal,
 attached-redirection observation, fail-closed shell nesting at the inspection
 limit, command/backtick/process-substitution refusal, opaque build/package/test
 runner refusal, active parameter/glob/brace/tilde-expansion refusal with quoted
-literal preservation, direct workspace/non-system executable refusal,
+literal preservation, Bash extglob refusal, fixed-system-`PATH` executable
+allowlisting with unadmitted bare-name refusal, direct workspace/non-system
+executable refusal, opaque AWK program-body refusal,
 sourced-shell refusal, Git alias/config-write/external-subcommand refusal, ambient
 environment-assignment refusal, Git-invisible FIFO and Unix-socket refusal,
 post-preflight full-manifest drift refusal, final-manifest tamper refusal,

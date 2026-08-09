@@ -449,6 +449,27 @@ if "FAKE_PARAMETER_EXPANSION" in task["objective"]:
         "status": "completed",
         "exit_code": 0,
     }})
+if "FAKE_BARE_EXECUTABLE" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "helper --emit-secret",
+        "status": "completed",
+        "exit_code": 0,
+    }})
+if "FAKE_EXTGLOB_EXPANSION" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/bash -O extglob -lc 'g@(it) push'",
+        "status": "completed",
+        "exit_code": 0,
+    }})
+if "FAKE_AWK_LAUNCHER" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/awk 'BEGIN { system(\"git push\") }'",
+        "status": "completed",
+        "exit_code": 0,
+    }})
 if "FAKE_STARTED_FORBIDDEN_COMMAND" in task["objective"]:
     emit({"type": "item.started", "item": {
         "id": "fixture-command-started-before-interruption",
@@ -3373,6 +3394,7 @@ def test_direct_non_system_executables_are_fail_closed(command: str) -> None:
         "/usr/bin/bash -lc 'git p*'",
         "/usr/bin/bash -lc 'g{it,rep} push'",
         "/usr/bin/bash -lc '~/bin/helper'",
+        "/usr/bin/bash -O extglob -lc 'g@(it) push'",
     ),
 )
 def test_active_shell_expansions_are_fail_closed(command: str) -> None:
@@ -3388,6 +3410,27 @@ def test_active_shell_expansions_are_fail_closed(command: str) -> None:
     ),
 )
 def test_quoted_or_escaped_shell_literals_remain_classifiable(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "helper --emit-secret",
+        "/usr/bin/helper --emit-secret",
+        "/usr/bin/awk 'BEGIN { system(\"git push\") }'",
+        "awk 'BEGIN { system(\"git push\") }'",
+    ),
+)
+def test_unadmitted_bare_names_and_awk_are_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    ("git status --short", "rg pattern README.md", "/usr/bin/git diff --check"),
+)
+def test_allowlisted_system_commands_remain_classifiable(command: str) -> None:
     assert RUNTIME._command_has_unclassified_indirection(command) is False
 
 
@@ -3438,7 +3481,7 @@ def test_runtime_forbidden_effects_do_not_trust_a_task_subset() -> None:
             }
         ],
         {"forbidden_effects": ["commit"]},
-    ) == ["secret_access"]
+    ) == ["secret_access", "unclassified_indirect_effect"]
 
 
 def test_task_schema_requires_the_complete_runtime_forbidden_set(
@@ -3521,9 +3564,15 @@ def test_started_command_survives_interruption_and_blocks_authority(
         ),
         ("FAKE_SOURCE_INDIRECTION", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_LOCAL_CONFIG_WRITE", ["unclassified_indirect_effect"]),
-        ("FAKE_DIRECT_SECRET_ENCODER", ["secret_access"]),
+        (
+            "FAKE_DIRECT_SECRET_ENCODER",
+            ["secret_access", "unclassified_indirect_effect"],
+        ),
         ("FAKE_WORKSPACE_EXECUTABLE", ["unclassified_indirect_effect"]),
         ("FAKE_PARAMETER_EXPANSION", ["unclassified_indirect_effect"]),
+        ("FAKE_BARE_EXECUTABLE", ["unclassified_indirect_effect"]),
+        ("FAKE_EXTGLOB_EXPANSION", ["unclassified_indirect_effect"]),
+        ("FAKE_AWK_LAUNCHER", ["unclassified_indirect_effect"]),
     ),
 )
 def test_opaque_command_authority_blocks_terminal_result(

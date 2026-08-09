@@ -316,12 +316,16 @@ command substitution, backticks, and process substitution likewise fail closed
 instead of being treated as inert command arguments. Build, package, test, and
 task runners that may execute manifest-, plugin-, or project-defined commands
 are opaque for model-issued commands; only an exact owner-fixed validation argv
-receives the fixed-validation exemption. Active shell parameter, glob, brace,
-and tilde expansion is opaque because the event does not expose the resulting
-argv; single-quoted and escaped literal text remains classifiable. A directly
-executed relative, workspace, home, or temporary program is likewise opaque;
-only stable system bin roots or an exact owner-fixed validation may select an
-executable by path. Shell `source` and `.` bodies remain
+receives the fixed-validation exemption. Active shell parameter, ordinary glob,
+Bash extglob, brace, and tilde expansion is opaque because the event does not
+expose the resulting argv; single-quoted and escaped literal text remains
+classifiable. Model-issued commands receive a fixed system-only `PATH`; a
+direct command is classifiable only when its basename is explicitly admitted
+and resolves beneath a stable system bin root. Unadmitted bare names and
+directly executed relative, workspace, home, or temporary programs are opaque.
+AWK-family program bodies are also opaque because `system()` can launch an
+unobserved command. Exact owner-fixed validation remains separately admitted.
+Shell `source` and `.` bodies remain
 opaque because the observed argv does not expose the sourced commands. Git
 configuration writes, including repository-local and per-worktree writes, and
 Git global options that can inject
