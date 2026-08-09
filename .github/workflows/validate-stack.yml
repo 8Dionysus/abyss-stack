@@ -50,6 +50,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y bubblewrap shellcheck rsync zsh podman podman-compose
+          # Ubuntu hosted runners restrict unprivileged user namespaces through
+          # AppArmor. Keep bubblewrap unprivileged and enable that kernel path
+          # only for this disposable CI machine rather than using setuid mode.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
       - name: Run release audit including routing canary contract
         env:
