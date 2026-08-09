@@ -100,7 +100,9 @@ def derive_managed_topology(
                     "organ unit executable conflicts with its instance template"
                 )
             unit_exec_start_binding = (
-                "ExecStart=/usr/bin/env python3 "
+                "ExecStart=/srv/AbyssOS/abyss-stack/Services/"
+                "abyss-stack-mcp/venv/bin/python -I -B -m "
+                "abyss_stack_mcp.process_launcher --executable "
                 "/srv/AbyssOS/.codex/bin/%i-mcp-server.py"
             )
         dependency_lock = package_root / "requirements.lock"

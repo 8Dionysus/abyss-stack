@@ -64,7 +64,14 @@ def _json(path: Path, payload: dict) -> None:
     _write(path, json.dumps(payload, sort_keys=True) + "\n")
 
 
-def _fixture(tmp_path: Path) -> ManagedContourBinding:
+def _fixture(
+    tmp_path: Path,
+    *,
+    receipt_process_unit_name: str = "aoa-organ-mcp-read@demo.service",
+    receipt_process_identity: str = (
+        "systemd-user:aoa-organ-mcp-read@demo.service:pid:321:start:654"
+    ),
+) -> ManagedContourBinding:
     deployed = tmp_path / "Configs/mcp/services/demo-mcp"
     _write(deployed / "pyproject.toml", "[project]\nname='demo-mcp'\nversion='1.0'\n")
     tree_digest = _tree_digest(deployed)
@@ -173,7 +180,7 @@ def _fixture(tmp_path: Path) -> ManagedContourBinding:
         organ_id="demo-organ",
         registry_organ_id="demo-organ",
         service_id="demo-mcp",
-        unit_name="demo.service",
+        unit_name="aoa-organ-mcp-read@demo.service",
         executable_ref=str(executable),
         endpoint_ref="http://127.0.0.1:5999/mcp",
         protocol_versions=("2025-11-25",),
@@ -211,6 +218,8 @@ def _fixture(tmp_path: Path) -> ManagedContourBinding:
         ttl_seconds=3600,
         signing_key=SIGNING_KEY,
         deployment=deployment,
+        process_identity=receipt_process_identity,
+        process_unit_name=receipt_process_unit_name,
     )
     canary_path = tmp_path / "Logs/canaries/latest/demo-organ.read.json"
     _json(canary_path, receipt.model_dump(mode="json"))
@@ -229,7 +238,7 @@ def _fixture(tmp_path: Path) -> ManagedContourBinding:
         policy_family="read",
         authority_class="read",
         service_id="demo-mcp",
-        unit_name="demo.service",
+        unit_name="aoa-organ-mcp-read@demo.service",
         unit_path=str(unit),
         endpoint_ref="http://127.0.0.1:5999/mcp",
         protocol_version="2025-11-25",
@@ -367,6 +376,11 @@ def test_runtime_overlay_binds_authenticated_canary_to_exact_deployment(
     )
     deployment_path = Path(binding.deployment_manifest_path)
     deployment = json.loads(deployment_path.read_text(encoding="utf-8"))
+    deployment["record_ref"] = (
+        "Logs/mcp/deployments/records/"
+        + deployment["manifest_id"].removeprefix("sha256:")
+        + ".json"
+    )
     target = RuntimeTarget(
         organ_id=binding.organ_id,
         registry_organ_id=binding.organ_id,
@@ -387,6 +401,18 @@ def test_runtime_overlay_binds_authenticated_canary_to_exact_deployment(
         rollback_route="runbook://demo/rollback/read",
     )
 
+    def process_runner(command: tuple[str, ...]) -> SimpleNamespace:
+        return SimpleNamespace(
+            returncode=0,
+            stdout=(
+                "LoadState=loaded\n"
+                "ActiveState=active\n"
+                "MainPID=321\n"
+                "ExecMainStartTimestampMonotonic=654\n"
+                "FragmentPath=/tmp/demo.service\n"
+            ),
+        )
+
     overlay, skipped = build_runtime_overlay(
         registry,
         deployment,
@@ -395,11 +421,18 @@ def test_runtime_overlay_binds_authenticated_canary_to_exact_deployment(
         canary_public_key_path=Path(binding.canary_public_key_path),
         deployment_manifest_path=deployment_path,
         generated_at=NOW,
+        systemctl_runner=process_runner,
+        deployment_loader=lambda path: (deployment, deployment["manifest_id"]),
     )
 
     assert skipped == ()
     assert overlay["contours"][0]["canary_evidence"]["receipt_id"] == (
         binding.canary_receipt_id
+    )
+    runtime_identity = overlay["contours"][0]["runtime_identity"]
+    assert runtime_identity["deployment_manifest_ref"] == deployment["record_ref"]
+    assert runtime_identity["process_identity"] == (
+        f"systemd-user:{binding.unit_name}:pid:321:start:654"
     )
 
     deployment["services"][0]["package_digest"] = "sha256:" + "8" * 64
@@ -412,7 +445,270 @@ def test_runtime_overlay_binds_authenticated_canary_to_exact_deployment(
             canary_public_key_path=Path(binding.canary_public_key_path),
             deployment_manifest_path=deployment_path,
             generated_at=NOW,
+            systemctl_runner=process_runner,
+            deployment_loader=lambda path: (deployment, deployment["manifest_id"]),
         )
+
+    verified_deployment = json.loads(json.dumps(deployment))
+    verified_deployment["record_ref"] = "different-immutable-record.json"
+    with pytest.raises(PreflightError, match="verified manifest"):
+        build_runtime_overlay(
+            registry,
+            deployment,
+            RuntimeTargetCatalog(targets=(target,)),
+            canary_root=Path(binding.canary_receipt_path).parent,
+            canary_public_key_path=Path(binding.canary_public_key_path),
+            deployment_manifest_path=deployment_path,
+            generated_at=NOW,
+            systemctl_runner=process_runner,
+            deployment_loader=lambda path: (
+                verified_deployment,
+                verified_deployment["manifest_id"],
+            ),
+        )
+
+
+def test_runtime_overlay_rejects_unobserved_managed_process(tmp_path: Path) -> None:
+    binding = _fixture(tmp_path)
+    registry = json.loads(Path(binding.registry_path).read_text(encoding="utf-8"))
+    deployment_path = Path(binding.deployment_manifest_path)
+    deployment = json.loads(deployment_path.read_text(encoding="utf-8"))
+    deployment["record_ref"] = (
+        "Logs/mcp/deployments/records/"
+        + deployment["manifest_id"].removeprefix("sha256:")
+        + ".json"
+    )
+    target = RuntimeTarget(
+        organ_id=binding.organ_id,
+        registry_organ_id=binding.organ_id,
+        service_id=binding.service_id,
+        unit_name=binding.unit_name,
+        executable_ref=binding.executable_path,
+        endpoint_ref=binding.endpoint_ref,
+        protocol_versions=(binding.protocol_version,),
+        effect_classes=("observe",),
+        canary_route="runbook://demo/read",
+        canary_contract=RuntimeCanaryContract(
+            tool_name="demo_read",
+            arguments={},
+            schema_pointer="/schema_version",
+            schema_value="demo-v1",
+            required_pointers=("/value",),
+        ),
+        rollback_route="runbook://demo/rollback/read",
+    )
+
+    def inactive_runner(command: tuple[str, ...]) -> SimpleNamespace:
+        return SimpleNamespace(
+            returncode=0,
+            stdout=(
+                "LoadState=loaded\n"
+                "ActiveState=inactive\n"
+                "MainPID=0\n"
+                "ExecMainStartTimestampMonotonic=0\n"
+                "FragmentPath=/tmp/demo.service\n"
+            ),
+        )
+
+    with pytest.raises(PreflightError, match="managed process identity is not exact"):
+        build_runtime_overlay(
+            registry,
+            deployment,
+            RuntimeTargetCatalog(targets=(target,)),
+            canary_root=Path(binding.canary_receipt_path).parent,
+            canary_public_key_path=Path(binding.canary_public_key_path),
+            deployment_manifest_path=deployment_path,
+            generated_at=NOW,
+            systemctl_runner=inactive_runner,
+            deployment_loader=lambda path: (deployment, deployment["manifest_id"]),
+        )
+
+
+def test_bootstrap_canary_builds_preflight_catalog_before_production_start(
+    tmp_path: Path,
+) -> None:
+    bootstrap_unit = "aoa-organ-mcp-read-bootstrap@demo.service"
+    bootstrap_identity = f"systemd-user:{bootstrap_unit}:pid:777:start:888"
+    binding = _fixture(
+        tmp_path,
+        receipt_process_unit_name=bootstrap_unit,
+        receipt_process_identity=bootstrap_identity,
+    )
+    assert run_preflight(binding, checked_at=NOW).eligible_to_start
+    registry = json.loads(Path(binding.registry_path).read_text(encoding="utf-8"))
+    registry["records"][0]["contours"][0]["runtime_identity"]["source_revision"] = (
+        "a" * 40
+    )
+    deployment_path = Path(binding.deployment_manifest_path)
+    deployment = json.loads(deployment_path.read_text(encoding="utf-8"))
+    deployment["record_ref"] = (
+        "Logs/mcp/deployments/records/"
+        + deployment["manifest_id"].removeprefix("sha256:")
+        + ".json"
+    )
+    target = RuntimeTarget(
+        organ_id=binding.organ_id,
+        registry_organ_id=binding.organ_id,
+        service_id=binding.service_id,
+        unit_name=binding.unit_name,
+        executable_ref=binding.executable_path,
+        endpoint_ref=binding.endpoint_ref,
+        protocol_versions=(binding.protocol_version,),
+        effect_classes=("observe",),
+        canary_route="runbook://demo/read",
+        rollback_route="runbook://demo/rollback/read",
+    )
+
+    def bootstrap_runner(command: tuple[str, ...]) -> SimpleNamespace:
+        assert bootstrap_unit in command
+        return SimpleNamespace(
+            returncode=0,
+            stdout=(
+                "LoadState=loaded\nActiveState=active\nMainPID=777\n"
+                "ExecMainStartTimestampMonotonic=888\n"
+                "FragmentPath=/tmp/demo-bootstrap.service\n"
+            ),
+        )
+
+    overlay, skipped = build_runtime_overlay(
+        registry,
+        deployment,
+        RuntimeTargetCatalog(targets=(target,)),
+        canary_root=Path(binding.canary_receipt_path).parent,
+        canary_public_key_path=Path(binding.canary_public_key_path),
+        deployment_manifest_path=deployment_path,
+        generated_at=NOW,
+        systemctl_runner=bootstrap_runner,
+        deployment_loader=lambda path: (deployment, deployment["manifest_id"]),
+    )
+
+    assert skipped == ()
+    assert overlay["contours"][0]["runtime_identity"]["process_identity"] == (
+        bootstrap_identity
+    )
+
+
+def test_runtime_overlay_rejects_canary_from_predecessor_process(
+    tmp_path: Path,
+) -> None:
+    binding = _fixture(tmp_path)
+    registry = json.loads(Path(binding.registry_path).read_text(encoding="utf-8"))
+    registry["records"][0]["contours"][0]["runtime_identity"]["source_revision"] = (
+        "a" * 40
+    )
+    deployment_path = Path(binding.deployment_manifest_path)
+    deployment = json.loads(deployment_path.read_text(encoding="utf-8"))
+    deployment["record_ref"] = (
+        "Logs/mcp/deployments/records/"
+        + deployment["manifest_id"].removeprefix("sha256:")
+        + ".json"
+    )
+    target = RuntimeTarget(
+        organ_id=binding.organ_id,
+        registry_organ_id=binding.organ_id,
+        service_id=binding.service_id,
+        unit_name=binding.unit_name,
+        executable_ref=binding.executable_path,
+        endpoint_ref=binding.endpoint_ref,
+        protocol_versions=(binding.protocol_version,),
+        effect_classes=("observe",),
+        canary_route="runbook://demo/read",
+        rollback_route="runbook://demo/rollback/read",
+    )
+
+    def replacement_process(command: tuple[str, ...]) -> SimpleNamespace:
+        return SimpleNamespace(
+            returncode=0,
+            stdout=(
+                "LoadState=loaded\nActiveState=active\nMainPID=322\n"
+                "ExecMainStartTimestampMonotonic=655\n"
+                "FragmentPath=/tmp/demo.service\n"
+            ),
+        )
+
+    with pytest.raises(PreflightError, match="canary process identity"):
+        build_runtime_overlay(
+            registry,
+            deployment,
+            RuntimeTargetCatalog(targets=(target,)),
+            canary_root=Path(binding.canary_receipt_path).parent,
+            canary_public_key_path=Path(binding.canary_public_key_path),
+            deployment_manifest_path=deployment_path,
+            generated_at=NOW,
+            systemctl_runner=replacement_process,
+            deployment_loader=lambda path: (deployment, deployment["manifest_id"]),
+        )
+
+
+def test_runtime_overlay_skips_malformed_sibling_canary(tmp_path: Path) -> None:
+    binding = _fixture(tmp_path)
+    registry = json.loads(Path(binding.registry_path).read_text(encoding="utf-8"))
+    registry["records"][0]["contours"][0]["runtime_identity"]["source_revision"] = (
+        "a" * 40
+    )
+    deployment_path = Path(binding.deployment_manifest_path)
+    deployment = json.loads(deployment_path.read_text(encoding="utf-8"))
+    deployment["record_ref"] = (
+        "Logs/mcp/deployments/records/"
+        + deployment["manifest_id"].removeprefix("sha256:")
+        + ".json"
+    )
+    base = RuntimeTarget(
+        organ_id=binding.organ_id,
+        registry_organ_id=binding.organ_id,
+        service_id=binding.service_id,
+        unit_name=binding.unit_name,
+        executable_ref=binding.executable_path,
+        endpoint_ref=binding.endpoint_ref,
+        protocol_versions=(binding.protocol_version,),
+        effect_classes=("observe",),
+        canary_route="runbook://demo/read",
+        rollback_route="runbook://demo/rollback/read",
+    )
+    sibling = base.model_copy(
+        update={
+            "organ_id": "broken-organ",
+            "registry_organ_id": "broken-organ",
+            "service_id": "broken-mcp",
+            "unit_name": "broken.service",
+            "endpoint_ref": "http://127.0.0.1:5998/mcp",
+        }
+    )
+    sibling_contour = json.loads(json.dumps(registry["records"][0]))
+    sibling_contour["organ_id"] = "broken-organ"
+    registry["records"].append(sibling_contour)
+    malformed = Path(binding.canary_receipt_path).parent / "broken-organ.read.json"
+    _write(malformed, "{truncated")
+
+    def process_runner(command: tuple[str, ...]) -> SimpleNamespace:
+        return SimpleNamespace(
+            returncode=0,
+            stdout=(
+                "LoadState=loaded\nActiveState=active\nMainPID=321\n"
+                "ExecMainStartTimestampMonotonic=654\nFragmentPath=/tmp/demo.service\n"
+            ),
+        )
+
+    overlay, skipped = build_runtime_overlay(
+        registry,
+        deployment,
+        RuntimeTargetCatalog(targets=(base, sibling)),
+        canary_root=Path(binding.canary_receipt_path).parent,
+        canary_public_key_path=Path(binding.canary_public_key_path),
+        deployment_manifest_path=deployment_path,
+        generated_at=NOW,
+        systemctl_runner=process_runner,
+        deployment_loader=lambda path: (deployment, deployment["manifest_id"]),
+    )
+
+    assert len(overlay["contours"]) == 1
+    assert skipped == (
+        {
+            "organ_id": "broken-organ",
+            "contour_id": "read",
+            "reason_code": "canary_evidence_invalid_or_expired",
+        },
+    )
 
 
 def test_preflight_sweep_persists_bounded_status_and_detects_change(

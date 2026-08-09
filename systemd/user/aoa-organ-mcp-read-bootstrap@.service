@@ -16,7 +16,7 @@ Environment=AOA_MCP_HOST=127.0.0.1
 Environment=AOA_MCP_POLICY_FAMILY=read
 Environment=PYTHONDONTWRITEBYTECODE=1
 LoadCredential=%i-mcp-read-bearer-token:/srv/AbyssOS/abyss-stack/Secrets/Configs/%i-mcp-read-bearer-token
-ExecStart=/usr/bin/env python3 /srv/AbyssOS/.codex/bin/%i-mcp-server.py
+ExecStart=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -I -B -m abyss_stack_mcp.process_launcher --executable /srv/AbyssOS/.codex/bin/%i-mcp-server.py
 Restart=no
 RuntimeMaxSec=10min
 TimeoutStopSec=20

@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 15846402,
+  "allowed_tracked_bytes": 31000628,
+  "approved_by": "repository-owner",
+  "base_ref": "7ab5d1273e1185e495af7b7d12ca0ab717fe1b1a",
+  "changed_generated_bytes": 15846402,
+  "changed_generated_files": 192,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "d9d48e0d2589706b6bdf3f4ab8260a1d018236f91a9e8fcd96443771f06bf45a",
+  "reason": "Refresh the portable family for the bootstrap-to-production process-bound canary handoff and final production admission gate.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 31000628,
+  "tracked_bytes_max": 24117248
+}

@@ -9,6 +9,7 @@ import errno
 import hashlib
 import json
 import os
+import re
 import stat
 import tempfile
 import time
@@ -47,6 +48,8 @@ from .observation import (
     RuntimeTarget,
     _load_deployment,
     _load_targets,
+    _process_observation,
+    _systemctl,
 )
 
 
@@ -68,6 +71,7 @@ Ed25519Signature = Annotated[
     Field(min_length=86, max_length=86, pattern=r"^[A-Za-z0-9_-]{86}$"),
 ]
 CanaryPurpose = Literal["current", "last-known-good"]
+CanaryProcessUnit = Literal["production", "bootstrap"]
 
 
 class CanaryRunnerError(ValueError):
@@ -139,6 +143,8 @@ class CanaryReceipt(StrictModel):
     deployment_package_digest: Digest
     deployment_tree_digest: Digest
     deployment_deployed_at: datetime
+    process_unit_name: NonEmpty
+    process_identity: NonEmpty
     canary_route: NonEmpty
     tool_name: Identifier
     tool_arguments_digest: Digest
@@ -163,12 +169,14 @@ class CanaryReceipt(StrictModel):
     instruction_authority: Literal["none"] = "none"
     claim_limit: Literal[
         "This stack-issued receipt proves one authenticated loopback MCP "
-        "schema observation and bounded read canary only. It does not prove "
+        "schema observation, bounded read canary, and exact named-systemd "
+        "process identity unchanged across the probe only. It does not prove "
         "owner grounding, owner freshness, owner acceptance, central proof, "
         "admission, or rollback."
     ] = (
         "This stack-issued receipt proves one authenticated loopback MCP "
-        "schema observation and bounded read canary only. It does not prove "
+        "schema observation, bounded read canary, and exact named-systemd "
+        "process identity unchanged across the probe only. It does not prove "
         "owner grounding, owner freshness, owner acceptance, central proof, "
         "admission, or rollback."
     )
@@ -188,6 +196,14 @@ class CanaryReceipt(StrictModel):
             raise ValueError("canary receipt must follow its exact deployment")
         if self.service_id != self.deployment_service_id:
             raise ValueError("canary deployment service must match the target service")
+        if (
+            re.fullmatch(
+                rf"systemd-user:{re.escape(self.process_unit_name)}:pid:[1-9][0-9]*:start:[1-9][0-9]*",
+                self.process_identity,
+            )
+            is None
+        ):
+            raise ValueError("canary process identity must bind its named systemd unit")
         if self.result_contract_matched and not self.call_succeeded:
             raise ValueError(
                 "a matching canary result contract requires a successful call"
@@ -275,10 +291,40 @@ ProbeRunner = Callable[
     [RuntimeTarget, RuntimeCanaryContract, str, int],
     Awaitable[CanaryProbeResult],
 ]
+ProcessIdentityReader = Callable[[RuntimeTarget, str, datetime], str]
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _live_process_identity(
+    target: RuntimeTarget,
+    deployment_revision: str,
+    observed_at: datetime,
+) -> str:
+    process = _process_observation(
+        target,
+        observed_at=observed_at,
+        expires_at=observed_at + timedelta(minutes=5),
+        deployment_revision=deployment_revision,
+        runner=_systemctl,
+    )
+    if not process.active or process.process_identity is None:
+        raise CanaryRunnerError("canary target process identity is not exact")
+    return process.process_identity
+
+
+def _bootstrap_unit_name(production_unit_name: str) -> str:
+    if production_unit_name == "abyss-stack-mcp-read.service":
+        return "abyss-stack-mcp-read-bootstrap.service"
+    match = re.fullmatch(
+        r"aoa-organ-mcp-read@([A-Za-z0-9_.@-]+)\.service",
+        production_unit_name,
+    )
+    if match is None:
+        raise CanaryRunnerError("canary target has no bounded bootstrap unit identity")
+    return f"aoa-organ-mcp-read-bootstrap@{match.group(1)}.service"
 
 
 def _digest(value: Any) -> str:
@@ -906,6 +952,8 @@ def _receipt_body(
     observed_at: datetime,
     expires_at: datetime,
     deployment: CanaryDeploymentBinding,
+    process_identity: str,
+    process_unit_name: str,
 ) -> dict[str, Any]:
     contract_matched = False
     contract_reasons: tuple[str, ...] = ()
@@ -940,6 +988,8 @@ def _receipt_body(
         "deployment_package_digest": deployment.package_digest,
         "deployment_tree_digest": deployment.deployed_tree_digest,
         "deployment_deployed_at": deployment.deployed_at.isoformat(),
+        "process_unit_name": process_unit_name,
+        "process_identity": process_identity,
         "canary_route": target.canary_route,
         "tool_name": contract.tool_name,
         "tool_arguments_digest": _digest(contract.arguments),
@@ -968,7 +1018,8 @@ def _receipt_body(
         "instruction_authority": "none",
         "claim_limit": (
             "This stack-issued receipt proves one authenticated loopback MCP "
-            "schema observation and bounded read canary only. It does not prove "
+            "schema observation, bounded read canary, and exact named-systemd "
+            "process identity unchanged across the probe only. It does not prove "
             "owner grounding, owner freshness, owner acceptance, central proof, "
             "admission, or rollback."
         ),
@@ -1064,6 +1115,8 @@ def build_receipt(
     ttl_seconds: int,
     signing_key: Ed25519PrivateKey,
     deployment: CanaryDeploymentBinding,
+    process_identity: str,
+    process_unit_name: str | None = None,
 ) -> CanaryReceipt:
     if not 30 <= ttl_seconds <= 3600:
         raise CanaryRunnerError("canary receipt TTL must be 30..3600 seconds")
@@ -1078,6 +1131,8 @@ def build_receipt(
         observed_at=observed_at,
         expires_at=expires_at,
         deployment=deployment,
+        process_identity=process_identity,
+        process_unit_name=process_unit_name or target.unit_name,
     )
     try:
         normalized = CanaryReceipt.model_validate(
@@ -1176,8 +1231,10 @@ async def run_canary(
     ttl_seconds: int = 600,
     timeout_seconds: int = 30,
     purpose: CanaryPurpose = "current",
+    process_unit: CanaryProcessUnit = "production",
     clock: Callable[[], datetime] = _now,
     probe_runner: ProbeRunner = live_probe,
+    process_identity_reader: ProcessIdentityReader = _live_process_identity,
 ) -> tuple[CanaryReceipt, Path, Path, Path | None]:
     if not 1 <= timeout_seconds <= 300:
         raise CanaryRunnerError("canary timeout must be 1..300 seconds")
@@ -1196,6 +1253,11 @@ async def run_canary(
         target = target.model_copy(
             update={"canary_route": target.canary_route + "/last-known-good"}
         )
+    observed_target = target
+    if process_unit == "bootstrap":
+        observed_target = target.model_copy(
+            update={"unit_name": _bootstrap_unit_name(target.unit_name)}
+        )
     credential_path = (
         _require_no_symlink_components(secret_dir, "canary secret root")
         / f"{target.service_id}-read-bearer-token"
@@ -1203,6 +1265,11 @@ async def run_canary(
     credential = _read_credential(credential_path)
     signing_key = _read_signing_key(secret_dir / CANARY_SIGNING_KEY_NAME)
     deployment = _read_deployment_binding(deployment_manifest_path, target)
+    process_before = process_identity_reader(
+        observed_target,
+        deployment.package_source_revision,
+        clock().astimezone(timezone.utc),
+    )
     probe = await probe_runner(
         target,
         target.canary_contract,
@@ -1210,6 +1277,13 @@ async def run_canary(
         timeout_seconds,
     )
     observed_at = clock().astimezone(timezone.utc)
+    process_after = process_identity_reader(
+        observed_target,
+        deployment.package_source_revision,
+        observed_at,
+    )
+    if process_before != process_after:
+        raise CanaryRunnerError("canary target process changed during the probe")
     receipt = build_receipt(
         target=target,
         contract=target.canary_contract,
@@ -1218,6 +1292,8 @@ async def run_canary(
         ttl_seconds=ttl_seconds,
         signing_key=signing_key,
         deployment=deployment,
+        process_identity=process_after,
+        process_unit_name=observed_target.unit_name,
     )
     root = _ensure_private_directory(output_root)
     result_path: Path | None = None
@@ -1273,6 +1349,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("current", "last-known-good"),
         default="current",
     )
+    parser.add_argument(
+        "--process-unit",
+        choices=("production", "bootstrap"),
+        default="production",
+    )
     return parser
 
 
@@ -1289,6 +1370,7 @@ def main() -> int:
                 ttl_seconds=args.ttl_seconds,
                 timeout_seconds=args.timeout_seconds,
                 purpose=args.purpose,
+                process_unit=args.process_unit,
             )
         )
     except CanaryRunnerError as exc:

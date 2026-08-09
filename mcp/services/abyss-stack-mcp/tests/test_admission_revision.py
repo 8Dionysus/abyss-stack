@@ -169,6 +169,14 @@ def _set_owner(link: dict, owner: str) -> None:
 
 def _inputs(tmp_path: Path) -> dict[str, Path]:
     registry = _registry()
+    production_unit = "aoa-organ-mcp-read@aoa-kag.service"
+    current_process_identity = f"systemd-user:{production_unit}:pid:321:start:654"
+    lkg_process_identity = f"systemd-user:{production_unit}:pid:322:start:655"
+    registry_payload = registry.model_dump(mode="json")
+    registry_payload["records"][0]["contours"][0]["runtime_identity"][
+        "process_identity"
+    ] = current_process_identity
+    registry = OrganRegistrySourceV2.model_validate(registry_payload)
     contour = registry.records[0].contours[0]
     current = subject()
     _set_owner(current["source"]["evidence"], "aoa-kag")
@@ -180,8 +188,15 @@ def _inputs(tmp_path: Path) -> dict[str, Path]:
         contour.model_dump(mode="json")
     )
     current["registry"]["registry_id"] = registry.registry_id
-    lkg = json.loads(json.dumps(current))
+    current["process"]["unit_name"] = production_unit
+    current["process"]["process_identity"] = current_process_identity
+    current["proof"]["proved_process_identity"] = current_process_identity
     rollback_target = current["rollback"]["proved_target"]
+    rollback_target["unit_name"] = production_unit
+    rollback_target["process_identity"] = lkg_process_identity
+    current["rollback"]["last_known_good_unit_name"] = production_unit
+    current["rollback"]["last_known_good_process_identity"] = lkg_process_identity
+    lkg = json.loads(json.dumps(current))
     lkg["credential_class"] = rollback_target["credential_class"]
     lkg["package"]["artifact_digest"] = rollback_target["package_digest"]
     lkg["package"]["source_revision"] = rollback_target["deploy_revision"]
@@ -189,9 +204,9 @@ def _inputs(tmp_path: Path) -> dict[str, Path]:
     lkg["deploy"]["tree_digest"] = rollback_target["deploy_tree_digest"]
     lkg["deploy"]["manifest_ref"] = rollback_target["deploy_manifest_ref"]
     lkg["deploy"]["manifest_digest"] = rollback_target["deploy_manifest_digest"]
-    lkg["deploy"]["evidence"]["evidence_refs"][0]["evidence_ref"] = (
-        rollback_target["deploy_manifest_ref"]
-    )
+    lkg["deploy"]["evidence"]["evidence_refs"][0]["evidence_ref"] = rollback_target[
+        "deploy_manifest_ref"
+    ]
     lkg["process"]["unit_name"] = rollback_target["unit_name"]
     lkg["process"]["executable_ref"] = rollback_target["executable_ref"]
     lkg["process"]["process_identity"] = rollback_target["process_identity"]
@@ -203,9 +218,9 @@ def _inputs(tmp_path: Path) -> dict[str, Path]:
     )
     lkg["canary"]["canary_route"] = rollback_target["canary_route"]
     lkg["canary"]["canary_ref"] = rollback_target["canary_ref"]
-    lkg["canary"]["evidence"]["evidence_refs"][0]["evidence_ref"] = (
-        lkg["canary"]["canary_ref"]
-    )
+    lkg["canary"]["evidence"]["evidence_refs"][0]["evidence_ref"] = lkg["canary"][
+        "canary_ref"
+    ]
     lkg["canary"]["evidence"]["evidence_refs"].append(
         {
             "owner": "aoa-kag",
@@ -215,9 +230,7 @@ def _inputs(tmp_path: Path) -> dict[str, Path]:
             "expires_at": (NOW + timedelta(hours=1)).isoformat(),
         }
     )
-    registry_path = _write(
-        tmp_path / "registry.json", registry.model_dump(mode="json")
-    )
+    registry_path = _write(tmp_path / "registry.json", registry.model_dump(mode="json"))
     current_path = _write(tmp_path / "current.json", observation(current))
     lkg_path = _write(tmp_path / "lkg.json", observation(lkg))
     contour_digest = sha256_digest(contour.model_dump(mode="json"))
@@ -251,6 +264,7 @@ def _compose(paths: dict[str, Path]):
         lkg_observation_path=paths["lkg"],
         operator_decision_path=paths["decision"],
         clock=lambda: NOW + timedelta(minutes=2),
+        process_executable_digest=lambda identity, path, unit: DIGEST_A,
     )
 
 
@@ -268,11 +282,56 @@ def test_composes_content_addressed_non_effect_admission_revision(
     assert revision.maturity.cross_organ_proven.state == "not_asserted"
 
 
+def test_accepts_stable_executable_rollback_target_for_live_lkg_process(
+    tmp_path: Path,
+) -> None:
+    paths = _inputs(tmp_path)
+    current = json.loads(paths["current"].read_text())
+    lkg = json.loads(paths["lkg"].read_text())
+    subject_payload = current["subjects"][0]
+    rollback = subject_payload["rollback"]
+    unit_name = rollback["proved_target"]["unit_name"]
+    stable_process = f"systemd-user:{unit_name}:executable:{DIGEST_A}"
+    rollback["proved_target"]["process_identity"] = stable_process
+    rollback["last_known_good_process_identity"] = stable_process
+    lkg["subjects"][0]["process"]["process_identity"] = (
+        f"systemd-user:{unit_name}:pid:321:start:654"
+    )
+    _write(paths["current"], current)
+    _write(paths["lkg"], lkg)
+
+    revision = _compose(paths)
+
+    assert revision.admission_authorized is True
+    assert revision.last_good.runtime_identity.process_identity == (
+        f"systemd-user:{unit_name}:pid:321:start:654"
+    )
+
+
+def test_rejects_stable_rollback_target_without_matching_executable_bytes(
+    tmp_path: Path,
+) -> None:
+    paths = _inputs(tmp_path)
+    current = json.loads(paths["current"].read_text())
+    lkg = json.loads(paths["lkg"].read_text())
+    rollback = current["subjects"][0]["rollback"]
+    unit_name = rollback["proved_target"]["unit_name"]
+    stable_process = f"systemd-user:{unit_name}:executable:{DIGEST_B}"
+    rollback["proved_target"]["process_identity"] = stable_process
+    rollback["last_known_good_process_identity"] = stable_process
+    lkg["subjects"][0]["process"]["process_identity"] = (
+        f"systemd-user:{unit_name}:pid:321:start:654"
+    )
+    _write(paths["current"], current)
+    _write(paths["lkg"], lkg)
+
+    with pytest.raises(AdmissionRevisionError, match="rollback proof target"):
+        _compose(paths)
+
+
 def test_rejects_operator_decision_for_different_contour(tmp_path: Path) -> None:
     paths = _inputs(tmp_path)
-    registry = OrganRegistrySourceV2.model_validate_json(
-        paths["registry"].read_bytes()
-    )
+    registry = OrganRegistrySourceV2.model_validate_json(paths["registry"].read_bytes())
     decision = materialize_admission_decision(
         AdmissionDecisionStatement(
             candidate_id=DIGEST_A,
@@ -295,40 +354,66 @@ def test_rejects_reused_current_canary_as_last_known_good(tmp_path: Path) -> Non
     paths = _inputs(tmp_path)
     current = json.loads(paths["current"].read_text())
     lkg = json.loads(paths["lkg"].read_text())
-    lkg["subjects"][0]["canary"]["canary_ref"] = current["subjects"][0][
-        "canary"
-    ]["canary_ref"]
-    lkg["subjects"][0]["canary"]["evidence"]["evidence_refs"][0][
-        "evidence_ref"
-    ] = current["subjects"][0]["canary"]["canary_ref"]
+    lkg["subjects"][0]["canary"]["canary_ref"] = current["subjects"][0]["canary"][
+        "canary_ref"
+    ]
+    lkg["subjects"][0]["canary"]["evidence"]["evidence_refs"][0]["evidence_ref"] = (
+        current["subjects"][0]["canary"]["canary_ref"]
+    )
     _write(paths["lkg"], lkg)
 
     with pytest.raises(AdmissionRevisionError, match="exact and distinct"):
         _compose(paths)
 
 
+def test_rejects_bootstrap_process_as_final_admission_evidence(
+    tmp_path: Path,
+) -> None:
+    paths = _inputs(tmp_path)
+    current = json.loads(paths["current"].read_text())
+    bootstrap_unit = "aoa-organ-mcp-read-bootstrap@aoa-kag.service"
+    bootstrap_identity = f"systemd-user:{bootstrap_unit}:pid:777:start:888"
+    current["subjects"][0]["process"]["unit_name"] = bootstrap_unit
+    current["subjects"][0]["process"]["process_identity"] = bootstrap_identity
+    current["subjects"][0]["proof"]["proved_process_identity"] = bootstrap_identity
+    _write(paths["current"], current)
+
+    with pytest.raises(AdmissionRevisionError, match="production process"):
+        _compose(paths)
+
+
 @pytest.mark.parametrize(
-    ("section", "field", "value"),
+    ("section", "field", "value", "error"),
     (
-        ("source", "tree_digest", DIGEST_D),
-        ("package", "name", "different-mcp"),
-        ("package", "version", "9.9.9"),
-        ("package", "source_revision", "different-deploy-rev"),
-        ("deploy", "revision", "different-deploy-rev"),
-        ("deploy", "tree_digest", DIGEST_A),
-        ("process", "executable_ref", "/srv/AbyssOS/bin/different-mcp"),
-        ("process", "process_identity", "different-mcp/9.9.9"),
+        ("source", "tree_digest", DIGEST_D, "registry contour"),
+        ("package", "name", "different-mcp", "registry contour"),
+        ("package", "version", "9.9.9", "registry contour"),
+        ("package", "source_revision", "different-deploy-rev", "registry contour"),
+        ("deploy", "revision", "different-deploy-rev", "registry contour"),
+        ("deploy", "tree_digest", DIGEST_A, "registry contour"),
+        (
+            "process",
+            "executable_ref",
+            "/srv/AbyssOS/bin/different-mcp",
+            "registry contour",
+        ),
+        (
+            "process",
+            "process_identity",
+            "different-mcp/9.9.9",
+            "production process",
+        ),
     ),
 )
 def test_rejects_partial_registry_runtime_identity_match(
-    tmp_path: Path, section: str, field: str, value: str
+    tmp_path: Path, section: str, field: str, value: str, error: str
 ) -> None:
     paths = _inputs(tmp_path)
     current = json.loads(paths["current"].read_text())
     current["subjects"][0][section][field] = value
     _write(paths["current"], current)
 
-    with pytest.raises(AdmissionRevisionError, match="registry contour"):
+    with pytest.raises(AdmissionRevisionError, match=error):
         _compose(paths)
 
 
@@ -380,22 +465,37 @@ def test_rejects_owner_acceptance_for_different_current_contour(
 
 
 @pytest.mark.parametrize(
-    ("section", "field", "value"),
+    ("section", "field", "value", "error"),
     (
-        ("package", "artifact_digest", DIGEST_A),
-        ("deploy", "revision", "different-deploy-rev"),
-        ("process", "unit_name", "aoa-organ-mcp-read@different.service"),
-        ("process", "executable_ref", "/srv/AbyssOS/bin/different-mcp"),
-        ("process", "process_identity", "different-mcp/9.9.9"),
+        ("package", "artifact_digest", DIGEST_A, "rollback proof target"),
+        ("deploy", "revision", "different-deploy-rev", "rollback proof target"),
+        (
+            "process",
+            "unit_name",
+            "aoa-organ-mcp-read@different.service",
+            "production process",
+        ),
+        (
+            "process",
+            "executable_ref",
+            "/srv/AbyssOS/bin/different-mcp",
+            "rollback proof target",
+        ),
+        (
+            "process",
+            "process_identity",
+            "different-mcp/9.9.9",
+            "production process",
+        ),
     ),
 )
 def test_rejects_lkg_observation_for_different_rollback_target(
-    tmp_path: Path, section: str, field: str, value: str
+    tmp_path: Path, section: str, field: str, value: str, error: str
 ) -> None:
     paths = _inputs(tmp_path)
     lkg = json.loads(paths["lkg"].read_text())
     lkg["subjects"][0][section][field] = value
     _write(paths["lkg"], lkg)
 
-    with pytest.raises(AdmissionRevisionError, match="rollback proof target"):
+    with pytest.raises(AdmissionRevisionError, match=error):
         _compose(paths)
