@@ -71,6 +71,7 @@ Ed25519Signature = Annotated[
     Field(min_length=86, max_length=86, pattern=r"^[A-Za-z0-9_-]{86}$"),
 ]
 CanaryPurpose = Literal["current", "last-known-good"]
+CanaryProcessUnit = Literal["production", "bootstrap"]
 
 
 class CanaryRunnerError(ValueError):
@@ -312,6 +313,16 @@ def _live_process_identity(
     if not process.active or process.process_identity is None:
         raise CanaryRunnerError("canary target process identity is not exact")
     return process.process_identity
+
+
+def _bootstrap_unit_name(production_unit_name: str) -> str:
+    match = re.fullmatch(
+        r"aoa-organ-mcp-read@([A-Za-z0-9_.@-]+)\.service",
+        production_unit_name,
+    )
+    if match is None:
+        raise CanaryRunnerError("canary target has no bounded bootstrap unit identity")
+    return f"aoa-organ-mcp-read-bootstrap@{match.group(1)}.service"
 
 
 def _digest(value: Any) -> str:
@@ -940,6 +951,7 @@ def _receipt_body(
     expires_at: datetime,
     deployment: CanaryDeploymentBinding,
     process_identity: str,
+    process_unit_name: str,
 ) -> dict[str, Any]:
     contract_matched = False
     contract_reasons: tuple[str, ...] = ()
@@ -974,7 +986,7 @@ def _receipt_body(
         "deployment_package_digest": deployment.package_digest,
         "deployment_tree_digest": deployment.deployed_tree_digest,
         "deployment_deployed_at": deployment.deployed_at.isoformat(),
-        "process_unit_name": target.unit_name,
+        "process_unit_name": process_unit_name,
         "process_identity": process_identity,
         "canary_route": target.canary_route,
         "tool_name": contract.tool_name,
@@ -1102,6 +1114,7 @@ def build_receipt(
     signing_key: Ed25519PrivateKey,
     deployment: CanaryDeploymentBinding,
     process_identity: str,
+    process_unit_name: str | None = None,
 ) -> CanaryReceipt:
     if not 30 <= ttl_seconds <= 3600:
         raise CanaryRunnerError("canary receipt TTL must be 30..3600 seconds")
@@ -1117,6 +1130,7 @@ def build_receipt(
         expires_at=expires_at,
         deployment=deployment,
         process_identity=process_identity,
+        process_unit_name=process_unit_name or target.unit_name,
     )
     try:
         normalized = CanaryReceipt.model_validate(
@@ -1215,6 +1229,7 @@ async def run_canary(
     ttl_seconds: int = 600,
     timeout_seconds: int = 30,
     purpose: CanaryPurpose = "current",
+    process_unit: CanaryProcessUnit = "production",
     clock: Callable[[], datetime] = _now,
     probe_runner: ProbeRunner = live_probe,
     process_identity_reader: ProcessIdentityReader = _live_process_identity,
@@ -1236,6 +1251,11 @@ async def run_canary(
         target = target.model_copy(
             update={"canary_route": target.canary_route + "/last-known-good"}
         )
+    observed_target = target
+    if process_unit == "bootstrap":
+        observed_target = target.model_copy(
+            update={"unit_name": _bootstrap_unit_name(target.unit_name)}
+        )
     credential_path = (
         _require_no_symlink_components(secret_dir, "canary secret root")
         / f"{target.service_id}-read-bearer-token"
@@ -1244,7 +1264,7 @@ async def run_canary(
     signing_key = _read_signing_key(secret_dir / CANARY_SIGNING_KEY_NAME)
     deployment = _read_deployment_binding(deployment_manifest_path, target)
     process_before = process_identity_reader(
-        target,
+        observed_target,
         deployment.package_source_revision,
         clock().astimezone(timezone.utc),
     )
@@ -1256,7 +1276,7 @@ async def run_canary(
     )
     observed_at = clock().astimezone(timezone.utc)
     process_after = process_identity_reader(
-        target,
+        observed_target,
         deployment.package_source_revision,
         observed_at,
     )
@@ -1271,6 +1291,7 @@ async def run_canary(
         signing_key=signing_key,
         deployment=deployment,
         process_identity=process_after,
+        process_unit_name=observed_target.unit_name,
     )
     root = _ensure_private_directory(output_root)
     result_path: Path | None = None
@@ -1326,6 +1347,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("current", "last-known-good"),
         default="current",
     )
+    parser.add_argument(
+        "--process-unit",
+        choices=("production", "bootstrap"),
+        default="production",
+    )
     return parser
 
 
@@ -1342,6 +1368,7 @@ def main() -> int:
                 ttl_seconds=args.ttl_seconds,
                 timeout_seconds=args.timeout_seconds,
                 purpose=args.purpose,
+                process_unit=args.process_unit,
             )
         )
     except CanaryRunnerError as exc:

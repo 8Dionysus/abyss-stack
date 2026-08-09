@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from .canary import (
     CanaryReceipt,
     CanaryRunnerError,
+    _bootstrap_unit_name,
     _read_public_key,
     verify_canary_receipt,
 )
@@ -154,8 +155,17 @@ def build_runtime_overlay(
         deployment_revision = service.get("package_source_revision")
         if not isinstance(deployment_revision, str):
             raise PreflightError("deployment revision is absent")
+        allowed_process_units = {
+            target.unit_name,
+            _bootstrap_unit_name(target.unit_name),
+        }
+        if receipt.process_unit_name not in allowed_process_units:
+            raise PreflightError("canary process unit conflicts with runtime target")
+        process_target = target.model_copy(
+            update={"unit_name": receipt.process_unit_name}
+        )
         process = _process_observation(
-            target,
+            process_target,
             observed_at=now,
             expires_at=now + timedelta(minutes=5),
             deployment_revision=deployment_revision,
@@ -163,11 +173,6 @@ def build_runtime_overlay(
         )
         if not process.active or process.process_identity is None:
             raise PreflightError("managed process identity is not exact")
-        _require_equal(
-            receipt.process_unit_name,
-            target.unit_name,
-            "canary process unit",
-        )
         _require_equal(
             receipt.process_identity,
             process.process_identity,

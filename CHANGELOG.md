@@ -24,7 +24,10 @@ Tracking starts with the community-docs baseline for this repository.
   a contour-local skip rather than a sweep-wide parse failure. Managed organ
   units retain the exact opened launcher inode for their complete lifetime, so
   admission hashes process-backed launch bytes rather than a replaceable
-  pathname.
+  pathname. First admission now records the bootstrap process explicitly and
+  requires a second production-process receipt before final proof or
+  admission, avoiding a preflight/canary startup cycle without weakening the
+  final identity gate.
 - Move the observation producer onto registry v2 and bind the managed
   admission Keeper to its provisioned private owner-evidence inbox, so the
   production units exercise the same v2 and incremental-refresh paths proven

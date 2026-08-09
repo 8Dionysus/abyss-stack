@@ -446,19 +446,24 @@ enough to issue the first receipt. The bootstrap unit has the exact production
 credential, endpoint, sandbox, and `ExecStart`, but no registry/catalog
 preflight; it conflicts with production, never restarts, has no `[Install]`
 section, and is killed after ten minutes. The complete first-admission sequence
-is: verify an exact deployment, start only the matching bootstrap unit, run the
-canary, stop bootstrap, build and review the registry/catalog transaction, then
-start the normal preflight-gated production unit. Bootstrap is not a general
-recovery bypass and must never be enabled.
+is: verify an exact deployment, start only the matching bootstrap unit, issue a
+receipt explicitly bound to that bootstrap process, stop bootstrap, build the
+managed catalog and pass production preflight, then start the normal unit and
+immediately issue a second receipt bound to the production PID/start identity.
+Only that second receipt can enter final proof, acceptance, rollback, and
+admission. Bootstrap is not a general recovery bypass and must never be
+enabled.
 
 For example:
 
 ```bash
 systemctl --user start aoa-organ-mcp-read-bootstrap@aoa-kag.service
-abyss-stack-mcp-canary --organ aoa-kag
+abyss-stack-mcp-canary --organ aoa-kag --process-unit bootstrap
 systemctl --user stop aoa-organ-mcp-read-bootstrap@aoa-kag.service
-# Build/review admission and managed-contours.json before the next command.
+# Build/review managed-contours.json and pass preflight before the next command.
 systemctl --user start aoa-organ-mcp-read@aoa-kag.service
+abyss-stack-mcp-canary --organ aoa-kag
+# Refresh proof and admission only from this production-process receipt.
 ```
 
 The stack auth provisioner creates the canary signing key once as a regular

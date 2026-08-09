@@ -638,6 +638,22 @@ def test_last_known_good_canary_uses_distinct_committed_route(tmp_path: Path) ->
         )
         return successful_probe()
 
+    bootstrap_identity = (
+        "systemd-user:aoa-organ-mcp-read-bootstrap@aoa-kag.service:pid:321:start:654"
+    )
+
+    def bootstrap_process_identity_reader(
+        selected_target: RuntimeTarget,
+        deployment_revision: str,
+        observed_at: datetime,
+    ) -> str:
+        assert selected_target.unit_name == (
+            "aoa-organ-mcp-read-bootstrap@aoa-kag.service"
+        )
+        assert deployment_revision == "a" * 40
+        assert observed_at == NOW
+        return bootstrap_identity
+
     receipt, _, _, _ = asyncio.run(
         run_canary(
             organ_id="aoa-kag",
@@ -646,13 +662,16 @@ def test_last_known_good_canary_uses_distinct_committed_route(tmp_path: Path) ->
             output_root=tmp_path / "rollback-canary",
             deployment_manifest_path=write_deployment_manifest(tmp_path),
             purpose="last-known-good",
+            process_unit="bootstrap",
             clock=lambda: NOW,
             probe_runner=fake_probe,
-            process_identity_reader=process_identity_reader,
+            process_identity_reader=bootstrap_process_identity_reader,
         )
     )
 
     assert receipt.canary_route.endswith("/last-known-good")
+    assert receipt.process_unit_name == ("aoa-organ-mcp-read-bootstrap@aoa-kag.service")
+    assert receipt.process_identity == bootstrap_identity
 
 
 def test_run_canary_rejects_process_change_during_probe(tmp_path: Path) -> None:

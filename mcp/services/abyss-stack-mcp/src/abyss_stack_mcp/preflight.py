@@ -17,6 +17,7 @@ from pydantic import Field, ValidationError, field_validator, model_validator
 from .canary import (
     CanaryReceipt,
     CanaryRunnerError,
+    _bootstrap_unit_name,
     _read_public_key,
     verify_canary_receipt,
 )
@@ -419,12 +420,14 @@ def run_preflight(
             "canary_deployment_service_mismatch",
             binding.canary_receipt_path,
         )
-        _check_equal(
+        _check_bool(
             checks,
             "canary-process-unit",
-            receipt.process_unit_name,
-            binding.unit_name,
+            receipt.process_unit_name
+            in {binding.unit_name, _bootstrap_unit_name(binding.unit_name)},
             "canary_process_unit_mismatch",
+            "production-or-bounded-bootstrap-unit",
+            receipt.process_unit_name,
             binding.canary_receipt_path,
         )
         _check_equal(

@@ -169,6 +169,14 @@ def _set_owner(link: dict, owner: str) -> None:
 
 def _inputs(tmp_path: Path) -> dict[str, Path]:
     registry = _registry()
+    production_unit = "aoa-organ-mcp-read@aoa-kag.service"
+    current_process_identity = f"systemd-user:{production_unit}:pid:321:start:654"
+    lkg_process_identity = f"systemd-user:{production_unit}:pid:322:start:655"
+    registry_payload = registry.model_dump(mode="json")
+    registry_payload["records"][0]["contours"][0]["runtime_identity"][
+        "process_identity"
+    ] = current_process_identity
+    registry = OrganRegistrySourceV2.model_validate(registry_payload)
     contour = registry.records[0].contours[0]
     current = subject()
     _set_owner(current["source"]["evidence"], "aoa-kag")
@@ -180,8 +188,15 @@ def _inputs(tmp_path: Path) -> dict[str, Path]:
         contour.model_dump(mode="json")
     )
     current["registry"]["registry_id"] = registry.registry_id
-    lkg = json.loads(json.dumps(current))
+    current["process"]["unit_name"] = production_unit
+    current["process"]["process_identity"] = current_process_identity
+    current["proof"]["proved_process_identity"] = current_process_identity
     rollback_target = current["rollback"]["proved_target"]
+    rollback_target["unit_name"] = production_unit
+    rollback_target["process_identity"] = lkg_process_identity
+    current["rollback"]["last_known_good_unit_name"] = production_unit
+    current["rollback"]["last_known_good_process_identity"] = lkg_process_identity
+    lkg = json.loads(json.dumps(current))
     lkg["credential_class"] = rollback_target["credential_class"]
     lkg["package"]["artifact_digest"] = rollback_target["package_digest"]
     lkg["package"]["source_revision"] = rollback_target["deploy_revision"]
@@ -351,28 +366,54 @@ def test_rejects_reused_current_canary_as_last_known_good(tmp_path: Path) -> Non
         _compose(paths)
 
 
+def test_rejects_bootstrap_process_as_final_admission_evidence(
+    tmp_path: Path,
+) -> None:
+    paths = _inputs(tmp_path)
+    current = json.loads(paths["current"].read_text())
+    bootstrap_unit = "aoa-organ-mcp-read-bootstrap@aoa-kag.service"
+    bootstrap_identity = f"systemd-user:{bootstrap_unit}:pid:777:start:888"
+    current["subjects"][0]["process"]["unit_name"] = bootstrap_unit
+    current["subjects"][0]["process"]["process_identity"] = bootstrap_identity
+    current["subjects"][0]["proof"]["proved_process_identity"] = bootstrap_identity
+    _write(paths["current"], current)
+
+    with pytest.raises(AdmissionRevisionError, match="production process"):
+        _compose(paths)
+
+
 @pytest.mark.parametrize(
-    ("section", "field", "value"),
+    ("section", "field", "value", "error"),
     (
-        ("source", "tree_digest", DIGEST_D),
-        ("package", "name", "different-mcp"),
-        ("package", "version", "9.9.9"),
-        ("package", "source_revision", "different-deploy-rev"),
-        ("deploy", "revision", "different-deploy-rev"),
-        ("deploy", "tree_digest", DIGEST_A),
-        ("process", "executable_ref", "/srv/AbyssOS/bin/different-mcp"),
-        ("process", "process_identity", "different-mcp/9.9.9"),
+        ("source", "tree_digest", DIGEST_D, "registry contour"),
+        ("package", "name", "different-mcp", "registry contour"),
+        ("package", "version", "9.9.9", "registry contour"),
+        ("package", "source_revision", "different-deploy-rev", "registry contour"),
+        ("deploy", "revision", "different-deploy-rev", "registry contour"),
+        ("deploy", "tree_digest", DIGEST_A, "registry contour"),
+        (
+            "process",
+            "executable_ref",
+            "/srv/AbyssOS/bin/different-mcp",
+            "registry contour",
+        ),
+        (
+            "process",
+            "process_identity",
+            "different-mcp/9.9.9",
+            "production process",
+        ),
     ),
 )
 def test_rejects_partial_registry_runtime_identity_match(
-    tmp_path: Path, section: str, field: str, value: str
+    tmp_path: Path, section: str, field: str, value: str, error: str
 ) -> None:
     paths = _inputs(tmp_path)
     current = json.loads(paths["current"].read_text())
     current["subjects"][0][section][field] = value
     _write(paths["current"], current)
 
-    with pytest.raises(AdmissionRevisionError, match="registry contour"):
+    with pytest.raises(AdmissionRevisionError, match=error):
         _compose(paths)
 
 
@@ -424,22 +465,37 @@ def test_rejects_owner_acceptance_for_different_current_contour(
 
 
 @pytest.mark.parametrize(
-    ("section", "field", "value"),
+    ("section", "field", "value", "error"),
     (
-        ("package", "artifact_digest", DIGEST_A),
-        ("deploy", "revision", "different-deploy-rev"),
-        ("process", "unit_name", "aoa-organ-mcp-read@different.service"),
-        ("process", "executable_ref", "/srv/AbyssOS/bin/different-mcp"),
-        ("process", "process_identity", "different-mcp/9.9.9"),
+        ("package", "artifact_digest", DIGEST_A, "rollback proof target"),
+        ("deploy", "revision", "different-deploy-rev", "rollback proof target"),
+        (
+            "process",
+            "unit_name",
+            "aoa-organ-mcp-read@different.service",
+            "production process",
+        ),
+        (
+            "process",
+            "executable_ref",
+            "/srv/AbyssOS/bin/different-mcp",
+            "rollback proof target",
+        ),
+        (
+            "process",
+            "process_identity",
+            "different-mcp/9.9.9",
+            "production process",
+        ),
     ),
 )
 def test_rejects_lkg_observation_for_different_rollback_target(
-    tmp_path: Path, section: str, field: str, value: str
+    tmp_path: Path, section: str, field: str, value: str, error: str
 ) -> None:
     paths = _inputs(tmp_path)
     lkg = json.loads(paths["lkg"].read_text())
     lkg["subjects"][0][section][field] = value
     _write(paths["lkg"], lkg)
 
-    with pytest.raises(AdmissionRevisionError, match="rollback proof target"):
+    with pytest.raises(AdmissionRevisionError, match=error):
         _compose(paths)

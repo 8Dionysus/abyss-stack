@@ -45,6 +45,7 @@ class AdmissionRevisionError(ObservationProducerError):
 
 
 MAX_PROCESS_EXECUTABLE_BYTES = 16 * 1024 * 1024
+KAG_PRODUCTION_UNIT = "aoa-organ-mcp-read@aoa-kag.service"
 
 
 def _now() -> datetime:
@@ -78,6 +79,20 @@ def _subject(observation: RuntimeObservation) -> Any:
     if len(matches) != 1:
         raise AdmissionRevisionError("observation lacks one exact KAG read contour")
     return matches[0]
+
+
+def _require_production_process(subject: Any, label: str) -> None:
+    if (
+        subject.process.unit_name != KAG_PRODUCTION_UNIT
+        or re.fullmatch(
+            rf"systemd-user:{re.escape(KAG_PRODUCTION_UNIT)}:pid:[1-9][0-9]*:start:[1-9][0-9]*",
+            subject.process.process_identity or "",
+        )
+        is None
+    ):
+        raise AdmissionRevisionError(
+            f"{label} evidence is not bound to the production process"
+        )
 
 
 def _registry_runtime_matches(current: Any, contour: Any) -> bool:
@@ -315,6 +330,8 @@ def compose_admission_revision(
         )
     current = _subject(observation)
     lkg = _subject(lkg_observation)
+    _require_production_process(current, "current")
+    _require_production_process(lkg, "last-known-good")
     now = clock().astimezone(timezone.utc)
     if (
         observation.generated_at > now + MAX_OVERLAY_FUTURE_SKEW

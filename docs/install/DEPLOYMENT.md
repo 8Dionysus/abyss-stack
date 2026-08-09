@@ -175,11 +175,15 @@ systemctl --user start aoa-organ-mcp-read-bootstrap@aoa-kag.service
 # The canary binds the exact latest deployment manifest and does not admit a
 # consumer or start/stop a unit itself:
 /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/abyss-stack-mcp-canary \
-  --organ aoa-kag
+  --organ aoa-kag --process-unit bootstrap
 systemctl --user stop aoa-organ-mcp-read-bootstrap@aoa-kag.service
-# Build and review owner registry admission and managed-contours.json, then use
-# only the normal preflight-gated unit:
+# Build and review managed-contours.json, then use only the normal
+# preflight-gated unit:
 systemctl --user start aoa-organ-mcp-read@aoa-kag.service
+# Replace the transitional bootstrap receipt with evidence bound to the exact
+# production PID/start identity before proof, acceptance, or admission:
+/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/abyss-stack-mcp-canary \
+  --organ aoa-kag
 # Later standalone rotation, only with every stack MCP plane and bootstrap stopped:
 scripts/aoa-install-systemd --rotate-abyss-stack-mcp-auth
 scripts/aoa-install-systemd --install-mcp-http-codex-client
