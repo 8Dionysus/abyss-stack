@@ -166,6 +166,20 @@ OPAQUE_EFFECT_EXECUTABLES = {
     "python3",
     "ruby",
 }
+GIT_CONFIG_DRIVEN_HELPER_SUBCOMMANDS = frozenset(
+    {
+        "blame",
+        "diff",
+        "diff-files",
+        "diff-index",
+        "diff-tree",
+        "format-patch",
+        "log",
+        "range-diff",
+        "show",
+        "status",
+    }
+)
 CLASSIFIABLE_DIRECT_EXECUTABLES = frozenset(
     {
         "basename",
@@ -177,6 +191,7 @@ CLASSIFIABLE_DIRECT_EXECUTABLES = frozenset(
         "cp",
         "cut",
         "date",
+        "dash",
         "diff",
         "dirname",
         "du",
@@ -212,6 +227,7 @@ CLASSIFIABLE_DIRECT_EXECUTABLES = frozenset(
         "uname",
         "uniq",
         "wc",
+        "zsh",
     }
 )
 CODEX_EXECUTABLE_PATH = "/usr/local/bin:/usr/bin:/bin"
@@ -1621,7 +1637,15 @@ def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
             "list",
         }:
             return True
+    if subcommand in GIT_CONFIG_DRIVEN_HELPER_SUBCOMMANDS:
+        return True
     return subcommand not in GIT_DIRECT_BUILTIN_SUBCOMMANDS
+
+
+def _sed_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
+    """Require GNU sed's enforced no-exec/no-file-write language mode."""
+
+    return "--sandbox" not in tokens[1:]
 
 
 def _command_matches_argv(command: str, expected: Sequence[str]) -> bool:
@@ -1871,6 +1895,8 @@ def _command_has_unclassified_indirection(command: str) -> bool:
                 return True
             if raw_executable in OPAQUE_BUILD_AND_TASK_RUNNERS:
                 return True
+            if _executable_path_is_opaque(raw_segment[0]):
+                return True
             if raw_executable in SHELL_NAMES:
                 has_inline_body = any(
                     token in {"-c", "-lc"}
@@ -1895,6 +1921,8 @@ def _command_has_unclassified_indirection(command: str) -> bool:
             ):
                 return True
             if executable == "git" and _git_has_opaque_dispatch(segment):
+                return True
+            if executable == "sed" and _sed_has_opaque_dispatch(segment):
                 return True
             if executable == "find" and any(
                 value in {"-exec", "-execdir", "-ok", "-okdir"}
@@ -3890,8 +3918,29 @@ class ExternalCodexRuntime:
             if value is not None:
                 environment[str(key)] = value
         environment["CODEX_HOME"] = str(launch["codex_home"])
-        environment.setdefault("HOME", os.environ.get("HOME", "/nonexistent"))
+        shell_home = scratch_root.parent / f"{scratch_root.name}-shell-home"
+        try:
+            shell_home.mkdir(mode=0o500, parents=False, exist_ok=True)
+            shell_home_stat = shell_home.lstat()
+            if not stat.S_ISDIR(shell_home_stat.st_mode) or shell_home.is_symlink():
+                raise OSError("isolated shell HOME is not a physical directory")
+            if any(shell_home.iterdir()):
+                raise OSError("isolated shell HOME is not empty")
+            shell_home.chmod(0o500)
+        except OSError as exc:
+            raise ExternalCodexRuntimeError(
+                "isolated_shell_home_unavailable",
+                "cannot establish the runtime-owned non-writable shell HOME",
+            ) from exc
+        environment["HOME"] = str(shell_home)
         environment["PATH"] = CODEX_EXECUTABLE_PATH
+        environment["BASH_ENV"] = "/dev/null"
+        environment["ENV"] = "/dev/null"
+        environment["GIT_CONFIG_GLOBAL"] = "/dev/null"
+        environment["GIT_CONFIG_NOSYSTEM"] = "1"
+        environment["GIT_PAGER"] = "cat"
+        environment["GIT_TERMINAL_PROMPT"] = "0"
+        environment["PAGER"] = "cat"
         environment.setdefault("LANG", "C.UTF-8")
         environment["TMPDIR"] = str(scratch_root)
         environment["NO_COLOR"] = "1"

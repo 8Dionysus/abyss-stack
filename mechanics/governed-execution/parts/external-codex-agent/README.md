@@ -99,6 +99,12 @@ The controller:
   unadmitted bare names, directly selected relative/workspace/home/temporary
   paths, and opaque AWK program bodies remain authority-blocking outside exact
   owner-fixed validation,
+  outer shell executables pass that same path admission before an inline body
+  is inspected; the worker uses an empty, runtime-owned, non-writable `HOME`
+  plus inert shell startup variables instead of ambient user profiles,
+  GNU sed is classifiable only with enforced `--sandbox`, and Git builtins that
+  can invoke repository-configured diff, textconv, or fsmonitor helpers remain
+  opaque,
   build/package/test/task runners remain opaque unless they are an exact
   owner-fixed validation,
   Git config writes plus alias/external-subcommand dispatch and ambient

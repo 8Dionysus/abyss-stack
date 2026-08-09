@@ -325,6 +325,17 @@ and resolves beneath a stable system bin root. Unadmitted bare names and
 directly executed relative, workspace, home, or temporary programs are opaque.
 AWK-family program bodies are also opaque because `system()` can launch an
 unobserved command. Exact owner-fixed validation remains separately admitted.
+An outer shell path is admitted before its `-c` body receives shell-specific
+inspection, so a workspace or temporary executable named `bash`, `sh`, `dash`,
+or `zsh` cannot impersonate the system shell. Codex and its child shells receive
+an empty runtime-owned non-writable `HOME`; `BASH_ENV` and POSIX `ENV` are bound
+to `/dev/null`, ambient user startup files are not inherited, and Git's global
+and system configuration plus interactive pager/prompt routes are disabled.
+GNU sed programs are opaque unless the actual invocation includes GNU sed's
+enforced `--sandbox` mode. Git builtins whose output path may invoke
+repository-configured diff, textconv, or fsmonitor helpers are likewise opaque;
+the controller's own exact Git observations remain outside model-issued command
+admission.
 Shell `source` and `.` bodies remain
 opaque because the observed argv does not expose the sourced commands. Git
 configuration writes, including repository-local and per-worktree writes, and

@@ -7,6 +7,7 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import signal
 import socket
 import subprocess
@@ -467,6 +468,27 @@ if "FAKE_AWK_LAUNCHER" in task["objective"]:
     emit({"type": "item.completed", "item": {
         "type": "command_execution",
         "command": "/usr/bin/awk 'BEGIN { system(\"git push\") }'",
+        "status": "completed",
+        "exit_code": 0,
+    }})
+if "FAKE_NON_SYSTEM_SHELL" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/tmp/bash -lc '/usr/bin/true'",
+        "status": "completed",
+        "exit_code": 0,
+    }})
+if "FAKE_UNSANDBOXED_SED" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/sed -nf scripts/leak.sed README.md",
+        "status": "completed",
+        "exit_code": 0,
+    }})
+if "FAKE_CONFIG_DRIVEN_GIT" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/git diff --check",
         "status": "completed",
         "exit_code": 0,
     }})
@@ -3195,9 +3217,17 @@ def test_fixed_validation_requires_explicit_workspace_cwd_binding(
     terminal = _wait_terminal(runtime, fixture["session_id"])
     result = runtime.result(fixture["session_id"])
 
-    assert terminal["status"] == "failed"
+    assert terminal["status"] == "authority_blocked"
     assert result is not None
     assert result["failure_code"] == "model_report_validation_not_executed"
+    validation_events = [
+        event
+        for event in runtime.events(fixture["session_id"], after_sequence=-1)
+        if event["event_type"] == "external_agent.report_validated"
+    ]
+    assert validation_events[-1]["payload"]["detected_forbidden_effects"] == [
+        "unclassified_indirect_effect"
+    ]
 
 
 def test_fixed_validation_receipt_records_exact_argv_and_cwd(tmp_path: Path) -> None:
@@ -3428,7 +3458,26 @@ def test_unadmitted_bare_names_and_awk_are_fail_closed(command: str) -> None:
 
 @pytest.mark.parametrize(
     "command",
-    ("git status --short", "grep pattern README.md", "/usr/bin/git diff --check"),
+    (
+        "/tmp/bash -lc '/usr/bin/true'",
+        "./bash -lc '/usr/bin/true'",
+        "/usr/bin/sed -nf scripts/leak.sed README.md",
+        "/usr/bin/sed -n '1e git push' README.md",
+        "/usr/bin/git diff --check",
+        "/usr/bin/git status --short",
+    ),
+)
+def test_startup_and_config_driven_dispatch_are_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "git rev-parse HEAD",
+        "grep pattern README.md",
+        "/usr/bin/sed --sandbox -n '1,5p' README.md",
+    ),
 )
 def test_allowlisted_system_commands_remain_classifiable(command: str) -> None:
     assert RUNTIME._command_has_unclassified_indirection(command) is False
@@ -3440,6 +3489,64 @@ def test_allowlisted_but_unavailable_system_command_fails_closed(
     monkeypatch.setattr(RUNTIME.shutil, "which", lambda *_args, **_kwargs: None)
 
     assert RUNTIME._command_has_unclassified_indirection("rg pattern README.md") is True
+
+
+def test_codex_environment_isolates_shell_startup_from_ambient_home(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ambient_home = tmp_path / "ambient-home"
+    ambient_home.mkdir()
+    marker = tmp_path / "ambient-profile-ran"
+    (ambient_home / ".bash_profile").write_text(
+        f"touch {shlex.quote(str(marker))}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HOME", str(ambient_home))
+    monkeypatch.setenv("PATH", f"{ambient_home / 'bin'}:/usr/bin:/bin")
+    scratch = tmp_path / "attempt" / "scratch"
+    scratch.parent.mkdir()
+    scratch.mkdir()
+
+    environment = RUNTIME.ExternalCodexRuntime._codex_environment(
+        None,
+        {
+            "environment_allowlist": ["HOME", "PATH"],
+            "codex_home": str(tmp_path / "codex-home"),
+        },
+        scratch,
+        {"mcp_server_configs": []},
+    )
+    completed = subprocess.run(
+        ["/usr/bin/bash", "-lc", "/usr/bin/true"],
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0
+    assert environment["HOME"] != str(ambient_home)
+    assert environment["PATH"] == RUNTIME.CODEX_EXECUTABLE_PATH
+    assert environment["BASH_ENV"] == "/dev/null"
+    assert environment["ENV"] == "/dev/null"
+    assert Path(environment["HOME"]).stat().st_mode & 0o222 == 0
+    assert marker.exists() is False
+
+    isolated_home = Path(environment["HOME"])
+    isolated_home.chmod(0o700)
+    (isolated_home / ".bash_profile").write_text("/usr/bin/false\n", encoding="utf-8")
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.ExternalCodexRuntime._codex_environment(
+            None,
+            {
+                "environment_allowlist": ["HOME", "PATH"],
+                "codex_home": str(tmp_path / "codex-home"),
+            },
+            scratch,
+            {"mcp_server_configs": []},
+        )
+    assert exc_info.value.code == "isolated_shell_home_unavailable"
 
 
 @pytest.mark.parametrize(
@@ -3512,9 +3619,10 @@ def test_task_schema_requires_the_complete_runtime_forbidden_set(
 @pytest.mark.parametrize(
     "command",
     (
-        "/usr/bin/git status --short",
-        "/usr/bin/git diff --check",
         "/usr/bin/git --version",
+        "/usr/bin/git rev-parse HEAD",
+        "/usr/bin/git ls-files",
+        "/usr/bin/git show-ref --head",
         "/usr/bin/git config core.hooksPath",
         "/usr/bin/git config --local --get core.hooksPath",
         "/usr/bin/git config get core.hooksPath",
@@ -3581,6 +3689,9 @@ def test_started_command_survives_interruption_and_blocks_authority(
         ("FAKE_BARE_EXECUTABLE", ["unclassified_indirect_effect"]),
         ("FAKE_EXTGLOB_EXPANSION", ["unclassified_indirect_effect"]),
         ("FAKE_AWK_LAUNCHER", ["unclassified_indirect_effect"]),
+        ("FAKE_NON_SYSTEM_SHELL", ["unclassified_indirect_effect"]),
+        ("FAKE_UNSANDBOXED_SED", ["unclassified_indirect_effect"]),
+        ("FAKE_CONFIG_DRIVEN_GIT", ["unclassified_indirect_effect"]),
     ),
 )
 def test_opaque_command_authority_blocks_terminal_result(
