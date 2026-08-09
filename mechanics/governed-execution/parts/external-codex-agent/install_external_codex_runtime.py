@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import stat
 import subprocess
@@ -561,7 +562,7 @@ def assert_release_inputs_unchanged(
 
 
 def entrypoint_text(target: str) -> str:
-    return f'''#!/usr/bin/env python3
+    return f'''#!/bin/false
 from __future__ import annotations
 import runpy
 import sys
@@ -576,38 +577,65 @@ runpy.run_path(str(TARGET), run_name="__main__")
 '''
 
 
-def wrapper_text(active_path: Path, entrypoint_name: str) -> str:
-    return f'''#!/usr/bin/env python3
-from __future__ import annotations
+def wrapper_text(
+    active_path: Path,
+    entrypoint_name: str,
+    python_executable: Path,
+) -> str:
+    bootstrap = '''from __future__ import annotations
 import json
 import os
 import sys
 from pathlib import Path
 
-ACTIVE = Path({str(active_path)!r})
-RUNTIME_ROOT = Path({str(active_path.parent)!r})
+ACTIVE = Path(sys.argv[1])
+RUNTIME_ROOT = Path(sys.argv[2])
+ENTRYPOINT_NAME = sys.argv[3]
+PINNED_PYTHON = Path(sys.argv[4])
 if ACTIVE.is_symlink() or not ACTIVE.is_file():
-    raise SystemExit(f"external Codex active release is unavailable: {{ACTIVE}}")
+    raise SystemExit(f"external Codex active release is unavailable: {ACTIVE}")
 record = json.loads(ACTIVE.read_text(encoding="utf-8"))
+if record.get("python_executable") != str(PINNED_PYTHON):
+    raise SystemExit("external Codex active interpreter differs from its wrapper")
 release_id = record["release_id"]
 if not isinstance(release_id, str) or not release_id.startswith("sha256-") or len(release_id) != 71 or any(character not in "0123456789abcdef" for character in release_id[7:]):
-    raise SystemExit(f"external Codex release id is invalid: {{release_id}}")
+    raise SystemExit(f"external Codex release id is invalid: {release_id}")
 raw_release_root = Path(record["release_root"])
 if raw_release_root.is_symlink() or not raw_release_root.is_dir():
-    raise SystemExit(f"external Codex release is unavailable: {{raw_release_root}}")
+    raise SystemExit(f"external Codex release is unavailable: {raw_release_root}")
 release_root = raw_release_root.resolve()
 releases_root = (RUNTIME_ROOT / "releases").resolve()
 try:
     release_root.relative_to(releases_root)
 except ValueError as exc:
-    raise SystemExit(f"external Codex release escapes runtime root: {{release_root}}") from exc
+    raise SystemExit(f"external Codex release escapes runtime root: {release_root}") from exc
 if release_root.parent != releases_root or release_root.name != release_id:
-    raise SystemExit(f"external Codex release coordinate is invalid: {{release_root}}")
-entrypoint = release_root / {entrypoint_name!r}
-python = Path(record["python_executable"])
+    raise SystemExit(f"external Codex release coordinate is invalid: {release_root}")
+entrypoint = release_root / ENTRYPOINT_NAME
 if entrypoint.is_symlink() or not entrypoint.is_file():
-    raise SystemExit(f"external Codex entrypoint is unavailable: {{entrypoint}}")
-os.execv(str(python), [str(python), "-I", "-B", str(entrypoint), *sys.argv[1:]])
+    raise SystemExit(f"external Codex entrypoint is unavailable: {entrypoint}")
+os.execv(
+    str(PINNED_PYTHON),
+    [str(PINNED_PYTHON), "-I", "-B", str(entrypoint), *sys.argv[5:]],
+)
+'''
+    command = " ".join(
+        (
+            "exec",
+            shlex.quote(str(python_executable)),
+            "-I",
+            "-B",
+            "-c",
+            shlex.quote(bootstrap),
+            shlex.quote(str(active_path)),
+            shlex.quote(str(active_path.parent)),
+            shlex.quote(entrypoint_name),
+            shlex.quote(str(python_executable)),
+            '"$@"',
+        )
+    )
+    return f'''#!/bin/sh
+{command}
 '''
 
 
@@ -721,7 +749,7 @@ def materialize_release(
         ):
             path = staging / name
             path.write_text(entrypoint_text(target), encoding="utf-8", newline="\n")
-            os.chmod(path, 0o555)
+            os.chmod(path, 0o444)
         manifest_path = staging / "release-manifest.json"
         manifest_path.write_text(
             json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
@@ -823,7 +851,11 @@ def install(
     }
     for name, entrypoint in wrappers.items():
         path = bin_dir / name
-        expected = wrapper_text(active_path, entrypoint).encode("utf-8")
+        expected = wrapper_text(
+            active_path,
+            entrypoint,
+            python_executable,
+        ).encode("utf-8")
         if path.exists() and not path.is_symlink() and path.read_bytes() == expected:
             wrapper_backups[name] = None
             continue
@@ -916,7 +948,11 @@ def activate(
     }.items():
         atomic_write(
             bin_dir.resolve() / name,
-            wrapper_text(active_path, entrypoint).encode("utf-8"),
+            wrapper_text(
+                active_path,
+                entrypoint,
+                python_executable,
+            ).encode("utf-8"),
             0o755,
         )
     now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
@@ -949,7 +985,7 @@ def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
     python_value = active.get("python_executable")
     if not isinstance(python_value, str):
         raise InstallError("active Python executable is invalid")
-    require_python_executable(Path(python_value))
+    python_executable = require_python_executable(Path(python_value))
     release_id = active.get("release_id")
     if not isinstance(release_id, str):
         raise InstallError("active release id is invalid")
@@ -974,7 +1010,11 @@ def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
         "aoa-external-codex-study": "study-entrypoint.py",
     }.items():
         path = require_regular_file(bin_dir.resolve() / name, f"wrapper {name}")
-        expected = wrapper_text(active_path, entrypoint).encode("utf-8")
+        expected = wrapper_text(
+            active_path,
+            entrypoint,
+            python_executable,
+        ).encode("utf-8")
         wrapper_status[name] = {
             "path": str(path),
             "digest": sha256_file(path),

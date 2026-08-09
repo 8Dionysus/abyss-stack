@@ -1374,6 +1374,42 @@ def _secret_shaped_path(value: str) -> bool:
     )
 
 
+def _shell_inline_body(tokens: Sequence[str]) -> str | None:
+    """Return a shell -c body only while argv remains in option position."""
+
+    if not tokens or Path(tokens[0]).name.lower() not in SHELL_NAMES:
+        return None
+    index = 1
+    while index < len(tokens):
+        token = tokens[index]
+        if token == "--":
+            return None
+        if token in {"-O", "+O", "-o", "+o"}:
+            if index + 1 >= len(tokens):
+                return None
+            index += 2
+            continue
+        if token == "-c":
+            return tokens[index + 1] if index + 1 < len(tokens) else None
+        if token.startswith("--"):
+            index += 1
+            continue
+        if token.startswith("-") and token != "-":
+            if token.startswith(("-O", "-o")):
+                return None
+            if "c" in token[1:]:
+                return tokens[index + 1] if index + 1 < len(tokens) else None
+            index += 1
+            continue
+        if token.startswith("+") and token != "+":
+            index += 1
+            continue
+        # The first non-option token selects a script. Later -c text is an
+        # argument to that script and must never be inspected as shell code.
+        return None
+    return None
+
+
 def _shell_tokenization_analysis(
     command: str,
 ) -> tuple[tuple[tuple[str, ...], ...], bool]:
@@ -1405,10 +1441,9 @@ def _shell_tokenization_analysis(
         tokenizations.append(tokens)
         executable = Path(tokens[0]).name
         if executable in SHELL_NAMES:
-            for index, token in enumerate(tokens[:-1]):
-                if token in {"-c", "-lc"}:
-                    pending.append(tokens[index + 1])
-                    break
+            inline_body = _shell_inline_body(tokens)
+            if inline_body is not None:
+                pending.append(inline_body)
     incomplete = incomplete or any(raw not in seen for raw in pending)
     return tuple(tokenizations), incomplete
 
@@ -1949,11 +1984,7 @@ def _command_has_unclassified_indirection(command: str) -> bool:
             if _executable_path_is_opaque(raw_segment[0]):
                 return True
             if raw_executable in SHELL_NAMES:
-                has_inline_body = any(
-                    token in {"-c", "-lc"}
-                    for token in raw_segment[:-1]
-                )
-                if not has_inline_body:
+                if _shell_inline_body(raw_segment) is None:
                     return True
                 continue
             segment = _unwrap_command(raw_segment)

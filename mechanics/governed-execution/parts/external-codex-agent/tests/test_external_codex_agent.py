@@ -422,6 +422,13 @@ if "FAKE_SOURCE_INDIRECTION" in task["objective"]:
         "status": "completed",
         "exit_code": 0,
     }})
+if "FAKE_SHELL_SCRIPT_BEFORE_C" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/bash scripts/helper.sh -c '/usr/bin/true'",
+        "status": "completed",
+        "exit_code": 0,
+    }})
 if "FAKE_GIT_LOCAL_CONFIG_WRITE" in task["objective"]:
     emit({"type": "item.completed", "item": {
         "type": "command_execution",
@@ -3437,6 +3444,33 @@ def test_sourced_shell_bodies_are_fail_closed(command: str) -> None:
 @pytest.mark.parametrize(
     "command",
     (
+        "/usr/bin/bash scripts/helper.sh -c '/usr/bin/true'",
+        "/usr/bin/bash scripts/helper.sh -lc '/usr/bin/true'",
+        "/usr/bin/bash -- scripts/helper.sh -c '/usr/bin/true'",
+        "/usr/bin/bash -O extglob scripts/helper.sh -c '/usr/bin/true'",
+    ),
+)
+def test_shell_c_after_script_operand_is_fail_closed(command: str) -> None:
+    tokenizations, incomplete = RUNTIME._shell_tokenization_analysis(command)
+
+    assert tokenizations == (tuple(shlex.split(command)),)
+    assert incomplete is False
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+def test_shell_c_in_option_position_remains_classifiable() -> None:
+    command = "/usr/bin/bash -O extglob -lc '/usr/bin/true'"
+
+    tokenizations, incomplete = RUNTIME._shell_tokenization_analysis(command)
+
+    assert tokenizations[-1] == ("/usr/bin/true",)
+    assert incomplete is False
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
         "./scripts/helper",
         "scripts/helper",
         "/home/operator/workspace/scripts/helper",
@@ -3830,6 +3864,7 @@ def test_started_command_survives_interruption_and_blocks_authority(
             ["secret_access", "unclassified_indirect_effect"],
         ),
         ("FAKE_SOURCE_INDIRECTION", ["unclassified_indirect_effect"]),
+        ("FAKE_SHELL_SCRIPT_BEFORE_C", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_LOCAL_CONFIG_WRITE", ["unclassified_indirect_effect"]),
         (
             "FAKE_DIRECT_SECRET_ENCODER",

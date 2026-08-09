@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -141,13 +142,46 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
     for directory in (release_root / "sdk/src").rglob("*"):
         if directory.is_dir():
             directory.chmod(0o755)
+    ambient = tmp_path / "ambient-python"
+    ambient_bin = ambient / "bin"
+    ambient_bin.mkdir(parents=True)
+    path_marker = tmp_path / "ambient-python-path-ran"
+    path_python = ambient_bin / "python3"
+    path_python.write_text(
+        "#!/bin/sh\n"
+        f"/usr/bin/touch {shlex.quote(str(path_marker))}\n"
+        "exit 97\n",
+        encoding="utf-8",
+    )
+    path_python.chmod(0o700)
+    import_marker = tmp_path / "ambient-pythonpath-ran"
+    (ambient / "json.py").write_text(
+        f"open({str(import_marker)!r}, 'w', encoding='utf-8').write('ran\\n')\n",
+        encoding="utf-8",
+    )
+    ambient_environment = dict(os.environ)
+    ambient_environment.update(
+        {
+            "PATH": f"{ambient_bin}:/usr/bin:/bin",
+            "PYTHONPATH": str(ambient),
+        }
+    )
     completed = subprocess.run(
         [str(bin_dir / "aoa-external-codex-agent")],
         check=True,
         capture_output=True,
         text=True,
+        env=ambient_environment,
     )
     assert completed.stdout == "agent:exact-sdk\n"
+    assert path_marker.exists() is False
+    assert import_marker.exists() is False
+    assert (bin_dir / "aoa-external-codex-agent").read_text(
+        encoding="utf-8"
+    ).startswith("#!/bin/sh\nexec ")
+    agent_entrypoint = release_root / "agent-entrypoint.py"
+    assert agent_entrypoint.read_text(encoding="utf-8").startswith("#!/bin/false\n")
+    assert agent_entrypoint.stat().st_mode & 0o111 == 0
     bound = subprocess.run(
         [str(bin_dir / "aoa-external-actor-bind")],
         check=True,
