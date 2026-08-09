@@ -9,6 +9,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Allow the admission composer to renew an already-admitted contour only after
+  its currentness window has expired according to the normalized composition
+  clock. The refresh remains bound to the exact predecessor digest and the
+  complete current owner/runtime/consumer/proof/acceptance/rollback evidence;
+  a still-current contour and a merely future-dated operator decision both
+  fail closed.
 - Bind registry-v2 runtime overlays to the live named user-systemd process
   identity and the immutable deployment record instead of treating MCP
   `serverInfo` and mutable `latest.json` as process and deployment identities.
