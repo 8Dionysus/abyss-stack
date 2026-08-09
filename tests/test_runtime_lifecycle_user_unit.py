@@ -1182,7 +1182,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
     def test_stack_mcp_runtime_requires_the_released_aoa_sdk(self) -> None:
         installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")
         self.assertIn("import abyss_stack_mcp, aoa_sdk, mcp, pydantic", installer)
-        self.assertIn('version("aoa-sdk") == "0.10.1"', installer)
+        self.assertIn('version("aoa-sdk") == "0.10.2"', installer)
 
     @unittest.skipIf(
         hasattr(os, "geteuid") and os.geteuid() == 0,
