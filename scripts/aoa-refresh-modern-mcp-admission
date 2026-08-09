@@ -9,6 +9,7 @@ TARGETS="$STACK/Configs/mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/runtime
 PUBLIC_KEY="$STACK/Secrets/Configs/abyss-stack-mcp-canary-ed25519-public-key.pem"
 ROOT="$STACK/Logs/mcp/fleet-admission"
 RUN="$ROOT/runs/$(date -u +%Y%m%dT%H%M%SZ)"
+LOCK="$ROOT/.refresh.lock"
 
 organs=(
   abyss-stack abyss-machine aoa-decisions aoa-memo aoa-session-memory
@@ -20,6 +21,28 @@ if [[ ! -f "$REGISTRY" || -L "$REGISTRY" ]]; then
   printf 'modern MCP admission registry is unavailable or unsafe\n' >&2
   exit 1
 fi
+
+mkdir -p "$ROOT"
+chmod 0700 "$ROOT"
+if [[ -e "$LOCK" || -L "$LOCK" ]]; then
+  [[ -f "$LOCK" && ! -L "$LOCK" ]] || {
+    printf 'modern MCP admission refresh lock is unsafe\n' >&2
+    exit 1
+  }
+else
+  (
+    umask 077
+    set -o noclobber
+    : > "$LOCK"
+  ) 2>/dev/null || true
+  [[ -f "$LOCK" && ! -L "$LOCK" ]] || {
+    printf 'modern MCP admission refresh lock could not be created\n' >&2
+    exit 1
+  }
+fi
+chmod 0600 "$LOCK"
+exec {refresh_lock_fd}<>"$LOCK"
+flock --exclusive "$refresh_lock_fd"
 
 now_epoch=$(date -u +%s)
 deployment_manifest_id=$(jq -er .manifest_id "$DEPLOYMENT")
