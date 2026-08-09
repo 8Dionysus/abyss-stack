@@ -199,7 +199,7 @@
 
 ## A2A return
 
-- [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0110 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md`)
 
 ## Codex hooks
 
@@ -458,7 +458,7 @@
 
 ## model incarnation
 
-- [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0110 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md`)
 
 ## model-neutral invocation
 
@@ -492,7 +492,7 @@
 
 ## persistent session
 
-- [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0110 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md`)
 
 ## policy plane
 
@@ -541,8 +541,8 @@
 
 ## runtime boundary
 
-- [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
 - [ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md`)
+- [ABYSS-STACK-D-0110 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md`)
 
 ## runtime contract
 

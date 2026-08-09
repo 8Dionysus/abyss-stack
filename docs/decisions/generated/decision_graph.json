@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 108,
-  "edge_count": 2439,
+  "decision_count": 110,
+  "edge_count": 2488,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 929,
-    "DATED": 108,
-    "GUARDED_BY": 322,
-    "HAS_STATUS": 108,
-    "HAS_SURFACE_CLASS": 282,
-    "IN_STACK_LANE": 245,
-    "NEXT_DECISION": 107,
-    "OWNED_BY_SURFACE": 114,
-    "OWNS_DECISION": 108,
+    "CITES_SOURCE_SURFACE": 941,
+    "DATED": 110,
+    "GUARDED_BY": 333,
+    "HAS_STATUS": 110,
+    "HAS_SURFACE_CLASS": 290,
+    "IN_STACK_LANE": 251,
+    "NEXT_DECISION": 109,
+    "OWNED_BY_SURFACE": 116,
+    "OWNS_DECISION": 110,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 114
+    "UNDER_MECHANIC_PARENT": 116
   },
   "edges": [
     {
@@ -11663,12 +11663,247 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0108",
+      "target": "decision:ABYSS-STACK-D-0109",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
       "target": "owner_surface:mcp/services/_shared/modern_runtime.py",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0108",
       "target": "mechanic_parent:runtime-lifecycle",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/bind_external_actor_launch.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/runtime-profile.v1.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-actor-launch-manifest.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-launch.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "source_surface:scripts/aoa-external-actor-bind",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "date:2026-08-08",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "guard_family:exact%20binding",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "guard_family:observe-only%20usage",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "guard_family:owner%20provenance",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "guard_family:role-scoped%20MCP",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "guard_family:task-local%20DAG",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "surface_class:actor%20admission",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "surface_class:model-neutral%20invocation",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "surface_class:responsibility%20transfer",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "surface_class:runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "stack_lane:review",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "stack_lane:source",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "decision:ABYSS-STACK-D-0110",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "source_surface:mechanics/governed-execution/PARTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "source_surface:mechanics/governed-execution/PROVENANCE.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "source_surface:mechanics/governed-execution/parts/agent-os-adapter/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "source_surface:scripts/aoa-external-codex-agent",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "date:2026-08-01",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "guard_family:durable%20resume",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "guard_family:effect%20ceiling",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "guard_family:exact%20binding",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "guard_family:independent%20review",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "guard_family:owner%20provenance",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "guard_family:process%20isolation",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "surface_class:A2A%20return",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "surface_class:model%20incarnation",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "surface_class:persistent%20session",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "surface_class:runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "stack_lane:review",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "stack_lane:source",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0110",
+      "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -12210,21 +12445,31 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0108",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0109",
+      "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0110",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1086,
+  "node_count": 1117,
   "node_type_counts": {
     "date": 33,
-    "decision": 108,
-    "guard_family": 160,
+    "decision": 110,
+    "guard_family": 169,
     "mechanic_parent": 10,
-    "owner_surface": 60,
+    "owner_surface": 61,
     "repo": 1,
-    "source_surface": 553,
-    "stack_lane": 45,
+    "source_surface": 564,
+    "stack_lane": 46,
     "status": 3,
-    "surface_class": 113
+    "surface_class": 120
   },
   "nodes": [
     {
@@ -13470,6 +13715,26 @@
       "posture": "accepted production protocol cutover",
       "status": "accepted",
       "title": "ABYSS-STACK-D-0108 Modern-Only MCP Organ Runtime",
+      "type": "decision"
+    },
+    {
+      "date": "2026-08-08",
+      "id": "decision:ABYSS-STACK-D-0109",
+      "label": "ABYSS-STACK-D-0109",
+      "path": "docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md",
+      "posture": "accepted source-local owner contour; clean installed release and real-role proof remain open",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours",
+      "type": "decision"
+    },
+    {
+      "date": "2026-08-01",
+      "id": "decision:ABYSS-STACK-D-0110",
+      "label": "ABYSS-STACK-D-0110",
+      "path": "docs/decisions/ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md",
+      "posture": "accepted source-local runtime with reviewed nonproduction machine-local vertical proof; model fit and production admission remain external",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0110 Launch Bound Model Incarnations as External Codex Processes",
       "type": "decision"
     },
     {

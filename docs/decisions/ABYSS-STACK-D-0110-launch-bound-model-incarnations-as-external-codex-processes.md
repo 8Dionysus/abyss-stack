@@ -1,6 +1,6 @@
 # Launch Bound Model Incarnations as External Codex Processes
 
-- Decision ID: ABYSS-STACK-D-0108
+- Decision ID: ABYSS-STACK-D-0110
 - Status: accepted
 - Date: 2026-08-01
 - Owner surface: `mechanics/governed-execution/parts/external-codex-agent/`

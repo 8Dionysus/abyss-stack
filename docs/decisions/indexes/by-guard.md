@@ -339,7 +339,7 @@
 
 ## durable resume
 
-- [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0110 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md`)
 
 ## effect boundary
 
@@ -347,7 +347,7 @@
 
 ## effect ceiling
 
-- [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0110 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md`)
 
 ## effect isolation
 
@@ -369,8 +369,8 @@
 
 ## exact binding
 
-- [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
 - [ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md`)
+- [ABYSS-STACK-D-0110 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md`)
 
 ## exact delivery
 
@@ -472,7 +472,7 @@
 
 ## independent review
 
-- [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0110 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md`)
 
 ## language competence
 
@@ -587,8 +587,8 @@
 
 ## owner provenance
 
-- [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
 - [ABYSS-STACK-D-0109 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md`)
+- [ABYSS-STACK-D-0110 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md`)
 
 ## owner skill package
 
@@ -633,7 +633,7 @@
 
 ## process isolation
 
-- [ABYSS-STACK-D-0108 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0108-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0110 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0110-launch-bound-model-incarnations-as-external-codex-processes.md`)
 
 ## profile topology
 
