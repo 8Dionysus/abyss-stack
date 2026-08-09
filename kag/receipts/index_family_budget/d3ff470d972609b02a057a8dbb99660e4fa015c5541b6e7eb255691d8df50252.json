@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 15928393,
+  "allowed_tracked_bytes": 31001690,
+  "approved_by": "repository-owner",
+  "base_ref": "7ab5d1273e1185e495af7b7d12ca0ab717fe1b1a",
+  "changed_generated_bytes": 15928393,
+  "changed_generated_files": 193,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "d3ff470d972609b02a057a8dbb99660e4fa015c5541b6e7eb255691d8df50252",
+  "reason": "Refresh the portable family after replacing cross-clock process-start comparison with exact systemd identity re-observation.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 31001690,
+  "tracked_bytes_max": 24117248
+}
