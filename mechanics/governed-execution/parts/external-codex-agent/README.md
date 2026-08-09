@@ -122,9 +122,10 @@ The controller:
   they launch an unobserved helper,
   build/package/test/task runners remain opaque unless they are an exact
   owner-fixed validation,
-  Git config writes plus alias/external-subcommand dispatch and ambient
-  environment assignment fail closed; `git remote` retains read-only listing
-  and URL resolution, while every mutating or transport-dispatching form is
+  all model-issued Git config access plus alias/external-subcommand dispatch
+  and ambient environment assignment fail closed because config reads may
+  expose credential- or command-bearing values; `git remote` retains read-only
+  listing and URL resolution, while every mutating or transport-dispatching form is
   opaque; `git update-ref` is opaque because it mutates repository state below
   the manifest-visible worktree, and Git help forms are opaque as well because
   configured man viewers can dispatch programs,

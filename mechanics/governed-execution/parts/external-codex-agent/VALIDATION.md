@@ -95,6 +95,7 @@ ripgrep preprocessor/hostname/decompressor dispatch refusal with ordinary
 search preserved and ambient ripgrep configuration disabled,
 GNU sort compression-program dispatch refusal with ordinary sort preserved,
 hidden Git ref mutation refusal with ordinary ref inspection preserved,
+credential-bearing Git config read refusal alongside config-write refusal,
 GNU sed `--sandbox` enforcement, config-driven Git helper refusal,
 sourced-shell refusal, Git alias/config-write/external-subcommand refusal, ambient
 environment-assignment refusal, Git-invisible FIFO and Unix-socket refusal,

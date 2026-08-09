@@ -362,6 +362,10 @@ Ordinary GNU sort remains classifiable, but `--compress-program` and its
 accepted GNU abbreviations are opaque because the selected compressor is an
 unobserved child process. `git update-ref` is also opaque because it mutates
 persistent repository refs below the manifest-visible worktree.
+All model-issued `git config` access is opaque: repository, worktree, global,
+or system reads may return credential- or command-bearing values, while writes
+may alter later command behavior. Controller-owned Git probes remain isolated
+under the separately fixed minimal environment.
 Shell `source` and `.` bodies remain
 opaque because the observed argv does not expose the sourced commands. Git
 configuration writes, including repository-local and per-worktree writes, and

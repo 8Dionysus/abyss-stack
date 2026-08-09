@@ -436,6 +436,13 @@ if "FAKE_GIT_LOCAL_CONFIG_WRITE" in task["objective"]:
         "status": "completed",
         "exit_code": 0,
     }})
+if "FAKE_GIT_CONFIG_READ" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/git config --get http.https://example.com/.extraheader",
+        "status": "completed",
+        "exit_code": 0,
+    }})
 if "FAKE_GIT_HIDDEN_PROGRAMS" in task["objective"]:
     for command in (
         "/usr/bin/git branch --edit-description",
@@ -3851,9 +3858,14 @@ def test_git_config_and_external_dispatch_are_fail_closed(command: str) -> None:
         "/usr/bin/git config --worktree core.hooksPath /tmp/hooks",
         "/usr/bin/git config --add core.hooksPath /tmp/hooks",
         "/usr/bin/git config set core.hooksPath /tmp/hooks",
+        "/usr/bin/git config --get http.https://example.com/.extraheader",
+        "/usr/bin/git config --list",
+        "/usr/bin/git config core.hooksPath",
+        "/usr/bin/git config --local --get core.hooksPath",
+        "/usr/bin/git config get core.hooksPath",
     ),
 )
-def test_git_repository_config_writes_are_fail_closed(command: str) -> None:
+def test_git_repository_config_access_is_fail_closed(command: str) -> None:
     assert RUNTIME._command_has_unclassified_indirection(command) is True
 
 
@@ -3953,9 +3965,6 @@ def test_task_schema_requires_the_complete_runtime_forbidden_set(
         "/usr/bin/git rev-parse HEAD",
         "/usr/bin/git ls-files",
         "/usr/bin/git show-ref --head",
-        "/usr/bin/git config core.hooksPath",
-        "/usr/bin/git config --local --get core.hooksPath",
-        "/usr/bin/git config get core.hooksPath",
         "/usr/bin/git remote",
         "/usr/bin/git remote -v",
         "/usr/bin/git remote get-url origin",
@@ -4014,6 +4023,7 @@ def test_started_command_survives_interruption_and_blocks_authority(
         ("FAKE_SOURCE_INDIRECTION", ["unclassified_indirect_effect"]),
         ("FAKE_SHELL_SCRIPT_BEFORE_C", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_LOCAL_CONFIG_WRITE", ["unclassified_indirect_effect"]),
+        ("FAKE_GIT_CONFIG_READ", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_HIDDEN_PROGRAMS", ["unclassified_indirect_effect"]),
         ("FAKE_RIPGREP_HIDDEN_PROGRAM", ["unclassified_indirect_effect"]),
         ("FAKE_SORT_HIDDEN_PROGRAM", ["unclassified_indirect_effect"]),

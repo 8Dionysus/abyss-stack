@@ -1670,41 +1670,11 @@ def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
     if subcommand is None:
         return not any(token in {"--help", "--version"} for token in tokens[1:])
     if subcommand == "config":
-        mutation_options = {
-            "--add",
-            "--edit",
-            "-e",
-            "--rename-section",
-            "--remove-section",
-            "--replace-all",
-            "--unset",
-            "--unset-all",
-        }
-        mutation_subcommands = {
-            "edit",
-            "rename-section",
-            "remove-section",
-            "set",
-            "unset",
-            "unset-all",
-        }
-        if any(value.lower() in mutation_options for value in git_args):
-            return True
-        positional = tuple(
-            value.lower() for value in git_args if not value.startswith("-")
-        )
-        if positional[:1] and positional[0] in mutation_subcommands:
-            return True
-        # The traditional `git config <name> <value>` form writes even when
-        # --local/--worktree is omitted.  A single name is a direct read.
-        if len(positional) > 1 and positional[0] not in {
-            "get",
-            "get-all",
-            "get-regexp",
-            "get-urlmatch",
-            "list",
-        }:
-            return True
+        # Repository, worktree, global, and system config may contain
+        # credentials or command-bearing values. The event exposes neither
+        # the selected source nor the returned value, so model-issued reads
+        # and writes are both opaque.
+        return True
     if subcommand == "remote":
         positional = tuple(
             value.lower() for value in git_args if not value.startswith("-")
