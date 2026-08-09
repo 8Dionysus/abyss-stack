@@ -3180,7 +3180,7 @@ def test_read_and_candidate_servers_expose_disjoint_tools(tmp_path: Path) -> Non
     }
     assert candidate_tools == {"stack_prepare_runtime_plan"}
     read_tool_contracts = {
-        tool.name: tool.inputSchema for tool in asyncio.run(read.list_tools())
+        tool.name: tool.input_schema for tool in asyncio.run(read.list_tools())
     }
     catalog_policy = read_tool_contracts["stack_runtime_catalog"]["properties"][
         "policy_family"
@@ -3226,9 +3226,9 @@ def test_stdio_server_round_trips_through_policy_seam(tmp_path: Path) -> None:
                 result = await session.call_tool(
                     "stack_runtime_catalog",
                     {"organ_id": "aoa-kag"},
-                    read_timeout_seconds=timedelta(seconds=5),
+                    read_timeout_seconds=5.0,
                 )
-        assert not result.isError
+        assert not result.is_error
         return json.loads(result.content[0].text)
 
     payload = asyncio.run(run_smoke())

@@ -42,8 +42,11 @@ Machine, Session Memory, ToS corpus, and all six connector adapters. Memo and
 Evals additionally use distinct candidate credentials and processes. Missing,
 short, malformed, cross-owner, cross-contour, or conflicting
 values fail before bind. Standalone package
-manifests require `mcp>=1.27.2,<2`, the SDK line on which this FastMCP bearer
-contract is exercised. This route is authenticated local transport
+manifests require exact `mcp==2.0.0`, the stable SDK line implementing the
+`2026-07-28` server/discovery and streamable-HTTP contract. The shared
+`_modern_runtime.py` projection preserves the standalone package shape while
+binding every organ server to the same fail-closed modern runtime and bearer
+contract. This route is authenticated local transport
 consolidation, not network publication. Remote, wildcard-bind, gateway, proxy,
 cross-host, and OAuth/federated identity topology require a later decision than
 [D-0077](../../docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md).

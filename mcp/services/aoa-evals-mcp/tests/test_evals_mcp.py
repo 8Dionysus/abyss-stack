@@ -2145,7 +2145,7 @@ def test_server_contours_have_disjoint_annotated_tool_catalogs(
             },
             {prompt.name for prompt in await server.list_prompts()},
             {
-                template.uriTemplate
+                template.uri_template
                 for template in await server.list_resource_templates()
             },
         )
@@ -2180,15 +2180,15 @@ def test_server_contours_have_disjoint_annotated_tool_catalogs(
     }
     assert set(read_tools).isdisjoint(candidate_tools)
     for tool_annotations in read_tools.values():
-        assert tool_annotations.readOnlyHint is True
-        assert tool_annotations.destructiveHint is False
-        assert tool_annotations.idempotentHint is True
-        assert tool_annotations.openWorldHint is False
+        assert tool_annotations.read_only_hint is True
+        assert tool_annotations.destructive_hint is False
+        assert tool_annotations.idempotent_hint is True
+        assert tool_annotations.open_world_hint is False
     for tool_annotations in candidate_tools.values():
-        assert tool_annotations.readOnlyHint is False
-        assert tool_annotations.destructiveHint is True
-        assert tool_annotations.idempotentHint is False
-        assert tool_annotations.openWorldHint is False
+        assert tool_annotations.read_only_hint is False
+        assert tool_annotations.destructive_hint is True
+        assert tool_annotations.idempotent_hint is False
+        assert tool_annotations.open_world_hint is False
     assert read_prompts == {
         "eval-find-or-propose",
         "eval-forge-access",
@@ -2236,7 +2236,7 @@ def test_owner_capability_profiles_expose_exact_disjoint_catalogs(
             {tool.name: tool.annotations for tool in await server.list_tools()},
             {str(resource.uri) for resource in await server.list_resources()},
             {
-                template.uriTemplate
+                template.uri_template
                 for template in await server.list_resource_templates()
             },
             {prompt.name for prompt in await server.list_prompts()},
@@ -2269,9 +2269,9 @@ def test_owner_capability_profiles_expose_exact_disjoint_catalogs(
     assert request_templates == set()
     assert prompts == set()
     request_annotations = request_tools["aoa_evals_prepare_request_candidate"]
-    assert request_annotations.readOnlyHint is False
-    assert request_annotations.destructiveHint is False
-    assert request_annotations.idempotentHint is True
+    assert request_annotations.read_only_hint is False
+    assert request_annotations.destructive_hint is False
+    assert request_annotations.idempotent_hint is True
 
     proof_tools, proof_resources, proof_templates, prompts = asyncio.run(
         inspect(proof)

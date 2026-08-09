@@ -22,6 +22,7 @@ anyio==4.13.0 \
     # via
     #   -c mcp/services/abyss-stack-mcp/requirements.constraints
     #   httpx
+    #   httpx2
     #   mcp
     #   sse-starlette
     #   starlette
@@ -198,6 +199,7 @@ h11==0.16.0 \
     # via
     #   -c mcp/services/abyss-stack-mcp/requirements.constraints
     #   httpcore
+    #   httpcore2
     #   uvicorn
 httpcore==1.0.9 \
     --hash=sha256:2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55 \
@@ -205,15 +207,21 @@ httpcore==1.0.9 \
     # via
     #   -c mcp/services/abyss-stack-mcp/requirements.constraints
     #   httpx
+httpcore2==2.9.1 \
+    --hash=sha256:4d8acbf8b306f48c9d6046591fd5ba4037d1b1b1000d140fc2c3eab1e9a0c0e2 \
+    --hash=sha256:6182472379e855fe4221246a2bb7ecede403bc61c6798062ae1787d051ccde26
+    # via
+    #   -c mcp/services/abyss-stack-mcp/requirements.constraints
+    #   httpx2
 httpx==0.28.1 \
     --hash=sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc \
     --hash=sha256:d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad
     # via
     #   -c mcp/services/abyss-stack-mcp/requirements.constraints
-    #   mcp
-httpx-sse==0.4.3 \
-    --hash=sha256:0ac1c9fe3c0afad2e0ebb25a934a59f4c7823b60792691f779fad2c5568830fc \
-    --hash=sha256:9b1ed0127459a66014aec3c56bebd93da3c1bc8bb6618c8082039a44889a755d
+    #   abyss-stack-mcp (mcp/services/abyss-stack-mcp/pyproject.toml)
+httpx2==2.9.1 \
+    --hash=sha256:1820fe14a9ab1107bfeff39259987429450b070ec0ff38cc87eb0d8c97fdc71a \
+    --hash=sha256:1932a768737e3666291582833da748cc4e563c337cf96706fccc04fa6e58764a
     # via
     #   -c mcp/services/abyss-stack-mcp/requirements.constraints
     #   mcp
@@ -224,6 +232,7 @@ idna==3.18 \
     #   -c mcp/services/abyss-stack-mcp/requirements.constraints
     #   anyio
     #   httpx
+    #   httpx2
 jsonschema==4.23.0 \
     --hash=sha256:d71497fef26351a33265337fa77ffeb82423f3ea21283cd9467bb03999266bc4 \
     --hash=sha256:fbadb6f8b144a8f8cf9f0b89ba94501d143e50411a1278633f56a7acf7fd5566
@@ -243,18 +252,30 @@ markdown-it-py==4.2.0 \
     # via
     #   -c mcp/services/abyss-stack-mcp/requirements.constraints
     #   rich
-mcp==1.27.2 \
-    --hash=sha256:8e02db104096d1c25b28e64bde29a5c32b31bc241710213e12fd4d84985bdfef \
-    --hash=sha256:d6ff5160c6ca65d93013626efb3fc249de683c30b2d8570755ceddd490344de5
+mcp==2.0.0 \
+    --hash=sha256:0f440e735c13ece8bb19bc62cf0b86f4313448432fbb77d35e14034f4e050728 \
+    --hash=sha256:1cb4c75d2d2c7b8c1d756355e5d82a39f2822cc7f13e22a2051d7ca3592349d6
     # via
     #   -c mcp/services/abyss-stack-mcp/requirements.constraints
     #   abyss-stack-mcp (mcp/services/abyss-stack-mcp/pyproject.toml)
+mcp-types==2.0.0 \
+    --hash=sha256:6b2de797ca2797f568b79529e1b25948e34de511bcc0bd82fef1039a6d1b8eb0 \
+    --hash=sha256:d7d939b9285c9961ae8866ba75ef85da34d12bafe276efbf4eb6a131786d8379
+    # via
+    #   -c mcp/services/abyss-stack-mcp/requirements.constraints
+    #   mcp
 mdurl==0.1.2 \
     --hash=sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8 \
     --hash=sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba
     # via
     #   -c mcp/services/abyss-stack-mcp/requirements.constraints
     #   markdown-it-py
+opentelemetry-api==1.44.0 \
+    --hash=sha256:67647e5e9566edcf421166fdf022b3537f818635daa852b289e34604dc6fb33a \
+    --hash=sha256:94b98c893a91b88657eaac1e3ba89618cdb85be6918196705354f34728b2cdef
+    # via
+    #   -c mcp/services/abyss-stack-mcp/requirements.constraints
+    #   mcp
 orjson==3.11.9 \
     --hash=sha256:011382e2a60fda9d46f1cdee31068cfc52ffe952b587d683ec0463002802a0f4 \
     --hash=sha256:03db380e3780fa0015ed776a90f20e8e20bb11dde13b216ce19e5718e3dfba62 \
@@ -347,7 +368,7 @@ pydantic==2.13.4 \
     #   abyss-stack-mcp (mcp/services/abyss-stack-mcp/pyproject.toml)
     #   aoa-sdk
     #   mcp
-    #   pydantic-settings
+    #   mcp-types
 pydantic-core==2.46.4 \
     --hash=sha256:00c603d540afdd6b80eb39f078f33ebd46211f02f33e34a32d9f053bba711de0 \
     --hash=sha256:0186750b482eefa11d7f435892b09c5c606193ef3375bcf94aa00ae6bfb66262 \
@@ -472,12 +493,6 @@ pydantic-core==2.46.4 \
     # via
     #   -c mcp/services/abyss-stack-mcp/requirements.constraints
     #   pydantic
-pydantic-settings==2.14.1 \
-    --hash=sha256:6e3c7edfd8277687cdc598f56e5cff0e9bfff0910a3749deaa8d4401c3a2b9de \
-    --hash=sha256:e874d3bec7e787b0c9958277956ed9b4dd5de6a80e162188fdaff7c5e26fd5fa
-    # via
-    #   -c mcp/services/abyss-stack-mcp/requirements.constraints
-    #   mcp
 pygments==2.20.0 \
     --hash=sha256:6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f \
     --hash=sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176
@@ -490,12 +505,6 @@ pyjwt==2.13.0 \
     # via
     #   -c mcp/services/abyss-stack-mcp/requirements.constraints
     #   mcp
-python-dotenv==1.2.2 \
-    --hash=sha256:1d8214789a24de455a8b8bd8ae6fe3c6b69a5e3d64aa8a8e5d68e694bbcb285a \
-    --hash=sha256:2c371a91fbd7ba082c2c1dc1f8bf89ca22564a087c2c287cd9b662adde799cf3
-    # via
-    #   -c mcp/services/abyss-stack-mcp/requirements.constraints
-    #   pydantic-settings
 python-multipart==0.0.29 \
     --hash=sha256:2ddcc971cef266225f54f552d8fa10bcfbb1f14446caec199060daac59ff2d69 \
     --hash=sha256:643e93849196645e2dbdd81a0f8829a23123ad7f797a84a364c6fb3563f18904
@@ -732,6 +741,13 @@ starlette==1.2.1 \
     #   -c mcp/services/abyss-stack-mcp/requirements.constraints
     #   mcp
     #   sse-starlette
+truststore==0.10.4 \
+    --hash=sha256:9d91bd436463ad5e4ee4aba766628dd6cd7010cf3e2461756b3303710eebc301 \
+    --hash=sha256:adaeaecf1cbb5f4de3b1959b42d41f6fab57b2b1666adb59e89cb0b53361d981
+    # via
+    #   -c mcp/services/abyss-stack-mcp/requirements.constraints
+    #   httpcore2
+    #   httpx2
 typer==0.27.1 \
     --hash=sha256:53150287edd11baeb4e4722c8e394fcdf8181c0ae89485cba8d25c778d5edd56 \
     --hash=sha256:a79bef8469a79c45498e7b814ecf8d603cc7644e9acbd9e19cac0334240b18df
@@ -745,6 +761,8 @@ typing-extensions==4.15.0 \
     #   -c mcp/services/abyss-stack-mcp/requirements.constraints
     #   aoa-sdk
     #   mcp
+    #   mcp-types
+    #   opentelemetry-api
     #   pydantic
     #   pydantic-core
     #   typing-inspection
@@ -755,7 +773,6 @@ typing-inspection==0.4.2 \
     #   -c mcp/services/abyss-stack-mcp/requirements.constraints
     #   mcp
     #   pydantic
-    #   pydantic-settings
 uvicorn==0.48.0 \
     --hash=sha256:48097851328b87ec36117d3d575234519eb58c2b22d79666e9bbc6c49a761dad \
     --hash=sha256:a5504207195d08c2511bf9125ede5ac4a4b71725d519e758d01dcf0bc2d31c37

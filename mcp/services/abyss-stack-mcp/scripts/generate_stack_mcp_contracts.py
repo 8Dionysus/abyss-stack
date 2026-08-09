@@ -145,7 +145,7 @@ def observation_example() -> dict[str, Any]:
                 "endpoint": {
                     "transport": "streamable-http",
                     "endpoint_ref": "http://127.0.0.1:5425/mcp",
-                    "protocol_versions": ["2025-11-25"],
+                    "protocol_versions": ["2026-07-28"],
                     "ready": True,
                     "server_schema_digest": DIGESTS["schema"],
                     "evidence": evidence("endpoint"),
@@ -162,7 +162,7 @@ def observation_example() -> dict[str, Any]:
                         "registration_ref": "example://consumer/aoa-kag",
                         "registered": True,
                         "observed_schema_digest": DIGESTS["schema"],
-                        "observed_protocol_versions": ["2025-11-25"],
+                        "observed_protocol_versions": ["2026-07-28"],
                         "evidence": evidence(
                             "consumer",
                             evidence_ref="example://consumer/aoa-kag",

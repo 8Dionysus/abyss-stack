@@ -45,7 +45,7 @@ def _application_version() -> str:
 
 
 def _bind_server_info_version(mcp: Any) -> None:
-    """Keep serverInfo.version application-owned under the pinned FastMCP seam."""
+    """Keep serverInfo.version application-owned under the pinned AbyssMCPServer seam."""
     low_level_server = getattr(mcp, "_mcp_server", None)
     if low_level_server is None or not hasattr(low_level_server, "version"):
         raise RuntimeError(
@@ -343,8 +343,7 @@ def _run_server(server: Any, policy_family: PolicyMode) -> None:
         return
     assert settings.host is not None
     assert settings.port is not None
-    server.settings.host = settings.host
-    server.settings.port = settings.port
+    server.configure_http(settings.host, settings.port)
     server.run(transport="streamable-http")
 
 
@@ -355,7 +354,7 @@ def build_server(
     orchestration_root: str | Path | None = None,
 ) -> Any:
     try:
-        from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
+        from ._modern_runtime import AbyssMCPServer  # type: ignore[import-not-found]
         from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
         raise SystemExit(
@@ -369,6 +368,18 @@ def build_server(
         policy_family=mode,
         orchestration_store=CrossOrganRunStore(orchestration_root),
     )
+    extensions: list[Any] = []
+    if mode == "read":
+        from .tasks_extension import (
+            StackReadTasksExtension,
+            task_root_from_environment,
+            tasks_enabled_from_environment,
+        )
+
+        if tasks_enabled_from_environment():
+            extensions.append(
+                StackReadTasksExtension(application, task_root_from_environment())
+            )
     policy = _build_policy_seam(mode)
     read_annotations = ToolAnnotations(
         readOnlyHint=True,
@@ -382,7 +393,7 @@ def build_server(
         idempotentHint=True,
         openWorldHint=False,
     )
-    mcp = FastMCP(
+    mcp = AbyssMCPServer(
         f"abyss-stack-mcp-{mode}",
         instructions=(
             "Inspect stack-owned source/package/deploy/process/endpoint/consumer "
@@ -390,6 +401,7 @@ def build_server(
             "does not proxy owner tools and never executes a plan."
         ),
         json_response=True,
+        extensions=extensions,
         **auth_kwargs,
     )
     _bind_server_info_version(mcp)

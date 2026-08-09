@@ -95,6 +95,9 @@ MANAGED_USER_UNITS = REPO_ROOT / "systemd" / "user" / "managed-units.txt"
 MCP_HTTP_AUTH_BUILDER = (
     REPO_ROOT / "mcp" / "services" / "_shared" / "build_http_auth_vendors.py"
 )
+MCP_MODERN_RUNTIME_BUILDER = (
+    REPO_ROOT / "mcp" / "services" / "_shared" / "build_modern_runtime_vendors.py"
+)
 MCP_HTTP_CODEX_CLIENT = (
     REPO_ROOT / "mcp" / "services" / "_shared" / "codex_http_client.sh"
 )
@@ -279,6 +282,10 @@ class DummyServer:
 
     def run(self, *, transport: str) -> None:
         self.transports.append(transport)
+
+    def configure_http(self, host: str, port: int) -> None:
+        self.settings.host = host
+        self.settings.port = port
 
 
 def mcp_environment(**overrides: str) -> dict[str, str]:
@@ -2882,7 +2889,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
 class McpLoopbackLifecycleTests(unittest.TestCase):
     def test_release_dependencies_retain_the_tested_mcp_auth_api(self) -> None:
         requirements = (REPO_ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
-        self.assertIn("mcp>=1.27.2,<2", requirements.splitlines())
+        self.assertIn("mcp==2.0.0", requirements.splitlines())
 
     def test_all_standalone_packages_require_the_tested_mcp_auth_api(self) -> None:
         for directory, _ in MCP_SERVER_PACKAGES.values():
@@ -2890,11 +2897,21 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 pyproject = (
                     REPO_ROOT / "mcp" / "services" / directory / "pyproject.toml"
                 ).read_text(encoding="utf-8")
-                self.assertIn('"mcp>=1.27.2,<2",', pyproject)
+                self.assertIn('"mcp==2.0.0",', pyproject)
 
     def test_generated_http_auth_helpers_are_current(self) -> None:
         result = subprocess.run(
             [sys.executable, str(MCP_HTTP_AUTH_BUILDER), "--check"],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_generated_modern_runtime_helpers_are_current(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(MCP_MODERN_RUNTIME_BUILDER), "--check"],
             cwd=REPO_ROOT,
             check=False,
             capture_output=True,

@@ -4622,7 +4622,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
 
     tools = {tool.name: tool for tool in asyncio.run(server.list_tools())}
 
-    query_schema = tools["aoa_session_search"].inputSchema["properties"]["query"]
+    query_schema = tools["aoa_session_search"].input_schema["properties"]["query"]
     assert query_schema["default"] == ""
     assert "aoa_session_literal_query_plan" in tools
     assert "aoa_session_agent_responses" in tools
@@ -4649,24 +4649,24 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "aoa_session_graph_shortest_path" in tools
     assert "aoa_session_graph_bridge" in tools
     assert "aoa_session_graph_cooccurrence" in tools
-    assert tools["aoa_session_hook_receipts"].inputSchema["properties"]["event_name"]["default"] == "UserPromptSubmit"
-    assert tools["aoa_session_entity_inventory"].inputSchema["properties"]["layer"]["default"] == "skill"
-    assert tools["aoa_session_entity_registry"].inputSchema["properties"]["kind"]["default"] == "all"
-    assert tools["aoa_session_live_scenario_audit"].inputSchema["properties"]["sample_size"]["default"] == 4
-    assert tools["aoa_session_live_scenario_corpus_check"].inputSchema["properties"]["case_limit"]["default"] == 0
-    assert tools["aoa_session_live_scenario_corpus_inventory"].inputSchema["properties"]["full"]["default"] is False
-    assert tools["aoa_session_route_rollup_query"].inputSchema["properties"]["layer"]["default"] == "tool"
-    assert tools["aoa_session_route_rollup_query"].inputSchema["properties"]["limit"]["default"] == 12
-    assert tools["aoa_session_route_rollup_query"].inputSchema["properties"]["ref_limit"]["default"] == 3
-    assert tools["aoa_session_direct_event_rollup_query"].inputSchema["properties"]["usage_role"]["default"] == "result"
-    assert tools["aoa_session_direct_event_rollup_query"].inputSchema["properties"]["limit"]["default"] == 12
-    assert tools["aoa_session_direct_event_rollup_query"].inputSchema["properties"]["ref_limit"]["default"] == 3
-    assert tools["aoa_session_projection_status"].inputSchema["properties"]["include_payload"]["default"] is False
-    assert tools["aoa_session_graph_neighborhood"].inputSchema["properties"]["edge_limit"]["default"] is None
-    assert tools["aoa_session_entity_usage_chain"].inputSchema["properties"]["limit"]["default"] == 6
-    assert tools["aoa_session_entity_usage_chain"].inputSchema["properties"]["per_route_limit"]["default"] == 12
-    assert tools["aoa_session_entity_dossier"].inputSchema["properties"]["usage_limit"]["default"] == 4
-    assert tools["aoa_session_entity_dossier"].inputSchema["properties"]["graph_edge_limit"]["default"] == 24
+    assert tools["aoa_session_hook_receipts"].input_schema["properties"]["event_name"]["default"] == "UserPromptSubmit"
+    assert tools["aoa_session_entity_inventory"].input_schema["properties"]["layer"]["default"] == "skill"
+    assert tools["aoa_session_entity_registry"].input_schema["properties"]["kind"]["default"] == "all"
+    assert tools["aoa_session_live_scenario_audit"].input_schema["properties"]["sample_size"]["default"] == 4
+    assert tools["aoa_session_live_scenario_corpus_check"].input_schema["properties"]["case_limit"]["default"] == 0
+    assert tools["aoa_session_live_scenario_corpus_inventory"].input_schema["properties"]["full"]["default"] is False
+    assert tools["aoa_session_route_rollup_query"].input_schema["properties"]["layer"]["default"] == "tool"
+    assert tools["aoa_session_route_rollup_query"].input_schema["properties"]["limit"]["default"] == 12
+    assert tools["aoa_session_route_rollup_query"].input_schema["properties"]["ref_limit"]["default"] == 3
+    assert tools["aoa_session_direct_event_rollup_query"].input_schema["properties"]["usage_role"]["default"] == "result"
+    assert tools["aoa_session_direct_event_rollup_query"].input_schema["properties"]["limit"]["default"] == 12
+    assert tools["aoa_session_direct_event_rollup_query"].input_schema["properties"]["ref_limit"]["default"] == 3
+    assert tools["aoa_session_projection_status"].input_schema["properties"]["include_payload"]["default"] is False
+    assert tools["aoa_session_graph_neighborhood"].input_schema["properties"]["edge_limit"]["default"] is None
+    assert tools["aoa_session_entity_usage_chain"].input_schema["properties"]["limit"]["default"] == 6
+    assert tools["aoa_session_entity_usage_chain"].input_schema["properties"]["per_route_limit"]["default"] == 12
+    assert tools["aoa_session_entity_dossier"].input_schema["properties"]["usage_limit"]["default"] == 4
+    assert tools["aoa_session_entity_dossier"].input_schema["properties"]["graph_edge_limit"]["default"] == 24
     literal_description = tools["aoa_session_literal_query_plan"].description or ""
     dossier_description = tools["aoa_session_entity_dossier"].description or ""
     usage_chain_description = tools["aoa_session_entity_usage_chain"].description or ""
@@ -4686,8 +4686,8 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "bounded indexed graph neighborhood" in graph_description
     assert "admission-required owner command" in graph_description
     assert "without hidden archive work" in bridge_description
-    assert tools["aoa_session_goal_lifecycles"].inputSchema["properties"]["target"]["default"] == "all"
-    goal_order_schema = tools["aoa_session_goal_lifecycles"].inputSchema["properties"]["order"]
+    assert tools["aoa_session_goal_lifecycles"].input_schema["properties"]["target"]["default"] == "all"
+    goal_order_schema = tools["aoa_session_goal_lifecycles"].input_schema["properties"]["order"]
     assert goal_order_schema["default"] == "recent"
     rendered_goal_order_schema = json.dumps(goal_order_schema, sort_keys=True)
     assert "recent" in rendered_goal_order_schema
@@ -4703,10 +4703,10 @@ def test_published_tools_advertise_closed_world_read_only_contract(tmp_path: Pat
     assert tools
     for tool in tools:
         assert tool.annotations is not None, tool.name
-        assert tool.annotations.readOnlyHint is True, tool.name
-        assert tool.annotations.destructiveHint is False, tool.name
-        assert tool.annotations.idempotentHint is True, tool.name
-        assert tool.annotations.openWorldHint is False, tool.name
+        assert tool.annotations.read_only_hint is True, tool.name
+        assert tool.annotations.destructive_hint is False, tool.name
+        assert tool.annotations.idempotent_hint is True, tool.name
+        assert tool.annotations.open_world_hint is False, tool.name
 
 
 def test_stdio_server_round_trips_tool_call_against_fixture_archive(tmp_path: Path) -> None:
@@ -4734,9 +4734,9 @@ def test_stdio_server_round_trips_tool_call_against_fixture_archive(tmp_path: Pa
                 result = await session.call_tool(
                     "aoa_session_entity_inventory",
                     {"layer": "skill", "session": "latest", "limit": 3, "sample_limit": 0},
-                    read_timeout_seconds=timedelta(seconds=5),
+                    read_timeout_seconds=5.0,
                 )
-        assert not result.isError
+        assert not result.is_error
         payload = json.loads(result.content[0].text)
         return {"tools": tools, "payload": payload}
 

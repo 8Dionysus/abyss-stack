@@ -172,8 +172,7 @@ def _run_server(server: Any) -> None:
         return
     assert settings.host is not None
     assert settings.port is not None
-    server.settings.host = settings.host
-    server.settings.port = settings.port
+    server.configure_http(settings.host, settings.port)
     server.run(transport="streamable-http")
 
 
@@ -183,7 +182,7 @@ def build_server(
     policy_family: PolicyFamily | None = None,
 ) -> Any:
     try:
-        from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
+        from ._modern_runtime import AbyssMCPServer  # type: ignore[import-not-found]
         from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
         raise SystemExit(
@@ -191,7 +190,7 @@ def build_server(
         ) from exc
 
     contour = policy_family or configured_policy_family()
-    mcp = FastMCP(
+    mcp = AbyssMCPServer(
         f"aoa-memo-mcp-{contour}",
         json_response=True,
         **_contour_http_auth_kwargs(contour),

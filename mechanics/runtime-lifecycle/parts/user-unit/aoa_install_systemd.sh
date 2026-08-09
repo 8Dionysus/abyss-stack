@@ -297,6 +297,8 @@ abyss_stack_mcp_keeper_inbox_root="${abyss_stack_mcp_admission_root}/keeper-inbo
 abyss_stack_mcp_preflight_root="${AOA_STACK_ROOT}/Logs/mcp/preflight"
 abyss_stack_mcp_protocol_watch_root="${AOA_STACK_ROOT}/Logs/mcp/protocol-watch"
 abyss_stack_mcp_orchestration_root="${AOA_STACK_ROOT}/Logs/mcp/cross-organ-orchestrations"
+abyss_stack_mcp_tasks_root="${AOA_STACK_ROOT}/Logs/mcp/tasks"
+abyss_stack_mcp_read_tasks_root="${abyss_stack_mcp_tasks_root}/abyss-stack-read"
 abyss_stack_mcp_source_lock_root="$(
   dirname -- "${AOA_CONFIGS_ROOT%/}"
 )/Services/abyss-stack-mcp"
@@ -1029,6 +1031,22 @@ aoa_provision_abyss_stack_mcp_orchestration_root() {
   chmod 0700 "$abyss_stack_mcp_orchestration_root"
 }
 
+aoa_provision_abyss_stack_mcp_tasks_root() {
+  local target=""
+
+  for target in \
+    "$abyss_stack_mcp_tasks_root" \
+    "$abyss_stack_mcp_read_tasks_root"; do
+    if [[ -e "$target" || -L "$target" ]]; then
+      [[ -d "$target" && ! -L "$target" ]] || \
+        aoa_die "abyss-stack MCP Tasks root must be a non-symlink directory"
+    else
+      install -d -m 0700 "$target"
+    fi
+    chmod 0700 "$target"
+  done
+}
+
 aoa_provision_abyss_stack_mcp_effect_root() {
   local parent=""
 
@@ -1632,6 +1650,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
   aoa_provision_abyss_stack_mcp_observation_root
   aoa_provision_abyss_stack_mcp_admission_roots
   aoa_provision_abyss_stack_mcp_orchestration_root
+  aoa_provision_abyss_stack_mcp_tasks_root
   aoa_provision_abyss_stack_mcp_effect_root
 
   if [[ -e "$abyss_stack_mcp_venv" || -L "$abyss_stack_mcp_venv" ]]; then

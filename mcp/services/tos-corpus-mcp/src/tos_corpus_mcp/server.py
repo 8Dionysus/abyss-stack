@@ -51,8 +51,7 @@ def _run_server(server: Any) -> None:
         return
     assert settings.host is not None
     assert settings.port is not None
-    server.settings.host = settings.host
-    server.settings.port = settings.port
+    server.configure_http(settings.host, settings.port)
     server.run(transport="streamable-http")
 
 
@@ -63,12 +62,12 @@ def build_server(
     philosophy_post_planting_audit_path: str | Path | None = None,
 ) -> Any:
     try:
-        from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
+        from ._modern_runtime import AbyssMCPServer  # type: ignore[import-not-found]
         from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
         raise SystemExit("Missing dependency 'mcp'. Install with: python -m pip install -e .") from exc
 
-    mcp = FastMCP(
+    mcp = AbyssMCPServer(
         "tos-corpus-mcp",
         json_response=True,
         **_read_http_auth_kwargs(),

@@ -35,7 +35,7 @@
       "organ_id": "aoa-kag",
       "policy_family": "read",
       "protocol_versions": [
-        "2025-11-25"
+        "2026-07-28"
       ],
       "registry_organ_id": "aoa-kag",
       "rollback_route": "runbook://mcp-rollback/aoa-kag/read",
@@ -68,7 +68,7 @@
       "organ_id": "aoa-stats",
       "policy_family": "read",
       "protocol_versions": [
-        "2025-11-25"
+        "2026-07-28"
       ],
       "registry_organ_id": "aoa-stats",
       "rollback_route": "runbook://mcp-rollback/aoa-stats/read",
@@ -102,7 +102,7 @@
       "organ_id": "aoa-decisions",
       "policy_family": "read",
       "protocol_versions": [
-        "2025-11-25"
+        "2026-07-28"
       ],
       "registry_organ_id": "aoa-decisions",
       "rollback_route": "runbook://mcp-rollback/aoa-decisions/read",
@@ -151,7 +151,7 @@
       "organ_id": "abyss-stack",
       "policy_family": "read",
       "protocol_versions": [
-        "2025-11-25"
+        "2026-07-28"
       ],
       "registry_organ_id": "abyss-stack",
       "rollback_route": "runbook://mcp-rollback/abyss-stack/read",
@@ -188,7 +188,7 @@
       "organ_id": "abyss-machine",
       "policy_family": "read",
       "protocol_versions": [
-        "2025-11-25"
+        "2026-07-28"
       ],
       "registry_organ_id": "abyss-machine",
       "rollback_route": "runbook://mcp-rollback/abyss-machine/read",
@@ -220,7 +220,7 @@
       "organ_id": "tree-of-sophia",
       "policy_family": "read",
       "protocol_versions": [
-        "2025-11-25"
+        "2026-07-28"
       ],
       "registry_organ_id": "tree-of-sophia",
       "rollback_route": "runbook://mcp-rollback/tree-of-sophia/read",
@@ -258,7 +258,7 @@
       "organ_id": "aoa-session-memory",
       "policy_family": "read",
       "protocol_versions": [
-        "2025-11-25"
+        "2026-07-28"
       ],
       "registry_organ_id": "aoa-session-memory",
       "rollback_route": "runbook://mcp-rollback/aoa-session-memory/read",
@@ -294,7 +294,7 @@
       "organ_id": "aoa-memo",
       "policy_family": "read",
       "protocol_versions": [
-        "2025-11-25"
+        "2026-07-28"
       ],
       "registry_organ_id": "aoa-memo",
       "rollback_route": "runbook://mcp-rollback/aoa-memo/read",
@@ -326,7 +326,7 @@
       "organ_id": "aoa-evals",
       "policy_family": "read",
       "protocol_versions": [
-        "2025-11-25"
+        "2026-07-28"
       ],
       "registry_organ_id": "aoa-evals",
       "rollback_route": "runbook://mcp-rollback/aoa-evals/read",
@@ -362,7 +362,7 @@
       "organ_id": "aoa-4pda-connector",
       "policy_family": "read",
       "protocol_versions": [
-        "2025-11-25"
+        "2026-07-28"
       ],
       "registry_organ_id": "aoa-4pda-connector",
       "rollback_route": "runbook://mcp-rollback/aoa-4pda-connector/read",
@@ -396,7 +396,7 @@
       "organ_id": "aoa-telegram-connector",
       "policy_family": "read",
       "protocol_versions": [
-        "2025-11-25"
+        "2026-07-28"
       ],
       "registry_organ_id": "aoa-telegram-connector",
       "rollback_route": "runbook://mcp-rollback/aoa-telegram-connector/read",
@@ -430,7 +430,7 @@
       "organ_id": "aoa-discord-connector",
       "policy_family": "read",
       "protocol_versions": [
-        "2025-11-25"
+        "2026-07-28"
       ],
       "registry_organ_id": "aoa-discord-connector",
       "rollback_route": "runbook://mcp-rollback/aoa-discord-connector/read",
@@ -463,7 +463,7 @@
       "organ_id": "aoa-course-connector",
       "policy_family": "read",
       "protocol_versions": [
-        "2025-11-25"
+        "2026-07-28"
       ],
       "registry_organ_id": "aoa-course-connector",
       "rollback_route": "runbook://mcp-rollback/aoa-course-connector/read",
@@ -495,7 +495,7 @@
       "organ_id": "aoa-stackoverflow-connector",
       "policy_family": "read",
       "protocol_versions": [
-        "2025-11-25"
+        "2026-07-28"
       ],
       "registry_organ_id": "aoa-stackoverflow-connector",
       "rollback_route": "runbook://mcp-rollback/aoa-stackoverflow-connector/read",
@@ -527,7 +527,7 @@
       "organ_id": "aoa-xda-connector",
       "policy_family": "read",
       "protocol_versions": [
-        "2025-11-25"
+        "2026-07-28"
       ],
       "registry_organ_id": "aoa-xda-connector",
       "rollback_route": "runbook://mcp-rollback/aoa-xda-connector/read",
