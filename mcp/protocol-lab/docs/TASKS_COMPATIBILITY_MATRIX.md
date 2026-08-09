@@ -7,8 +7,14 @@ of those evidence levels substitutes for another.
 
 ## Current decision
 
+- OS Abyss Codex `0.147.0-abyss.2` is the bounded production consumer. Its
+  exact production pair with `abyss-stack-mcp` advertises the extension and
+  passes task creation, completed retrieval, cancellation acknowledgement,
+  cancelled retrieval, auth/owner binding, observe-only output, and
+  missing-extension denial.
 - Codex `0.147.0` remains Tasks-ineligible because its real request does not
-  advertise `io.modelcontextprotocol/tasks`.
+  advertise `io.modelcontextprotocol/tasks`; this row represents the upstream
+  fallback, not the OS Abyss derivative.
 - Released `rmcp 3.1.2` is the current isolated reference client. It passed
   modern discovery, task creation, `tasks/get`, required routing headers,
   per-request capability, durable owner result retrieval, and unknown-task
@@ -27,13 +33,15 @@ of those evidence levels substitutes for another.
 
 ## Consequence for OS Abyss
 
-The Abyss adapter stays disabled by default and the TaskStore remains
-protocol-independent. `rmcp` is a replaceable lab witness, not a new owner and
-not a reason to migrate organ authority into Rust. Core-read MCP 2026-07-28
-migration remains independent from Tasks.
+The `abyss-stack` read adapter enables Tasks explicitly; other organ adapters
+do not inherit it. The TaskStore remains protocol-independent and owner-bound.
+`rmcp` remains a replaceable reference witness, not a new owner and not a
+reason to migrate organ authority into Rust. Core-read MCP migration and Tasks
+admission remain independently derived even though both now pass for their
+exact scopes.
 
-Production Tasks stays false until the exact production consumer advertises
-the extension on every request and the same pair proves create/get/update,
-cancellation, input, TTL cleanup, restart recovery, auth negatives, bounded
-payloads, and rollback. Notifications remain excluded until an
-extension-filtered `subscriptions/listen` path is proven end to end.
+Production Tasks is true only for the proved bounded lifecycle. Update and
+input-required remain source-present but live-unpaired. Notifications remain
+excluded until an extension-filtered `subscriptions/listen` path is proven end
+to end, and distributed poll enforcement requires its own evidence. Those
+limits do not erase the useful create/get/cancel production capability.

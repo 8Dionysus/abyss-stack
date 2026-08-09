@@ -1,0 +1,31 @@
+{
+  "schema_version": "codex_abyss_tasks_production_pair_v1",
+  "observed_at": "2026-08-09T13:53:36.813735Z",
+  "expires_at": "2026-08-16T13:53:36.813735Z",
+  "protocol_version": "2026-07-28",
+  "extension_id": "io.modelcontextprotocol/tasks",
+  "codex_runtime": "0.147.0-abyss.2",
+  "codex_source_revision": "f9c242e801459a99f12f24297278b07ad66ed5f0",
+  "codex_artifact_digest": "sha256:49a5f3509ff395168c967b1cfd28646f35ecf2bb902cffdaeb0a7d7e16b6d77b",
+  "server": "abyss-stack-mcp/0.5.2",
+  "mcp_sdk": "2.0.0",
+  "production_pair": true,
+  "lifecycle": {
+    "extension_advertised": true,
+    "create_passed": true,
+    "get_completed_passed": true,
+    "cancel_acknowledged": true,
+    "get_cancelled_passed": true,
+    "missing_extension_rejected": true,
+    "owner_bound": true,
+    "observe_only": true,
+    "update_input_required_live_pair": false,
+    "notifications_proven": false
+  },
+  "verdict": "eligible_for_bounded_production",
+  "claim_limits": [
+    "Production Tasks admission is limited to create, get, and cancel through the exact owner-managed Codex and abyss-stack read pair.",
+    "Tasks update, input-required continuation, notifications, and distributed polling enforcement remain outside this production receipt.",
+    "The private raw receipt is content-addressed by the installed runtime manifest and remains outside this public-safe fixture."
+  ]
+}

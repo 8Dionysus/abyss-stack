@@ -5,12 +5,17 @@ The authoritative machine-readable comparison is
 
 ## Current decision
 
-Production stays on MCP `2025-11-25`. Stable Codex `0.147.0` is current, but
-its production `aoa_kag` registration has not been moved. With
-`mcp_2026_07_28` enabled only in an isolated `CODEX_HOME`, the same exact
-binary passed the separately named `aoa_kag_next_lab` contour on the real
-`2026-07-28` wire. That is stable-client lab compatibility, not production
-admission.
+Production uses MCP `2026-07-28` for the eleven admitted OS Abyss organ read
+registrations. Each listener runs exact Python MCP `2.0.0`, advertises only the
+modern wire, rejects wrong bearer and legacy initialization before session
+creation, and is bound to a production process identity rather than a bootstrap
+unit. OS Abyss Codex `0.147.0-abyss.2` selects this wire only for the explicit
+organ allow-list; upstream Codex and unrelated external MCP owners are separate
+compatibility rows.
+
+The earlier isolated `aoa_kag_next_lab` contour remains the precursor evidence
+that proved stable-client modern compatibility and rollback before the live
+cutover. It no longer describes production state.
 
 The removable contour used an independent process, loopback endpoint,
 generated mode `0600` credential, registration, Codex home, Python MCP `2.0.0`
@@ -47,21 +52,17 @@ future work.
 
 ## Independent gates
 
-P1-01 through P1-10 and P1-12 through P1-14 pass. P1-11 remains blocked
-independently:
+P1-01 through P1-14 pass. P1-11 passed independently through the exact
+OS Abyss Codex/abyss-stack production Tasks pair, not through Python SDK core
+conformance or upstream Codex literals. The admitted subset is extension
+advertisement, create, completed get, cancel, cancelled get, auth and owner
+binding, observe-only output, and missing-extension denial. Update/input-required,
+notifications, and distributed poll enforcement remain outside that subset.
 
-- Python MCP `2.0.0` does not implement the Tasks extension;
-- stable Codex `0.147.0` did not advertise
-  `_meta.io.modelcontextprotocol/clientCapabilities.extensions["io.modelcontextprotocol/tasks"]`
-  on the real request wire;
-- an owner-bounded replacement adapter and its own compatibility proof are
-  still required.
-
-The isolated read-only pilot is allowed and complete. Production core-read
-migration remains false until the exact production contour receives its own
-admission transaction, deployment canary, registry refresh, observation
-window, and rollback. Candidate, internal-effect, and external-effect
-contours cannot inherit the read result.
+Production core-read migration is allowed for exactly eleven admitted read
+contours. Three candidate contours and one internal-effect contour are
+protocol-ready on the same modern-only runtime, but remain inactive and
+unadmitted. External effects remain outside this decision.
 
 ## Supporting behavior receipts
 
@@ -75,9 +76,9 @@ The exact isolated receipts separately prove:
 - stale-catalog inability to authorize a removed tool;
 - explicit refresh after a disconnected listener.
 
-These are bounded single-process read proofs. They do not prove multi-replica
-fan-out, effectful replay safety, owner acceptance, production admission, or
-Tasks benefit.
+These are bounded read proofs. The live fleet receipt additionally proves
+production admission and exact modern wire for the eleven named units; it does
+not prove multi-replica fan-out or effectful replay safety.
 
 ## Automated refresh workflow
 
@@ -99,6 +100,7 @@ before and after, and advances its baseline only after a fully successful
 suite.
 
 The event-driven path unit handles local changes. The hourly timer polls
-upstream identities and acts as a TTL backstop. Neither unit changes production
-automatically. Every successful lab still requires a separate owner/runtime
-admission before any production cutover.
+upstream identities and acts as a TTL backstop. Neither unit starts or restarts
+organs. Admission refresh can republish only already-owner-reviewed read
+authority against fresh exact deployment and canary evidence; new authority
+still requires a separate owner decision.

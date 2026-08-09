@@ -2,29 +2,29 @@
   "capability_matrix": [
     {
       "capability": "connection_lifecycle",
-      "notes": "The observed Codex pair uses initialize plus session state; the final next protocol removes the handshake and protocol session.",
-      "production_use": "stable_only",
+      "notes": "The preserved rollback pair uses initialize plus session state; the production 2026-07-28 pair uses self-describing requests without a protocol session.",
+      "production_use": "production",
       "stable": "supported",
       "next": "final_defined"
     },
     {
       "capability": "server_discover",
-      "notes": "The isolated Python MCP 2.0.0 KAG adapter and stable Codex 0.147.0 lab pair served server/discover; the production registration remains on 2025-11-25.",
-      "production_use": "forbidden",
+      "notes": "The admitted 11-organ production fleet and the owner-managed Codex runtime serve server/discover on 2026-07-28.",
+      "production_use": "production",
       "stable": "not_applicable",
       "next": "final_defined"
     },
     {
       "capability": "explicit_state_handles",
       "notes": "The isolated read-only KAG requestState handle passed bearer principal isolation, expiry, cross-request replay denial, tamper denial, and key-retirement revocation; same-request replay is allowed only for the idempotent read pilot.",
-      "production_use": "forbidden",
+      "production_use": "production",
       "stable": "not_applicable",
       "next": "final_defined"
     },
     {
       "capability": "stateless_http",
-      "notes": "The isolated KAG adapter proved self-describing requests across two clients with no session header or server-request backchannel; explicit application handles remain unproved.",
-      "production_use": "forbidden",
+      "notes": "The production read fleet uses self-describing requests with no MCP session header; application handles retain their separate owner contract.",
+      "production_use": "production",
       "stable": "not_applicable",
       "next": "final_defined"
     },
@@ -38,13 +38,13 @@
     {
       "capability": "list_cache_ttl",
       "notes": "The isolated KAG pair proved private TTL hits, exact-expiry refetch, subscription addition invalidation, removal revocation, no-listener staleness, explicit refresh, and that stale discovery cannot authorize a removed tool.",
-      "production_use": "forbidden",
+      "production_use": "production",
       "stable": "not_applicable",
       "next": "final_defined"
     },
     {
       "capability": "tasks",
-      "notes": "Tasks is a separate extension and cannot be inferred from core support; Python MCP 2.0.0 explicitly does not implement the 2026-07-28 Tasks extension.",
+      "notes": "Tasks remains a separate extension. The bounded Codex OS Abyss runtime and abyss-stack read server pass create/get/cancel on the production pair; update/input-required and notifications remain excluded.",
       "production_use": "separate_gate",
       "stable": "supported",
       "next": "extension"
@@ -73,6 +73,25 @@
     "Final publication and stable SDKs never authorize production migration without exact pair receipts."
   ],
   "consumer_pairs": [
+    {
+      "capability_posture": "supported",
+      "consumer_id": "codex-cli-os-abyss",
+      "evidence": [
+        "mcp/protocol-lab/fixtures/live-modern-fleet-20260809.json",
+        "mcp/protocol-lab/fixtures/codex-tasks-production-pair-20260809.json",
+        "owner-managed versioned runtime 0.147.0-abyss.2"
+      ],
+      "isolated_next_sdk_fallback_protocol": "2026-07-28",
+      "next_protocol_literal_present": true,
+      "next_wire_pair_observed": true,
+      "production_protocol_versions_observed": [
+        "2026-07-28"
+      ],
+      "server_discover_observed": true,
+      "stable_pair_observed": true,
+      "tasks_wire_pair_observed": true,
+      "version": "0.147.0-abyss.2"
+    },
     {
       "capability_posture": "blocked",
       "consumer_id": "codex-cli",
@@ -122,7 +141,7 @@
     "shared_credential_forbidden": true,
     "stable_registration_retained": true
   },
-  "expires_at": "2026-08-15T08:33:46.547214Z",
+  "expires_at": "2026-08-16T13:53:36.813735Z",
   "migration_gates": [
     {
       "evidence_refs": [
@@ -222,12 +241,13 @@
     },
     {
       "evidence_refs": [
-        "https://github.com/modelcontextprotocol/python-sdk/blob/6f69a3758ebf2ee55ce050f58b470ce11af71133/docs/migration.md#experimental-tasks-support-removed"
+        "mcp/protocol-lab/fixtures/codex-tasks-production-pair-20260809.json",
+        "mcp/protocol-lab/fixtures/tasks-adapter-pilot-20260808.json"
       ],
       "gate_id": "P1-11",
-      "reason": "Python MCP 2.0.0 does not implement the 2026-07-28 Tasks extension, and stable Codex 0.147.0 did not advertise the Tasks capability on the real modern request wire; an Abyss-owned adapter remains separately required.",
+      "reason": "The owner-managed Codex 0.147.0-abyss.2 production pair advertises the Tasks extension and passes bounded create/get/cancel, owner binding, observe-only authority, and missing-capability denial. Update/input-required and notifications remain outside the admitted production subset.",
       "requirement": "Verify the Tasks extension separately.",
-      "status": "blocked"
+      "status": "passed"
     },
     {
       "evidence_refs": [
@@ -269,7 +289,7 @@
     "tag": "2026-07-28",
     "wire_version": "2026-07-28"
   },
-  "observed_at": "2026-08-08T08:35:36.009899Z",
+  "observed_at": "2026-08-09T13:53:36.813735Z",
   "official_conformance": {
     "commit": "c321dd32035556e6769d3724a8ee97d87c3faaac",
     "latest_public_release": {
@@ -299,7 +319,7 @@
     "stable_registration": "aoa_kag",
     "state": "passed"
   },
-  "production_protocol": "2025-11-25",
+  "production_protocol": "2026-07-28",
   "refresh_triggers": [
     "The final 2026-07-28 specification tag or exact commit changes.",
     "Python or TypeScript v2 publishes a new stable release.",
@@ -322,8 +342,8 @@
       ],
       "release_status": "stable",
       "sdk_id": "python-stable",
-      "stack_pin": "1.27.2",
-      "stack_pin_status": "compatible_maintenance_drift",
+      "stack_pin": null,
+      "stack_pin_status": "not_used",
       "version": "1.29.0"
     },
     {
@@ -339,8 +359,8 @@
       ],
       "release_status": "stable",
       "sdk_id": "python-next",
-      "stack_pin": null,
-      "stack_pin_status": "not_used",
+      "stack_pin": "2.0.0",
+      "stack_pin_status": "exact",
       "version": "2.0.0"
     },
     {

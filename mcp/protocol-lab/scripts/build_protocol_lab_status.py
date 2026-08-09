@@ -22,6 +22,8 @@ TASKS_MATRIX_PATH = LAB_ROOT / "tasks-compatibility-matrix.v1.json"
 TASKS_PILOT_PATH = LAB_ROOT / "fixtures" / "tasks-adapter-pilot-20260808.json"
 RMCP_TASKS_PAIR_PATH = LAB_ROOT / "fixtures" / "rmcp-3.1.2-tasks-adapter-pair-20260808.json"
 INSPECTOR_TASKS_BLOCKER_PATH = LAB_ROOT / "fixtures" / "inspector-2.1.0-tasks-strict-pair-blocked-20260808.json"
+LIVE_MODERN_FLEET_PATH = LAB_ROOT / "fixtures" / "live-modern-fleet-20260809.json"
+CODEX_TASKS_PRODUCTION_PAIR_PATH = LAB_ROOT / "fixtures" / "codex-tasks-production-pair-20260809.json"
 MATRIX_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-compatibility-matrix.schema.json"
 OBSERVATION_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-pair-observation.schema.json"
 STATUS_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-lab-status.schema.json"
@@ -32,6 +34,8 @@ TASKS_MATRIX_SCHEMA_PATH = LAB_ROOT / "schemas" / "tasks-compatibility-matrix.sc
 TASKS_PILOT_SCHEMA_PATH = LAB_ROOT / "schemas" / "tasks-adapter-pilot.schema.json"
 RMCP_TASKS_PAIR_SCHEMA_PATH = LAB_ROOT / "schemas" / "rmcp-tasks-adapter-pair.schema.json"
 INSPECTOR_TASKS_BLOCKER_SCHEMA_PATH = LAB_ROOT / "schemas" / "inspector-tasks-strict-pair.schema.json"
+LIVE_MODERN_FLEET_SCHEMA_PATH = LAB_ROOT / "schemas" / "live-modern-fleet-observation.schema.json"
+CODEX_TASKS_PRODUCTION_PAIR_SCHEMA_PATH = LAB_ROOT / "schemas" / "codex-tasks-production-pair.schema.json"
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -85,6 +89,8 @@ def build_status(
     tasks_pilot: dict[str, Any] | None = None,
     rmcp_tasks_pair: dict[str, Any] | None = None,
     inspector_tasks_blocker: dict[str, Any] | None = None,
+    live_modern_fleet: dict[str, Any] | None = None,
+    codex_tasks_production_pair: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     production_observation = production_observation or load_json(PRODUCTION_OBSERVATION_PATH)
     codex_lab_observation = codex_lab_observation or load_json(CODEX_LAB_OBSERVATION_PATH)
@@ -94,6 +100,10 @@ def build_status(
     rmcp_tasks_pair = rmcp_tasks_pair or load_json(RMCP_TASKS_PAIR_PATH)
     inspector_tasks_blocker = inspector_tasks_blocker or load_json(
         INSPECTOR_TASKS_BLOCKER_PATH
+    )
+    live_modern_fleet = live_modern_fleet or load_json(LIVE_MODERN_FLEET_PATH)
+    codex_tasks_production_pair = codex_tasks_production_pair or load_json(
+        CODEX_TASKS_PRODUCTION_PAIR_PATH
     )
     for payload, schema in (
         (matrix, MATRIX_SCHEMA_PATH),
@@ -105,6 +115,8 @@ def build_status(
         (tasks_pilot, TASKS_PILOT_SCHEMA_PATH),
         (rmcp_tasks_pair, RMCP_TASKS_PAIR_SCHEMA_PATH),
         (inspector_tasks_blocker, INSPECTOR_TASKS_BLOCKER_SCHEMA_PATH),
+        (live_modern_fleet, LIVE_MODERN_FLEET_SCHEMA_PATH),
+        (codex_tasks_production_pair, CODEX_TASKS_PRODUCTION_PAIR_SCHEMA_PATH),
     ):
         validate_payload(payload, schema)
     if observation["matrix_version"] != matrix["schema_version"]:
@@ -124,7 +136,7 @@ def build_status(
         and next_version in sdk["protocol_versions"]
         for sdk in matrix["sdk_lines"]
     )
-    production_consumer = _consumer(matrix, "codex-cli")
+    production_consumer = _consumer(matrix, "codex-cli-os-abyss")
     lab_consumer = _consumer(matrix, "codex-cli-stable-modern-lab")
     lab_canary_completed = all(
         (
@@ -160,11 +172,17 @@ def build_status(
             _passed(observation, "rollback"),
             matrix["pilot"]["state"] == "passed",
             not remaining_core_gate_ids,
+            live_modern_fleet["verdict"] == "production_modern_only_passed",
+            live_modern_fleet["read_fleet"]["production_units"] == 11,
+            live_modern_fleet["read_fleet"]["admitted_units"] == 11,
+            live_modern_fleet["read_fleet"]["bootstrap_identities"] == 0,
+            live_modern_fleet["rollback"]["active_legacy_units"] == 0,
         )
     )
     tasks_extension_allowed = bool(
         production_pair_ready
-        and observation["tasks_extension"]["status"] == "passed"
+        and codex_tasks_production_pair["verdict"]
+        == "eligible_for_bounded_production"
         and not remaining_tasks_gate_ids
     )
     production_cutover_blockers: list[str] = []
@@ -183,6 +201,8 @@ def build_status(
             codex_lab_observation["expires_at"],
             stable_rollback_observation["expires_at"],
             tasks_matrix["expires_at"],
+            live_modern_fleet["expires_at"],
+            codex_tasks_production_pair["expires_at"],
         ),
         "matrix_digest": canonical_digest(matrix),
         "observation_digest": canonical_digest(observation),
@@ -192,6 +212,10 @@ def build_status(
         "tasks_pilot_digest": canonical_digest(tasks_pilot),
         "rmcp_tasks_pair_digest": canonical_digest(rmcp_tasks_pair),
         "inspector_tasks_blocker_digest": canonical_digest(inspector_tasks_blocker),
+        "live_modern_fleet_digest": canonical_digest(live_modern_fleet),
+        "codex_tasks_production_pair_digest": canonical_digest(
+            codex_tasks_production_pair
+        ),
         "tasks_evidence_expires_at": tasks_matrix["expires_at"],
         "production_protocol": matrix["production_protocol"],
         "next_protocol": next_version,
@@ -213,16 +237,18 @@ def build_status(
             inspector_tasks_blocker["verdict"]
             == "blocked_missing_mcp_name_on_raw_tasks_get"
         ),
-        "tasks_codex_consumer_eligible": False,
+        "tasks_codex_consumer_eligible": tasks_extension_allowed,
         "tasks_production_enabled": tasks_matrix["production_tasks_allowed"],
         "tasks_notifications_proven": tasks_pilot["notifications"]["tested"],
         "tasks_blockers": [
-            "codex_tasks_capability_absent",
-            "inspector_task_name_header_missing",
+            "input_required_update_live_pair_unproved",
             "tasks_notifications_unproved",
             "distributed_poll_limit_unproved",
-            "production_tasks_disabled",
         ],
+        "candidate_protocol_ready": live_modern_fleet["nonread_protocol"]
+        ["modern_discovery_passed"],
+        "internal_effect_protocol_ready": live_modern_fleet["nonread_protocol"]
+        ["modern_discovery_passed"],
         "candidate_migration_allowed": False,
         "internal_effect_migration_allowed": False,
         "external_effect_migration_allowed": False,
@@ -240,9 +266,9 @@ def build_status(
         "production_cutover_blockers": production_cutover_blockers,
         "reason_codes": observation["reason_codes"],
         "next_action": (
-            "Retain the stable 2025-11-25 route while the exact production contour "
-            "receives independent admission, deployment canary, cutover and registry "
-            "refresh; keep the Tasks extension on its separate adapter gate."
+            "Maintain the admitted modern-only read fleet, refresh expiring registry "
+            "evidence automatically, and keep candidate/effect authority disabled "
+            "until those contours receive separate owner admission."
         ),
         "claim_limits": matrix["claim_limits"],
     }

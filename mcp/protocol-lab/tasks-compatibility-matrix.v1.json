@@ -1,12 +1,12 @@
 {
   "schema_version": "abyss_mcp_tasks_compatibility_matrix_v1",
-  "observed_at": "2026-08-08T09:52:33.467338Z",
-  "expires_at": "2026-08-15T09:52:33.467338Z",
+  "observed_at": "2026-08-09T13:53:36.813735Z",
+  "expires_at": "2026-08-16T13:53:36.813735Z",
   "protocol_version": "2026-07-28",
   "extension_id": "io.modelcontextprotocol/tasks",
   "extension_maturity": "experimental",
   "core_read_migration_independent": true,
-  "production_tasks_allowed": false,
+  "production_tasks_allowed": true,
   "reference_pair": {
     "consumer_id": "rust-rmcp",
     "version": "3.1.2",
@@ -14,6 +14,38 @@
     "evidence_ref": "mcp/protocol-lab/fixtures/rmcp-3.1.2-tasks-adapter-pair-20260808.json"
   },
   "consumers": [
+    {
+      "consumer_id": "codex-cli-os-abyss",
+      "kind": "agent_consumer",
+      "version": "0.147.0-abyss.2",
+      "release_status": "stable",
+      "source_revision": "f9c242e801459a99f12f24297278b07ad66ed5f0",
+      "artifact_digest": "sha256:49a5f3509ff395168c967b1cfd28646f35ecf2bb902cffdaeb0a7d7e16b6d77b",
+      "core_2026_07_28": "wire_pass",
+      "features": {
+        "advertisement": "wire_pass",
+        "create_task": "wire_pass",
+        "tasks_get": "wire_pass",
+        "tasks_update": "source_present_unpaired",
+        "tasks_cancel": "wire_pass",
+        "input_required": "source_present_unpaired",
+        "cancellation": "wire_pass",
+        "notifications": "unproved",
+        "restart_recovery": "source_present_unpaired",
+        "auth_binding": "wire_pass",
+        "ttl_behavior": "upstream_test_pass"
+      },
+      "evidence_level": "owner_managed_production_pair_bounded_lifecycle_pass",
+      "verdict": "eligible_for_bounded_production",
+      "evidence_refs": [
+        "mcp/protocol-lab/fixtures/codex-tasks-production-pair-20260809.json",
+        "mcp/protocol-lab/fixtures/tasks-adapter-pilot-20260808.json"
+      ],
+      "removal_conditions": [
+        "Replace the bounded derivative after upstream Codex provides the same per-server modern protocol and Tasks behavior.",
+        "Keep update/input-required and notifications outside production until their exact live pair receipts pass."
+      ]
+    },
     {
       "consumer_id": "codex-cli",
       "kind": "agent_consumer",
@@ -267,10 +299,11 @@
     }
   ],
   "known_risks": [
-    "Codex 0.147.0 still does not advertise the Tasks extension on real requests.",
+    "Upstream Codex 0.147.0 remains Tasks-ineligible; production uses a versioned owner-managed derivative.",
     "Inspector 2.1.0 omits the required Mcp-Name taskId header on raw modern tasks/get.",
     "The Inspector lab dependency installs reported unresolved npm audit findings and are not production artifacts.",
     "Notifications remain blocked until subscriptions/listen can carry and prove the extension filter end to end.",
-    "The Abyss poll limiter is process-local and resets after adapter restart; distributed enforcement is not proven."
+    "The Abyss poll limiter is process-local and resets after adapter restart; distributed enforcement is not proven.",
+    "Production Tasks admission is bounded to create, get, and cancel for one observe-only abyss-stack tool; update/input-required is not admitted."
   ]
 }

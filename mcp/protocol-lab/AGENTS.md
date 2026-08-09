@@ -6,20 +6,21 @@ This card applies to `mcp/protocol-lab/`.
 
 ## Role
 
-The protocol lab is the fail-closed compatibility and migration gate for the
-production MCP wire pair used by OS Abyss. It compares the current stable pair
-with one isolated next-protocol candidate without changing registrations,
-runtime credentials, owner authority, or deployed services.
+The protocol lab is the fail-closed compatibility, currentness, and migration
+gate for the production MCP wire pair used by OS Abyss. It preserves historical
+fallback/lab evidence while validating the admitted modern fleet and bounded
+Tasks production pair without granting new owner authority.
 
 ## Boundaries
 
 - Production remains on the exact protocol named by the compatibility matrix.
 - Release candidates, prerelease SDKs, binary literals, and successful schema
   listing are evidence inputs, not migration authority.
-- A next-protocol registration must be separately named, separately
-  credentialed, disabled before its prerequisites pass, and removable without
-  mutating the stable registration.
-- The first pilot is `aoa-kag` read-only. Candidate and effect organs are out of
+- Any future-protocol registration must be separately named, separately
+  credentialed, disabled before prerequisites pass, and removable without
+  mutating the production registration.
+- The historical first pilot is `aoa-kag` read-only. Candidate and effect
+  protocol probes may perform discovery only; their authority remains out of
   scope until a later decision with separate proof.
 - Tasks is an extension gate and never follows automatically from core
   protocol compatibility.

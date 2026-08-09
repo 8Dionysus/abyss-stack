@@ -1,6 +1,7 @@
 {
   "authority_move_combined": false,
   "candidate_migration_allowed": false,
+  "candidate_protocol_ready": true,
   "claim_limits": [
     "Protocol literals in a binary do not prove negotiated wire support.",
     "A stable SDK release does not prove Codex pair support.",
@@ -10,22 +11,25 @@
     "Final publication and stable SDKs never authorize production migration without exact pair receipts."
   ],
   "codex_lab_observation_digest": "sha256:edcfc2a5765f0b14d18bc72e8cb5ae03f9f7b60e9187beec242a7b0e93be1998",
-  "core_read_migration_allowed": false,
-  "evaluated_at": "2026-08-08T08:35:36.009899Z",
+  "codex_tasks_production_pair_digest": "sha256:5a7c3f00872f5afff9a4c3291975cd4c05cf78e1c0411c05b8203e7920880610",
+  "core_read_migration_allowed": true,
+  "evaluated_at": "2026-08-09T13:53:36.813735Z",
   "evidence_expires_at": "2026-08-15T08:33:46.547214Z",
   "external_effect_migration_allowed": false,
   "gate_counts": {
-    "blocked": 1,
-    "passed": 13,
+    "blocked": 0,
+    "passed": 14,
     "pending": 0
   },
   "inspector_tasks_blocker_digest": "sha256:c169b672bb7be2ab0e24da24cb22c14e6c2ff9bb450b746974644612e1217d07",
   "internal_effect_migration_allowed": false,
-  "matrix_digest": "sha256:90304f1643d1f19c18aa97524941ed517e143aa6123fb3e51586c661be324fee",
-  "next_action": "Retain the stable 2025-11-25 route while the exact production contour receives independent admission, deployment canary, cutover and registry refresh; keep the Tasks extension on its separate adapter gate.",
+  "internal_effect_protocol_ready": true,
+  "live_modern_fleet_digest": "sha256:c61a1f0756d267bf55a790f662eb948d46580523a003a27ddefdb9fc2366cc75",
+  "matrix_digest": "sha256:8a87369c7b8ed7d787813ce41b4fc7c5227239d470d2695b2e3a61daeb9c3b1a",
+  "next_action": "Maintain the admitted modern-only read fleet, refresh expiring registry evidence automatically, and keep candidate/effect authority disabled until those contours receive separate owner admission.",
   "next_protocol": "2026-07-28",
   "next_release_status": "final",
-  "observation_digest": "sha256:737fff896dabca43848efee94790b6c1419a4d51c6f208cd00c3374128514056",
+  "observation_digest": "sha256:60bbf8972f9439dd0ba7f79e498ef358d58d1cba94a68a426e9b22d60dbad9d1",
   "passed_gate_ids": [
     "P1-01",
     "P1-02",
@@ -37,53 +41,45 @@
     "P1-08",
     "P1-09",
     "P1-10",
+    "P1-11",
     "P1-12",
     "P1-13",
     "P1-14"
   ],
-  "production_cutover_blockers": [
-    "production_modern_pair_not_admitted"
-  ],
-  "production_protocol": "2025-11-25",
+  "production_cutover_blockers": [],
+  "production_protocol": "2026-07-28",
   "read_only_pilot_allowed": true,
   "read_only_pilot_completed": true,
   "reason_codes": [
-    "production_registration_remains_2025-11-25",
-    "stable_modern_lab_canary_passed",
+    "production_modern_only_fleet_admitted",
+    "zero_active_legacy_units",
     "frozen_core_conformance_passed",
     "modern_cancellation_propagated",
-    "tasks_client_extension_capability_absent",
-    "candidate_and_effect_migration_independent",
-    "production_modern_pair_not_admitted"
+    "bounded_production_tasks_pair_passed",
+    "candidate_and_effect_authority_independent"
   ],
   "remaining_core_gate_ids": [],
-  "remaining_gate_ids": [
-    "P1-11"
-  ],
-  "remaining_tasks_gate_ids": [
-    "P1-11"
-  ],
+  "remaining_gate_ids": [],
+  "remaining_tasks_gate_ids": [],
   "rmcp_tasks_pair_digest": "sha256:ada33eff1464ec37517a16634cf6edc6d364d096aeb1da709c11c2231267b2d7",
   "schema_version": "abyss_mcp_protocol_lab_status_v2",
   "stable_registration_retained": true,
   "stable_rollback_observation_digest": "sha256:eeba4f8f37eacf249d3ead0e9552eaa68a05848a86f51f1fc50304210295ed1f",
-  "status_digest": "sha256:42b42872cd4fbfd3db0578417dec6de65da28e5ec5b4df9c57b2260264a723c7",
+  "status_digest": "sha256:87d5689e51164611fcc16333c43f31ed9944ff5024bad36d2a35738754020f12",
   "tasks_blockers": [
-    "codex_tasks_capability_absent",
-    "inspector_task_name_header_missing",
+    "input_required_update_live_pair_unproved",
     "tasks_notifications_unproved",
-    "distributed_poll_limit_unproved",
-    "production_tasks_disabled"
+    "distributed_poll_limit_unproved"
   ],
-  "tasks_codex_consumer_eligible": false,
-  "tasks_evidence_expires_at": "2026-08-15T09:52:33.467338Z",
-  "tasks_extension_allowed": false,
+  "tasks_codex_consumer_eligible": true,
+  "tasks_evidence_expires_at": "2026-08-16T13:53:36.813735Z",
+  "tasks_extension_allowed": true,
   "tasks_extension_maturity": "experimental",
   "tasks_inspector_strict_pair_blocked": true,
-  "tasks_matrix_digest": "sha256:63d225d41159afb86ea98b04ffe0ba5f342d760578f0aee9df74d5ce8fa0d300",
+  "tasks_matrix_digest": "sha256:b44a14252549905c514afc19df48b35452c326c3e6d75dac4a4fcedcccbb5192",
   "tasks_notifications_proven": false,
   "tasks_pilot_digest": "sha256:dfa97a26a89b3278e465f718a6f524095f8c14d6952c8f4b7f746fb907b4f876",
-  "tasks_production_enabled": false,
+  "tasks_production_enabled": true,
   "tasks_reference_consumer": "rust-rmcp-3.1.2",
   "tasks_reference_pair_passed": true
 }

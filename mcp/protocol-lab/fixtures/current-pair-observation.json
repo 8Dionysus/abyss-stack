@@ -28,8 +28,8 @@
   "effectful_organs_migrated": false,
   "explicit_handles_observed": true,
   "matrix_version": "abyss_mcp_protocol_compatibility_matrix_v1",
-  "observation_id": "p1-kag-stable-modern-lab-pair-20260808",
-  "observed_at": "2026-08-08T08:35:36.009899Z",
+  "observation_id": "p1-production-modern-fleet-and-tasks-20260809",
+  "observed_at": "2026-08-09T13:53:36.813735Z",
   "official_conformance": {
     "reason": "Official conformance commit c321dd3 freezes requirements per specification revision; Python MCP 2.0.0 passed every scored client and server check for 2026-07-28, while later extension and pending failures remain visible and unscored.",
     "receipt_refs": [
@@ -38,20 +38,19 @@
     "status": "passed"
   },
   "read_only_canary": {
-    "reason": "The separately registered aoa_kag_next_lab performed exact discovery and kag_discover through stable Codex 0.147.0 on the 2026-07-28 wire.",
+    "reason": "The admitted production fleet performed exact discovery and tools/list on all eleven loopback organs through the 2026-07-28 wire.",
     "receipt_refs": [
-      "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json"
+      "mcp/protocol-lab/fixtures/live-modern-fleet-20260809.json"
     ],
     "status": "passed"
   },
   "reason_codes": [
-    "production_registration_remains_2025-11-25",
-    "stable_modern_lab_canary_passed",
+    "production_modern_only_fleet_admitted",
+    "zero_active_legacy_units",
     "frozen_core_conformance_passed",
     "modern_cancellation_propagated",
-    "tasks_client_extension_capability_absent",
-    "candidate_and_effect_migration_independent",
-    "production_modern_pair_not_admitted"
+    "bounded_production_tasks_pair_passed",
+    "candidate_and_effect_authority_independent"
   ],
   "receipt_refs": [
     "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json",
@@ -60,6 +59,8 @@
     "mcp/protocol-lab/fixtures/kag-next-cancellable-pair-observation.json",
     "mcp/protocol-lab/fixtures/kag-handle-pair-current-observation.json",
     "mcp/protocol-lab/fixtures/kag-cache-pair-current-observation.json",
+    "mcp/protocol-lab/fixtures/live-modern-fleet-20260809.json",
+    "mcp/protocol-lab/fixtures/codex-tasks-production-pair-20260809.json",
     "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28",
     "https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.0.0",
     "https://github.com/modelcontextprotocol/typescript-sdk/releases"
@@ -78,12 +79,12 @@
   "stable_sdk_release_observed": true,
   "stateless_behavior_observed": true,
   "tasks_extension": {
-    "reason": "Tasks remains a separate extension gate; Python MCP 2.0.0 does not implement it and stable Codex 0.147.0 did not advertise io.modelcontextprotocol/tasks on the real modern request wire.",
+    "reason": "The owner-managed Codex and abyss-stack production pair advertises the extension and passes bounded create, get, cancel, owner-binding, and missing-capability denial.",
     "receipt_refs": [
-      "https://github.com/modelcontextprotocol/python-sdk/blob/6f69a3758ebf2ee55ce050f58b470ce11af71133/docs/migration.md#experimental-tasks-support-removed"
+      "mcp/protocol-lab/fixtures/codex-tasks-production-pair-20260809.json"
     ],
-    "status": "blocked"
+    "status": "passed"
   },
   "trace_cache_metadata_observed": true,
-  "verdict": "blocked"
+  "verdict": "passed"
 }
