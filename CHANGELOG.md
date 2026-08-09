@@ -9,11 +9,13 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
-- Harden the external Codex contour against four pre-execution and observation
+- Harden the external Codex contour against six pre-execution and observation
   escape seams: opaque `git ls-remote` transport-helper dispatch now fails
   closed; ripgrep preprocessor, hostname-helper, and decompressor modes are
   opaque while ordinary searches remain admitted and ambient ripgrep config is
-  disabled; each installed launcher is a static x86_64 ELF that removes
+  disabled; GNU sort compression helpers and hidden Git ref mutations now fail
+  closed while ordinary sorting and ref inspection remain admitted; each
+  installed launcher is a static x86_64 ELF that removes
   ambient `LD_*` injection before its first dynamic exec; and verified release
   bytes are mounted at a namespace-private read-only `/mnt` coordinate rather
   than overlaying a host-visible release path that could be renamed or

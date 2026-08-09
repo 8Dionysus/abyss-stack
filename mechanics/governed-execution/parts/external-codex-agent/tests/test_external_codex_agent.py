@@ -460,6 +460,20 @@ if "FAKE_RIPGREP_HIDDEN_PROGRAM" in task["objective"]:
         "status": "completed",
         "exit_code": 0,
     }})
+if "FAKE_SORT_HIDDEN_PROGRAM" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/sort -S 4K --compress-program=/tmp/helper input",
+        "status": "completed",
+        "exit_code": 0,
+    }})
+if "FAKE_GIT_HIDDEN_REF_MUTATION" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/git update-ref refs/heads/hidden HEAD",
+        "status": "completed",
+        "exit_code": 0,
+    }})
 if "FAKE_DIRECT_SECRET_ENCODER" in task["objective"]:
     emit({"type": "item.completed", "item": {
         "type": "command_execution",
@@ -3445,6 +3459,44 @@ def test_ordinary_ripgrep_search_remains_classifiable(command: str) -> None:
     assert RUNTIME._command_has_unclassified_indirection(command) is False
 
 
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/sort -S 4K --compress-program=/tmp/helper input",
+        "/usr/bin/sort --compress-program /tmp/helper input",
+        "/usr/bin/sort --compress-program= input",
+        "/usr/bin/sort --comp=/tmp/helper input",
+        "/usr/bin/sort --co /tmp/helper input",
+    ),
+)
+def test_sort_compression_program_dispatch_is_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+def test_ordinary_sort_remains_classifiable() -> None:
+    assert RUNTIME._command_has_unclassified_indirection(
+        "/usr/bin/sort -u input"
+    ) is False
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/git update-ref refs/heads/hidden HEAD",
+        "/usr/bin/git update-ref -d refs/heads/hidden",
+        "/usr/bin/git update-ref --stdin",
+    ),
+)
+def test_git_update_ref_is_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+def test_git_show_ref_remains_classifiable() -> None:
+    assert RUNTIME._command_has_unclassified_indirection(
+        "/usr/bin/git show-ref --heads"
+    ) is False
+
+
 def test_shell_nesting_beyond_inspection_limit_is_fail_closed() -> None:
     command = "/usr/bin/git push"
     for _ in range(RUNTIME.SHELL_NESTING_INSPECTION_LIMIT):
@@ -3964,6 +4016,8 @@ def test_started_command_survives_interruption_and_blocks_authority(
         ("FAKE_GIT_LOCAL_CONFIG_WRITE", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_HIDDEN_PROGRAMS", ["unclassified_indirect_effect"]),
         ("FAKE_RIPGREP_HIDDEN_PROGRAM", ["unclassified_indirect_effect"]),
+        ("FAKE_SORT_HIDDEN_PROGRAM", ["unclassified_indirect_effect"]),
+        ("FAKE_GIT_HIDDEN_REF_MUTATION", ["unclassified_indirect_effect"]),
         (
             "FAKE_DIRECT_SECRET_ENCODER",
             ["secret_access", "unclassified_indirect_effect"],

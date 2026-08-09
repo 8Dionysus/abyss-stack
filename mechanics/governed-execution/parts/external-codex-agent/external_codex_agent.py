@@ -368,7 +368,6 @@ GIT_DIRECT_BUILTIN_SUBCOMMANDS = {
     "symbolic-ref",
     "tag",
     "update-index",
-    "update-ref",
     "verify-commit",
     "verify-pack",
     "verify-tag",
@@ -1777,6 +1776,19 @@ def _ripgrep_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
     return False
 
 
+def _sort_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
+    """Reject GNU sort modes that launch an unobserved compression program."""
+
+    for token in tokens[1:]:
+        lowered = token.lower()
+        if lowered == "--":
+            break
+        option = lowered.split("=", 1)[0]
+        if len(option) >= len("--co") and "--compress-program".startswith(option):
+            return True
+    return False
+
+
 def _command_matches_argv(command: str, expected: Sequence[str]) -> bool:
     expected_tokens = tuple(str(value) for value in expected)
     for tokens in _shell_tokenizations(command):
@@ -2050,6 +2062,8 @@ def _command_has_unclassified_indirection(command: str) -> bool:
             if executable == "sed" and _sed_has_opaque_dispatch(segment):
                 return True
             if executable == "rg" and _ripgrep_has_opaque_dispatch(segment):
+                return True
+            if executable == "sort" and _sort_has_opaque_dispatch(segment):
                 return True
             if executable == "find" and any(
                 value in {"-exec", "-execdir", "-ok", "-okdir"}

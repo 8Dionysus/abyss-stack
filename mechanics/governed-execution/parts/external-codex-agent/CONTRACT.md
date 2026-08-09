@@ -358,6 +358,10 @@ Ordinary ripgrep source search remains classifiable, but `--pre`,
 processes whose commands are absent from the Codex event. The runtime also
 fixes `RIPGREP_CONFIG_PATH=/dev/null`, preventing an ambient config file from
 adding one of those hidden process routes to an otherwise ordinary argv.
+Ordinary GNU sort remains classifiable, but `--compress-program` and its
+accepted GNU abbreviations are opaque because the selected compressor is an
+unobserved child process. `git update-ref` is also opaque because it mutates
+persistent repository refs below the manifest-visible worktree.
 Shell `source` and `.` bodies remain
 opaque because the observed argv does not expose the sourced commands. Git
 configuration writes, including repository-local and per-worktree writes, and

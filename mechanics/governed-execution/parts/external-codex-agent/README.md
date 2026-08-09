@@ -117,13 +117,17 @@ The controller:
   `--hostname-bin`, and `-z`/`--search-zip` are opaque because they launch
   unobserved helpers; `RIPGREP_CONFIG_PATH` is fixed to `/dev/null` so ambient
   configuration cannot re-enable those modes,
+  GNU sort remains available for ordinary ordering, while
+  `--compress-program` and its accepted GNU abbreviations are opaque because
+  they launch an unobserved helper,
   build/package/test/task runners remain opaque unless they are an exact
   owner-fixed validation,
   Git config writes plus alias/external-subcommand dispatch and ambient
   environment assignment fail closed; `git remote` retains read-only listing
   and URL resolution, while every mutating or transport-dispatching form is
-  opaque; Git help forms are opaque as well because configured man viewers can
-  dispatch programs,
+  opaque; `git update-ref` is opaque because it mutates repository state below
+  the manifest-visible worktree, and Git help forms are opaque as well because
+  configured man viewers can dispatch programs,
   any command carrying a secret-shaped path is classified as secret access,
   and commands are durably observed
   from `item.started` rather than only after completion, while exact task validation

@@ -93,6 +93,8 @@ executable refusal including shell-name impersonation, opaque AWK program-body
 refusal, isolated non-writable shell `HOME` with ambient-profile refusal,
 ripgrep preprocessor/hostname/decompressor dispatch refusal with ordinary
 search preserved and ambient ripgrep configuration disabled,
+GNU sort compression-program dispatch refusal with ordinary sort preserved,
+hidden Git ref mutation refusal with ordinary ref inspection preserved,
 GNU sed `--sandbox` enforcement, config-driven Git helper refusal,
 sourced-shell refusal, Git alias/config-write/external-subcommand refusal, ambient
 environment-assignment refusal, Git-invisible FIFO and Unix-socket refusal,
