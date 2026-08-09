@@ -92,7 +92,8 @@ The controller:
   shell nesting that exceeds the bounded inspection depth fails opaque,
   command/backtick/process substitutions remain opaque executable indirection,
   active parameter, glob (including Bash extglob), brace, and tilde expansion
-  remains opaque while quoted or escaped literals stay classifiable,
+  plus literal command newlines remain opaque while quoted or escaped literals
+  stay classifiable,
   sourced shell bodies through `source` or `.` remain opaque,
   model-issued commands run with a fixed system-only `PATH`, and only an
   explicit small set of system-resolved executables is directly classifiable;
@@ -108,7 +109,10 @@ The controller:
   opaque,
   GNU sed is classifiable only with enforced `--sandbox`, and Git builtins that
   can invoke repository-configured diff, textconv, or fsmonitor helpers remain
-  opaque,
+  opaque; checkout/checkin builtins that can invoke repository-defined content
+  filters remain opaque as well, while controller-owned manifest Git probes run
+  in a minimal environment with hooks/fsmonitor disabled and diff/textconv
+  programs explicitly prohibited,
   build/package/test/task runners remain opaque unless they are an exact
   owner-fixed validation,
   Git config writes plus alias/external-subcommand dispatch and ambient

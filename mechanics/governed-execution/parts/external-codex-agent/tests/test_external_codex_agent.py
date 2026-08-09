@@ -492,6 +492,13 @@ if "FAKE_CONFIG_DRIVEN_GIT" in task["objective"]:
         "status": "completed",
         "exit_code": 0,
     }})
+if "FAKE_MULTILINE_SHELL" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/bash -lc 'true\\ngit push'",
+        "status": "completed",
+        "exit_code": 0,
+    }})
 if "FAKE_STARTED_FORBIDDEN_COMMAND" in task["objective"]:
     emit({"type": "item.started", "item": {
         "id": "fixture-command-started-before-interruption",
@@ -3425,6 +3432,7 @@ def test_direct_non_system_executables_are_fail_closed(command: str) -> None:
         "/usr/bin/bash -lc 'g{it,rep} push'",
         "/usr/bin/bash -lc '~/bin/helper'",
         "/usr/bin/bash -O extglob -lc 'g@(it) push'",
+        "/usr/bin/bash -lc 'true\ngit push'",
     ),
 )
 def test_active_shell_expansions_are_fail_closed(command: str) -> None:
@@ -3465,6 +3473,11 @@ def test_unadmitted_bare_names_and_awk_are_fail_closed(command: str) -> None:
         "/usr/bin/sed -n '1e git push' README.md",
         "/usr/bin/git diff --check",
         "/usr/bin/git status --short",
+        "/usr/bin/git checkout HEAD -- README.md",
+        "/usr/bin/git add README.md",
+        "/usr/bin/git cat-file --filters HEAD:README.md",
+        "/usr/bin/git grep --textconv bounded",
+        "/usr/bin/git hash-object --path=README.md README.md",
     ),
 )
 def test_startup_and_config_driven_dispatch_are_fail_closed(command: str) -> None:
@@ -3511,7 +3524,11 @@ def test_codex_environment_isolates_shell_startup_and_repository_hooks(
     workspace.mkdir()
     _git(workspace, "init")
     (workspace / "README.md").write_text("bounded\n", encoding="utf-8")
-    _git(workspace, "add", "README.md")
+    (workspace / ".gitattributes").write_text(
+        "README.md filter=leak\n",
+        encoding="utf-8",
+    )
+    _git(workspace, "add", "README.md", ".gitattributes")
     _git(
         workspace,
         "-c",
@@ -3529,12 +3546,23 @@ def test_codex_environment_isolates_shell_startup_and_repository_hooks(
         encoding="utf-8",
     )
     post_checkout.chmod(0o700)
+    filter_marker = tmp_path / "smudge-filter-ran"
+    filter_helper = tmp_path / "smudge-filter"
+    filter_helper.write_text(
+        "#!/bin/sh\n"
+        f"/usr/bin/touch {shlex.quote(str(filter_marker))}\n"
+        "/bin/cat\n",
+        encoding="utf-8",
+    )
+    filter_helper.chmod(0o700)
+    _git(workspace, "config", "filter.leak.smudge", str(filter_helper))
 
     environment = RUNTIME.ExternalCodexRuntime._codex_environment(
         None,
         {
             "environment_allowlist": ["HOME", "PATH"],
             "codex_home": str(tmp_path / "codex-home"),
+            "workspace_path": str(workspace),
         },
         scratch,
         {"mcp_server_configs": []},
@@ -3560,13 +3588,20 @@ def test_codex_environment_isolates_shell_startup_and_repository_hooks(
     assert environment["PATH"] == RUNTIME.CODEX_EXECUTABLE_PATH
     assert environment["BASH_ENV"] == "/dev/null"
     assert environment["ENV"] == "/dev/null"
-    assert environment["GIT_CONFIG_COUNT"] == "1"
+    assert environment["GIT_CONFIG_COUNT"] == "4"
     assert environment["GIT_CONFIG_KEY_0"] == "core.hooksPath"
+    assert environment["GIT_CONFIG_KEY_1"] == "core.fsmonitor"
+    assert environment["GIT_CONFIG_VALUE_1"] == "false"
+    assert environment["GIT_CONFIG_KEY_2"] == "core.attributesFile"
+    assert environment["GIT_CONFIG_VALUE_2"] == "/dev/null"
+    assert environment["GIT_CONFIG_KEY_3"] == "filter.leak.smudge"
+    assert environment["GIT_CONFIG_VALUE_3"] == ""
     assert Path(environment["GIT_CONFIG_VALUE_0"]).stat().st_mode & 0o222 == 0
     assert Path(environment["HOME"]).stat().st_mode & 0o222 == 0
     assert marker.exists() is False
     assert checkout.returncode == 0
     assert hook_marker.exists() is False
+    assert filter_marker.exists() is False
 
     isolated_home = Path(environment["HOME"])
     isolated_home.chmod(0o700)
@@ -3577,6 +3612,7 @@ def test_codex_environment_isolates_shell_startup_and_repository_hooks(
             {
                 "environment_allowlist": ["HOME", "PATH"],
                 "codex_home": str(tmp_path / "codex-home"),
+                "workspace_path": str(workspace),
             },
             scratch,
             {"mcp_server_configs": []},
@@ -3683,7 +3719,6 @@ def test_task_schema_requires_the_complete_runtime_forbidden_set(
         "/usr/bin/git rev-parse HEAD",
         "/usr/bin/git ls-files",
         "/usr/bin/git show-ref --head",
-        "/usr/bin/git checkout HEAD -- README.md",
         "/usr/bin/git config core.hooksPath",
         "/usr/bin/git config --local --get core.hooksPath",
         "/usr/bin/git config get core.hooksPath",
@@ -3753,6 +3788,7 @@ def test_started_command_survives_interruption_and_blocks_authority(
         ("FAKE_NON_SYSTEM_SHELL", ["unclassified_indirect_effect"]),
         ("FAKE_UNSANDBOXED_SED", ["unclassified_indirect_effect"]),
         ("FAKE_CONFIG_DRIVEN_GIT", ["unclassified_indirect_effect"]),
+        ("FAKE_MULTILINE_SHELL", ["unclassified_indirect_effect"]),
     ),
 )
 def test_opaque_command_authority_blocks_terminal_result(
@@ -3870,6 +3906,50 @@ def test_secret_shaped_ignored_path_blocks_manifest_without_hashing(
         RUNTIME.build_workspace_manifest(workspace)
 
     assert exc_info.value.code == "workspace_secret_path_present"
+
+
+def test_workspace_manifest_disables_repository_diff_and_filter_programs(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    tracked = workspace / "tracked.txt"
+    tracked.write_text("baseline\n", encoding="utf-8")
+    (workspace / ".gitattributes").write_text(
+        "tracked.txt filter=leak\n",
+        encoding="utf-8",
+    )
+    _git(workspace, "add", "tracked.txt", ".gitattributes")
+    _git(workspace, "commit", "-m", "fixture")
+
+    diff_marker = tmp_path / "external-diff-ran"
+    diff_helper = tmp_path / "external-diff"
+    diff_helper.write_text(
+        f"#!/bin/sh\n/usr/bin/touch {shlex.quote(str(diff_marker))}\n",
+        encoding="utf-8",
+    )
+    diff_helper.chmod(0o700)
+    filter_marker = tmp_path / "clean-filter-ran"
+    filter_helper = tmp_path / "clean-filter"
+    filter_helper.write_text(
+        "#!/bin/sh\n"
+        f"/usr/bin/touch {shlex.quote(str(filter_marker))}\n"
+        "/bin/cat\n",
+        encoding="utf-8",
+    )
+    filter_helper.chmod(0o700)
+    _git(workspace, "config", "diff.external", str(diff_helper))
+    _git(workspace, "config", "filter.leak.clean", str(filter_helper))
+    tracked.write_text("changed\n", encoding="utf-8")
+
+    manifest = RUNTIME.build_workspace_manifest(workspace)
+
+    assert manifest["status_entries"] == [{"path": "tracked.txt", "status": " M"}]
+    assert diff_marker.exists() is False
+    assert filter_marker.exists() is False
 
 
 @pytest.mark.parametrize("index_flag", ["--assume-unchanged", "--skip-worktree"])

@@ -180,6 +180,27 @@ GIT_CONFIG_DRIVEN_HELPER_SUBCOMMANDS = frozenset(
         "status",
     }
 )
+GIT_FILTER_RUNNING_SUBCOMMANDS = frozenset(
+    {
+        "add",
+        "am",
+        "apply",
+        "checkout",
+        "cherry-pick",
+        "clone",
+        "commit",
+        "merge",
+        "pull",
+        "read-tree",
+        "rebase",
+        "reset",
+        "restore",
+        "sparse-checkout",
+        "switch",
+        "update-index",
+        "worktree",
+    }
+)
 CLASSIFIABLE_DIRECT_EXECUTABLES = frozenset(
     {
         "basename",
@@ -1367,6 +1388,8 @@ def _shell_tokenization_analysis(
         if raw in seen:
             continue
         seen.add(raw)
+        if "\n" in raw or "\r" in raw:
+            incomplete = True
         if _shell_has_active_expansion(raw):
             incomplete = True
         try:
@@ -1638,6 +1661,21 @@ def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
         }:
             return True
     if subcommand in GIT_CONFIG_DRIVEN_HELPER_SUBCOMMANDS:
+        return True
+    if subcommand in GIT_FILTER_RUNNING_SUBCOMMANDS:
+        return True
+    if subcommand == "cat-file" and any(
+        value.lower() in {"--filters", "--textconv"} for value in git_args
+    ):
+        return True
+    if subcommand == "grep" and "--textconv" in {
+        value.lower() for value in git_args
+    }:
+        return True
+    if subcommand == "hash-object" and any(
+        value.lower() == "--path" or value.lower().startswith("--path=")
+        for value in git_args
+    ):
         return True
     return subcommand not in GIT_DIRECT_BUILTIN_SUBCOMMANDS
 
@@ -1934,13 +1972,100 @@ def _command_has_unclassified_indirection(command: str) -> bool:
     return False
 
 
-def _git_head(workspace: Path) -> str:
+def _base_controller_git_environment() -> dict[str, str]:
+    return {
+        "GIT_ATTR_NOSYSTEM": "1",
+        "GIT_CONFIG_COUNT": "3",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_KEY_0": "core.hooksPath",
+        "GIT_CONFIG_KEY_1": "core.fsmonitor",
+        "GIT_CONFIG_KEY_2": "core.attributesFile",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_CONFIG_VALUE_0": "/dev/null",
+        "GIT_CONFIG_VALUE_1": "false",
+        "GIT_CONFIG_VALUE_2": "/dev/null",
+        "GIT_OPTIONAL_LOCKS": "0",
+        "GIT_TERMINAL_PROMPT": "0",
+        "HOME": "/nonexistent",
+        "LANG": "C.UTF-8",
+        "NO_COLOR": "1",
+        "PATH": CODEX_EXECUTABLE_PATH,
+    }
+
+
+def _controller_git_environment(workspace: Path) -> dict[str, str]:
+    """Disable every repository-defined content filter for controller probes."""
+
+    environment = _base_controller_git_environment()
+    completed = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(workspace),
+            "config",
+            "--local",
+            "--includes",
+            "--name-only",
+            "--null",
+            "--get-regexp",
+            r"^filter\..*\.(clean|smudge|process|required)$",
+        ],
+        capture_output=True,
+        check=False,
+        timeout=15,
+        env=environment,
+    )
+    if completed.returncode not in {0, 1}:
+        raise ExternalCodexRuntimeError(
+            "workspace_filter_config_failed",
+            "cannot enumerate repository-defined Git content filters",
+        )
+    try:
+        keys = sorted(
+            {
+                raw.decode("utf-8")
+                for raw in completed.stdout.split(b"\0")
+                if raw
+            }
+        )
+    except UnicodeDecodeError as exc:
+        raise ExternalCodexRuntimeError(
+            "workspace_filter_config_failed",
+            "repository-defined Git filter key is not UTF-8",
+        ) from exc
+    if len(keys) > 128 or any(
+        re.fullmatch(r"filter\..+\.(?:clean|smudge|process|required)", key, re.I)
+        is None
+        for key in keys
+    ):
+        raise ExternalCodexRuntimeError(
+            "workspace_filter_config_failed",
+            "repository-defined Git filter keys exceed the bounded grammar",
+        )
+    next_index = int(environment["GIT_CONFIG_COUNT"])
+    for key in keys:
+        environment[f"GIT_CONFIG_KEY_{next_index}"] = key
+        environment[f"GIT_CONFIG_VALUE_{next_index}"] = (
+            "false" if key.lower().endswith(".required") else ""
+        )
+        next_index += 1
+    environment["GIT_CONFIG_COUNT"] = str(next_index)
+    return environment
+
+
+def _git_head(
+    workspace: Path,
+    *,
+    git_env: Mapping[str, str] | None = None,
+) -> str:
     completed = subprocess.run(
         ["/usr/bin/git", "-C", str(workspace), "rev-parse", "HEAD"],
         text=True,
         capture_output=True,
         check=False,
         timeout=15,
+        env=dict(git_env or _controller_git_environment(workspace)),
     )
     value = completed.stdout.strip()
     if completed.returncode != 0 or re.fullmatch(r"[0-9a-f]{40}", value) is None:
@@ -1950,7 +2075,11 @@ def _git_head(workspace: Path) -> str:
     return value
 
 
-def _git_status(workspace: Path) -> dict[str, str]:
+def _git_status(
+    workspace: Path,
+    *,
+    git_env: Mapping[str, str] | None = None,
+) -> dict[str, str]:
     completed = subprocess.run(
         [
             "/usr/bin/git",
@@ -1966,6 +2095,7 @@ def _git_status(workspace: Path) -> dict[str, str]:
         capture_output=True,
         check=False,
         timeout=30,
+        env=dict(git_env or _controller_git_environment(workspace)),
     )
     if completed.returncode != 0:
         raise ExternalCodexRuntimeError(
@@ -1981,12 +2111,18 @@ def _git_status(workspace: Path) -> dict[str, str]:
     return status
 
 
-def _git_bytes(workspace: Path, *args: str, timeout: int = 30) -> bytes:
+def _git_bytes(
+    workspace: Path,
+    *args: str,
+    timeout: int = 30,
+    git_env: Mapping[str, str] | None = None,
+) -> bytes:
     completed = subprocess.run(
         ["/usr/bin/git", "-C", str(workspace), *args],
         capture_output=True,
         check=False,
         timeout=timeout,
+        env=dict(git_env or _controller_git_environment(workspace)),
     )
     if completed.returncode != 0:
         raise ExternalCodexRuntimeError(
@@ -2018,9 +2154,19 @@ def _nul_paths(payload: bytes, *, label: str) -> tuple[str, ...]:
     return tuple(values)
 
 
-def _tracked_index_flags(workspace: Path) -> dict[str, tuple[str, ...]]:
+def _tracked_index_flags(
+    workspace: Path,
+    *,
+    git_env: Mapping[str, str],
+) -> dict[str, tuple[str, ...]]:
     flags: dict[str, tuple[str, ...]] = {}
-    for raw in _git_bytes(workspace, "ls-files", "--stage", "-z").split(b"\0"):
+    for raw in _git_bytes(
+        workspace,
+        "ls-files",
+        "--stage",
+        "-z",
+        git_env=git_env,
+    ).split(b"\0"):
         if not raw:
             continue
         try:
@@ -2042,7 +2188,13 @@ def _tracked_index_flags(workspace: Path) -> dict[str, tuple[str, ...]]:
                 "workspace_submodule_unsupported",
                 f"workspace manifest does not yet admit tracked submodule {paths[0]}",
             )
-    for raw in _git_bytes(workspace, "ls-files", "-v", "-z").split(b"\0"):
+    for raw in _git_bytes(
+        workspace,
+        "ls-files",
+        "-v",
+        "-z",
+        git_env=git_env,
+    ).split(b"\0"):
         if not raw:
             continue
         if len(raw) < 3 or raw[1:2] != b" ":
@@ -2122,16 +2274,38 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
         raise ExternalCodexRuntimeError(
             "workspace_unavailable", "workspace manifest target is unavailable"
         )
+    git_env = _controller_git_environment(location)
     status_raw = _git_bytes(
         location,
         "status",
         "--porcelain=v1",
         "-z",
         "--untracked-files=all",
+        git_env=git_env,
     )
-    diff_raw = _git_bytes(location, "diff", "--binary", "HEAD", "--", timeout=60)
+    diff_raw = _git_bytes(
+        location,
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "HEAD",
+        "--",
+        timeout=60,
+        git_env=git_env,
+    )
     changed = _nul_paths(
-        _git_bytes(location, "diff", "--name-only", "-z", "HEAD", "--"),
+        _git_bytes(
+            location,
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--name-only",
+            "-z",
+            "HEAD",
+            "--",
+            git_env=git_env,
+        ),
         label="tracked diff",
     )
     untracked = _nul_paths(
@@ -2141,6 +2315,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
             "--others",
             "--exclude-standard",
             "-z",
+            git_env=git_env,
         ),
         label="untracked files",
     )
@@ -2152,10 +2327,11 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
             "--ignored",
             "--exclude-standard",
             "-z",
+            git_env=git_env,
         ),
         label="ignored files",
     )
-    tracked_flags = _tracked_index_flags(location)
+    tracked_flags = _tracked_index_flags(location, git_env=git_env)
     for relative in sorted(set(untracked) | set(ignored)):
         if _secret_shaped_path(relative):
             raise ExternalCodexRuntimeError(
@@ -2244,12 +2420,12 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
                     "index_flags": index_flags,
                 }
             )
-    status = _git_status(location)
+    status = _git_status(location, git_env=git_env)
     return {
         "$schema": "schemas/external-codex-workspace-manifest.schema.json",
         "schema_version": "abyss_stack_external_codex_workspace_manifest_v1",
         "workspace_path": str(location),
-        "git_head": _git_head(location),
+        "git_head": _git_head(location, git_env=git_env),
         "git_status_porcelain_sha256": sha256_bytes(status_raw),
         "git_diff_binary_sha256": sha256_bytes(diff_raw),
         "status_entries": [
@@ -3952,14 +4128,20 @@ class ExternalCodexRuntime:
             error_code="isolated_git_hooks_unavailable",
             purpose="Git hooks directory",
         )
+        repository_git_environment = _controller_git_environment(
+            Path(str(launch["workspace_path"]))
+        )
         environment["HOME"] = str(shell_home)
         environment["PATH"] = CODEX_EXECUTABLE_PATH
         environment["BASH_ENV"] = "/dev/null"
         environment["ENV"] = "/dev/null"
-        environment["GIT_CONFIG_COUNT"] = "1"
-        environment["GIT_CONFIG_GLOBAL"] = "/dev/null"
-        environment["GIT_CONFIG_KEY_0"] = "core.hooksPath"
-        environment["GIT_CONFIG_NOSYSTEM"] = "1"
+        for key, value in repository_git_environment.items():
+            if key.startswith("GIT_CONFIG_") or key in {
+                "GIT_ATTR_NOSYSTEM",
+                "GIT_OPTIONAL_LOCKS",
+                "GIT_TERMINAL_PROMPT",
+            }:
+                environment[key] = value
         environment["GIT_CONFIG_VALUE_0"] = str(git_hooks_root)
         environment["GIT_PAGER"] = "cat"
         environment["GIT_TERMINAL_PROMPT"] = "0"
