@@ -25,6 +25,7 @@ from abyss_stack_mcp.canary import (
     CanaryDeploymentBinding,
     CanaryInventoryCounts,
     CanaryProbeResult,
+    CanaryReceipt,
     CanaryRunnerError,
     build_overlay,
     build_receipt as _build_receipt,
@@ -405,6 +406,46 @@ def test_receipt_rejects_changed_before_after_process_identity() -> None:
             process_identity_before=PROCESS_IDENTITY,
             process_identity_after=changed,
         )
+
+
+def test_legacy_v3_receipt_shape_remains_verifiable_during_migration() -> None:
+    receipt = build_receipt(
+        target=target(),
+        contract=canary_contract(),
+        probe=successful_probe(),
+        observed_at=NOW,
+        ttl_seconds=600,
+        signing_key=SIGNING_KEY,
+        deployment=deployment_binding(),
+    )
+    legacy_body = receipt.model_dump(
+        mode="json",
+        exclude={
+            "receipt_id",
+            "attestation",
+            "process_identity_before",
+            "process_identity_after",
+        },
+    )
+    legacy_receipt_id = canonical_digest(legacy_body)
+    signed_payload = {"receipt_id": legacy_receipt_id, **legacy_body}
+    legacy = CanaryReceipt.model_validate(
+        {
+            **signed_payload,
+            **canary._signed_fields(signed_payload, SIGNING_KEY),
+        }
+    )
+
+    verified = verify_canary_receipt(
+        legacy,
+        SIGNING_KEY.public_key(),
+        checked_at=NOW,
+        require_success=True,
+    )
+
+    assert verified.receipt_id == legacy_receipt_id
+    assert verified.process_identity_before is None
+    assert verified.process_identity_after is None
 
 
 def test_receipt_cannot_predate_its_bound_deployment() -> None:

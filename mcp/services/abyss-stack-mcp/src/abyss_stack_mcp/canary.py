@@ -144,8 +144,8 @@ class CanaryReceipt(StrictModel):
     deployment_tree_digest: Digest
     deployment_deployed_at: datetime
     process_unit_name: NonEmpty
-    process_identity_before: NonEmpty
-    process_identity_after: NonEmpty
+    process_identity_before: NonEmpty | None = None
+    process_identity_after: NonEmpty | None = None
     process_identity: NonEmpty
     canary_route: NonEmpty
     tool_name: Identifier
@@ -206,7 +206,17 @@ class CanaryReceipt(StrictModel):
             is None
         ):
             raise ValueError("canary process identity must bind its named systemd unit")
-        if not (
+        legacy_process_shape = (
+            self.process_identity_before is None
+            and self.process_identity_after is None
+        )
+        if (self.process_identity_before is None) != (
+            self.process_identity_after is None
+        ):
+            raise ValueError(
+                "canary before/after process identities must be both present or absent"
+            )
+        if not legacy_process_shape and not (
             self.process_identity_before
             == self.process_identity_after
             == self.process_identity
@@ -585,6 +595,12 @@ def verify_canary_receipt(
             "canary receipt signer conflicts with pinned public key"
         )
     signed_payload = receipt.model_dump(mode="json")
+    for migration_field in (
+        "process_identity_before",
+        "process_identity_after",
+    ):
+        if migration_field not in receipt.model_fields_set:
+            signed_payload.pop(migration_field)
     attestation = signed_payload.pop("attestation")
     digest_payload = dict(signed_payload)
     receipt_id = digest_payload.pop("receipt_id")
