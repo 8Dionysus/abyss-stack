@@ -178,6 +178,8 @@ GIT_CONFIG_DRIVEN_HELPER_SUBCOMMANDS = frozenset(
         "range-diff",
         "show",
         "status",
+        "verify-commit",
+        "verify-tag",
     }
 )
 GIT_FILTER_RUNNING_SUBCOMMANDS = frozenset(
@@ -1707,6 +1709,18 @@ def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
         # read-only. Every other remote subcommand can mutate repository
         # config/refs or dispatch a transport selected by repository config.
         if positional and positional[0] != "get-url":
+            return True
+    if subcommand == "branch" and any(
+        value.lower() == "--edit-description"
+        or value.lower().startswith("--edit-description=")
+        for value in git_args
+    ):
+        return True
+    if subcommand == "bisect":
+        positional = tuple(
+            value.lower() for value in git_args if not value.startswith("-")
+        )
+        if positional[:1] == ("run",):
             return True
     if subcommand in GIT_CONFIG_DRIVEN_HELPER_SUBCOMMANDS:
         return True

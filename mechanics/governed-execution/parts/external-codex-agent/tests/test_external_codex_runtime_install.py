@@ -215,6 +215,83 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
     assert repeated["active"]["release_id"] == active["release_id"]
 
 
+def test_interpreter_activation_publishes_at_active_record(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    runtime_root = tmp_path / "runtime"
+    bin_dir = tmp_path / "bin"
+    first = runtime_install.install(
+        source,
+        sdk,
+        agents,
+        skills,
+        runtime_root,
+        bin_dir,
+        Path(sys.executable),
+        allow_dirty_source=False,
+        allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
+    )
+    alternate_python = tmp_path / "alternate-python"
+    alternate_python.write_text(
+        "#!/bin/sh\n"
+        f"exec {shlex.quote(str(Path(sys.executable).resolve()))} \"$@\"\n",
+        encoding="utf-8",
+    )
+    alternate_python.chmod(0o700)
+    active_path = runtime_root / "active.json"
+    original_atomic_write = runtime_install.atomic_write
+
+    def fail_active_publication(path: Path, content: bytes, mode: int) -> None:
+        if path == active_path:
+            raise runtime_install.InstallError("simulated active publication failure")
+        original_atomic_write(path, content, mode)
+
+    monkeypatch.setattr(runtime_install, "atomic_write", fail_active_publication)
+    with pytest.raises(runtime_install.InstallError, match="simulated active"):
+        runtime_install.activate(
+            runtime_root,
+            bin_dir,
+            first["active"]["release_id"],
+            alternate_python,
+        )
+
+    assert json.loads(active_path.read_text(encoding="utf-8"))["python_executable"] == (
+        first["active"]["python_executable"]
+    )
+    assert runtime_install.status(runtime_root, bin_dir)["healthy"] is True
+    failed_transition_run = subprocess.run(
+        [str(bin_dir / "aoa-external-codex-agent")],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert failed_transition_run.stdout == "agent:exact-sdk\n"
+
+    monkeypatch.setattr(runtime_install, "atomic_write", original_atomic_write)
+    activated = runtime_install.activate(
+        runtime_root,
+        bin_dir,
+        first["active"]["release_id"],
+        alternate_python,
+    )
+
+    assert activated["active"]["python_executable"] == str(
+        alternate_python.resolve()
+    )
+    assert runtime_install.status(runtime_root, bin_dir)["healthy"] is True
+    completed_transition_run = subprocess.run(
+        [str(bin_dir / "aoa-external-codex-agent")],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert completed_transition_run.stdout == "agent:exact-sdk\n"
+
+
 def test_git_posture_does_not_run_repository_fsmonitor_or_content_filter(
     tmp_path: Path,
 ) -> None:

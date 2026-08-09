@@ -436,6 +436,18 @@ if "FAKE_GIT_LOCAL_CONFIG_WRITE" in task["objective"]:
         "status": "completed",
         "exit_code": 0,
     }})
+if "FAKE_GIT_HIDDEN_PROGRAMS" in task["objective"]:
+    for command in (
+        "/usr/bin/git branch --edit-description",
+        "/usr/bin/git bisect run scripts/helper",
+        "/usr/bin/git verify-commit HEAD",
+    ):
+        emit({"type": "item.completed", "item": {
+            "type": "command_execution",
+            "command": command,
+            "status": "completed",
+            "exit_code": 0,
+        }})
 if "FAKE_DIRECT_SECRET_ENCODER" in task["objective"]:
     emit({"type": "item.completed", "item": {
         "type": "command_execution",
@@ -3761,6 +3773,22 @@ def test_git_help_dispatch_is_fail_closed(command: str) -> None:
     assert RUNTIME._command_has_unclassified_indirection(command) is True
 
 
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/git branch --edit-description",
+        "/usr/bin/git branch --edit-description=main",
+        "/usr/bin/git bisect run scripts/helper",
+        "/usr/bin/git verify-commit HEAD",
+        "/usr/bin/git verify-tag v1.0.0",
+    ),
+)
+def test_git_editor_runner_and_verifier_dispatch_is_fail_closed(
+    command: str,
+) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
 def test_direct_secret_file_encoder_is_classified() -> None:
     assert RUNTIME._command_effects(
         "/usr/bin/base64 /home/operator/.ssh/id_rsa"
@@ -3866,6 +3894,7 @@ def test_started_command_survives_interruption_and_blocks_authority(
         ("FAKE_SOURCE_INDIRECTION", ["unclassified_indirect_effect"]),
         ("FAKE_SHELL_SCRIPT_BEFORE_C", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_LOCAL_CONFIG_WRITE", ["unclassified_indirect_effect"]),
+        ("FAKE_GIT_HIDDEN_PROGRAMS", ["unclassified_indirect_effect"]),
         (
             "FAKE_DIRECT_SECRET_ENCODER",
             ["secret_access", "unclassified_indirect_effect"],

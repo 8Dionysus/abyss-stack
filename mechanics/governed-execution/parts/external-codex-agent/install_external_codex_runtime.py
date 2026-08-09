@@ -48,6 +48,7 @@ OWNER_CONTRACT_FILES = (
 )
 INSTALLER_GIT = "/usr/bin/git"
 SHARED_INDEX_MAX_BYTES = 512 * 1024 * 1024
+WRAPPER_BOOTSTRAP_PYTHON = Path("/usr/bin/python3")
 
 
 class InstallError(RuntimeError):
@@ -580,8 +581,11 @@ runpy.run_path(str(TARGET), run_name="__main__")
 def wrapper_text(
     active_path: Path,
     entrypoint_name: str,
-    python_executable: Path,
 ) -> str:
+    # The wrapper's isolated bootstrap is stable across runtime-interpreter
+    # changes. It reads the interpreter only from the atomically published
+    # active record, so staged wrapper replacement remains callable before and
+    # after that single publication point.
     bootstrap = '''from __future__ import annotations
 import json
 import os
@@ -591,12 +595,21 @@ from pathlib import Path
 ACTIVE = Path(sys.argv[1])
 RUNTIME_ROOT = Path(sys.argv[2])
 ENTRYPOINT_NAME = sys.argv[3]
-PINNED_PYTHON = Path(sys.argv[4])
 if ACTIVE.is_symlink() or not ACTIVE.is_file():
     raise SystemExit(f"external Codex active release is unavailable: {ACTIVE}")
 record = json.loads(ACTIVE.read_text(encoding="utf-8"))
-if record.get("python_executable") != str(PINNED_PYTHON):
-    raise SystemExit("external Codex active interpreter differs from its wrapper")
+python_value = record.get("python_executable")
+if not isinstance(python_value, str):
+    raise SystemExit("external Codex active interpreter is invalid")
+runtime_python = Path(python_value)
+if (
+    not runtime_python.is_absolute()
+    or runtime_python.is_symlink()
+    or not runtime_python.is_file()
+    or not os.access(runtime_python, os.X_OK)
+    or runtime_python.resolve() != runtime_python
+):
+    raise SystemExit(f"external Codex active interpreter is unavailable: {runtime_python}")
 release_id = record["release_id"]
 if not isinstance(release_id, str) or not release_id.startswith("sha256-") or len(release_id) != 71 or any(character not in "0123456789abcdef" for character in release_id[7:]):
     raise SystemExit(f"external Codex release id is invalid: {release_id}")
@@ -615,14 +628,14 @@ entrypoint = release_root / ENTRYPOINT_NAME
 if entrypoint.is_symlink() or not entrypoint.is_file():
     raise SystemExit(f"external Codex entrypoint is unavailable: {entrypoint}")
 os.execv(
-    str(PINNED_PYTHON),
-    [str(PINNED_PYTHON), "-I", "-B", str(entrypoint), *sys.argv[5:]],
+    str(runtime_python),
+    [str(runtime_python), "-I", "-B", str(entrypoint), *sys.argv[4:]],
 )
 '''
     command = " ".join(
         (
             "exec",
-            shlex.quote(str(python_executable)),
+            shlex.quote(str(WRAPPER_BOOTSTRAP_PYTHON)),
             "-I",
             "-B",
             "-c",
@@ -630,7 +643,6 @@ os.execv(
             shlex.quote(str(active_path)),
             shlex.quote(str(active_path.parent)),
             shlex.quote(entrypoint_name),
-            shlex.quote(str(python_executable)),
             '"$@"',
         )
     )
@@ -799,6 +811,7 @@ def install(
     runtime_root = runtime_root.resolve()
     bin_dir = bin_dir.resolve()
     python_executable = require_python_executable(python_executable)
+    require_python_executable(WRAPPER_BOOTSTRAP_PYTHON)
     files = source_files(source_root, sdk_root, agents_root, skills_root)
     postures = source_postures(
         files,
@@ -854,7 +867,6 @@ def install(
         expected = wrapper_text(
             active_path,
             entrypoint,
-            python_executable,
         ).encode("utf-8")
         if path.exists() and not path.is_symlink() and path.read_bytes() == expected:
             wrapper_backups[name] = None
@@ -939,6 +951,7 @@ def activate(
     if manifest["release_id"] != release_id:
         raise InstallError("requested release id differs from verified manifest")
     python_executable = require_python_executable(python_executable)
+    require_python_executable(WRAPPER_BOOTSTRAP_PYTHON)
     active_path = runtime_root / "active.json"
     previous = json.loads(active_path.read_text(encoding="utf-8")) if active_path.exists() else None
     for name, entrypoint in {
@@ -951,7 +964,6 @@ def activate(
             wrapper_text(
                 active_path,
                 entrypoint,
-                python_executable,
             ).encode("utf-8"),
             0o755,
         )
@@ -985,7 +997,8 @@ def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
     python_value = active.get("python_executable")
     if not isinstance(python_value, str):
         raise InstallError("active Python executable is invalid")
-    python_executable = require_python_executable(Path(python_value))
+    require_python_executable(Path(python_value))
+    require_python_executable(WRAPPER_BOOTSTRAP_PYTHON)
     release_id = active.get("release_id")
     if not isinstance(release_id, str):
         raise InstallError("active release id is invalid")
@@ -1013,7 +1026,6 @@ def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
         expected = wrapper_text(
             active_path,
             entrypoint,
-            python_executable,
         ).encode("utf-8")
         wrapper_status[name] = {
             "path": str(path),
