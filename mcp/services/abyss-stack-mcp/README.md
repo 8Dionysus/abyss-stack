@@ -35,7 +35,10 @@ authorizes either contour:
   contour revision only after exact current and last-known-good observations,
   central proof, KAG owner acceptance, consumer compatibility, rollback
   readiness, and a separately issued operator decision all bind the same
-  shadow predecessor;
+  predecessor. The predecessor may be a shadow contour for first admission or
+  an admitted contour whose currentness window has already expired according
+  to the normalized composition clock; a still-current admitted contour and a
+  merely future-dated decision both fail closed;
 - `abyss-stack-mcp-system-status` combines that private projection with the
   managed catalog, owner registry, protocol-lab verdict, and aggregate SDK
   TaskStore state into one private, content-addressed read model.
