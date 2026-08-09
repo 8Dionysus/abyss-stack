@@ -2566,7 +2566,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 ],
             )
             self.assertIn("Restart=no", bootstrap_lines)
-            self.assertIn("RuntimeMaxSec=10min", bootstrap_lines)
+            self.assertIn("RuntimeMaxSec=30min", bootstrap_lines)
             self.assertNotIn("[Install]", bootstrap_lines)
             self.assertFalse(
                 any(line.startswith("WantedBy=") for line in bootstrap_lines)
@@ -3349,6 +3349,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 f"http://127.0.0.1:{port}/mcp",
                 data=b"{}",
                 method="POST",
+                headers={"MCP-Protocol-Version": "2026-07-28"},
             )
             with self.assertRaises(urllib.error.HTTPError) as missing_auth:
                 urllib.request.urlopen(request, timeout=2)
@@ -3358,7 +3359,10 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 f"http://127.0.0.1:{port}/mcp",
                 data=b"{}",
                 method="POST",
-                headers={"Authorization": "Bearer wrong-token"},
+                headers={
+                    "Authorization": "Bearer wrong-token",
+                    "MCP-Protocol-Version": "2026-07-28",
+                },
             )
             with self.assertRaises(urllib.error.HTTPError) as wrong_auth:
                 urllib.request.urlopen(wrong_request, timeout=2)
@@ -3371,6 +3375,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 headers={
                     "Authorization": f"Bearer {MCP_HTTP_AUTH_TOKEN}",
                     "Content-Type": "application/json",
+                    "MCP-Protocol-Version": "2026-07-28",
                     "Origin": "https://untrusted.example",
                 },
             )
@@ -3386,6 +3391,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                     "Authorization": f"Bearer {MCP_HTTP_AUTH_TOKEN}",
                     "Content-Type": "application/json",
                     "Host": "untrusted.example",
+                    "MCP-Protocol-Version": "2026-07-28",
                 },
             )
             with self.assertRaises(urllib.error.HTTPError) as invalid_host:
@@ -3394,20 +3400,34 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
 
             async def authenticated_inventory() -> int:
                 import httpx
-                from mcp import ClientSession
-                from mcp.client.streamable_http import streamable_http_client
 
                 async with httpx.AsyncClient(
-                    headers={"Authorization": f"Bearer {MCP_HTTP_AUTH_TOKEN}"}
+                    headers={
+                        "Authorization": f"Bearer {MCP_HTTP_AUTH_TOKEN}",
+                        "MCP-Protocol-Version": "2026-07-28",
+                        "MCP-Method": "tools/list",
+                    }
                 ) as http_client:
-                    async with streamable_http_client(
+                    response = await http_client.post(
                         f"http://127.0.0.1:{port}/mcp",
-                        http_client=http_client,
-                    ) as (read_stream, write_stream, _):
-                        async with ClientSession(read_stream, write_stream) as session:
-                            await session.initialize()
-                            tools = await session.list_tools()
-                            return len(tools.tools)
+                        json={
+                            "jsonrpc": "2.0",
+                            "id": 1,
+                            "method": "tools/list",
+                            "params": {
+                                "_meta": {
+                                    "io.modelcontextprotocol/clientInfo": {
+                                        "name": "abyss-stack-unit-test",
+                                        "version": "1",
+                                    },
+                                    "io.modelcontextprotocol/clientCapabilities": {},
+                                    "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                                }
+                            },
+                        },
+                    )
+                    response.raise_for_status()
+                    return len(response.json()["result"]["tools"])
 
             self.assertGreater(asyncio.run(authenticated_inventory()), 0)
         finally:

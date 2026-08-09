@@ -22,6 +22,7 @@ from aoa_sdk.contracts.organ_registry_v2 import (
     ContourLastGoodState,
     ContourSupplementEntry,
     OrganContourAdmissionRevision,
+    OrganContourShapeRevision,
     OrganContourSupplement,
     OrganRegistryRuntimeOverlay,
     OrganRegistrySourceV2,
@@ -33,10 +34,12 @@ from aoa_sdk.contracts.organs import (
     OrganMaturityVector,
     PrimitiveContract,
     QualifiedEvidenceRef,
+    RevisionIdentity,
 )
 from aoa_sdk.organs.registry import sha256_digest
 from aoa_sdk.organs.registry_v2 import (
     apply_contour_admission_revision,
+    apply_contour_shape_revision,
     apply_contour_supplement,
     apply_registry_runtime_overlay,
     render_registry_source_v2,
@@ -56,6 +59,21 @@ PROOF_SOURCE_SHA256 = (
 )
 SUPPORTED_PROTOCOL = "2026-07-28"
 ADMISSION_POLICY = "modern-wire-exact-live-admission-v1"
+READ_FLEET = frozenset(
+    {
+        "abyss-stack",
+        "abyss-machine",
+        "aoa-decisions",
+        "aoa-memo",
+        "aoa-session-memory",
+        "aoa-evals",
+        "aoa-kag",
+        "aoa-stats",
+        "aoa-4pda-connector",
+        "aoa-telegram-connector",
+        "aoa-discord-connector",
+    }
+)
 
 
 class FleetAdmissionError(ValueError):
@@ -225,6 +243,70 @@ def _ensure_read_contours(
     return source
 
 
+def _bind_read_canary_names(
+    source: OrganRegistrySourceV2,
+    targets: RuntimeTargetCatalog,
+    *,
+    observed_at: datetime,
+) -> OrganRegistrySourceV2:
+    """Bind abstract registry primitives to their deployed MCP export names.
+
+    Older shadow shapes used prose-like primitive ids while the actual adapters
+    exported Python tool names.  Preflight correctly rejects that mismatch.  A
+    shape revision makes the adapter name explicit and resets any old claims
+    before fresh admission evidence is applied.
+    """
+
+    for target in targets.targets:
+        organ_id = target.registry_organ_id
+        if organ_id not in READ_FLEET:
+            continue
+        record, contour = _contour(source, organ_id)
+        tool_name = target.canary_contract.tool_name
+        if tool_name in contour.allowlist and contour.registry_state == "shadow":
+            continue
+        capabilities = list(contour.capabilities)
+        first = capabilities[0]
+        primitives = list(first.primitives)
+        if tool_name not in contour.allowlist:
+            primitives[0] = primitives[0].model_copy(update={"mcp_name": tool_name})
+            capabilities[0] = first.model_copy(update={"primitives": tuple(primitives)})
+        source_revision = contour.revisions.source
+        source_evidence = QualifiedEvidenceRef(
+            owner=record.owners.source_owner,
+            evidence_ref=(
+                f"owner-source://{record.owners.source_owner}/"
+                f"{source_revision.revision}/mcp-read-name"
+            ),
+            revision=source_revision.revision,
+            observed_at=observed_at,
+            expires_at=source.expires_at,
+        )
+        shape = OrganContourShapeRevision(
+            revision_id=f"{organ_id}-read-name-modern-wire-v1",
+            organ_id=organ_id,
+            source_owner=record.owners.source_owner,
+            source_revision=RevisionIdentity.model_validate(
+                source_revision.model_dump(mode="json")
+            ),
+            source_evidence=source_evidence,
+            owner_decision_ref=DECISION_REF,
+            expected_contour_digest=sha256_digest(contour.model_dump(mode="json")),
+            contour=ContourSupplementEntry(
+                contour_id="read",
+                authority_class="read",
+                policy_family="read",
+                credential_class=contour.credential_class,
+                principal_id=contour.principal_id,
+                capabilities=tuple(capabilities),
+                observation_route=target.canary_route,
+                rollback_route=target.rollback_route,
+            ),
+        )
+        source = apply_contour_shape_revision(source, shape)
+    return source
+
+
 def _receipt(root: Path, organ_id: str, public_key: Any, now: datetime) -> CanaryReceipt:
     path = root / f"{organ_id}.read.json"
     receipt = CanaryReceipt.model_validate(_read(path, "canary receipt"))
@@ -259,27 +341,15 @@ def build_fleet_admission_candidate(
     if now >= source.expires_at:
         raise FleetAdmissionError("registry source is expired")
     source = _ensure_read_contours(source, targets, observed_at=now)
+    source = _bind_read_canary_names(source, targets, observed_at=now)
     public_key = _read_public_key(canary_public_key_path)
 
     current_receipts: dict[str, CanaryReceipt] = {}
     lkg_receipts: dict[str, CanaryReceipt] = {}
-    desired = {
-        "abyss-stack",
-        "abyss-machine",
-        "aoa-decisions",
-        "aoa-memo",
-        "aoa-session-memory",
-        "aoa-evals",
-        "aoa-kag",
-        "aoa-stats",
-        "aoa-4pda-connector",
-        "aoa-telegram-connector",
-        "aoa-discord-connector",
-    }
     selected_targets = tuple(
-        target for target in targets.targets if target.registry_organ_id in desired
+        target for target in targets.targets if target.registry_organ_id in READ_FLEET
     )
-    if {item.registry_organ_id for item in selected_targets} != desired:
+    if {item.registry_organ_id for item in selected_targets} != READ_FLEET:
         raise FleetAdmissionError("runtime target catalog does not cover the read fleet")
     selected_catalog = targets.model_copy(update={"targets": selected_targets})
     for target in selected_targets:
@@ -566,7 +636,9 @@ def build_fleet_admission_candidate(
         )
         unsigned_revision = {
             "schema_version": "aoa_organ_contour_admission_revision_v1",
-            "revision_id": f"{organ_id}-read-modern-wire-{now.strftime('%Y%m%dT%H%M%SZ')}",
+            "revision_id": (
+                f"{organ_id}-read-modern-wire-{now.strftime('%Y%m%dt%H%M%Sz').lower()}"
+            ),
             "organ_id": organ_id,
             "contour_id": "read",
             "expected_contour_digest": sha256_digest(
@@ -593,8 +665,14 @@ def build_fleet_admission_candidate(
         revision = OrganContourAdmissionRevision.model_validate(
             {
                 **unsigned_revision,
-                "revision_digest": sha256_digest(unsigned_revision),
+                "revision_digest": "sha256:" + ("0" * 64),
             }
+        )
+        normalized_unsigned = revision.model_dump(
+            mode="json", exclude={"revision_digest"}
+        )
+        revision = revision.model_copy(
+            update={"revision_digest": sha256_digest(normalized_unsigned)}
         )
         source = apply_contour_admission_revision(source, revision, applied_at=now)
         report["organs"].append(
