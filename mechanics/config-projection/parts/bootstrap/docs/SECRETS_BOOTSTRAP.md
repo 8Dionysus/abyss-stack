@@ -154,8 +154,8 @@ candidate digests in a separate secret-local manifest.
 ## Minimum expectation
 
 Before trying to run the full Intel-aware or local-worker surface, ensure that
-its required paths exist in real form. Provision the transitional bearer
-before starting an `aoa-mcp-http@...` owner and the owner read bearers before
+its required paths exist in real form. The legacy `aoa-mcp-http@...` route is
+retired and non-startable; provision the owner read bearers before
 starting an `aoa-organ-mcp-read@...` owner.
 
 ## Helpful check

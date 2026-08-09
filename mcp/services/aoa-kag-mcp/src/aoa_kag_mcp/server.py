@@ -50,8 +50,7 @@ def _run_server(server: Any) -> None:
         return
     assert settings.host is not None
     assert settings.port is not None
-    server.settings.host = settings.host
-    server.settings.port = settings.port
+    server.configure_http(settings.host, settings.port)
     server.run(transport="streamable-http")
 
 
@@ -86,7 +85,7 @@ def build_server(
     stack_root: str | Path | None = None,
 ) -> Any:
     try:
-        from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
+        from ._modern_runtime import AbyssMCPServer  # type: ignore[import-not-found]
         from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
         raise SystemExit(
@@ -107,7 +106,7 @@ def build_server(
         idempotentHint=True,
         openWorldHint=False,
     )
-    mcp = FastMCP(
+    mcp = AbyssMCPServer(
         "aoa-kag-mcp",
         instructions=(
             "Discover KAG capabilities, search owner-qualified repository knowledge, "

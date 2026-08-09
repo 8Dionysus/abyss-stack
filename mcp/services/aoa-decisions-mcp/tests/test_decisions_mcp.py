@@ -239,16 +239,16 @@ def test_read_and_internal_effect_servers_have_disjoint_tools(tmp_path: Path) ->
     assert "aoa_decisions_refresh" not in read_tools
     assert (
         "force_refresh"
-        not in read_tools["aoa_decisions_status"].inputSchema["properties"]
+        not in read_tools["aoa_decisions_status"].input_schema["properties"]
     )
     assert set(effect_tools) == {"aoa_decisions_status", "aoa_decisions_refresh"}
     for tool in read_tools.values():
         assert tool.annotations is not None
-        assert tool.annotations.readOnlyHint is True
-        assert tool.annotations.destructiveHint is False
-        assert tool.annotations.idempotentHint is True
-        assert tool.annotations.openWorldHint is False
-    assert effect_tools["aoa_decisions_status"].annotations.readOnlyHint is True
+        assert tool.annotations.read_only_hint is True
+        assert tool.annotations.destructive_hint is False
+        assert tool.annotations.idempotent_hint is True
+        assert tool.annotations.open_world_hint is False
+    assert effect_tools["aoa_decisions_status"].annotations.read_only_hint is True
     assert effect_tools["aoa_decisions_refresh"].annotations is None
 
 
@@ -262,7 +262,8 @@ def test_read_server_status_never_materializes_cache(tmp_path: Path) -> None:
         contour="read",
     )
 
-    _, result = asyncio.run(server.call_tool("aoa_decisions_status", {}))
+    call = asyncio.run(server.call_tool("aoa_decisions_status", {}))
+    result = call.structured_content
 
     assert result["status"] == "missing"
     assert result["cache_write_allowed"] is False

@@ -6,8 +6,8 @@ This directory stores user-unit skeletons for the deployed runtime.
 
 - `podman-compose-abyss.service`
 - `abyss-stack-resource-guards-apply.service`
-- `aoa-mcp-http@.service`, the transitional authenticated loopback template
-  for shadow owners not yet split by policy family
+- `aoa-mcp-http@.service`, the non-startable tombstone for the retired
+  ambient-Python/shared-bearer route
 - `aoa-organ-mcp-read@.service`, the owner-specific, filesystem-read-only
   template for admitted read candidates
 - `aoa-organ-mcp-read-bootstrap@.service`, the manual, ten-minute bootstrap
@@ -88,7 +88,7 @@ The current allowlist covers the local working surface:
 - `abyss-stack-resource-guards-apply.service`, a manual one-shot unit that runs
   `aoa-apply-resource-guards --wait-game-guard-clear` and applies staged cgroup
   limits only after the game guard clears
-- the transitional `aoa-mcp-http@.service`, owner-specific
+- the retired `aoa-mcp-http@.service` tombstone, owner-specific
   `aoa-organ-mcp-read@.service`, its manual-only bootstrap template,
   Memo/Evals candidate units, and
   `aoa-mcp-http.service` bundle; these run
@@ -134,12 +134,11 @@ explicit registry argument, leaving canonical registry selection with the
 sibling owner.
 
 Linking the MCP units does not start them. After source-to-Configs parity is
-green, canary one exact `aoa-mcp-http@OWNER.service` or
-`aoa-organ-mcp-read@OWNER.service`, verify its loopback port and MCP inventory,
+green, canary one exact `aoa-organ-mcp-read@OWNER.service`, verify its loopback
+port and MCP inventory,
 then advance to the next owner. The bundle is lifecycle grouping, not a
-gateway. Provision the transitional bearer with
-`scripts/aoa-install-systemd --provision-mcp-http-auth`. Provision the
-owner-distinct KAG, Stats, Decisions, Memo, Evals, Session Memory, Abyss
+gateway. Provision the owner-distinct KAG, Stats, Decisions, Memo, Evals,
+Session Memory, Abyss
 Machine, staged ToS corpus, 4PDA, Telegram, Discord, Course, StackOverflow, and
 XDA read bearers with
 `scripts/aoa-install-systemd --provision-organ-mcp-read-auth`. Each read unit

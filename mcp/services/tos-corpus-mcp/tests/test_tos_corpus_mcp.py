@@ -349,10 +349,10 @@ def test_published_tools_advertise_closed_world_read_only_contract(
     assert tools
     for tool in tools:
         assert tool.annotations is not None, tool.name
-        assert tool.annotations.readOnlyHint is True, tool.name
-        assert tool.annotations.destructiveHint is False, tool.name
-        assert tool.annotations.idempotentHint is True, tool.name
-        assert tool.annotations.openWorldHint is False, tool.name
+        assert tool.annotations.read_only_hint is True, tool.name
+        assert tool.annotations.destructive_hint is False, tool.name
+        assert tool.annotations.idempotent_hint is True, tool.name
+        assert tool.annotations.open_world_hint is False, tool.name
 
 
 def test_philosophy_graph_packets_and_resources(tmp_path: Path) -> None:

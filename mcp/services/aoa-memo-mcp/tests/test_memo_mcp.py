@@ -1400,7 +1400,7 @@ def test_mcp_surface_contracts(tmp_path: Path) -> None:
         }
         tools = {tool.name for tool in await server.list_tools()}
         prompts = {prompt.name for prompt in await server.list_prompts()}
-        templates = {template.uriTemplate for template in await server.list_resource_templates()}
+        templates = {template.uri_template for template in await server.list_resource_templates()}
         assert tools == set(tool_records)
         return tool_records, prompts, templates
 
@@ -1432,15 +1432,15 @@ def test_mcp_surface_contracts(tmp_path: Path) -> None:
     }
     assert set(read_tools).isdisjoint(candidate_tools)
     for tool_annotations in read_tools.values():
-        assert tool_annotations.readOnlyHint is True
-        assert tool_annotations.destructiveHint is False
-        assert tool_annotations.idempotentHint is True
-        assert tool_annotations.openWorldHint is False
+        assert tool_annotations.read_only_hint is True
+        assert tool_annotations.destructive_hint is False
+        assert tool_annotations.idempotent_hint is True
+        assert tool_annotations.open_world_hint is False
     for tool_annotations in candidate_tools.values():
-        assert tool_annotations.readOnlyHint is False
-        assert tool_annotations.destructiveHint is True
-        assert tool_annotations.idempotentHint is False
-        assert tool_annotations.openWorldHint is False
+        assert tool_annotations.read_only_hint is False
+        assert tool_annotations.destructive_hint is True
+        assert tool_annotations.idempotent_hint is False
+        assert tool_annotations.open_world_hint is False
     assert read_prompts == {
         "memo-brief",
         "memo-landing-plan",

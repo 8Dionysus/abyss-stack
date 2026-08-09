@@ -365,10 +365,10 @@ def test_server_exposes_only_proven_read_only_tools(tmp_path: Path) -> None:
     }
     for tool in tools:
         assert tool.annotations is not None
-        assert tool.annotations.readOnlyHint is True
-        assert tool.annotations.destructiveHint is False
-        assert tool.annotations.idempotentHint is True
-        assert tool.annotations.openWorldHint is False
+        assert tool.annotations.read_only_hint is True
+        assert tool.annotations.destructive_hint is False
+        assert tool.annotations.idempotent_hint is True
+        assert tool.annotations.open_world_hint is False
     assert asyncio.run(server.list_resources()) == []
     assert asyncio.run(server.list_resource_templates()) == []
     assert asyncio.run(server.list_prompts()) == []

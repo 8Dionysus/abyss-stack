@@ -33,16 +33,18 @@ unit from the deployed Configs mirror into `~/.config/systemd/user`. This is a
 link-and-reload operation only; it preserves enable state, running processes,
 host-local drop-ins, and existing `/dev/null` masks.
 
-The allowlist includes the transitional `aoa-mcp-http@.service`, the
+The allowlist includes a non-startable tombstone for the retired
+`aoa-mcp-http@.service`, the
 owner-specific `aoa-organ-mcp-read@.service`, the dedicated Memo/Evals
 candidate services, and their bundle. Each read template
 launches one deployed workspace MCP wrapper with
 `AOA_MCP_TRANSPORT=streamable-http` and `AOA_MCP_HOST=127.0.0.1`; package code
-still defaults to stdio outside that explicit lifecycle. The transitional
-template loads `aoa-mcp-http-bearer-token`; the read template loads only
-`%i-mcp-read-bearer-token` and denies persistent filesystem writes. Provision
-the former with `--provision-mcp-http-auth` and the owner-distinct Decisions,
-Memo, Evals, KAG, Session Memory, Stats, Abyss Machine, and staged ToS corpus
+still defaults to stdio outside that explicit lifecycle. The tombstone has no
+server command or bearer; the read template loads only
+`%i-mcp-read-bearer-token` and denies persistent filesystem writes. The
+`--provision-mcp-http-auth` route retains only an inactive rollback credential;
+provision the owner-distinct Decisions, Memo, Evals, KAG, Session Memory, Stats, Abyss
+Machine, and staged ToS corpus
 read credentials, plus the exact 4PDA, Telegram, Discord, Course,
 StackOverflow, and XDA connector read credentials, with
 `--provision-organ-mcp-read-auth`.
@@ -76,8 +78,9 @@ green lab mutates production registration or admission.
 
 Use `aoa-install-systemd --install-mcp-http-codex-client` once for the target
 user after the MCP package has been projected into deployed `Configs`. The
-action validates or provisions the legacy credential plus the fourteen
-source-isolated owner-read and two candidate credentials and adds one managed Zsh function that
+action preserves the inactive rollback credential, validates or provisions the
+fourteen source-isolated owner-read and two candidate credentials, and adds one
+managed Zsh function that
 delegates new
 interactive Codex launches to the deployed client-side launcher. The named
 bearers are inherited only by Codex, the managed Codex binary symlink is

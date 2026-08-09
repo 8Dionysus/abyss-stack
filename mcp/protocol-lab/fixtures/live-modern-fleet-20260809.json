@@ -1,0 +1,44 @@
+{
+  "schema_version": "abyss_live_modern_fleet_observation_v1",
+  "observed_at": "2026-08-09T11:11:58Z",
+  "expires_at": "2026-08-16T11:11:58Z",
+  "source_revision": "a468623b63dc0096144b324c7b0674ba8880103a",
+  "protocol_version": "2026-07-28",
+  "mcp_sdk": "2.0.0",
+  "read_fleet": {
+    "production_units": 11,
+    "admitted_units": 11,
+    "production_identities": 11,
+    "bootstrap_identities": 0,
+    "modern_discovery_passed": true,
+    "wrong_bearer_denied": true,
+    "legacy_initialize_denied": true,
+    "legacy_session_issued": false
+  },
+  "nonread_protocol": {
+    "candidate_units_checked": 3,
+    "internal_effect_units_checked": 1,
+    "modern_discovery_passed": true,
+    "legacy_initialize_denied": true,
+    "left_inactive": true,
+    "authority_admitted": false
+  },
+  "automation": {
+    "admission_refresh_timer_enabled": true,
+    "admission_refresh_last_run_passed": true,
+    "admission_keeper_enabled": true,
+    "preflight_all_eligible": true
+  },
+  "rollback": {
+    "legacy_runtime_preserved_inactive": true,
+    "rollback_rehearsed": true,
+    "modern_restore_passed": true,
+    "active_legacy_units": 0
+  },
+  "verdict": "production_modern_only_passed",
+  "claim_limits": [
+    "The read-fleet claim is limited to the eleven owner-admitted production contours and does not admit candidate or effect authority.",
+    "The rollback claim is backed by coherent d6f38c79 deployment and wire proof followed by e493f33e modern restore proof; the cold MCP 1 runtime was not activated.",
+    "Private raw receipts remain under the host-managed mcp-modern-fleet evidence root and are not embedded in this public-safe fixture."
+  ]
+}

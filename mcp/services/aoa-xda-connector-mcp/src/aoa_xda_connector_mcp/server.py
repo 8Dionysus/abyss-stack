@@ -1,4 +1,4 @@
-"""FastMCP server for the XDA connector read contour."""
+"""AbyssMCPServer server for the XDA connector read contour."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from ._modern_runtime import AbyssMCPServer
 from mcp.types import ToolAnnotations
 
 from ._http_auth import http_auth_kwargs, transport_settings
@@ -45,9 +45,9 @@ def _read_http_auth_kwargs() -> dict[str, Any]:
     )
 
 
-def build_server(state: AoAXDAConnectorMCPState | None = None) -> FastMCP:
+def build_server(state: AoAXDAConnectorMCPState | None = None) -> AbyssMCPServer:
     service_state = state or AoAXDAConnectorMCPState.discover()
-    mcp = FastMCP(
+    mcp = AbyssMCPServer(
         "aoa-xda-connector-mcp",
         json_response=True,
         **_read_http_auth_kwargs(),
@@ -114,8 +114,7 @@ def _run_server(server: Any) -> None:
     if settings.transport == "stdio":
         server.run(transport="stdio")
         return
-    server.settings.host = settings.host
-    server.settings.port = settings.port
+    server.configure_http(settings.host, settings.port)
     server.run(transport="streamable-http")
 
 

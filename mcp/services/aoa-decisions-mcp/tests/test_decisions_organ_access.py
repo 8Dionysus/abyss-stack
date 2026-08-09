@@ -52,7 +52,7 @@ def test_exact_profile_catalog_is_minimal_and_read_only() -> None:
         return (
             {tool.name for tool in tools},
             {str(resource.uri) for resource in resources},
-            {template.uriTemplate for template in templates},
+            {template.uri_template for template in templates},
             {prompt.name for prompt in prompts},
         )
 
@@ -67,10 +67,10 @@ def test_exact_profile_catalog_is_minimal_and_read_only() -> None:
     assert prompts == set()
     for tool in asyncio.run(server.list_tools()):
         assert tool.annotations is not None
-        assert tool.annotations.readOnlyHint is True
-        assert tool.annotations.destructiveHint is False
-        assert tool.annotations.idempotentHint is True
-        assert tool.annotations.openWorldHint is False
+        assert tool.annotations.read_only_hint is True
+        assert tool.annotations.destructive_hint is False
+        assert tool.annotations.idempotent_hint is True
+        assert tool.annotations.open_world_hint is False
 
 
 def test_profile_env_is_read_only_and_internal_effect_rejects_it(

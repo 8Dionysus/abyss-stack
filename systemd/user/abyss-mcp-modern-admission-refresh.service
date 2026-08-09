@@ -1,0 +1,26 @@
+[Unit]
+Description=Refresh the exact modern MCP read-fleet admission
+Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/README.md
+After=abyss-stack-mcp-read.service
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/abyss-stack-mcp-fleet-admission
+ConditionPathExists=/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json
+
+[Service]
+Type=oneshot
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-refresh-modern-mcp-admission
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/AbyssOS/.aoa/organ-access /srv/AbyssOS/abyss-stack/Logs/mcp
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+UMask=0077

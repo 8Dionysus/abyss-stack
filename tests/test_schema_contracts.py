@@ -11,6 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema"
 
 EXPECTED_ACTIVE_SCHEMA_PATHS = {
+    Path("mcp/protocol-lab/schemas/codex-tasks-production-pair.schema.json"),
     Path("mcp/protocol-lab/schemas/codex-kag-next-lab-observation.schema.json"),
     Path("mcp/protocol-lab/schemas/codex-kag-next-stable-observation.schema.json"),
     Path("mcp/protocol-lab/schemas/inspector-tasks-strict-pair.schema.json"),
@@ -20,6 +21,7 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
     Path("mcp/protocol-lab/schemas/kag-handle-pair-current-observation.schema.json"),
     Path("mcp/protocol-lab/schemas/kag-next-cancellable-pair-observation.schema.json"),
     Path("mcp/protocol-lab/schemas/kag-next-pair-observation.schema.json"),
+    Path("mcp/protocol-lab/schemas/live-modern-fleet-observation.schema.json"),
     Path("mcp/protocol-lab/schemas/protocol-compatibility-matrix.schema.json"),
     Path("mcp/protocol-lab/schemas/protocol-conformance-observation.schema.json"),
     Path("mcp/protocol-lab/schemas/protocol-consumer-wire-observation.schema.json"),

@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os-abyss.dev/schemas/live-modern-fleet-observation.schema.json",
+  "title": "OS Abyss live modern MCP fleet observation",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "abyss_live_modern_fleet_observation_v1"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "protocol_version": {"const": "2026-07-28"},
+    "mcp_sdk": {"const": "2.0.0"},
+    "read_fleet": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "production_units": {"const": 11},
+        "admitted_units": {"const": 11},
+        "production_identities": {"const": 11},
+        "bootstrap_identities": {"const": 0},
+        "modern_discovery_passed": {"const": true},
+        "wrong_bearer_denied": {"const": true},
+        "legacy_initialize_denied": {"const": true},
+        "legacy_session_issued": {"const": false}
+      },
+      "required": ["production_units", "admitted_units", "production_identities", "bootstrap_identities", "modern_discovery_passed", "wrong_bearer_denied", "legacy_initialize_denied", "legacy_session_issued"]
+    },
+    "nonread_protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "candidate_units_checked": {"const": 3},
+        "internal_effect_units_checked": {"const": 1},
+        "modern_discovery_passed": {"const": true},
+        "legacy_initialize_denied": {"const": true},
+        "left_inactive": {"const": true},
+        "authority_admitted": {"const": false}
+      },
+      "required": ["candidate_units_checked", "internal_effect_units_checked", "modern_discovery_passed", "legacy_initialize_denied", "left_inactive", "authority_admitted"]
+    },
+    "automation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "admission_refresh_timer_enabled": {"const": true},
+        "admission_refresh_last_run_passed": {"const": true},
+        "admission_keeper_enabled": {"const": true},
+        "preflight_all_eligible": {"const": true}
+      },
+      "required": ["admission_refresh_timer_enabled", "admission_refresh_last_run_passed", "admission_keeper_enabled", "preflight_all_eligible"]
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "legacy_runtime_preserved_inactive": {"const": true},
+        "rollback_rehearsed": {"const": true},
+        "modern_restore_passed": {"const": true},
+        "active_legacy_units": {"const": 0}
+      },
+      "required": ["legacy_runtime_preserved_inactive", "rollback_rehearsed", "modern_restore_passed", "active_legacy_units"]
+    },
+    "verdict": {"const": "production_modern_only_passed"},
+    "claim_limits": {"type": "array", "minItems": 2, "items": {"type": "string", "minLength": 12}}
+  },
+  "required": ["schema_version", "observed_at", "expires_at", "source_revision", "protocol_version", "mcp_sdk", "read_fleet", "nonread_protocol", "automation", "rollback", "verdict", "claim_limits"]
+}

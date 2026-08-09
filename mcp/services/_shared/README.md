@@ -9,12 +9,14 @@ Regenerate after changing the canonical helper:
 
 ```bash
 python mcp/services/_shared/build_http_auth_vendors.py
+python mcp/services/_shared/build_modern_runtime_vendors.py
 ```
 
 Validate without writing:
 
 ```bash
 python mcp/services/_shared/build_http_auth_vendors.py --check
+python mcp/services/_shared/build_modern_runtime_vendors.py --check
 ```
 
 The helper never owns MCP tools, resources, prompts, or sibling data. It owns

@@ -53,5 +53,5 @@ def test_server_is_small_and_annotated(tmp_path: Path) -> None:
         "aoa_xda_connector_source_route",
         "aoa_xda_connector_status",
     }
-    assert all(tool.annotations.readOnlyHint is True for tool in tools)
-    assert all(tool.annotations.openWorldHint is False for tool in tools)
+    assert all(tool.annotations.read_only_hint is True for tool in tools)
+    assert all(tool.annotations.open_world_hint is False for tool in tools)

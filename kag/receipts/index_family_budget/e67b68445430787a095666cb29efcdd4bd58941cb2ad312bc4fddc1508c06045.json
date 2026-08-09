@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 25792937,
+  "allowed_tracked_bytes": 31531586,
+  "approved_by": "repository-owner",
+  "base_ref": "8621c72aaa6f54a6e4e548c60327add99e3985fc",
+  "changed_generated_bytes": 25792937,
+  "changed_generated_files": 403,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "e67b68445430787a095666cb29efcdd4bd58941cb2ad312bc4fddc1508c06045",
+  "reason": "Refresh the portable family after the complete modern MCP organ-fleet migration and bounded Codex Tasks production pair; this receipt admits the exact measured generated family for the reviewed source diff without raising standing budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 31531586,
+  "tracked_bytes_max": 24117248
+}

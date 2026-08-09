@@ -15,7 +15,7 @@
       "type": "string"
     },
     "production_protocol": {
-      "const": "2025-11-25"
+      "const": "2026-07-28"
     },
     "stable_spec": {
       "$ref": "#/$defs/spec"
@@ -220,7 +220,8 @@
           "enum": [
             "stable_only",
             "forbidden",
-            "separate_gate"
+            "separate_gate",
+            "production"
           ]
         },
         "notes": {
