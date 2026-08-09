@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26837714,
+  "allowed_tracked_bytes": 33320059,
+  "approved_by": "repository-owner",
+  "base_ref": "39774a36371bfbc179096664318d39ae8b0dca99",
+  "changed_generated_bytes": 26837714,
+  "changed_generated_files": 366,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "2043da0153aa58db35de7475d0bbdbf54e261e73299146b6ccfaa3627bfb1ff8",
+  "reason": "Role-first external actor runtime and credential/verifier isolation materially expand the portable family; the exact pinned actor-runtime suite, owner validators, and independent changed-surface review passed before this base-bound projection receipt.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 33320059,
+  "tracked_bytes_max": 24117248
+}
