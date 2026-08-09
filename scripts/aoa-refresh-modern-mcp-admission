@@ -33,12 +33,12 @@ mkdir -p "$RUN/current" "$RUN/lkg" "$RUN/stdout" "$ROOT/evidence"
 chmod 0700 "$ROOT" "$ROOT/runs" "$RUN" "$RUN/current" "$RUN/lkg" "$RUN/stdout" "$ROOT/evidence"
 
 for organ in "${organs[@]}"; do
-  "$VENV/abyss-stack-mcp-canary" --organ "$organ" --process-unit production --ttl-seconds 3600 > "$RUN/stdout/${organ}-current.json"
   "$VENV/abyss-stack-mcp-canary" --organ "$organ" --process-unit production --purpose last-known-good --ttl-seconds 3600 > "$RUN/stdout/${organ}-lkg.json"
-  current_record=$(jq -er .record_path "$RUN/stdout/${organ}-current.json")
+  "$VENV/abyss-stack-mcp-canary" --organ "$organ" --process-unit production --ttl-seconds 3600 > "$RUN/stdout/${organ}-current.json"
   lkg_record=$(jq -er .record_path "$RUN/stdout/${organ}-lkg.json")
-  install -m 0600 "$current_record" "$RUN/current/${organ}.read.json"
+  current_record=$(jq -er .record_path "$RUN/stdout/${organ}-current.json")
   install -m 0600 "$lkg_record" "$RUN/lkg/${organ}.read.json"
+  install -m 0600 "$current_record" "$RUN/current/${organ}.read.json"
 done
 
 "$VENV/abyss-stack-mcp-fleet-admission" \
