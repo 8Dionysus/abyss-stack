@@ -519,12 +519,6 @@ for validation in task["validation_commands"]:
         "status": "completed",
         "exit_code": 0,
     }})
-if "FAKE_MUTATE_AFTER_VALIDATION" in task["objective"]:
-    time.sleep(1.5)
-    (workspace / "landing-note.md").write_text(
-        "mutation after validation receipt\n", encoding="utf-8"
-    )
-
 report_status = "review_required" if task["review_required"] else "completed"
 report = {
     "schema_version": "abyss_stack_external_codex_report_v1",
@@ -4288,13 +4282,49 @@ def test_unavailable_command_observation_is_authority_blocked(tmp_path: Path) ->
     assert result["failure_code"] == "command_observation_gap"
 
 
-def test_validation_receipt_must_match_final_workspace_bytes(tmp_path: Path) -> None:
+def test_validation_receipt_must_match_final_workspace_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     fixture = _fixture(
         tmp_path,
-        objective_marker="FAKE_MUTATE_AFTER_VALIDATION",
         workspace_write=True,
     )
     runtime = fixture["runtime"]
+    original_record_codex_event = runtime._record_codex_event
+
+    def mutate_after_validation_receipt(
+        session_id: str,
+        *,
+        attempt_id: str,
+        attempt_number: int,
+        line: bytes,
+    ) -> None:
+        original_record_codex_event(
+            session_id,
+            attempt_id=attempt_id,
+            attempt_number=attempt_number,
+            line=line,
+        )
+        payload = json.loads(line)
+        item = payload.get("item") if payload.get("type") == "item.completed" else None
+        if (
+            isinstance(item, dict)
+            and item.get("type") == "command_execution"
+            and str(item.get("command", "")).endswith("git status --short")
+        ):
+            (fixture["workspace"] / "landing-note.md").write_text(
+                "mutation after validation receipt\n", encoding="utf-8"
+            )
+
+    # The worker is forked from this runtime. Mutating immediately after the
+    # controller durably records the validation event proves the intended
+    # receipt/final-workspace mismatch without a scheduler-dependent sleep.
+    monkeypatch.setattr(
+        runtime,
+        "_record_codex_event",
+        mutate_after_validation_receipt,
+    )
     runtime.start(fixture["launch_path"])
 
     terminal = _wait_terminal(runtime, fixture["session_id"])
