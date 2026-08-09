@@ -453,6 +453,13 @@ if "FAKE_GIT_HIDDEN_PROGRAMS" in task["objective"]:
             "status": "completed",
             "exit_code": 0,
         }})
+if "FAKE_RIPGREP_HIDDEN_PROGRAM" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/rg --pre=/bin/sh pattern scripts/helper.sh",
+        "status": "completed",
+        "exit_code": 0,
+    }})
 if "FAKE_DIRECT_SECRET_ENCODER" in task["objective"]:
     emit({"type": "item.completed", "item": {
         "type": "command_execution",
@@ -3411,6 +3418,33 @@ def test_process_launch_wrappers_are_fail_closed(command: str) -> None:
     assert RUNTIME._command_has_unclassified_indirection(command) is True
 
 
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/rg --pre=/bin/sh pattern scripts/helper.sh",
+        "/usr/bin/rg --pre /bin/sh pattern scripts/helper.sh",
+        "/usr/bin/rg --hostname-bin=/tmp/helper --hyperlink-format=default pattern .",
+        "/usr/bin/rg --search-zip pattern archive.gz",
+        "/usr/bin/rg -zH pattern archive.gz",
+    ),
+)
+def test_ripgrep_helper_process_dispatch_is_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/rg -n pattern .",
+        "/usr/bin/rg --no-pre --no-search-zip pattern .",
+        "/usr/bin/rg --pre= pattern .",
+        "/usr/bin/rg -- --pre",
+    ),
+)
+def test_ordinary_ripgrep_search_remains_classifiable(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
 def test_shell_nesting_beyond_inspection_limit_is_fail_closed() -> None:
     command = "/usr/bin/git push"
     for _ in range(RUNTIME.SHELL_NESTING_INSPECTION_LIMIT):
@@ -3592,6 +3626,9 @@ def test_codex_environment_isolates_shell_startup_and_repository_hooks(
     )
     monkeypatch.setenv("HOME", str(ambient_home))
     monkeypatch.setenv("PATH", f"{ambient_home / 'bin'}:/usr/bin:/bin")
+    ripgrep_config = tmp_path / "ambient-ripgrep-config"
+    ripgrep_config.write_text("--pre=/bin/sh\n", encoding="utf-8")
+    monkeypatch.setenv("RIPGREP_CONFIG_PATH", str(ripgrep_config))
     scratch = tmp_path / "attempt" / "scratch"
     scratch.parent.mkdir()
     scratch.mkdir()
@@ -3657,12 +3694,28 @@ def test_codex_environment_isolates_shell_startup_and_repository_hooks(
         capture_output=True,
         text=True,
     )
+    ripgrep_marker = tmp_path / "ripgrep-preprocessor-ran"
+    ripgrep_input = workspace / "ripgrep-input.sh"
+    ripgrep_input.write_text(
+        f"/usr/bin/touch {shlex.quote(str(ripgrep_marker))}\n"
+        "/usr/bin/printf 'bounded\\n'\n",
+        encoding="utf-8",
+    )
+    ripgrep = subprocess.run(
+        ["/usr/bin/rg", "bounded", str(ripgrep_input)],
+        cwd=workspace,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
     assert completed.returncode == 0
     assert environment["HOME"] != str(ambient_home)
     assert environment["PATH"] == RUNTIME.CODEX_EXECUTABLE_PATH
     assert environment["BASH_ENV"] == "/dev/null"
     assert environment["ENV"] == "/dev/null"
+    assert environment["RIPGREP_CONFIG_PATH"] == "/dev/null"
     assert environment["GIT_CONFIG_COUNT"] == "4"
     assert environment["GIT_CONFIG_KEY_0"] == "core.hooksPath"
     assert environment["GIT_CONFIG_KEY_1"] == "core.fsmonitor"
@@ -3677,6 +3730,8 @@ def test_codex_environment_isolates_shell_startup_and_repository_hooks(
     assert checkout.returncode == 0
     assert hook_marker.exists() is False
     assert filter_marker.exists() is False
+    assert ripgrep.returncode == 0
+    assert ripgrep_marker.exists() is False
 
     isolated_home = Path(environment["HOME"])
     isolated_home.chmod(0o700)
@@ -3908,6 +3963,7 @@ def test_started_command_survives_interruption_and_blocks_authority(
         ("FAKE_SHELL_SCRIPT_BEFORE_C", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_LOCAL_CONFIG_WRITE", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_HIDDEN_PROGRAMS", ["unclassified_indirect_effect"]),
+        ("FAKE_RIPGREP_HIDDEN_PROGRAM", ["unclassified_indirect_effect"]),
         (
             "FAKE_DIRECT_SECRET_ENCODER",
             ["secret_access", "unclassified_indirect_effect"],

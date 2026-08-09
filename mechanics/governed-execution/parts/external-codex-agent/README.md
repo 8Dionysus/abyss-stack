@@ -113,6 +113,10 @@ The controller:
   filters remain opaque as well, while controller-owned manifest Git probes run
   in a minimal environment with hooks/fsmonitor disabled and diff/textconv
   programs explicitly prohibited,
+  ripgrep remains available for ordinary source search, while `--pre`,
+  `--hostname-bin`, and `-z`/`--search-zip` are opaque because they launch
+  unobserved helpers; `RIPGREP_CONFIG_PATH` is fixed to `/dev/null` so ambient
+  configuration cannot re-enable those modes,
   build/package/test/task runners remain opaque unless they are an exact
   owner-fixed validation,
   Git config writes plus alias/external-subcommand dispatch and ambient

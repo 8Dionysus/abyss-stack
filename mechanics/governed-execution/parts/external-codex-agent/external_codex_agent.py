@@ -1753,6 +1753,30 @@ def _sed_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
     return "--sandbox" not in tokens[1:]
 
 
+def _ripgrep_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
+    """Reject ripgrep modes that launch an unobserved helper process."""
+
+    for token in tokens[1:]:
+        lowered = token.lower()
+        if lowered == "--":
+            break
+        if lowered in {"--hostname-bin=", "--pre="}:
+            continue
+        if lowered in {
+            "--hostname-bin",
+            "--pre",
+            "--search-zip",
+        } or lowered.startswith(("--hostname-bin=", "--pre=")):
+            return True
+        if (
+            lowered.startswith("-")
+            and not lowered.startswith("--")
+            and "z" in lowered[1:]
+        ):
+            return True
+    return False
+
+
 def _command_matches_argv(command: str, expected: Sequence[str]) -> bool:
     expected_tokens = tuple(str(value) for value in expected)
     for tokens in _shell_tokenizations(command):
@@ -2024,6 +2048,8 @@ def _command_has_unclassified_indirection(command: str) -> bool:
             if executable == "git" and _git_has_opaque_dispatch(segment):
                 return True
             if executable == "sed" and _sed_has_opaque_dispatch(segment):
+                return True
+            if executable == "rg" and _ripgrep_has_opaque_dispatch(segment):
                 return True
             if executable == "find" and any(
                 value in {"-exec", "-execdir", "-ok", "-okdir"}
@@ -4209,6 +4235,7 @@ class ExternalCodexRuntime:
         environment["GIT_PAGER"] = "cat"
         environment["GIT_TERMINAL_PROMPT"] = "0"
         environment["PAGER"] = "cat"
+        environment["RIPGREP_CONFIG_PATH"] = "/dev/null"
         environment.setdefault("LANG", "C.UTF-8")
         environment["TMPDIR"] = str(scratch_root)
         environment["NO_COLOR"] = "1"

@@ -353,6 +353,11 @@ enforced `--sandbox` mode. Git builtins whose output path may invoke
 repository-configured diff, textconv, or fsmonitor helpers are likewise opaque;
 the controller's own exact Git observations remain outside model-issued command
 admission.
+Ordinary ripgrep source search remains classifiable, but `--pre`,
+`--hostname-bin`, and `-z`/`--search-zip` are opaque because they spawn helper
+processes whose commands are absent from the Codex event. The runtime also
+fixes `RIPGREP_CONFIG_PATH=/dev/null`, preventing an ambient config file from
+adding one of those hidden process routes to an otherwise ordinary argv.
 Shell `source` and `.` bodies remain
 opaque because the observed argv does not expose the sourced commands. Git
 configuration writes, including repository-local and per-worktree writes, and

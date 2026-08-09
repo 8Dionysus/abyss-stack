@@ -91,6 +91,8 @@ literal preservation, Bash extglob refusal, fixed-system-`PATH` executable
 allowlisting with unadmitted bare-name refusal, direct workspace/non-system
 executable refusal including shell-name impersonation, opaque AWK program-body
 refusal, isolated non-writable shell `HOME` with ambient-profile refusal,
+ripgrep preprocessor/hostname/decompressor dispatch refusal with ordinary
+search preserved and ambient ripgrep configuration disabled,
 GNU sed `--sandbox` enforcement, config-driven Git helper refusal,
 sourced-shell refusal, Git alias/config-write/external-subcommand refusal, ambient
 environment-assignment refusal, Git-invisible FIFO and Unix-socket refusal,
