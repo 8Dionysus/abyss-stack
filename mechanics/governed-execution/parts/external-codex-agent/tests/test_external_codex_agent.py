@@ -3428,10 +3428,18 @@ def test_unadmitted_bare_names_and_awk_are_fail_closed(command: str) -> None:
 
 @pytest.mark.parametrize(
     "command",
-    ("git status --short", "rg pattern README.md", "/usr/bin/git diff --check"),
+    ("git status --short", "grep pattern README.md", "/usr/bin/git diff --check"),
 )
 def test_allowlisted_system_commands_remain_classifiable(command: str) -> None:
     assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
+def test_allowlisted_but_unavailable_system_command_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(RUNTIME.shutil, "which", lambda *_args, **_kwargs: None)
+
+    assert RUNTIME._command_has_unclassified_indirection("rg pattern README.md") is True
 
 
 @pytest.mark.parametrize(
