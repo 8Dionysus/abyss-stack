@@ -447,9 +447,10 @@ credential, endpoint, sandbox, and `ExecStart`, but no registry/catalog
 preflight; it conflicts with production, never restarts, has no `[Install]`
 section, and is killed after ten minutes. The complete first-admission sequence
 is: verify an exact deployment, start only the matching bootstrap unit, issue a
-receipt explicitly bound to that bootstrap process, stop bootstrap, build the
-managed catalog and pass production preflight, then start the normal unit and
-immediately issue a second receipt bound to the production PID/start identity.
+receipt explicitly bound to that bootstrap process, build the runtime overlay
+and managed catalog while that signed process is still active, review the
+preflight result, stop bootstrap, then start the normal unit and immediately
+issue a second receipt bound to the production PID/start identity.
 Only that second receipt can enter final proof, acceptance, rollback, and
 admission. Bootstrap is not a general recovery bypass and must never be
 enabled.
@@ -459,8 +460,9 @@ For example:
 ```bash
 systemctl --user start aoa-organ-mcp-read-bootstrap@aoa-kag.service
 abyss-stack-mcp-canary --organ aoa-kag --process-unit bootstrap
+systemctl --user start abyss-mcp-admission-keeper.service
+# Review Logs/mcp/admission/managed-contours.json and the preflight result.
 systemctl --user stop aoa-organ-mcp-read-bootstrap@aoa-kag.service
-# Build/review managed-contours.json and pass preflight before the next command.
 systemctl --user start aoa-organ-mcp-read@aoa-kag.service
 abyss-stack-mcp-canary --organ aoa-kag
 # Refresh proof and admission only from this production-process receipt.

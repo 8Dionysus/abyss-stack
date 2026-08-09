@@ -176,9 +176,12 @@ systemctl --user start aoa-organ-mcp-read-bootstrap@aoa-kag.service
 # consumer or start/stop a unit itself:
 /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/abyss-stack-mcp-canary \
   --organ aoa-kag --process-unit bootstrap
+# Materialize and review the transitional overlay/catalog while the exact
+# signed bootstrap process is still live:
+systemctl --user start abyss-mcp-admission-keeper.service
 systemctl --user stop aoa-organ-mcp-read-bootstrap@aoa-kag.service
-# Build and review managed-contours.json, then use only the normal
-# preflight-gated unit:
+# After reviewing managed-contours.json and its preflight result, use only the
+# normal preflight-gated unit:
 systemctl --user start aoa-organ-mcp-read@aoa-kag.service
 # Replace the transitional bootstrap receipt with evidence bound to the exact
 # production PID/start identity before proof, acceptance, or admission:

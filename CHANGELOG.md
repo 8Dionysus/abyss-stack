@@ -27,7 +27,8 @@ Tracking starts with the community-docs baseline for this repository.
   pathname. Admission re-observes the exact systemd PID/start identity before
   and after hashing, avoiding any comparison between systemd monotonic time
   and the different `/proc` boot-time clock. First admission now records the
-  bootstrap process explicitly and
+  bounded organ or stack-owned bootstrap process explicitly, materializes the
+  transitional catalog while that process remains live, and
   requires a second production-process receipt before final proof or
   admission, avoiding a preflight/canary startup cycle without weakening the
   final identity gate.

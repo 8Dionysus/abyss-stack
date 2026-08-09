@@ -64,6 +64,28 @@ def process_identity_reader(
     return PROCESS_IDENTITY
 
 
+@pytest.mark.parametrize(
+    ("production_unit", "bootstrap_unit"),
+    (
+        (
+            "aoa-organ-mcp-read@aoa-kag.service",
+            "aoa-organ-mcp-read-bootstrap@aoa-kag.service",
+        ),
+        ("abyss-stack-mcp-read.service", "abyss-stack-mcp-read-bootstrap.service"),
+    ),
+)
+def test_bootstrap_unit_name_is_bounded_to_managed_read_pairs(
+    production_unit: str,
+    bootstrap_unit: str,
+) -> None:
+    assert canary._bootstrap_unit_name(production_unit) == bootstrap_unit
+
+
+def test_bootstrap_unit_name_rejects_unmanaged_unit() -> None:
+    with pytest.raises(CanaryRunnerError, match="no bounded bootstrap"):
+        canary._bootstrap_unit_name("different.service")
+
+
 def canonical_digest(value: object) -> str:
     raw = json.dumps(
         value,

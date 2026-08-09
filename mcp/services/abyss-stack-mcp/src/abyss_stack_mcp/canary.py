@@ -316,6 +316,8 @@ def _live_process_identity(
 
 
 def _bootstrap_unit_name(production_unit_name: str) -> str:
+    if production_unit_name == "abyss-stack-mcp-read.service":
+        return "abyss-stack-mcp-read-bootstrap.service"
     match = re.fullmatch(
         r"aoa-organ-mcp-read@([A-Za-z0-9_.@-]+)\.service",
         production_unit_name,
