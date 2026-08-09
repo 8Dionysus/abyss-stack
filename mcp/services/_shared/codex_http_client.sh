@@ -2,8 +2,7 @@
 set -euo pipefail
 
 stack_root="${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}"
-legacy_credential_path="${AOA_MCP_HTTP_CREDENTIAL_FILE:-${stack_root}/Secrets/Configs/aoa-mcp-http-bearer-token}"
-modern_codex_default="/srv/abyss-machine/runtimes/codex-os-abyss-mcp/0.147.0-abyss.1/bin/codex-os-abyss-mcp"
+modern_codex_default="/srv/abyss-machine/runtimes/codex-os-abyss-mcp/0.147.0-abyss.2/bin/codex-os-abyss-mcp"
 modern_server_default="abyss_stack,abyss_machine,aoa_decisions,aoa_memo,aoa_session_memory,aoa_evals,aoa_kag,aoa_stats,aoa_4pda_connector,aoa_telegram_connector,aoa_discord_connector"
 
 fail() {
@@ -48,10 +47,6 @@ load_credential() {
   export "$environment_name"
 }
 
-load_credential \
-  "$legacy_credential_path" \
-  "AOA_MCP_HTTP_BEARER_TOKEN" \
-  "legacy MCP HTTP bearer credential"
 load_credential \
   "${stack_root}/Secrets/Configs/aoa-decisions-mcp-read-bearer-token" \
   "AOA_DECISIONS_MCP_READ_BEARER_TOKEN" \
@@ -140,5 +135,5 @@ if [[ "$codex_real" == "$(readlink -f "$modern_codex_default")" ]]; then
   export CODEX_MCP_2026_SERVERS="${CODEX_MCP_2026_SERVERS:-$modern_server_default}"
 fi
 
-unset AOA_MCP_HTTP_CREDENTIAL_FILE AOA_CODEX_EXECUTABLE
+unset AOA_CODEX_EXECUTABLE
 exec "$codex_executable" "$@"

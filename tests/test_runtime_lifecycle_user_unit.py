@@ -2411,25 +2411,13 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
     def test_loopback_mcp_units_keep_owner_processes_and_deployed_paths(self) -> None:
         template = MCP_HTTP_TEMPLATE.read_text(encoding="utf-8")
         organ_read_template = ORGAN_MCP_READ_TEMPLATE.read_text(encoding="utf-8")
-        self.assertIn("Environment=AOA_MCP_TRANSPORT=streamable-http", template)
-        self.assertIn("Environment=AOA_MCP_HOST=127.0.0.1", template)
-        self.assertIn(
-            "LoadCredential=aoa-mcp-http-bearer-token:/srv/AbyssOS/abyss-stack/Secrets/Configs/aoa-mcp-http-bearer-token",
-            template,
-        )
-        self.assertNotIn("Environment=AOA_MCP_HTTP_BEARER_TOKEN", template)
-        self.assertIn(
-            "Environment=AOA_ABYSS_STACK_ROOT=/srv/AbyssOS/abyss-stack/Configs",
-            template,
-        )
-        self.assertIn("WorkingDirectory=/srv/AbyssOS", template)
-        self.assertIn(
-            "ExecStart=/usr/bin/env python3 /srv/AbyssOS/.codex/bin/%i-mcp-server.py",
-            template,
-        )
-        self.assertIn("RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6", template)
-        self.assertIn("Restart=on-failure", template)
-        self.assertNotIn(str(REPO_ROOT), template)
+        self.assertIn("RefuseManualStart=yes", template)
+        self.assertIn("RefuseManualStop=yes", template)
+        self.assertIn("ExecStart=/usr/bin/false", template)
+        self.assertNotIn("AOA_MCP_TRANSPORT", template)
+        self.assertNotIn("LoadCredential", template)
+        self.assertNotIn("/usr/bin/env python3", template)
+        self.assertNotIn("[Install]", template)
 
         self.assertIn(
             "LoadCredential=%i-mcp-read-bearer-token:"

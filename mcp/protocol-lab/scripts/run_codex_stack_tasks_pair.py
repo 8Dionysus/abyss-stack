@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import argparse
 import hashlib
 import json
 import os
@@ -17,9 +18,13 @@ from typing import Any
 
 TASKS = "io.modelcontextprotocol/tasks"
 PROTOCOL = "2026-07-28"
-RUNTIME = Path(
+DEFAULT_RUNTIME = Path(
     "/srv/abyss-machine/runtimes/codex-os-abyss-mcp/"
-    "0.147.0-abyss.1/bin/codex-os-abyss-mcp"
+    "0.147.0-abyss.2/bin/codex-os-abyss-mcp"
+)
+LIVE_ENDPOINT = "http://127.0.0.1:5431/mcp"
+LIVE_BEARER_FILE = Path(
+    "/srv/AbyssOS/abyss-stack/Secrets/Configs/abyss-stack-mcp-read-bearer-token"
 )
 PYTHON = Path("/srv/abyss-machine/cache/mcp-modern-fleet-20260809/venv/bin/python")
 OBSERVATION = Path("/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json")
@@ -95,7 +100,12 @@ async def wait_port(port: int, process: asyncio.subprocess.Process) -> None:
     raise TimeoutError("real abyss-stack MCP server did not bind")
 
 
-async def start_app(home: Path, *, extension: bool) -> tuple[AppClient, asyncio.subprocess.Process]:
+async def start_app(
+    home: Path,
+    runtime: Path,
+    *,
+    extension: bool,
+) -> tuple[AppClient, asyncio.subprocess.Process]:
     env = os.environ.copy()
     env.update(
         {
@@ -106,7 +116,7 @@ async def start_app(home: Path, *, extension: bool) -> tuple[AppClient, asyncio.
         }
     )
     process = await asyncio.create_subprocess_exec(
-        str(RUNTIME),
+        str(runtime),
         "app-server",
         env=env,
         stdin=asyncio.subprocess.PIPE,
@@ -141,52 +151,28 @@ async def stop(process: asyncio.subprocess.Process) -> None:
         await process.wait()
 
 
-async def main() -> None:
-    started = datetime.now(UTC)
-    root = Path("/srv/abyss-machine/cache/mcp-modern-fleet-20260809/evidence") / started.strftime(
-        "codex-real-stack-tasks-%Y%m%dT%H%M%SZ"
-    )
-    root.mkdir(mode=0o700, parents=True)
-    task_root = root / "tasks"
-    task_root.mkdir(mode=0o700)
-    audit = root / "policy-read.jsonl"
-    audit.touch(mode=0o600)
-    bearer = secrets.token_urlsafe(48)
-    port = free_port()
-    env = os.environ.copy()
-    env.update(
-        {
-            "AOA_MCP_TRANSPORT": "streamable-http",
-            "AOA_MCP_HOST": "127.0.0.1",
-            "AOA_MCP_PORT": str(port),
-            "ABYSS_STACK_MCP_POLICY_FAMILY": "read",
-            "ABYSS_STACK_MCP_READ_BEARER_TOKEN": bearer,
-            "ABYSS_STACK_MCP_OBSERVATION_PATH": str(OBSERVATION),
-            "ABYSS_STACK_MCP_AUDIT_JOURNAL_PATH": str(audit),
-            "ABYSS_STACK_MCP_REQUIRE_AUDIT_JOURNAL": "1",
-            "ABYSS_STACK_MCP_TASKS_ENABLED": "1",
-            "ABYSS_STACK_MCP_TASK_ROOT": str(task_root),
-            "PYTHONDONTWRITEBYTECODE": "1",
-        }
-    )
-    server = await asyncio.create_subprocess_exec(
-        str(PYTHON),
-        "-I",
-        "-B",
-        "-m",
-        "abyss_stack_mcp.server",
-        env=env,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
+def load_bearer(path: Path) -> str:
+    if not path.is_file() or path.is_symlink() or path.stat().st_mode & 0o777 != 0o600:
+        raise RuntimeError(f"unsafe Tasks bearer file: {path}")
+    bearer = path.read_text(encoding="utf-8").strip()
+    if not 43 <= len(bearer) <= 512:
+        raise RuntimeError("invalid Tasks bearer")
+    return bearer
+
+
+async def exercise_pair(
+    root: Path,
+    runtime: Path,
+    endpoint: str,
+    bearer: str,
+) -> dict[str, Any]:
     apps: list[asyncio.subprocess.Process] = []
-    try:
-        await wait_port(port, server)
-        with tempfile.TemporaryDirectory(dir=root) as temporary:
-            home = Path(temporary)
-            write_config(home, f"http://127.0.0.1:{port}/mcp", bearer)
-            client, app = await start_app(home, extension=True)
-            apps.append(app)
+    with tempfile.TemporaryDirectory(dir=root) as temporary:
+        home = Path(temporary)
+        write_config(home, endpoint, bearer)
+        client, app = await start_app(home, runtime, extension=True)
+        apps.append(app)
+        try:
             thread = (
                 await client.request(
                     2, "thread/start", {"cwd": "/home/dionysus", "model": "mock-model"}
@@ -215,23 +201,56 @@ async def main() -> None:
                 polled = await client.request(
                     request_id,
                     "mcpServer/task/get",
-                    {
-                        "threadId": thread,
-                        "server": "abyss_stack_tasks",
-                        "taskId": task_id,
-                    },
+                    {"threadId": thread, "server": "abyss_stack_tasks", "taskId": task_id},
                 )
                 result = polled.get("result", {}).get("result", {})
                 if result.get("status") in {"completed", "failed", "cancelled"}:
                     terminal = result
                     break
-            await stop(app)
-            apps.remove(app)
             if terminal is None or terminal.get("status") != "completed":
                 raise RuntimeError(f"task did not complete: {terminal}")
 
-            no_ext, app = await start_app(home, extension=False)
-            apps.append(app)
+            cancel_started = await client.request(
+                44,
+                "mcpServer/task/start",
+                {
+                    "threadId": thread,
+                    "server": "abyss_stack_tasks",
+                    "tool": "stack_runtime_inspect_task",
+                    "arguments": {"organ_id": "aoa-kag", "policy_family": "read"},
+                },
+            )
+            if "error" in cancel_started:
+                raise RuntimeError(json.dumps(cancel_started))
+            cancelled_task_id = cancel_started["result"]["result"]["taskId"]
+            cancelled = await client.request(
+                45,
+                "mcpServer/task/cancel",
+                {
+                    "threadId": thread,
+                    "server": "abyss_stack_tasks",
+                    "taskId": cancelled_task_id,
+                },
+            )
+            if "error" in cancelled:
+                raise RuntimeError(f"task cancel failed: {cancelled}")
+            cancelled_get = await client.request(
+                46,
+                "mcpServer/task/get",
+                {
+                    "threadId": thread,
+                    "server": "abyss_stack_tasks",
+                    "taskId": cancelled_task_id,
+                },
+            )
+            cancelled_status = cancelled_get.get("result", {}).get("result", {}).get("status")
+        finally:
+            await stop(app)
+            apps.remove(app)
+
+        no_ext, app = await start_app(home, runtime, extension=False)
+        apps.append(app)
+        try:
             no_ext_thread = (
                 await no_ext.request(
                     50, "thread/start", {"cwd": "/home/dionysus", "model": "mock-model"}
@@ -247,8 +266,77 @@ async def main() -> None:
                     "arguments": {"organ_id": "aoa-kag"},
                 },
             )
+        finally:
             await stop(app)
             apps.remove(app)
+
+    return {
+        "completed": terminal,
+        "completed_task_id": task_id,
+        "cancelled_task_id": cancelled_task_id,
+        "cancel_acknowledged": "error" not in cancelled,
+        "cancelled_status": cancelled_status,
+        "missing_extension": rejected,
+    }
+
+
+async def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--runtime", type=Path, default=DEFAULT_RUNTIME)
+    parser.add_argument("--live-production", action="store_true")
+    parser.add_argument("--output", type=Path)
+    args = parser.parse_args()
+    if not args.runtime.is_file():
+        raise RuntimeError(f"missing Codex Tasks runtime: {args.runtime}")
+    started = datetime.now(UTC)
+    root = Path("/srv/abyss-machine/cache/mcp-modern-fleet-20260809/evidence") / started.strftime(
+        "codex-real-stack-tasks-%Y%m%dT%H%M%SZ"
+    )
+    root.mkdir(mode=0o700, parents=True)
+    server: asyncio.subprocess.Process | None = None
+    try:
+        if args.live_production:
+            bearer = load_bearer(LIVE_BEARER_FILE)
+            endpoint = LIVE_ENDPOINT
+        else:
+            task_root = root / "tasks"
+            task_root.mkdir(mode=0o700)
+            audit = root / "policy-read.jsonl"
+            audit.touch(mode=0o600)
+            bearer = secrets.token_urlsafe(48)
+            port = free_port()
+            endpoint = f"http://127.0.0.1:{port}/mcp"
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_MCP_TRANSPORT": "streamable-http",
+                    "AOA_MCP_HOST": "127.0.0.1",
+                    "AOA_MCP_PORT": str(port),
+                    "ABYSS_STACK_MCP_POLICY_FAMILY": "read",
+                    "ABYSS_STACK_MCP_READ_BEARER_TOKEN": bearer,
+                    "ABYSS_STACK_MCP_OBSERVATION_PATH": str(OBSERVATION),
+                    "ABYSS_STACK_MCP_AUDIT_JOURNAL_PATH": str(audit),
+                    "ABYSS_STACK_MCP_REQUIRE_AUDIT_JOURNAL": "1",
+                    "ABYSS_STACK_MCP_TASKS_ENABLED": "1",
+                    "ABYSS_STACK_MCP_TASK_ROOT": str(task_root),
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                }
+            )
+            server = await asyncio.create_subprocess_exec(
+                str(PYTHON),
+                "-I",
+                "-B",
+                "-m",
+                "abyss_stack_mcp.server",
+                env=env,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await wait_port(port, server)
+        pair = await exercise_pair(root, args.runtime, endpoint, bearer)
+        terminal = pair["completed"]
+        task_id = pair["completed_task_id"]
+        rejected = pair["missing_extension"]
 
         receipt = {
             "schema_version": "codex_real_abyss_stack_tasks_pair_v1",
@@ -256,9 +344,11 @@ async def main() -> None:
             "protocol_version": PROTOCOL,
             "server": "abyss-stack-mcp/0.5.2",
             "mcp_sdk": "2.0.0",
+            "codex_runtime": args.runtime.parents[1].name,
             "codex_runtime_sha256": hashlib.sha256(
-                RUNTIME.parent.joinpath("codex").read_bytes()
+                args.runtime.parent.joinpath("codex").read_bytes()
             ).hexdigest(),
+            "production_pair": args.live_production,
             "task": {
                 "status": terminal["status"],
                 "task_id_digest": "sha256:"
@@ -270,6 +360,12 @@ async def main() -> None:
                     "effect_class"
                 ],
             },
+            "cancellation": {
+                "acknowledged": pair["cancel_acknowledged"],
+                "status": pair["cancelled_status"],
+                "task_id_digest": "sha256:"
+                + hashlib.sha256(pair["cancelled_task_id"].encode()).hexdigest(),
+            },
             "negative_gates": {
                 "missing_extension_rejected": "error" in rejected,
                 "error": rejected.get("error"),
@@ -279,20 +375,22 @@ async def main() -> None:
             "passed"
             if receipt["task"]["owner"] == "abyss-stack"
             and receipt["task"]["effect_class"] == "observe"
+            and receipt["cancellation"]["acknowledged"]
+            and receipt["cancellation"]["status"] == "cancelled"
             and receipt["negative_gates"]["missing_extension_rejected"]
             else "failed"
         )
-        output = root / "receipt.json"
+        output = args.output or root / "receipt.json"
+        output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         output.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
         os.chmod(output, 0o600)
         if receipt["verdict"] != "passed":
             raise RuntimeError(json.dumps(receipt, indent=2))
         print(output)
     finally:
-        for app in apps:
-            await stop(app)
-        server.terminate()
-        await server.wait()
+        if server is not None:
+            server.terminate()
+            await server.wait()
 
 
 if __name__ == "__main__":

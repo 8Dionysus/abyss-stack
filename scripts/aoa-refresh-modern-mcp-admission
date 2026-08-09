@@ -24,7 +24,8 @@ fi
 now_epoch=$(date -u +%s)
 minimum_expiry=$(jq -r '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted") | .currentness_expires_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601] | min // 0' "$REGISTRY")
 admitted_count=$(jq -r '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted")] | length' "$REGISTRY")
-if [[ "$admitted_count" -eq 11 && "$minimum_expiry" -gt "$now_epoch" ]]; then
+production_identity_count=$(jq -r '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted") | .runtime_identity.process_identity | select(contains("bootstrap") | not)] | length' "$REGISTRY")
+if [[ "$admitted_count" -eq 11 && "$production_identity_count" -eq 11 && "$minimum_expiry" -gt "$now_epoch" ]]; then
   exit 0
 fi
 
