@@ -3904,6 +3904,30 @@ class ExternalCodexRuntime:
             state = self.status(session_id)
         return state
 
+    @staticmethod
+    def _isolated_empty_directory(
+        path: Path,
+        *,
+        error_code: str,
+        purpose: str,
+    ) -> Path:
+        """Establish one runtime-owned non-writable empty directory."""
+
+        try:
+            path.mkdir(mode=0o500, parents=False, exist_ok=True)
+            path_stat = path.lstat()
+            if not stat.S_ISDIR(path_stat.st_mode) or path.is_symlink():
+                raise OSError(f"isolated {purpose} is not a physical directory")
+            if any(path.iterdir()):
+                raise OSError(f"isolated {purpose} is not empty")
+            path.chmod(0o500)
+        except OSError as exc:
+            raise ExternalCodexRuntimeError(
+                error_code,
+                f"cannot establish the runtime-owned non-writable {purpose}",
+            ) from exc
+        return path
+
     def _codex_environment(
         self,
         launch: Mapping[str, Any],
@@ -3918,26 +3942,25 @@ class ExternalCodexRuntime:
             if value is not None:
                 environment[str(key)] = value
         environment["CODEX_HOME"] = str(launch["codex_home"])
-        shell_home = scratch_root.parent / f"{scratch_root.name}-shell-home"
-        try:
-            shell_home.mkdir(mode=0o500, parents=False, exist_ok=True)
-            shell_home_stat = shell_home.lstat()
-            if not stat.S_ISDIR(shell_home_stat.st_mode) or shell_home.is_symlink():
-                raise OSError("isolated shell HOME is not a physical directory")
-            if any(shell_home.iterdir()):
-                raise OSError("isolated shell HOME is not empty")
-            shell_home.chmod(0o500)
-        except OSError as exc:
-            raise ExternalCodexRuntimeError(
-                "isolated_shell_home_unavailable",
-                "cannot establish the runtime-owned non-writable shell HOME",
-            ) from exc
+        shell_home = ExternalCodexRuntime._isolated_empty_directory(
+            scratch_root.parent / f"{scratch_root.name}-shell-home",
+            error_code="isolated_shell_home_unavailable",
+            purpose="shell HOME",
+        )
+        git_hooks_root = ExternalCodexRuntime._isolated_empty_directory(
+            scratch_root.parent / f"{scratch_root.name}-git-hooks",
+            error_code="isolated_git_hooks_unavailable",
+            purpose="Git hooks directory",
+        )
         environment["HOME"] = str(shell_home)
         environment["PATH"] = CODEX_EXECUTABLE_PATH
         environment["BASH_ENV"] = "/dev/null"
         environment["ENV"] = "/dev/null"
+        environment["GIT_CONFIG_COUNT"] = "1"
         environment["GIT_CONFIG_GLOBAL"] = "/dev/null"
+        environment["GIT_CONFIG_KEY_0"] = "core.hooksPath"
         environment["GIT_CONFIG_NOSYSTEM"] = "1"
+        environment["GIT_CONFIG_VALUE_0"] = str(git_hooks_root)
         environment["GIT_PAGER"] = "cat"
         environment["GIT_TERMINAL_PROMPT"] = "0"
         environment["PAGER"] = "cat"

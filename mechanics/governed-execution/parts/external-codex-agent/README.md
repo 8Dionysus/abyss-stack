@@ -101,7 +101,11 @@ The controller:
   owner-fixed validation,
   outer shell executables pass that same path admission before an inline body
   is inspected; the worker uses an empty, runtime-owned, non-writable `HOME`
-  plus inert shell startup variables instead of ambient user profiles,
+  plus inert shell startup variables instead of ambient user profiles, and
+  binds `core.hooksPath` through command-scope Git configuration to a separate
+  empty, runtime-owned, non-writable directory so repository hooks cannot add
+  unobserved execution; model-issued attempts to override that binding remain
+  opaque,
   GNU sed is classifiable only with enforced `--sandbox`, and Git builtins that
   can invoke repository-configured diff, textconv, or fsmonitor helpers remain
   opaque,

@@ -3491,7 +3491,7 @@ def test_allowlisted_but_unavailable_system_command_fails_closed(
     assert RUNTIME._command_has_unclassified_indirection("rg pattern README.md") is True
 
 
-def test_codex_environment_isolates_shell_startup_from_ambient_home(
+def test_codex_environment_isolates_shell_startup_and_repository_hooks(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -3507,6 +3507,28 @@ def test_codex_environment_isolates_shell_startup_from_ambient_home(
     scratch = tmp_path / "attempt" / "scratch"
     scratch.parent.mkdir()
     scratch.mkdir()
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init")
+    (workspace / "README.md").write_text("bounded\n", encoding="utf-8")
+    _git(workspace, "add", "README.md")
+    _git(
+        workspace,
+        "-c",
+        "user.name=fixture",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "commit",
+        "-m",
+        "fixture",
+    )
+    hook_marker = tmp_path / "post-checkout-ran"
+    post_checkout = workspace / ".git" / "hooks" / "post-checkout"
+    post_checkout.write_text(
+        f"#!/bin/sh\n/usr/bin/touch {shlex.quote(str(hook_marker))}\n",
+        encoding="utf-8",
+    )
+    post_checkout.chmod(0o700)
 
     environment = RUNTIME.ExternalCodexRuntime._codex_environment(
         None,
@@ -3524,14 +3546,27 @@ def test_codex_environment_isolates_shell_startup_from_ambient_home(
         capture_output=True,
         text=True,
     )
+    checkout = subprocess.run(
+        ["/usr/bin/git", "checkout", "HEAD", "--", "README.md"],
+        cwd=workspace,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
     assert completed.returncode == 0
     assert environment["HOME"] != str(ambient_home)
     assert environment["PATH"] == RUNTIME.CODEX_EXECUTABLE_PATH
     assert environment["BASH_ENV"] == "/dev/null"
     assert environment["ENV"] == "/dev/null"
+    assert environment["GIT_CONFIG_COUNT"] == "1"
+    assert environment["GIT_CONFIG_KEY_0"] == "core.hooksPath"
+    assert Path(environment["GIT_CONFIG_VALUE_0"]).stat().st_mode & 0o222 == 0
     assert Path(environment["HOME"]).stat().st_mode & 0o222 == 0
     assert marker.exists() is False
+    assert checkout.returncode == 0
+    assert hook_marker.exists() is False
 
     isolated_home = Path(environment["HOME"])
     isolated_home.chmod(0o700)
@@ -3549,12 +3584,37 @@ def test_codex_environment_isolates_shell_startup_from_ambient_home(
     assert exc_info.value.code == "isolated_shell_home_unavailable"
 
 
+def test_codex_environment_rejects_nonempty_git_hooks_directory(
+    tmp_path: Path,
+) -> None:
+    scratch = tmp_path / "attempt" / "scratch"
+    scratch.parent.mkdir()
+    scratch.mkdir()
+    hooks_root = scratch.parent / f"{scratch.name}-git-hooks"
+    hooks_root.mkdir()
+    (hooks_root / "post-checkout").write_text("#!/bin/false\n", encoding="utf-8")
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.ExternalCodexRuntime._codex_environment(
+            None,
+            {
+                "environment_allowlist": [],
+                "codex_home": str(tmp_path / "codex-home"),
+            },
+            scratch,
+            {"mcp_server_configs": []},
+        )
+
+    assert exc_info.value.code == "isolated_git_hooks_unavailable"
+
+
 @pytest.mark.parametrize(
     "command",
     (
         "/usr/bin/git -c alias.leak='!cat /home/operator/.ssh/id_rsa' leak",
         "/usr/bin/git -calias.leak='!cat /home/operator/.ssh/id_rsa' leak",
         "/usr/bin/git --config-env=alias.leak=LEAK_COMMAND leak",
+        "/usr/bin/git -c core.hooksPath=.git/hooks checkout HEAD -- README.md",
         "/usr/bin/git leak",
         "/usr/bin/git --exec-path=/tmp leak",
         "/usr/bin/git -C/tmp leak",
@@ -3623,6 +3683,7 @@ def test_task_schema_requires_the_complete_runtime_forbidden_set(
         "/usr/bin/git rev-parse HEAD",
         "/usr/bin/git ls-files",
         "/usr/bin/git show-ref --head",
+        "/usr/bin/git checkout HEAD -- README.md",
         "/usr/bin/git config core.hooksPath",
         "/usr/bin/git config --local --get core.hooksPath",
         "/usr/bin/git config get core.hooksPath",
