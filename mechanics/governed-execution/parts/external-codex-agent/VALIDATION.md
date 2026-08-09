@@ -96,6 +96,9 @@ search preserved and ambient ripgrep configuration disabled,
 GNU sort compression-program dispatch refusal with ordinary sort preserved,
 hidden Git ref mutation refusal with ordinary ref inspection preserved,
 credential-bearing Git config read refusal alongside config-write refusal,
+Bash rcfile/init-file startup execution refusal,
+hidden Git symbolic-ref, reflog, ref, and object mutation refusal with
+read-only metadata inspection preserved,
 GNU sed `--sandbox` enforcement, config-driven Git helper refusal,
 sourced-shell refusal, Git alias/config-write/external-subcommand refusal, ambient
 environment-assignment refusal, Git-invisible FIFO and Unix-socket refusal,

@@ -208,6 +208,15 @@ GIT_FILTER_RUNNING_SUBCOMMANDS = frozenset(
         "worktree",
     }
 )
+GIT_HIDDEN_STATE_MUTATOR_SUBCOMMANDS = frozenset(
+    {
+        "bisect",
+        "branch",
+        "merge-tree",
+        "mktree",
+        "write-tree",
+    }
+)
 CLASSIFIABLE_DIRECT_EXECUTABLES = frozenset(
     {
         "basename",
@@ -1398,6 +1407,16 @@ def _shell_inline_body(tokens: Sequence[str]) -> str | None:
         if token == "-c":
             return tokens[index + 1] if index + 1 < len(tokens) else None
         if token.startswith("--"):
+            shell_option = token.lower().split("=", 1)[0]
+            if (
+                len(shell_option) >= len("--i")
+                and "--init-file".startswith(shell_option)
+            ) or (
+                len(shell_option) >= len("--rc")
+                and "--rcfile".startswith(shell_option)
+            ):
+                return None
+        if token.startswith("--"):
             index += 1
             continue
         if token.startswith("-") and token != "-":
@@ -1675,6 +1694,8 @@ def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
         # the selected source nor the returned value, so model-issued reads
         # and writes are both opaque.
         return True
+    if subcommand in GIT_HIDDEN_STATE_MUTATOR_SUBCOMMANDS:
+        return True
     if subcommand == "remote":
         positional = tuple(
             value.lower() for value in git_args if not value.startswith("-")
@@ -1684,17 +1705,26 @@ def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
         # config/refs or dispatch a transport selected by repository config.
         if positional and positional[0] != "get-url":
             return True
-    if subcommand == "branch" and any(
-        value.lower() == "--edit-description"
-        or value.lower().startswith("--edit-description=")
-        for value in git_args
-    ):
-        return True
-    if subcommand == "bisect":
+    if subcommand == "symbolic-ref":
         positional = tuple(
             value.lower() for value in git_args if not value.startswith("-")
         )
-        if positional[:1] == ("run",):
+        if any(
+            value.lower() == "-d"
+            or (
+                len(value.lower().split("=", 1)[0]) >= len("--d")
+                and "--delete".startswith(value.lower().split("=", 1)[0])
+            )
+            for value in git_args
+        ):
+            return True
+        if len(positional) != 1:
+            return True
+    if subcommand == "reflog":
+        positional = tuple(
+            value.lower() for value in git_args if not value.startswith("-")
+        )
+        if positional and positional[0] not in {"exists", "list", "show"}:
             return True
     if subcommand in GIT_CONFIG_DRIVEN_HELPER_SUBCOMMANDS:
         return True
@@ -1710,6 +1740,22 @@ def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
         return True
     if subcommand == "hash-object" and any(
         value.lower() == "--path" or value.lower().startswith("--path=")
+        for value in git_args
+    ):
+        return True
+    if subcommand == "hash-object" and any(
+        value.lower() == "--literally"
+        or (
+            value.lower().startswith("-")
+            and not value.lower().startswith("--")
+            and "w" in value.lower()[1:]
+        )
+        for value in git_args
+    ):
+        return True
+    if subcommand == "fsck" and any(
+        len(value.lower().split("=", 1)[0]) >= len("--lo")
+        and "--lost-found".startswith(value.lower().split("=", 1)[0])
         for value in git_args
     ):
         return True

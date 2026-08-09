@@ -429,6 +429,13 @@ if "FAKE_SHELL_SCRIPT_BEFORE_C" in task["objective"]:
         "status": "completed",
         "exit_code": 0,
     }})
+if "FAKE_SHELL_STARTUP_FILE" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/bash --rcfile -x -ic '/usr/bin/true'",
+        "status": "completed",
+        "exit_code": 0,
+    }})
 if "FAKE_GIT_LOCAL_CONFIG_WRITE" in task["objective"]:
     emit({"type": "item.completed", "item": {
         "type": "command_execution",
@@ -478,6 +485,20 @@ if "FAKE_GIT_HIDDEN_REF_MUTATION" in task["objective"]:
     emit({"type": "item.completed", "item": {
         "type": "command_execution",
         "command": "/usr/bin/git update-ref refs/heads/hidden HEAD",
+        "status": "completed",
+        "exit_code": 0,
+    }})
+if "FAKE_GIT_SYMBOLIC_REF_MUTATION" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/git symbolic-ref HEAD refs/heads/other",
+        "status": "completed",
+        "exit_code": 0,
+    }})
+if "FAKE_GIT_REFLOG_MUTATION" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/git reflog expire --expire=now --all",
         "status": "completed",
         "exit_code": 0,
     }})
@@ -3504,6 +3525,49 @@ def test_git_show_ref_remains_classifiable() -> None:
     ) is False
 
 
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/git symbolic-ref HEAD refs/heads/other",
+        "/usr/bin/git symbolic-ref -m bounded HEAD refs/heads/other",
+        "/usr/bin/git symbolic-ref -d refs/heads/hidden",
+        "/usr/bin/git symbolic-ref --del refs/heads/hidden",
+        "/usr/bin/git reflog expire --expire=now --all",
+        "/usr/bin/git reflog delete HEAD@{0}",
+        "/usr/bin/git reflog drop --all",
+        "/usr/bin/git branch hidden",
+        "/usr/bin/git bisect start",
+        "/usr/bin/git mktree",
+        "/usr/bin/git merge-tree HEAD HEAD",
+        "/usr/bin/git write-tree",
+        "/usr/bin/git hash-object -w README.md",
+        "/usr/bin/git hash-object --literally -w README.md",
+        "/usr/bin/git hash-object -wt blob README.md",
+        "/usr/bin/git fsck --lost-found",
+        "/usr/bin/git fsck --lost-f",
+    ),
+)
+def test_git_hidden_metadata_mutations_are_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/git symbolic-ref HEAD",
+        "/usr/bin/git symbolic-ref --short HEAD",
+        "/usr/bin/git reflog",
+        "/usr/bin/git reflog show HEAD",
+        "/usr/bin/git reflog exists refs/heads/main",
+        "/usr/bin/git reflog list",
+        "/usr/bin/git hash-object README.md",
+        "/usr/bin/git fsck --no-reflogs",
+    ),
+)
+def test_git_metadata_inspection_remains_classifiable(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
 def test_shell_nesting_beyond_inspection_limit_is_fail_closed() -> None:
     command = "/usr/bin/git push"
     for _ in range(RUNTIME.SHELL_NESTING_INSPECTION_LIMIT):
@@ -3576,6 +3640,21 @@ def test_shell_c_in_option_position_remains_classifiable() -> None:
     assert tokenizations[-1] == ("/usr/bin/true",)
     assert incomplete is False
     assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/bash --rcfile -x -ic '/usr/bin/true'",
+        "/usr/bin/bash --rcfile=/tmp/helper -ic '/usr/bin/true'",
+        "/usr/bin/bash --rcf=/tmp/helper -ic '/usr/bin/true'",
+        "/usr/bin/bash --init-file /tmp/helper -ic '/usr/bin/true'",
+        "/usr/bin/bash --init-file=/tmp/helper -ic '/usr/bin/true'",
+        "/usr/bin/bash --init-f=/tmp/helper -ic '/usr/bin/true'",
+    ),
+)
+def test_shell_startup_file_options_are_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
 
 
 @pytest.mark.parametrize(
@@ -4022,12 +4101,15 @@ def test_started_command_survives_interruption_and_blocks_authority(
         ),
         ("FAKE_SOURCE_INDIRECTION", ["unclassified_indirect_effect"]),
         ("FAKE_SHELL_SCRIPT_BEFORE_C", ["unclassified_indirect_effect"]),
+        ("FAKE_SHELL_STARTUP_FILE", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_LOCAL_CONFIG_WRITE", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_CONFIG_READ", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_HIDDEN_PROGRAMS", ["unclassified_indirect_effect"]),
         ("FAKE_RIPGREP_HIDDEN_PROGRAM", ["unclassified_indirect_effect"]),
         ("FAKE_SORT_HIDDEN_PROGRAM", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_HIDDEN_REF_MUTATION", ["unclassified_indirect_effect"]),
+        ("FAKE_GIT_SYMBOLIC_REF_MUTATION", ["unclassified_indirect_effect"]),
+        ("FAKE_GIT_REFLOG_MUTATION", ["unclassified_indirect_effect"]),
         (
             "FAKE_DIRECT_SECRET_ENCODER",
             ["secret_access", "unclassified_indirect_effect"],

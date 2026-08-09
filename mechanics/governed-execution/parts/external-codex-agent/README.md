@@ -94,7 +94,9 @@ The controller:
   active parameter, glob (including Bash extglob), brace, and tilde expansion
   plus literal command newlines remain opaque while quoted or escaped literals
   stay classifiable,
-  sourced shell bodies through `source` or `.` remain opaque,
+  sourced shell bodies through `source` or `.` remain opaque, and Bash
+  `--rcfile`/`--init-file` startup code is opaque even before an otherwise
+  classifiable `-c` body,
   model-issued commands run with a fixed system-only `PATH`, and only an
   explicit small set of system-resolved executables is directly classifiable;
   unadmitted bare names, directly selected relative/workspace/home/temporary
@@ -127,8 +129,11 @@ The controller:
   expose credential- or command-bearing values; `git remote` retains read-only
   listing and URL resolution, while every mutating or transport-dispatching form is
   opaque; `git update-ref` is opaque because it mutates repository state below
-  the manifest-visible worktree, and Git help forms are opaque as well because
-  configured man viewers can dispatch programs,
+  the manifest-visible worktree; mutating `symbolic-ref` and `reflog` forms,
+  ref/temporary-object helpers whose effects stay below `.git`, and explicit
+  hidden-object write options are also opaque while their read-only inspection
+  forms remain admitted; Git help forms are opaque as well because configured
+  man viewers can dispatch programs,
   any command carrying a secret-shaped path is classified as secret access,
   and commands are durably observed
   from `item.started` rather than only after completion, while exact task validation

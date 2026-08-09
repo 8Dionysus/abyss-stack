@@ -366,6 +366,12 @@ All model-issued `git config` access is opaque: repository, worktree, global,
 or system reads may return credential- or command-bearing values, while writes
 may alter later command behavior. Controller-owned Git probes remain isolated
 under the separately fixed minimal environment.
+Mutating `git symbolic-ref` and `git reflog` forms, branch/bisect and tree-object
+writers, `hash-object -w`/`--literally`, and `fsck --lost-found` are opaque
+because their persistent effects remain below the manifest-excluded `.git`
+tree. Read-only symbolic-ref, reflog show/exists/list, ordinary hash-object,
+and fsck inspection remain classifiable. Bash `--rcfile` and `--init-file` are
+opaque because startup code runs before an otherwise visible `-c` body.
 Shell `source` and `.` bodies remain
 opaque because the observed argv does not expose the sourced commands. Git
 configuration writes, including repository-local and per-worktree writes, and
