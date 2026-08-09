@@ -31,7 +31,7 @@ ExecCondition=/usr/bin/test -x /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp
 ExecCondition=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --verify-abyss-stack-mcp-runtime=read
 ExecStart=/usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.source-projection.lock /usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock /usr/bin/env /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --launch-verified-abyss-stack-mcp=read
 Restart=no
-RuntimeMaxSec=10min
+RuntimeMaxSec=30min
 TimeoutStopSec=20
 KillMode=control-group
 NoNewPrivileges=yes
