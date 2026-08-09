@@ -122,9 +122,10 @@ The controller:
   abbreviated `cat-file` filter/textconv and
   `hash-object --path` forms are covered by the same refusal; `hash-object`
   reads are admitted only with exact `--no-filters` and no filter-enabling,
-  path, write, or literal override, while signature-backed `for-each-ref`
-  format and sort fields are opaque because they invoke the configured
-  verifier,
+  path, write, or literal override, while signature-backed `for-each-ref`,
+  `rev-list`, and `reflog show` formats are opaque because they invoke the
+  configured verifier; OpenPGP, X.509, and SSH verifier programs are fixed to
+  `/usr/bin/false`,
   ripgrep remains available for ordinary source search, while `--pre`,
   `--hostname-bin`, and `-z`/`--search-zip` are opaque because they launch
   unobserved helpers; `RIPGREP_CONFIG_PATH` is fixed to `/dev/null` so ambient
@@ -244,6 +245,18 @@ All commit, push, PR, merge, tag, release, publication, service, secret, and
 global-config effects remain disabled in this first admission. A green runtime
 fixture proves the transport and guards; it does not prove Luna's landing fit
 or net benefit.
+
+For MCP-bearing read roles, the worker keeps the real owner bearer outside the
+Codex process and injects it through an attempt-local loopback relay. Codex sees
+only a random, expiring proxy path and no bearer environment variable; its
+model-issued commands run under the Codex 0.147 bubblewrap backend with private
+PID and network namespaces because legacy Landlock fallback is explicitly
+disabled for this bounded filesystem posture. Thus procfs remains usable for
+ordinary process work without exposing the upstream role credential. The
+runtime does not claim exhaustive path-alias classification from command events
+that omit effective working directory. Streaming MCP events are forwarded
+incrementally, and active authenticated relay sockets and handlers are
+terminated before the attempt can reach terminal finalization.
 
 ## Machine-local installation
 

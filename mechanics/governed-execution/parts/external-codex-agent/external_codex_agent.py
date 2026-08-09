@@ -12,18 +12,24 @@ from __future__ import annotations
 import argparse
 import fcntl
 import hashlib
+import http.client
+import http.server
 import json
 import os
 import re
 import selectors
+import secrets
 import shlex
 import shutil
 import signal
+import socket
 import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+import urllib.parse
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -79,6 +85,8 @@ REENTRY_STATE_SCHEMA_VERSION = "abyss_stack_external_codex_reentry_state_v2"
 MAX_CONTROL_BYTES = 16 * 1024 * 1024
 MAX_ROLE_BYTES = 2 * 1024 * 1024
 MAX_EVENT_LINE_BYTES = 8 * 1024 * 1024
+MAX_MCP_PROXY_REQUEST_BYTES = 16 * 1024 * 1024
+MCP_PROXY_CONNECT_TIMEOUT_SECONDS = 15
 SHELL_NESTING_INSPECTION_LIMIT = 4
 FOREGROUND_OBSERVATION_INTERVAL_SECONDS = 0.25
 TERMINAL_STATES = {
@@ -88,6 +96,299 @@ TERMINAL_STATES = {
     "review_required",
     "authority_blocked",
 }
+
+
+class _ThreadingMcpProxyServer(http.server.ThreadingHTTPServer):
+    daemon_threads = False
+    block_on_close = True
+    allow_reuse_address = False
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self._accepted_lock = threading.Lock()
+        self._accepted_requests: set[socket.socket] = set()
+        super().__init__(*args, **kwargs)
+
+    def get_request(self) -> tuple[socket.socket, Any]:
+        request, address = super().get_request()
+        with self._accepted_lock:
+            self._accepted_requests.add(request)
+        return request, address
+
+    def shutdown_request(self, request: socket.socket) -> None:
+        try:
+            super().shutdown_request(request)
+        finally:
+            with self._accepted_lock:
+                self._accepted_requests.discard(request)
+
+    def close_accepted_requests(self) -> None:
+        with self._accepted_lock:
+            accepted_requests = tuple(self._accepted_requests)
+        for request in accepted_requests:
+            try:
+                request.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            try:
+                request.close()
+            except OSError:
+                pass
+
+
+class _McpCredentialProxy:
+    """Attempt-local loopback proxy that keeps the upstream bearer out of Codex."""
+
+    def __init__(self, server: Mapping[str, Any], bearer_token: str) -> None:
+        parsed = urllib.parse.urlsplit(str(server["url"]))
+        if (
+            parsed.scheme != "http"
+            or parsed.hostname != "127.0.0.1"
+            or parsed.port is None
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ExternalCodexRuntimeError(
+                "mcp_proxy_upstream_invalid",
+                "role-scoped MCP proxy requires one exact loopback HTTP upstream",
+            )
+        self._upstream_host = parsed.hostname
+        self._upstream_port = parsed.port
+        self._upstream_path = parsed.path or "/"
+        self._bearer_token = bearer_token
+        self._capability_path = "/mcp/" + secrets.token_urlsafe(32)
+        self._close_lock = threading.Lock()
+        self._relay_lock = threading.Lock()
+        self._active_relay_sockets: set[socket.socket] = set()
+        self._closed = False
+        proxy = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.0"
+
+            def setup(self) -> None:
+                super().setup()
+                self.connection.settimeout(15)
+
+            def log_message(self, _format: str, *_args: Any) -> None:
+                return
+
+            def _proxy(self) -> None:
+                response_started = False
+                request_path = urllib.parse.urlsplit(self.path).path
+                if request_path != proxy._capability_path:
+                    self.send_error(404)
+                    return
+                transfer_encoding = self.headers.get("Transfer-Encoding", "").lower()
+                if transfer_encoding and transfer_encoding != "identity":
+                    self.send_error(400, "chunked proxy requests are unsupported")
+                    return
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                except ValueError:
+                    self.send_error(400, "invalid content length")
+                    return
+                if length < 0 or length > MAX_MCP_PROXY_REQUEST_BYTES:
+                    self.send_error(413)
+                    return
+                body = self.rfile.read(length) if length else None
+                # Header and request-body admission is bounded. Once admitted,
+                # downstream response consumption remains Codex-owned just as
+                # the upstream MCP response duration does.
+                self.connection.settimeout(None)
+                headers = {
+                    key: value
+                    for key, value in self.headers.items()
+                    if key.lower()
+                    not in {
+                        "authorization",
+                        "connection",
+                        "content-length",
+                        "host",
+                        "proxy-authorization",
+                        "transfer-encoding",
+                    }
+                }
+                headers["Connection"] = "close"
+                upstream = http.client.HTTPConnection(
+                    proxy._upstream_host,
+                    proxy._upstream_port,
+                    timeout=MCP_PROXY_CONNECT_TIMEOUT_SECONDS,
+                )
+                relay_sockets: tuple[socket.socket, ...] = ()
+                try:
+                    # Bound only establishment of the fixed loopback hop. MCP
+                    # tool and streaming response duration remains Codex-owned.
+                    upstream.connect()
+                    if upstream.sock is not None:
+                        upstream.sock.settimeout(None)
+                    relay_sockets = tuple(
+                        sock
+                        for sock in (self.connection, upstream.sock)
+                        if sock is not None
+                    )
+                    bearer_token = proxy._register_relay(relay_sockets)
+                    if bearer_token is None:
+                        raise OSError("attempt-local MCP credential proxy is closing")
+                    headers["Authorization"] = f"Bearer {bearer_token}"
+                    upstream.request(
+                        self.command,
+                        proxy._upstream_path,
+                        body=body,
+                        headers=headers,
+                    )
+                    response = upstream.getresponse()
+                    self.send_response(response.status, response.reason)
+                    for key, value in response.getheaders():
+                        if key.lower() not in {
+                            "connection",
+                            "content-length",
+                            "keep-alive",
+                            "proxy-authenticate",
+                            "proxy-authorization",
+                            "te",
+                            "trailer",
+                            "transfer-encoding",
+                            "upgrade",
+                        }:
+                            self.send_header(key, value)
+                    self.send_header("Connection", "close")
+                    # From this point forward an end_headers() write may be
+                    # partially visible. Never append a second status line.
+                    response_started = True
+                    self.end_headers()
+                    while True:
+                        chunk = response.read1(65_536)
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                        self.wfile.flush()
+                except (OSError, http.client.HTTPException):
+                    if not response_started and not self.wfile.closed:
+                        try:
+                            self.send_error(502)
+                        except OSError:
+                            pass
+                finally:
+                    proxy._unregister_relay(relay_sockets)
+                    upstream.close()
+                    self.close_connection = True
+
+            do_GET = _proxy
+            do_POST = _proxy
+            do_DELETE = _proxy
+
+        try:
+            self._server = _ThreadingMcpProxyServer(("127.0.0.1", 0), Handler)
+        except OSError as exc:
+            raise ExternalCodexRuntimeError(
+                "mcp_credential_proxy_unavailable",
+                "cannot bind the attempt-local MCP credential proxy",
+            ) from exc
+        self._thread = threading.Thread(
+            target=self._server.serve_forever,
+            name="aoa-mcp-credential-proxy",
+            daemon=True,
+        )
+
+    @property
+    def endpoint_url(self) -> str:
+        host, port = self._server.server_address
+        return f"http://{host}:{port}{self._capability_path}"
+
+    def start(self) -> None:
+        try:
+            self._thread.start()
+        except BaseException:
+            self._server.server_close()
+            self._bearer_token = ""
+            self._closed = True
+            raise
+
+    def _register_relay(
+        self,
+        relay_sockets: Sequence[socket.socket],
+    ) -> str | None:
+        with self._relay_lock:
+            if self._closed:
+                return None
+            self._active_relay_sockets.update(relay_sockets)
+            return self._bearer_token
+
+    def _unregister_relay(
+        self,
+        relay_sockets: Sequence[socket.socket],
+    ) -> None:
+        with self._relay_lock:
+            self._active_relay_sockets.difference_update(relay_sockets)
+
+    def close(self) -> None:
+        with self._close_lock:
+            if self._closed:
+                return
+            with self._relay_lock:
+                self._closed = True
+                self._bearer_token = ""
+                active_sockets = tuple(self._active_relay_sockets)
+            # Stop accepting before taking the complete accepted-socket
+            # snapshot. This includes clients stalled before request parsing,
+            # which cannot yet have registered as authenticated relays.
+            self._server.shutdown()
+            self._server.close_accepted_requests()
+            for active_socket in active_sockets:
+                try:
+                    active_socket.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+                try:
+                    active_socket.close()
+                except OSError:
+                    pass
+            self._server.server_close()
+            self._thread.join(timeout=5)
+            if self._thread.is_alive():
+                raise ExternalCodexRuntimeError(
+                    "mcp_credential_proxy_close_incomplete",
+                    "attempt-local MCP credential proxy did not terminate",
+                )
+            with self._relay_lock:
+                self._active_relay_sockets.clear()
+
+
+def _start_mcp_credential_proxies(
+    tool_entry: Mapping[str, Any],
+) -> tuple[list[_McpCredentialProxy], dict[str, str]]:
+    proxies: list[_McpCredentialProxy] = []
+    endpoints: dict[str, str] = {}
+    try:
+        for server in tool_entry["mcp_server_configs"]:
+            token_name = str(server["bearer_token_env_var"])
+            token = os.environ.get(token_name)
+            if not token:
+                raise ExternalCodexRuntimeError(
+                    "mcp_credential_unavailable",
+                    f"required role-scoped MCP credential is unavailable: {token_name}",
+                )
+            proxy = _McpCredentialProxy(server, token)
+            proxy.start()
+            proxies.append(proxy)
+            endpoints[str(server["server_id"])] = proxy.endpoint_url
+    except BaseException:
+        for proxy in reversed(proxies):
+            proxy.close()
+        raise
+    return proxies, endpoints
+
+
+def _close_mcp_credential_proxies(proxies: list[_McpCredentialProxy]) -> None:
+    """Expire every attempt-local relay before publishing terminal state."""
+
+    for proxy in reversed(proxies):
+        proxy.close()
+    proxies.clear()
+
+
 RESUMABLE_STATES = {"paused", "interrupted", "review_required"}
 REVIEW_REPORT_RECOVERY_FAILURES = {"model_report_identity_mismatch"}
 SECRET_ENV_RE = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)", re.I)
@@ -1702,6 +2003,77 @@ def _git_for_each_ref_has_signature_dispatch(git_args: Sequence[str]) -> bool:
     return False
 
 
+def _git_revision_walk_has_signature_dispatch(git_args: Sequence[str]) -> bool:
+    """Detect pretty formats that execute a configured signature verifier."""
+
+    builtin_pretty_formats = {
+        "email",
+        "full",
+        "fuller",
+        "medium",
+        "mboxrd",
+        "oneline",
+        "raw",
+        "reference",
+        "short",
+    }
+    index = 0
+    while index < len(git_args):
+        token = git_args[index]
+        lowered = token.lower()
+        if lowered == "--":
+            break
+        option, separator, attached_value = token.partition("=")
+        lowered_option = option.lower()
+        if (
+            len(lowered_option) >= len("--show-s")
+            and "--show-signature".startswith(lowered_option)
+        ):
+            return True
+        is_format = lowered_option == "--format"
+        is_pretty = lowered_option == "--pretty"
+        is_abbreviated_format = (
+            len(lowered_option) >= len("--f")
+            and "--format".startswith(lowered_option)
+            and not is_format
+        )
+        is_abbreviated_pretty = (
+            len(lowered_option) >= len("--p")
+            and "--pretty".startswith(lowered_option)
+            and not is_pretty
+        )
+        if is_abbreviated_format or is_abbreviated_pretty:
+            return True
+        if is_pretty and not separator:
+            # Bare --pretty has no following value. In particular, do not
+            # swallow a subsequent --show-signature option.
+            if index + 1 < len(git_args) and re.search(
+                r"%G(?:\?|[A-Z])", git_args[index + 1]
+            ):
+                return True
+            index += 1
+            continue
+        if is_format or is_pretty:
+            if not separator:
+                # --format requires an attached value. Ambiguous/invalid
+                # spellings are not part of the admitted command surface.
+                return True
+            format_value = attached_value
+            normalized_format = format_value.lower()
+            if re.search(r"%G(?:\?|[A-Z])", format_value):
+                return True
+            if not (
+                "%" in format_value
+                or normalized_format.startswith(("format:", "tformat:"))
+                or normalized_format in builtin_pretty_formats
+            ):
+                # Any other name may resolve repository-local pretty.<name>
+                # configuration, whose expansion can contain %G placeholders.
+                return True
+        index += 1
+    return False
+
+
 def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
     """Reject config-driven aliases and external git-subcommand dispatch."""
 
@@ -1765,9 +2137,24 @@ def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
         positional = tuple(
             value.lower() for value in git_args if not value.startswith("-")
         )
-        if positional and positional[0] not in {"exists", "list", "show"}:
+        operation = (
+            positional[0]
+            if positional
+            and positional[0]
+            in {"delete", "drop", "exists", "expire", "list", "show", "write"}
+            else None
+        )
+        if operation in {"delete", "drop", "expire", "write"}:
+            return True
+        if (
+            operation in {None, "show"}
+        ) and _git_revision_walk_has_signature_dispatch(git_args):
             return True
     if subcommand == "for-each-ref" and _git_for_each_ref_has_signature_dispatch(
+        git_args
+    ):
+        return True
+    if subcommand == "rev-list" and _git_revision_walk_has_signature_dispatch(
         git_args
     ):
         return True
@@ -2203,16 +2590,24 @@ def _command_has_unclassified_indirection(command: str) -> bool:
 def _base_controller_git_environment() -> dict[str, str]:
     return {
         "GIT_ATTR_NOSYSTEM": "1",
-        "GIT_CONFIG_COUNT": "3",
+        "GIT_CONFIG_COUNT": "7",
         "GIT_CONFIG_GLOBAL": "/dev/null",
         "GIT_CONFIG_KEY_0": "core.hooksPath",
         "GIT_CONFIG_KEY_1": "core.fsmonitor",
         "GIT_CONFIG_KEY_2": "core.attributesFile",
+        "GIT_CONFIG_KEY_3": "gpg.program",
+        "GIT_CONFIG_KEY_4": "gpg.openpgp.program",
+        "GIT_CONFIG_KEY_5": "gpg.x509.program",
+        "GIT_CONFIG_KEY_6": "gpg.ssh.program",
         "GIT_CONFIG_NOSYSTEM": "1",
         "GIT_CONFIG_SYSTEM": "/dev/null",
         "GIT_CONFIG_VALUE_0": "/dev/null",
         "GIT_CONFIG_VALUE_1": "false",
         "GIT_CONFIG_VALUE_2": "/dev/null",
+        "GIT_CONFIG_VALUE_3": "/usr/bin/false",
+        "GIT_CONFIG_VALUE_4": "/usr/bin/false",
+        "GIT_CONFIG_VALUE_5": "/usr/bin/false",
+        "GIT_CONFIG_VALUE_6": "/usr/bin/false",
         "GIT_NO_LAZY_FETCH": "1",
         "GIT_OPTIONAL_LOCKS": "0",
         "GIT_TERMINAL_PROMPT": "0",
@@ -3417,7 +3812,18 @@ class ExternalCodexRuntime:
                 "process_containment_unavailable",
                 "runtime profile selected an unexpected supervisor source",
             )
-        env = self._codex_environment(launch, self.state_root, tool_entry)
+        for server in tool_entry["mcp_server_configs"]:
+            token_name = str(server["bearer_token_env_var"])
+            if not os.environ.get(token_name):
+                raise ExternalCodexRuntimeError(
+                    "mcp_credential_unavailable",
+                    f"required role-scoped MCP credential is unavailable: {token_name}",
+                )
+        env = self._codex_environment(
+            launch,
+            self.state_root,
+            tool_entry,
+        )
         probes: list[tuple[str, list[str]]] = [
             ("version", [str(executable), "--version"]),
             ("login", [str(executable), "login", "status"]),
@@ -4337,7 +4743,7 @@ class ExternalCodexRuntime:
         self,
         launch: Mapping[str, Any],
         scratch_root: Path,
-        tool_entry: Mapping[str, Any],
+        _tool_entry: Mapping[str, Any],
     ) -> dict[str, str]:
         environment: dict[str, str] = {}
         for key in launch.get("environment_allowlist", []):
@@ -4380,15 +4786,6 @@ class ExternalCodexRuntime:
         environment.setdefault("LANG", "C.UTF-8")
         environment["TMPDIR"] = str(scratch_root)
         environment["NO_COLOR"] = "1"
-        for server in tool_entry["mcp_server_configs"]:
-            token_name = str(server["bearer_token_env_var"])
-            token = os.environ.get(token_name)
-            if not token:
-                raise ExternalCodexRuntimeError(
-                    "mcp_credential_unavailable",
-                    f"required role-scoped MCP credential is unavailable: {token_name}",
-                )
-            environment[token_name] = token
         return environment
 
     def _materialized_payloads(
@@ -5105,6 +5502,7 @@ Runtime session identity: {state['session_id']}
         output_message: Path,
         mode: Literal["start", "resume"],
         thread_id: str | None,
+        mcp_endpoint_overrides: Mapping[str, str] | None = None,
     ) -> list[str]:
         executable = str(launch["codex_executable"])
         configuration = realization["configuration"]
@@ -5131,6 +5529,8 @@ Runtime session identity: {state['session_id']}
             "--strict-config",
             "--disable",
             "multi_agent",
+            "--disable",
+            "use_legacy_landlock",
             "-m",
             model_slug,
             "-c",
@@ -5149,11 +5549,15 @@ Runtime session identity: {state['session_id']}
         ]
         for server in reversed(tool_entry["mcp_server_configs"]):
             server_id = str(server["server_id"])
+            endpoint_url = (mcp_endpoint_overrides or {}).get(server_id)
+            if endpoint_url is None:
+                raise ExternalCodexRuntimeError(
+                    "mcp_credential_proxy_unavailable",
+                    f"role-scoped MCP server lacks an attempt-local proxy: {server_id}",
+                )
             server_config = (
                 "{url=\""
-                + str(server["url"])
-                + "\",bearer_token_env_var=\""
-                + str(server["bearer_token_env_var"])
+                + endpoint_url
                 + "\",enabled=true,required=true}"
             )
             common[0:0] = ["-c", f"mcp_servers.{server_id}={server_config}"]
@@ -5180,6 +5584,31 @@ Runtime session identity: {state['session_id']}
         attempt_number: int,
         mode: Literal["start", "resume"],
         resume_payload: Mapping[str, Any] | None,
+    ) -> None:
+        credential_proxies: list[_McpCredentialProxy] = []
+        try:
+            self._run_worker_attempt(
+                session_id,
+                attempt_id=attempt_id,
+                attempt_number=attempt_number,
+                mode=mode,
+                resume_payload=resume_payload,
+                credential_proxies=credential_proxies,
+            )
+        finally:
+            # The bearer-bearing relay is an attempt-local capability. Close it
+            # before any exception reaches the outer worker failure closeout.
+            _close_mcp_credential_proxies(credential_proxies)
+
+    def _run_worker_attempt(
+        self,
+        session_id: str,
+        *,
+        attempt_id: str,
+        attempt_number: int,
+        mode: Literal["start", "resume"],
+        resume_payload: Mapping[str, Any] | None,
+        credential_proxies: list[_McpCredentialProxy],
     ) -> None:
         session_dir = self._session_dir(session_id)
         attempt_dir = session_dir / "attempts" / f"{attempt_number:03d}"
@@ -5287,6 +5716,10 @@ Runtime session identity: {state['session_id']}
             _atomic_write_bytes(prompt_path, prompt.encode("utf-8"), mode=0o400)
             output_schema = self._execution_result_schema_path(state)
             output_message = attempt_dir / "model-report.json"
+            started_credential_proxies, mcp_endpoints = _start_mcp_credential_proxies(
+                tool_entry
+            )
+            credential_proxies.extend(started_credential_proxies)
             codex_command = self._codex_command(
                 launch=launch,
                 realization=realization,
@@ -5296,6 +5729,7 @@ Runtime session identity: {state['session_id']}
                 output_message=output_message,
                 mode=mode,
                 thread_id=state.get("thread_id"),
+                mcp_endpoint_overrides=mcp_endpoints,
             )
             process_identity_path = attempt_dir / "process-identity.json"
             command = self._containment_command(
@@ -5313,7 +5747,11 @@ Runtime session identity: {state['session_id']}
 
         raw_events_path = attempt_dir / "codex-events.jsonl"
         stderr_path = attempt_dir / "codex-stderr.log"
-        environment = self._codex_environment(launch, scratch, tool_entry)
+        environment = self._codex_environment(
+            launch,
+            scratch,
+            tool_entry,
+        )
         started = utc_now()
         runtime_failure_code: str | None = None
         terminate_requested = False
@@ -5508,6 +5946,7 @@ Runtime session identity: {state['session_id']}
                 runtime_failure_code = "controlled_interruption"
             except ExternalCodexRuntimeError as exc:
                 runtime_failure_code = exc.code
+        _close_mcp_credential_proxies(credential_proxies)
         finished = utc_now()
         with self._lock(session_id):
             state = self._load_state(session_id)

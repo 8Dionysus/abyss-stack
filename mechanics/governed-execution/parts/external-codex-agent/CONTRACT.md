@@ -189,8 +189,15 @@ Semantic profiles admit only `read-only` or bounded `workspace-write` target
 authority with model-shell network disabled. A role-scoped read profile may
 configure exactly one loopback AoA MCP (`aoa_evals`, `aoa_stats`, or
 `aoa_memo`) from its own required bearer-token environment variable. The
-token is passed to the Codex MCP client configuration but excluded from the
-model shell; ambient MCPs and the other role servers remain absent. For
+worker retains that upstream credential outside Codex and starts an
+attempt-local loopback proxy which injects it only while relaying to the fixed
+owner endpoint. Codex receives a random attempt-scoped proxy path with no
+bearer environment variable; its model shell has network disabled and cannot
+use that path directly. The relay forwards streaming response bytes as they
+become available. Before terminal finalization it stops admission, closes all
+active client and upstream sockets, and joins its handler threads, so neither
+the path nor an already-authenticated connection survives the attempt. Ambient
+MCPs and the other role servers remain absent. For
 `read-only`, the runtime does not make the target
 checkout the Codex writable root. It creates a distinct attempt-local execution
 root, launches Codex's internal `workspace-write` sandbox there, and sets
@@ -215,7 +222,11 @@ access, or global config mutation.
 
 Codex runs beneath a Linux supervisor that owns a separate process group but
 does not create an outer user or PID namespace. This leaves Codex's own
-`codex-linux-sandbox`/bubblewrap namespace construction intact. Before it
+`codex-linux-sandbox`/bubblewrap namespace construction intact. The exact Codex
+0.147 invocation disables legacy Landlock fallback; for this bounded filesystem
+posture that version requires bubblewrap. Model commands therefore run in its
+private PID and network namespaces, or the attempt fails rather than exposing
+the credential-bearing worker. Before it
 launches Codex, the supervisor verifies the exact worker PPID, enables
 `PR_SET_CHILD_SUBREAPER`, requests `SIGTERM` through `PR_SET_PDEATHSIG`, and
 checks the PPID again to close the parent-death setup race. It then opens the
@@ -354,15 +365,22 @@ repository-configured diff, textconv, or fsmonitor helpers are likewise opaque;
 accepted abbreviated `cat-file` filter/textconv and `hash-object --path` forms
 are matched to the same canonical refusal. `hash-object` is classifiable only
 with exact `--no-filters` and no later filter-enabling, path, write, or literal
-override. Signature-backed `for-each-ref` format and sort fields are opaque
-because they invoke the configured verifier. The controller's own exact Git observations remain outside model-issued command
+override. Signature-backed `for-each-ref` fields and `rev-list`/`reflog show`
+pretty formats are opaque because they invoke a configured verifier. All
+OpenPGP, X.509, and SSH verifier program coordinates are additionally forced
+to `/usr/bin/false` in controller and Codex Git configuration. The controller's
+own exact Git observations remain outside model-issued command
 admission, but run with `GIT_NO_LAZY_FETCH=1` so a missing promisor object
 cannot dispatch a repository-configured remote helper before admission.
-Jq `env`/`$ENV` access is both opaque and classified as secret access because
-the Codex environment may contain a role-scoped MCP bearer token. Jq file,
-module-path, and test-program options are also opaque; ordinary inline jq
-transforms, including `.env` data fields and literal `"env"` keys, remain
-classifiable.
+Jq `env`/`$ENV` access remains opaque and classified as secret access under the
+runtime's general environment-observation policy. Jq file, module-path, and
+test-program options are also opaque; ordinary inline jq transforms, including
+`.env` data fields and literal `"env"` keys, remain classifiable. Codex command
+events do not carry their effective working directory, so this runtime does not
+claim exhaustive semantic recognition of procfs path aliases. Credential
+separation is instead enforced structurally by removing the upstream bearer
+from Codex and hiding the credential-bearing worker behind Codex's private PID
+namespace.
 Ordinary ripgrep source search remains classifiable, but `--pre`,
 `--hostname-bin`, and `-z`/`--search-zip` are opaque because they spawn helper
 processes whose commands are absent from the Codex event. The runtime also

@@ -93,6 +93,13 @@ executable refusal including shell-name impersonation, opaque AWK program-body
 refusal, isolated non-writable shell `HOME` with ambient-profile refusal,
 ripgrep preprocessor/hostname/decompressor dispatch refusal with ordinary
 search preserved and ambient ripgrep configuration disabled,
+attempt-local MCP bearer relay with the upstream credential absent from Codex,
+incremental streaming relay and active-connection termination before finalize,
+Codex 0.147 bubblewrap/private-PID selection with legacy fallback disabled,
+live Codex process-environment proof that the upstream bearer name and value
+are absent without claiming path-alias inference from cwd-less events,
+signature-format
+revision-walker refusal, and fixed false OpenPGP/X.509/SSH verifier coordinates,
 GNU sort compression-program dispatch refusal with ordinary sort preserved,
 hidden Git ref mutation refusal with ordinary ref inspection preserved,
 credential-bearing Git config read refusal alongside config-write refusal,
@@ -100,7 +107,7 @@ credential-bearing Git remote URL refusal with name listing preserved,
 jq env/$ENV secret-access refusal with ordinary data transforms preserved,
 abbreviated Git cat-file filter/textconv and hash-object path refusal,
 hash-object filter-enabling refusal with exact no-filter hashing preserved,
-signature-backed for-each-ref format/sort verifier refusal,
+signature-backed for-each-ref and revision-walker verifier refusal,
 controller and model Git promisor lazy-fetch helper suppression,
 Bash rcfile/init-file startup execution refusal,
 hidden Git symbolic-ref, reflog, ref, and object mutation refusal with
@@ -148,8 +155,9 @@ suite also rejects an unmanifested importable file from an otherwise
 content-addressed release.
 
 It also proves role-scoped MCP argv isolation: the selected AoA server alone is
-configured, its exact token is required but never exposed in argv or the model
-shell, and ambient/other MCPs are absent.
+configured through an attempt-local relay, its exact upstream token is required
+but absent from Codex argv, environment, and model shell, the relay injects it
+only at the fixed upstream hop, and ambient/other MCPs are absent.
 
 That suite does not prove the installed Codex binary, ChatGPT quota behavior,
 Luna role performance, comparative net benefit, productive eval/stats/memo or

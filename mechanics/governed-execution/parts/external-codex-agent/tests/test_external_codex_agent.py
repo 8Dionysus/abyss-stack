@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import fcntl
 import hashlib
+import http.client
+import http.server
 import importlib.util
 import json
 import os
@@ -12,7 +14,10 @@ import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
+import urllib.parse
+import urllib.request
 from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
@@ -2084,6 +2089,8 @@ def test_preflight_and_separate_process_return_structured_result(tmp_path: Path)
     assert "/usr/bin/setpriv" not in argv
     assert "exec" in argv
     assert argv[argv.index("--disable") + 1] == "multi_agent"
+    assert "use_linux_sandbox_bwrap" not in argv
+    assert "use_legacy_landlock" in argv
     assert "spawn_agent" not in argv
     assert argv[argv.index("-s") + 1] == "workspace-write"
     execution_root = Path(invocation["execution_root"])
@@ -2194,10 +2201,503 @@ def test_role_scoped_mcp_injects_only_selected_server_config(
     argv = state["attempts"][0]["codex_argv"]
     rendered = "\n".join(argv)
     assert "mcp_servers.aoa_evals=" in rendered
-    assert "AOA_EVALS_MCP_READ_BEARER_TOKEN" in rendered
+    assert "AOA_EVALS_MCP_READ_BEARER_TOKEN" not in rendered
+    assert "bearer_token_env_var" not in rendered
+    assert re.search(r"http://127\.0\.0\.1:[0-9]+/mcp/[A-Za-z0-9_-]+", rendered)
     assert "aoa_stats" not in rendered
     assert "aoa_memo" not in rendered
     assert "eval-token" not in rendered
+
+
+def test_attempt_environment_excludes_upstream_mcp_credential(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        task_family="eval_application",
+        role_mcp="aoa_evals",
+    )
+    monkeypatch.setenv("AOA_EVALS_MCP_READ_BEARER_TOKEN", "upstream-token")
+    tool_entry = next(
+        item
+        for item in fixture["runtime"].profile["tool_profiles"]
+        if item["required_mcp_server_ids"] == ["aoa_evals"]
+    )
+    scratch = tmp_path / "attempt" / "scratch"
+    scratch.parent.mkdir(exist_ok=True)
+    scratch.mkdir()
+
+    environment = fixture["runtime"]._codex_environment(
+        fixture["launch"],
+        scratch,
+        tool_entry,
+    )
+
+    assert "AOA_EVALS_MCP_READ_BEARER_TOKEN" not in environment
+    assert "upstream-token" not in environment.values()
+
+
+def test_attempt_local_mcp_proxy_injects_upstream_credential_only_at_relay() -> None:
+    observed: dict[str, Any] = {}
+
+    class UpstreamHandler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, _format: str, *_args: Any) -> None:
+            return
+
+        def do_POST(self) -> None:
+            length = int(self.headers.get("Content-Length", "0"))
+            observed["authorization"] = self.headers.get("Authorization")
+            observed["path"] = self.path
+            observed["body"] = self.rfile.read(length)
+            payload = b'{"jsonrpc":"2.0","id":1,"result":{}}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+    upstream = http.server.ThreadingHTTPServer(("127.0.0.1", 0), UpstreamHandler)
+    upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+    upstream_thread.start()
+    host, port = upstream.server_address
+    proxy = RUNTIME._McpCredentialProxy(
+        {"url": f"http://{host}:{port}/mcp"},
+        "upstream-token",
+    )
+    proxy.start()
+    try:
+        request = urllib.request.Request(
+            proxy.endpoint_url,
+            data=b'{"jsonrpc":"2.0","id":1,"method":"initialize"}',
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:
+            assert response.status == 200
+            assert json.loads(response.read()) == {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": {},
+            }
+    finally:
+        proxy.close()
+        upstream.shutdown()
+        upstream.server_close()
+        upstream_thread.join(timeout=5)
+
+    assert observed == {
+        "authorization": "Bearer upstream-token",
+        "path": "/mcp",
+        "body": b'{"jsonrpc":"2.0","id":1,"method":"initialize"}',
+    }
+    assert "upstream-token" not in proxy.endpoint_url
+
+
+def test_mcp_proxy_connect_timeout_does_not_limit_response_duration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class SlowUpstreamHandler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, _format: str, *_args: Any) -> None:
+            return
+
+        def do_POST(self) -> None:
+            self.rfile.read(int(self.headers.get("Content-Length", "0")))
+            time.sleep(0.15)
+            payload = b'{"jsonrpc":"2.0","id":1,"result":{}}'
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+    monkeypatch.setattr(RUNTIME, "MCP_PROXY_CONNECT_TIMEOUT_SECONDS", 0.05)
+    upstream = http.server.ThreadingHTTPServer(
+        ("127.0.0.1", 0),
+        SlowUpstreamHandler,
+    )
+    upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+    upstream_thread.start()
+    host, port = upstream.server_address
+    proxy = RUNTIME._McpCredentialProxy(
+        {"url": f"http://{host}:{port}/mcp"},
+        "upstream-token",
+    )
+    proxy.start()
+    try:
+        request = urllib.request.Request(
+            proxy.endpoint_url,
+            data=b"{}",
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:
+            assert response.status == 200
+            assert json.loads(response.read())["result"] == {}
+    finally:
+        proxy.close()
+        upstream.shutdown()
+        upstream.server_close()
+        upstream_thread.join(timeout=5)
+
+
+def test_mcp_proxy_forwards_stream_events_without_waiting_for_large_buffer() -> None:
+    event_payload = b"data: one\n\n"
+    upstream_flushed = threading.Event()
+    release_upstream = threading.Event()
+    received = threading.Event()
+
+    class StreamingUpstreamHandler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, _format: str, *_args: Any) -> None:
+            return
+
+        def do_POST(self) -> None:
+            self.rfile.read(int(self.headers.get("Content-Length", "0")))
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(event_payload)
+            self.wfile.flush()
+            upstream_flushed.set()
+            release_upstream.wait(timeout=5)
+
+    upstream = http.server.ThreadingHTTPServer(
+        ("127.0.0.1", 0),
+        StreamingUpstreamHandler,
+    )
+    upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+    upstream_thread.start()
+    host, port = upstream.server_address
+    proxy = RUNTIME._McpCredentialProxy(
+        {"url": f"http://{host}:{port}/mcp"},
+        "upstream-token",
+    )
+    proxy.start()
+
+    def read_event() -> None:
+        request = urllib.request.Request(proxy.endpoint_url, data=b"{}", method="POST")
+        with urllib.request.urlopen(request, timeout=5) as response:
+            if response.read(len(event_payload)) == event_payload:
+                received.set()
+
+    client_thread = threading.Thread(target=read_event)
+    client_thread.start()
+    try:
+        assert upstream_flushed.wait(timeout=5)
+        assert received.wait(timeout=1)
+    finally:
+        release_upstream.set()
+        client_thread.join(timeout=5)
+        proxy.close()
+        upstream.shutdown()
+        upstream.server_close()
+        upstream_thread.join(timeout=5)
+
+
+def test_mcp_proxy_close_terminates_client_stalled_before_request_parsing() -> None:
+    proxy = RUNTIME._McpCredentialProxy(
+        {"url": "http://127.0.0.1:9/mcp"},
+        "upstream-token",
+    )
+    proxy.start()
+    host, port = proxy._server.server_address
+    idle_client = socket.create_connection((host, port), timeout=5)
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        with proxy._server._accepted_lock:
+            if proxy._server._accepted_requests:
+                break
+        time.sleep(0.01)
+    else:
+        pytest.fail("proxy did not track the accepted idle client")
+
+    closed = threading.Event()
+
+    def close_proxy() -> None:
+        proxy.close()
+        closed.set()
+
+    closer = threading.Thread(target=close_proxy)
+    closer.start()
+    try:
+        assert closed.wait(timeout=2)
+    finally:
+        try:
+            idle_client.close()
+        finally:
+            closer.join(timeout=5)
+            proxy.close()
+
+    assert not closer.is_alive()
+
+
+def test_mcp_proxy_removes_request_timeout_before_response_streaming() -> None:
+    upstream_received = threading.Event()
+    release_upstream = threading.Event()
+
+    class WaitingUpstreamHandler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, _format: str, *_args: Any) -> None:
+            return
+
+        def do_POST(self) -> None:
+            self.rfile.read(int(self.headers.get("Content-Length", "0")))
+            upstream_received.set()
+            release_upstream.wait(timeout=5)
+            self.send_response(200)
+            self.send_header("Content-Length", "2")
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+    upstream = http.server.ThreadingHTTPServer(
+        ("127.0.0.1", 0),
+        WaitingUpstreamHandler,
+    )
+    upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+    upstream_thread.start()
+    host, port = upstream.server_address
+    proxy = RUNTIME._McpCredentialProxy(
+        {"url": f"http://{host}:{port}/mcp"},
+        "upstream-token",
+    )
+    proxy.start()
+    client_result: list[bytes] = []
+
+    def read_response() -> None:
+        request = urllib.request.Request(proxy.endpoint_url, data=b"{}", method="POST")
+        with urllib.request.urlopen(request, timeout=5) as response:
+            client_result.append(response.read())
+
+    client_thread = threading.Thread(target=read_response)
+    client_thread.start()
+    try:
+        assert upstream_received.wait(timeout=5)
+        with proxy._server._accepted_lock:
+            accepted_requests = tuple(proxy._server._accepted_requests)
+        assert len(accepted_requests) == 1
+        assert accepted_requests[0].gettimeout() is None
+    finally:
+        release_upstream.set()
+        client_thread.join(timeout=5)
+        proxy.close()
+        upstream.shutdown()
+        upstream.server_close()
+        upstream_thread.join(timeout=5)
+
+    assert client_result == [b"ok"]
+
+
+def test_mcp_proxy_does_not_append_second_response_after_upstream_truncation() -> None:
+    class TruncatedUpstreamHandler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, _format: str, *_args: Any) -> None:
+            return
+
+        def do_POST(self) -> None:
+            self.rfile.read(int(self.headers.get("Content-Length", "0")))
+            self.send_response(200)
+            self.send_header("Content-Length", "10")
+            self.end_headers()
+            self.wfile.write(b"ok")
+            self.wfile.flush()
+            self.close_connection = True
+
+    upstream = http.server.ThreadingHTTPServer(
+        ("127.0.0.1", 0),
+        TruncatedUpstreamHandler,
+    )
+    upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+    upstream_thread.start()
+    host, port = upstream.server_address
+    proxy = RUNTIME._McpCredentialProxy(
+        {"url": f"http://{host}:{port}/mcp"},
+        "upstream-token",
+    )
+    proxy.start()
+    proxy_host, proxy_port = proxy._server.server_address
+    client = socket.create_connection((proxy_host, proxy_port), timeout=5)
+    request = (
+        f"POST {urllib.parse.urlsplit(proxy.endpoint_url).path} HTTP/1.0\r\n"
+        "Content-Length: 2\r\n\r\n{}"
+    ).encode("ascii")
+    client.sendall(request)
+    response_parts: list[bytes] = []
+    try:
+        while True:
+            part = client.recv(65_536)
+            if not part:
+                break
+            response_parts.append(part)
+    finally:
+        client.close()
+        proxy.close()
+        upstream.shutdown()
+        upstream.server_close()
+        upstream_thread.join(timeout=5)
+
+    raw_response = b"".join(response_parts)
+    response_headers, response_body = raw_response.split(b"\r\n\r\n", 1)
+    assert response_headers.startswith(b"HTTP/1.0 200")
+    assert b"Content-Length:" not in response_headers
+    assert response_body == b"ok"
+    assert raw_response.count(b"HTTP/1.0 ") == 1
+    assert b"502 Bad Gateway" not in raw_response
+
+
+def test_mcp_proxy_close_terminates_an_active_authenticated_relay() -> None:
+    upstream_flushed = threading.Event()
+    release_upstream = threading.Event()
+    client_received = threading.Event()
+
+    class LongLivedUpstreamHandler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, _format: str, *_args: Any) -> None:
+            return
+
+        def do_POST(self) -> None:
+            self.rfile.read(int(self.headers.get("Content-Length", "0")))
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(b"x")
+            self.wfile.flush()
+            upstream_flushed.set()
+            release_upstream.wait(timeout=5)
+
+    upstream = http.server.ThreadingHTTPServer(
+        ("127.0.0.1", 0),
+        LongLivedUpstreamHandler,
+    )
+    upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+    upstream_thread.start()
+    host, port = upstream.server_address
+    proxy = RUNTIME._McpCredentialProxy(
+        {"url": f"http://{host}:{port}/mcp"},
+        "upstream-token",
+    )
+    proxy.start()
+
+    def hold_client() -> None:
+        request = urllib.request.Request(proxy.endpoint_url, data=b"{}", method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=5) as response:
+                response.read(1)
+                client_received.set()
+                response.read()
+        except (OSError, http.client.HTTPException):
+            return
+
+    client_thread = threading.Thread(target=hold_client)
+    client_thread.start()
+    try:
+        assert upstream_flushed.wait(timeout=5)
+        assert client_received.wait(timeout=5)
+        proxy.close()
+        assert not proxy._active_relay_sockets
+        assert not proxy._thread.is_alive()
+    finally:
+        release_upstream.set()
+        client_thread.join(timeout=5)
+        proxy.close()
+        upstream.shutdown()
+        upstream.server_close()
+        upstream_thread.join(timeout=5)
+
+
+def test_worker_closes_mcp_credential_proxy_before_failure_propagates(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path)
+    runtime = fixture["runtime"]
+    lifecycle: list[str] = []
+
+    class FakeProxy:
+        def close(self) -> None:
+            lifecycle.append("closed")
+
+    def fail_attempt(_session_id: str, **kwargs: Any) -> None:
+        kwargs["credential_proxies"].append(FakeProxy())
+        lifecycle.append("raised")
+        raise RuntimeError("failure after credential proxy startup")
+
+    monkeypatch.setattr(runtime, "_run_worker_attempt", fail_attempt)
+
+    with pytest.raises(RuntimeError, match="failure after credential proxy startup"):
+        runtime._run_worker(
+            fixture["session_id"],
+            attempt_id="attempt-id",
+            attempt_number=1,
+            mode="start",
+            resume_payload=None,
+        )
+
+    assert lifecycle == ["raised", "closed"]
+
+
+def test_worker_closes_mcp_credential_proxy_before_terminal_finalization(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        task_family="eval_application",
+        role_mcp="aoa_evals",
+    )
+    monkeypatch.setenv("AOA_EVALS_MCP_READ_BEARER_TOKEN", "upstream-token")
+    relay_closed = tmp_path / "relay-closed"
+    original_close = RUNTIME._McpCredentialProxy.close
+    original_finalize = fixture["runtime"]._finalize_attempt_locked
+
+    def observed_close(proxy: Any) -> None:
+        original_close(proxy)
+        relay_closed.write_text("closed\n", encoding="utf-8")
+
+    def guarded_finalize(state: dict[str, Any], **kwargs: Any) -> None:
+        assert relay_closed.is_file()
+        original_finalize(state, **kwargs)
+
+    monkeypatch.setattr(RUNTIME._McpCredentialProxy, "close", observed_close)
+    monkeypatch.setattr(
+        fixture["runtime"],
+        "_finalize_attempt_locked",
+        guarded_finalize,
+    )
+
+    fixture["runtime"].start(fixture["launch_path"])
+
+    assert _wait_terminal(fixture["runtime"], fixture["session_id"])["status"] == (
+        "completed"
+    )
+    assert relay_closed.is_file()
+
+
+def test_live_codex_process_environment_has_no_upstream_mcp_credential(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        task_family="eval_application",
+        role_mcp="aoa_evals",
+        objective_marker="FAKE_WAIT_FOR_INTERRUPT",
+    )
+    monkeypatch.setenv("AOA_EVALS_MCP_READ_BEARER_TOKEN", "upstream-token")
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    deadline = time.monotonic() + 10
+    codex_pid: int | None = None
+    while time.monotonic() < deadline:
+        status = runtime.status(fixture["session_id"])
+        if isinstance(status.get("codex_pid"), int):
+            codex_pid = status["codex_pid"]
+            break
+        time.sleep(0.05)
+    assert codex_pid is not None
+
+    observed_environment = Path(f"/proc/{codex_pid}/environ").read_bytes()
+
+    assert b"AOA_EVALS_MCP_READ_BEARER_TOKEN" not in observed_environment
+    assert b"upstream-token" not in observed_environment
+    interrupted = runtime.interrupt(fixture["session_id"])
+    assert interrupted["status"] == "interrupted"
 
 
 def test_runtime_tool_profile_ids_are_model_neutral() -> None:
@@ -3819,6 +4319,134 @@ def test_non_dispatching_git_ref_and_hash_reads_remain_classifiable(
 @pytest.mark.parametrize(
     "command",
     (
+        "/usr/bin/git rev-list --format=%G? -1 HEAD",
+        "/usr/bin/git rev-list --pretty '%GS' -1 HEAD",
+        "/usr/bin/git rev-list --show-signature -1 HEAD",
+        "/usr/bin/git rev-list --show-sig -1 HEAD",
+        "/usr/bin/git rev-list --pretty=verify -1 HEAD",
+        "/usr/bin/git rev-list --format=verify -1 HEAD",
+        "/usr/bin/git reflog --format=%G? -1 HEAD",
+        "/usr/bin/git reflog show --format=%G? -1 HEAD",
+        "/usr/bin/git reflog show --pretty='%GK' -1 HEAD",
+        "/usr/bin/git reflog --pretty --show-signature -1 HEAD",
+    ),
+)
+def test_git_revision_signature_formats_are_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/git rev-list --format=%h -1 HEAD",
+        "/usr/bin/git rev-list --pretty -1 HEAD",
+        "/usr/bin/git rev-list --pretty=short -1 HEAD",
+        "/usr/bin/git rev-list --pretty=format:%h -1 HEAD",
+        "/usr/bin/git reflog --format=%h -1 HEAD",
+        "/usr/bin/git reflog show --format=%h -1 HEAD",
+    ),
+)
+def test_non_signature_revision_formats_remain_classifiable(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
+def test_git_signature_verifier_program_is_neutralized_for_signed_commit(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "README.md").write_text("fixture\n", encoding="utf-8")
+    _git(workspace, "add", "README.md")
+    _git(workspace, "commit", "-m", "fixture")
+    original_commit = subprocess.run(
+        ["/usr/bin/git", "-C", str(workspace), "cat-file", "commit", "HEAD"],
+        check=True,
+        capture_output=True,
+    ).stdout
+    headers, message = original_commit.split(b"\n\n", 1)
+    signed_commit = (
+        headers
+        + b"\n"
+        + b"gpgsig -----BEGIN PGP SIGNATURE-----\n"
+        + b" \n"
+        + b" Zml4dHVyZQ==\n"
+        + b" -----END PGP SIGNATURE-----\n"
+        + b"\n"
+        + message
+    )
+    signed_oid = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(workspace),
+            "hash-object",
+            "-t",
+            "commit",
+            "-w",
+            "--stdin",
+        ],
+        input=signed_commit,
+        check=True,
+        capture_output=True,
+        text=False,
+    ).stdout.decode("ascii").strip()
+    _git(workspace, "update-ref", "HEAD", signed_oid)
+    marker = tmp_path / "configured-verifier-ran"
+    helper = tmp_path / "configured-verifier"
+    helper.write_text(
+        "#!/bin/sh\n"
+        f"/usr/bin/touch {shlex.quote(str(marker))}\n"
+        "exit 1\n",
+        encoding="utf-8",
+    )
+    helper.chmod(0o700)
+    _git(workspace, "config", "gpg.program", str(helper))
+
+    unsafe_environment = RUNTIME._base_controller_git_environment()
+    unsafe_environment["GIT_CONFIG_COUNT"] = "3"
+    for index in range(3, 7):
+        unsafe_environment.pop(f"GIT_CONFIG_KEY_{index}")
+        unsafe_environment.pop(f"GIT_CONFIG_VALUE_{index}")
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(workspace),
+            "rev-list",
+            "--format=%G?",
+            "-1",
+            "HEAD",
+        ],
+        env=unsafe_environment,
+        check=False,
+        capture_output=True,
+    )
+    assert marker.is_file()
+    marker.unlink()
+
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(workspace),
+            "rev-list",
+            "--format=%G?",
+            "-1",
+            "HEAD",
+        ],
+        env=RUNTIME._base_controller_git_environment(),
+        check=False,
+        capture_output=True,
+    )
+    assert marker.exists() is False
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
         "/usr/bin/jq -n env",
         "/usr/bin/jq -n 'env.MCP_TOKEN'",
         "/usr/bin/jq -n '$ENV'",
@@ -3961,14 +4589,22 @@ def test_codex_environment_isolates_shell_startup_and_repository_hooks(
     assert environment["BASH_ENV"] == "/dev/null"
     assert environment["ENV"] == "/dev/null"
     assert environment["RIPGREP_CONFIG_PATH"] == "/dev/null"
-    assert environment["GIT_CONFIG_COUNT"] == "4"
+    assert environment["GIT_CONFIG_COUNT"] == "8"
     assert environment["GIT_CONFIG_KEY_0"] == "core.hooksPath"
     assert environment["GIT_CONFIG_KEY_1"] == "core.fsmonitor"
     assert environment["GIT_CONFIG_VALUE_1"] == "false"
     assert environment["GIT_CONFIG_KEY_2"] == "core.attributesFile"
     assert environment["GIT_CONFIG_VALUE_2"] == "/dev/null"
-    assert environment["GIT_CONFIG_KEY_3"] == "filter.leak.smudge"
-    assert environment["GIT_CONFIG_VALUE_3"] == ""
+    assert environment["GIT_CONFIG_KEY_3"] == "gpg.program"
+    assert environment["GIT_CONFIG_KEY_4"] == "gpg.openpgp.program"
+    assert environment["GIT_CONFIG_KEY_5"] == "gpg.x509.program"
+    assert environment["GIT_CONFIG_KEY_6"] == "gpg.ssh.program"
+    assert all(
+        environment[f"GIT_CONFIG_VALUE_{index}"] == "/usr/bin/false"
+        for index in range(3, 7)
+    )
+    assert environment["GIT_CONFIG_KEY_7"] == "filter.leak.smudge"
+    assert environment["GIT_CONFIG_VALUE_7"] == ""
     assert environment["GIT_NO_LAZY_FETCH"] == "1"
     assert Path(environment["GIT_CONFIG_VALUE_0"]).stat().st_mode & 0o222 == 0
     assert Path(environment["HOME"]).stat().st_mode & 0o222 == 0
