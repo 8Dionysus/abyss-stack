@@ -24,7 +24,10 @@ Tracking starts with the community-docs baseline for this repository.
   a contour-local skip rather than a sweep-wide parse failure. Managed organ
   units retain the exact opened launcher inode for their complete lifetime, so
   admission hashes process-backed launch bytes rather than a replaceable
-  pathname. First admission now records the bootstrap process explicitly and
+  pathname. Admission re-observes the exact systemd PID/start identity before
+  and after hashing, avoiding any comparison between systemd monotonic time
+  and the different `/proc` boot-time clock. First admission now records the
+  bootstrap process explicitly and
   requires a second production-process receipt before final proof or
   admission, avoiding a preflight/canary startup cycle without weakening the
   final identity gate.

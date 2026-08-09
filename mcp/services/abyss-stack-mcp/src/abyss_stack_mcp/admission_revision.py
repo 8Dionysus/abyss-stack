@@ -35,6 +35,7 @@ from .observation import (
     MAX_OVERLAY_FUTURE_SKEW,
     ObservationProducerError,
     _read_json,
+    _systemctl,
     _write_atomic,
 )
 from .process_launcher import PROCESS_EXECUTABLE_FD
@@ -138,6 +139,7 @@ def _proof_and_acceptance_match_current(current: Any, consumer: Any) -> bool:
 
 
 ProcessExecutableDigest = Callable[[str, Path, str], str]
+SystemdIdentityReader = Callable[[str], str]
 
 
 def _proc_start_ticks(pid: int) -> int:
@@ -151,12 +153,56 @@ def _proc_start_ticks(pid: int) -> int:
         ) from exc
 
 
+def _live_systemd_process_identity(unit_name: str) -> str:
+    command = (
+        "systemctl",
+        "--user",
+        "show",
+        unit_name,
+        "--property=LoadState",
+        "--property=ActiveState",
+        "--property=MainPID",
+        "--property=ExecMainStartTimestampMonotonic",
+        "--property=FragmentPath",
+        "--no-pager",
+    )
+    try:
+        completed = _systemctl(command)
+    except (OSError, ValueError) as exc:
+        raise AdmissionRevisionError(
+            "live systemd process identity is unavailable"
+        ) from exc
+    properties: dict[str, str] = {}
+    for raw_line in completed.stdout.splitlines():
+        key, separator, value = raw_line.partition("=")
+        if separator and key:
+            properties[key] = value
+    try:
+        pid = int(properties.get("MainPID", "0"))
+        start = int(properties.get("ExecMainStartTimestampMonotonic", "0"))
+    except ValueError as exc:
+        raise AdmissionRevisionError(
+            "live systemd process identity is invalid"
+        ) from exc
+    if (
+        completed.returncode != 0
+        or properties.get("LoadState") != "loaded"
+        or properties.get("ActiveState") != "active"
+        or not properties.get("FragmentPath")
+        or pid <= 0
+        or start <= 0
+    ):
+        raise AdmissionRevisionError("live systemd process identity is unavailable")
+    return f"systemd-user:{unit_name}:pid:{pid}:start:{start}"
+
+
 def _process_backed_executable_digest(
     process_identity: str,
     executable_ref: Path,
     unit_name: str,
     *,
     launch_fd: int = PROCESS_EXECUTABLE_FD,
+    systemd_identity_reader: SystemdIdentityReader = _live_systemd_process_identity,
 ) -> str:
     match = re.fullmatch(
         rf"systemd-user:{re.escape(unit_name)}:pid:([1-9][0-9]*):start:([1-9][0-9]*)",
@@ -165,12 +211,9 @@ def _process_backed_executable_digest(
     if match is None:
         raise AdmissionRevisionError("live process identity is not exact")
     pid = int(match.group(1))
-    systemd_start_us = int(match.group(2))
-    ticks_per_second = os.sysconf("SC_CLK_TCK")
+    if systemd_identity_reader(unit_name) != process_identity:
+        raise AdmissionRevisionError("live systemd process identity changed")
     start_ticks_before = _proc_start_ticks(pid)
-    proc_start_us = start_ticks_before * 1_000_000 // ticks_per_second
-    if abs(proc_start_us - systemd_start_us) > (1_000_000 // ticks_per_second) + 1:
-        raise AdmissionRevisionError("live process start identity changed")
     fd_ref = Path(f"/proc/{pid}/fd/{launch_fd}")
     try:
         target = os.readlink(fd_ref)
@@ -204,7 +247,10 @@ def _process_backed_executable_digest(
             os.close(descriptor)
     except OSError as exc:
         raise AdmissionRevisionError("process-backed executable is unreadable") from exc
-    if _proc_start_ticks(pid) != start_ticks_before:
+    if (
+        _proc_start_ticks(pid) != start_ticks_before
+        or systemd_identity_reader(unit_name) != process_identity
+    ):
         raise AdmissionRevisionError("live process changed during executable proof")
     return "sha256:" + digest.hexdigest()
 

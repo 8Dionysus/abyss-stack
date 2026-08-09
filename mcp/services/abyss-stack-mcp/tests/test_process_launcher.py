@@ -18,12 +18,6 @@ def _digest(value: bytes) -> str:
     return "sha256:" + hashlib.sha256(value).hexdigest()
 
 
-def _process_start_us(pid: int) -> int:
-    raw = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
-    fields = raw[raw.rfind(")") + 2 :].split()
-    return int(fields[19]) * 1_000_000 // os.sysconf("SC_CLK_TCK")
-
-
 def test_launcher_retains_the_exact_opened_executable_inode(tmp_path: Path) -> None:
     executable = tmp_path / "server.py"
     original = b"#!/usr/bin/env python3\nprint('original')\n"
@@ -80,14 +74,14 @@ def test_admission_hashes_the_process_retained_inode_not_mutable_path(
         replacement.write_bytes(b"#!/usr/bin/env python3\nprint('different')\n")
         replacement.chmod(0o700)
         os.replace(replacement, executable)
-        start_us = _process_start_us(process.pid)
-        identity = f"systemd-user:demo.service:pid:{process.pid}:start:{start_us}"
+        identity = f"systemd-user:demo.service:pid:{process.pid}:start:654321"
 
         observed = _process_backed_executable_digest(
             identity,
             executable,
             "demo.service",
             launch_fd=descriptor,
+            systemd_identity_reader=lambda unit_name: identity,
         )
 
         assert observed == _digest(original)
