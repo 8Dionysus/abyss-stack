@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 331914,
+  "allowed_tracked_bytes": 31532747,
+  "approved_by": "repository-owner",
+  "base_ref": "39774a36371bfbc179096664318d39ae8b0dca99",
+  "changed_generated_bytes": 331914,
+  "changed_generated_files": 5,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "5e05f33d5193c1896dcb954488dfa608add1ed3dd836363a842dbbcc613ed9f2",
+  "reason": "Pin accepted aoa-kag D0035 action 30ce3b8f33ed27ef3888c214b9e9e5cd0f50f80e to adopt the bounded two-worker owner-family gate without removing any canonical proof.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "tracked_size",
+  "tracked_bytes": 31532747,
+  "tracked_bytes_max": 24117248
+}
