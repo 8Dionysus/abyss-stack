@@ -9,6 +9,29 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Bind registry-v2 runtime overlays to the live named user-systemd process
+  identity and the immutable deployment record instead of treating MCP
+  `serverInfo` and mutable `latest.json` as process and deployment identities.
+  An inactive or unobserved managed process now fails the projection closed,
+  while one expired or invalid sibling canary blocks only its own contour
+  instead of aborting the complete managed refresh. Admission now also keeps
+  the live LKG PID observation distinct from the rollback target's verified
+  stable executable identity, rehashes that executable before admission, and
+  signs the exact named-systemd PID/start identity after proving that it stayed
+  unchanged across the canary probe. Runtime projection requires that signed
+  identity to equal the current process and validates the complete
+  content-addressed deployment record, and a malformed sibling receipt is now
+  a contour-local skip rather than a sweep-wide parse failure. Managed organ
+  units retain the exact opened launcher inode for their complete lifetime, so
+  admission hashes process-backed launch bytes rather than a replaceable
+  pathname. Admission re-observes the exact systemd PID/start identity before
+  and after hashing, avoiding any comparison between systemd monotonic time
+  and the different `/proc` boot-time clock. First admission now records the
+  bounded organ or stack-owned bootstrap process explicitly, materializes the
+  transitional catalog while that process remains live, and
+  requires a second production-process receipt before final proof or
+  admission, avoiding a preflight/canary startup cycle without weakening the
+  final identity gate.
 - Move the observation producer onto registry v2 and bind the managed
   admission Keeper to its provisioned private owner-evidence inbox, so the
   production units exercise the same v2 and incremental-refresh paths proven

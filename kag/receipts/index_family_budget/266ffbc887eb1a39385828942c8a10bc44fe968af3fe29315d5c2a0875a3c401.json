@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 14770835,
+  "allowed_tracked_bytes": 30989958,
+  "approved_by": "repository-owner",
+  "base_ref": "7ab5d1273e1185e495af7b7d12ca0ab717fe1b1a",
+  "changed_generated_bytes": 14770835,
+  "changed_generated_files": 176,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "266ffbc887eb1a39385828942c8a10bc44fe968af3fe29315d5c2a0875a3c401",
+  "reason": "Refresh the portable owner index family after binding MCP rollback admission to the process-retained launch inode instead of a mutable pathname; preserve full source coverage and record the generated-size exception explicitly.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 30989958,
+  "tracked_bytes_max": 24117248
+}

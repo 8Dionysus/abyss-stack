@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -13,12 +14,23 @@ from pydantic import ValidationError
 from .canary import (
     CanaryReceipt,
     CanaryRunnerError,
+    _bootstrap_unit_name,
     _read_public_key,
     verify_canary_receipt,
 )
 from .preflight import PreflightError, _safe_json
 from .managed_catalog import publish_private_json
-from .observation import RuntimeTargetCatalog
+from .observation import (
+    ObservationProducerError,
+    RuntimeTargetCatalog,
+    SystemctlRunner,
+    _load_deployment,
+    _process_observation,
+    _systemctl,
+)
+
+
+DeploymentLoader = Callable[[Path], tuple[dict[str, Any], str]]
 
 
 def build_runtime_overlay(
@@ -30,8 +42,21 @@ def build_runtime_overlay(
     canary_public_key_path: Path,
     deployment_manifest_path: Path,
     generated_at: datetime | None = None,
+    systemctl_runner: SystemctlRunner = _systemctl,
+    deployment_loader: DeploymentLoader = _load_deployment,
 ) -> tuple[dict[str, Any], tuple[dict[str, str], ...]]:
     now = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    try:
+        verified_deployment, verified_manifest_id = deployment_loader(
+            deployment_manifest_path
+        )
+    except ObservationProducerError as exc:
+        raise PreflightError(str(exc)) from exc
+    if verified_deployment != deployment:
+        raise PreflightError("deployment payload differs from its verified manifest")
+    if verified_deployment.get("manifest_id") != verified_manifest_id:
+        raise PreflightError("deployment manifest identity is not content addressed")
+    deployment = verified_deployment
     contours: list[dict[str, Any]] = []
     skipped: list[dict[str, str]] = []
     try:
@@ -71,10 +96,15 @@ def build_runtime_overlay(
                 checked_at=now,
                 require_success=True,
             )
-        except (CanaryRunnerError, ValidationError) as exc:
-            raise PreflightError(
-                "canary receipt failed authenticated validation"
-            ) from exc
+        except (CanaryRunnerError, PreflightError, ValidationError):
+            skipped.append(
+                {
+                    "organ_id": target.registry_organ_id,
+                    "contour_id": target.policy_family,
+                    "reason_code": "canary_evidence_invalid_or_expired",
+                }
+            )
+            continue
         canary = receipt.model_dump(mode="json")
         service = _deployment_service(deployment, receipt.service_id)
         _require_equal(receipt.organ_id, target.organ_id, "canary organ")
@@ -122,6 +152,35 @@ def build_runtime_overlay(
         deployed_tree = service.get("deployed_tree")
         if not isinstance(deployed_tree, dict):
             raise PreflightError("deployment tree identity is absent")
+        deployment_revision = service.get("package_source_revision")
+        if not isinstance(deployment_revision, str):
+            raise PreflightError("deployment revision is absent")
+        allowed_process_units = {
+            target.unit_name,
+            _bootstrap_unit_name(target.unit_name),
+        }
+        if receipt.process_unit_name not in allowed_process_units:
+            raise PreflightError("canary process unit conflicts with runtime target")
+        process_target = target.model_copy(
+            update={"unit_name": receipt.process_unit_name}
+        )
+        process = _process_observation(
+            process_target,
+            observed_at=now,
+            expires_at=now + timedelta(minutes=5),
+            deployment_revision=deployment_revision,
+            runner=systemctl_runner,
+        )
+        if not process.active or process.process_identity is None:
+            raise PreflightError("managed process identity is not exact")
+        _require_equal(
+            receipt.process_identity,
+            process.process_identity,
+            "canary process identity",
+        )
+        record_ref = deployment.get("record_ref")
+        if not isinstance(record_ref, str):
+            raise PreflightError("immutable deployment record identity is absent")
         contours.append(
             {
                 "organ_id": target.registry_organ_id,
@@ -142,23 +201,24 @@ def build_runtime_overlay(
                     "package_name": service["package_name"],
                     "package_version": service["package_version"],
                     "package_digest": service["package_digest"],
-                    "deployment_revision": service["package_source_revision"],
-                    "deployment_manifest_ref": str(deployment_manifest_path),
+                    "deployment_revision": deployment_revision,
+                    "deployment_manifest_ref": record_ref,
                     "deployment_manifest_digest": manifest_id,
                     "deployed_tree_digest": deployed_tree["tree_digest"],
                     "process_ref": target.executable_ref,
-                    "process_identity": (
-                        f"{canary['server_name']}/{canary['server_version']}"
-                    ),
+                    "process_identity": process.process_identity,
                     "dependency_graph_digest": service.get("dependency_lock_digest"),
                 },
                 "runtime_evidence_refs": [
                     {
                         "owner": "abyss-stack",
-                        "evidence_ref": str(deployment_manifest_path),
+                        "evidence_ref": record_ref,
                         "revision": manifest_id,
                         "observed_at": deployment["deployed_at"],
                     },
+                    process.evidence.evidence_refs[0].model_dump(
+                        mode="json", exclude_none=True
+                    ),
                     {
                         "owner": "abyss-stack",
                         "evidence_ref": str(canary_path),

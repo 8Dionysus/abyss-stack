@@ -27,7 +27,7 @@ from abyss_stack_mcp.canary import (
     CanaryProbeResult,
     CanaryRunnerError,
     build_overlay,
-    build_receipt,
+    build_receipt as _build_receipt,
     build_result_artifact,
     live_probe,
     run_canary,
@@ -45,6 +45,45 @@ NOW = datetime(2026, 7, 28, 15, 0, tzinfo=timezone.utc)
 DIGEST_A = "sha256:" + ("a" * 64)
 DIGEST_B = "sha256:" + ("b" * 64)
 SIGNING_KEY = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+PROCESS_IDENTITY = "systemd-user:aoa-organ-mcp-read@aoa-kag.service:pid:321:start:654"
+
+
+def build_receipt(**kwargs: object):
+    kwargs.setdefault("process_identity", PROCESS_IDENTITY)
+    return _build_receipt(**kwargs)
+
+
+def process_identity_reader(
+    selected_target: RuntimeTarget,
+    deployment_revision: str,
+    observed_at: datetime,
+) -> str:
+    assert selected_target.unit_name == "aoa-organ-mcp-read@aoa-kag.service"
+    assert deployment_revision == "a" * 40
+    assert observed_at == NOW
+    return PROCESS_IDENTITY
+
+
+@pytest.mark.parametrize(
+    ("production_unit", "bootstrap_unit"),
+    (
+        (
+            "aoa-organ-mcp-read@aoa-kag.service",
+            "aoa-organ-mcp-read-bootstrap@aoa-kag.service",
+        ),
+        ("abyss-stack-mcp-read.service", "abyss-stack-mcp-read-bootstrap.service"),
+    ),
+)
+def test_bootstrap_unit_name_is_bounded_to_managed_read_pairs(
+    production_unit: str,
+    bootstrap_unit: str,
+) -> None:
+    assert canary._bootstrap_unit_name(production_unit) == bootstrap_unit
+
+
+def test_bootstrap_unit_name_rejects_unmanaged_unit() -> None:
+    with pytest.raises(CanaryRunnerError, match="no bounded bootstrap"):
+        canary._bootstrap_unit_name("different.service")
 
 
 def canonical_digest(value: object) -> str:
@@ -290,6 +329,8 @@ def test_receipt_is_content_addressed_and_preserves_claim_limit() -> None:
         "results/aoa-kag/" + receipt.result_digest.removeprefix("sha256:") + ".json"
     )
     assert receipt.reason_codes == ()
+    assert receipt.process_unit_name == target().unit_name
+    assert receipt.process_identity == PROCESS_IDENTITY
     assert "owner freshness" in receipt.claim_limit
     assert receipt.server_version == "0.1.0"
 
@@ -518,6 +559,7 @@ def test_run_canary_reads_one_owner_credential_and_writes_private_outputs(
             timeout_seconds=17,
             clock=lambda: NOW,
             probe_runner=fake_probe,
+            process_identity_reader=process_identity_reader,
         )
     )
 
@@ -618,6 +660,22 @@ def test_last_known_good_canary_uses_distinct_committed_route(tmp_path: Path) ->
         )
         return successful_probe()
 
+    bootstrap_identity = (
+        "systemd-user:aoa-organ-mcp-read-bootstrap@aoa-kag.service:pid:321:start:654"
+    )
+
+    def bootstrap_process_identity_reader(
+        selected_target: RuntimeTarget,
+        deployment_revision: str,
+        observed_at: datetime,
+    ) -> str:
+        assert selected_target.unit_name == (
+            "aoa-organ-mcp-read-bootstrap@aoa-kag.service"
+        )
+        assert deployment_revision == "a" * 40
+        assert observed_at == NOW
+        return bootstrap_identity
+
     receipt, _, _, _ = asyncio.run(
         run_canary(
             organ_id="aoa-kag",
@@ -626,12 +684,52 @@ def test_last_known_good_canary_uses_distinct_committed_route(tmp_path: Path) ->
             output_root=tmp_path / "rollback-canary",
             deployment_manifest_path=write_deployment_manifest(tmp_path),
             purpose="last-known-good",
+            process_unit="bootstrap",
             clock=lambda: NOW,
             probe_runner=fake_probe,
+            process_identity_reader=bootstrap_process_identity_reader,
         )
     )
 
     assert receipt.canary_route.endswith("/last-known-good")
+    assert receipt.process_unit_name == ("aoa-organ-mcp-read-bootstrap@aoa-kag.service")
+    assert receipt.process_identity == bootstrap_identity
+
+
+def test_run_canary_rejects_process_change_during_probe(tmp_path: Path) -> None:
+    targets_path = write_json(
+        tmp_path / "targets.json",
+        RuntimeTargetCatalog(targets=(target(),)).model_dump(mode="json"),
+    )
+    secret_dir = tmp_path / "secrets"
+    secret_dir.mkdir(mode=0o700)
+    credential_path = secret_dir / "aoa-kag-mcp-read-bearer-token"
+    credential_path.write_text("private-value\n", encoding="utf-8")
+    credential_path.chmod(0o600)
+    write_signing_key(secret_dir)
+    identities = iter(
+        (
+            PROCESS_IDENTITY,
+            "systemd-user:aoa-organ-mcp-read@aoa-kag.service:pid:322:start:655",
+        )
+    )
+
+    async def fake_probe(*args: object) -> CanaryProbeResult:
+        return successful_probe()
+
+    with pytest.raises(CanaryRunnerError, match="changed during the probe"):
+        asyncio.run(
+            run_canary(
+                organ_id="aoa-kag",
+                targets_path=targets_path,
+                secret_dir=secret_dir,
+                output_root=tmp_path / "race-output",
+                deployment_manifest_path=write_deployment_manifest(tmp_path),
+                clock=lambda: NOW,
+                probe_runner=fake_probe,
+                process_identity_reader=lambda *args: next(identities),
+            )
+        )
 
 
 def test_canary_rejects_broad_or_symlinked_credential(tmp_path: Path) -> None:
