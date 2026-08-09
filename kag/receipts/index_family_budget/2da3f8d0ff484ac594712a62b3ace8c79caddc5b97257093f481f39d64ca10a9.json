@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26201809,
+  "allowed_tracked_bytes": 32600840,
+  "approved_by": "repository-owner",
+  "base_ref": "8621c72aaa6f54a6e4e548c60327add99e3985fc",
+  "changed_generated_bytes": 26201809,
+  "changed_generated_files": 368,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "2da3f8d0ff484ac594712a62b3ace8c79caddc5b97257093f481f39d64ca10a9",
+  "reason": "Refresh external actor projections after causal validation-drift proof",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 32600840,
+  "tracked_bytes_max": 24117248
+}
