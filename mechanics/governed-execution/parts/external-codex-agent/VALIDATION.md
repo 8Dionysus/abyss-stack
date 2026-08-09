@@ -120,11 +120,15 @@ separate live receipts are required for the installed product surface. The
 installer suite additionally proves that index-hidden packaged source and
 ignored files entering the packaged SDK require explicit dirty-source
 admission, and that activation plus status reject a non-CPython executable or
-an interpreter shim whose eventual delegate is not bound. A synchronized
-host-path replacement after wrapper verification proves that a deferred import
-still reads the private verified snapshot. Wrapper execution under writable
-directory modes is also proven not to create bytecode inside the immutable
-release. A clean-checkout race between initial posture capture and release
+an interpreter shim whose eventual delegate is not bound. A synchronized host
+release-directory rename and replacement after wrapper verification proves
+that a deferred import still reads the namespace-private verified snapshot.
+The installer also proves that each launcher is a static x86_64 ELF without
+`PT_INTERP`, that an ambient constructor-bearing `LD_PRELOAD` cannot run before
+the wrapper filters loader state, and that the adjacent Python companion is
+non-executable and read-only. Wrapper execution under writable directory modes
+is also proven not to create bytecode inside the immutable release. A
+clean-checkout race between initial posture capture and release
 hashing is proven to fail before wrapper or active-receipt publication. The
 suite also rejects an unmanifested importable file from an otherwise
 content-addressed release.

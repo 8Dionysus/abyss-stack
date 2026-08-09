@@ -9,6 +9,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Harden machine-local external Codex wrappers against three pre-execution
+  escape seams: opaque `git ls-remote` transport-helper dispatch now fails
+  closed; each installed launcher is a static x86_64 ELF that removes ambient
+  `LD_*` injection before its first dynamic exec; and verified release bytes
+  are mounted at a namespace-private read-only `/mnt` coordinate rather than
+  overlaying a host-visible release path that could be renamed or replaced.
 - Allow the admission composer to renew an already-admitted contour only after
   its currentness window has expired according to the normalized composition
   clock. The refresh remains bound to the exact predecessor digest and the

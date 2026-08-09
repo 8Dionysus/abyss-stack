@@ -234,21 +234,35 @@ non-symlink wrappers in `~/.local/bin`:
 - `aoa-external-actor-bind` for model-neutral launch binding;
 - `aoa-external-codex-study` for the canonical study preparer.
 
-Each wrapper verifies the exact manifest closure, seals every verified file,
-and asks the system bubblewrap runtime to copy those descriptors into a
-private read-only mount snapshot over the release coordinate. It then launches
+Each installed wrapper is a minimal static x86_64 Linux ELF with no dynamic
+interpreter. Before its first dynamic exec it removes every ambient `LD_*`
+loader variable, derives its adjacent non-executable read-only Python
+companion through `/proc/self/exe`, and starts that companion with fixed
+`/usr/bin/python3 -I -B`. Installation, activation, and status build and
+validate this launcher from the packaged assembly with fixed `/usr/bin/cc`;
+therefore x86_64 Linux, that compiler coordinate, bubblewrap at
+`/usr/bin/bwrap`, and unprivileged user/mount namespaces are host
+prerequisites. Activation of a legacy immutable release whose manifest predates
+the assembly uses the current landed installer's assembly only as an explicit
+rollback-compatibility bridge; new releases bind the assembly inside their own
+manifest.
+
+The companion verifies the exact manifest closure, seals every verified file,
+and asks bubblewrap to copy those descriptors into a private read-only tmpfs
+root at `/mnt/aoa-external-codex-release`, a coordinate absent from the host
+release tree. It then launches
 the sealed selected Python from inside that snapshot in isolated,
 bytecode-disabled mode through a release-local entrypoint that inserts only the
 packaged SDK source before entering the runtime. Imports and adjacent schema or
 module-digest reads therefore remain bound to the bytes already verified even
-if the host release path is replaced concurrently. Ordinary wrapper execution
-also cannot add `__pycache__` entries to the immutable release. Bubblewrap at
-`/usr/bin/bwrap` and unprivileged user/mount namespaces are host prerequisites.
+if the host release directory or its parent coordinate is replaced
+concurrently. Ordinary wrapper execution also cannot add `__pycache__`
+entries to the immutable release.
 The packaged SDK subtree is
 also a valid `--aoa-sdk-root` for study
 preparation because it carries the exact non-Python contracts consumed there.
 `status` rejects extra files, directories, symlinks, or missing entries,
-re-hashes every released file, and verifies all three wrappers.
+re-hashes every released file, and verifies all three launcher/companion pairs.
 `activate --release-id ...` provides release rollback without deleting later
 releases; release IDs must be exact SHA-256 identifiers whose resolved
 directory and manifest identity remain inside the release root. Installation

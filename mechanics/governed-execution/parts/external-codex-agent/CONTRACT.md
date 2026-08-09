@@ -37,15 +37,26 @@ incarnation/summon schema closure, and the runtime-profile-pinned
 The installer must recompute those two owner-schema digests and match the
 profile pins before packaging them.
 The packaged SDK root must therefore satisfy both isolated imports and the
-preparer's exact non-Python contract reads. Stable wrappers consult a regular-file active
-receipt, verify and seal every manifest file, and materialize those descriptors
-as one private read-only bubblewrap mount snapshot before executing a
-release-local bootstrap with Python isolated mode. Imports, packaged data, and
-self-digest reads must resolve inside that snapshot, never by reopening a
-verified host pathname. Wrappers also disable bytecode writes so ordinary
-execution cannot add `__pycache__` entries to its own immutable release. They
-do not follow a mutable source checkout, import ambient `PYTHONPATH`, or use a
-symlinked `current` directory.
+preparer's exact non-Python contract reads. Each stable wrapper is a minimal
+static x86_64 Linux ELF with no `PT_INTERP`; it filters every `LD_*` variable
+before the first dynamic executable, derives an adjacent non-executable
+read-only companion through `/proc/self/exe`, and executes fixed
+`/usr/bin/python3 -I -B`. Installation, activation, and status compile and
+validate that launcher from the packaged assembly through fixed
+`/usr/bin/cc`. The companion consults a regular-file active receipt, verifies
+and seals every manifest file, and materializes those descriptors at the
+namespace-private `/mnt/aoa-external-codex-release` inside one read-only
+bubblewrap tmpfs. The host release coordinate is used only for descriptor-based
+verification and is never reused as the runtime import coordinate. Imports,
+packaged data, and self-digest reads must resolve inside that snapshot, never
+by reopening a verified host pathname. Wrappers also disable bytecode writes
+so ordinary execution cannot add `__pycache__` entries to its own immutable
+release. They do not follow a mutable source checkout, import ambient
+`PYTHONPATH`, or use a symlinked `current` directory.
+For rollback compatibility only, activating an immutable legacy release whose
+verified manifest predates the packaged assembly may build the same validated
+launcher from the current landed installer source. A newly materialized
+release must carry and build its own manifest-bound assembly.
 The selected and recorded Python coordinate must
 be a direct ELF CPython 3.11-or-newer executable at install, activation, and
 status time. Its compatibility probe must execute that same admitted inode;
@@ -63,7 +74,8 @@ release, but it cannot publish a falsely attributed active release.
 `install_external_codex_runtime.py status`
 requires the release tree to contain exactly the manifest files and their
 necessary parent directories, rejects every symlink or extra entry, and
-re-hashes the release and wrappers before availability may be claimed.
+re-hashes the release, rebuilds and validates the static launcher, and verifies
+each launcher/companion pair before availability may be claimed.
 Activation rollback changes only the active receipt while retaining immutable
 releases. An install, status, or activation target is admitted only as an exact
 SHA-256 release ID whose resolved directory and manifest identity remain one

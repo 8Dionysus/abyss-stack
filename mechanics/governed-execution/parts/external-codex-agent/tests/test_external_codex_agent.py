@@ -445,6 +445,7 @@ if "FAKE_GIT_HIDDEN_PROGRAMS" in task["objective"]:
         "/usr/bin/git notes edit HEAD",
         "/usr/bin/git grep --open-files-in-pager=/tmp/helper pattern",
         "/usr/bin/git init --separate-git-dir=/tmp/repo-meta --template=/tmp/template .",
+        "/usr/bin/git ls-remote --upload-pack=/tmp/helper /tmp/remote",
     ):
         emit({"type": "item.completed", "item": {
             "type": "command_execution",
@@ -3791,6 +3792,8 @@ def test_git_help_dispatch_is_fail_closed(command: str) -> None:
         "/usr/bin/git grep --open-files-in-pager=/tmp/helper pattern",
         "/usr/bin/git init .",
         "/usr/bin/git init --separate-git-dir=/tmp/repo-meta --template=/tmp/template .",
+        "/usr/bin/git ls-remote /tmp/remote",
+        "/usr/bin/git ls-remote --upload-pack=/tmp/helper /tmp/remote",
     ),
 )
 def test_git_editor_runner_and_verifier_dispatch_is_fail_closed(

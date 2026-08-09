@@ -64,6 +64,10 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         encoding="utf-8",
     )
     (part / "external_codex_supervisor.py").write_text("PASS = True\n", encoding="utf-8")
+    shutil.copyfile(
+        PART_ROOT / "external_codex_static_bootstrap.S",
+        part / "external_codex_static_bootstrap.S",
+    )
     profile_path = part / "runtime-profile.v1.json"
     (schemas / "external-codex-test.schema.json").write_text("{}\n", encoding="utf-8")
     package = sdk / "src/aoa_sdk"
@@ -162,8 +166,35 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
         encoding="utf-8",
     )
     ambient_environment = dict(os.environ)
+    preload_marker = tmp_path / "ambient-loader-ran"
+    preload_source = tmp_path / "ambient-loader.c"
+    preload_library = tmp_path / "ambient-loader.so"
+    preload_source.write_text(
+        "#include <fcntl.h>\n"
+        "#include <unistd.h>\n"
+        "__attribute__((constructor)) static void injected(void) {\n"
+        f"  int fd = open({json.dumps(str(preload_marker))}, "
+        "O_WRONLY | O_CREAT | O_APPEND, 0600);\n"
+        "  if (fd >= 0) { (void)write(fd, \"ran\\n\", 4); (void)close(fd); }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    subprocess.run(
+        [
+            "/usr/bin/cc",
+            "-shared",
+            "-fPIC",
+            "-o",
+            str(preload_library),
+            str(preload_source),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     ambient_environment.update(
         {
+            "LD_PRELOAD": str(preload_library),
             "PATH": f"{ambient_bin}:/usr/bin:/bin",
             "PYTHONPATH": str(ambient),
         }
@@ -178,9 +209,13 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
     assert completed.stdout == "agent:exact-sdk\n"
     assert path_marker.exists() is False
     assert import_marker.exists() is False
-    assert (bin_dir / "aoa-external-codex-agent").read_text(
-        encoding="utf-8"
-    ).startswith("#!/bin/sh\nexec ")
+    assert preload_marker.exists() is False
+    launcher = bin_dir / "aoa-external-codex-agent"
+    assert launcher.read_bytes().startswith(b"\x7fELF")
+    runtime_install.validate_static_wrapper(launcher.read_bytes())
+    companion = Path(str(launcher) + ".bootstrap.py")
+    assert companion.read_text(encoding="utf-8").startswith("#!/bin/false\n")
+    assert companion.stat().st_mode & 0o777 == 0o444
     agent_entrypoint = release_root / "agent-entrypoint.py"
     assert agent_entrypoint.read_text(encoding="utf-8").startswith("#!/bin/false\n")
     assert agent_entrypoint.stat().st_mode & 0o111 == 0
@@ -215,6 +250,70 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
     )
     assert repeated["release_created"] is False
     assert repeated["active"]["release_id"] == active["release_id"]
+
+
+def test_activate_release_without_packaged_static_source_uses_rollback_compatibility(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    runtime_root = tmp_path / "runtime"
+    bin_dir = tmp_path / "bin"
+    current_runtime_files = runtime_install.RUNTIME_FILES
+    monkeypatch.setattr(
+        runtime_install,
+        "RUNTIME_FILES",
+        tuple(
+            name
+            for name in current_runtime_files
+            if name != "external_codex_static_bootstrap.S"
+        ),
+    )
+    legacy = runtime_install.install(
+        source,
+        sdk,
+        agents,
+        skills,
+        runtime_root,
+        bin_dir,
+        Path(sys.executable),
+        allow_dirty_source=False,
+        allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
+    )
+    monkeypatch.setattr(runtime_install, "RUNTIME_FILES", current_runtime_files)
+    current = runtime_install.install(
+        source,
+        sdk,
+        agents,
+        skills,
+        runtime_root,
+        bin_dir,
+        Path(sys.executable),
+        allow_dirty_source=False,
+        allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
+    )
+    assert current["active"]["release_id"] != legacy["active"]["release_id"]
+
+    activated = runtime_install.activate(
+        runtime_root,
+        bin_dir,
+        legacy["active"]["release_id"],
+        Path(sys.executable),
+    )
+
+    assert activated["active"]["release_id"] == legacy["active"]["release_id"]
+    assert runtime_install.status(runtime_root, bin_dir)["healthy"] is True
+    completed = subprocess.run(
+        [str(bin_dir / "aoa-external-codex-agent")],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.stdout == "agent:exact-sdk\n"
 
 
 def test_interpreter_activation_publishes_at_active_record(
@@ -530,13 +629,15 @@ def test_wrapper_imports_from_private_verified_release_snapshot(
     while not ready.exists() and process.poll() is None and time.monotonic() < deadline:
         time.sleep(0.01)
     assert ready.exists(), f"snapshot actor did not become ready; returncode={process.poll()}"
-    installed_deferred = (
-        Path(receipt["active"]["release_root"])
-        / "sdk/src/aoa_sdk/deferred.py"
+    installed_release = Path(receipt["active"]["release_root"])
+    moved_release = installed_release.with_name(installed_release.name + "-host-moved")
+    os.replace(installed_release, moved_release)
+    installed_release.mkdir()
+    (installed_release / "sdk/src/aoa_sdk").mkdir(parents=True)
+    (installed_release / "sdk/src/aoa_sdk/deferred.py").write_text(
+        "MARKER = 'replacement-host-release'\n",
+        encoding="utf-8",
     )
-    installed_deferred.parent.chmod(0o755)
-    installed_deferred.chmod(0o644)
-    installed_deferred.write_text("MARKER = 'mutated-host-release'\n", encoding="utf-8")
     release.write_text("continue\n", encoding="utf-8")
 
     stdout, stderr = process.communicate(timeout=10)

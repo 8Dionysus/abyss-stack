@@ -178,6 +178,7 @@ GIT_CONFIG_DRIVEN_HELPER_SUBCOMMANDS = frozenset(
         "grep",
         "init",
         "log",
+        "ls-remote",
         "notes",
         "range-diff",
         "show",

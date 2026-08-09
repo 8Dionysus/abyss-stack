@@ -8,9 +8,9 @@ import hashlib
 import json
 import os
 import re
-import shlex
 import shutil
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
@@ -30,6 +30,7 @@ DEFAULT_BIN_DIR = Path.home() / ".local/bin"
 RUNTIME_FILES = (
     "bind_external_actor_launch.py",
     "external_codex_agent.py",
+    "external_codex_static_bootstrap.S",
     "external_codex_supervisor.py",
     "prepare_landing_study.py",
     "runtime-profile.v1.json",
@@ -50,6 +51,7 @@ INSTALLER_GIT = "/usr/bin/git"
 SHARED_INDEX_MAX_BYTES = 512 * 1024 * 1024
 WRAPPER_BOOTSTRAP_PYTHON = Path("/usr/bin/python3")
 BWRAP_EXECUTABLE = Path("/usr/bin/bwrap")
+WRAPPER_COMPILER = Path("/usr/bin/cc")
 
 
 class InstallError(RuntimeError):
@@ -247,6 +249,96 @@ def require_snapshot_runtime() -> Path:
             f"bubblewrap snapshot runtime compatibility probe failed: {candidate}{suffix}"
         )
     return candidate
+
+
+def validate_static_wrapper(raw: bytes) -> None:
+    if len(raw) < 64 or raw[:6] != b"\x7fELF\x02\x01":
+        raise InstallError("external Codex static bootstrap is not ELF64 little-endian")
+    executable_type, machine = struct.unpack_from("<HH", raw, 16)
+    if executable_type != 2 or machine != 62:
+        raise InstallError("external Codex static bootstrap must be x86_64 ET_EXEC")
+    program_offset = struct.unpack_from("<Q", raw, 32)[0]
+    program_size, program_count = struct.unpack_from("<HH", raw, 54)
+    if program_size < 56 or program_count == 0:
+        raise InstallError("external Codex static bootstrap program table is invalid")
+    if program_offset + program_size * program_count > len(raw):
+        raise InstallError("external Codex static bootstrap program table is truncated")
+    for index in range(program_count):
+        program_type = struct.unpack_from(
+            "<I",
+            raw,
+            program_offset + index * program_size,
+        )[0]
+        if program_type == 2:
+            raise InstallError(
+                "external Codex static bootstrap must not contain PT_DYNAMIC"
+            )
+        if program_type == 3:
+            raise InstallError(
+                "external Codex static bootstrap must not contain PT_INTERP"
+            )
+
+
+def build_static_wrapper(source_path: Path | None = None) -> bytes:
+    source = require_regular_file(
+        source_path
+        if source_path is not None
+        else Path(__file__).resolve().parent / "external_codex_static_bootstrap.S",
+        "external Codex static bootstrap source",
+    )
+    compiler = require_regular_file(
+        WRAPPER_COMPILER.resolve(),
+        "external Codex static bootstrap compiler",
+    )
+    if not os.access(compiler, os.X_OK):
+        raise InstallError(f"external Codex static bootstrap compiler is not executable: {compiler}")
+    with tempfile.TemporaryDirectory(prefix="aoa-external-codex-bootstrap-") as temporary:
+        output = Path(temporary) / "bootstrap"
+        try:
+            completed = subprocess.run(
+                [
+                    str(compiler),
+                    "-nostdlib",
+                    "-static",
+                    "-Wl,--build-id=none",
+                    "-Wl,-z,noexecstack",
+                    "-Wl,-s",
+                    "-o",
+                    str(output),
+                    str(source),
+                ],
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=30,
+                env={
+                    "HOME": "/nonexistent",
+                    "LANG": "C.UTF-8",
+                    "PATH": "/usr/bin:/bin",
+                },
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise InstallError("cannot build external Codex static bootstrap") from exc
+        if completed.returncode != 0:
+            detail = completed.stderr.strip()
+            suffix = f": {detail}" if detail else ""
+            raise InstallError(f"cannot build external Codex static bootstrap{suffix}")
+        raw = require_regular_file(
+            output,
+            "built external Codex static bootstrap",
+        ).read_bytes()
+    validate_static_wrapper(raw)
+    return raw
+
+
+def static_wrapper_for_release(release_root: Path) -> bytes:
+    packaged_source = release_root / "runtime/external_codex_static_bootstrap.S"
+    if packaged_source.exists() or packaged_source.is_symlink():
+        return build_static_wrapper(packaged_source)
+    # Compatibility rollback for release manifests created before the static
+    # launcher source entered the packaged runtime closure.
+    return build_static_wrapper()
 
 
 def require_regular_file(path: Path, label: str) -> Path:
@@ -701,7 +793,7 @@ runpy.run_path(str(TARGET), run_name="__main__")
 '''
 
 
-def wrapper_text(
+def wrapper_bootstrap_text(
     active_path: Path,
     entrypoint_name: str,
 ) -> str:
@@ -718,9 +810,9 @@ import stat
 import sys
 from pathlib import Path
 
-ACTIVE = Path(sys.argv[1])
-RUNTIME_ROOT = Path(sys.argv[2])
-ENTRYPOINT_NAME = sys.argv[3]
+ACTIVE = Path(__AOA_ACTIVE_PATH__)
+RUNTIME_ROOT = Path(__AOA_RUNTIME_ROOT__)
+ENTRYPOINT_NAME = __AOA_ENTRYPOINT_NAME__
 BWRAP = Path("/usr/bin/bwrap")
 
 FILE_FLAGS = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
@@ -1021,7 +1113,9 @@ if os.execve not in os.supports_fd:
     os.close(release_descriptor)
     raise SystemExit("external Codex host cannot execute a verified snapshot runtime")
 
-snapshot_python = release_root / ".verified-python"
+snapshot_parent = Path("/mnt")
+snapshot_root = snapshot_parent / "aoa-external-codex-release"
+snapshot_python = snapshot_root / ".verified-python"
 snapshot_bootstrap = (
     "from pathlib import Path\\n"
     "import os\\n"
@@ -1043,10 +1137,12 @@ bwrap_arguments = [
     "/",
     "/",
     "--tmpfs",
-    str(release_root),
+    str(snapshot_parent),
+    "--dir",
+    str(snapshot_root),
 ]
 for relative in sorted(expected_directories, key=lambda item: (len(item.parts), str(item))):
-    bwrap_arguments.extend(("--dir", str(release_root / relative)))
+    bwrap_arguments.extend(("--dir", str(snapshot_root / relative)))
 for relative, descriptor in sorted(snapshot_descriptors, key=lambda item: str(item[0])):
     os.set_inheritable(descriptor, True)
     bwrap_arguments.extend(
@@ -1055,7 +1151,7 @@ for relative, descriptor in sorted(snapshot_descriptors, key=lambda item: str(it
             "0444",
             "--ro-bind-data",
             str(descriptor),
-            str(release_root / relative),
+            str(snapshot_root / relative),
         )
     )
 os.set_inheritable(verified_python_descriptor, True)
@@ -1067,7 +1163,7 @@ bwrap_arguments.extend(
         str(verified_python_descriptor),
         str(snapshot_python),
         "--remount-ro",
-        str(release_root),
+        str(snapshot_parent),
         "--",
         str(snapshot_python),
         "-I",
@@ -1075,13 +1171,13 @@ bwrap_arguments.extend(
         "-c",
         snapshot_bootstrap,
         str(snapshot_python),
-        str(release_root / ENTRYPOINT_NAME),
-        *sys.argv[4:],
+        str(snapshot_root / ENTRYPOINT_NAME),
+        *sys.argv[1:],
     )
 )
 os.set_inheritable(verified_bwrap_descriptor, True)
 environment = dict(os.environ)
-environment["AOA_EXTERNAL_CODEX_VERIFIED_RELEASE_ROOT"] = str(release_root)
+environment["AOA_EXTERNAL_CODEX_VERIFIED_RELEASE_ROOT"] = str(snapshot_root)
 os.close(release_descriptor)
 os.execve(
     verified_bwrap_descriptor,
@@ -1089,23 +1185,87 @@ os.execve(
     environment,
 )
 '''
-    command = " ".join(
-        (
-            "exec",
-            shlex.quote(str(WRAPPER_BOOTSTRAP_PYTHON)),
-            "-I",
-            "-B",
-            "-c",
-            shlex.quote(bootstrap),
-            shlex.quote(str(active_path)),
-            shlex.quote(str(active_path.parent)),
-            shlex.quote(entrypoint_name),
-            '"$@"',
+    replacements = {
+        "__AOA_ACTIVE_PATH__": repr(str(active_path)),
+        "__AOA_RUNTIME_ROOT__": repr(str(active_path.parent)),
+        "__AOA_ENTRYPOINT_NAME__": repr(entrypoint_name),
+    }
+    for marker, value in replacements.items():
+        if bootstrap.count(marker) != 1:
+            raise InstallError(f"external Codex wrapper marker is invalid: {marker}")
+        bootstrap = bootstrap.replace(marker, value)
+    return "#!/bin/false\n" + bootstrap
+
+
+def wrapper_paths(bin_dir: Path, name: str) -> tuple[Path, Path]:
+    launcher = bin_dir / name
+    companion = Path(str(launcher) + ".bootstrap.py")
+    return launcher, companion
+
+
+def publish_wrappers(
+    bin_dir: Path,
+    runtime_root: Path,
+    active_path: Path,
+    wrappers: dict[str, str],
+    static_launcher: bytes,
+) -> dict[str, str | None]:
+    backups: dict[str, str | None] = {}
+    for name, entrypoint in wrappers.items():
+        launcher, companion = wrapper_paths(bin_dir, name)
+        companion_raw = wrapper_bootstrap_text(active_path, entrypoint).encode("utf-8")
+        for key, path, expected, mode in (
+            (f"{name}.bootstrap.py", companion, companion_raw, 0o444),
+            (name, launcher, static_launcher, 0o755),
+        ):
+            if (
+                path.exists()
+                and not path.is_symlink()
+                and path.read_bytes() == expected
+                and stat.S_IMODE(path.stat().st_mode) == mode
+            ):
+                backups[key] = None
+                continue
+            backups[key] = backup_existing_wrapper(path, runtime_root)
+            atomic_write(path, expected, mode)
+    return backups
+
+
+def wrapper_status_rows(
+    bin_dir: Path,
+    active_path: Path,
+    wrappers: dict[str, str],
+    static_launcher: bytes,
+) -> dict[str, dict[str, object]]:
+    result: dict[str, dict[str, object]] = {}
+    for name, entrypoint in wrappers.items():
+        launcher, companion = wrapper_paths(bin_dir, name)
+        launcher = require_regular_file(launcher, f"wrapper {name}")
+        companion = require_regular_file(
+            companion,
+            f"wrapper bootstrap {name}",
         )
-    )
-    return f'''#!/bin/sh
-{command}
-'''
+        expected_companion = wrapper_bootstrap_text(active_path, entrypoint).encode(
+            "utf-8"
+        )
+        launcher_current = (
+            launcher.read_bytes() == static_launcher
+            and stat.S_IMODE(launcher.stat().st_mode) == 0o755
+        )
+        companion_current = (
+            companion.read_bytes() == expected_companion
+            and stat.S_IMODE(companion.stat().st_mode) == 0o444
+        )
+        result[name] = {
+            "path": str(launcher),
+            "digest": sha256_file(launcher),
+            "bootstrap_path": str(companion),
+            "bootstrap_digest": sha256_file(companion),
+            "current": launcher_current and companion_current,
+        }
+        if not result[name]["current"]:
+            raise InstallError(f"wrapper drift: {launcher}")
+    return result
 
 
 def release_manifest(files: Iterable[tuple[Path, Path]]) -> dict[str, object]:
@@ -1318,23 +1478,18 @@ def install(
         require_regular_file(active_path, "active release record")
         previous_active = json.loads(active_path.read_text(encoding="utf-8"))
 
-    wrapper_backups: dict[str, str | None] = {}
     wrappers = {
         "aoa-external-codex-agent": "agent-entrypoint.py",
         "aoa-external-actor-bind": "bind-entrypoint.py",
         "aoa-external-codex-study": "study-entrypoint.py",
     }
-    for name, entrypoint in wrappers.items():
-        path = bin_dir / name
-        expected = wrapper_text(
-            active_path,
-            entrypoint,
-        ).encode("utf-8")
-        if path.exists() and not path.is_symlink() and path.read_bytes() == expected:
-            wrapper_backups[name] = None
-            continue
-        wrapper_backups[name] = backup_existing_wrapper(path, runtime_root)
-        atomic_write(path, expected, 0o755)
+    wrapper_backups = publish_wrappers(
+        bin_dir,
+        runtime_root,
+        active_path,
+        wrappers,
+        static_wrapper_for_release(release_root),
+    )
 
     verify_release(release_root)
     assert_python_identity_unchanged(python_executable, python_identity)
@@ -1370,7 +1525,10 @@ def install(
         "active": active,
         "release_created": created,
         "previous_active": previous_active,
-        "wrappers": {name: str(bin_dir / name) for name in wrappers},
+        "wrappers": {name: str(wrapper_paths(bin_dir, name)[0]) for name in wrappers},
+        "wrapper_bootstraps": {
+            name: str(wrapper_paths(bin_dir, name)[1]) for name in wrappers
+        },
         "wrapper_backups": wrapper_backups,
         "rollback": {
             "command": (
@@ -1378,7 +1536,7 @@ def install(
                 "external-codex-agent/install_external_codex_runtime.py activate "
                 f"--runtime-root {runtime_root} --bin-dir {bin_dir} "
                 f"--release-id {previous_active.get('release_id')}"
-            ) if previous_active else "Remove the three newly created wrappers and active.json after operator review; the immutable release may be retained.",
+            ) if previous_active else "Remove the three newly created launcher/companion pairs and active.json after operator review; the immutable release may be retained.",
         },
     }
     receipts = runtime_root / "receipts"
@@ -1424,19 +1582,18 @@ def activate(
     assert_python_identity_unchanged(python_executable, python_identity)
     active_path = runtime_root / "active.json"
     previous = json.loads(active_path.read_text(encoding="utf-8")) if active_path.exists() else None
-    for name, entrypoint in {
+    wrappers = {
         "aoa-external-codex-agent": "agent-entrypoint.py",
         "aoa-external-actor-bind": "bind-entrypoint.py",
         "aoa-external-codex-study": "study-entrypoint.py",
-    }.items():
-        atomic_write(
-            bin_dir.resolve() / name,
-            wrapper_text(
-                active_path,
-                entrypoint,
-            ).encode("utf-8"),
-            0o755,
-        )
+    }
+    publish_wrappers(
+        bin_dir.resolve(),
+        runtime_root,
+        active_path,
+        wrappers,
+        static_wrapper_for_release(release_root),
+    )
     verify_release(release_root)
     assert_python_identity_unchanged(python_executable, python_identity)
     now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
@@ -1497,24 +1654,17 @@ def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
     manifest = verify_release(release_root)
     if manifest["release_id"] != release_id:
         raise InstallError("active release id differs from verified manifest")
-    wrapper_status = {}
-    for name, entrypoint in {
+    wrappers = {
         "aoa-external-codex-agent": "agent-entrypoint.py",
         "aoa-external-actor-bind": "bind-entrypoint.py",
         "aoa-external-codex-study": "study-entrypoint.py",
-    }.items():
-        path = require_regular_file(bin_dir.resolve() / name, f"wrapper {name}")
-        expected = wrapper_text(
-            active_path,
-            entrypoint,
-        ).encode("utf-8")
-        wrapper_status[name] = {
-            "path": str(path),
-            "digest": sha256_file(path),
-            "current": path.read_bytes() == expected,
-        }
-        if not wrapper_status[name]["current"]:
-            raise InstallError(f"wrapper drift: {path}")
+    }
+    wrapper_status = wrapper_status_rows(
+        bin_dir.resolve(),
+        active_path,
+        wrappers,
+        static_wrapper_for_release(release_root),
+    )
     return {
         "schema_version": SCHEMA_VERSION,
         "operation": "status",
