@@ -22,10 +22,35 @@ if [[ ! -f "$REGISTRY" || -L "$REGISTRY" ]]; then
 fi
 
 now_epoch=$(date -u +%s)
+deployment_manifest_id=$(jq -er .manifest_id "$DEPLOYMENT")
 minimum_expiry=$(jq -r '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted") | .currentness_expires_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601] | min // 0' "$REGISTRY")
 admitted_count=$(jq -r '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted")] | length' "$REGISTRY")
 production_identity_count=$(jq -r '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted") | .runtime_identity.process_identity | select(contains("bootstrap") | not)] | length' "$REGISTRY")
-if [[ "$admitted_count" -eq 11 && "$production_identity_count" -eq 11 && "$minimum_expiry" -gt "$now_epoch" ]]; then
+deployment_identity_count=$(jq -r --arg manifest_id "$deployment_manifest_id" '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted" and .runtime_identity.deployment_manifest_digest == $manifest_id)] | length' "$REGISTRY")
+current_canary_count=0
+active_unit_count=0
+for organ in "${organs[@]}"; do
+  latest_canary="$STACK/Logs/mcp/canaries/latest/${organ}.read.json"
+  if [[ -f "$latest_canary" && ! -L "$latest_canary" ]] && jq -e --arg manifest_id "$deployment_manifest_id" '
+    .deployment_manifest_id == $manifest_id
+    and (.canary_route | endswith("/last-known-good") | not)
+    and (.process_identity | contains("bootstrap") | not)
+    and ((.expires_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) > now)
+  ' "$latest_canary" >/dev/null; then
+    ((current_canary_count += 1))
+  fi
+  unit="aoa-organ-mcp-read@${organ}.service"
+  [[ "$organ" == "abyss-stack" ]] && unit="abyss-stack-mcp-read.service"
+  if systemctl --user is-active --quiet "$unit"; then
+    ((active_unit_count += 1))
+  fi
+done
+if [[ "$admitted_count" -eq 11 \
+      && "$production_identity_count" -eq 11 \
+      && "$deployment_identity_count" -eq 11 \
+      && "$current_canary_count" -eq 11 \
+      && "$active_unit_count" -eq 11 \
+      && "$minimum_expiry" -gt "$now_epoch" ]]; then
   exit 0
 fi
 
