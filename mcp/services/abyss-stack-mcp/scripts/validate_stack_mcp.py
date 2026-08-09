@@ -48,11 +48,11 @@ LOCK_DIRECT_URL_RE = re.compile(
 )
 HASH_RE = re.compile(r"--hash=sha256:[0-9a-f]{64}$")
 AOA_SDK_WHEEL_URL = (
-    "https://github.com/8Dionysus/aoa-sdk/releases/download/v0.10.1/"
-    "aoa_sdk-0.10.1-py3-none-any.whl"
+    "https://github.com/8Dionysus/aoa-sdk/releases/download/v0.10.2/"
+    "aoa_sdk-0.10.2-py3-none-any.whl"
 )
 AOA_SDK_WHEEL_HASH = (
-    "--hash=sha256:7222d373044506d0e79175c364b64e3a6ed6a164650af0db54dcce1fcf67f6ad"
+    "--hash=sha256:cf512a7b0a00f8707e21b3950b147d01b7fd2317d64ce7fbcba004a2d1846e2f"
 )
 
 
