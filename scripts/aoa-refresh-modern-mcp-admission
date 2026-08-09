@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STACK=/srv/AbyssOS/abyss-stack
+VENV="$STACK/Services/abyss-stack-mcp/venv/bin"
+REGISTRY=/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json
+DEPLOYMENT="$STACK/Logs/mcp/deployments/latest.json"
+TARGETS="$STACK/Configs/mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/runtime-targets.v1.json"
+PUBLIC_KEY="$STACK/Secrets/Configs/abyss-stack-mcp-canary-ed25519-public-key.pem"
+ROOT="$STACK/Logs/mcp/fleet-admission"
+RUN="$ROOT/runs/$(date -u +%Y%m%dT%H%M%SZ)"
+
+organs=(
+  abyss-stack abyss-machine aoa-decisions aoa-memo aoa-session-memory
+  aoa-evals aoa-kag aoa-stats aoa-4pda-connector aoa-telegram-connector
+  aoa-discord-connector
+)
+
+if [[ ! -f "$REGISTRY" || -L "$REGISTRY" ]]; then
+  printf 'modern MCP admission registry is unavailable or unsafe\n' >&2
+  exit 1
+fi
+
+now_epoch=$(date -u +%s)
+minimum_expiry=$(jq -r '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted") | .currentness_expires_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601] | min // 0' "$REGISTRY")
+admitted_count=$(jq -r '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted")] | length' "$REGISTRY")
+if [[ "$admitted_count" -eq 11 && "$minimum_expiry" -gt "$now_epoch" ]]; then
+  exit 0
+fi
+
+mkdir -p "$RUN/current" "$RUN/lkg" "$RUN/stdout" "$ROOT/evidence"
+chmod 0700 "$ROOT" "$ROOT/runs" "$RUN" "$RUN/current" "$RUN/lkg" "$RUN/stdout" "$ROOT/evidence"
+
+for organ in "${organs[@]}"; do
+  "$VENV/abyss-stack-mcp-canary" --organ "$organ" --process-unit production --ttl-seconds 3600 > "$RUN/stdout/${organ}-current.json"
+  "$VENV/abyss-stack-mcp-canary" --organ "$organ" --process-unit production --purpose last-known-good --ttl-seconds 3600 > "$RUN/stdout/${organ}-lkg.json"
+  current_record=$(jq -er .record_path "$RUN/stdout/${organ}-current.json")
+  lkg_record=$(jq -er .record_path "$RUN/stdout/${organ}-lkg.json")
+  install -m 0600 "$current_record" "$RUN/current/${organ}.read.json"
+  install -m 0600 "$lkg_record" "$RUN/lkg/${organ}.read.json"
+done
+
+"$VENV/abyss-stack-mcp-fleet-admission" \
+  --registry "$REGISTRY" \
+  --deployment-manifest "$DEPLOYMENT" \
+  --runtime-targets "$TARGETS" \
+  --current-canary-root "$RUN/current" \
+  --lkg-canary-root "$RUN/lkg" \
+  --canary-public-key "$PUBLIC_KEY" \
+  --evidence-root "$ROOT/evidence" \
+  --output "$RUN/organ-registry.v2.candidate.json" \
+  --report "$RUN/report.json" \
+  --publish
+
+"$VENV/aoa" organs registry-v2-validate "$REGISTRY"
+ln -sfn "runs/${RUN##*/}/report.json" "$ROOT/latest-report.json"
