@@ -161,6 +161,7 @@
         "mcp/services/abyss-stack-mcp/tests/test_overlay.py",
     "mcp/services/abyss-stack-mcp/tests/test_orchestration_host.py",
     "mcp/services/abyss-stack-mcp/tests/test_preflight.py",
+        "mcp/services/abyss-stack-mcp/tests/test_process_launcher.py",
     "mcp/services/abyss-stack-mcp/tests/test_proof_projection.py",
         "mcp/services/abyss-stack-mcp/tests/test_rollback_candidate.py",
         "mcp/services/abyss-stack-mcp/tests/test_rollback_projection.py",
