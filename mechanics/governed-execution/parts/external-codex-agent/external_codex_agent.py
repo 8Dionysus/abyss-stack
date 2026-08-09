@@ -1700,10 +1700,12 @@ def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
         positional = tuple(
             value.lower() for value in git_args if not value.startswith("-")
         )
-        # Only listing configured names and resolving a configured URL are
-        # read-only. Every other remote subcommand can mutate repository
-        # config/refs or dispatch a transport selected by repository config.
-        if positional and positional[0] != "get-url":
+        # Only listing configured names is admitted. Verbose listing and URL
+        # resolution can expose embedded credentials; subcommands can mutate
+        # config/refs or dispatch a repository-configured transport.
+        if positional or any(
+            value.lower() in {"-v", "--verbose"} for value in git_args
+        ):
             return True
     if subcommand == "symbolic-ref":
         positional = tuple(
@@ -1731,7 +1733,15 @@ def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
     if subcommand in GIT_FILTER_RUNNING_SUBCOMMANDS:
         return True
     if subcommand == "cat-file" and any(
-        value.lower() in {"--filters", "--textconv"} for value in git_args
+        (
+            len(value.lower().split("=", 1)[0]) >= len("--fi")
+            and "--filters".startswith(value.lower().split("=", 1)[0])
+        )
+        or (
+            len(value.lower().split("=", 1)[0]) >= len("--te")
+            and "--textconv".startswith(value.lower().split("=", 1)[0])
+        )
+        for value in git_args
     ):
         return True
     if subcommand == "grep" and "--textconv" in {
@@ -1739,7 +1749,8 @@ def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
     }:
         return True
     if subcommand == "hash-object" and any(
-        value.lower() == "--path" or value.lower().startswith("--path=")
+        len(value.lower().split("=", 1)[0]) >= len("--pa")
+        and "--path".startswith(value.lower().split("=", 1)[0])
         for value in git_args
     ):
         return True
@@ -1790,6 +1801,39 @@ def _ripgrep_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
         ):
             return True
     return False
+
+
+def _jq_has_opaque_environment_access(tokens: Sequence[str]) -> bool:
+    """Reject jq programs that can read the inherited process environment."""
+
+    index = 1
+    while index < len(tokens):
+        token = tokens[index]
+        lowered = token.lower()
+        if token == "--":
+            index += 1
+            break
+        if lowered in {"-f", "-l", "--from-file", "--run-tests"} or (
+            lowered.startswith(("-f", "-l")) and len(lowered) > 2
+        ) or lowered.startswith(("--from-file=", "--run-tests=")):
+            return True
+        if lowered in {"--arg", "--argjson", "--rawfile", "--slurpfile"}:
+            index += 3
+            continue
+        if lowered == "--indent":
+            index += 2
+            continue
+        if token.startswith("-"):
+            index += 1
+            continue
+        break
+    if index >= len(tokens):
+        return False
+    program = tokens[index]
+    return re.search(
+        r"(?<![A-Za-z0-9_.$\"'])env(?![A-Za-z0-9_])|\$ENV(?![A-Za-z0-9_])",
+        program,
+    ) is not None
 
 
 def _sort_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
@@ -1936,6 +1980,8 @@ def _command_effects(command: str) -> set[str]:
                     detected.add("global_config_mutation")
                 elif subcommand == "credential":
                     detected.add("secret_access")
+            elif executable == "jq" and _jq_has_opaque_environment_access(segment):
+                detected.add("secret_access")
             elif executable == "gh":
                 if any(args[index : index + 2] == ("pr", "create") for index in range(len(args))):
                     detected.add("pull_request")
@@ -2078,6 +2124,8 @@ def _command_has_unclassified_indirection(command: str) -> bool:
             if executable == "sed" and _sed_has_opaque_dispatch(segment):
                 return True
             if executable == "rg" and _ripgrep_has_opaque_dispatch(segment):
+                return True
+            if executable == "jq" and _jq_has_opaque_environment_access(segment):
                 return True
             if executable == "sort" and _sort_has_opaque_dispatch(segment):
                 return True

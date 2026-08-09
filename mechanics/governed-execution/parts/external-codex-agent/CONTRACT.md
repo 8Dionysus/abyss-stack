@@ -351,8 +351,15 @@ and system configuration plus interactive pager/prompt routes are disabled.
 GNU sed programs are opaque unless the actual invocation includes GNU sed's
 enforced `--sandbox` mode. Git builtins whose output path may invoke
 repository-configured diff, textconv, or fsmonitor helpers are likewise opaque;
+accepted abbreviated `cat-file` filter/textconv and `hash-object --path` forms
+are matched to the same canonical refusal.
 the controller's own exact Git observations remain outside model-issued command
 admission.
+Jq `env`/`$ENV` access is both opaque and classified as secret access because
+the Codex environment may contain a role-scoped MCP bearer token. Jq file,
+module-path, and test-program options are also opaque; ordinary inline jq
+transforms, including `.env` data fields and literal `"env"` keys, remain
+classifiable.
 Ordinary ripgrep source search remains classifiable, but `--pre`,
 `--hostname-bin`, and `-z`/`--search-zip` are opaque because they spawn helper
 processes whose commands are absent from the Codex event. The runtime also
@@ -366,6 +373,9 @@ All model-issued `git config` access is opaque: repository, worktree, global,
 or system reads may return credential- or command-bearing values, while writes
 may alter later command behavior. Controller-owned Git probes remain isolated
 under the separately fixed minimal environment.
+Model-issued `git remote` admits only name listing; verbose URL output,
+`get-url`, and every remote subcommand are opaque because URLs may embed
+credentials and subcommands may mutate or dispatch configured transports.
 Mutating `git symbolic-ref` and `git reflog` forms, branch/bisect and tree-object
 writers, `hash-object -w`/`--literally`, and `fsck --lost-found` are opaque
 because their persistent effects remain below the manifest-excluded `.git`
@@ -374,7 +384,7 @@ and fsck inspection remain classifiable. Bash `--rcfile` and `--init-file` are
 opaque because startup code runs before an otherwise visible `-c` body.
 Shell `source` and `.` bodies remain
 opaque because the observed argv does not expose the sourced commands. Git
-configuration writes, including repository-local and per-worktree writes, and
+configuration access, including repository-local and per-worktree reads or writes, and
 Git global options that can inject
 configuration, redirect repository coordinates, select an exec path, or enable
 pagination are likewise opaque, as are unknown/external Git subcommands and

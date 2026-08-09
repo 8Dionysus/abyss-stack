@@ -94,6 +94,9 @@ The controller:
   active parameter, glob (including Bash extglob), brace, and tilde expansion
   plus literal command newlines remain opaque while quoted or escaped literals
   stay classifiable,
+  jq environment builtins and externally supplied jq programs/modules are
+  opaque and classified as secret access, while ordinary inline jq data
+  transforms remain admitted,
   sourced shell bodies through `source` or `.` remain opaque, and Bash
   `--rcfile`/`--init-file` startup code is opaque even before an otherwise
   classifiable `-c` body,
@@ -114,7 +117,8 @@ The controller:
   opaque; checkout/checkin builtins that can invoke repository-defined content
   filters remain opaque as well, while controller-owned manifest Git probes run
   in a minimal environment with hooks/fsmonitor disabled and diff/textconv
-  programs explicitly prohibited,
+  programs explicitly prohibited; abbreviated `cat-file` filter/textconv and
+  `hash-object --path` forms are covered by the same refusal,
   ripgrep remains available for ordinary source search, while `--pre`,
   `--hostname-bin`, and `-z`/`--search-zip` are opaque because they launch
   unobserved helpers; `RIPGREP_CONFIG_PATH` is fixed to `/dev/null` so ambient
@@ -126,9 +130,10 @@ The controller:
   owner-fixed validation,
   all model-issued Git config access plus alias/external-subcommand dispatch
   and ambient environment assignment fail closed because config reads may
-  expose credential- or command-bearing values; `git remote` retains read-only
-  listing and URL resolution, while every mutating or transport-dispatching form is
-  opaque; `git update-ref` is opaque because it mutates repository state below
+  expose credential- or command-bearing values; `git remote` retains only
+  read-only name listing, while URL output and every mutating or
+  transport-dispatching form are opaque; `git update-ref` is opaque because it
+  mutates repository state below
   the manifest-visible worktree; mutating `symbolic-ref` and `reflog` forms,
   ref/temporary-object helpers whose effects stay below `.git`, and explicit
   hidden-object write options are also opaque while their read-only inspection

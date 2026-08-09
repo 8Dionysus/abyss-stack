@@ -16,8 +16,11 @@ Tracking starts with the community-docs baseline for this repository.
   disabled; GNU sort compression helpers and hidden Git ref mutations now fail
   closed while ordinary sorting and ref inspection remain admitted; all
   model-issued Git config access now fails closed so credential-bearing reads
-  cannot reach the model; Bash startup-file options and Git metadata/object
-  mutations invisible to the workspace manifest now fail closed while
+  cannot reach the model, and Git remote access is limited to name listing so
+  credential-bearing URLs stay opaque; jq environment reads are classified as
+  secret access; accepted abbreviated Git filter-program options, Bash
+  startup-file options, and Git metadata/object mutations invisible to the
+  workspace manifest now fail closed while
   read-only metadata inspection remains admitted; each
   installed launcher is a static x86_64 ELF that removes
   ambient `LD_*` injection before its first dynamic exec; and verified release

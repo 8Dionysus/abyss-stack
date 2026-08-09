@@ -467,10 +467,24 @@ if "FAKE_GIT_HIDDEN_PROGRAMS" in task["objective"]:
             "status": "completed",
             "exit_code": 0,
         }})
+if "FAKE_GIT_CAT_FILE_FILTER" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/git cat-file --filter HEAD:README.md",
+        "status": "completed",
+        "exit_code": 0,
+    }})
 if "FAKE_RIPGREP_HIDDEN_PROGRAM" in task["objective"]:
     emit({"type": "item.completed", "item": {
         "type": "command_execution",
         "command": "/usr/bin/rg --pre=/bin/sh pattern scripts/helper.sh",
+        "status": "completed",
+        "exit_code": 0,
+    }})
+if "FAKE_JQ_ENVIRONMENT_READ" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": "/usr/bin/jq -n env",
         "status": "completed",
         "exit_code": 0,
     }})
@@ -3723,8 +3737,11 @@ def test_unadmitted_bare_names_and_awk_are_fail_closed(command: str) -> None:
         "/usr/bin/git checkout HEAD -- README.md",
         "/usr/bin/git add README.md",
         "/usr/bin/git cat-file --filters HEAD:README.md",
+        "/usr/bin/git cat-file --filter HEAD:README.md",
+        "/usr/bin/git cat-file --textc HEAD:README.md",
         "/usr/bin/git grep --textconv bounded",
         "/usr/bin/git hash-object --path=README.md README.md",
+        "/usr/bin/git hash-object --pa=README.md README.md",
     ),
 )
 def test_startup_and_config_driven_dispatch_are_fail_closed(command: str) -> None:
@@ -3740,6 +3757,46 @@ def test_startup_and_config_driven_dispatch_are_fail_closed(command: str) -> Non
     ),
 )
 def test_allowlisted_system_commands_remain_classifiable(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
+def test_ordinary_git_cat_file_remains_classifiable() -> None:
+    assert RUNTIME._command_has_unclassified_indirection(
+        "/usr/bin/git cat-file -p HEAD:README.md"
+    ) is False
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/jq -n env",
+        "/usr/bin/jq -n 'env.MCP_TOKEN'",
+        "/usr/bin/jq -n '$ENV'",
+        "/usr/bin/jq --from-file helper.jq input.json",
+        "/usr/bin/jq -Lmodules 'import \"helper\" as h; h::run' input.json",
+        "/usr/bin/jq --run-tests tests.jq",
+    ),
+)
+def test_jq_environment_and_external_program_sources_are_fail_closed(
+    command: str,
+) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+def test_jq_environment_read_is_secret_access() -> None:
+    assert RUNTIME._command_effects("/usr/bin/jq -n env") == {"secret_access"}
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/jq -n '{}'",
+        "/usr/bin/jq -r '.env' input.json",
+        "/usr/bin/jq -n '{\"env\": 1}'",
+        "/usr/bin/jq --arg name env -n '$name'",
+    ),
+)
+def test_ordinary_jq_remains_classifiable(command: str) -> None:
     assert RUNTIME._command_has_unclassified_indirection(command) is False
 
 
@@ -3957,6 +4014,9 @@ def test_git_repository_config_access_is_fail_closed(command: str) -> None:
         "/usr/bin/git remote remove origin",
         "/usr/bin/git remote set-branches origin main",
         "/usr/bin/git remote update origin",
+        "/usr/bin/git remote -v",
+        "/usr/bin/git remote --verbose",
+        "/usr/bin/git remote get-url origin",
     ),
 )
 def test_git_remote_mutations_and_dispatch_are_fail_closed(command: str) -> None:
@@ -4045,8 +4105,6 @@ def test_task_schema_requires_the_complete_runtime_forbidden_set(
         "/usr/bin/git ls-files",
         "/usr/bin/git show-ref --head",
         "/usr/bin/git remote",
-        "/usr/bin/git remote -v",
-        "/usr/bin/git remote get-url origin",
     ),
 )
 def test_direct_git_builtins_remain_classifiable(command: str) -> None:
@@ -4105,7 +4163,12 @@ def test_started_command_survives_interruption_and_blocks_authority(
         ("FAKE_GIT_LOCAL_CONFIG_WRITE", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_CONFIG_READ", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_HIDDEN_PROGRAMS", ["unclassified_indirect_effect"]),
+        ("FAKE_GIT_CAT_FILE_FILTER", ["unclassified_indirect_effect"]),
         ("FAKE_RIPGREP_HIDDEN_PROGRAM", ["unclassified_indirect_effect"]),
+        (
+            "FAKE_JQ_ENVIRONMENT_READ",
+            ["secret_access", "unclassified_indirect_effect"],
+        ),
         ("FAKE_SORT_HIDDEN_PROGRAM", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_HIDDEN_REF_MUTATION", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_SYMBOLIC_REF_MUTATION", ["unclassified_indirect_effect"]),
