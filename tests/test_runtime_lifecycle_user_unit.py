@@ -2174,11 +2174,17 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             credential.parent.mkdir(parents=True)
             credential.write_text(f"{MCP_HTTP_AUTH_TOKEN}\n", encoding="utf-8")
             credential.chmod(0o600)
+            stack_read_credential = credential.parent / "abyss-stack-mcp-read-bearer-token"
+            stack_read_credential.write_text(
+                f"{'s' * 64}\n", encoding="utf-8"
+            )
+            stack_read_credential.chmod(0o600)
             owner_tokens: list[str] = []
             for index, name in enumerate(
                 (
                     *ORGAN_MCP_READ_CREDENTIAL_NAMES,
                     *ORGAN_MCP_CANDIDATE_CREDENTIAL_NAMES,
+                    "abyss-stack-mcp-read-bearer-token",
                 )
             ):
                 owner_token = f"test-owner-{index}-" + (chr(ord("b") + index) * 50)
@@ -2209,6 +2215,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 '"$TOS_CORPUS_MCP_READ_BEARER_TOKEN" '
                 '"$AOA_MEMO_MCP_CANDIDATE_BEARER_TOKEN" '
                 '"$AOA_EVALS_MCP_CANDIDATE_BEARER_TOKEN" > "$CAPTURE_TOKEN"\n'
+                'printf \'%s\\n\' "$ABYSS_STACK_MCP_READ_BEARER_TOKEN" >> "$CAPTURE_TOKEN"\n'
                 'printf \'%s\\n\' "$@" > "$CAPTURE_ARGS"\n',
                 encoding="utf-8",
             )
@@ -2240,6 +2247,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "AOA_XDA_CONNECTOR_MCP_READ_BEARER_TOKEN",
                 "ABYSS_MACHINE_MCP_READ_BEARER_TOKEN",
                 "TOS_CORPUS_MCP_READ_BEARER_TOKEN",
+                "ABYSS_STACK_MCP_READ_BEARER_TOKEN",
             ):
                 env.pop(environment_name, None)
 
@@ -2295,6 +2303,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             credential.parent.mkdir(parents=True)
             credential.write_text(f"{MCP_HTTP_AUTH_TOKEN}\n", encoding="utf-8")
             credential.chmod(0o600)
+            stack_read_credential = credential.parent / "abyss-stack-mcp-read-bearer-token"
+            stack_read_credential.write_text(f"{'s' * 64}\n", encoding="utf-8")
+            stack_read_credential.chmod(0o600)
             home = root / "home"
             home.mkdir()
             zshrc = home / ".zshrc"
@@ -2324,6 +2335,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 *(auth["env"] for auth in ORGAN_MCP_READ_AUTH.values()),
                 "AOA_MEMO_MCP_CANDIDATE_BEARER_TOKEN",
                 "AOA_EVALS_MCP_CANDIDATE_BEARER_TOKEN",
+                "ABYSS_STACK_MCP_READ_BEARER_TOKEN",
             ):
                 env.pop(environment_name, None)
 

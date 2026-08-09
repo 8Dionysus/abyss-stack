@@ -3,6 +3,8 @@ set -euo pipefail
 
 stack_root="${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}"
 legacy_credential_path="${AOA_MCP_HTTP_CREDENTIAL_FILE:-${stack_root}/Secrets/Configs/aoa-mcp-http-bearer-token}"
+modern_codex_default="/srv/abyss-machine/runtimes/codex-os-abyss-mcp/0.147.0-abyss.1/bin/codex-os-abyss-mcp"
+modern_server_default="abyss_stack,abyss_machine,aoa_decisions,aoa_memo,aoa_session_memory,aoa_evals,aoa_kag,aoa_stats,aoa_4pda_connector,aoa_telegram_connector,aoa_discord_connector"
 
 fail() {
   printf 'abyss-stack Codex MCP HTTP client: %s\n' "$1" >&2
@@ -114,10 +116,18 @@ load_credential \
   "${stack_root}/Secrets/Configs/aoa-evals-mcp-candidate-bearer-token" \
   "AOA_EVALS_MCP_CANDIDATE_BEARER_TOKEN" \
   "aoa-evals MCP candidate bearer credential"
+load_credential \
+  "${stack_root}/Secrets/Configs/abyss-stack-mcp-read-bearer-token" \
+  "ABYSS_STACK_MCP_READ_BEARER_TOKEN" \
+  "abyss-stack MCP read bearer credential"
 
 codex_executable="${AOA_CODEX_EXECUTABLE:-}"
 if [[ -z "$codex_executable" ]]; then
-  codex_executable="$(command -v codex || true)"
+  if [[ -x "$modern_codex_default" && ! -d "$modern_codex_default" ]]; then
+    codex_executable="$modern_codex_default"
+  else
+    codex_executable="$(command -v codex || true)"
+  fi
 fi
 [[ -n "$codex_executable" && -x "$codex_executable" && ! -d "$codex_executable" ]] || \
   fail "Codex executable was not found"
@@ -125,6 +135,10 @@ fi
 launcher_real="$(readlink -f "$0")"
 codex_real="$(readlink -f "$codex_executable")"
 [[ "$launcher_real" != "$codex_real" ]] || fail "Codex executable resolves back to this launcher"
+
+if [[ "$codex_real" == "$(readlink -f "$modern_codex_default")" ]]; then
+  export CODEX_MCP_2026_SERVERS="${CODEX_MCP_2026_SERVERS:-$modern_server_default}"
+fi
 
 unset AOA_MCP_HTTP_CREDENTIAL_FILE AOA_CODEX_EXECUTABLE
 exec "$codex_executable" "$@"
