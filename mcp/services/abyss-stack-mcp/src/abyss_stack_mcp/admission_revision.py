@@ -361,8 +361,20 @@ def compose_admission_revision(
         raise AdmissionRevisionError("registry lacks one KAG read contour")
     contour = contours[0]
     contour_digest = sha256_digest(contour.model_dump(mode="json"))
-    if contour.registry_state != "shadow" or contour.endpoint is None:
-        raise AdmissionRevisionError("only a shadow contour can be proposed")
+    refreshes_expired_admission = (
+        contour.registry_state == "admitted"
+        and decision.decided_at >= contour.currentness_expires_at
+    )
+    if (
+        contour.endpoint is None
+        or (
+            contour.registry_state != "shadow"
+            and not refreshes_expired_admission
+        )
+    ):
+        raise AdmissionRevisionError(
+            "only a shadow or expired admitted contour can be proposed"
+        )
     if (
         decision.decision_kind != "operator"
         or decision.decision != "accepted"
@@ -372,7 +384,7 @@ def compose_admission_revision(
         or decision.registry_mutation_performed is not False
     ):
         raise AdmissionRevisionError(
-            "operator decision does not bind the shadow contour"
+            "operator decision does not bind the admission contour"
         )
     current = _subject(observation)
     lkg = _subject(lkg_observation)
