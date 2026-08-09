@@ -276,14 +276,14 @@
           "/repo": "aoa-memo"
         },
         "required_pointers": [
-          "/source_hierarchy",
-          "/memory_route",
-          "/local_port",
-          "/validation"
+          "/reviewed_memory",
+          "/source_owner",
+          "/source_catalog",
+          "/authority_boundary"
         ],
         "schema_pointer": "/schema",
-        "schema_value": "aoa_memo_brief_v1",
-        "tool_name": "aoa_memo_brief"
+        "schema_value": "aoa_memo_reviewed_brief_v1",
+        "tool_name": "aoa_memo_recall_brief"
       },
       "canary_route": "runbook://mcp-canary/aoa-memo/read",
       "effect_classes": [

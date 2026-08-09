@@ -1088,3 +1088,29 @@ def test_session_memory_canary_tracks_the_bounded_admission_profile() -> None:
     assert contract.exact_values["/mutates"] is False
     assert "/mcp_access/mutates" not in contract.exact_values
     assert "/truth_status" not in contract.required_pointers
+
+
+def test_memo_canary_tracks_the_reviewed_recall_surface() -> None:
+    catalog = RuntimeTargetCatalog.model_validate_json(
+        (
+            Path(__file__).resolve().parents[1]
+            / "src"
+            / "abyss_stack_mcp"
+            / "runtime-targets.v1.json"
+        ).read_text(encoding="utf-8")
+    )
+    target = next(item for item in catalog.targets if item.organ_id == "aoa-memo")
+    contract = target.canary_contract
+
+    assert contract is not None
+    assert contract.tool_name == "aoa_memo_recall_brief"
+    assert contract.arguments == {"intent": "", "repo": "aoa-memo"}
+    assert contract.schema_pointer == "/schema"
+    assert contract.schema_value == "aoa_memo_reviewed_brief_v1"
+    assert contract.exact_values == {"/repo": "aoa-memo"}
+    assert contract.required_pointers == (
+        "/reviewed_memory",
+        "/source_owner",
+        "/source_catalog",
+        "/authority_boundary",
+    )
