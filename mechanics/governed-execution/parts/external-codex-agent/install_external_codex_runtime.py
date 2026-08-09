@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -43,6 +44,8 @@ OWNER_CONTRACT_FILES = (
     ),
     ("aoa-skills", "schemas/task_local_dag_v2.schema.json"),
 )
+INSTALLER_GIT = "/usr/bin/git"
+INSTALLER_GIT_FILTER_LIMIT = 128
 
 
 class InstallError(RuntimeError):
@@ -127,17 +130,100 @@ def require_regular_file(path: Path, label: str) -> Path:
     return path
 
 
+def _base_installer_git_environment() -> dict[str, str]:
+    """Return a fixed environment that cannot inherit Git executable hooks."""
+
+    return {
+        "GIT_ATTR_NOSYSTEM": "1",
+        "GIT_CONFIG_COUNT": "3",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_KEY_0": "core.hooksPath",
+        "GIT_CONFIG_KEY_1": "core.fsmonitor",
+        "GIT_CONFIG_KEY_2": "core.attributesFile",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_CONFIG_VALUE_0": "/dev/null",
+        "GIT_CONFIG_VALUE_1": "false",
+        "GIT_CONFIG_VALUE_2": "/dev/null",
+        "GIT_OPTIONAL_LOCKS": "0",
+        "GIT_TERMINAL_PROMPT": "0",
+        "HOME": "/nonexistent",
+        "LANG": "C.UTF-8",
+        "NO_COLOR": "1",
+        "PATH": "/usr/bin:/bin",
+    }
+
+
+def _installer_git_environment(root: Path) -> dict[str, str]:
+    """Neutralize repository-defined filters before posture probes read bytes."""
+
+    environment = _base_installer_git_environment()
+    try:
+        completed = subprocess.run(
+            [
+                INSTALLER_GIT,
+                "-C",
+                str(root),
+                "config",
+                "--local",
+                "--includes",
+                "--name-only",
+                "--null",
+                "--get-regexp",
+                r"^filter\..*\.(clean|smudge|process|required)$",
+            ],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=15,
+            env=environment,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise InstallError(f"cannot inspect Git filters for {root}: {exc}") from exc
+    if completed.returncode not in {0, 1}:
+        raise InstallError(f"cannot inspect Git filters for {root}")
+    try:
+        keys = sorted(
+            {
+                raw.decode("utf-8")
+                for raw in completed.stdout.split(b"\0")
+                if raw
+            }
+        )
+    except UnicodeDecodeError as exc:
+        raise InstallError(f"Git filter key is not UTF-8 for {root}") from exc
+    if len(keys) > INSTALLER_GIT_FILTER_LIMIT or any(
+        re.fullmatch(r"filter\..+\.(?:clean|smudge|process|required)", key, re.I)
+        is None
+        for key in keys
+    ):
+        raise InstallError(f"Git filter keys exceed the bounded grammar for {root}")
+    next_index = int(environment["GIT_CONFIG_COUNT"])
+    for key in keys:
+        environment[f"GIT_CONFIG_KEY_{next_index}"] = key
+        environment[f"GIT_CONFIG_VALUE_{next_index}"] = (
+            "false" if key.lower().endswith(".required") else ""
+        )
+        next_index += 1
+    environment["GIT_CONFIG_COUNT"] = str(next_index)
+    return environment
+
+
 def git_posture(
     root: Path,
     packaged_files: Iterable[Path] = (),
 ) -> dict[str, object]:
+    environment = _installer_git_environment(root)
+
     def run(*args: str) -> str:
         completed = subprocess.run(
-            ["git", "-C", str(root), *args],
+            [INSTALLER_GIT, "-C", str(root), *args],
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            timeout=15,
+            env=environment,
         )
         return completed.stdout.strip()
 
@@ -149,13 +235,15 @@ def git_posture(
         head = run("rev-parse", "HEAD")
         status = run("status", "--porcelain=v1", "--untracked-files=all")
         flagged = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "-v", "-z"],
+            [INSTALLER_GIT, "-C", str(root), "ls-files", "-v", "-z"],
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            timeout=15,
+            env=environment,
         ).stdout
         ignored = subprocess.run(
-            ["git", "-C", str(root), "check-ignore", "-z", "--stdin"],
+            [INSTALLER_GIT, "-C", str(root), "check-ignore", "-z", "--stdin"],
             check=False,
             input=b"".join(
                 relative.encode("utf-8") + b"\0"
@@ -163,8 +251,10 @@ def git_posture(
             ),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            timeout=15,
+            env=environment,
         )
-    except (OSError, subprocess.CalledProcessError) as exc:
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
         raise InstallError(f"cannot inspect Git posture for {root}: {exc}") from exc
     if ignored.returncode not in {0, 1}:
         raise InstallError(

@@ -1660,6 +1660,15 @@ def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
             "list",
         }:
             return True
+    if subcommand == "remote":
+        positional = tuple(
+            value.lower() for value in git_args if not value.startswith("-")
+        )
+        # Only listing configured names and resolving a configured URL are
+        # read-only. Every other remote subcommand can mutate repository
+        # config/refs or dispatch a transport selected by repository config.
+        if positional and positional[0] != "get-url":
+            return True
     if subcommand in GIT_CONFIG_DRIVEN_HELPER_SUBCOMMANDS:
         return True
     if subcommand in GIT_FILTER_RUNNING_SUBCOMMANDS:

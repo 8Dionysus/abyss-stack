@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -178,6 +179,53 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
     )
     assert repeated["release_created"] is False
     assert repeated["active"]["release_id"] == active["release_id"]
+
+
+def test_git_posture_does_not_run_repository_fsmonitor_or_content_filter(
+    tmp_path: Path,
+) -> None:
+    source, _sdk, _agents, _skills = make_sources(tmp_path)
+    fsmonitor_marker = tmp_path / "fsmonitor-ran"
+    fsmonitor = tmp_path / "fsmonitor"
+    fsmonitor.write_text(
+        "#!/bin/sh\n"
+        f"/usr/bin/touch {shlex.quote(str(fsmonitor_marker))}\n"
+        "/usr/bin/printf '{}\\n'\n",
+        encoding="utf-8",
+    )
+    fsmonitor.chmod(0o700)
+    filter_marker = tmp_path / "filter-ran"
+    filter_helper = tmp_path / "clean-filter"
+    filter_helper.write_text(
+        "#!/bin/sh\n"
+        f"/usr/bin/touch {shlex.quote(str(filter_marker))}\n"
+        "/bin/cat\n",
+        encoding="utf-8",
+    )
+    filter_helper.chmod(0o700)
+    (source / ".gitattributes").write_text(
+        "mechanics/** filter=leak\n",
+        encoding="utf-8",
+    )
+    git("add", ".gitattributes", cwd=source)
+    git("commit", "-qm", "attributes", cwd=source)
+    git("config", "core.fsmonitor", str(fsmonitor), cwd=source)
+    git("config", "filter.leak.clean", str(filter_helper), cwd=source)
+    controller = (
+        source
+        / "mechanics/governed-execution/parts/external-codex-agent/"
+        "external_codex_agent.py"
+    )
+    controller.write_text(
+        controller.read_text(encoding="utf-8") + "# visible drift\n",
+        encoding="utf-8",
+    )
+
+    posture = runtime_install.git_posture(source)
+
+    assert posture["dirty"] is True
+    assert fsmonitor_marker.exists() is False
+    assert filter_marker.exists() is False
 
 
 def test_install_refuses_clean_checkout_race_before_activation(

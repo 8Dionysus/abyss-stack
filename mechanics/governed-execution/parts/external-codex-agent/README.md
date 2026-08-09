@@ -116,7 +116,9 @@ The controller:
   build/package/test/task runners remain opaque unless they are an exact
   owner-fixed validation,
   Git config writes plus alias/external-subcommand dispatch and ambient
-  environment assignment fail closed,
+  environment assignment fail closed; `git remote` retains read-only listing
+  and URL resolution, while every mutating or transport-dispatching form is
+  opaque,
   any command carrying a secret-shaped path is classified as secret access,
   and commands are durably observed
   from `item.started` rather than only after completion, while exact task validation
@@ -254,6 +256,12 @@ or remotely reproducible release. Before activating any materialized release,
 the installer re-enumerates the selected inputs, requires unchanged Git
 postures, and re-hashes every source byte against the release manifest; a
 checkout race therefore fails before wrapper or active-receipt mutation.
+Every installer posture probe uses the exact system Git under a fixed minimal
+environment: repository hooks and fsmonitor are disabled, global/system
+attributes and configuration are excluded, and effective repository content
+filters are enumerated and neutralized at command scope before status or index
+inspection. A source checkout therefore cannot gain installer-process
+execution merely by configuring a Git helper.
 Installation requires clean exact
 `abyss-stack`, `aoa-sdk`, `aoa-agents`, and `aoa-skills` source roots unless
 each dirty posture is admitted explicitly.

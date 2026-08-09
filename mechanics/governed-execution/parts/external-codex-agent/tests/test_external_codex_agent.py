@@ -3675,6 +3675,21 @@ def test_git_repository_config_writes_are_fail_closed(command: str) -> None:
     assert RUNTIME._command_has_unclassified_indirection(command) is True
 
 
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/git remote add leak https://example.invalid/repo.git",
+        "/usr/bin/git remote set-url origin https://example.invalid/repo.git",
+        "/usr/bin/git remote rename origin upstream",
+        "/usr/bin/git remote remove origin",
+        "/usr/bin/git remote set-branches origin main",
+        "/usr/bin/git remote update origin",
+    ),
+)
+def test_git_remote_mutations_and_dispatch_are_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
 def test_direct_secret_file_encoder_is_classified() -> None:
     assert RUNTIME._command_effects(
         "/usr/bin/base64 /home/operator/.ssh/id_rsa"
@@ -3722,6 +3737,9 @@ def test_task_schema_requires_the_complete_runtime_forbidden_set(
         "/usr/bin/git config core.hooksPath",
         "/usr/bin/git config --local --get core.hooksPath",
         "/usr/bin/git config get core.hooksPath",
+        "/usr/bin/git remote",
+        "/usr/bin/git remote -v",
+        "/usr/bin/git remote get-url origin",
     ),
 )
 def test_direct_git_builtins_remain_classifiable(command: str) -> None:
