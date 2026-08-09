@@ -84,7 +84,16 @@ def require_absolute_directory(path: Path, label: str) -> Path:
     return path.resolve()
 
 
-def require_python_executable(path: Path) -> Path:
+def _descriptor_sha256(descriptor: int) -> str:
+    digest = hashlib.sha256()
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    for chunk in iter(lambda: os.read(descriptor, 1024 * 1024), b""):
+        digest.update(chunk)
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    return "sha256:" + digest.hexdigest()
+
+
+def require_python_executable(path: Path) -> tuple[Path, dict[str, object]]:
     candidate = require_regular_file(path.resolve(), "Python executable")
     if not os.access(candidate, os.X_OK):
         raise InstallError(f"Python executable is not executable: {candidate}")
@@ -94,17 +103,41 @@ def require_python_executable(path: Path) -> Path:
         "'version':[sys.version_info.major,sys.version_info.minor]},"
         "sort_keys=True,separators=(',',':')))"
     )
+    flags = os.O_RDONLY | os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
     try:
-        completed = subprocess.run(
-            [str(candidate), "-I", "-c", probe],
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=10,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise InstallError(f"Python executable compatibility probe failed: {candidate}") from exc
+        descriptor = os.open(candidate, flags)
+    except OSError as exc:
+        raise InstallError(f"Python executable cannot be opened safely: {candidate}") from exc
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise InstallError(f"Python executable is not a regular file: {candidate}")
+        if metadata.st_mode & 0o111 == 0:
+            raise InstallError(f"Python executable is not executable: {candidate}")
+        identity = {
+            "sha256": _descriptor_sha256(descriptor),
+            "size": metadata.st_size,
+            "device": metadata.st_dev,
+            "inode": metadata.st_ino,
+        }
+        try:
+            completed = subprocess.run(
+                [f"/proc/self/fd/{descriptor}", "-I", "-c", probe],
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=10,
+                pass_fds=(descriptor,),
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise InstallError(
+                f"Python executable compatibility probe failed: {candidate}"
+            ) from exc
+    finally:
+        os.close(descriptor)
     expected = '{"implementation":"CPython","version":[3,11]}'
     try:
         payload = json.loads(completed.stdout)
@@ -124,7 +157,16 @@ def require_python_executable(path: Path) -> Path:
             "Python executable must be compatible CPython 3.11 or newer: "
             f"{candidate}; expected at least {expected}"
         )
-    return candidate
+    return candidate, identity
+
+
+def assert_python_identity_unchanged(
+    path: Path,
+    expected_identity: dict[str, object],
+) -> None:
+    _, observed_identity = require_python_executable(path)
+    if observed_identity != expected_identity:
+        raise InstallError("Python executable identity changed before activation")
 
 
 def require_regular_file(path: Path, label: str) -> Path:
@@ -565,11 +607,12 @@ def assert_release_inputs_unchanged(
 def entrypoint_text(target: str) -> str:
     return f'''#!/bin/false
 from __future__ import annotations
+import os
 import runpy
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(os.environ["AOA_EXTERNAL_CODEX_VERIFIED_RELEASE_ROOT"])
 SDK = ROOT / "sdk/src"
 TARGET = ROOT / "runtime/{target}"
 sys.path.insert(0, str(SDK))
@@ -587,28 +630,164 @@ def wrapper_text(
     # active record, so staged wrapper replacement remains callable before and
     # after that single publication point.
     bootstrap = '''from __future__ import annotations
+import fcntl
+import hashlib
 import json
 import os
+import stat
 import sys
 from pathlib import Path
 
 ACTIVE = Path(sys.argv[1])
 RUNTIME_ROOT = Path(sys.argv[2])
 ENTRYPOINT_NAME = sys.argv[3]
-if ACTIVE.is_symlink() or not ACTIVE.is_file():
-    raise SystemExit(f"external Codex active release is unavailable: {ACTIVE}")
-record = json.loads(ACTIVE.read_text(encoding="utf-8"))
+
+FILE_FLAGS = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
+DIRECTORY_FLAGS = FILE_FLAGS | os.O_DIRECTORY
+
+def read_all(descriptor, maximum=None):
+    chunks = []
+    total = 0
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    while True:
+        chunk = os.read(descriptor, 1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if maximum is not None and total > maximum:
+            raise SystemExit("external Codex control file exceeds its size limit")
+        chunks.append(chunk)
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    return b"".join(chunks)
+
+def digest(raw):
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+def canonical(value):
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+def sealed_memfd(name, raw):
+    descriptor = os.memfd_create(name, os.MFD_ALLOW_SEALING)
+    offset = 0
+    while offset < len(raw):
+        offset += os.write(descriptor, raw[offset:])
+    os.fchmod(descriptor, 0o500)
+    fcntl.fcntl(
+        descriptor,
+        fcntl.F_ADD_SEALS,
+        fcntl.F_SEAL_WRITE
+        | fcntl.F_SEAL_GROW
+        | fcntl.F_SEAL_SHRINK
+        | fcntl.F_SEAL_SEAL,
+    )
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    return descriptor
+
+def open_regular_at(root_descriptor, relative):
+    path = Path(relative)
+    if path.is_absolute() or not path.parts or ".." in path.parts:
+        raise SystemExit(f"external Codex release path is unsafe: {relative}")
+    directory_descriptor = os.dup(root_descriptor)
+    try:
+        for component in path.parts[:-1]:
+            child_descriptor = os.open(
+                component,
+                DIRECTORY_FLAGS,
+                dir_fd=directory_descriptor,
+            )
+            child_metadata = os.fstat(child_descriptor)
+            if not stat.S_ISDIR(child_metadata.st_mode):
+                os.close(child_descriptor)
+                raise SystemExit(
+                    f"external Codex release directory is invalid: {relative}"
+                )
+            os.close(directory_descriptor)
+            directory_descriptor = child_descriptor
+        descriptor = os.open(
+            path.parts[-1],
+            FILE_FLAGS,
+            dir_fd=directory_descriptor,
+        )
+    finally:
+        os.close(directory_descriptor)
+    metadata = os.fstat(descriptor)
+    if not stat.S_ISREG(metadata.st_mode):
+        os.close(descriptor)
+        raise SystemExit(f"external Codex release file is invalid: {relative}")
+    return descriptor, metadata
+
+def release_closure(root_descriptor):
+    files = set()
+    directories = set()
+    pending = [(os.dup(root_descriptor), Path("."))]
+    while pending:
+        directory_descriptor, relative_root = pending.pop()
+        try:
+            for name in os.listdir(directory_descriptor):
+                metadata = os.stat(
+                    name,
+                    dir_fd=directory_descriptor,
+                    follow_symlinks=False,
+                )
+                relative = (
+                    Path(name)
+                    if relative_root == Path(".")
+                    else relative_root / name
+                )
+                if stat.S_ISREG(metadata.st_mode):
+                    files.add(relative)
+                elif stat.S_ISDIR(metadata.st_mode):
+                    child_descriptor = os.open(
+                        name,
+                        DIRECTORY_FLAGS,
+                        dir_fd=directory_descriptor,
+                    )
+                    child_metadata = os.fstat(child_descriptor)
+                    if not stat.S_ISDIR(child_metadata.st_mode):
+                        os.close(child_descriptor)
+                        raise SystemExit(
+                            f"external Codex release directory drifted: {relative}"
+                        )
+                    directories.add(relative)
+                    pending.append((child_descriptor, relative))
+                else:
+                    raise SystemExit(
+                        f"external Codex release entry is invalid: {relative}"
+                    )
+        finally:
+            os.close(directory_descriptor)
+    return files, directories
+
+try:
+    active_descriptor = os.open(ACTIVE, FILE_FLAGS)
+except OSError as exc:
+    raise SystemExit(
+        f"external Codex active release is unavailable: {ACTIVE}"
+    ) from exc
+try:
+    active_metadata = os.fstat(active_descriptor)
+    if not stat.S_ISREG(active_metadata.st_mode):
+        raise SystemExit(f"external Codex active release is invalid: {ACTIVE}")
+    record = json.loads(read_all(active_descriptor, 1024 * 1024))
+finally:
+    os.close(active_descriptor)
+if (
+    not isinstance(record, dict)
+    or record.get("schema_version")
+    != "abyss_stack_external_codex_active_release_v1"
+):
+    raise SystemExit("external Codex active release schema is invalid")
 python_value = record.get("python_executable")
-if not isinstance(python_value, str):
+python_identity = record.get("python_identity")
+if not isinstance(python_value, str) or not isinstance(python_identity, dict):
     raise SystemExit("external Codex active interpreter is invalid")
 runtime_python = Path(python_value)
-if (
-    not runtime_python.is_absolute()
-    or runtime_python.is_symlink()
-    or not runtime_python.is_file()
-    or not os.access(runtime_python, os.X_OK)
-    or runtime_python.resolve() != runtime_python
-):
+if not runtime_python.is_absolute():
     raise SystemExit(f"external Codex active interpreter is unavailable: {runtime_python}")
 release_id = record["release_id"]
 if not isinstance(release_id, str) or not release_id.startswith("sha256-") or len(release_id) != 71 or any(character not in "0123456789abcdef" for character in release_id[7:]):
@@ -624,12 +803,132 @@ except ValueError as exc:
     raise SystemExit(f"external Codex release escapes runtime root: {release_root}") from exc
 if release_root.parent != releases_root or release_root.name != release_id:
     raise SystemExit(f"external Codex release coordinate is invalid: {release_root}")
-entrypoint = release_root / ENTRYPOINT_NAME
-if entrypoint.is_symlink() or not entrypoint.is_file():
-    raise SystemExit(f"external Codex entrypoint is unavailable: {entrypoint}")
-os.execv(
-    str(runtime_python),
-    [str(runtime_python), "-I", "-B", str(entrypoint), *sys.argv[4:]],
+try:
+    release_descriptor = os.open(release_root, DIRECTORY_FLAGS)
+except OSError as exc:
+    raise SystemExit(f"external Codex release is unavailable: {release_root}") from exc
+release_metadata = os.fstat(release_descriptor)
+if not stat.S_ISDIR(release_metadata.st_mode):
+    os.close(release_descriptor)
+    raise SystemExit(f"external Codex release is invalid: {release_root}")
+
+manifest_descriptor, _ = open_regular_at(
+    release_descriptor,
+    "release-manifest.json",
+)
+try:
+    manifest = json.loads(read_all(manifest_descriptor, 16 * 1024 * 1024))
+finally:
+    os.close(manifest_descriptor)
+if not isinstance(manifest, dict):
+    os.close(release_descriptor)
+    raise SystemExit("external Codex release manifest is invalid")
+rows = manifest.get("files")
+identity = {
+    "schema_version": "abyss_stack_external_codex_release_manifest_v1",
+    "files": rows,
+}
+expected_digest = digest(canonical(identity))
+if (
+    manifest.get("schema_version") != identity["schema_version"]
+    or manifest.get("release_digest") != expected_digest
+    or manifest.get("release_id") != expected_digest.replace("sha256:", "sha256-")
+    or record.get("release_digest") != expected_digest
+    or manifest.get("release_id") != release_id
+    or not isinstance(rows, list)
+):
+    os.close(release_descriptor)
+    raise SystemExit("external Codex release manifest identity is invalid")
+
+expected_files = {Path("release-manifest.json")}
+expected_directories = set()
+entrypoint_descriptor = None
+for row in rows:
+    if not isinstance(row, dict):
+        os.close(release_descriptor)
+        raise SystemExit("external Codex release manifest row is invalid")
+    relative = Path(str(row.get("path", "")))
+    if relative.is_absolute() or not relative.parts or ".." in relative.parts:
+        os.close(release_descriptor)
+        raise SystemExit(f"external Codex release path is unsafe: {relative}")
+    if relative in expected_files:
+        os.close(release_descriptor)
+        raise SystemExit(f"external Codex release path is duplicated: {relative}")
+    expected_files.add(relative)
+    expected_directories.update(relative.parents)
+    descriptor, metadata = open_regular_at(release_descriptor, relative)
+    raw = read_all(descriptor)
+    if metadata.st_size != row.get("size") or digest(raw) != row.get("sha256"):
+        os.close(descriptor)
+        os.close(release_descriptor)
+        raise SystemExit(f"external Codex release file drift: {relative}")
+    if relative == Path(ENTRYPOINT_NAME):
+        entrypoint_descriptor = sealed_memfd("aoa-external-codex-entrypoint", raw)
+    os.close(descriptor)
+expected_directories.discard(Path("."))
+actual_files, actual_directories = release_closure(release_descriptor)
+if (
+    actual_files != expected_files
+    or actual_directories != expected_directories
+    or entrypoint_descriptor is None
+):
+    if entrypoint_descriptor is not None:
+        os.close(entrypoint_descriptor)
+    os.close(release_descriptor)
+    raise SystemExit("external Codex release manifest closure mismatch")
+
+try:
+    python_descriptor = os.open(runtime_python, FILE_FLAGS)
+except OSError as exc:
+    os.close(entrypoint_descriptor)
+    os.close(release_descriptor)
+    raise SystemExit(
+        f"external Codex active interpreter is unavailable: {runtime_python}"
+    ) from exc
+python_metadata = os.fstat(python_descriptor)
+python_raw = read_all(python_descriptor)
+observed_python_identity = {
+    "sha256": digest(python_raw),
+    "size": python_metadata.st_size,
+    "device": python_metadata.st_dev,
+    "inode": python_metadata.st_ino,
+}
+if (
+    not stat.S_ISREG(python_metadata.st_mode)
+    or python_metadata.st_mode & 0o111 == 0
+    or observed_python_identity != python_identity
+):
+    os.close(python_descriptor)
+    os.close(entrypoint_descriptor)
+    os.close(release_descriptor)
+    raise SystemExit("external Codex active interpreter identity drift")
+verified_python_descriptor = sealed_memfd(
+    "aoa-external-codex-python",
+    python_raw,
+)
+os.close(python_descriptor)
+if os.execve not in os.supports_fd:
+    os.close(verified_python_descriptor)
+    os.close(entrypoint_descriptor)
+    os.close(release_descriptor)
+    raise SystemExit("external Codex host cannot execute a verified interpreter descriptor")
+os.set_inheritable(verified_python_descriptor, True)
+os.set_inheritable(entrypoint_descriptor, True)
+os.set_inheritable(release_descriptor, True)
+environment = dict(os.environ)
+environment["AOA_EXTERNAL_CODEX_VERIFIED_RELEASE_ROOT"] = (
+    f"/proc/self/fd/{release_descriptor}"
+)
+os.execve(
+    verified_python_descriptor,
+    [
+        str(runtime_python),
+        "-I",
+        "-B",
+        f"/proc/self/fd/{entrypoint_descriptor}",
+        *sys.argv[4:],
+    ],
+    environment,
 )
 '''
     command = " ".join(
@@ -810,7 +1109,9 @@ def install(
     skills_root = require_absolute_directory(skills_root, "aoa-skills source root")
     runtime_root = runtime_root.resolve()
     bin_dir = bin_dir.resolve()
-    python_executable = require_python_executable(python_executable)
+    python_executable, python_identity = require_python_executable(
+        python_executable
+    )
     require_python_executable(WRAPPER_BOOTSTRAP_PYTHON)
     files = source_files(source_root, sdk_root, agents_root, skills_root)
     postures = source_postures(
@@ -850,6 +1151,8 @@ def install(
     if current_postures != postures:
         raise InstallError("source Git posture changed during installation")
     assert_release_inputs_unchanged(files, current_files, manifest)
+    verify_release(release_root)
+    assert_python_identity_unchanged(python_executable, python_identity)
     previous_active = None
     active_path = runtime_root / "active.json"
     if active_path.exists():
@@ -874,6 +1177,8 @@ def install(
         wrapper_backups[name] = backup_existing_wrapper(path, runtime_root)
         atomic_write(path, expected, 0o755)
 
+    verify_release(release_root)
+    assert_python_identity_unchanged(python_executable, python_identity)
     now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     active = {
         "schema_version": ACTIVE_SCHEMA_VERSION,
@@ -881,6 +1186,7 @@ def install(
         "release_digest": manifest["release_digest"],
         "release_root": str(release_root),
         "python_executable": str(python_executable),
+        "python_identity": python_identity,
         "source": source_posture,
         "sdk": sdk_posture,
         "agents": agents_posture,
@@ -950,8 +1256,12 @@ def activate(
     manifest = verify_release(release_root)
     if manifest["release_id"] != release_id:
         raise InstallError("requested release id differs from verified manifest")
-    python_executable = require_python_executable(python_executable)
+    python_executable, python_identity = require_python_executable(
+        python_executable
+    )
     require_python_executable(WRAPPER_BOOTSTRAP_PYTHON)
+    verify_release(release_root)
+    assert_python_identity_unchanged(python_executable, python_identity)
     active_path = runtime_root / "active.json"
     previous = json.loads(active_path.read_text(encoding="utf-8")) if active_path.exists() else None
     for name, entrypoint in {
@@ -967,6 +1277,8 @@ def activate(
             ).encode("utf-8"),
             0o755,
         )
+    verify_release(release_root)
+    assert_python_identity_unchanged(python_executable, python_identity)
     now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     active = {
         "schema_version": ACTIVE_SCHEMA_VERSION,
@@ -974,6 +1286,7 @@ def activate(
         "release_digest": manifest["release_digest"],
         "release_root": str(release_root),
         "python_executable": str(python_executable),
+        "python_identity": python_identity,
         "source": None,
         "sdk": None,
         "installed_at": now,
@@ -997,7 +1310,9 @@ def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
     python_value = active.get("python_executable")
     if not isinstance(python_value, str):
         raise InstallError("active Python executable is invalid")
-    require_python_executable(Path(python_value))
+    _, observed_python_identity = require_python_executable(Path(python_value))
+    if active.get("python_identity") != observed_python_identity:
+        raise InstallError("active Python executable identity drift")
     require_python_executable(WRAPPER_BOOTSTRAP_PYTHON)
     release_id = active.get("release_id")
     if not isinstance(release_id, str):

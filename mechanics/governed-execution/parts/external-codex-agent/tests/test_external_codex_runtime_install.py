@@ -292,6 +292,161 @@ def test_interpreter_activation_publishes_at_active_record(
     assert completed_transition_run.stdout == "agent:exact-sdk\n"
 
 
+def test_wrapper_rejects_release_drift_before_execution(tmp_path: Path) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    runtime_root = tmp_path / "runtime"
+    bin_dir = tmp_path / "bin"
+    receipt = runtime_install.install(
+        source,
+        sdk,
+        agents,
+        skills,
+        runtime_root,
+        bin_dir,
+        Path(sys.executable),
+        allow_dirty_source=False,
+        allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
+    )
+    release_root = Path(receipt["active"]["release_root"])
+    target = release_root / "runtime/external_codex_agent.py"
+    marker = tmp_path / "drifted-release-ran"
+    target.parent.chmod(0o755)
+    target.chmod(0o644)
+    target.write_text(
+        f"from pathlib import Path\nPath({str(marker)!r}).write_text('ran')\n",
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [str(bin_dir / "aoa-external-codex-agent")],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode != 0
+    assert "release file drift" in completed.stderr
+    assert marker.exists() is False
+
+
+def test_wrapper_rejects_compatible_interpreter_replacement(
+    tmp_path: Path,
+) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    runtime_root = tmp_path / "runtime"
+    bin_dir = tmp_path / "bin"
+    real_python = Path(sys.executable).resolve()
+    selected_python = tmp_path / "selected-python"
+    selected_python.write_text(
+        "#!/bin/sh\n"
+        f"exec {shlex.quote(str(real_python))} \"$@\"\n",
+        encoding="utf-8",
+    )
+    selected_python.chmod(0o700)
+    receipt = runtime_install.install(
+        source,
+        sdk,
+        agents,
+        skills,
+        runtime_root,
+        bin_dir,
+        selected_python,
+        allow_dirty_source=False,
+        allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
+    )
+    assert receipt["active"]["python_identity"]["sha256"].startswith("sha256:")
+    assert subprocess.run(
+        [str(bin_dir / "aoa-external-codex-agent")],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout == "agent:exact-sdk\n"
+    marker = tmp_path / "replacement-python-ran"
+    selected_python.write_text(
+        "#!/bin/sh\n"
+        f"/usr/bin/touch {shlex.quote(str(marker))}\n"
+        f"exec {shlex.quote(str(real_python))} \"$@\"\n",
+        encoding="utf-8",
+    )
+    selected_python.chmod(0o700)
+
+    completed = subprocess.run(
+        [str(bin_dir / "aoa-external-codex-agent")],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode != 0
+    assert "interpreter identity drift" in completed.stderr
+    assert marker.exists() is False
+    with pytest.raises(runtime_install.InstallError, match="identity drift"):
+        runtime_install.status(runtime_root, bin_dir)
+
+
+def test_install_rejects_interpreter_drift_before_activation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    runtime_root = tmp_path / "runtime"
+    bin_dir = tmp_path / "bin"
+    real_python = Path(sys.executable).resolve()
+    selected_python = tmp_path / "selected-python"
+    selected_python.write_text(
+        "#!/bin/sh\n"
+        f"exec {shlex.quote(str(real_python))} \"$@\"\n",
+        encoding="utf-8",
+    )
+    selected_python.chmod(0o700)
+    original_require = runtime_install.require_python_executable
+    selected_admissions = 0
+
+    def mutate_after_initial_admission(
+        path: Path,
+    ) -> tuple[Path, dict[str, object]]:
+        nonlocal selected_admissions
+        admitted = original_require(path)
+        if admitted[0] == selected_python.resolve() and selected_admissions == 0:
+            selected_admissions += 1
+            selected_python.write_text(
+                "#!/bin/sh\n"
+                f"exec {shlex.quote(str(real_python))} -B \"$@\"\n",
+                encoding="utf-8",
+            )
+            selected_python.chmod(0o700)
+        return admitted
+
+    monkeypatch.setattr(
+        runtime_install,
+        "require_python_executable",
+        mutate_after_initial_admission,
+    )
+
+    with pytest.raises(runtime_install.InstallError, match="changed before activation"):
+        runtime_install.install(
+            source,
+            sdk,
+            agents,
+            skills,
+            runtime_root,
+            bin_dir,
+            selected_python,
+            allow_dirty_source=False,
+            allow_dirty_sdk=False,
+            allow_dirty_agents=False,
+            allow_dirty_skills=False,
+        )
+
+    assert selected_admissions == 1
+    assert not (runtime_root / "active.json").exists()
+    assert not bin_dir.exists()
+
+
 def test_git_posture_does_not_run_repository_fsmonitor_or_content_filter(
     tmp_path: Path,
 ) -> None:
