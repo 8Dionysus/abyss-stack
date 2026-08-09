@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 10352595,
+  "allowed_tracked_bytes": 31023010,
+  "approved_by": "repository-owner",
+  "base_ref": "3af24d31f749631c03141a981fea1a1aa7792ddb",
+  "changed_generated_bytes": 10352595,
+  "changed_generated_files": 124,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "d08bbdab6d10fca8161f1a1d3d996e07dc1d38606cfc70f0d91c0d3c202b40be",
+  "reason": "Pin the managed MCP runtime to the released aoa-sdk 0.10.2 artifact",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 31023010,
+  "tracked_bytes_max": 24117248
+}
