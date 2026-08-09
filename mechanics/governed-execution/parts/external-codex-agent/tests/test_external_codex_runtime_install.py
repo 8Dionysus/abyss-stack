@@ -287,6 +287,23 @@ def test_git_posture_snapshot_ignores_filter_config_added_before_status(
     assert marker.exists() is False
 
 
+def test_git_posture_snapshot_carries_split_index_backing_file(tmp_path: Path) -> None:
+    source, _sdk, _agents, _skills = make_sources(tmp_path)
+    git("update-index", "--split-index", cwd=source)
+    shared_index = subprocess.run(
+        ["/usr/bin/git", "rev-parse", "--shared-index-path"],
+        cwd=source,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    posture = runtime_install.git_posture(source)
+
+    assert shared_index
+    assert posture["dirty"] is False
+
+
 def test_install_refuses_clean_checkout_race_before_activation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

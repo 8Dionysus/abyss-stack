@@ -175,6 +175,36 @@ def _source_git_coordinate(root: Path, *args: str) -> str:
     return value
 
 
+def _source_shared_index(root: Path) -> Path | None:
+    """Resolve the one split-index backing file, when the selected index uses it."""
+
+    try:
+        completed = subprocess.run(
+            [INSTALLER_GIT, "-C", str(root), "rev-parse", "--shared-index-path"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=15,
+            env=_base_installer_git_environment(),
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise InstallError(f"cannot inspect shared Git index for {root}: {exc}") from exc
+    value = completed.stdout.strip()
+    if completed.returncode != 0:
+        raise InstallError(f"cannot inspect shared Git index for {root}")
+    if not value:
+        return None
+    candidate = Path(value)
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    if candidate.is_symlink():
+        raise InstallError(f"source shared Git index must not be symlinked for {root}")
+    candidate = candidate.resolve()
+    require_regular_file(candidate, "source shared Git index")
+    return candidate
+
+
 @contextmanager
 def _installer_git_snapshot(root: Path) -> Iterator[dict[str, str]]:
     """Expose posture through private Git metadata with no source config race."""
@@ -191,6 +221,7 @@ def _installer_git_snapshot(root: Path) -> Iterator[dict[str, str]]:
 
     index_value = _source_git_coordinate(root, "rev-parse", "--git-path", "index")
     objects_value = _source_git_coordinate(root, "rev-parse", "--git-path", "objects")
+    shared_index_path = _source_shared_index(root)
     index_path = Path(index_value)
     objects_path = Path(objects_value)
     if not index_path.is_absolute():
@@ -211,6 +242,16 @@ def _installer_git_snapshot(root: Path) -> Iterator[dict[str, str]]:
         (git_dir / "objects/info").mkdir(parents=True, mode=0o700)
         (git_dir / "refs/heads").mkdir(parents=True, mode=0o700)
         shutil.copyfile(index_path, git_dir / "index")
+        if shared_index_path is not None:
+            shared_name = shared_index_path.name
+            shared_digest = shared_name.removeprefix("sharedindex.")
+            if (
+                not shared_name.startswith("sharedindex.")
+                or len(shared_digest) != expected_length
+                or re.fullmatch(r"[0-9a-f]+", shared_digest) is None
+            ):
+                raise InstallError(f"invalid source shared Git index name for {root}")
+            shutil.copyfile(shared_index_path, git_dir / shared_name)
         (git_dir / "HEAD").write_text(head + "\n", encoding="ascii")
         (git_dir / "objects/info/alternates").write_text(
             str(objects_path) + "\n",
