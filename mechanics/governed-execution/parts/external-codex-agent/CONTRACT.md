@@ -38,14 +38,19 @@ The installer must recompute those two owner-schema digests and match the
 profile pins before packaging them.
 The packaged SDK root must therefore satisfy both isolated imports and the
 preparer's exact non-Python contract reads. Stable wrappers consult a regular-file active
-receipt and execute a release-local bootstrap with Python isolated mode; they
-also disable bytecode writes so ordinary execution cannot add `__pycache__`
-entries to its own immutable release. They do not follow a mutable source
-checkout, import ambient `PYTHONPATH`, or use a symlinked `current` directory.
+receipt, verify and seal every manifest file, and materialize those descriptors
+as one private read-only bubblewrap mount snapshot before executing a
+release-local bootstrap with Python isolated mode. Imports, packaged data, and
+self-digest reads must resolve inside that snapshot, never by reopening a
+verified host pathname. Wrappers also disable bytecode writes so ordinary
+execution cannot add `__pycache__` entries to its own immutable release. They
+do not follow a mutable source checkout, import ambient `PYTHONPATH`, or use a
+symlinked `current` directory.
 The selected and recorded Python coordinate must
-be a regular executable compatible CPython 3.11-or-newer interpreter at
-install, activation, and status time; executable-bit presence alone is not
-admission. Before packaging, every selected source file hidden by
+be a direct ELF CPython 3.11-or-newer executable at install, activation, and
+status time. Its compatibility probe must execute that same admitted inode;
+script and executable delegate shims are not admissible. Executable-bit
+presence alone is not admission. Before packaging, every selected source file hidden by
 assume-unchanged or skip-worktree and every ignored selected file must make its
 owner checkout dirty, with the classified path set counted and digested in the
 receipt. Such bytes require the matching explicit dirty-source admission and

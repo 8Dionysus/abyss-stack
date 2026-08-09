@@ -234,10 +234,17 @@ non-symlink wrappers in `~/.local/bin`:
 - `aoa-external-actor-bind` for model-neutral launch binding;
 - `aoa-external-codex-study` for the canonical study preparer.
 
-Each wrapper launches Python in isolated, bytecode-disabled mode through a
-release-local entrypoint that inserts only the packaged SDK source before
-entering the runtime. Ordinary wrapper execution therefore cannot add
-`__pycache__` entries to the immutable release. The packaged SDK subtree is
+Each wrapper verifies the exact manifest closure, seals every verified file,
+and asks the system bubblewrap runtime to copy those descriptors into a
+private read-only mount snapshot over the release coordinate. It then launches
+the sealed selected Python from inside that snapshot in isolated,
+bytecode-disabled mode through a release-local entrypoint that inserts only the
+packaged SDK source before entering the runtime. Imports and adjacent schema or
+module-digest reads therefore remain bound to the bytes already verified even
+if the host release path is replaced concurrently. Ordinary wrapper execution
+also cannot add `__pycache__` entries to the immutable release. Bubblewrap at
+`/usr/bin/bwrap` and unprivileged user/mount namespaces are host prerequisites.
+The packaged SDK subtree is
 also a valid `--aoa-sdk-root` for study
 preparation because it carries the exact non-Python contracts consumed there.
 `status` rejects extra files, directories, symlinks, or missing entries,
@@ -247,9 +254,11 @@ releases; release IDs must be exact SHA-256 identifiers whose resolved
 directory and manifest identity remain inside the release root. Installation
 also verifies that the packaged `aoa-agents` and `aoa-skills` schema bytes have
 the exact digests pinned by the runtime profile. Install, activation, and
-status also require the recorded Python coordinate to remain a regular
-executable compatible CPython 3.11-or-newer interpreter, proven by an isolated
-probe rather than the executable bit alone. Dirty worktree installation is
+status also require the recorded Python coordinate to remain a direct ELF
+CPython 3.11-or-newer executable, proven by an isolated probe whose
+`/proc/self/exe` identity must match the admitted file. Scripts and delegate
+shims are rejected rather than trusting an unbound downstream interpreter.
+Dirty worktree installation is
 rejected unless every dirty source posture is explicitly admitted. This
 includes index-hidden packaged files marked assume-unchanged or skip-worktree
 and ignored files that would enter the packaged SDK; their path sets are

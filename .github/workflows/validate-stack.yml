@@ -46,10 +46,10 @@ jobs:
           python -m pip install -r requirements-dev.txt
           python -m pip install "$RUNNER_TEMP/aoa-sdk-source"
 
-      - name: Install shellcheck, rsync, zsh, podman and podman-compose
+      - name: Install bubblewrap, shellcheck, rsync, zsh, podman and podman-compose
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck rsync zsh podman podman-compose
+          sudo apt-get install -y bubblewrap shellcheck rsync zsh podman podman-compose
 
       - name: Run release audit including routing canary contract
         env:

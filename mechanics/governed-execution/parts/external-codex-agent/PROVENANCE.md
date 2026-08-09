@@ -85,6 +85,8 @@ pinned `aoa-agents`/`aoa-skills` owner schemas into separate release subtrees un
 content-addressed manifest. The release identity is a canonical digest over
 every delivered path, size, and byte digest. The active receipt additionally
 records all four Git HEADs and dirty postures, status digests, Python executable, and
-the prior active release. This proves which local bytes a wrapper can execute;
+the prior active release. At each invocation the wrapper seals those bytes and
+materializes the complete manifest as a private read-only mount snapshot before
+imports begin. This proves which local bytes a wrapper can execute;
 it does not turn dirty source into a landed SDK/runtime release or substitute
 for remote CI.

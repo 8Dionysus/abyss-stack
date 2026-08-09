@@ -4,8 +4,10 @@ import importlib.util
 import json
 import os
 import shlex
+import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -236,11 +238,7 @@ def test_interpreter_activation_publishes_at_active_record(
         allow_dirty_skills=False,
     )
     alternate_python = tmp_path / "alternate-python"
-    alternate_python.write_text(
-        "#!/bin/sh\n"
-        f"exec {shlex.quote(str(Path(sys.executable).resolve()))} \"$@\"\n",
-        encoding="utf-8",
-    )
+    shutil.copyfile(Path(sys.executable).resolve(), alternate_python)
     alternate_python.chmod(0o700)
     active_path = runtime_root / "active.json"
     original_atomic_write = runtime_install.atomic_write
@@ -339,11 +337,7 @@ def test_wrapper_rejects_compatible_interpreter_replacement(
     bin_dir = tmp_path / "bin"
     real_python = Path(sys.executable).resolve()
     selected_python = tmp_path / "selected-python"
-    selected_python.write_text(
-        "#!/bin/sh\n"
-        f"exec {shlex.quote(str(real_python))} \"$@\"\n",
-        encoding="utf-8",
-    )
+    shutil.copyfile(real_python, selected_python)
     selected_python.chmod(0o700)
     receipt = runtime_install.install(
         source,
@@ -388,6 +382,38 @@ def test_wrapper_rejects_compatible_interpreter_replacement(
         runtime_install.status(runtime_root, bin_dir)
 
 
+def test_install_rejects_python_shim_with_unbound_delegate(tmp_path: Path) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    real_python = Path(sys.executable).resolve()
+    shim = tmp_path / "python-shim"
+    shim.write_text(
+        "#!/bin/sh\n"
+        f"exec {shlex.quote(str(real_python))} \"$@\"\n",
+        encoding="utf-8",
+    )
+    shim.chmod(0o700)
+    runtime_root = tmp_path / "runtime"
+    bin_dir = tmp_path / "bin"
+
+    with pytest.raises(runtime_install.InstallError, match="direct CPython ELF"):
+        runtime_install.install(
+            source,
+            sdk,
+            agents,
+            skills,
+            runtime_root,
+            bin_dir,
+            shim,
+            allow_dirty_source=False,
+            allow_dirty_sdk=False,
+            allow_dirty_agents=False,
+            allow_dirty_skills=False,
+        )
+
+    assert not (runtime_root / "active.json").exists()
+    assert not bin_dir.exists()
+
+
 def test_install_rejects_interpreter_drift_before_activation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -397,11 +423,7 @@ def test_install_rejects_interpreter_drift_before_activation(
     bin_dir = tmp_path / "bin"
     real_python = Path(sys.executable).resolve()
     selected_python = tmp_path / "selected-python"
-    selected_python.write_text(
-        "#!/bin/sh\n"
-        f"exec {shlex.quote(str(real_python))} \"$@\"\n",
-        encoding="utf-8",
-    )
+    shutil.copyfile(real_python, selected_python)
     selected_python.chmod(0o700)
     original_require = runtime_install.require_python_executable
     selected_admissions = 0
@@ -445,6 +467,82 @@ def test_install_rejects_interpreter_drift_before_activation(
     assert selected_admissions == 1
     assert not (runtime_root / "active.json").exists()
     assert not bin_dir.exists()
+
+
+def test_wrapper_imports_from_private_verified_release_snapshot(
+    tmp_path: Path,
+) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    deferred = sdk / "src/aoa_sdk/deferred.py"
+    deferred.write_text("MARKER = 'verified-snapshot'\n", encoding="utf-8")
+    commit_all(sdk)
+    controller = (
+        source
+        / "mechanics/governed-execution/parts/external-codex-agent/"
+        "external_codex_agent.py"
+    )
+    controller.write_text(
+        "import os\n"
+        "import time\n"
+        "from pathlib import Path\n"
+        "ready = Path(os.environ['AOA_SNAPSHOT_TEST_READY'])\n"
+        "release = Path(os.environ['AOA_SNAPSHOT_TEST_RELEASE'])\n"
+        "ready.write_text('ready\\n', encoding='utf-8')\n"
+        "while not release.exists():\n"
+        "    time.sleep(0.01)\n"
+        "from aoa_sdk import deferred\n"
+        "print(deferred.MARKER)\n",
+        encoding="utf-8",
+    )
+    commit_all(source)
+    runtime_root = tmp_path / "runtime"
+    bin_dir = tmp_path / "bin"
+    receipt = runtime_install.install(
+        source,
+        sdk,
+        agents,
+        skills,
+        runtime_root,
+        bin_dir,
+        Path(sys.executable),
+        allow_dirty_source=False,
+        allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
+    )
+    ready = tmp_path / "snapshot-ready"
+    release = tmp_path / "snapshot-release"
+    environment = dict(os.environ)
+    environment.update(
+        {
+            "AOA_SNAPSHOT_TEST_READY": str(ready),
+            "AOA_SNAPSHOT_TEST_RELEASE": str(release),
+        }
+    )
+    process = subprocess.Popen(
+        [str(bin_dir / "aoa-external-codex-agent")],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=environment,
+    )
+    deadline = time.monotonic() + 10
+    while not ready.exists() and process.poll() is None and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert ready.exists(), f"snapshot actor did not become ready; returncode={process.poll()}"
+    installed_deferred = (
+        Path(receipt["active"]["release_root"])
+        / "sdk/src/aoa_sdk/deferred.py"
+    )
+    installed_deferred.parent.chmod(0o755)
+    installed_deferred.chmod(0o644)
+    installed_deferred.write_text("MARKER = 'mutated-host-release'\n", encoding="utf-8")
+    release.write_text("continue\n", encoding="utf-8")
+
+    stdout, stderr = process.communicate(timeout=10)
+
+    assert process.returncode == 0, stderr
+    assert stdout == "verified-snapshot\n"
 
 
 def test_git_posture_does_not_run_repository_fsmonitor_or_content_filter(

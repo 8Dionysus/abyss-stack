@@ -119,8 +119,10 @@ distilled return. The fake Codex fixture exercises both filtered and wake branch
 separate live receipts are required for the installed product surface. The
 installer suite additionally proves that index-hidden packaged source and
 ignored files entering the packaged SDK require explicit dirty-source
-admission, and that activation plus status reject an executable which cannot
-pass the isolated compatible-CPython probe. Wrapper execution under writable
+admission, and that activation plus status reject a non-CPython executable or
+an interpreter shim whose eventual delegate is not bound. A synchronized
+host-path replacement after wrapper verification proves that a deferred import
+still reads the private verified snapshot. Wrapper execution under writable
 directory modes is also proven not to create bytecode inside the immutable
 release. A clean-checkout race between initial posture capture and release
 hashing is proven to fail before wrapper or active-receipt publication. The

@@ -176,6 +176,7 @@ GIT_CONFIG_DRIVEN_HELPER_SUBCOMMANDS = frozenset(
         "fetch",
         "format-patch",
         "grep",
+        "init",
         "log",
         "notes",
         "range-diff",

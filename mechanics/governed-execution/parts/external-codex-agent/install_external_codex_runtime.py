@@ -49,6 +49,7 @@ OWNER_CONTRACT_FILES = (
 INSTALLER_GIT = "/usr/bin/git"
 SHARED_INDEX_MAX_BYTES = 512 * 1024 * 1024
 WRAPPER_BOOTSTRAP_PYTHON = Path("/usr/bin/python3")
+BWRAP_EXECUTABLE = Path("/usr/bin/bwrap")
 
 
 class InstallError(RuntimeError):
@@ -98,9 +99,12 @@ def require_python_executable(path: Path) -> tuple[Path, dict[str, object]]:
     if not os.access(candidate, os.X_OK):
         raise InstallError(f"Python executable is not executable: {candidate}")
     probe = (
-        "import json,platform,sys;"
+        "import json,os,platform,sys;"
+        "executable=os.stat('/proc/self/exe');"
         "print(json.dumps({'implementation':platform.python_implementation(),"
-        "'version':[sys.version_info.major,sys.version_info.minor]},"
+        "'version':[sys.version_info.major,sys.version_info.minor],"
+        "'executable_device':executable.st_dev,"
+        "'executable_inode':executable.st_ino},"
         "sort_keys=True,separators=(',',':')))"
     )
     flags = os.O_RDONLY | os.O_CLOEXEC
@@ -116,6 +120,12 @@ def require_python_executable(path: Path) -> tuple[Path, dict[str, object]]:
             raise InstallError(f"Python executable is not a regular file: {candidate}")
         if metadata.st_mode & 0o111 == 0:
             raise InstallError(f"Python executable is not executable: {candidate}")
+        elf_magic = os.pread(descriptor, 4, 0)
+        if elf_magic != b"\x7fELF":
+            raise InstallError(
+                "Python executable must be a direct CPython ELF executable, "
+                f"not a script or interpreter shim: {candidate}"
+            )
         identity = {
             "sha256": _descriptor_sha256(descriptor),
             "size": metadata.st_size,
@@ -152,9 +162,11 @@ def require_python_executable(path: Path) -> tuple[Path, dict[str, object]]:
         or len(version) != 2
         or not all(isinstance(item, int) for item in version)
         or tuple(version) < (3, 11)
+        or payload.get("executable_device") != identity["device"]
+        or payload.get("executable_inode") != identity["inode"]
     ):
         raise InstallError(
-            "Python executable must be compatible CPython 3.11 or newer: "
+            "Python executable must be a direct compatible CPython 3.11 or newer: "
             f"{candidate}; expected at least {expected}"
         )
     return candidate, identity
@@ -164,9 +176,77 @@ def assert_python_identity_unchanged(
     path: Path,
     expected_identity: dict[str, object],
 ) -> None:
-    _, observed_identity = require_python_executable(path)
+    try:
+        _, observed_identity = require_python_executable(path)
+    except InstallError as exc:
+        raise InstallError("Python executable identity changed before activation") from exc
     if observed_identity != expected_identity:
         raise InstallError("Python executable identity changed before activation")
+
+
+def require_snapshot_runtime() -> Path:
+    candidate = require_regular_file(
+        BWRAP_EXECUTABLE.resolve(),
+        "bubblewrap snapshot runtime",
+    )
+    if not os.access(candidate, os.X_OK):
+        raise InstallError(f"bubblewrap snapshot runtime is not executable: {candidate}")
+    flags = os.O_RDONLY | os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(candidate, flags)
+    except OSError as exc:
+        raise InstallError(
+            f"bubblewrap snapshot runtime cannot be opened safely: {candidate}"
+        ) from exc
+    data_descriptor = os.memfd_create("aoa-bwrap-admission", os.MFD_CLOEXEC)
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_mode & 0o111 == 0:
+            raise InstallError(f"bubblewrap snapshot runtime is invalid: {candidate}")
+        os.write(data_descriptor, b"verified\n")
+        os.lseek(data_descriptor, 0, os.SEEK_SET)
+        try:
+            completed = subprocess.run(
+                [
+                    f"/proc/self/fd/{descriptor}",
+                    "--bind",
+                    "/",
+                    "/",
+                    "--tmpfs",
+                    "/tmp",
+                    "--perms",
+                    "0444",
+                    "--ro-bind-data",
+                    str(data_descriptor),
+                    "/tmp/aoa-external-codex-bwrap-probe",
+                    "--",
+                    "/usr/bin/test",
+                    "-r",
+                    "/tmp/aoa-external-codex-bwrap-probe",
+                ],
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=10,
+                pass_fds=(descriptor, data_descriptor),
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise InstallError(
+                f"bubblewrap snapshot runtime compatibility probe failed: {candidate}"
+            ) from exc
+    finally:
+        os.close(data_descriptor)
+        os.close(descriptor)
+    if completed.returncode != 0:
+        detail = completed.stderr.strip()
+        suffix = f": {detail}" if detail else ""
+        raise InstallError(
+            f"bubblewrap snapshot runtime compatibility probe failed: {candidate}{suffix}"
+        )
+    return candidate
 
 
 def require_regular_file(path: Path, label: str) -> Path:
@@ -641,6 +721,7 @@ from pathlib import Path
 ACTIVE = Path(sys.argv[1])
 RUNTIME_ROOT = Path(sys.argv[2])
 ENTRYPOINT_NAME = sys.argv[3]
+BWRAP = Path("/usr/bin/bwrap")
 
 FILE_FLAGS = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
 DIRECTORY_FLAGS = FILE_FLAGS | os.O_DIRECTORY
@@ -817,7 +898,8 @@ manifest_descriptor, _ = open_regular_at(
     "release-manifest.json",
 )
 try:
-    manifest = json.loads(read_all(manifest_descriptor, 16 * 1024 * 1024))
+    manifest_raw = read_all(manifest_descriptor, 16 * 1024 * 1024)
+    manifest = json.loads(manifest_raw)
 finally:
     os.close(manifest_descriptor)
 if not isinstance(manifest, dict):
@@ -842,7 +924,13 @@ if (
 
 expected_files = {Path("release-manifest.json")}
 expected_directories = set()
-entrypoint_descriptor = None
+snapshot_descriptors = [
+    (
+        Path("release-manifest.json"),
+        sealed_memfd("aoa-external-codex-release-manifest", manifest_raw),
+    )
+]
+entrypoint_present = False
 for row in rows:
     if not isinstance(row, dict):
         os.close(release_descriptor)
@@ -862,25 +950,28 @@ for row in rows:
         os.close(descriptor)
         os.close(release_descriptor)
         raise SystemExit(f"external Codex release file drift: {relative}")
+    snapshot_descriptors.append(
+        (
+            relative,
+            sealed_memfd("aoa-external-codex-release-file", raw),
+        )
+    )
     if relative == Path(ENTRYPOINT_NAME):
-        entrypoint_descriptor = sealed_memfd("aoa-external-codex-entrypoint", raw)
+        entrypoint_present = True
     os.close(descriptor)
 expected_directories.discard(Path("."))
 actual_files, actual_directories = release_closure(release_descriptor)
 if (
     actual_files != expected_files
     or actual_directories != expected_directories
-    or entrypoint_descriptor is None
+    or not entrypoint_present
 ):
-    if entrypoint_descriptor is not None:
-        os.close(entrypoint_descriptor)
     os.close(release_descriptor)
     raise SystemExit("external Codex release manifest closure mismatch")
 
 try:
     python_descriptor = os.open(runtime_python, FILE_FLAGS)
 except OSError as exc:
-    os.close(entrypoint_descriptor)
     os.close(release_descriptor)
     raise SystemExit(
         f"external Codex active interpreter is unavailable: {runtime_python}"
@@ -899,7 +990,6 @@ if (
     or observed_python_identity != python_identity
 ):
     os.close(python_descriptor)
-    os.close(entrypoint_descriptor)
     os.close(release_descriptor)
     raise SystemExit("external Codex active interpreter identity drift")
 verified_python_descriptor = sealed_memfd(
@@ -907,27 +997,95 @@ verified_python_descriptor = sealed_memfd(
     python_raw,
 )
 os.close(python_descriptor)
-if os.execve not in os.supports_fd:
-    os.close(verified_python_descriptor)
-    os.close(entrypoint_descriptor)
+
+try:
+    bwrap_descriptor = os.open(BWRAP, FILE_FLAGS)
+except OSError as exc:
     os.close(release_descriptor)
-    raise SystemExit("external Codex host cannot execute a verified interpreter descriptor")
-os.set_inheritable(verified_python_descriptor, True)
-os.set_inheritable(entrypoint_descriptor, True)
-os.set_inheritable(release_descriptor, True)
-environment = dict(os.environ)
-environment["AOA_EXTERNAL_CODEX_VERIFIED_RELEASE_ROOT"] = (
-    f"/proc/self/fd/{release_descriptor}"
+    raise SystemExit(
+        f"external Codex snapshot runtime is unavailable: {BWRAP}"
+    ) from exc
+bwrap_metadata = os.fstat(bwrap_descriptor)
+if not stat.S_ISREG(bwrap_metadata.st_mode) or bwrap_metadata.st_mode & 0o111 == 0:
+    os.close(bwrap_descriptor)
+    os.close(release_descriptor)
+    raise SystemExit(f"external Codex snapshot runtime is invalid: {BWRAP}")
+verified_bwrap_descriptor = sealed_memfd(
+    "aoa-external-codex-bwrap",
+    read_all(bwrap_descriptor),
 )
-os.execve(
-    verified_python_descriptor,
-    [
-        str(runtime_python),
+os.close(bwrap_descriptor)
+if os.execve not in os.supports_fd:
+    os.close(verified_bwrap_descriptor)
+    os.close(verified_python_descriptor)
+    os.close(release_descriptor)
+    raise SystemExit("external Codex host cannot execute a verified snapshot runtime")
+
+snapshot_python = release_root / ".verified-python"
+snapshot_bootstrap = (
+    "from pathlib import Path\\n"
+    "import os\\n"
+    "import runpy\\n"
+    "import sys\\n"
+    "runtime_python = Path(sys.argv[1])\\n"
+    "entrypoint = Path(sys.argv[2])\\n"
+    "running = os.stat('/proc/self/exe')\\n"
+    "admitted = runtime_python.stat()\\n"
+    "if (running.st_dev, running.st_ino) != (admitted.st_dev, admitted.st_ino):\\n"
+    "    raise SystemExit('external Codex runtime interpreter delegated after admission')\\n"
+    "sys.argv = [str(entrypoint), *sys.argv[3:]]\\n"
+    "runpy.run_path(str(entrypoint), run_name='__main__')\\n"
+)
+bwrap_arguments = [
+    str(BWRAP),
+    "--die-with-parent",
+    "--bind",
+    "/",
+    "/",
+    "--tmpfs",
+    str(release_root),
+]
+for relative in sorted(expected_directories, key=lambda item: (len(item.parts), str(item))):
+    bwrap_arguments.extend(("--dir", str(release_root / relative)))
+for relative, descriptor in sorted(snapshot_descriptors, key=lambda item: str(item[0])):
+    os.set_inheritable(descriptor, True)
+    bwrap_arguments.extend(
+        (
+            "--perms",
+            "0444",
+            "--ro-bind-data",
+            str(descriptor),
+            str(release_root / relative),
+        )
+    )
+os.set_inheritable(verified_python_descriptor, True)
+bwrap_arguments.extend(
+    (
+        "--perms",
+        "0500",
+        "--ro-bind-data",
+        str(verified_python_descriptor),
+        str(snapshot_python),
+        "--remount-ro",
+        str(release_root),
+        "--",
+        str(snapshot_python),
         "-I",
         "-B",
-        f"/proc/self/fd/{entrypoint_descriptor}",
+        "-c",
+        snapshot_bootstrap,
+        str(snapshot_python),
+        str(release_root / ENTRYPOINT_NAME),
         *sys.argv[4:],
-    ],
+    )
+)
+os.set_inheritable(verified_bwrap_descriptor, True)
+environment = dict(os.environ)
+environment["AOA_EXTERNAL_CODEX_VERIFIED_RELEASE_ROOT"] = str(release_root)
+os.close(release_descriptor)
+os.execve(
+    verified_bwrap_descriptor,
+    bwrap_arguments,
     environment,
 )
 '''
@@ -1113,6 +1271,7 @@ def install(
         python_executable
     )
     require_python_executable(WRAPPER_BOOTSTRAP_PYTHON)
+    require_snapshot_runtime()
     files = source_files(source_root, sdk_root, agents_root, skills_root)
     postures = source_postures(
         files,
@@ -1260,6 +1419,7 @@ def activate(
         python_executable
     )
     require_python_executable(WRAPPER_BOOTSTRAP_PYTHON)
+    require_snapshot_runtime()
     verify_release(release_root)
     assert_python_identity_unchanged(python_executable, python_identity)
     active_path = runtime_root / "active.json"
@@ -1310,10 +1470,16 @@ def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
     python_value = active.get("python_executable")
     if not isinstance(python_value, str):
         raise InstallError("active Python executable is invalid")
-    _, observed_python_identity = require_python_executable(Path(python_value))
+    try:
+        _, observed_python_identity = require_python_executable(Path(python_value))
+    except InstallError as exc:
+        raise InstallError(
+            f"active Python executable identity drift: {exc}"
+        ) from exc
     if active.get("python_identity") != observed_python_identity:
         raise InstallError("active Python executable identity drift")
     require_python_executable(WRAPPER_BOOTSTRAP_PYTHON)
+    require_snapshot_runtime()
     release_id = active.get("release_id")
     if not isinstance(release_id, str):
         raise InstallError("active release id is invalid")
