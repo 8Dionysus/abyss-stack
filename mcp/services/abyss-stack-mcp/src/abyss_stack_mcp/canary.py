@@ -144,6 +144,8 @@ class CanaryReceipt(StrictModel):
     deployment_tree_digest: Digest
     deployment_deployed_at: datetime
     process_unit_name: NonEmpty
+    process_identity_before: NonEmpty
+    process_identity_after: NonEmpty
     process_identity: NonEmpty
     canary_route: NonEmpty
     tool_name: Identifier
@@ -204,6 +206,14 @@ class CanaryReceipt(StrictModel):
             is None
         ):
             raise ValueError("canary process identity must bind its named systemd unit")
+        if not (
+            self.process_identity_before
+            == self.process_identity_after
+            == self.process_identity
+        ):
+            raise ValueError(
+                "canary before/after process identities must be unchanged"
+            )
         if self.result_contract_matched and not self.call_succeeded:
             raise ValueError(
                 "a matching canary result contract requires a successful call"
@@ -953,6 +963,8 @@ def _receipt_body(
     expires_at: datetime,
     deployment: CanaryDeploymentBinding,
     process_identity: str,
+    process_identity_before: str,
+    process_identity_after: str,
     process_unit_name: str,
 ) -> dict[str, Any]:
     contract_matched = False
@@ -989,6 +1001,8 @@ def _receipt_body(
         "deployment_tree_digest": deployment.deployed_tree_digest,
         "deployment_deployed_at": deployment.deployed_at.isoformat(),
         "process_unit_name": process_unit_name,
+        "process_identity_before": process_identity_before,
+        "process_identity_after": process_identity_after,
         "process_identity": process_identity,
         "canary_route": target.canary_route,
         "tool_name": contract.tool_name,
@@ -1116,10 +1130,20 @@ def build_receipt(
     signing_key: Ed25519PrivateKey,
     deployment: CanaryDeploymentBinding,
     process_identity: str,
+    process_identity_before: str | None = None,
+    process_identity_after: str | None = None,
     process_unit_name: str | None = None,
 ) -> CanaryReceipt:
     if not 30 <= ttl_seconds <= 3600:
         raise CanaryRunnerError("canary receipt TTL must be 30..3600 seconds")
+    process_identity_before = process_identity_before or process_identity
+    process_identity_after = process_identity_after or process_identity
+    if not (
+        process_identity_before == process_identity_after == process_identity
+    ):
+        raise CanaryRunnerError(
+            "canary before/after process identities must be unchanged"
+        )
     observed_at = observed_at.astimezone(timezone.utc)
     if observed_at < deployment.deployed_at:
         raise CanaryRunnerError("canary receipt must follow its exact deployment")
@@ -1132,6 +1156,8 @@ def build_receipt(
         expires_at=expires_at,
         deployment=deployment,
         process_identity=process_identity,
+        process_identity_before=process_identity_before,
+        process_identity_after=process_identity_after,
         process_unit_name=process_unit_name or target.unit_name,
     )
     try:
@@ -1293,6 +1319,8 @@ async def run_canary(
         signing_key=signing_key,
         deployment=deployment,
         process_identity=process_after,
+        process_identity_before=process_before,
+        process_identity_after=process_after,
         process_unit_name=observed_target.unit_name,
     )
     root = _ensure_private_directory(output_root)

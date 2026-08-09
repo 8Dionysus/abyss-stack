@@ -352,6 +352,7 @@ def compose_admission_revision(
         raise AdmissionRevisionError(
             "operator decision content address is invalid"
         ) from exc
+    now = clock().astimezone(timezone.utc)
     records = [item for item in registry.records if item.organ_id == "aoa-kag"]
     if len(records) != 1:
         raise AdmissionRevisionError("registry lacks one KAG organ")
@@ -363,7 +364,7 @@ def compose_admission_revision(
     contour_digest = sha256_digest(contour.model_dump(mode="json"))
     refreshes_expired_admission = (
         contour.registry_state == "admitted"
-        and decision.decided_at >= contour.currentness_expires_at
+        and now >= contour.currentness_expires_at
     )
     if (
         contour.endpoint is None
@@ -390,7 +391,6 @@ def compose_admission_revision(
     lkg = _subject(lkg_observation)
     _require_production_process(current, "current")
     _require_production_process(lkg, "last-known-good")
-    now = clock().astimezone(timezone.utc)
     if (
         observation.generated_at > now + MAX_OVERLAY_FUTURE_SKEW
         or lkg_observation.generated_at > now + MAX_OVERLAY_FUTURE_SKEW

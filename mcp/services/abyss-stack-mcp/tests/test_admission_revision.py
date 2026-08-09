@@ -348,6 +348,46 @@ def test_rejects_refresh_of_current_admitted_contour(tmp_path: Path) -> None:
         _compose(paths)
 
 
+def test_future_decision_cannot_refresh_a_still_current_admitted_contour(
+    tmp_path: Path,
+) -> None:
+    paths = _inputs(tmp_path)
+    registry = json.loads(paths["registry"].read_text())
+    contour = registry["records"][0]["contours"][0]
+    runtime_ref = contour["runtime_identity_evidence"][0]
+    contour.update(
+        {
+            "registry_state": "admitted",
+            "currentness": "current",
+            "currentness_expires_at": (NOW + timedelta(minutes=3)).isoformat(),
+            "activation_preconditions": [runtime_ref],
+            "proof_refs": [runtime_ref],
+            "acceptance_refs": [runtime_ref],
+        }
+    )
+    admitted = OrganRegistrySourceV2.model_validate(registry)
+    _write(paths["registry"], admitted.model_dump(mode="json"))
+    contour_digest = sha256_digest(
+        admitted.records[0].contours[0].model_dump(mode="json")
+    )
+    decision = materialize_admission_decision(
+        AdmissionDecisionStatement(
+            candidate_id=contour_digest,
+            decision_kind="operator",
+            issuer=admitted.workspace_owner,
+            decision="accepted",
+            decision_ref="owner://os-abyss/goal/mcp-next-future-decision",
+            decision_artifact_digest=contour_digest,
+            decided_at=NOW + timedelta(minutes=4),
+            expires_at=NOW + timedelta(hours=1),
+        )
+    )
+    _write(paths["decision"], decision.model_dump(mode="json"))
+
+    with pytest.raises(AdmissionRevisionError, match="expired admitted"):
+        _compose(paths)
+
+
 def test_accepts_stable_executable_rollback_target_for_live_lkg_process(
     tmp_path: Path,
 ) -> None:

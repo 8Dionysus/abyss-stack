@@ -330,6 +330,8 @@ def test_receipt_is_content_addressed_and_preserves_claim_limit() -> None:
     )
     assert receipt.reason_codes == ()
     assert receipt.process_unit_name == target().unit_name
+    assert receipt.process_identity_before == PROCESS_IDENTITY
+    assert receipt.process_identity_after == PROCESS_IDENTITY
     assert receipt.process_identity == PROCESS_IDENTITY
     assert "owner freshness" in receipt.claim_limit
     assert receipt.server_version == "0.1.0"
@@ -386,6 +388,22 @@ def test_receipt_verification_requires_current_success_and_pinned_signer() -> No
             SIGNING_KEY.public_key(),
             checked_at=NOW,
             require_success=True,
+        )
+
+
+def test_receipt_rejects_changed_before_after_process_identity() -> None:
+    changed = PROCESS_IDENTITY.replace("start:654", "start:655")
+    with pytest.raises(CanaryRunnerError, match="before/after process identities"):
+        build_receipt(
+            target=target(),
+            contract=canary_contract(),
+            probe=successful_probe(),
+            observed_at=NOW,
+            ttl_seconds=600,
+            signing_key=SIGNING_KEY,
+            deployment=deployment_binding(),
+            process_identity_before=PROCESS_IDENTITY,
+            process_identity_after=changed,
         )
 
 
