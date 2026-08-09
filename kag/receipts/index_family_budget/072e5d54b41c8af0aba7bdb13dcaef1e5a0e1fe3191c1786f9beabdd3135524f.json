@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 10171436,
+  "allowed_tracked_bytes": 31020795,
+  "approved_by": "repository-owner",
+  "base_ref": "3af24d31f749631c03141a981fea1a1aa7792ddb",
+  "changed_generated_bytes": 10171436,
+  "changed_generated_files": 117,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "072e5d54b41c8af0aba7bdb13dcaef1e5a0e1fe3191c1786f9beabdd3135524f",
+  "reason": "Preserve legacy canary v3 verification while requiring explicit process proof for new admission",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 31020795,
+  "tracked_bytes_max": 24117248
+}

@@ -35,7 +35,10 @@ authorizes either contour:
   contour revision only after exact current and last-known-good observations,
   central proof, KAG owner acceptance, consumer compatibility, rollback
   readiness, and a separately issued operator decision all bind the same
-  shadow predecessor;
+  predecessor. The predecessor may be a shadow contour for first admission or
+  an admitted contour whose currentness window has already expired according
+  to the normalized composition clock; a still-current admitted contour and a
+  merely future-dated decision both fail closed;
 - `abyss-stack-mcp-system-status` combines that private projection with the
   managed catalog, owner registry, protocol-lab verdict, and aggregate SDK
   TaskStore state into one private, content-addressed read model.
@@ -672,9 +675,9 @@ authorize an effect.
 
 Runtime dependencies and the build backend are exact pins in
 `requirements.constraints`; the one direct artifact requirement is the immutable
-`aoa-sdk v0.10.1` GitHub Release wheel. The committed `requirements.lock` binds
+`aoa-sdk v0.10.2` GitHub Release wheel. The committed `requirements.lock` binds
 that public release to SHA-256
-`7222d373044506d0e79175c364b64e3a6ed6a164650af0db54dcce1fcf67f6ad`
+`cf512a7b0a00f8707e21b3950b147d01b7fd2317d64ce7fbcba004a2d1846e2f`
 and carries hashes for the entire resolved closure. The validator rejects any
 other SDK URL or digest. Regenerate the lock from the repository root with
 `pip-tools==7.6.0`:

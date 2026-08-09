@@ -1660,7 +1660,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
            "${abyss_stack_mcp_venv}/bin/python" -m pip check >/dev/null && \
        PYTHONDONTWRITEBYTECODE=1 \
          aoa_run_isolated_python "${abyss_stack_mcp_venv}/bin/python" -c \
-           'import abyss_stack_mcp, aoa_sdk, mcp, pydantic; from importlib.metadata import version; assert version("aoa-sdk") == "0.10.1"' >/dev/null; then
+           'import abyss_stack_mcp, aoa_sdk, mcp, pydantic; from importlib.metadata import version; assert version("aoa-sdk") == "0.10.2"' >/dev/null; then
       deployed_digest="$(
         aoa_digest_abyss_stack_mcp_package "$abyss_stack_mcp_service_root"
       )" || \
@@ -1745,7 +1745,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
          "${temp_venv}/bin/python" -m pip check >/dev/null || \
      ! PYTHONDONTWRITEBYTECODE=1 \
        aoa_run_isolated_python "${temp_venv}/bin/python" -c \
-         'import abyss_stack_mcp, aoa_sdk, mcp, pydantic; from importlib.metadata import version; assert version("aoa-sdk") == "0.10.1"' >/dev/null; then
+         'import abyss_stack_mcp, aoa_sdk, mcp, pydantic; from importlib.metadata import version; assert version("aoa-sdk") == "0.10.2"' >/dev/null; then
     rm -rf -- "$temp_venv"
     aoa_die "provisioned abyss-stack MCP runtime failed dependency verification"
   fi

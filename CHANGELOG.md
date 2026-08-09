@@ -9,6 +9,14 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Allow the admission composer to renew an already-admitted contour only after
+  its currentness window has expired according to the normalized composition
+  clock. The refresh remains bound to the exact predecessor digest and the
+  complete current owner/runtime/consumer/proof/acceptance/rollback evidence;
+  a still-current contour and a merely future-dated operator decision both
+  fail closed. The managed stack runtime now pins the public `aoa-sdk 0.10.2`
+  release wheel and its exact SHA-256 so this refresh contract is present in
+  the production dependency closure.
 - Bind registry-v2 runtime overlays to the live named user-systemd process
   identity and the immutable deployment record instead of treating MCP
   `serverInfo` and mutable `latest.json` as process and deployment identities.
