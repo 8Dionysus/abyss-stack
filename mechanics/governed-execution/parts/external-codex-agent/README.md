@@ -118,7 +118,11 @@ The controller:
   filters remain opaque as well, while controller-owned manifest Git probes run
   in a minimal environment with hooks/fsmonitor disabled and diff/textconv
   programs explicitly prohibited; abbreviated `cat-file` filter/textconv and
-  `hash-object --path` forms are covered by the same refusal,
+  `hash-object --path` forms are covered by the same refusal; `hash-object`
+  reads are admitted only with exact `--no-filters` and no filter-enabling,
+  path, write, or literal override, while signature-backed `for-each-ref`
+  format and sort fields are opaque because they invoke the configured
+  verifier,
   ripgrep remains available for ordinary source search, while `--pre`,
   `--hostname-bin`, and `-z`/`--search-zip` are opaque because they launch
   unobserved helpers; `RIPGREP_CONFIG_PATH` is fixed to `/dev/null` so ambient
@@ -136,8 +140,8 @@ The controller:
   mutates repository state below
   the manifest-visible worktree; mutating `symbolic-ref` and `reflog` forms,
   ref/temporary-object helpers whose effects stay below `.git`, and explicit
-  hidden-object write options are also opaque while their read-only inspection
-  forms remain admitted; Git help forms are opaque as well because configured
+  hidden-object write options are also opaque while explicitly filter-free
+  read-only hashing remains admitted; Git help forms are opaque as well because configured
   man viewers can dispatch programs,
   any command carrying a secret-shaped path is classified as secret access,
   and commands are durably observed

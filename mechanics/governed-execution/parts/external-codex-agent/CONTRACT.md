@@ -352,8 +352,10 @@ GNU sed programs are opaque unless the actual invocation includes GNU sed's
 enforced `--sandbox` mode. Git builtins whose output path may invoke
 repository-configured diff, textconv, or fsmonitor helpers are likewise opaque;
 accepted abbreviated `cat-file` filter/textconv and `hash-object --path` forms
-are matched to the same canonical refusal.
-the controller's own exact Git observations remain outside model-issued command
+are matched to the same canonical refusal. `hash-object` is classifiable only
+with exact `--no-filters` and no later filter-enabling, path, write, or literal
+override. Signature-backed `for-each-ref` format and sort fields are opaque
+because they invoke the configured verifier. The controller's own exact Git observations remain outside model-issued command
 admission.
 Jq `env`/`$ENV` access is both opaque and classified as secret access because
 the Codex environment may contain a role-scoped MCP bearer token. Jq file,
@@ -379,8 +381,8 @@ credentials and subcommands may mutate or dispatch configured transports.
 Mutating `git symbolic-ref` and `git reflog` forms, branch/bisect and tree-object
 writers, `hash-object -w`/`--literally`, and `fsck --lost-found` are opaque
 because their persistent effects remain below the manifest-excluded `.git`
-tree. Read-only symbolic-ref, reflog show/exists/list, ordinary hash-object,
-and fsck inspection remain classifiable. Bash `--rcfile` and `--init-file` are
+tree. Read-only symbolic-ref, reflog show/exists/list, explicitly filter-free
+hash-object, and fsck inspection remain classifiable. Bash `--rcfile` and `--init-file` are
 opaque because startup code runs before an otherwise visible `-c` body.
 Shell `source` and `.` bodies remain
 opaque because the observed argv does not expose the sourced commands. Git

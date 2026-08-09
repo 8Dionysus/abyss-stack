@@ -474,6 +474,24 @@ if "FAKE_GIT_CAT_FILE_FILTER" in task["objective"]:
         "status": "completed",
         "exit_code": 0,
     }})
+if "FAKE_GIT_SIGNATURE_FORMAT" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": (
+            "/usr/bin/git for-each-ref --sort=version:signature:grade"
+        ),
+        "status": "completed",
+        "exit_code": 0,
+    }})
+if "FAKE_GIT_HASH_OBJECT_FILTER" in task["objective"]:
+    emit({"type": "item.completed", "item": {
+        "type": "command_execution",
+        "command": (
+            "/usr/bin/git hash-object -- README.md --no-filters"
+        ),
+        "status": "completed",
+        "exit_code": 0,
+    }})
 if "FAKE_RIPGREP_HIDDEN_PROGRAM" in task["objective"]:
     emit({"type": "item.completed", "item": {
         "type": "command_execution",
@@ -3574,7 +3592,7 @@ def test_git_hidden_metadata_mutations_are_fail_closed(command: str) -> None:
         "/usr/bin/git reflog show HEAD",
         "/usr/bin/git reflog exists refs/heads/main",
         "/usr/bin/git reflog list",
-        "/usr/bin/git hash-object README.md",
+        "/usr/bin/git hash-object --no-filters README.md",
         "/usr/bin/git fsck --no-reflogs",
     ),
 )
@@ -3742,6 +3760,23 @@ def test_unadmitted_bare_names_and_awk_are_fail_closed(command: str) -> None:
         "/usr/bin/git grep --textconv bounded",
         "/usr/bin/git hash-object --path=README.md README.md",
         "/usr/bin/git hash-object --pa=README.md README.md",
+        "/usr/bin/git hash-object README.md",
+        "/usr/bin/git hash-object --filters README.md",
+        "/usr/bin/git hash-object --no-filters --filters README.md",
+        "/usr/bin/git hash-object --no-filters --f README.md",
+        "/usr/bin/git hash-object -- README.md --no-filters",
+        "/usr/bin/git for-each-ref '--format=%(signature:grade)'",
+        "/usr/bin/git for-each-ref --format '%(signature:signer)'",
+        "/usr/bin/git for-each-ref '--f=%(signature:key)'",
+        "/usr/bin/git for-each-ref '--fo=%(signature:fingerprint)'",
+        "/usr/bin/git for-each-ref '--format=%(*signature:grade)'",
+        "/usr/bin/git for-each-ref --sort=signature:grade",
+        "/usr/bin/git for-each-ref --sort -signature:grade",
+        "/usr/bin/git for-each-ref --sort '*signature:grade'",
+        "/usr/bin/git for-each-ref --sort=version:signature:grade",
+        "/usr/bin/git for-each-ref --sort=v:signature:signer",
+        "/usr/bin/git for-each-ref --sort=-version:*signature:key",
+        "/usr/bin/git for-each-ref --so signature:signer",
     ),
 )
 def test_startup_and_config_driven_dispatch_are_fail_closed(command: str) -> None:
@@ -3764,6 +3799,21 @@ def test_ordinary_git_cat_file_remains_classifiable() -> None:
     assert RUNTIME._command_has_unclassified_indirection(
         "/usr/bin/git cat-file -p HEAD:README.md"
     ) is False
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/git for-each-ref",
+        "/usr/bin/git for-each-ref '--format=%(refname)'",
+        "/usr/bin/git hash-object --no-filters README.md",
+        "/usr/bin/git hash-object --no-filters -- README.md",
+    ),
+)
+def test_non_dispatching_git_ref_and_hash_reads_remain_classifiable(
+    command: str,
+) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
 
 
 @pytest.mark.parametrize(
@@ -4164,6 +4214,8 @@ def test_started_command_survives_interruption_and_blocks_authority(
         ("FAKE_GIT_CONFIG_READ", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_HIDDEN_PROGRAMS", ["unclassified_indirect_effect"]),
         ("FAKE_GIT_CAT_FILE_FILTER", ["unclassified_indirect_effect"]),
+        ("FAKE_GIT_SIGNATURE_FORMAT", ["unclassified_indirect_effect"]),
+        ("FAKE_GIT_HASH_OBJECT_FILTER", ["unclassified_indirect_effect"]),
         ("FAKE_RIPGREP_HIDDEN_PROGRAM", ["unclassified_indirect_effect"]),
         (
             "FAKE_JQ_ENVIRONMENT_READ",

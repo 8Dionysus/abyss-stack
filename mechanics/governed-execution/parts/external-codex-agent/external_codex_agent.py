@@ -1663,6 +1663,45 @@ def _git_subcommand(tokens: Sequence[str]) -> tuple[str | None, tuple[str, ...]]
     return None, ()
 
 
+def _git_for_each_ref_has_signature_dispatch(git_args: Sequence[str]) -> bool:
+    """Detect ref fields that dispatch the repository-configured verifier."""
+
+    index = 0
+    while index < len(git_args):
+        token = git_args[index]
+        lowered = token.lower()
+        if lowered == "--":
+            break
+        option, separator, attached_value = lowered.partition("=")
+        if len(option) >= len("--f") and "--format".startswith(option):
+            if separator:
+                field_value = attached_value
+            else:
+                index += 1
+                if index >= len(git_args):
+                    return True
+                field_value = git_args[index].lower()
+            if "%(signature" in field_value or "%(*signature" in field_value:
+                return True
+        elif len(option) >= len("--s") and "--sort".startswith(option):
+            if separator:
+                field_value = attached_value
+            else:
+                index += 1
+                if index >= len(git_args):
+                    return True
+                field_value = git_args[index].lower()
+            sort_field = field_value.lstrip("-")
+            if sort_field.startswith("version:"):
+                sort_field = sort_field[len("version:") :]
+            elif sort_field.startswith("v:"):
+                sort_field = sort_field[len("v:") :]
+            if sort_field.lstrip("*").startswith("signature"):
+                return True
+        index += 1
+    return False
+
+
 def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
     """Reject config-driven aliases and external git-subcommand dispatch."""
 
@@ -1728,6 +1767,10 @@ def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
         )
         if positional and positional[0] not in {"exists", "list", "show"}:
             return True
+    if subcommand == "for-each-ref" and _git_for_each_ref_has_signature_dispatch(
+        git_args
+    ):
+        return True
     if subcommand in GIT_CONFIG_DRIVEN_HELPER_SUBCOMMANDS:
         return True
     if subcommand in GIT_FILTER_RUNNING_SUBCOMMANDS:
@@ -1748,22 +1791,40 @@ def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
         value.lower() for value in git_args
     }:
         return True
-    if subcommand == "hash-object" and any(
-        len(value.lower().split("=", 1)[0]) >= len("--pa")
-        and "--path".startswith(value.lower().split("=", 1)[0])
-        for value in git_args
-    ):
-        return True
-    if subcommand == "hash-object" and any(
-        value.lower() == "--literally"
-        or (
-            value.lower().startswith("-")
-            and not value.lower().startswith("--")
-            and "w" in value.lower()[1:]
-        )
-        for value in git_args
-    ):
-        return True
+    if subcommand == "hash-object":
+        try:
+            option_terminator = git_args.index("--")
+        except ValueError:
+            option_args = git_args
+        else:
+            option_args = git_args[:option_terminator]
+        if any(
+            len(value.lower().split("=", 1)[0]) >= len("--pa")
+            and "--path".startswith(value.lower().split("=", 1)[0])
+            for value in option_args
+        ):
+            return True
+        if any(
+            value.lower() == "--literally"
+            or (
+                value.lower().startswith("-")
+                and not value.lower().startswith("--")
+                and "w" in value.lower()[1:]
+            )
+            for value in option_args
+        ):
+            return True
+        # Hashing a workspace path applies clean filters unless the caller
+        # explicitly selects Git's byte-preserving mode. A late repository
+        # config writer can otherwise add a helper after environment setup.
+        if any(
+            len(value.lower().split("=", 1)[0]) >= len("--f")
+            and "--filters".startswith(value.lower().split("=", 1)[0])
+            for value in option_args
+        ):
+            return True
+        if "--no-filters" not in {value.lower() for value in option_args}:
+            return True
     if subcommand == "fsck" and any(
         len(value.lower().split("=", 1)[0]) >= len("--lo")
         and "--lost-found".startswith(value.lower().split("=", 1)[0])

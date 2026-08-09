@@ -99,6 +99,8 @@ credential-bearing Git config read refusal alongside config-write refusal,
 credential-bearing Git remote URL refusal with name listing preserved,
 jq env/$ENV secret-access refusal with ordinary data transforms preserved,
 abbreviated Git cat-file filter/textconv and hash-object path refusal,
+hash-object filter-enabling refusal with exact no-filter hashing preserved,
+signature-backed for-each-ref format/sort verifier refusal,
 Bash rcfile/init-file startup execution refusal,
 hidden Git symbolic-ref, reflog, ref, and object mutation refusal with
 read-only metadata inspection preserved,
