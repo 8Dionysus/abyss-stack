@@ -304,7 +304,7 @@ def test_server_exposes_compact_read_only_kag_surface(tmp_path: Path) -> None:
     tools = {tool.name: tool for tool in asyncio.run(server.list_tools())}
     resources = {str(resource.uri) for resource in asyncio.run(server.list_resources())}
     resource_templates = {
-        str(resource.uriTemplate)
+        str(resource.uri_template)
         for resource in asyncio.run(server.list_resource_templates())
     }
 
@@ -316,17 +316,17 @@ def test_server_exposes_compact_read_only_kag_surface(tmp_path: Path) -> None:
         "kag_traverse",
         "kag_explain",
     }
-    assert all(tool.outputSchema for tool in tools.values())
-    assert all(tool.annotations.readOnlyHint is True for tool in tools.values())
-    assert all(tool.annotations.destructiveHint is False for tool in tools.values())
-    assert tools["kag_search"].inputSchema["properties"]["limit"] == {
+    assert all(tool.output_schema for tool in tools.values())
+    assert all(tool.annotations.read_only_hint is True for tool in tools.values())
+    assert all(tool.annotations.destructive_hint is False for tool in tools.values())
+    assert tools["kag_search"].input_schema["properties"]["limit"] == {
         "default": 10,
         "maximum": 10,
         "minimum": 1,
         "title": "Limit",
         "type": "integer",
     }
-    assert tools["kag_traverse"].inputSchema["properties"]["max_depth"] == {
+    assert tools["kag_traverse"].input_schema["properties"]["max_depth"] == {
         "default": 2,
         "maximum": 4,
         "minimum": 1,

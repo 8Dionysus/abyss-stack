@@ -11,7 +11,8 @@ requires-python = ">=3.11"
 dependencies = [
   "aoa-sdk @ https://github.com/8Dionysus/aoa-sdk/releases/download/v0.10.2/aoa_sdk-0.10.2-py3-none-any.whl",
   "cryptography==48.0.0",
-  "mcp==1.27.2",
+  "httpx==0.28.1",
+  "mcp==2.0.0",
   "pydantic==2.13.4",
 ]
 
@@ -38,6 +39,7 @@ abyss-stack-mcp-managed-topology = "abyss_stack_mcp.managed_topology:main"
 abyss-stack-mcp-admission-automation = "abyss_stack_mcp.admission_automation:main"
 abyss-stack-mcp-admission-revision = "abyss_stack_mcp.admission_revision:main"
 abyss-stack-mcp-system-status = "abyss_stack_mcp.system_status:main"
+abyss-stack-mcp-fleet-admission = "abyss_stack_mcp.fleet_admission:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

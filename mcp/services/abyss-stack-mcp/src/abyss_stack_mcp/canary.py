@@ -737,14 +737,14 @@ async def _collect_pages(
         if not isinstance(page, list):
             raise CanaryRunnerError("MCP inventory response has an invalid shape")
         rows.extend(page)
-        cursor = getattr(response, "nextCursor", None)
+        cursor = getattr(response, "next_cursor", None)
         if not cursor:
             return rows
     raise CanaryRunnerError("MCP inventory exceeded its pagination limit")
 
 
 def _structured_result(result: Any) -> dict[str, Any] | None:
-    structured = getattr(result, "structuredContent", None)
+    structured = getattr(result, "structured_content", None)
     if isinstance(structured, dict):
         return structured
     content = getattr(result, "content", None)
@@ -767,8 +767,8 @@ async def live_probe(
     timeout_seconds: int,
 ) -> CanaryProbeResult:
     try:
-        import httpx
-        from mcp import ClientSession
+        import httpx2
+        from mcp.client import Client
         from mcp.client.streamable_http import streamable_http_client
     except ImportError as exc:
         raise CanaryRunnerError(
@@ -781,119 +781,136 @@ async def live_probe(
         timeout_seconds,
     )
     try:
-        async with httpx.AsyncClient(
+        async with httpx2.AsyncClient(
             headers={"Authorization": f"Bearer {credential}"},
-            timeout=httpx.Timeout(float(request_timeout_seconds)),
+            timeout=httpx2.Timeout(float(request_timeout_seconds)),
         ) as http_client:
-            async with streamable_http_client(
+            transport = streamable_http_client(
                 target.endpoint_ref,
                 http_client=http_client,
-            ) as (read_stream, write_stream, _):
-                async with ClientSession(read_stream, write_stream) as session:
-                    initialized = await session.initialize()
-                    capabilities = initialized.capabilities
-                    tools = await _collect_pages(session.list_tools, "tools")
-                    resources: list[Any] = []
-                    resource_templates: list[Any] = []
-                    prompts: list[Any] = []
-                    if getattr(capabilities, "resources", None) is not None:
-                        resources = await _collect_pages(
-                            session.list_resources,
-                            "resources",
-                        )
-                        resource_templates = await _collect_pages(
-                            session.list_resource_templates,
-                            "resourceTemplates",
-                        )
-                    if getattr(capabilities, "prompts", None) is not None:
-                        prompts = await _collect_pages(
-                            session.list_prompts,
-                            "prompts",
-                        )
-                    inventory = {
-                        "protocol_version": initialized.protocolVersion,
-                        "tools": sorted(
-                            (_model_json(item) for item in tools),
-                            key=lambda item: str(item.get("name", "")),
-                        ),
-                        "resources": sorted(
-                            (_model_json(item) for item in resources),
-                            key=lambda item: str(item.get("uri", "")),
-                        ),
-                        "resource_templates": sorted(
-                            (_model_json(item) for item in resource_templates),
-                            key=lambda item: str(item.get("uriTemplate", "")),
-                        ),
-                        "prompts": sorted(
-                            (_model_json(item) for item in prompts),
-                            key=lambda item: str(item.get("name", "")),
-                        ),
-                    }
-                    _reject_secret_material(inventory)
-                    server_schema_digest = _bounded_digest(
-                        inventory,
-                        limit=MAX_SCHEMA_BYTES,
-                        label="MCP server schema inventory",
+            )
+            async with Client(
+                transport,
+                mode="auto",
+                raise_exceptions=True,
+                read_timeout_seconds=float(request_timeout_seconds),
+            ) as client:
+                if client.protocol_version != "2026-07-28":
+                    raise CanaryRunnerError(
+                        "MCP canary did not negotiate the required modern wire"
                     )
-                    selected = next(
-                        (
-                            item
-                            for item in inventory["tools"]
-                            if item.get("name") == contract.tool_name
-                        ),
-                        None,
+                if client.session.discover_result is None:
+                    raise CanaryRunnerError(
+                        "MCP canary reached legacy initialization instead of server/discover"
                     )
-                    if selected is None:
-                        raise CanaryRunnerError(
-                            "committed canary tool is absent from MCP inventory"
-                        )
-                    selected_tool_schema_digest = _bounded_digest(
-                        selected,
-                        limit=MAX_SCHEMA_BYTES,
-                        label="selected MCP tool schema",
+                server_info = client.server_info
+                if server_info is None:
+                    raise CanaryRunnerError(
+                        "MCP canary server omitted its application identity"
                     )
-                    call_started = time.monotonic()
-                    result = await session.call_tool(
-                        contract.tool_name,
-                        contract.arguments,
-                        read_timeout_seconds=timedelta(seconds=request_timeout_seconds),
+                capabilities = client.server_capabilities
+                tools = await _collect_pages(client.list_tools, "tools")
+                resources: list[Any] = []
+                resource_templates: list[Any] = []
+                prompts: list[Any] = []
+                if getattr(capabilities, "resources", None) is not None:
+                    resources = await _collect_pages(
+                        client.list_resources,
+                        "resources",
                     )
-                    call_latency_ms = int((time.monotonic() - call_started) * 1000)
-                    payload = _structured_result(result)
-                    call_succeeded = (
-                        not bool(getattr(result, "isError", False))
-                        and payload is not None
+                    resource_templates = await _collect_pages(
+                        client.list_resource_templates,
+                        "resource_templates",
                     )
-                    reason_codes = (
-                        ()
-                        if call_succeeded
-                        else ("mcp-canary-call-or-result-shape-failed",)
+                if getattr(capabilities, "prompts", None) is not None:
+                    prompts = await _collect_pages(
+                        client.list_prompts,
+                        "prompts",
                     )
-                    if payload is not None:
-                        _reject_secret_material(payload)
-                        _bounded_digest(
-                            payload,
-                            limit=MAX_RESULT_BYTES,
-                            label="MCP canary result",
-                        )
-                    return CanaryProbeResult(
-                        protocol_version=initialized.protocolVersion,
-                        server_name=initialized.serverInfo.name,
-                        server_version=initialized.serverInfo.version,
-                        server_schema_digest=server_schema_digest,
-                        selected_tool_schema_digest=selected_tool_schema_digest,
-                        inventory_counts=CanaryInventoryCounts(
-                            tools=len(tools),
-                            resources=len(resources),
-                            resource_templates=len(resource_templates),
-                            prompts=len(prompts),
-                        ),
-                        call_succeeded=call_succeeded,
-                        result=payload,
-                        call_latency_ms=call_latency_ms,
-                        total_latency_ms=int((time.monotonic() - started) * 1000),
-                        reason_codes=reason_codes,
+                inventory = {
+                    "protocol_version": client.protocol_version,
+                    "tools": sorted(
+                        (_model_json(item) for item in tools),
+                        key=lambda item: str(item.get("name", "")),
+                    ),
+                    "resources": sorted(
+                        (_model_json(item) for item in resources),
+                        key=lambda item: str(item.get("uri", "")),
+                    ),
+                    "resource_templates": sorted(
+                        (_model_json(item) for item in resource_templates),
+                        key=lambda item: str(item.get("uriTemplate", "")),
+                    ),
+                    "prompts": sorted(
+                        (_model_json(item) for item in prompts),
+                        key=lambda item: str(item.get("name", "")),
+                    ),
+                }
+                _reject_secret_material(inventory)
+                server_schema_digest = _bounded_digest(
+                    inventory,
+                    limit=MAX_SCHEMA_BYTES,
+                    label="MCP server schema inventory",
+                )
+                selected = next(
+                    (
+                        item
+                        for item in inventory["tools"]
+                        if item.get("name") == contract.tool_name
+                    ),
+                    None,
+                )
+                if selected is None:
+                    raise CanaryRunnerError(
+                        "committed canary tool is absent from MCP inventory"
                     )
+                selected_tool_schema_digest = _bounded_digest(
+                    selected,
+                    limit=MAX_SCHEMA_BYTES,
+                    label="selected MCP tool schema",
+                )
+                call_started = time.monotonic()
+                result = await client.call_tool(
+                    contract.tool_name,
+                    contract.arguments,
+                    read_timeout_seconds=float(request_timeout_seconds),
+                )
+                call_latency_ms = int((time.monotonic() - call_started) * 1000)
+                payload = _structured_result(result)
+                call_succeeded = (
+                    not bool(getattr(result, "is_error", False))
+                    and payload is not None
+                )
+                reason_codes = (
+                    ()
+                    if call_succeeded
+                    else ("mcp-canary-call-or-result-shape-failed",)
+                )
+                if payload is not None:
+                    _reject_secret_material(payload)
+                    _bounded_digest(
+                        payload,
+                        limit=MAX_RESULT_BYTES,
+                        label="MCP canary result",
+                    )
+                return CanaryProbeResult(
+                    protocol_version=client.protocol_version,
+                    server_name=server_info.name,
+                    server_version=server_info.version,
+                    server_schema_digest=server_schema_digest,
+                    selected_tool_schema_digest=selected_tool_schema_digest,
+                    inventory_counts=CanaryInventoryCounts(
+                        tools=len(tools),
+                        resources=len(resources),
+                        resource_templates=len(resource_templates),
+                        prompts=len(prompts),
+                    ),
+                    call_succeeded=call_succeeded,
+                    result=payload,
+                    call_latency_ms=call_latency_ms,
+                    total_latency_ms=int((time.monotonic() - started) * 1000),
+                    reason_codes=reason_codes,
+                )
     except CanaryRunnerError:
         raise
     except Exception as exc:

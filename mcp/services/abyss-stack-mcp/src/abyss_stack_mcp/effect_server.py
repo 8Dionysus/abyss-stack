@@ -117,7 +117,7 @@ async def _run_worker(
 
 def build_effect_server() -> Any:
     try:
-        from mcp.server.fastmcp import FastMCP
+        from ._modern_runtime import AbyssMCPServer
         from mcp.types import ToolAnnotations
     except ImportError as exc:
         raise SystemExit("Missing dependency 'mcp'.") from exc
@@ -131,7 +131,7 @@ def build_effect_server() -> Any:
             "ABYSS_STACK_MCP_OBSERVATION_PATH", str(DEFAULT_OBSERVATION_PATH)
         )
     )
-    mcp = FastMCP(
+    mcp = AbyssMCPServer(
         "abyss-stack-mcp-internal-effect",
         instructions=(
             "Execute only one content-addressed, explicitly approved restart-and-"
@@ -189,8 +189,7 @@ def main() -> None:
         server.run(transport="stdio")
         return
     assert settings.host is not None and settings.port is not None
-    server.settings.host = settings.host
-    server.settings.port = settings.port
+    server.configure_http(settings.host, settings.port)
     LOGGER.info("abyss-stack MCP internal-effect plane ready")
     server.run(transport="streamable-http")
 

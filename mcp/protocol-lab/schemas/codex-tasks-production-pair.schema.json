@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os-abyss.dev/schemas/codex-tasks-production-pair.schema.json",
+  "title": "OS Abyss Codex Tasks production pair observation",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "codex_abyss_tasks_production_pair_v1"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "protocol_version": {"const": "2026-07-28"},
+    "extension_id": {"const": "io.modelcontextprotocol/tasks"},
+    "codex_runtime": {"const": "0.147.0-abyss.2"},
+    "codex_source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "codex_artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "server": {"const": "abyss-stack-mcp/0.5.2"},
+    "mcp_sdk": {"const": "2.0.0"},
+    "production_pair": {"const": true},
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "extension_advertised": {"const": true},
+        "create_passed": {"const": true},
+        "get_completed_passed": {"const": true},
+        "cancel_acknowledged": {"const": true},
+        "get_cancelled_passed": {"const": true},
+        "missing_extension_rejected": {"const": true},
+        "owner_bound": {"const": true},
+        "observe_only": {"const": true},
+        "update_input_required_live_pair": {"const": false},
+        "notifications_proven": {"const": false}
+      },
+      "required": ["extension_advertised", "create_passed", "get_completed_passed", "cancel_acknowledged", "get_cancelled_passed", "missing_extension_rejected", "owner_bound", "observe_only", "update_input_required_live_pair", "notifications_proven"]
+    },
+    "verdict": {"const": "eligible_for_bounded_production"},
+    "claim_limits": {"type": "array", "minItems": 2, "items": {"type": "string", "minLength": 12}}
+  },
+  "required": ["schema_version", "observed_at", "expires_at", "protocol_version", "extension_id", "codex_runtime", "codex_source_revision", "codex_artifact_digest", "server", "mcp_sdk", "production_pair", "lifecycle", "verdict", "claim_limits"]
+}

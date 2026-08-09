@@ -1,11 +1,11 @@
-"""FastMCP server for the Telegram connector access plane."""
+"""AbyssMCPServer server for the Telegram connector access plane."""
 
 from __future__ import annotations
 
 import logging
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from ._modern_runtime import AbyssMCPServer
 from mcp.types import ToolAnnotations
 
 from aoa_telegram_connector_mcp._http_auth import http_auth_kwargs as _http_auth_kwargs
@@ -53,14 +53,13 @@ def _run_server(server: Any) -> None:
         return
     assert settings.host is not None
     assert settings.port is not None
-    server.settings.host = settings.host
-    server.settings.port = settings.port
+    server.configure_http(settings.host, settings.port)
     server.run(transport="streamable-http")
 
 
-def build_server(state: AoATelegramConnectorMCPState | None = None) -> FastMCP:
+def build_server(state: AoATelegramConnectorMCPState | None = None) -> AbyssMCPServer:
     service_state = state or AoATelegramConnectorMCPState.discover()
-    mcp = FastMCP(
+    mcp = AbyssMCPServer(
         "aoa-telegram-connector-mcp",
         json_response=True,
         **_read_http_auth_kwargs(),

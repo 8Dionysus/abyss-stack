@@ -12,7 +12,7 @@
     "extension_id": {"const": "io.modelcontextprotocol/tasks"},
     "extension_maturity": {"const": "experimental"},
     "core_read_migration_independent": {"const": true},
-    "production_tasks_allowed": {"const": false},
+    "production_tasks_allowed": {"const": true},
     "reference_pair": {
       "const": {
         "consumer_id": "rust-rmcp",
@@ -23,8 +23,8 @@
     },
     "consumers": {
       "type": "array",
-      "minItems": 8,
-      "maxItems": 8,
+      "minItems": 9,
+      "maxItems": 9,
       "items": {"$ref": "#/$defs/consumer"}
     },
     "known_risks": {"type": "array", "minItems": 5, "items": {"type": "string", "minLength": 12}}
@@ -65,7 +65,7 @@
         "core_2026_07_28": {"enum": ["wire_pass", "conformance_pass", "source_supported", "not_applicable"]},
         "features": {"$ref": "#/$defs/features"},
         "evidence_level": {"type": "string", "minLength": 3},
-        "verdict": {"enum": ["ineligible", "blocked", "eligible_for_isolated_reference_pilots", "source_supported_unpaired", "reference_only"]},
+        "verdict": {"enum": ["ineligible", "blocked", "eligible_for_isolated_reference_pilots", "eligible_for_bounded_production", "source_supported_unpaired", "reference_only"]},
         "evidence_refs": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 3}},
         "removal_conditions": {"type": "array", "minItems": 2, "items": {"type": "string", "minLength": 12}}
       },

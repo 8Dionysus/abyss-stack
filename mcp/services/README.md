@@ -34,31 +34,37 @@ wrappers therefore report the code they actually imported instead of ambient
 metadata from an older installed wheel. The MCP SDK version is dependency
 evidence, not the deployed service identity used by canary and provenance
 checks.
-The legacy template still accepts `AOA_MCP_HTTP_BEARER_TOKEN` and
-`aoa-mcp-http-bearer-token` only as compatibility transport. Current organ
-read contours use exact owner-and-policy token variables, credential names,
+The retired shared template is a non-startable tombstone and accepts no
+transport or credential. Current organ read contours use exact
+owner-and-policy token variables, credential names,
 scopes, and client identities for Decisions, Memo, Evals, KAG, Stats, Abyss
 Machine, Session Memory, ToS corpus, and all six connector adapters. Memo and
 Evals additionally use distinct candidate credentials and processes. Missing,
 short, malformed, cross-owner, cross-contour, or conflicting
 values fail before bind. Standalone package
-manifests require `mcp>=1.27.2,<2`, the SDK line on which this FastMCP bearer
-contract is exercised. This route is authenticated local transport
+manifests require exact `mcp==2.0.0`, the stable SDK line implementing the
+`2026-07-28` server/discovery and streamable-HTTP contract. The shared
+`_modern_runtime.py` projection preserves the standalone package shape while
+binding every organ server to the same fail-closed modern runtime and bearer
+contract. This route is authenticated local transport
 consolidation, not network publication. Remote, wildcard-bind, gateway, proxy,
 cross-host, and OAuth/federated identity topology require a later decision than
 [D-0077](../../docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md).
 
-The remaining shared credential and `mcp:access` scope are compatibility-only.
-They prove that an unauthenticated local caller is rejected, but they do not
-separate owners or effects and therefore cannot admit an organ capability. The governed
+The preserved shared credential and `mcp:access` scope are offline rollback
+material only. No managed service loads them, so they cannot admit or launch an
+organ capability. The governed
 organ-access target in
 [D-0087](../../docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md)
 uses per-owner, per-policy-plane credentials and process contours. Decisions,
 Memo, Evals, KAG, Stats, Abyss Machine, Session Memory, ToS corpus, 4PDA,
 Telegram, Discord, Course, StackOverflow, and XDA now have source-level read
 isolation. Memo and Evals also have source-level candidate process isolation
-with finite write allowlists. They remain shadow until package, deploy,
-consumer, proof, acceptance, and rollback gates pass.
+with finite write allowlists. Eleven read contours are currently admitted:
+Stack, Machine, Decisions, Memo, Session Memory, Evals, KAG, Stats, 4PDA,
+Telegram, and Discord. ToS, Course, StackOverflow, XDA, every candidate
+contour, and the internal-effect contour remain shadow/unadmitted until their
+own package, deploy, consumer, proof, acceptance, and rollback gates pass.
 
 | Owner instance | Default port |
 |---|---:|
@@ -83,14 +89,15 @@ consumer, proof, acceptance, and rollback gates pass.
 | `aoa-xda-connector` | 5438 |
 | `abyss-stack` internal-effect pilot | 5439 |
 
-`abyss-stack-mcp` does not join the transitional shared owner credential. Its
+`abyss-stack-mcp` does not use the retired shared owner credential. Its
 read, candidate, and exact internal-effect planes select distinct credential
 names, scopes, client identities, ports, and tool catalogs. The candidate
 plane only prepares content-addressed plans and has no dispatch method. The
 effect plane exposes only the approved read-service restart-and-rollback pilot
-on port `5439`; it cannot select a unit, command, or external effect. No plane is included
-in the existing owner bundle until package/deploy provenance, a live
-observation, consumer canary, and rollback evidence are present.
+on port `5439`; it cannot select a unit, command, or external effect. None of
+the stack planes belongs to the shared owner bundle. The read plane is
+separately admitted and active; candidate and internal-effect planes remain
+inactive and unadmitted even though their discovery protocol is modern-only.
 The managed units use the explicitly provisioned
 `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv` runtime rather than ambient
 Python. `scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime`
@@ -103,7 +110,9 @@ runtime is installed only from a private digest-matched snapshot of deployed
 source and lock material. The two contour bearers are also compared and cannot
 share one value.
 
-`systemd/user/aoa-mcp-http@.service` remains a compatibility template only.
+`systemd/user/aoa-mcp-http@.service` is a non-startable tombstone for the
+retired ambient-Python/shared-bearer route. It contains no server command,
+credential load, transport, or install target.
 `systemd/user/aoa-organ-mcp-read@.service` owns the filesystem-read-only
 Decisions, Memo, Evals, KAG, Stats, Abyss Machine, Session Memory, and six
 connector process contours. Dedicated Memo and Evals candidate units add only

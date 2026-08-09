@@ -26,8 +26,12 @@ Production migration is allowed only when:
 - official and Abyss pair-conformance pass;
 - compatibility aliases, dual support, and rollback pass;
 - the isolated read-only `aoa-kag` canary passes;
-- all core-read P1 gates are `passed`; P1-11 remains an independent Tasks
-  extension gate and never blocks interpretation of the core-read verdict.
+- all core-read P1 gates are `passed`; P1-11 is an independent Tasks extension
+  gate and can pass only for the explicitly bounded Tasks production subset.
+- every admitted production unit has an exact production process identity,
+  deployment-bound canary, current registry record, modern-only negative wire
+  proof, and zero bootstrap identity;
+- no executable legacy template or enabled legacy instance remains.
 
 The derived status reports five separate verdicts:
 
@@ -63,42 +67,41 @@ even while an old catalog entry is still warm. Cross-replica invalidation
 requires its own production subscription-bus receipt.
 
 Tasks remains a separately versioned extension gate. Python MCP `2.0.0` does
-not implement the `2026-07-28` Tasks extension, and stable Codex `0.147.0` did
-not advertise `io.modelcontextprotocol/tasks` on the real modern request wire.
-Type literals or core conformance cannot pass that gate.
+not implement the Tasks client extension, and upstream Codex `0.147.0` does
+not advertise it. The bounded OS Abyss derivative does advertise
+`io.modelcontextprotocol/tasks` on the real production pair and passes
+create/get/cancel, owner binding, observe-only result, auth, and capability
+negatives. Type literals or core conformance still cannot pass that gate.
 
 The feature-gated Abyss adapter may be exercised before a capable external
 consumer exists. Such a synthetic pilot proves only adapter/store behavior. A
 real Tasks consumer must advertise the extension per request and pass the same
 wire, auth, restart, input, cancellation, TTL, and owner-bound result checks
-before P1-11 can pass. Poll throttling is process-local in this pilot and resets
-after adapter restart; durable or distributed rate enforcement remains a
-separate production requirement. Notifications remain excluded until an
-extension-filtered `subscriptions/listen` path is proven end to end.
+before P1-11 can pass. That exact bounded production pair has now passed P1-11.
+Update/input-required, notifications, and distributed poll enforcement remain
+explicitly outside its admitted subset until their own receipts exist.
 
 Released Rust `rmcp 3.1.2` is the first real external reference client to pass
 the strict adapter boundary for discovery, create, `tasks/get`, task-bound
 headers, completed results, preserved owner errors, and unknown-task denial.
-That pair does not yet prove update/cancel/input/notifications, shared rate
-enforcement, or production deployment, so it cannot pass P1-11 by itself.
+That reference pair does not by itself prove OS Abyss production deployment;
+it remains independent corroboration rather than the production consumer.
 
 MCP Inspector `2.1.0` remains blocked against the strict adapter. Its raw
 `tasks/get` request supplies `Mcp-Method` but omits task-bound `Mcp-Name`; the
 adapter returns JSON-RPC `-32020` with HTTP `400`. The boundary must not be
 weakened to accommodate this client. The removal condition is a client request
 that binds `Mcp-Name` to the task ID, followed by an unchanged-adapter retest.
-Neither the released-rmcp pass nor the Inspector blocker changes Codex
-eligibility or production Tasks admission.
+Neither the released-rmcp pass nor the Inspector blocker changes the exact
+OS Abyss Codex production-pair verdict.
 
 ## Dual support and rollback
 
-`aoa_kag` remains the stable registration. `aoa_kag_next_lab` is a removable
-lab alias with an independent process, loopback endpoint, credential,
-`CODEX_HOME`, exact Codex binary, and exact SDK/source identity. A prerelease
-or stable consumer using an under-development feature may prove this lab pair
-but cannot acquire production authority.
-Rollback removes only the lab contour and then performs an actual call through
-the unchanged stable operator registration.
+`aoa_kag_next_lab` remains a historical removable precursor proof. Production
+now uses owner-specific registrations and credentials on the admitted modern
+wire. Rollback is a coherent source/runtime restore followed by fresh canary,
+registry, preflight, and production-wire proof; mixed-era source/runtime states
+are invalid. The cold MCP 1 runtime is never an active compatibility route.
 
 ## Watcher
 

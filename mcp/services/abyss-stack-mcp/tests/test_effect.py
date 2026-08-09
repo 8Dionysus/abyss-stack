@@ -325,9 +325,9 @@ def test_effect_server_exposes_only_the_exact_pilot_tool(
         "stack_execute_approved_read_restart_pilot"
     ]
     tool = tools[0]
-    assert tool.annotations.destructiveHint is True
-    assert tool.annotations.idempotentHint is True
-    assert set(tool.inputSchema["properties"]) == {
+    assert tool.annotations.destructive_hint is True
+    assert tool.annotations.idempotent_hint is True
+    assert set(tool.input_schema["properties"]) == {
         "plan_id",
         "approval_id",
         "idempotency_key",

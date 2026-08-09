@@ -58,7 +58,7 @@ def observation(builder: Any) -> dict[str, Any]:
     return _load(builder.OBSERVATION_PATH)
 
 
-def test_current_status_is_deterministic_and_blocks_migration(
+def test_current_status_is_deterministic_and_admits_bounded_production(
     builder: Any,
     matrix: dict[str, Any],
     observation: dict[str, Any],
@@ -67,65 +67,62 @@ def test_current_status_is_deterministic_and_blocks_migration(
     second = builder.build_status(copy.deepcopy(matrix), copy.deepcopy(observation))
 
     assert first == second
-    assert first["evidence_expires_at"] == "2026-08-15T08:33:46.547214Z"
-    assert first["gate_counts"] == {"passed": 13, "blocked": 1, "pending": 0}
-    assert first["passed_gate_ids"] == [
-        "P1-01",
-        "P1-02",
-        "P1-03",
-        "P1-04",
-        "P1-05",
-        "P1-06",
-        "P1-07",
-        "P1-08",
-        "P1-09",
-        "P1-10",
-        "P1-12",
-        "P1-13",
-        "P1-14",
-    ]
-    assert first["core_read_migration_allowed"] is False
+    assert first["evidence_expires_at"] <= first["tasks_evidence_expires_at"]
+    assert first["gate_counts"] == {"passed": 14, "blocked": 0, "pending": 0}
+    assert first["passed_gate_ids"] == [f"P1-{index:02d}" for index in range(1, 15)]
+    assert first["core_read_migration_allowed"] is True
     assert first["read_only_pilot_allowed"] is True
     assert first["read_only_pilot_completed"] is True
-    assert first["tasks_extension_allowed"] is False
-    assert first["tasks_evidence_expires_at"] == "2026-08-15T09:52:33.467338Z"
+    assert first["tasks_extension_allowed"] is True
+    assert first["tasks_evidence_expires_at"] == "2026-08-16T13:53:36.813735Z"
     assert first["tasks_reference_consumer"] == "rust-rmcp-3.1.2"
     assert first["tasks_reference_pair_passed"] is True
     assert first["tasks_inspector_strict_pair_blocked"] is True
-    assert first["tasks_codex_consumer_eligible"] is False
-    assert first["tasks_production_enabled"] is False
-    assert "inspector_task_name_header_missing" in first["tasks_blockers"]
+    assert first["tasks_codex_consumer_eligible"] is True
+    assert first["tasks_production_enabled"] is True
+    assert first["tasks_blockers"] == [
+        "input_required_update_live_pair_unproved",
+        "tasks_notifications_unproved",
+        "distributed_poll_limit_unproved",
+    ]
+    assert first["candidate_protocol_ready"] is True
+    assert first["internal_effect_protocol_ready"] is True
     assert first["candidate_migration_allowed"] is False
     assert first["internal_effect_migration_allowed"] is False
     assert first["external_effect_migration_allowed"] is False
     assert first["remaining_core_gate_ids"] == []
-    assert first["remaining_tasks_gate_ids"] == ["P1-11"]
+    assert first["remaining_tasks_gate_ids"] == []
+    assert first["production_cutover_blockers"] == []
     assert first["stable_registration_retained"] is True
 
 
-def test_final_spec_and_stable_sdks_cannot_enable_migration(
+def test_final_spec_and_stable_sdks_are_part_of_admitted_migration(
     builder: Any,
     matrix: dict[str, Any],
     observation: dict[str, Any],
 ) -> None:
     status = builder.build_status(copy.deepcopy(matrix), observation)
 
-    assert status["core_read_migration_allowed"] is False
+    assert status["core_read_migration_allowed"] is True
     assert status["read_only_pilot_allowed"] is True
 
 
-def test_consumer_literals_are_not_wire_pair_evidence(
+def test_production_consumer_is_bound_to_wire_pair_evidence(
     builder: Any,
     matrix: dict[str, Any],
     observation: dict[str, Any],
 ) -> None:
-    assert matrix["consumer_pairs"][0]["next_protocol_literal_present"] is True
+    consumer = next(
+        item for item in matrix["consumer_pairs"]
+        if item["consumer_id"] == "codex-cli-os-abyss"
+    )
+    assert consumer["next_protocol_literal_present"] is True
 
     status = builder.build_status(matrix, observation)
 
-    assert matrix["consumer_pairs"][0]["capability_posture"] == "blocked"
-    assert "production_modern_pair_not_admitted" in status["reason_codes"]
-    assert status["core_read_migration_allowed"] is False
+    assert consumer["capability_posture"] == "supported"
+    assert "production_modern_pair_not_admitted" not in status["reason_codes"]
+    assert status["core_read_migration_allowed"] is True
 
 
 def test_codex_wire_receipt_proves_legacy_pair_only(builder: Any) -> None:
@@ -150,12 +147,15 @@ def test_codex_wire_receipt_proves_legacy_pair_only(builder: Any) -> None:
 def test_production_pair_is_distinct_from_next_sdk_fallback(
     matrix: dict[str, Any],
 ) -> None:
-    consumer = matrix["consumer_pairs"][0]
+    consumer = next(
+        item for item in matrix["consumer_pairs"]
+        if item["consumer_id"] == "codex-cli-os-abyss"
+    )
 
-    assert matrix["production_protocol"] == "2025-11-25"
+    assert matrix["production_protocol"] == "2026-07-28"
     assert matrix["stable_spec"]["wire_version"] == "2025-11-25"
-    assert consumer["production_protocol_versions_observed"] == ["2025-11-25"]
-    assert consumer["isolated_next_sdk_fallback_protocol"] == "2025-11-25"
+    assert consumer["production_protocol_versions_observed"] == ["2026-07-28"]
+    assert consumer["isolated_next_sdk_fallback_protocol"] == "2026-07-28"
 
 
 def test_production_pair_receipt_is_public_safe_and_bounded(builder: Any) -> None:
@@ -331,8 +331,11 @@ def test_tasks_compatibility_matrix_keeps_pair_evidence_distinct(builder: Any) -
     builder.validate_payload(matrix, schema)
     rows = {item["consumer_id"]: item for item in matrix["consumers"]}
 
-    assert matrix["production_tasks_allowed"] is False
+    assert matrix["production_tasks_allowed"] is True
     assert matrix["core_read_migration_independent"] is True
+    assert rows["codex-cli-os-abyss"]["features"]["advertisement"] == "wire_pass"
+    assert rows["codex-cli-os-abyss"]["features"]["tasks_cancel"] == "wire_pass"
+    assert rows["codex-cli-os-abyss"]["verdict"] == "eligible_for_bounded_production"
     assert rows["codex-cli"]["features"]["advertisement"] == "wire_absent"
     assert rows["mcp-inspector"]["features"]["create_task"] == "wire_pass"
     assert rows["mcp-inspector"]["features"]["tasks_get"] == "wire_blocked"

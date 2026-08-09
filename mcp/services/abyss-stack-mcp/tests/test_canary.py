@@ -908,12 +908,12 @@ def test_live_probe_uses_authenticated_http_and_observes_application_version(
     script = tmp_path / "canary_server.py"
     script.write_text(
         f"""
-from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from typing import Any
 from abyss_stack_mcp._http_auth import http_auth_kwargs
+from abyss_stack_mcp._modern_runtime import AbyssMCPServer
 
-server = FastMCP(
+server = AbyssMCPServer(
     "aoa-kag-mcp",
     json_response=True,
     **http_auth_kwargs(
@@ -950,8 +950,7 @@ def kag_discover(owner: str, detail: str = "compact") -> dict[str, Any]:
         }},
     }}
 
-server.settings.host = "127.0.0.1"
-server.settings.port = {port}
+server.configure_http("127.0.0.1", {port})
 server.run(transport="streamable-http")
 """,
         encoding="utf-8",
@@ -1004,7 +1003,7 @@ server.run(transport="streamable-http")
         assert probe.call_succeeded is True
         assert probe.server_name == "aoa-kag-mcp"
         assert probe.server_version == "9.8.7"
-        assert probe.protocol_version == "2025-11-25"
+        assert probe.protocol_version == "2026-07-28"
         assert probe.inventory_counts.tools == 1
         assert probe.result == grounded_result()
 
@@ -1089,3 +1088,29 @@ def test_session_memory_canary_tracks_the_bounded_admission_profile() -> None:
     assert contract.exact_values["/mutates"] is False
     assert "/mcp_access/mutates" not in contract.exact_values
     assert "/truth_status" not in contract.required_pointers
+
+
+def test_memo_canary_tracks_the_reviewed_recall_surface() -> None:
+    catalog = RuntimeTargetCatalog.model_validate_json(
+        (
+            Path(__file__).resolve().parents[1]
+            / "src"
+            / "abyss_stack_mcp"
+            / "runtime-targets.v1.json"
+        ).read_text(encoding="utf-8")
+    )
+    target = next(item for item in catalog.targets if item.organ_id == "aoa-memo")
+    contract = target.canary_contract
+
+    assert contract is not None
+    assert contract.tool_name == "aoa_memo_recall_brief"
+    assert contract.arguments == {"intent": "", "repo": "aoa-memo"}
+    assert contract.schema_pointer == "/schema"
+    assert contract.schema_value == "aoa_memo_reviewed_brief_v1"
+    assert contract.exact_values == {"/repo": "aoa-memo"}
+    assert contract.required_pointers == (
+        "/reviewed_memory",
+        "/source_owner",
+        "/source_catalog",
+        "/authority_boundary",
+    )

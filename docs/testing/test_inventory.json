@@ -167,6 +167,7 @@
         "mcp/services/abyss-stack-mcp/tests/test_rollback_projection.py",
         "mcp/services/abyss-stack-mcp/tests/test_stack_mcp.py",
         "mcp/services/abyss-stack-mcp/tests/test_stack_organ_access.py",
+        "mcp/services/abyss-stack-mcp/tests/test_tasks_extension.py",
         "mcp/services/abyss-machine-mcp/tests/test_machine_mcp.py",
         "mcp/services/aoa-decisions-mcp/tests/test_decisions_mcp.py",
         "mcp/services/aoa-decisions-mcp/tests/test_decisions_organ_access.py",

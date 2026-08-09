@@ -6,11 +6,31 @@ because a specification, SDK, or client advertises support.
 
 Current posture after the 2026-07-28 final release:
 
-- observed Codex production-compatible wire version: `2025-11-25`;
-- next candidate: final `2026-07-28`;
+- admitted OS Abyss production wire: final `2026-07-28`;
 - stable next SDKs: Python `2.0.0`, TypeScript client/server `2.0.0`;
-- stable Codex `0.147.0`: the production `aoa_kag` registration remains on
-  the stable route; it has not received modern production admission;
+- all fifteen standalone stack-owned organ packages pin exact `mcp==2.0.0`;
+- eleven production read units are deployment-bound, canary-proven, admitted,
+  and observed through `server/discover` and `tools/list` on the exact modern
+  wire; wrong bearers and legacy `initialize` are denied before session issue;
+- no active or enabled legacy owner instance remains; the old shared template
+  is a non-startable tombstone and the MCP 1 runtime is cold rollback material;
+- OS Abyss Codex `0.147.0-abyss.2` selects modern MCP only for the explicit
+  admitted organ allow-list and keeps unrelated external MCP owners outside
+  this claim;
+- that production Codex/abyss-stack pair advertises
+  `io.modelcontextprotocol/tasks` and passes bounded create, completed get,
+  cancel, cancelled get, owner binding, observe-only result, and missing
+  extension denial;
+- Tasks update/input-required, notifications, and distributed poll enforcement
+  remain outside the admitted subset without blocking the proven lifecycle;
+- three candidate units and one internal-effect unit also pass modern-only
+  discovery and legacy denial, but no tool was invoked, no non-read contour is
+  admitted, and all four were returned to `inactive`;
+- admission refresh, preflight sweep, and admission keeper preserve currentness
+  without starting or restarting organs;
+- the same exact stable binary, with `mcp_2026_07_28` enabled only in a
+  removable `CODEX_HOME`, previously passed the isolated
+  `aoa_kag_next_lab` precursor proof;
 - the same exact stable binary, with `mcp_2026_07_28` enabled only in a
   removable `CODEX_HOME`, passed the separately named and credentialed
   `aoa_kag_next_lab` call on the actual `2026-07-28` wire;
@@ -36,7 +56,7 @@ Current posture after the 2026-07-28 final release:
 - rollback: the lab process, port, credential, registration, and isolated
   `CODEX_HOME` were removed; the operator config stayed byte-identical and
   the existing `aoa_kag` registration passed a post-rollback call;
-- Python MCP `2.0.0` Tasks extension: not implemented;
+- Python MCP `2.0.0` does not itself implement the Tasks client extension;
 - feature-gated Abyss Tasks adapter: 11/11 synthetic lifecycle cases pass,
   including restart recovery and one real read-only owner diagnostic; Codex was
   not the Tasks client and notifications remain unproved;
@@ -50,21 +70,22 @@ Current posture after the 2026-07-28 final release:
   raw `tasks/get` omits task-bound `Mcp-Name`; the adapter correctly retains
   the boundary with JSON-RPC `-32020` / HTTP `400`;
 - isolated read-only modern pair and rollback: passed;
-- production core-read migration: still false because the production contour
-  has not received independent admission, deployment canary, observation, and
-  registry refresh;
-- Tasks, candidate, internal-effect, and external-effect migration: separately
-  blocked;
+- production core-read migration: passed;
+- bounded production Tasks lifecycle: passed;
+- candidate and internal-effect protocol readiness: passed, while their
+  authority migration remains false;
+- external-effect migration: false;
 - stable registration: `aoa_kag`;
 - isolated lab registration: `aoa_kag_next_lab`, removed after proof;
 - first pilot: compact read-only `aoa-kag`;
-- candidate and effect organs: excluded.
+- candidate and effect authority: excluded.
 
 The matrix pins exact specification, SDK, conformance-suite, and consumer
-observations. Thirteen P1 gates pass; P1-11 remains the independent Tasks gate.
+observations. All fourteen P1 gates pass, including the independently evidenced
+bounded Tasks gate.
 The generated v2 status reports separate core-read, Tasks, candidate,
-internal-effect, and external-effect verdicts. A passed stable modern lab pilot
-does not authorize production cutover.
+internal-effect, and external-effect verdicts. Protocol readiness never grants
+candidate or effect authority.
 
 ## Protocol watcher
 
@@ -114,6 +135,8 @@ can execute.
 | `tasks-compatibility-matrix.v1.json` | exact per-consumer Tasks feature and wire verdicts, kept independent from the core migration matrix |
 | `fixtures/rmcp-3.1.2-tasks-adapter-pair-20260808.json` | released Rust reference-client proof against the strict feature-gated Abyss adapter |
 | `fixtures/inspector-2.1.0-tasks-strict-pair-blocked-20260808.json` | exact Inspector strict-pair blocker without weakening task-bound routing |
+| `fixtures/live-modern-fleet-20260809.json` | compact production read-fleet, automation, rollback, and non-read protocol observation |
+| `fixtures/codex-tasks-production-pair-20260809.json` | bounded OS Abyss Codex Tasks production-pair receipt |
 | `scripts/run_kag_next_pair.py` | private raw-receipt runner for the isolated KAG adapter |
 | `scripts/run_kag_handle_pair.py` | private raw-receipt runner for bearer-bound KAG requestState handles |
 | `scripts/run_kag_cache_pair.py` | private raw-receipt runner for KAG catalog cache behavior |
@@ -121,6 +144,9 @@ can execute.
 | `scripts/run_tasks_adapter_pilot.py` | private synthetic Tasks lifecycle runner with one real read-only owner diagnostic |
 | `scripts/run_rust_tasks_adapter_pair.py` | isolated released-rmcp client pair runner; emits public-safe evidence and leaves production disabled |
 | `scripts/run_inspector_tasks_adapter_pair.py` | strict Inspector pair runner; preserves a bounded public-safe failure receipt when task routing headers are incomplete |
+| `scripts/run_codex_stack_tasks_pair.py` | isolated or production Codex/abyss-stack Tasks lifecycle runner |
+| `scripts/run_live_modern_read_fleet.py` | exact live eleven-unit modern-only read-fleet verifier |
+| `scripts/run_live_nonread_protocol.py` | discovery-only candidate/effect verifier that leaves authority absent and units inactive |
 | `protocol-watch-plan.v1.json` | exact local/upstream drift inputs and TTL law |
 | `scripts/protocol_watcher.py` | immutable observation, trigger, isolated suite and protected-path gate |
 | `schemas/` | machine-readable input and derived-status contracts |
@@ -129,9 +155,9 @@ can execute.
 | `scripts/validate_protocol_lab.py` | fail-closed source and stack-pin validator |
 | `tests/` | mutation and migration-gate tests |
 
-The modern Codex receipt passes the isolated consumer and registered-read lab
-gates only. It does not admit the production contour, prove subscription fan-out
-across replicas, or authorize candidate/effect migration.
+The modern production receipts admit only the eleven read contours and the
+bounded Tasks lifecycle on `abyss-stack` read. They do not prove subscription
+fan-out across replicas or authorize candidate/effect migration.
 
 Read [CONTRACT.md](CONTRACT.md) for admission law and
 [docs/COMPATIBILITY_MATRIX.md](docs/COMPATIBILITY_MATRIX.md) for the core

@@ -67,6 +67,14 @@ FIXTURES = {
         "inspector-2.1.0-tasks-strict-pair-blocked-20260808.json",
         "inspector-tasks-strict-pair.schema.json",
     ),
+    "live_modern_fleet": (
+        "live-modern-fleet-20260809.json",
+        "live-modern-fleet-observation.schema.json",
+    ),
+    "codex_tasks_production_pair": (
+        "codex-tasks-production-pair-20260809.json",
+        "codex-tasks-production-pair.schema.json",
+    ),
 }
 
 
@@ -119,6 +127,12 @@ def validate(checked_at: datetime | None = None) -> list[str]:
             fixtures["production"],
             fixtures["codex_lab"],
             fixtures["stable_rollback"],
+            tasks_matrix,
+            fixtures["tasks_pilot"],
+            fixtures["rmcp_tasks_pair"],
+            fixtures["inspector_tasks_blocker"],
+            fixtures["live_modern_fleet"],
+            fixtures["codex_tasks_production_pair"],
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return [str(exc)]
@@ -128,6 +142,8 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         ("Codex stable modern lab observation", fixtures["codex_lab"]),
         ("stable KAG post-rollback observation", fixtures["stable_rollback"]),
         ("Tasks compatibility matrix", tasks_matrix),
+        ("live modern fleet observation", fixtures["live_modern_fleet"]),
+        ("Codex Tasks production pair", fixtures["codex_tasks_production_pair"]),
     ):
         expiry = _expiry_error(label, payload, checked_at)
         if expiry is not None:
@@ -137,6 +153,8 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         fixtures["codex_lab"]["expires_at"],
         fixtures["stable_rollback"]["expires_at"],
         tasks_matrix["expires_at"],
+        fixtures["live_modern_fleet"]["expires_at"],
+        fixtures["codex_tasks_production_pair"]["expires_at"],
     ):
         errors.append("generated status lost the earliest current evidence expiry")
 
@@ -147,8 +165,8 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     if tuple(gate["gate_id"] for gate in matrix["migration_gates"]) != EXPECTED_GATE_IDS:
         errors.append("P1 gates must remain ordered P1-01 through P1-14")
     gate_status = {gate["gate_id"]: gate["status"] for gate in matrix["migration_gates"]}
-    if {gate_id for gate_id, state in gate_status.items() if state == "blocked"} != {"P1-11"}:
-        errors.append("frozen core conformance and cancellation must pass while Tasks remains separate")
+    if any(state != "passed" for state in gate_status.values()):
+        errors.append("all P1 core and bounded Tasks gates must pass after production cutover")
     p113 = next(gate for gate in matrix["migration_gates"] if gate["gate_id"] == "P1-13")
     if p113["evidence_refs"] != [
         "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json"
@@ -180,7 +198,12 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         "fixtures/tasks-adapter-pilot-20260808.json",
         "fixtures/rmcp-3.1.2-tasks-adapter-pair-20260808.json",
         "fixtures/inspector-2.1.0-tasks-strict-pair-blocked-20260808.json",
+        "fixtures/codex-tasks-production-pair-20260809.json",
+        "fixtures/live-modern-fleet-20260809.json",
         "scripts/run_tasks_adapter_pilot.py",
+        "scripts/run_codex_stack_tasks_pair.py",
+        "scripts/run_live_modern_read_fleet.py",
+        "scripts/run_live_nonread_protocol.py",
         "scripts/run_rust_tasks_adapter_pair.py",
         "scripts/run_inspector_tasks_adapter_pair.py",
     }
@@ -225,10 +248,19 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     ):
         errors.append("frozen 2026-07-28 conformance observation drifted")
 
+    production = _consumer(matrix, "codex-cli-os-abyss")
     stable = _consumer(matrix, "codex-cli")
     lab = _consumer(matrix, "codex-cli-stable-modern-lab")
+    if (
+        production["version"] != "0.147.0-abyss.2"
+        or not production["next_wire_pair_observed"]
+        or not production["server_discover_observed"]
+        or not production["tasks_wire_pair_observed"]
+        or production["production_protocol_versions_observed"] != ["2026-07-28"]
+    ):
+        errors.append("OS Abyss Codex production modern pair facts drifted")
     if stable["version"] != "0.147.0" or stable["next_wire_pair_observed"] or stable["server_discover_observed"]:
-        errors.append("stable Codex must remain a legacy production pair")
+        errors.append("upstream Codex fallback row drifted")
     if (
         lab["version"] != "0.147.0"
         or not lab["next_wire_pair_observed"]
@@ -243,6 +275,8 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     tasks_pilot = fixtures["tasks_pilot"]
     rmcp_tasks_pair = fixtures["rmcp_tasks_pair"]
     inspector_tasks_blocker = fixtures["inspector_tasks_blocker"]
+    live_modern_fleet = fixtures["live_modern_fleet"]
+    codex_tasks_production_pair = fixtures["codex_tasks_production_pair"]
     if (
         codex_lab["wire"]["version"] != "2026-07-28"
         or not codex_lab["wire"]["server_discover_observed"]
@@ -311,6 +345,7 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         errors.append("bounded Tasks adapter pilot evidence drifted")
     tasks_by_id = {item["consumer_id"]: item for item in tasks_matrix["consumers"]}
     expected_tasks_consumers = {
+        "codex-cli-os-abyss",
         "codex-cli",
         "mcp-inspector",
         "python-sdk",
@@ -323,8 +358,12 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     if set(tasks_by_id) != expected_tasks_consumers:
         errors.append("Tasks compatibility matrix lost an exact consumer row")
     elif (
-        tasks_matrix["production_tasks_allowed"]
+        not tasks_matrix["production_tasks_allowed"]
         or not tasks_matrix["core_read_migration_independent"]
+        or tasks_by_id["codex-cli-os-abyss"]["features"]["advertisement"] != "wire_pass"
+        or tasks_by_id["codex-cli-os-abyss"]["features"]["tasks_cancel"] != "wire_pass"
+        or tasks_by_id["codex-cli-os-abyss"]["verdict"]
+        != "eligible_for_bounded_production"
         or tasks_by_id["codex-cli"]["features"]["advertisement"] != "wire_absent"
         or tasks_by_id["codex-cli"]["verdict"] != "ineligible"
         or tasks_by_id["mcp-inspector"]["features"]["tasks_get"] != "wire_blocked"
@@ -352,6 +391,26 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         }
     ):
         errors.append("reference-client Tasks pair or Inspector blocker drifted")
+    if (
+        live_modern_fleet["verdict"] != "production_modern_only_passed"
+        or live_modern_fleet["read_fleet"]["production_units"] != 11
+        or live_modern_fleet["read_fleet"]["admitted_units"] != 11
+        or live_modern_fleet["read_fleet"]["bootstrap_identities"] != 0
+        or not live_modern_fleet["read_fleet"]["legacy_initialize_denied"]
+        or live_modern_fleet["rollback"]["active_legacy_units"] != 0
+    ):
+        errors.append("live modern-only production fleet evidence drifted")
+    if (
+        codex_tasks_production_pair["verdict"] != "eligible_for_bounded_production"
+        or not codex_tasks_production_pair["production_pair"]
+        or not codex_tasks_production_pair["lifecycle"]["create_passed"]
+        or not codex_tasks_production_pair["lifecycle"]["get_completed_passed"]
+        or not codex_tasks_production_pair["lifecycle"]["cancel_acknowledged"]
+        or not codex_tasks_production_pair["lifecycle"]["get_cancelled_passed"]
+        or codex_tasks_production_pair["lifecycle"]["update_input_required_live_pair"]
+        or codex_tasks_production_pair["lifecycle"]["notifications_proven"]
+    ):
+        errors.append("bounded Codex Tasks production pair evidence drifted")
 
     handle = fixtures["handle"]
     cache = fixtures["cache"]
@@ -382,35 +441,35 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or observation["read_only_canary"]["status"] != "passed"
         or observation["dual_support"]["status"] != "passed"
         or observation["rollback"]["status"] != "passed"
-        or observation["tasks_extension"]["status"] != "blocked"
-        or observation["verdict"] != "blocked"
+        or observation["tasks_extension"]["status"] != "passed"
+        or observation["verdict"] != "passed"
     ):
         errors.append("current pair observation lost its bounded pilot/production split")
     if (
         not status["read_only_pilot_allowed"]
         or not status["read_only_pilot_completed"]
-        or status["core_read_migration_allowed"]
-        or status["tasks_extension_allowed"]
+        or not status["core_read_migration_allowed"]
+        or not status["tasks_extension_allowed"]
+        or not status["candidate_protocol_ready"]
+        or not status["internal_effect_protocol_ready"]
         or status["candidate_migration_allowed"]
         or status["internal_effect_migration_allowed"]
         or status["external_effect_migration_allowed"]
     ):
         errors.append("split migration verdicts no longer match exact evidence")
-    if status["remaining_core_gate_ids"] != [] or status["remaining_tasks_gate_ids"] != ["P1-11"]:
-        errors.append("Tasks must remain independent from the core-read blocker list")
-    if status["production_cutover_blockers"] != [
-        "production_modern_pair_not_admitted",
-    ]:
+    if status["remaining_core_gate_ids"] or status["remaining_tasks_gate_ids"]:
+        errors.append("completed core-read and bounded Tasks gates must have no remainder")
+    if status["production_cutover_blockers"]:
         errors.append("production cutover blockers drifted")
 
     service_pyprojects = sorted((REPO_ROOT / "mcp" / "services").glob("*/pyproject.toml"))
     constraints: list[str] = []
     for path in service_pyprojects:
-        match = re.search(r'"mcp>=([^"]+)"', path.read_text())
+        match = re.search(r'"mcp==([^"]+)"', path.read_text())
         if match is not None:
             constraints.append(match.group(1))
-    if not constraints or any(value != "1.27.2,<2" for value in constraints):
-        errors.append("production stack MCP services must retain mcp>=1.27.2,<2 before cutover")
+    if not constraints or any(value != "2.0.0" for value in constraints):
+        errors.append("all stack MCP service packages must pin exact mcp==2.0.0")
     return errors
 
 
@@ -422,9 +481,8 @@ def main() -> int:
             print(f"- {error}")
         return 1
     print(
-        "MCP protocol lab validation passed: frozen core conformance, cancellation, stable "
-        "modern read canary and rollback are proven; production admission and Tasks remain "
-        "separate gates."
+        "MCP protocol lab validation passed: the admitted read fleet is modern-only, "
+        "bounded Codex Tasks is production-proven, and non-read authority remains separate."
     )
     return 0
 

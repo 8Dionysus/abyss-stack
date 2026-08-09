@@ -9,7 +9,8 @@ description = "MCP access plane for AoA session evidence and route intelligence"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-  "mcp>=1.27.2,<2",
+  "httpx==0.28.1",
+  "mcp==2.0.0",
 ]
 
 [project.scripts]

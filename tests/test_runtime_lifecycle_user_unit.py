@@ -95,6 +95,9 @@ MANAGED_USER_UNITS = REPO_ROOT / "systemd" / "user" / "managed-units.txt"
 MCP_HTTP_AUTH_BUILDER = (
     REPO_ROOT / "mcp" / "services" / "_shared" / "build_http_auth_vendors.py"
 )
+MCP_MODERN_RUNTIME_BUILDER = (
+    REPO_ROOT / "mcp" / "services" / "_shared" / "build_modern_runtime_vendors.py"
+)
 MCP_HTTP_CODEX_CLIENT = (
     REPO_ROOT / "mcp" / "services" / "_shared" / "codex_http_client.sh"
 )
@@ -127,6 +130,19 @@ ORGAN_MCP_READ_CREDENTIAL_NAMES = (
 ORGAN_MCP_CANDIDATE_CREDENTIAL_NAMES = (
     "aoa-memo-mcp-candidate-bearer-token",
     "aoa-evals-mcp-candidate-bearer-token",
+)
+CODEX_MCP_READ_CREDENTIAL_NAMES = (
+    "aoa-decisions-mcp-read-bearer-token",
+    "aoa-memo-mcp-read-bearer-token",
+    "aoa-evals-mcp-read-bearer-token",
+    "aoa-kag-mcp-read-bearer-token",
+    "aoa-4pda-connector-mcp-read-bearer-token",
+    "aoa-discord-connector-mcp-read-bearer-token",
+    "aoa-session-memory-mcp-read-bearer-token",
+    "aoa-stats-mcp-read-bearer-token",
+    "aoa-telegram-connector-mcp-read-bearer-token",
+    "abyss-machine-mcp-read-bearer-token",
+    "abyss-stack-mcp-read-bearer-token",
 )
 ORGAN_MCP_READ_AUTH_MANIFEST_NAME = "organ-mcp-read-auth-manifest.json"
 ORGAN_MCP_CANDIDATE_AUTH_MANIFEST_NAME = "organ-mcp-candidate-auth-manifest.json"
@@ -279,6 +295,10 @@ class DummyServer:
 
     def run(self, *, transport: str) -> None:
         self.transports.append(transport)
+
+    def configure_http(self, host: str, port: int) -> None:
+        self.settings.host = host
+        self.settings.port = port
 
 
 def mcp_environment(**overrides: str) -> dict[str, str]:
@@ -2167,12 +2187,14 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             credential.parent.mkdir(parents=True)
             credential.write_text(f"{MCP_HTTP_AUTH_TOKEN}\n", encoding="utf-8")
             credential.chmod(0o600)
+            stack_read_credential = credential.parent / "abyss-stack-mcp-read-bearer-token"
+            stack_read_credential.write_text(
+                f"{'s' * 64}\n", encoding="utf-8"
+            )
+            stack_read_credential.chmod(0o600)
             owner_tokens: list[str] = []
             for index, name in enumerate(
-                (
-                    *ORGAN_MCP_READ_CREDENTIAL_NAMES,
-                    *ORGAN_MCP_CANDIDATE_CREDENTIAL_NAMES,
-                )
+                CODEX_MCP_READ_CREDENTIAL_NAMES
             ):
                 owner_token = f"test-owner-{index}-" + (chr(ord("b") + index) * 50)
                 owner_tokens.append(owner_token)
@@ -2185,23 +2207,17 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             fake_codex.write_text(
                 "#!/usr/bin/env bash\n"
                 "printf '%s\\n' "
-                '"$AOA_MCP_HTTP_BEARER_TOKEN" '
                 '"$AOA_DECISIONS_MCP_READ_BEARER_TOKEN" '
                 '"$AOA_MEMO_MCP_READ_BEARER_TOKEN" '
                 '"$AOA_EVALS_MCP_READ_BEARER_TOKEN" '
                 '"$AOA_KAG_MCP_READ_BEARER_TOKEN" '
                 '"$AOA_4PDA_CONNECTOR_MCP_READ_BEARER_TOKEN" '
-                '"$AOA_COURSE_CONNECTOR_MCP_READ_BEARER_TOKEN" '
                 '"$AOA_DISCORD_CONNECTOR_MCP_READ_BEARER_TOKEN" '
                 '"$AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN" '
-                '"$AOA_STACKOVERFLOW_CONNECTOR_MCP_READ_BEARER_TOKEN" '
                 '"$AOA_STATS_MCP_READ_BEARER_TOKEN" '
                 '"$AOA_TELEGRAM_CONNECTOR_MCP_READ_BEARER_TOKEN" '
-                '"$AOA_XDA_CONNECTOR_MCP_READ_BEARER_TOKEN" '
-                '"$ABYSS_MACHINE_MCP_READ_BEARER_TOKEN" '
-                '"$TOS_CORPUS_MCP_READ_BEARER_TOKEN" '
-                '"$AOA_MEMO_MCP_CANDIDATE_BEARER_TOKEN" '
-                '"$AOA_EVALS_MCP_CANDIDATE_BEARER_TOKEN" > "$CAPTURE_TOKEN"\n'
+                '"$ABYSS_MACHINE_MCP_READ_BEARER_TOKEN" > "$CAPTURE_TOKEN"\n'
+                'printf \'%s\\n\' "$ABYSS_STACK_MCP_READ_BEARER_TOKEN" >> "$CAPTURE_TOKEN"\n'
                 'printf \'%s\\n\' "$@" > "$CAPTURE_ARGS"\n',
                 encoding="utf-8",
             )
@@ -2233,6 +2249,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "AOA_XDA_CONNECTOR_MCP_READ_BEARER_TOKEN",
                 "ABYSS_MACHINE_MCP_READ_BEARER_TOKEN",
                 "TOS_CORPUS_MCP_READ_BEARER_TOKEN",
+                "ABYSS_STACK_MCP_READ_BEARER_TOKEN",
             ):
                 env.pop(environment_name, None)
 
@@ -2248,7 +2265,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(
                 capture_token.read_text(encoding="utf-8").splitlines(),
-                [MCP_HTTP_AUTH_TOKEN, *owner_tokens],
+                owner_tokens,
             )
             self.assertEqual(
                 capture_args.read_text(encoding="utf-8").splitlines(),
@@ -2256,7 +2273,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertNotIn(MCP_HTTP_AUTH_TOKEN, result.stdout + result.stderr)
 
-            env["AOA_MCP_HTTP_BEARER_TOKEN"] = "different-" + ("b" * 54)
+            env["AOA_MEMO_MCP_READ_BEARER_TOKEN"] = "different-" + ("b" * 54)
             conflict = subprocess.run(
                 [str(MCP_HTTP_CODEX_CLIENT), "--version"],
                 cwd=REPO_ROOT,
@@ -2288,6 +2305,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             credential.parent.mkdir(parents=True)
             credential.write_text(f"{MCP_HTTP_AUTH_TOKEN}\n", encoding="utf-8")
             credential.chmod(0o600)
+            stack_read_credential = credential.parent / "abyss-stack-mcp-read-bearer-token"
+            stack_read_credential.write_text(f"{'s' * 64}\n", encoding="utf-8")
+            stack_read_credential.chmod(0o600)
             home = root / "home"
             home.mkdir()
             zshrc = home / ".zshrc"
@@ -2297,7 +2317,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             capture_token = root / "captured-token"
             fake_codex.write_text(
                 "#!/usr/bin/env bash\n"
-                'printf \'%s\' "$AOA_MCP_HTTP_BEARER_TOKEN" > "$CAPTURE_TOKEN"\n',
+                'printf \'%s\' "$ABYSS_STACK_MCP_READ_BEARER_TOKEN" > "$CAPTURE_TOKEN"\n',
                 encoding="utf-8",
             )
             fake_codex.chmod(0o755)
@@ -2317,6 +2337,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 *(auth["env"] for auth in ORGAN_MCP_READ_AUTH.values()),
                 "AOA_MEMO_MCP_CANDIDATE_BEARER_TOKEN",
                 "AOA_EVALS_MCP_CANDIDATE_BEARER_TOKEN",
+                "ABYSS_STACK_MCP_READ_BEARER_TOKEN",
             ):
                 env.pop(environment_name, None)
 
@@ -2372,7 +2393,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 )
                 self.assertEqual(launch.returncode, 0, launch.stderr)
                 self.assertEqual(
-                    capture_token.read_text(encoding="utf-8"), MCP_HTTP_AUTH_TOKEN
+                    capture_token.read_text(encoding="utf-8"), "s" * 64
                 )
 
             remove = subprocess.run(
@@ -2392,25 +2413,13 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
     def test_loopback_mcp_units_keep_owner_processes_and_deployed_paths(self) -> None:
         template = MCP_HTTP_TEMPLATE.read_text(encoding="utf-8")
         organ_read_template = ORGAN_MCP_READ_TEMPLATE.read_text(encoding="utf-8")
-        self.assertIn("Environment=AOA_MCP_TRANSPORT=streamable-http", template)
-        self.assertIn("Environment=AOA_MCP_HOST=127.0.0.1", template)
-        self.assertIn(
-            "LoadCredential=aoa-mcp-http-bearer-token:/srv/AbyssOS/abyss-stack/Secrets/Configs/aoa-mcp-http-bearer-token",
-            template,
-        )
-        self.assertNotIn("Environment=AOA_MCP_HTTP_BEARER_TOKEN", template)
-        self.assertIn(
-            "Environment=AOA_ABYSS_STACK_ROOT=/srv/AbyssOS/abyss-stack/Configs",
-            template,
-        )
-        self.assertIn("WorkingDirectory=/srv/AbyssOS", template)
-        self.assertIn(
-            "ExecStart=/usr/bin/env python3 /srv/AbyssOS/.codex/bin/%i-mcp-server.py",
-            template,
-        )
-        self.assertIn("RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6", template)
-        self.assertIn("Restart=on-failure", template)
-        self.assertNotIn(str(REPO_ROOT), template)
+        self.assertIn("RefuseManualStart=yes", template)
+        self.assertIn("RefuseManualStop=yes", template)
+        self.assertIn("ExecStart=/usr/bin/false", template)
+        self.assertNotIn("AOA_MCP_TRANSPORT", template)
+        self.assertNotIn("LoadCredential", template)
+        self.assertNotIn("/usr/bin/env python3", template)
+        self.assertNotIn("[Install]", template)
 
         self.assertIn(
             "LoadCredential=%i-mcp-read-bearer-token:"
@@ -2547,7 +2556,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 ],
             )
             self.assertIn("Restart=no", bootstrap_lines)
-            self.assertIn("RuntimeMaxSec=10min", bootstrap_lines)
+            self.assertIn("RuntimeMaxSec=30min", bootstrap_lines)
             self.assertNotIn("[Install]", bootstrap_lines)
             self.assertFalse(
                 any(line.startswith("WantedBy=") for line in bootstrap_lines)
@@ -2882,7 +2891,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
 class McpLoopbackLifecycleTests(unittest.TestCase):
     def test_release_dependencies_retain_the_tested_mcp_auth_api(self) -> None:
         requirements = (REPO_ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
-        self.assertIn("mcp>=1.27.2,<2", requirements.splitlines())
+        self.assertIn("mcp==2.0.0", requirements.splitlines())
 
     def test_all_standalone_packages_require_the_tested_mcp_auth_api(self) -> None:
         for directory, _ in MCP_SERVER_PACKAGES.values():
@@ -2890,11 +2899,21 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 pyproject = (
                     REPO_ROOT / "mcp" / "services" / directory / "pyproject.toml"
                 ).read_text(encoding="utf-8")
-                self.assertIn('"mcp>=1.27.2,<2",', pyproject)
+                self.assertIn('"mcp==2.0.0",', pyproject)
 
     def test_generated_http_auth_helpers_are_current(self) -> None:
         result = subprocess.run(
             [sys.executable, str(MCP_HTTP_AUTH_BUILDER), "--check"],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_generated_modern_runtime_helpers_are_current(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(MCP_MODERN_RUNTIME_BUILDER), "--check"],
             cwd=REPO_ROOT,
             check=False,
             capture_output=True,
@@ -3320,6 +3339,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 f"http://127.0.0.1:{port}/mcp",
                 data=b"{}",
                 method="POST",
+                headers={"MCP-Protocol-Version": "2026-07-28"},
             )
             with self.assertRaises(urllib.error.HTTPError) as missing_auth:
                 urllib.request.urlopen(request, timeout=2)
@@ -3329,7 +3349,10 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 f"http://127.0.0.1:{port}/mcp",
                 data=b"{}",
                 method="POST",
-                headers={"Authorization": "Bearer wrong-token"},
+                headers={
+                    "Authorization": "Bearer wrong-token",
+                    "MCP-Protocol-Version": "2026-07-28",
+                },
             )
             with self.assertRaises(urllib.error.HTTPError) as wrong_auth:
                 urllib.request.urlopen(wrong_request, timeout=2)
@@ -3342,6 +3365,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 headers={
                     "Authorization": f"Bearer {MCP_HTTP_AUTH_TOKEN}",
                     "Content-Type": "application/json",
+                    "MCP-Protocol-Version": "2026-07-28",
                     "Origin": "https://untrusted.example",
                 },
             )
@@ -3357,6 +3381,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                     "Authorization": f"Bearer {MCP_HTTP_AUTH_TOKEN}",
                     "Content-Type": "application/json",
                     "Host": "untrusted.example",
+                    "MCP-Protocol-Version": "2026-07-28",
                 },
             )
             with self.assertRaises(urllib.error.HTTPError) as invalid_host:
@@ -3365,20 +3390,34 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
 
             async def authenticated_inventory() -> int:
                 import httpx
-                from mcp import ClientSession
-                from mcp.client.streamable_http import streamable_http_client
 
                 async with httpx.AsyncClient(
-                    headers={"Authorization": f"Bearer {MCP_HTTP_AUTH_TOKEN}"}
+                    headers={
+                        "Authorization": f"Bearer {MCP_HTTP_AUTH_TOKEN}",
+                        "MCP-Protocol-Version": "2026-07-28",
+                        "MCP-Method": "tools/list",
+                    }
                 ) as http_client:
-                    async with streamable_http_client(
+                    response = await http_client.post(
                         f"http://127.0.0.1:{port}/mcp",
-                        http_client=http_client,
-                    ) as (read_stream, write_stream, _):
-                        async with ClientSession(read_stream, write_stream) as session:
-                            await session.initialize()
-                            tools = await session.list_tools()
-                            return len(tools.tools)
+                        json={
+                            "jsonrpc": "2.0",
+                            "id": 1,
+                            "method": "tools/list",
+                            "params": {
+                                "_meta": {
+                                    "io.modelcontextprotocol/clientInfo": {
+                                        "name": "abyss-stack-unit-test",
+                                        "version": "1",
+                                    },
+                                    "io.modelcontextprotocol/clientCapabilities": {},
+                                    "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                                }
+                            },
+                        },
+                    )
+                    response.raise_for_status()
+                    return len(response.json()["result"]["tools"])
 
             self.assertGreater(asyncio.run(authenticated_inventory()), 0)
         finally:
