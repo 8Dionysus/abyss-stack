@@ -249,7 +249,7 @@ def _compose(paths: dict[str, Path]):
         lkg_observation_path=paths["lkg"],
         operator_decision_path=paths["decision"],
         clock=lambda: NOW + timedelta(minutes=2),
-        file_digest=lambda path, label: DIGEST_A,
+        process_executable_digest=lambda identity, path, unit: DIGEST_A,
     )
 
 

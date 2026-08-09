@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import os
 import re
+import stat
 from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,11 +37,14 @@ from .observation import (
     _read_json,
     _write_atomic,
 )
-from .rollback_candidate import _file_digest
+from .process_launcher import PROCESS_EXECUTABLE_FD
 
 
 class AdmissionRevisionError(ObservationProducerError):
     """The supplied live evidence cannot support one v2 admission revision."""
+
+
+MAX_PROCESS_EXECUTABLE_BYTES = 16 * 1024 * 1024
 
 
 def _now() -> datetime:
@@ -116,14 +122,83 @@ def _proof_and_acceptance_match_current(current: Any, consumer: Any) -> bool:
     )
 
 
-FileDigest = Callable[[Path, str], str]
+ProcessExecutableDigest = Callable[[str, Path, str], str]
+
+
+def _proc_start_ticks(pid: int) -> int:
+    try:
+        raw = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+        fields = raw[raw.rfind(")") + 2 :].split()
+        return int(fields[19])
+    except (IndexError, OSError, ValueError) as exc:
+        raise AdmissionRevisionError(
+            "live process start identity is unavailable"
+        ) from exc
+
+
+def _process_backed_executable_digest(
+    process_identity: str,
+    executable_ref: Path,
+    unit_name: str,
+    *,
+    launch_fd: int = PROCESS_EXECUTABLE_FD,
+) -> str:
+    match = re.fullmatch(
+        rf"systemd-user:{re.escape(unit_name)}:pid:([1-9][0-9]*):start:([1-9][0-9]*)",
+        process_identity,
+    )
+    if match is None:
+        raise AdmissionRevisionError("live process identity is not exact")
+    pid = int(match.group(1))
+    systemd_start_us = int(match.group(2))
+    ticks_per_second = os.sysconf("SC_CLK_TCK")
+    start_ticks_before = _proc_start_ticks(pid)
+    proc_start_us = start_ticks_before * 1_000_000 // ticks_per_second
+    if abs(proc_start_us - systemd_start_us) > (1_000_000 // ticks_per_second) + 1:
+        raise AdmissionRevisionError("live process start identity changed")
+    fd_ref = Path(f"/proc/{pid}/fd/{launch_fd}")
+    try:
+        target = os.readlink(fd_ref)
+    except OSError as exc:
+        raise AdmissionRevisionError(
+            "process-backed executable evidence is unavailable"
+        ) from exc
+    expected = executable_ref.expanduser().absolute().as_posix()
+    if target not in {expected, expected + " (deleted)"}:
+        raise AdmissionRevisionError(
+            "process-backed executable differs from the managed executable"
+        )
+    try:
+        descriptor = os.open(fd_ref, os.O_RDONLY | os.O_CLOEXEC)
+        try:
+            metadata = os.fstat(descriptor)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise AdmissionRevisionError(
+                    "process-backed executable is not a regular file"
+                )
+            digest = hashlib.sha256()
+            total = 0
+            while chunk := os.read(descriptor, 1024 * 1024):
+                total += len(chunk)
+                if total > MAX_PROCESS_EXECUTABLE_BYTES:
+                    raise AdmissionRevisionError(
+                        "process-backed executable exceeds its bounded size"
+                    )
+                digest.update(chunk)
+        finally:
+            os.close(descriptor)
+    except OSError as exc:
+        raise AdmissionRevisionError("process-backed executable is unreadable") from exc
+    if _proc_start_ticks(pid) != start_ticks_before:
+        raise AdmissionRevisionError("live process changed during executable proof")
+    return "sha256:" + digest.hexdigest()
 
 
 def _lkg_matches_rollback_target(
     lkg: Any,
     current: Any,
     *,
-    file_digest: FileDigest,
+    process_executable_digest: ProcessExecutableDigest,
 ) -> bool:
     target = current.rollback.proved_target
     if target is None:
@@ -150,8 +225,10 @@ def _lkg_matches_rollback_target(
     process_target_matches = live_process_identity == target.process_identity
     if not process_target_matches and exact_live_process and exact_stable_target:
         try:
-            observed_executable_digest = file_digest(
-                Path(lkg.process.executable_ref), "LKG executable"
+            observed_executable_digest = process_executable_digest(
+                live_process_identity,
+                Path(lkg.process.executable_ref),
+                target.unit_name,
             )
         except (OSError, ValueError):
             return False
@@ -184,7 +261,9 @@ def compose_admission_revision(
     lkg_observation_path: Path,
     operator_decision_path: Path,
     clock: Any = _now,
-    file_digest: FileDigest = _file_digest,
+    process_executable_digest: ProcessExecutableDigest = (
+        _process_backed_executable_digest
+    ),
 ) -> OrganContourAdmissionRevision:
     registry_payload, _ = _read_json(registry_path, "v2 organ registry")
     observation_payload, _ = _read_json(observation_path, "current observation")
@@ -301,7 +380,11 @@ def compose_admission_revision(
         raise AdmissionRevisionError(
             "proof or owner acceptance targets a different current contour"
         )
-    if not _lkg_matches_rollback_target(lkg, current, file_digest=file_digest):
+    if not _lkg_matches_rollback_target(
+        lkg,
+        current,
+        process_executable_digest=process_executable_digest,
+    ):
         raise AdmissionRevisionError(
             "last-known-good observation differs from the rollback proof target"
         )

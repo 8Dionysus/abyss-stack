@@ -2428,6 +2428,10 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertIn("IPAddressAllow=localhost", organ_read_template)
         self.assertNotIn("ReadWritePaths=", organ_read_template)
         self.assertIn(" -m abyss_stack_mcp.preflight ", organ_read_template)
+        self.assertIn(
+            "ExecStart=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -I -B -m abyss_stack_mcp.process_launcher --executable /srv/AbyssOS/.codex/bin/%i-mcp-server.py",
+            organ_read_template,
+        )
         self.assertNotIn(
             "Environment=AOA_MCP_HTTP_BEARER_TOKEN",
             organ_read_template,
