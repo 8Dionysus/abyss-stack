@@ -13,9 +13,10 @@ import stat
 import subprocess
 import sys
 import tempfile
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Iterable, Iterator, Sequence
 
 
 SCHEMA_VERSION = "abyss_stack_external_codex_runtime_install_v1"
@@ -45,7 +46,6 @@ OWNER_CONTRACT_FILES = (
     ("aoa-skills", "schemas/task_local_dag_v2.schema.json"),
 )
 INSTALLER_GIT = "/usr/bin/git"
-INSTALLER_GIT_FILTER_LIMIT = 128
 
 
 class InstallError(RuntimeError):
@@ -154,108 +154,151 @@ def _base_installer_git_environment() -> dict[str, str]:
     }
 
 
-def _installer_git_environment(root: Path) -> dict[str, str]:
-    """Neutralize repository-defined filters before posture probes read bytes."""
+def _source_git_coordinate(root: Path, *args: str) -> str:
+    """Read one non-dispatching coordinate with exact Git and no ambient state."""
 
-    environment = _base_installer_git_environment()
     try:
         completed = subprocess.run(
-            [
-                INSTALLER_GIT,
-                "-C",
-                str(root),
-                "config",
-                "--local",
-                "--includes",
-                "--name-only",
-                "--null",
-                "--get-regexp",
-                r"^filter\..*\.(clean|smudge|process|required)$",
-            ],
+            [INSTALLER_GIT, "-C", str(root), *args],
             check=False,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            text=True,
             timeout=15,
-            env=environment,
+            env=_base_installer_git_environment(),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        raise InstallError(f"cannot inspect Git filters for {root}: {exc}") from exc
-    if completed.returncode not in {0, 1}:
-        raise InstallError(f"cannot inspect Git filters for {root}")
-    try:
-        keys = sorted(
+        raise InstallError(f"cannot inspect Git coordinate for {root}: {exc}") from exc
+    value = completed.stdout.strip()
+    if completed.returncode != 0 or not value:
+        raise InstallError(f"cannot inspect Git coordinate for {root}")
+    return value
+
+
+@contextmanager
+def _installer_git_snapshot(root: Path) -> Iterator[dict[str, str]]:
+    """Expose posture through private Git metadata with no source config race."""
+
+    head = _source_git_coordinate(root, "rev-parse", "--verify", "HEAD")
+    object_format = _source_git_coordinate(root, "rev-parse", "--show-object-format")
+    expected_length = {"sha1": 40, "sha256": 64}.get(object_format)
+    if (
+        expected_length is None
+        or len(head) != expected_length
+        or re.fullmatch(r"[0-9a-f]+", head) is None
+    ):
+        raise InstallError(f"unsupported Git object identity for {root}")
+
+    index_value = _source_git_coordinate(root, "rev-parse", "--git-path", "index")
+    objects_value = _source_git_coordinate(root, "rev-parse", "--git-path", "objects")
+    index_path = Path(index_value)
+    objects_path = Path(objects_value)
+    if not index_path.is_absolute():
+        index_path = root / index_path
+    if not objects_path.is_absolute():
+        objects_path = root / objects_path
+    if index_path.is_symlink() or objects_path.is_symlink():
+        raise InstallError(f"source Git metadata must not be symlinked for {root}")
+    index_path = index_path.resolve()
+    objects_path = objects_path.resolve()
+    require_regular_file(index_path, "source Git index")
+    require_absolute_directory(objects_path, "source Git object directory")
+    if "\n" in str(objects_path) or "\r" in str(objects_path):
+        raise InstallError("source Git object directory contains a newline")
+
+    with tempfile.TemporaryDirectory(prefix="aoa-external-codex-git-") as temporary:
+        git_dir = Path(temporary) / "git"
+        (git_dir / "objects/info").mkdir(parents=True, mode=0o700)
+        (git_dir / "refs/heads").mkdir(parents=True, mode=0o700)
+        shutil.copyfile(index_path, git_dir / "index")
+        (git_dir / "HEAD").write_text(head + "\n", encoding="ascii")
+        (git_dir / "objects/info/alternates").write_text(
+            str(objects_path) + "\n",
+            encoding="utf-8",
+        )
+        config = [
+            "[core]",
+            f"\trepositoryFormatVersion = {1 if object_format == 'sha256' else 0}",
+            "\tbare = false",
+            "\tfileMode = true",
+            "\thooksPath = /dev/null",
+            "\tfsmonitor = false",
+            "\tattributesFile = /dev/null",
+            "[diff]",
+            "\tignoreSubmodules = all",
+            "[status]",
+            "\tsubmoduleSummary = false",
+        ]
+        if object_format == "sha256":
+            config.extend(("[extensions]", "\tobjectFormat = sha256"))
+        (git_dir / "config").write_text("\n".join(config) + "\n", encoding="utf-8")
+        environment = _base_installer_git_environment()
+        environment.update(
             {
-                raw.decode("utf-8")
-                for raw in completed.stdout.split(b"\0")
-                if raw
+                "GIT_DIR": str(git_dir),
+                "GIT_INDEX_FILE": str(git_dir / "index"),
+                "GIT_WORK_TREE": str(root),
             }
         )
-    except UnicodeDecodeError as exc:
-        raise InstallError(f"Git filter key is not UTF-8 for {root}") from exc
-    if len(keys) > INSTALLER_GIT_FILTER_LIMIT or any(
-        re.fullmatch(r"filter\..+\.(?:clean|smudge|process|required)", key, re.I)
-        is None
-        for key in keys
-    ):
-        raise InstallError(f"Git filter keys exceed the bounded grammar for {root}")
-    next_index = int(environment["GIT_CONFIG_COUNT"])
-    for key in keys:
-        environment[f"GIT_CONFIG_KEY_{next_index}"] = key
-        environment[f"GIT_CONFIG_VALUE_{next_index}"] = (
-            "false" if key.lower().endswith(".required") else ""
-        )
-        next_index += 1
-    environment["GIT_CONFIG_COUNT"] = str(next_index)
-    return environment
+        yield environment
 
 
 def git_posture(
     root: Path,
     packaged_files: Iterable[Path] = (),
 ) -> dict[str, object]:
-    environment = _installer_git_environment(root)
-
-    def run(*args: str) -> str:
-        completed = subprocess.run(
-            [INSTALLER_GIT, "-C", str(root), *args],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=15,
-            env=environment,
-        )
-        return completed.stdout.strip()
-
     packaged_relatives = {
         path.relative_to(root).as_posix()
         for path in packaged_files
     }
-    try:
-        head = run("rev-parse", "HEAD")
-        status = run("status", "--porcelain=v1", "--untracked-files=all")
-        flagged = subprocess.run(
-            [INSTALLER_GIT, "-C", str(root), "ls-files", "-v", "-z"],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=15,
-            env=environment,
-        ).stdout
-        ignored = subprocess.run(
-            [INSTALLER_GIT, "-C", str(root), "check-ignore", "-z", "--stdin"],
-            check=False,
-            input=b"".join(
-                relative.encode("utf-8") + b"\0"
-                for relative in sorted(packaged_relatives)
-            ),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=15,
-            env=environment,
-        )
-    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-        raise InstallError(f"cannot inspect Git posture for {root}: {exc}") from exc
+    with _installer_git_snapshot(root) as environment:
+        def run(*args: str) -> str:
+            completed = subprocess.run(
+                [INSTALLER_GIT, "-C", str(root), *args],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=15,
+                env=environment,
+            )
+            return completed.stdout.strip()
+
+        try:
+            head = run("rev-parse", "HEAD")
+            status = run("status", "--porcelain=v1", "--untracked-files=all")
+            flagged = subprocess.run(
+                [INSTALLER_GIT, "-C", str(root), "ls-files", "-v", "-z"],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=15,
+                env=environment,
+            ).stdout
+            ignored = subprocess.run(
+                [INSTALLER_GIT, "-C", str(root), "check-ignore", "-z", "--stdin"],
+                check=False,
+                input=b"".join(
+                    relative.encode("utf-8") + b"\0"
+                    for relative in sorted(packaged_relatives)
+                ),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=15,
+                env=environment,
+            )
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            detail = ""
+            if isinstance(exc, subprocess.CalledProcessError) and exc.stderr:
+                raw_detail = exc.stderr
+                if isinstance(raw_detail, bytes):
+                    detail = raw_detail.decode("utf-8", errors="replace").strip()
+                else:
+                    detail = str(raw_detail).strip()
+            suffix = f": {detail}" if detail else ""
+            raise InstallError(
+                f"cannot inspect Git posture for {root}: {exc}{suffix}"
+            ) from exc
     if ignored.returncode not in {0, 1}:
         raise InstallError(
             f"cannot inspect ignored packaged files for {root}: "

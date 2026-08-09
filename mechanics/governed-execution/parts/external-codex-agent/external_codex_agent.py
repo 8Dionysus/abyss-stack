@@ -1606,6 +1606,10 @@ def _git_subcommand(tokens: Sequence[str]) -> tuple[str | None, tuple[str, ...]]
 def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
     """Reject config-driven aliases and external git-subcommand dispatch."""
 
+    # Git help can dispatch repository/user-configured man viewers and commands.
+    if any(token.lower() in {"--help", "-h"} for token in tokens[1:]):
+        return True
+
     for token in tokens[1:]:
         if token == "--":
             break

@@ -228,6 +228,65 @@ def test_git_posture_does_not_run_repository_fsmonitor_or_content_filter(
     assert filter_marker.exists() is False
 
 
+def test_git_posture_snapshot_ignores_filter_config_added_before_status(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, _sdk, _agents, _skills = make_sources(tmp_path)
+    marker = tmp_path / "late-filter-ran"
+    helper = tmp_path / "late-filter"
+    helper.write_text(
+        "#!/bin/sh\n"
+        f"/usr/bin/touch {shlex.quote(str(marker))}\n"
+        "/bin/cat\n",
+        encoding="utf-8",
+    )
+    helper.chmod(0o700)
+    (source / ".gitattributes").write_text(
+        "mechanics/** filter=late\n",
+        encoding="utf-8",
+    )
+    git("add", ".gitattributes", cwd=source)
+    git("commit", "-qm", "late attributes", cwd=source)
+    controller = (
+        source
+        / "mechanics/governed-execution/parts/external-codex-agent/"
+        "external_codex_agent.py"
+    )
+    controller.write_text(
+        controller.read_text(encoding="utf-8") + "# late-filter drift\n",
+        encoding="utf-8",
+    )
+    original_run = subprocess.run
+    mutation_observed = False
+
+    def mutate_before_status(*args: object, **kwargs: object) -> subprocess.CompletedProcess:
+        nonlocal mutation_observed
+        argv = args[0] if args else kwargs.get("args")
+        if (
+            not mutation_observed
+            and isinstance(argv, (list, tuple))
+            and "status" in argv
+        ):
+            mutation_observed = True
+            original_run(
+                ["/usr/bin/git", "config", "filter.late.clean", str(helper)],
+                cwd=source,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        return original_run(*args, **kwargs)
+
+    monkeypatch.setattr(runtime_install.subprocess, "run", mutate_before_status)
+
+    posture = runtime_install.git_posture(source)
+
+    assert mutation_observed is True
+    assert posture["dirty"] is True
+    assert marker.exists() is False
+
+
 def test_install_refuses_clean_checkout_race_before_activation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

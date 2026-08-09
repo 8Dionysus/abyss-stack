@@ -2440,6 +2440,36 @@ def test_neutral_binder_reproduces_exact_owner_contour_launch(tmp_path: Path) ->
     assert response["launch_ref"]["digest"] == _digest_path(output_path)
 
 
+def test_neutral_binder_uses_exact_git_outside_ambient_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "README.md").write_text("bounded\n", encoding="utf-8")
+    _git(workspace, "add", "README.md")
+    _git(workspace, "commit", "-m", "fixture")
+    expected = _git(workspace, "rev-parse", "HEAD")
+    malicious_bin = tmp_path / "bin"
+    malicious_bin.mkdir()
+    marker = tmp_path / "replacement-git-ran"
+    replacement = malicious_bin / "git"
+    replacement.write_text(
+        "#!/bin/sh\n"
+        f"/usr/bin/touch {shlex.quote(str(marker))}\n"
+        "/usr/bin/printf '0000000000000000000000000000000000000000\\n'\n",
+        encoding="utf-8",
+    )
+    replacement.chmod(0o700)
+    monkeypatch.setenv("PATH", f"{malicious_bin}:/usr/bin:/bin")
+
+    assert BINDER._git_head(workspace) == expected
+    assert marker.exists() is False
+
+
 @pytest.mark.skipif(
     not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
     or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file(),
@@ -3687,6 +3717,19 @@ def test_git_repository_config_writes_are_fail_closed(command: str) -> None:
     ),
 )
 def test_git_remote_mutations_and_dispatch_are_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/git remote --help",
+        "/usr/bin/git remote -h",
+        "/usr/bin/git --help remote",
+        "/usr/bin/git status --help",
+    ),
+)
+def test_git_help_dispatch_is_fail_closed(command: str) -> None:
     assert RUNTIME._command_has_unclassified_indirection(command) is True
 
 

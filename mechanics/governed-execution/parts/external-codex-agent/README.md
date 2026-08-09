@@ -118,7 +118,8 @@ The controller:
   Git config writes plus alias/external-subcommand dispatch and ambient
   environment assignment fail closed; `git remote` retains read-only listing
   and URL resolution, while every mutating or transport-dispatching form is
-  opaque,
+  opaque; Git help forms are opaque as well because configured man viewers can
+  dispatch programs,
   any command carrying a secret-shaped path is classified as secret access,
   and commands are durably observed
   from `item.started` rather than only after completion, while exact task validation
@@ -187,7 +188,9 @@ usage but does not fabricate the missing interrupted-attempt tokens.
 accepts already selected owner/SDK/model/runtime artifact paths, verifies the
 runtime-profile-pinned owner schema bytes, hashes the workspace, Codex binary,
 and every coordinate, writes one immutable `owner_contour` launch, and returns
-control to `aoa-agents`. It does not detect an obligation, choose a role or
+control to `aoa-agents`. Its workspace-HEAD binding uses exact system Git under
+a fixed minimal environment, never an ambient `PATH` resolution. It does not
+detect an obligation, choose a role or
 model, form the owner execution request, or start the actor. `aoa-summon` then
 forms the separate semantic request and calls `preflight`, `start`, or
 `run-to-terminal` with both exact paths.
@@ -257,11 +260,12 @@ the installer re-enumerates the selected inputs, requires unchanged Git
 postures, and re-hashes every source byte against the release manifest; a
 checkout race therefore fails before wrapper or active-receipt mutation.
 Every installer posture probe uses the exact system Git under a fixed minimal
-environment: repository hooks and fsmonitor are disabled, global/system
-attributes and configuration are excluded, and effective repository content
-filters are enumerated and neutralized at command scope before status or index
-inspection. A source checkout therefore cannot gain installer-process
-execution merely by configuring a Git helper.
+environment and a private metadata snapshot containing only the selected HEAD,
+index, a read-only object-store alternate, and runtime-authored configuration.
+Repository hooks, fsmonitor, filters, global/system attributes, and source
+configuration never enter the posture process. Even a filter added to the
+source `.git/config` after snapshot creation therefore cannot gain
+installer-process execution before status or index inspection.
 Installation requires clean exact
 `abyss-stack`, `aoa-sdk`, `aoa-agents`, and `aoa-skills` source roots unless
 each dirty posture is admitted explicitly.

@@ -29,6 +29,7 @@ from external_codex_agent import (  # noqa: E402
 PROFILE_PATH = PART_ROOT / "runtime-profile.v1.json"
 MANIFEST_SCHEMA_PATH = PART_ROOT / "schemas/external-actor-launch-manifest.schema.json"
 RESPONSE_SCHEMA_VERSION = "abyss_stack_external_actor_launch_binding_response_v1"
+BINDER_GIT = "/usr/bin/git"
 COORDINATE_KEYS = (
     "plan",
     "incarnation_binding",
@@ -61,12 +62,36 @@ def _digest(path: Path) -> str:
 
 
 def _git_head(workspace: Path) -> str:
-    completed = subprocess.run(
-        ["git", "-C", str(workspace), "rev-parse", "HEAD"],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    environment = {
+        "GIT_ATTR_NOSYSTEM": "1",
+        "GIT_CONFIG_COUNT": "3",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_KEY_0": "core.hooksPath",
+        "GIT_CONFIG_KEY_1": "core.fsmonitor",
+        "GIT_CONFIG_KEY_2": "core.attributesFile",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_CONFIG_VALUE_0": "/dev/null",
+        "GIT_CONFIG_VALUE_1": "false",
+        "GIT_CONFIG_VALUE_2": "/dev/null",
+        "GIT_OPTIONAL_LOCKS": "0",
+        "GIT_TERMINAL_PROMPT": "0",
+        "HOME": "/nonexistent",
+        "LANG": "C.UTF-8",
+        "NO_COLOR": "1",
+        "PATH": "/usr/bin:/bin",
+    }
+    try:
+        completed = subprocess.run(
+            [BINDER_GIT, "-C", str(workspace), "rev-parse", "HEAD"],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=15,
+            env=environment,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise LaunchBindingError("cannot inspect exact workspace Git HEAD") from exc
     head = completed.stdout.strip()
     if completed.returncode != 0 or len(head) != 40 or any(c not in "0123456789abcdef" for c in head):
         raise LaunchBindingError("workspace has no exact Git HEAD")
