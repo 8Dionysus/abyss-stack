@@ -126,6 +126,7 @@
 - [ABYSS-STACK-D-0105 Bind Stack MCP Capabilities to Process Contours](../ABYSS-STACK-D-0105-bind-stack-mcp-capabilities-to-process-contours.md) (`docs/decisions/ABYSS-STACK-D-0105-bind-stack-mcp-capabilities-to-process-contours.md`)
 - [ABYSS-STACK-D-0106 Admit One Exact Stack MCP Read Restart Pilot](../ABYSS-STACK-D-0106-admit-one-exact-stack-mcp-read-restart-pilot.md) (`docs/decisions/ABYSS-STACK-D-0106-admit-one-exact-stack-mcp-read-restart-pilot.md`)
 - [ABYSS-STACK-D-0107 Fail Closed MCP Admission Maintenance](../ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md) (`docs/decisions/ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md`)
+- [ABYSS-STACK-D-0108 Modern-Only MCP Organ Runtime](../ABYSS-STACK-D-0108-modern-only-mcp-organ-runtime.md) (`docs/decisions/ABYSS-STACK-D-0108-modern-only-mcp-organ-runtime.md`)
 
 ## cross-mechanic
 
