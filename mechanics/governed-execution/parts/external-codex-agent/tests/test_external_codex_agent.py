@@ -3969,6 +3969,7 @@ def test_codex_environment_isolates_shell_startup_and_repository_hooks(
     assert environment["GIT_CONFIG_VALUE_2"] == "/dev/null"
     assert environment["GIT_CONFIG_KEY_3"] == "filter.leak.smudge"
     assert environment["GIT_CONFIG_VALUE_3"] == ""
+    assert environment["GIT_NO_LAZY_FETCH"] == "1"
     assert Path(environment["GIT_CONFIG_VALUE_0"]).stat().st_mode & 0o222 == 0
     assert Path(environment["HOME"]).stat().st_mode & 0o222 == 0
     assert marker.exists() is False
@@ -4399,6 +4400,68 @@ def test_workspace_manifest_disables_repository_diff_and_filter_programs(
     assert manifest["status_entries"] == [{"path": "tracked.txt", "status": " M"}]
     assert diff_marker.exists() is False
     assert filter_marker.exists() is False
+
+
+def test_workspace_manifest_disables_promisor_lazy_fetch_helpers(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    tracked = workspace / "tracked.txt"
+    tracked.write_text("baseline\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    _git(workspace, "commit", "-m", "fixture")
+    blob_oid = _git(workspace, "rev-parse", "HEAD:tracked.txt")
+    blob_path = workspace / ".git" / "objects" / blob_oid[:2] / blob_oid[2:]
+    assert blob_path.is_file()
+
+    marker = tmp_path / "promisor-helper-ran"
+    helper = tmp_path / "promisor-helper"
+    helper.write_text(
+        "#!/bin/sh\n"
+        f"/usr/bin/touch {shlex.quote(str(marker))}\n"
+        "exit 1\n",
+        encoding="utf-8",
+    )
+    helper.chmod(0o700)
+    _git(workspace, "config", "extensions.partialClone", "origin")
+    _git(workspace, "config", "protocol.ext.allow", "always")
+    _git(workspace, "config", "remote.origin.url", f"ext::{helper}")
+    _git(workspace, "config", "remote.origin.promisor", "true")
+    _git(workspace, "config", "remote.origin.partialclonefilter", "blob:none")
+    blob_path.unlink()
+    tracked.write_text("changed\n", encoding="utf-8")
+
+    unsafe_environment = RUNTIME._base_controller_git_environment()
+    unsafe_environment.pop("GIT_NO_LAZY_FETCH")
+    unsafe = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(workspace),
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--binary",
+            "HEAD",
+            "--",
+        ],
+        env=unsafe_environment,
+        check=False,
+        capture_output=True,
+    )
+    assert unsafe.returncode != 0
+    assert marker.is_file()
+    marker.unlink()
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.build_workspace_manifest(workspace)
+
+    assert exc_info.value.code == "workspace_manifest_failed"
+    assert marker.exists() is False
 
 
 @pytest.mark.parametrize("index_flag", ["--assume-unchanged", "--skip-worktree"])

@@ -356,7 +356,8 @@ are matched to the same canonical refusal. `hash-object` is classifiable only
 with exact `--no-filters` and no later filter-enabling, path, write, or literal
 override. Signature-backed `for-each-ref` format and sort fields are opaque
 because they invoke the configured verifier. The controller's own exact Git observations remain outside model-issued command
-admission.
+admission, but run with `GIT_NO_LAZY_FETCH=1` so a missing promisor object
+cannot dispatch a repository-configured remote helper before admission.
 Jq `env`/`$ENV` access is both opaque and classified as secret access because
 the Codex environment may contain a role-scoped MCP bearer token. Jq file,
 module-path, and test-program options are also opaque; ordinary inline jq

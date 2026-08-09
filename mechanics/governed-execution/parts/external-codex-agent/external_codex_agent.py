@@ -2213,6 +2213,7 @@ def _base_controller_git_environment() -> dict[str, str]:
         "GIT_CONFIG_VALUE_0": "/dev/null",
         "GIT_CONFIG_VALUE_1": "false",
         "GIT_CONFIG_VALUE_2": "/dev/null",
+        "GIT_NO_LAZY_FETCH": "1",
         "GIT_OPTIONAL_LOCKS": "0",
         "GIT_TERMINAL_PROMPT": "0",
         "HOME": "/nonexistent",
@@ -4366,6 +4367,7 @@ class ExternalCodexRuntime:
         for key, value in repository_git_environment.items():
             if key.startswith("GIT_CONFIG_") or key in {
                 "GIT_ATTR_NOSYSTEM",
+                "GIT_NO_LAZY_FETCH",
                 "GIT_OPTIONAL_LOCKS",
                 "GIT_TERMINAL_PROMPT",
             }:

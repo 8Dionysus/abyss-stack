@@ -117,7 +117,9 @@ The controller:
   opaque; checkout/checkin builtins that can invoke repository-defined content
   filters remain opaque as well, while controller-owned manifest Git probes run
   in a minimal environment with hooks/fsmonitor disabled and diff/textconv
-  programs explicitly prohibited; abbreviated `cat-file` filter/textconv and
+  programs explicitly prohibited; promisor lazy fetching is disabled so a
+  missing object cannot dispatch a repository-configured remote helper;
+  abbreviated `cat-file` filter/textconv and
   `hash-object --path` forms are covered by the same refusal; `hash-object`
   reads are admitted only with exact `--no-filters` and no filter-enabling,
   path, write, or literal override, while signature-backed `for-each-ref`
@@ -312,8 +314,8 @@ When the selected index is split, its exact validated `sharedindex.<hash>`
 backing file is copied into the same private snapshot. One non-following file
 descriptor supplies both verification and copied bytes: the repository-format
 digest must match the index footer and filename before those bytes are written.
-Repository hooks, fsmonitor, filters, global/system attributes, and source
-configuration never enter the posture process. Even a filter added to the
+Repository hooks, fsmonitor, filters, promisor lazy fetching, global/system
+attributes, and source configuration never enter the posture process. Even a filter added to the
 source `.git/config` after snapshot creation therefore cannot gain
 installer-process execution before status or index inspection.
 Installation requires clean exact
