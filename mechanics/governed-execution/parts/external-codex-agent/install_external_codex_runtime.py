@@ -46,6 +46,7 @@ OWNER_CONTRACT_FILES = (
     ("aoa-skills", "schemas/task_local_dag_v2.schema.json"),
 )
 INSTALLER_GIT = "/usr/bin/git"
+SHARED_INDEX_MAX_BYTES = 512 * 1024 * 1024
 
 
 class InstallError(RuntimeError):
@@ -175,8 +176,14 @@ def _source_git_coordinate(root: Path, *args: str) -> str:
     return value
 
 
-def _source_shared_index(root: Path) -> Path | None:
-    """Resolve the one split-index backing file, when the selected index uses it."""
+def _copy_verified_shared_index(
+    root: Path,
+    git_dir: Path,
+    *,
+    object_format: str,
+    expected_length: int,
+) -> None:
+    """Verify and copy one split-index backing inode without reopening it."""
 
     try:
         completed = subprocess.run(
@@ -194,15 +201,68 @@ def _source_shared_index(root: Path) -> Path | None:
     if completed.returncode != 0:
         raise InstallError(f"cannot inspect shared Git index for {root}")
     if not value:
-        return None
+        return
     candidate = Path(value)
     if not candidate.is_absolute():
         candidate = root / candidate
-    if candidate.is_symlink():
-        raise InstallError(f"source shared Git index must not be symlinked for {root}")
-    candidate = candidate.resolve()
-    require_regular_file(candidate, "source shared Git index")
-    return candidate
+    shared_name = candidate.name
+    shared_digest = shared_name.removeprefix("sharedindex.")
+    if (
+        not shared_name.startswith("sharedindex.")
+        or len(shared_digest) != expected_length
+        or re.fullmatch(r"[0-9a-f]+", shared_digest) is None
+    ):
+        raise InstallError(f"invalid source shared Git index name for {root}")
+
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = -1
+    try:
+        descriptor = os.open(candidate, flags)
+        metadata = os.fstat(descriptor)
+        digest_size = expected_length // 2
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_size <= digest_size
+            or metadata.st_size > SHARED_INDEX_MAX_BYTES
+        ):
+            raise InstallError(f"invalid source shared Git index file for {root}")
+        chunks: list[bytes] = []
+        remaining = metadata.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(1024 * 1024, remaining))
+            if not chunk:
+                raise InstallError(f"source shared Git index changed while reading {root}")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if os.read(descriptor, 1):
+            raise InstallError(f"source shared Git index changed while reading {root}")
+        payload = b"".join(chunks)
+        content, footer = payload[:-digest_size], payload[-digest_size:]
+        computed = hashlib.new(object_format, content).digest()
+        if computed != footer or computed.hex() != shared_digest:
+            raise InstallError(f"source shared Git index digest mismatch for {root}")
+
+        destination = git_dir / shared_name
+        output = os.open(
+            destination,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0),
+            0o400,
+        )
+        try:
+            remaining_payload = memoryview(payload)
+            while remaining_payload:
+                written = os.write(output, remaining_payload)
+                if written <= 0:
+                    raise OSError("short write while copying shared Git index")
+                remaining_payload = remaining_payload[written:]
+            os.fsync(output)
+        finally:
+            os.close(output)
+    except OSError as exc:
+        raise InstallError(f"cannot copy source shared Git index for {root}: {exc}") from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
 
 
 @contextmanager
@@ -221,7 +281,6 @@ def _installer_git_snapshot(root: Path) -> Iterator[dict[str, str]]:
 
     index_value = _source_git_coordinate(root, "rev-parse", "--git-path", "index")
     objects_value = _source_git_coordinate(root, "rev-parse", "--git-path", "objects")
-    shared_index_path = _source_shared_index(root)
     index_path = Path(index_value)
     objects_path = Path(objects_value)
     if not index_path.is_absolute():
@@ -242,16 +301,12 @@ def _installer_git_snapshot(root: Path) -> Iterator[dict[str, str]]:
         (git_dir / "objects/info").mkdir(parents=True, mode=0o700)
         (git_dir / "refs/heads").mkdir(parents=True, mode=0o700)
         shutil.copyfile(index_path, git_dir / "index")
-        if shared_index_path is not None:
-            shared_name = shared_index_path.name
-            shared_digest = shared_name.removeprefix("sharedindex.")
-            if (
-                not shared_name.startswith("sharedindex.")
-                or len(shared_digest) != expected_length
-                or re.fullmatch(r"[0-9a-f]+", shared_digest) is None
-            ):
-                raise InstallError(f"invalid source shared Git index name for {root}")
-            shutil.copyfile(shared_index_path, git_dir / shared_name)
+        _copy_verified_shared_index(
+            root,
+            git_dir,
+            object_format=object_format,
+            expected_length=expected_length,
+        )
         (git_dir / "HEAD").write_text(head + "\n", encoding="ascii")
         (git_dir / "objects/info/alternates").write_text(
             str(objects_path) + "\n",

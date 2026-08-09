@@ -304,6 +304,30 @@ def test_git_posture_snapshot_carries_split_index_backing_file(tmp_path: Path) -
     assert posture["dirty"] is False
 
 
+def test_git_posture_snapshot_rejects_corrupt_split_index_backing(
+    tmp_path: Path,
+) -> None:
+    source, _sdk, _agents, _skills = make_sources(tmp_path)
+    git("update-index", "--split-index", cwd=source)
+    shared_index = Path(
+        subprocess.run(
+            ["/usr/bin/git", "rev-parse", "--shared-index-path"],
+            cwd=source,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    )
+    if not shared_index.is_absolute():
+        shared_index = source / shared_index
+    payload = bytearray(shared_index.read_bytes())
+    payload[16] ^= 0x01
+    shared_index.write_bytes(payload)
+
+    with pytest.raises(runtime_install.InstallError, match="digest mismatch"):
+        runtime_install.git_posture(source)
+
+
 def test_install_refuses_clean_checkout_race_before_activation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

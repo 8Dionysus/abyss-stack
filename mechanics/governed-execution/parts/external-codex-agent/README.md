@@ -263,7 +263,9 @@ Every installer posture probe uses the exact system Git under a fixed minimal
 environment and a private metadata snapshot containing only the selected HEAD,
 index, a read-only object-store alternate, and runtime-authored configuration.
 When the selected index is split, its exact validated `sharedindex.<hash>`
-backing file is copied into the same private snapshot.
+backing file is copied into the same private snapshot. One non-following file
+descriptor supplies both verification and copied bytes: the repository-format
+digest must match the index footer and filename before those bytes are written.
 Repository hooks, fsmonitor, filters, global/system attributes, and source
 configuration never enter the posture process. Even a filter added to the
 source `.git/config` after snapshot creation therefore cannot gain
