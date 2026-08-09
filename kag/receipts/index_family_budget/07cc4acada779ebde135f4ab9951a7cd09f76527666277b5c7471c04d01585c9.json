@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26197990,
+  "allowed_tracked_bytes": 32592712,
+  "approved_by": "repository-owner",
+  "base_ref": "8621c72aaa6f54a6e4e548c60327add99e3985fc",
+  "changed_generated_bytes": 26197990,
+  "changed_generated_files": 369,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "07cc4acada779ebde135f4ab9951a7cd09f76527666277b5c7471c04d01585c9",
+  "reason": "Refresh external actor projections after split-index snapshot compatibility",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 32592712,
+  "tracked_bytes_max": 24117248
+}
