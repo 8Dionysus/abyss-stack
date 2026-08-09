@@ -131,6 +131,19 @@ ORGAN_MCP_CANDIDATE_CREDENTIAL_NAMES = (
     "aoa-memo-mcp-candidate-bearer-token",
     "aoa-evals-mcp-candidate-bearer-token",
 )
+CODEX_MCP_READ_CREDENTIAL_NAMES = (
+    "aoa-decisions-mcp-read-bearer-token",
+    "aoa-memo-mcp-read-bearer-token",
+    "aoa-evals-mcp-read-bearer-token",
+    "aoa-kag-mcp-read-bearer-token",
+    "aoa-4pda-connector-mcp-read-bearer-token",
+    "aoa-discord-connector-mcp-read-bearer-token",
+    "aoa-session-memory-mcp-read-bearer-token",
+    "aoa-stats-mcp-read-bearer-token",
+    "aoa-telegram-connector-mcp-read-bearer-token",
+    "abyss-machine-mcp-read-bearer-token",
+    "abyss-stack-mcp-read-bearer-token",
+)
 ORGAN_MCP_READ_AUTH_MANIFEST_NAME = "organ-mcp-read-auth-manifest.json"
 ORGAN_MCP_CANDIDATE_AUTH_MANIFEST_NAME = "organ-mcp-candidate-auth-manifest.json"
 ORGAN_MCP_READ_AUTH = {
@@ -2181,11 +2194,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             stack_read_credential.chmod(0o600)
             owner_tokens: list[str] = []
             for index, name in enumerate(
-                (
-                    *ORGAN_MCP_READ_CREDENTIAL_NAMES,
-                    *ORGAN_MCP_CANDIDATE_CREDENTIAL_NAMES,
-                    "abyss-stack-mcp-read-bearer-token",
-                )
+                CODEX_MCP_READ_CREDENTIAL_NAMES
             ):
                 owner_token = f"test-owner-{index}-" + (chr(ord("b") + index) * 50)
                 owner_tokens.append(owner_token)
@@ -2198,23 +2207,16 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             fake_codex.write_text(
                 "#!/usr/bin/env bash\n"
                 "printf '%s\\n' "
-                '"$AOA_MCP_HTTP_BEARER_TOKEN" '
                 '"$AOA_DECISIONS_MCP_READ_BEARER_TOKEN" '
                 '"$AOA_MEMO_MCP_READ_BEARER_TOKEN" '
                 '"$AOA_EVALS_MCP_READ_BEARER_TOKEN" '
                 '"$AOA_KAG_MCP_READ_BEARER_TOKEN" '
                 '"$AOA_4PDA_CONNECTOR_MCP_READ_BEARER_TOKEN" '
-                '"$AOA_COURSE_CONNECTOR_MCP_READ_BEARER_TOKEN" '
                 '"$AOA_DISCORD_CONNECTOR_MCP_READ_BEARER_TOKEN" '
                 '"$AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN" '
-                '"$AOA_STACKOVERFLOW_CONNECTOR_MCP_READ_BEARER_TOKEN" '
                 '"$AOA_STATS_MCP_READ_BEARER_TOKEN" '
                 '"$AOA_TELEGRAM_CONNECTOR_MCP_READ_BEARER_TOKEN" '
-                '"$AOA_XDA_CONNECTOR_MCP_READ_BEARER_TOKEN" '
-                '"$ABYSS_MACHINE_MCP_READ_BEARER_TOKEN" '
-                '"$TOS_CORPUS_MCP_READ_BEARER_TOKEN" '
-                '"$AOA_MEMO_MCP_CANDIDATE_BEARER_TOKEN" '
-                '"$AOA_EVALS_MCP_CANDIDATE_BEARER_TOKEN" > "$CAPTURE_TOKEN"\n'
+                '"$ABYSS_MACHINE_MCP_READ_BEARER_TOKEN" > "$CAPTURE_TOKEN"\n'
                 'printf \'%s\\n\' "$ABYSS_STACK_MCP_READ_BEARER_TOKEN" >> "$CAPTURE_TOKEN"\n'
                 'printf \'%s\\n\' "$@" > "$CAPTURE_ARGS"\n',
                 encoding="utf-8",
@@ -2263,7 +2265,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(
                 capture_token.read_text(encoding="utf-8").splitlines(),
-                [MCP_HTTP_AUTH_TOKEN, *owner_tokens],
+                owner_tokens,
             )
             self.assertEqual(
                 capture_args.read_text(encoding="utf-8").splitlines(),
@@ -2271,7 +2273,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertNotIn(MCP_HTTP_AUTH_TOKEN, result.stdout + result.stderr)
 
-            env["AOA_MCP_HTTP_BEARER_TOKEN"] = "different-" + ("b" * 54)
+            env["AOA_MEMO_MCP_READ_BEARER_TOKEN"] = "different-" + ("b" * 54)
             conflict = subprocess.run(
                 [str(MCP_HTTP_CODEX_CLIENT), "--version"],
                 cwd=REPO_ROOT,
@@ -2315,7 +2317,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             capture_token = root / "captured-token"
             fake_codex.write_text(
                 "#!/usr/bin/env bash\n"
-                'printf \'%s\' "$AOA_MCP_HTTP_BEARER_TOKEN" > "$CAPTURE_TOKEN"\n',
+                'printf \'%s\' "$ABYSS_STACK_MCP_READ_BEARER_TOKEN" > "$CAPTURE_TOKEN"\n',
                 encoding="utf-8",
             )
             fake_codex.chmod(0o755)
@@ -2391,7 +2393,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 )
                 self.assertEqual(launch.returncode, 0, launch.stderr)
                 self.assertEqual(
-                    capture_token.read_text(encoding="utf-8"), MCP_HTTP_AUTH_TOKEN
+                    capture_token.read_text(encoding="utf-8"), "s" * 64
                 )
 
             remove = subprocess.run(
