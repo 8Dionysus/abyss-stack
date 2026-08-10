@@ -6,6 +6,18 @@ allowlist at `systemd/user/managed-units.txt`, and `scripts/aoa-install-systemd`
 
 User units must point at runtime paths, not the source checkout.
 
+The OVMS owner route uses `abyss-ovms.container` as a rootless Quadlet plus
+loopback and Unix activation sockets. The installer places the Quadlet under
+`~/.config/containers/systemd/`; the generated `abyss-ovms.service` owns the
+container cgroup with `KillMode=mixed`. The proxy exits after idle, systemd
+then stops the unneeded container, and the next real connection repeats
+owner cold-load admission. No health or smoke path opens the activation socket.
+Before those sockets open, `aoa-up` calls the rootless
+`aoa-install-systemd --provision-ovms-auth` transaction. It creates the Podman
+secret from the canonical mode-`0600` owner file once, verifies exact content
+on later starts, and fails closed on drift without replacing a value used by a
+running consumer.
+
 The installer also links the source-managed
 `podman-compose-abyss.service.d/99-runtime-lifecycle.conf`. Its late ordering
 keeps the stack's delegated cgroup, explicit teardown, and non-abort stop

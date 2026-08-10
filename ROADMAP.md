@@ -93,9 +93,10 @@ The current direction is:
   runtime-substrate hardening, not AoA/ToS meaning and not a claim of live
   service mutation
 - keep the current Intel inference route explicit: Gemma 4 E2B is a measured
-  `llama.cpp` Vulkan candidate lane, embeddings stay on OVMS, reranking is a
-  separate opt-in wrapper profile, and helper tools, workflows, and dashboards
-  stay selected service layers rather than implicit resident growth
+  `llama.cpp` Vulkan candidate lane, embeddings use request-activated OVMS,
+  reranking is a separate opt-in wrapper profile, and helper tools, workflows,
+  and dashboards stay selected service layers rather than implicit resident
+  growth
 - promote RAG through a bounded `rag` profile that composes existing Qdrant,
   Neo4j, OVMS embeddings, reranking, route, and local text lanes before adding
   heavier DAG engines or more resident model services
@@ -179,8 +180,9 @@ The current direction is:
   `langchain-api` on `5403` backed by `llama.cpp` is the bounded promoted
   local-worker posture, with LangGraph adopted for bounded long-horizon flows.
   On the Intel reference route, Gemma 4 E2B is an explicit `llama.cpp` Vulkan
-  candidate lane, OVMS remains the embeddings seam, and Qwen3 reranking is an
-  opt-in `reranking` profile through a dedicated OpenVINO wrapper.
+  candidate lane, OVMS remains the socket-activated embeddings seam, and Qwen3
+  reranking is an opt-in `reranking` profile through a dedicated OpenVINO
+  wrapper.
 - Next honest move:
   keep old trial IDs behind compatibility bridges while current trial,
   model-card, benchmark, service-selection, and promotion surfaces use

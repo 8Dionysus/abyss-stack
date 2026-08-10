@@ -79,6 +79,7 @@
         "scripts/aoa-long-horizon-pilot",
         "scripts/aoa-machine-bridge",
         "scripts/aoa-machine-fit",
+        "scripts/aoa-ovms-admission",
         "scripts/aoa-platform-adaptation",
         "scripts/aoa-preset-profiles",
         "scripts/aoa-profile-endpoints",

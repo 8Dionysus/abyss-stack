@@ -1,0 +1,38 @@
+[Unit]
+Description=Abyss owner-managed OVMS embeddings container
+Documentation=man:podman-systemd.unit(5)
+StopWhenUnneeded=yes
+StartLimitIntervalSec=10min
+StartLimitBurst=3
+
+[Container]
+Image=docker.io/openvino/model_server:2026.2-gpu@sha256:fdc34725b35d79cde23cff1967f90efb40237b7cf5545a70460209056f3da733
+ContainerName=ovms
+Pull=never
+AddDevice=/dev/dri
+Volume=/srv/AbyssOS/abyss-stack/Models/ovms:/models:ro,Z
+Volume=/srv/AbyssOS/abyss-stack/Configs/ovms:/ovms-config:ro,z
+Secret=abyss-ovms-api-key,type=mount,target=/run/secrets/ovms_api_key,uid=5000,gid=5000,mode=0400
+PublishPort=127.0.0.1:8201:8000
+HealthCmd=/bin/sh -c 'key="$(cat /run/secrets/ovms_api_key)"; curl -fsS -H "Authorization: Bearer $${key}" http://127.0.0.1:8000/v1/config | grep -q '"'"'AVAILABLE'"'"''
+HealthInterval=30s
+HealthRetries=3
+HealthTimeout=3s
+HealthStartupCmd=/bin/sh -c 'key="$(cat /run/secrets/ovms_api_key)"; curl -fsS -H "Authorization: Bearer $${key}" http://127.0.0.1:8000/v1/config | grep -q '"'"'AVAILABLE'"'"''
+HealthStartupInterval=1s
+HealthStartupRetries=120
+HealthStartupSuccess=1
+HealthStartupTimeout=3s
+Notify=healthy
+Exec=--config_path /ovms-config/config.json --port 9000 --rest_port 8000 --log_level INFO --api_key_file /run/secrets/ovms_api_key
+
+[Service]
+Restart=no
+TimeoutStartSec=300
+TimeoutStopSec=45
+MemoryAccounting=yes
+Environment=AOA_OVMS_COLD_LOAD_MIB=2800
+Environment=AOA_OVMS_ADMISSION_WAIT_SEC=120
+ExecStartPre=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-ovms-admission reserve
+ExecStartPost=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-ovms-admission release
+ExecStopPost=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-ovms-admission release

@@ -95,9 +95,9 @@ They are intentionally additive:
 - `intel-text.ovms-qwen3-settings` layers the official `Qwen3` OVMS settings over that harness: `tool_parser=hermes3`, `reasoning_parser=qwen3`, `cache_size=2`, `LC_OPENAI_LITERAL_COMPLETIONS=false`, and `chat_template_kwargs.enable_thinking=false`
 - `storage.intel-285h.resource-guard` keeps service-native database budgets and
   soft reclaim reservations without private cgroup CPU or memory ceilings
-- `intel-worker.thin-host` gives the promoted OVMS embeddings seam soft reclaim
-  protection and owner-native thread tuning while keeping both worker services
-  CPU- and memory-elastic
+- `intel-worker.thin-host` keeps the resident `langchain-api` facade elastic;
+  the selected OVMS embeddings workload is owned separately by systemd socket
+  activation and is absent while idle
 - `federation.thin-host` keeps the advisory `route-api` facade soft-reserved
   without a private cgroup ceiling
 - `observability.thin-host` shortens Prometheus retention, lowers cAdvisor

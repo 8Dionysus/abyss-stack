@@ -463,7 +463,7 @@ def execute_semantic_retrieval(
     rerank_url: str = "http://127.0.0.1:5405",
     qdrant_url: str = "http://127.0.0.1:6333",
     ovms_url: str = "http://127.0.0.1:8200",
-    ovms_config_path: Path = Path("/srv/AbyssOS/abyss-stack/Models/ovms/config.json"),
+    ovms_config_path: Path = Path("/srv/AbyssOS/abyss-stack/Configs/ovms/config.json"),
     embedding_model_root: Path = Path(
         "/srv/AbyssOS/abyss-stack/Models/ovms/OpenVINO/Qwen3-Embedding-0.6B-int8-ov"
     ),

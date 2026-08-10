@@ -50,7 +50,12 @@ This file maps the first migrated runtime modules to their intended services.
 
 ## `31-intel-inference.yml`
 
-- `ovms` — current reviewed Intel and OpenVINO oriented serving surface in promoted presets; the current landed use is embeddings
+- `ovms` — current reviewed Intel/OpenVINO embeddings workload selected by the
+  module but owned by rootless systemd rather than Compose
+- `abyss-ovms.socket` and `abyss-ovms-unix.socket` activate an idle proxy;
+  `abyss-ovms.container` is the Quadlet source for the full container lifecycle
+- port `8200` remains loopback-only; `langchain-api` uses the private Unix
+  socket, and periodic monitoring must not open either activation socket
 - OVMS, OpenVINO, and future OpenVINO GenAI lanes may host other model classes through separate reviewed profile, preset, machine-fit, or rollout changes
 - any migration from OVMS/OpenVINO serving to OpenVINO GenAI, or promotion of a non-embedding Intel-served lane, is a separate reviewed stack change
 

@@ -43,8 +43,7 @@ if has_module "32-llamacpp-inference.yml"; then
 fi
 
 if has_module "31-intel-inference.yml"; then
-  aoa_note "- ovms rest        http://127.0.0.1:8200/v2/health/live"
-  aoa_note "- ovms grpc        127.0.0.1:9200"
+  aoa_note "- ovms embeddings  http://127.0.0.1:8200/v3/embeddings (socket-activated)"
 fi
 
 if has_module "40-llm-gateway.yml"; then

@@ -16,6 +16,7 @@ provision_organ_mcp_read_auth=0
 provision_organ_mcp_candidate_auth=0
 provision_abyss_stack_mcp_auth=0
 rotate_abyss_stack_mcp_auth=0
+provision_ovms_auth=0
 provision_abyss_stack_mcp_runtime=0
 repair_abyss_stack_mcp_runtime=0
 verify_abyss_stack_mcp_runtime=0
@@ -104,6 +105,9 @@ while (($#)); do
       ;;
     --rotate-abyss-stack-mcp-auth)
       rotate_abyss_stack_mcp_auth=1
+      ;;
+    --provision-ovms-auth)
+      provision_ovms_auth=1
       ;;
     --provision-abyss-stack-mcp-runtime)
       provision_abyss_stack_mcp_runtime=1
@@ -224,6 +228,16 @@ if (((enable_abyss_stack_mcp_auto_repair || disable_abyss_stack_mcp_auto_repair)
        selection_set || overlay_set))); then
   aoa_die "abyss-stack MCP auto-repair policy changes must be standalone actions"
 fi
+if ((provision_ovms_auth && \
+      (provision_mcp_http_auth || provision_organ_mcp_read_auth || \
+       provision_organ_mcp_candidate_auth || provision_abyss_stack_mcp_auth || \
+       rotate_abyss_stack_mcp_auth || provision_abyss_stack_mcp_runtime || \
+       verify_abyss_stack_mcp_runtime || launch_verified_abyss_stack_mcp || \
+       install_mcp_http_codex_client || remove_mcp_http_codex_client || \
+       enable_now || restart_now || link_all_user_units || link_system_units || \
+       selection_set || overlay_set))); then
+  aoa_die "OVMS credential provisioning must be a standalone action"
+fi
 if ((rotate_abyss_stack_mcp_auth && \
       (provision_mcp_http_auth || provision_organ_mcp_read_auth || \
        provision_organ_mcp_candidate_auth || \
@@ -302,6 +316,9 @@ fi
 if (((provision_abyss_stack_mcp_auth || rotate_abyss_stack_mcp_auth) && EUID == 0)); then
   aoa_die "abyss-stack MCP credential management must run as the target user, not root"
 fi
+if ((provision_ovms_auth && EUID == 0)); then
+  aoa_die "OVMS credential provisioning must run as the target rootless Podman user, not root"
+fi
 if (((provision_organ_mcp_read_auth || provision_organ_mcp_candidate_auth) && EUID == 0)); then
   aoa_die "organ MCP credential management must run as the target user, not root"
 fi
@@ -319,6 +336,8 @@ fi
 mcp_http_credential_name="aoa-mcp-http-bearer-token"
 mcp_http_secret_dir="${AOA_STACK_ROOT}/Secrets/Configs"
 abyss_stack_mcp_auto_repair_marker="${mcp_http_secret_dir}/abyss-stack-mcp-runtime-auto-repair.enabled"
+ovms_credential_name="abyss-ovms-api-key"
+ovms_credential_path="${mcp_http_secret_dir}/ovms_api_key.txt"
 aoa_decisions_mcp_read_credential_name="aoa-decisions-mcp-read-bearer-token"
 aoa_memo_mcp_read_credential_name="aoa-memo-mcp-read-bearer-token"
 aoa_memo_mcp_candidate_credential_name="aoa-memo-mcp-candidate-bearer-token"
@@ -448,6 +467,47 @@ aoa_validate_mcp_bearer_file() {
     aoa_die "existing ${credential_label} has invalid content"
   fi
   chmod 0600 "$credential_path"
+}
+
+aoa_provision_ovms_auth() {
+  local token=""
+  local token_size=0
+  local file_size=0
+  local expected_json=""
+  local installed_json=""
+
+  command -v podman >/dev/null 2>&1 || aoa_die "podman is required to provision OVMS auth"
+  [[ -f "$ovms_credential_path" && ! -L "$ovms_credential_path" ]] || \
+    aoa_die "OVMS credential must be a regular non-symlink file: ${ovms_credential_path}"
+  token="$(<"$ovms_credential_path")"
+  token_size="${#token}"
+  file_size="$(stat -c '%s' "$ovms_credential_path")"
+  if [[ ! "$token" =~ ^[A-Za-z0-9._~-]{43,512}$ ]] || \
+    ! ((file_size == token_size || file_size == token_size + 1)); then
+    aoa_die "OVMS credential has invalid content: ${ovms_credential_path}"
+  fi
+  chmod 0600 "$ovms_credential_path"
+
+  if podman secret inspect "$ovms_credential_name" >/dev/null 2>&1; then
+    expected_json="$(
+      aoa_run_isolated_python python3 -c \
+        'import json, pathlib, sys; print(json.dumps(pathlib.Path(sys.argv[1]).read_text()))' \
+        "$ovms_credential_path"
+    )"
+    installed_json="$(
+      podman secret inspect --showsecret --format '{{json .SecretData}}' \
+        "$ovms_credential_name"
+    )"
+    [[ "$installed_json" == "$expected_json" ]] || \
+      aoa_die "OVMS credential differs from the installed Podman secret; stop its consumers before an explicit rotation"
+    aoa_note "OVMS Podman secret already matches the canonical credential"
+    return 0
+  fi
+
+  podman secret create \
+    --label io.abyss.owner=abyss-stack \
+    "$ovms_credential_name" "$ovms_credential_path" >/dev/null
+  aoa_note "OVMS Podman secret provisioned from the canonical credential"
 }
 
 aoa_provision_mcp_bearer() {
@@ -2380,6 +2440,9 @@ fi
 if ((rotate_abyss_stack_mcp_auth)); then
   aoa_rotate_abyss_stack_mcp_auth
 fi
+if ((provision_ovms_auth)); then
+  aoa_provision_ovms_auth
+fi
 if ((provision_abyss_stack_mcp_runtime)); then
   aoa_provision_abyss_stack_mcp_runtime manual
 fi
@@ -2409,7 +2472,7 @@ fi
 if ((remove_mcp_http_codex_client)); then
   aoa_remove_mcp_http_codex_client
 fi
-if ((provision_mcp_http_auth || provision_organ_mcp_read_auth || provision_organ_mcp_candidate_auth || provision_abyss_stack_mcp_auth || rotate_abyss_stack_mcp_auth || provision_abyss_stack_mcp_runtime || repair_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_repair_eligibility || launch_verified_abyss_stack_mcp || enable_abyss_stack_mcp_auto_repair || disable_abyss_stack_mcp_auto_repair || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
+ if ((provision_mcp_http_auth || provision_organ_mcp_read_auth || provision_organ_mcp_candidate_auth || provision_abyss_stack_mcp_auth || rotate_abyss_stack_mcp_auth || provision_ovms_auth || provision_abyss_stack_mcp_runtime || repair_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_repair_eligibility || launch_verified_abyss_stack_mcp || enable_abyss_stack_mcp_auto_repair || disable_abyss_stack_mcp_auto_repair || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
   ((!enable_now && !restart_now && !link_all_user_units && !link_system_units && !selection_set && !overlay_set)); then
   exit 0
 fi
@@ -2418,6 +2481,7 @@ unit_source="${AOA_CONFIGS_ROOT}/systemd/user/podman-compose-abyss.service"
 unit_manifest="${AOA_CONFIGS_ROOT}/systemd/user/managed-units.txt"
 system_unit_manifest="${AOA_CONFIGS_ROOT}/systemd/system/managed-units.txt"
 unit_target_dir="${XDG_CONFIG_HOME:-${HOME}/.config}/systemd/user"
+quadlet_target_dir="${XDG_CONFIG_HOME:-${HOME}/.config}/containers/systemd"
 unit_target="${unit_target_dir}/podman-compose-abyss.service"
 selection_dropin_dir="${unit_target_dir}/podman-compose-abyss.service.d"
 selection_dropin="${selection_dropin_dir}/20-runtime-selection.conf"
@@ -2478,11 +2542,16 @@ mkdir -p "$unit_target_dir"
 aoa_link_user_unit() {
   local unit_name="$1"
   local source_path="${AOA_CONFIGS_ROOT}/systemd/user/${unit_name}"
-  local target_path="${unit_target_dir}/${unit_name}"
+  local target_path
   local backup_path
   local previous_target
 
-  if [[ ! "$unit_name" =~ ^[A-Za-z0-9_.@-]+\.(service|timer|path)$ ]]; then
+  if [[ "$unit_name" =~ ^[A-Za-z0-9_.@-]+\.container$ ]]; then
+    mkdir -p "$quadlet_target_dir"
+    target_path="${quadlet_target_dir}/${unit_name}"
+  elif [[ "$unit_name" =~ ^[A-Za-z0-9_.@-]+\.(service|timer|path|socket)$ ]]; then
+    target_path="${unit_target_dir}/${unit_name}"
+  else
     aoa_die "invalid unit name in managed user-unit manifest: ${unit_name}"
   fi
   [[ -f "$source_path" ]] || aoa_die "managed user unit source not found: ${source_path}"
@@ -2552,6 +2621,10 @@ if ((link_all_user_units)); then
   done < "$unit_manifest"
 else
   aoa_link_user_unit "podman-compose-abyss.service"
+  aoa_link_user_unit "abyss-ovms.container"
+  aoa_link_user_unit "abyss-ovms.socket"
+  aoa_link_user_unit "abyss-ovms-unix.socket"
+  aoa_link_user_unit "abyss-ovms-proxy.service"
 fi
 aoa_link_runtime_lifecycle_dropin
 

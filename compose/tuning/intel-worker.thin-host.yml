@@ -1,19 +1,6 @@
 # Candidate elastic Intel worker posture for workstation runs.
 # Use only with `intel-worker` or presets that include it.
 services:
-  ovms:
-    labels:
-      aoa.tuning.overlay: "intel-worker.thin-host"
-      aoa.tuning.posture: "candidate"
-    cpus: "0"
-    # Protect the warm embedding lane from reclaim without forcing it into a
-    # private hard ceiling; OVMS health and owner lifecycle govern release.
-    mem_reservation: "${AOA_OVMS_MEM_RESERVATION:-1g}"
-    environment:
-      OMP_NUM_THREADS: "${AOA_OVMS_OMP_NUM_THREADS:-2}"
-      MKL_NUM_THREADS: "${AOA_OVMS_MKL_NUM_THREADS:-2}"
-      NUMEXPR_NUM_THREADS: "${AOA_OVMS_NUMEXPR_NUM_THREADS:-2}"
-
   langchain-api:
     labels:
       aoa.tuning.overlay: "intel-worker.thin-host"

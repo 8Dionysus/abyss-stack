@@ -37,6 +37,7 @@
         "tests/test_machine_fit_validator_module.py",
         "tests/test_mechanics_topology_validator_module.py",
         "tests/test_mcp_application_identity_validator_module.py",
+        "tests/test_ovms_lifecycle.py",
         "tests/test_platform_adaptation_backend.py",
         "tests/test_profile_topology_validator_module.py",
         "tests/test_profile_composition.py",

@@ -1,0 +1,10 @@
+[Unit]
+Description=Abyss OVMS container activation socket
+PartOf=podman-compose-abyss.service
+
+[Socket]
+ListenStream=%t/abyss-stack/ovms.sock
+Service=abyss-ovms-proxy.service
+SocketMode=0600
+DirectoryMode=0700
+RemoveOnStop=yes
