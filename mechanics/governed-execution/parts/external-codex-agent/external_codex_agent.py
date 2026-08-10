@@ -913,6 +913,20 @@ def owner_object_digest(value: Mapping[str, Any], digest_field: str) -> str:
     return sha256_bytes(raw)
 
 
+def owner_request_digest(value: Mapping[str, Any]) -> str:
+    """Hash one aoa-summon request with request_digest omitted by owner law."""
+
+    candidate = dict(value)
+    candidate.pop("request_digest", None)
+    raw = json.dumps(
+        candidate,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return sha256_bytes(raw)
+
+
 def parse_incarnation_binding(value: Mapping[str, Any]) -> IncarnationBinding:
     """Parse historical v1 receipts and evidence-complete v2 bindings exactly."""
 
@@ -5517,6 +5531,11 @@ class ExternalCodexRuntime:
             coordinates["owner_execution_request_schema"][0],
             label="aoa-agents external execution request",
         )
+        if owner_request.get("request_digest") != owner_request_digest(owner_request):
+            raise ExternalCodexRuntimeError(
+                "owner_execution_request_digest_invalid",
+                "owner execution request digest differs from its canonical bytes",
+            )
         if (
             owner_request.get("intent") != "execute"
             or owner_request.get("summon_request", {}).get("transport_preference")
@@ -5826,6 +5845,9 @@ class ExternalCodexRuntime:
                 "owner request names another incarnation binding",
             )
         sdk_request_ref = external["sdk_summon_request_ref"]
+        sdk_request_input = exact_input(
+            sdk_request_ref, label="canonical SDK summon request"
+        )
         if (
             sdk_request_ref["object_id"] != binding.task_request_ref.artifact_ref
             or sdk_request_ref["digest"] != binding.task_request_ref.artifact_digest
@@ -5835,6 +5857,25 @@ class ExternalCodexRuntime:
             raise ExternalCodexRuntimeError(
                 "owner_sdk_request_mismatch",
                 "owner request names another canonical SDK summon request",
+            )
+        sdk_request = load_json_bytes(
+            sdk_request_input["raw"], label="canonical SDK summon request"
+        )
+        sdk_summon = sdk_request.get("summon_request", {})
+        expected_owner_summon = dict(sdk_summon)
+        expected_owner_summon.pop("expected_outputs", None)
+        expected_owner_summon["transport_preference"] = "external_cli"
+        if (
+            sdk_summon.get("transport_preference") not in {"a2a_remote", "either"}
+            or owner_request["quest_passport"]
+            != sdk_request.get("quest_passport")
+            or owner_request["summon_request"] != expected_owner_summon
+            or owner_request["expected_outputs"]
+            != sdk_request.get("expected_outputs")
+        ):
+            raise ExternalCodexRuntimeError(
+                "owner_sdk_request_content_mismatch",
+                "owner execution request differs from the exact SDK external transport request",
             )
         sdk_decision_ref = external["sdk_summon_decision_ref"]
         decision_matches = [

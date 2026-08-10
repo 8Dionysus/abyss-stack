@@ -65,6 +65,13 @@ Immutable input transport continues to require raw byte SHA-256 through its
 identities additionally require their owner-defined canonical self-digests.
 The runtime checks both classes rather than equating them.
 
+The SDK request remains in SDK vocabulary: its external transport is
+`a2a_remote` or `either`. The `aoa-summon` leaf translates only that field to
+`external_cli` and removes the SDK's duplicate nested output list; passport,
+task identity, capability, review, workspace, and top-level named outputs must
+otherwise remain exact. The final owner request also verifies its canonical
+digest with `request_digest` omitted, as defined by `aoa-summon`.
+
 SDK binding v1 remains readable for existing `transport_study_fixture`
 receipts, resume, review, and historical evidence. It is not sufficient for a
 new owner-contour responsibility transfer. Built-in Codex subagents remain
