@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 23925591,
+  "allowed_tracked_bytes": 31566901,
+  "approved_by": "repository-owner",
+  "base_ref": "39774a36371bfbc179096664318d39ae8b0dca99",
+  "changed_generated_bytes": 23925591,
+  "changed_generated_files": 298,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "351620adf7dad2ba988a0d229433a28d82ab9d3e1f323f95aadea89d425c9779",
+  "reason": "Refresh the portable family for the reviewed D-0109 exact modern MCP cold-start recovery; this receipt admits only the measured generated family for the bounded source diff without raising standing budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 31566901,
+  "tracked_bytes_max": 24117248
+}
