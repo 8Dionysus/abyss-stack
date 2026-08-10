@@ -23,6 +23,15 @@
     "workspace_expected_head": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "workspace_initial_posture": {"enum": ["clean_required", "exact_baseline"]},
     "workspace_manifest_input_id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "maxLength": 96},
+    "workspace_projection_seed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["envelope_path", "envelope_digest"],
+      "properties": {
+        "envelope_path": {"type": "string", "pattern": "^/"},
+        "envelope_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
     "codex_executable": {"type": "string", "pattern": "^/"},
     "codex_executable_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "codex_home": {"type": "string", "pattern": "^/"},

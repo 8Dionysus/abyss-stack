@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-actor-workspace-manifest.schema.json",
+  "title": "Runtime-owned external actor workspace manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "projection_kind", "workspace_path", "workspace_identity", "source_manifest_digest", "source_git_head", "private_git_digest", "content_entries"],
+  "properties": {
+    "$schema": {"const": "schemas/external-codex-actor-workspace-manifest.schema.json"},
+    "schema_version": {"const": "abyss_stack_external_codex_actor_workspace_manifest_v2"},
+    "projection_kind": {"const": "runtime_owned_actor_workspace"},
+    "workspace_path": {"type": "string", "pattern": "^/"},
+    "workspace_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["st_dev", "st_ino"],
+      "properties": {
+        "st_dev": {"type": "integer", "minimum": 0},
+        "st_ino": {"type": "integer", "minimum": 0}
+      }
+    },
+    "source_manifest_digest": {"$ref": "#/$defs/digest"},
+    "source_git_head": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "private_git_digest": {"$ref": "#/$defs/digest"},
+    "content_entries": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/contentEntry"}
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": {"pattern": "(^/|(^|/)\\.\\.(/|$))"}
+    },
+    "contentEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "kind", "mode", "size_bytes", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/relativePath"},
+        "kind": {"enum": ["file", "symlink", "directory"]},
+        "mode": {"type": "integer", "minimum": 0},
+        "size_bytes": {"type": "integer", "minimum": 0},
+        "sha256": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]}
+      }
+    }
+  }
+}

@@ -4,9 +4,55 @@
   "title": "Runtime-observed external Codex agent result",
   "type": "object",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {"schema_version": {"const": "abyss_stack_external_codex_result_v2"}},
+        "required": ["schema_version"]
+      },
+      "then": {
+        "required": [
+          "actor_projection_path",
+          "actor_baseline_manifest_ref",
+          "actor_final_manifest_ref",
+          "actor_delta_ref",
+          "source_manifest_before_ref",
+          "source_manifest_after_ref",
+          "source_manifest_final_ref",
+          "workspace_manifest_match",
+          "source_manifest_match"
+        ],
+        "properties": {
+          "actor_projection_path": {"type": "string", "pattern": "^/"},
+          "actor_baseline_manifest_ref": {"$ref": "#/$defs/evidenceRef"},
+          "source_manifest_before_ref": {"$ref": "#/$defs/evidenceRef"},
+          "source_manifest_after_ref": {"$ref": "#/$defs/evidenceRef"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_version": {"const": "abyss_stack_external_codex_result_v2"},
+          "status": {"enum": ["completed", "interrupted", "paused", "review_required"]}
+        },
+        "required": ["schema_version", "status"]
+      },
+      "then": {
+        "properties": {
+          "workspace_manifest_match": {"type": "boolean"},
+          "source_manifest_match": {"type": "boolean"},
+          "workspace_manifest_ref": {"$ref": "#/$defs/evidenceRef"},
+          "actor_final_manifest_ref": {"$ref": "#/$defs/evidenceRef"},
+          "actor_delta_ref": {"$ref": "#/$defs/evidenceRef"},
+          "source_manifest_final_ref": {"$ref": "#/$defs/evidenceRef"}
+        }
+      }
+    }
+  ],
   "required": ["schema_version", "session_id", "admission_class", "incarnation_id", "task_id", "task_family", "execution_posture", "status", "thread_id", "model_slug", "reasoning_effort", "started_at", "finished_at", "duration_seconds", "attempt_count", "turn_count", "output_bytes", "active_wall_seconds", "exit_code", "usage", "codex_invocations", "executed_commands", "changed_paths", "workspace_manifest_ref", "owner_admission_ref", "report_ref", "events_ref", "stderr_ref", "wake_evaluation", "evidence_refs"],
   "properties": {
-    "schema_version": {"const": "abyss_stack_external_codex_result_v1"},
+    "schema_version": {"enum": ["abyss_stack_external_codex_result_v1", "abyss_stack_external_codex_result_v2"]},
     "session_id": {"type": "string", "minLength": 1},
     "admission_class": {"enum": ["owner_contour", "transport_study_fixture"]},
     "incarnation_id": {"type": "string", "minLength": 1},
@@ -81,11 +127,31 @@
     "executed_commands": {"type": "array", "items": {"type": "object"}},
     "changed_paths": {"type": "array", "items": {"type": "object", "required": ["path", "status"], "properties": {"path": {"type": "string", "minLength": 1}, "status": {"type": "string", "minLength": 1}}, "additionalProperties": false}},
     "workspace_manifest_match": {"type": ["boolean", "null"]},
+    "source_manifest_match": {"type": ["boolean", "null"]},
+    "actor_projection_path": {"type": ["string", "null"], "pattern": "^/"},
     "workspace_manifest_ref": {
       "oneOf": [
         {"type": "null"},
         {"$ref": "#/$defs/evidenceRef"}
       ]
+    },
+    "actor_baseline_manifest_ref": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/evidenceRef"}]
+    },
+    "actor_final_manifest_ref": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/evidenceRef"}]
+    },
+    "actor_delta_ref": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/evidenceRef"}]
+    },
+    "source_manifest_before_ref": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/evidenceRef"}]
+    },
+    "source_manifest_after_ref": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/evidenceRef"}]
+    },
+    "source_manifest_final_ref": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/evidenceRef"}]
     },
     "owner_admission_ref": {
       "oneOf": [

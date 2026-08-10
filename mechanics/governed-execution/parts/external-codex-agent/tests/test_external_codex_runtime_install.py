@@ -63,13 +63,25 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         "import aoa_sdk\nprint('study:' + aoa_sdk.MARKER)\n",
         encoding="utf-8",
     )
-    (part / "external_codex_supervisor.py").write_text("PASS = True\n", encoding="utf-8")
+    (part / "external_codex_supervisor.py").write_text(
+        "PASS = True\n", encoding="utf-8"
+    )
+    (part / "external_codex_mount_launcher.py").write_text(
+        "PASS = True\n", encoding="utf-8"
+    )
+    (part / "external_codex_projection.py").write_text(
+        "PASS = True\n", encoding="utf-8"
+    )
     shutil.copyfile(
         PART_ROOT / "external_codex_static_bootstrap.S",
         part / "external_codex_static_bootstrap.S",
     )
     profile_path = part / "runtime-profile.v1.json"
     (schemas / "external-codex-test.schema.json").write_text("{}\n", encoding="utf-8")
+    (schemas / "external-codex-actor-input-envelope.schema.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
     package = sdk / "src/aoa_sdk"
     (package / "contracts").mkdir(parents=True)
     (package / "__init__.py").write_text("MARKER = 'exact-sdk'\n", encoding="utf-8")
@@ -139,12 +151,18 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
     release_root = Path(active["release_root"])
     assert active["nonproduction_dirty_source"] is False
     assert release_root.name == active["release_id"]
-    assert runtime_install.verify_release(release_root)["release_id"] == active["release_id"]
+    assert (
+        runtime_install.verify_release(release_root)["release_id"]
+        == active["release_id"]
+    )
     assert runtime_install.status(runtime_root, bin_dir)["healthy"] is True
     for relative in runtime_install.SDK_CONTRACT_FILES:
         assert (release_root / "sdk" / relative).is_file()
     for owner, relative in runtime_install.OWNER_CONTRACT_FILES:
         assert (release_root / "owners" / owner / relative).is_file()
+    assert (
+        release_root / "runtime/schemas/external-codex-actor-input-envelope.schema.json"
+    ).is_file()
     for directory in (release_root / "sdk/src").rglob("*"):
         if directory.is_dir():
             directory.chmod(0o755)
@@ -154,9 +172,7 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
     path_marker = tmp_path / "ambient-python-path-ran"
     path_python = ambient_bin / "python3"
     path_python.write_text(
-        "#!/bin/sh\n"
-        f"/usr/bin/touch {shlex.quote(str(path_marker))}\n"
-        "exit 97\n",
+        f"#!/bin/sh\n/usr/bin/touch {shlex.quote(str(path_marker))}\nexit 97\n",
         encoding="utf-8",
     )
     path_python.chmod(0o700)
@@ -175,7 +191,7 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
         "__attribute__((constructor)) static void injected(void) {\n"
         f"  int fd = open({json.dumps(str(preload_marker))}, "
         "O_WRONLY | O_CREAT | O_APPEND, 0600);\n"
-        "  if (fd >= 0) { (void)write(fd, \"ran\\n\", 4); (void)close(fd); }\n"
+        '  if (fd >= 0) { (void)write(fd, "ran\\n", 4); (void)close(fd); }\n'
         "}\n",
         encoding="utf-8",
     )
@@ -356,8 +372,9 @@ def test_interpreter_activation_publishes_at_active_record(
             alternate_python,
         )
 
-    assert json.loads(active_path.read_text(encoding="utf-8"))["python_executable"] == (
-        first["active"]["python_executable"]
+    assert (
+        json.loads(active_path.read_text(encoding="utf-8"))["python_executable"]
+        == (first["active"]["python_executable"])
     )
     assert runtime_install.status(runtime_root, bin_dir)["healthy"] is True
     failed_transition_run = subprocess.run(
@@ -376,9 +393,7 @@ def test_interpreter_activation_publishes_at_active_record(
         alternate_python,
     )
 
-    assert activated["active"]["python_executable"] == str(
-        alternate_python.resolve()
-    )
+    assert activated["active"]["python_executable"] == str(alternate_python.resolve())
     assert runtime_install.status(runtime_root, bin_dir)["healthy"] is True
     completed_transition_run = subprocess.run(
         [str(bin_dir / "aoa-external-codex-agent")],
@@ -452,17 +467,20 @@ def test_wrapper_rejects_compatible_interpreter_replacement(
         allow_dirty_skills=False,
     )
     assert receipt["active"]["python_identity"]["sha256"].startswith("sha256:")
-    assert subprocess.run(
-        [str(bin_dir / "aoa-external-codex-agent")],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout == "agent:exact-sdk\n"
+    assert (
+        subprocess.run(
+            [str(bin_dir / "aoa-external-codex-agent")],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        == "agent:exact-sdk\n"
+    )
     marker = tmp_path / "replacement-python-ran"
     selected_python.write_text(
         "#!/bin/sh\n"
         f"/usr/bin/touch {shlex.quote(str(marker))}\n"
-        f"exec {shlex.quote(str(real_python))} \"$@\"\n",
+        f'exec {shlex.quote(str(real_python))} "$@"\n',
         encoding="utf-8",
     )
     selected_python.chmod(0o700)
@@ -486,8 +504,7 @@ def test_install_rejects_python_shim_with_unbound_delegate(tmp_path: Path) -> No
     real_python = Path(sys.executable).resolve()
     shim = tmp_path / "python-shim"
     shim.write_text(
-        "#!/bin/sh\n"
-        f"exec {shlex.quote(str(real_python))} \"$@\"\n",
+        f'#!/bin/sh\nexec {shlex.quote(str(real_python))} "$@"\n',
         encoding="utf-8",
     )
     shim.chmod(0o700)
@@ -535,8 +552,7 @@ def test_install_rejects_interpreter_drift_before_activation(
         if admitted[0] == selected_python.resolve() and selected_admissions == 0:
             selected_admissions += 1
             selected_python.write_text(
-                "#!/bin/sh\n"
-                f"exec {shlex.quote(str(real_python))} -B \"$@\"\n",
+                f'#!/bin/sh\nexec {shlex.quote(str(real_python))} -B "$@"\n',
                 encoding="utf-8",
             )
             selected_python.chmod(0o700)
@@ -576,8 +592,7 @@ def test_wrapper_imports_from_private_verified_release_snapshot(
     deferred.write_text("MARKER = 'verified-snapshot'\n", encoding="utf-8")
     commit_all(sdk)
     controller = (
-        source
-        / "mechanics/governed-execution/parts/external-codex-agent/"
+        source / "mechanics/governed-execution/parts/external-codex-agent/"
         "external_codex_agent.py"
     )
     controller.write_text(
@@ -628,7 +643,9 @@ def test_wrapper_imports_from_private_verified_release_snapshot(
     deadline = time.monotonic() + 10
     while not ready.exists() and process.poll() is None and time.monotonic() < deadline:
         time.sleep(0.01)
-    assert ready.exists(), f"snapshot actor did not become ready; returncode={process.poll()}"
+    assert ready.exists(), (
+        f"snapshot actor did not become ready; returncode={process.poll()}"
+    )
     installed_release = Path(receipt["active"]["release_root"])
     moved_release = installed_release.with_name(installed_release.name + "-host-moved")
     os.replace(installed_release, moved_release)
@@ -662,9 +679,7 @@ def test_git_posture_does_not_run_repository_fsmonitor_or_content_filter(
     filter_marker = tmp_path / "filter-ran"
     filter_helper = tmp_path / "clean-filter"
     filter_helper.write_text(
-        "#!/bin/sh\n"
-        f"/usr/bin/touch {shlex.quote(str(filter_marker))}\n"
-        "/bin/cat\n",
+        f"#!/bin/sh\n/usr/bin/touch {shlex.quote(str(filter_marker))}\n/bin/cat\n",
         encoding="utf-8",
     )
     filter_helper.chmod(0o700)
@@ -677,8 +692,7 @@ def test_git_posture_does_not_run_repository_fsmonitor_or_content_filter(
     git("config", "core.fsmonitor", str(fsmonitor), cwd=source)
     git("config", "filter.leak.clean", str(filter_helper), cwd=source)
     controller = (
-        source
-        / "mechanics/governed-execution/parts/external-codex-agent/"
+        source / "mechanics/governed-execution/parts/external-codex-agent/"
         "external_codex_agent.py"
     )
     controller.write_text(
@@ -701,9 +715,7 @@ def test_git_posture_snapshot_ignores_filter_config_added_before_status(
     marker = tmp_path / "late-filter-ran"
     helper = tmp_path / "late-filter"
     helper.write_text(
-        "#!/bin/sh\n"
-        f"/usr/bin/touch {shlex.quote(str(marker))}\n"
-        "/bin/cat\n",
+        f"#!/bin/sh\n/usr/bin/touch {shlex.quote(str(marker))}\n/bin/cat\n",
         encoding="utf-8",
     )
     helper.chmod(0o700)
@@ -714,8 +726,7 @@ def test_git_posture_snapshot_ignores_filter_config_added_before_status(
     git("add", ".gitattributes", cwd=source)
     git("commit", "-qm", "late attributes", cwd=source)
     controller = (
-        source
-        / "mechanics/governed-execution/parts/external-codex-agent/"
+        source / "mechanics/governed-execution/parts/external-codex-agent/"
         "external_codex_agent.py"
     )
     controller.write_text(
@@ -725,7 +736,9 @@ def test_git_posture_snapshot_ignores_filter_config_added_before_status(
     original_run = subprocess.run
     mutation_observed = False
 
-    def mutate_before_status(*args: object, **kwargs: object) -> subprocess.CompletedProcess:
+    def mutate_before_status(
+        *args: object, **kwargs: object
+    ) -> subprocess.CompletedProcess:
         nonlocal mutation_observed
         argv = args[0] if args else kwargs.get("args")
         if (
@@ -806,8 +819,7 @@ def test_install_refuses_clean_checkout_race_before_activation(
         text=True,
     ).stdout.strip()
     controller = (
-        source
-        / "mechanics/governed-execution/parts/external-codex-agent/"
+        source / "mechanics/governed-execution/parts/external-codex-agent/"
         "external_codex_agent.py"
     )
     controller.write_text(
@@ -888,7 +900,9 @@ def test_release_verification_rejects_unmanifested_importable_file(
         runtime_install.status(runtime_root, bin_dir)
 
 
-def test_dirty_source_requires_explicit_admission_and_preserves_rollback(tmp_path: Path) -> None:
+def test_dirty_source_requires_explicit_admission_and_preserves_rollback(
+    tmp_path: Path,
+) -> None:
     source, sdk, agents, skills = make_sources(tmp_path)
     runtime_root = tmp_path / "runtime"
     bin_dir = tmp_path / "bin"
@@ -950,7 +964,10 @@ def test_dirty_source_requires_explicit_admission_and_preserves_rollback(tmp_pat
         Path(sys.executable),
     )
     assert restored["active"]["release_id"] == first["active"]["release_id"]
-    assert json.loads((runtime_root / "active.json").read_text())["release_id"] == first["active"]["release_id"]
+    assert (
+        json.loads((runtime_root / "active.json").read_text())["release_id"]
+        == first["active"]["release_id"]
+    )
 
 
 @pytest.mark.parametrize("index_flag", ["--assume-unchanged", "--skip-worktree"])
@@ -964,7 +981,9 @@ def test_hidden_index_posture_requires_explicit_source_admission(
         / "mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py"
     )
     git("update-index", index_flag, str(controller.relative_to(source)), cwd=source)
-    controller.write_text(controller.read_text() + "# hidden change\n", encoding="utf-8")
+    controller.write_text(
+        controller.read_text() + "# hidden change\n", encoding="utf-8"
+    )
 
     with pytest.raises(runtime_install.InstallError, match="--allow-dirty-source"):
         runtime_install.install(
@@ -1000,7 +1019,9 @@ def test_hidden_index_posture_requires_explicit_source_admission(
 
 def test_ignored_packaged_sdk_file_requires_explicit_admission(tmp_path: Path) -> None:
     source, sdk, agents, skills = make_sources(tmp_path)
-    (sdk / ".gitignore").write_text("src/aoa_sdk/local_generated.py\n", encoding="utf-8")
+    (sdk / ".gitignore").write_text(
+        "src/aoa_sdk/local_generated.py\n", encoding="utf-8"
+    )
     commit_all(sdk)
     ignored = sdk / "src/aoa_sdk/local_generated.py"
     ignored.write_text("LOCAL = True\n", encoding="utf-8")
@@ -1036,8 +1057,7 @@ def test_ignored_packaged_sdk_file_requires_explicit_admission(tmp_path: Path) -
     assert receipt["active"]["nonproduction_dirty_source"] is True
     assert receipt["active"]["sdk"]["ignored_packaged_file_count"] == 1
     assert (
-        Path(receipt["active"]["release_root"])
-        / "sdk/src/aoa_sdk/local_generated.py"
+        Path(receipt["active"]["release_root"]) / "sdk/src/aoa_sdk/local_generated.py"
     ).is_file()
 
 

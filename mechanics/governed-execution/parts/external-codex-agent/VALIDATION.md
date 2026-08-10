@@ -17,6 +17,7 @@ python -m py_compile \
   scripts/aoa-external-actor-bind \
   mechanics/governed-execution/parts/external-codex-agent/bind_external_actor_launch.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py \
+  mechanics/governed-execution/parts/external-codex-agent/external_codex_mount_launcher.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py \
   mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py \
   mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py
@@ -46,13 +47,36 @@ ceilings, secret-shaped ignored
 input refusal, complete runtime-wide forbidden-set admission plus subset-resistant
 terminal classification, direct secret-path encoder classification, exact-open-inode
 Codex preflight and inference execution across a pathname replacement plus
-pre-exec digest-drift refusal, a real masked outer-bubblewrap plus inner named
-Codex-sandbox preflight command, retention of that preflighted mount-wrapper
-digest through inference, and replacement refusal between those phases,
-exclusive same-workspace active-attempt admission across distinct
+pre-exec digest-drift refusal, and a real historical outer-bubblewrap plus inner
+named Codex-sandbox preflight command. The mount-wrapper and mount-launcher
+checks also prove the descriptor-bound inference contour. The projection slice
+proves an admitted Git baseline is copied through open descriptors, receives a
+source-independent private `.git` body with equivalent status/diff, and is
+mounted from its exact open inode at the stable child coordinate. Source
+manifests are checked before and after materialization, source-parent replacement
+cannot expose source config to the actor, a source race fails without an orphan
+projection, and a post-publication target swap cannot become the durable actor
+baseline. Publication is relative to a pinned parent descriptor, its baseline
+comes from the retained staging inode, uses non-replacing rename, and cleans the
+exact committed inode after an injected post-rename failure for both source and
+review-seed projections while refusing a replacement inode. Unicode/JSON-escaped
+source coordinates are removed from mapping keys, values, arbitrary text, and
+model-facing control views by schema-validated actor input envelopes. Tests
+cover mixed/case-varied/nested escapes, escaped slashes, surrogate pairs,
+invalid-UTF-8 binary shadows, and bounded-depth rejection; key collisions fail closed, controller originals are denied, and system minimal-read roots
+are not valid source locations. A host projection pathname replacement after open is detected
+at closeout while the child continues on the original inode;
+create/modify/delete/binary/mode/symlink changes yield a canonical actor
+delta while the source remains unchanged. It also proves independent
+same-source sessions use distinct projections, rather than treating a source
+flock as a rename defense,
+exclusive same-projection active-attempt admission across distinct
 session identities, wrapped effect-family observation, exact validation-claim
 binding to final workspace bytes, authority-blocked failure closeout when the
-final manifest is unobservable, streaming rejection of an unterminated
+final manifest is unobservable or a dying worker leaves read-only/out-of-scope
+projection drift, final-lock rejection of changed review seed, actor
+manifest/delta, and writer/reviewer summon request/schema bytes, strict
+`landing_review` admission/export binding, streaming rejection of an unterminated
 oversized protocol record, review-gate enforcement, TERM-resistant and unexpected-worker-death
 cleanup including a detached `setsid` descendant, high token/turn usage
 measurement without truncation, durable interrupt/resume on one thread,
@@ -62,7 +86,7 @@ authority-blocked interruption after a forbidden command was durably observed
 at `item.started`, attached shell-separator effect recognition,
 authority-blocked worker-death closeout after a recovered command, retry of
 a durable attempt-free `prepared` session after launch failure, an exact
-pre-fork child launch gate, and refusal to release the mount gate after a parent
+pre-fork child launch gate, and refusal to release a historical mount gate after a parent
 termination signal or supervisor-endpoint EOF, using a bubblewrap-retained peer
 and killing the complete blocked wrapper test tree before closing the supervisor
 endpoint,
@@ -73,18 +97,30 @@ partial-usage classification when interruption precedes Codex usage emission,
 immutable preservation of the interrupted receipt and its complete evidence
 closure across ordinary resume, including multiple terminal revisions within
 one recovered attempt,
-read-only target projection through a separately recorded attempt-local Codex
-execution root and temp area, with the target checkout outside writable roots,
+workspace-write continuation from the exact preceding actor final tree while
+retaining the original baseline as the cumulative delta origin,
+runtime-owned actor projection as the Codex target/cwd for both read-only and
+workspace-write actors, with the source checkout outside actor writes, fixed
+validation argv bound to that projection, and source-path exclusion from
+cwd/prompt/argv,
 session-local exact task/incarnation constraints with tamper refusal,
 immutable-input evidence identities constrained before structured output,
 idempotent exact duplicate evidence with raw-report preservation and typed
 semantic failure messages,
 digest-bound same-thread recovery from one unchanged read-only reviewer
 identity typo while preserving the failed result,
-canonical non-starting reviewer preparation with stable forwarded input IDs,
+canonical non-starting reviewer preparation with controller-owned immutable
+copies and stable forwarded input IDs, reviewer operation after the historical
+source checkout disappears or an historical ancestor is retargeted,
+nonterminal/stale/foreign review-seed refusal,
 an explicit workspace-write coder to read-only reviewer transition with a
-post-write manifest and reviewed A2A return, exact review-input-to-writer-final
-manifest binding, reviewer lock retention through durable A2A export,
+post-write actor manifest/delta and reviewed A2A return, exact review-input-to-
+writer-final-manifest and writer-delta digest binding, exact projection-seed
+envelope ownership and terminal-result binding, mandatory seed presence in
+reviewed A2A export, result-v2 mandatory successful
+projection provenance with legacy-v1 read compatibility,
+reuse on reviewer preparation, reviewer lock retention through durable A2A
+export,
 reviewer-result race refusal, wrapper-delimiter effect observation,
 unclassified non-validation interpreter indirection with exact fixed-validation
 exemption, fail-closed `env --split-string` handling, value-aware `timeout`
@@ -131,7 +167,8 @@ read-only metadata inspection preserved,
 GNU sed `--sandbox` enforcement, config-driven Git helper refusal,
 sourced-shell refusal, Git alias/config-write/external-subcommand refusal, ambient
 environment-assignment refusal, Git-invisible FIFO and Unix-socket refusal,
-post-preflight full-manifest drift refusal, final-manifest tamper refusal,
+post-preflight full-manifest drift refusal, source-race refusal before
+inference, final actor-manifest/delta tamper refusal,
 provenance checks for all loaded `aoa_sdk` modules in the study preparer plus a
 post-compilation persisted
 path inventory, produced-artifact admission, source-evidence file/line
@@ -143,9 +180,10 @@ would conflict with Codex sandboxing (the filesystem boundary uses rootless
 user+mount namespaces but adds no PID or network namespace), native
 nested-repository Git behavior,
 and a separately bound review/A2A export.
-Compatibility proof also loads a completed pre-change v2 state without a
-mount-wrapper digest for status and terminal-result recovery, without granting
-it a new inference attempt.
+Compatibility proof also loads completed pre-change v1/v2 states for status and
+terminal-result recovery, without granting them a new inference attempt when a
+safe v3 projection is absent. A Python 3.11 launcher regression proves namespace
+setup calls libc's `unshare` syscall path and never depends on `os.unshare`.
 It also proves parent obligation admission, durable pre-inference `yielding`
 state, preservation and retry beyond a partial yield attempt, recovery of a
 complete yield event without a second inference, a completed yield turn followed

@@ -61,8 +61,8 @@ The controller:
   terminal process stream before finalization, counts tokens/turns/time/output
   without imposing execution budgets, includes ignored workspace bytes without
   reading secret-shaped ignored inputs, holds an inode-scoped exclusive lock
-  on the exact workspace through each active worker attempt so separate
-  sessions cannot overlap their evidence or mutations, and runs Codex beneath a Linux
+  on the exact runtime-owned actor projection through each active worker attempt
+  so separate attempts cannot overlap one projection, and runs Codex beneath a Linux
   parent-death/subreaper supervisor that
   adopts and cleans detached descendants without placing an outer PID or
   network namespace in front of Codex's own sandbox, while retaining exact PGID/SID TERM/KILL
@@ -77,37 +77,56 @@ The controller:
   a self-peered Unix-socket gate retained through bubblewrap `--sync-fd` makes
   supervisor EOF non-releasing, while an abort kills and reaps the blocked
   wrapper before closing the still-unreleased supervisor endpoint;
-  preflight executes the same outer mask plus Codex's own inner named
-  bubblewrap/private-PID sandbox instead of merely checking their binaries, and
-  its exact mount-wrapper digest remains pinned through inference launch;
-- keeps read-only target-workspace authority while running Codex from a distinct
-  runtime-created attempt-local execution root; Codex's internal
-  `workspace-write` sandbox can write only that execution root and its
-  attempt-local `TMPDIR`, while the target checkout remains outside writable
-  roots and network remains disabled;
-- launches every inference with a generated named permission profile which
-  makes its credential-free config source read-only, masks the physical
-  repository config at every current bind-mount coordinate from a
-  digest-verified descriptor, reconstructs each affected Git metadata parent
-  as a private `tmpfs` view from identity-checked open descriptors, reserves
-  config-lock and absent worktree-config coordinates only inside that view,
-  preserves only
-  closed-grammar repository and worktree structural settings, preserves
-  `core.worktree` only when it resolves to the exact admitted workspace, rejects
-  redirected worktrees, and proves native
-  Git yields the same exact workspace status under an explicit no-rename display
-  on both views; ordinary source writes, nested or
-  temporary repositories, split indexes, reftable refs, case-handling semantics,
-  and Git inspection remain available without exposing remote auth/configured
-  helpers or making owner Git metadata writable;
+  preflight executes the same historical outer mask plus Codex's own inner
+  named bubblewrap/private-PID sandbox instead of merely checking their
+  binaries, and records the exact mount-wrapper and mount-launcher digests for
+  defense-in-depth drift checks;
+- materializes every admitted Git baseline into a fresh runtime-owned actor
+  projection before inference, rejecting unsupported special entries or unsafe
+  symlinks and constructing a private source-independent `.git` body whose
+  status/diff exactly match the admitted manifest; the source manifest is
+  recorded before and after materialization and must remain identical before
+  inference. Staging and publication are relative to one pinned parent
+  descriptor, the baseline is inventoried from the still-open staging inode,
+  and the public coordinate must name that same device/inode before it can
+  become durable state. Publication is non-replacing and rename commitment is
+  recorded before verification, so a post-rename failure cleans only the exact
+  staged inode through the pinned parent descriptor; a replaced coordinate is retained as typed
+  contamination rather than trusted or destructively cleaned. The actor
+  baseline/final manifests and canonical delta are durable session artifacts.
+  The model receives only the projection as target,
+  cwd, and validation root; the source checkout remains the owner acceptance
+  surface and is never an actor write target. Reviewer launches may seed an
+  exact writer projection only through a controller-issued review-seed envelope;
+  reviewer preparation and execution remain valid after the historical source
+  checkout disappears;
+- opens the actor projection once, inventories that descriptor, and passes the
+  same open inode through the supervisor and mount launcher to bubblewrap at
+  `/tmp/aoa-external-actor-workspace`. Final inventory uses the retained
+  descriptor and closeout rejects any pathname/inode replacement. Codex also
+  receives an explicit minimal allowlist permission profile, sanitized
+  actor-local Git config, disabled model-shell network, and an attempt-local
+  scratch directory;
+- keeps controller-original immutable inputs outside the actor permission
+  contour and gives the actor only schema-validated derivative envelopes.
+  JSON is parsed before source-coordinate removal; arbitrary text is checked
+  through bounded nested JSON-escape decoding, including mixed literal/escaped
+  text, slash escapes, hex-case variants, and surrogate pairs. Mapping keys and
+  values are both sanitized, excessive escape depth and collisions fail closed,
+  serialized aliases and invalid-UTF-8 binary shadows are checked through the
+  same decoder before any reversible base64 materialization, and
+  source aliases are removed from model-facing control views. Workspace
+  identity/ancestor coordinates are omitted. A source beneath Codex's built-in minimal-read system roots is
+  rejected instead of relying on an allowlist that would expose it;
 - resumes only the exact durable thread and event cursor, with one explicit
   digest-bound follow-up route for an unchanged read-only review rejected only
   by an identity-field mismatch, and preserves every prior terminal result plus
   a digest-bound snapshot closure for all referenced evidence in its attempt
   directory before any admitted continuation;
-- continues to read pre-existing durable v2 states that lack the newer
-  mount-wrapper digest for observation and terminal-result recovery, while
-  refusing a new attempt whose historical admission did not bind that identity;
+- emits result v2 with mandatory actor/source provenance for successful returns,
+  while continuing to read legacy result v1 and durable state v1/v2 for status and
+  terminal-result recovery, while refusing a new inference attempt unless a
+  safe v3 runtime-owned projection and its baseline are available;
 - turns read-only drift, out-of-scope paths, forbidden effects, identity drift,
   or report-contract drift into typed failure or authority-blocked evidence;
   non-owner-fixed interpreter, script, process-launch wrapper, `find -exec`,
@@ -213,9 +232,12 @@ The controller:
   only when the supplied writer summon request matches the admitted immutable
   bytes and both writer/reviewer SDK request semantics and outputs; the
   reviewer state digest must still equal the exact result bytes initially
-  admitted by the exporter; its session lock is retained across the final
-  artifact revalidation and atomic A2A write, so a concurrent resume cannot mix
-  verdicts or referenced bytes.
+  admitted by the exporter. `landing_review` is bound at seed admission and
+  again across result, task, durable state, and the final locked snapshot. The
+  writer and reviewer session locks are retained while the seed, both summon
+  request/schema pairs, and every exported writer/reviewer artifact are
+  revalidated, the payload is rebuilt, and the A2A output is atomically written,
+  so a concurrent continuation cannot mix verdicts or referenced bytes.
 - records a digest-bound `yielding` parent state before `yield-parent` may
   launch Codex, preserves every partial yield attempt in a distinct directory,
   recovers a completed yield event without a second inference, ends the
@@ -255,9 +277,10 @@ forms the separate semantic request and calls `preflight`, `start`, or
 
 `prepare_landing_study.py prepare-reviewer` remains the canonical non-starting
 transport-study review preparation path. It accepts an exact terminal read-only or bounded
-repo-mutation writer, verifies the runtime-owned final workspace manifest,
-forwards every original immutable input under the same stable ID, and adds the
-exact result, report, and a distinct post-writer manifest. A mutation writer
+repo-mutation writer, verifies the runtime-owned actor final manifest and
+canonical delta, forwards every original immutable input under the same stable
+ID, and adds the exact result, report, source baseline, actor final manifest,
+and actor delta. A mutation writer
 must name an explicit plan-bound reviewer contract and same-model/same-effort
 read-only realization; the reviewer never inherits coder permissions. The
 preparer compiles a distinct reviewer task, plan, binding, session, and launch

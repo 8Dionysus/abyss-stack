@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import fcntl
 import hashlib
 import json
 import os
@@ -28,7 +29,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import NoReturn
+from typing import Callable, NoReturn
 
 
 PR_SET_PDEATHSIG = 1
@@ -39,7 +40,13 @@ POLL_INTERVAL_SECONDS = 0.05
 ADOPTED_REAP_INTERVAL_SECONDS = 1.0
 MAX_EXECUTABLE_BYTES = 512 * 1024 * 1024
 MAX_MASK_BYTES = 2 * 1024 * 1024
+MAX_MOUNT_LAUNCHER_BYTES = 2 * 1024 * 1024
 IDENTITY_DISCOVERY_TIMEOUT_SECONDS = 5.0
+MOUNT_SETUP_TIMEOUT_SECONDS = 5.0
+MOUNT_LAUNCHER_PATH = Path(__file__).resolve().with_name(
+    "external_codex_mount_launcher.py"
+)
+ACTOR_WORKSPACE_COORDINATE = Path("/tmp/aoa-external-actor-workspace")
 PRIVATE_VIEW_IDENTITY_FIELDS = {
     "device": "st_dev",
     "inode": "st_ino",
@@ -128,6 +135,177 @@ def _open_verified_executable(path: str, expected_digest: str) -> int:
     return descriptor
 
 
+def _sealed_verified_file_snapshot(
+    path: str,
+    expected_digest: str,
+    *,
+    label: str,
+    maximum_bytes: int,
+) -> tuple[int, os.stat_result]:
+    """Copy verified bytes into a sealed memfd before returning authority."""
+
+    source = Path(path)
+    if (
+        not source.is_absolute()
+        or source.resolve() != source
+        or not expected_digest.startswith("sha256:")
+        or len(expected_digest) != 71
+    ):
+        raise SupervisorError(f"{label} identity is invalid")
+    source_descriptor = snapshot_descriptor = -1
+    try:
+        flags = os.O_RDONLY | os.O_CLOEXEC
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        source_descriptor = os.open(source, flags)
+        before = os.fstat(source_descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            raise SupervisorError(f"{label} is not a regular file")
+        snapshot_descriptor = os.memfd_create(
+            "external-codex-mask-snapshot",
+            os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING,
+        )
+        digest = hashlib.sha256()
+        observed_bytes = 0
+        while True:
+            chunk = os.read(source_descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            observed_bytes += len(chunk)
+            if observed_bytes > maximum_bytes:
+                raise SupervisorError(f"{label} exceeds the digest limit")
+            digest.update(chunk)
+            offset = 0
+            while offset < len(chunk):
+                written = os.write(snapshot_descriptor, chunk[offset:])
+                if written <= 0:
+                    raise OSError("mount mask snapshot write was incomplete")
+                offset += written
+        after = os.fstat(source_descriptor)
+        identity_fields = (
+            "st_dev",
+            "st_ino",
+            "st_mode",
+            "st_size",
+            "st_mtime_ns",
+            "st_ctime_ns",
+        )
+        if any(getattr(before, field) != getattr(after, field) for field in identity_fields):
+            raise SupervisorError(f"{label} changed while being snapshotted")
+        if observed_bytes != after.st_size:
+            raise SupervisorError(f"{label} size changed while being snapshotted")
+        actual_digest = "sha256:" + digest.hexdigest()
+        if actual_digest != expected_digest:
+            raise SupervisorError(f"{label} digest changed before use")
+        os.lseek(snapshot_descriptor, 0, os.SEEK_SET)
+        fcntl.fcntl(
+            snapshot_descriptor,
+            fcntl.F_ADD_SEALS,
+            fcntl.F_SEAL_SEAL
+            | fcntl.F_SEAL_SHRINK
+            | fcntl.F_SEAL_GROW
+            | fcntl.F_SEAL_WRITE,
+        )
+        result = snapshot_descriptor
+        snapshot_descriptor = -1
+        return result, after
+    except OSError as exc:
+        raise SupervisorError(f"cannot snapshot the exact {label}") from exc
+    finally:
+        if source_descriptor >= 0:
+            os.close(source_descriptor)
+        if snapshot_descriptor >= 0:
+            os.close(snapshot_descriptor)
+
+
+def _path_digest(path: Path, *, maximum_bytes: int) -> str:
+    try:
+        observed = path.stat()
+        if not stat.S_ISREG(observed.st_mode) or observed.st_size > maximum_bytes:
+            raise SupervisorError("verified launcher input is not one bounded file")
+        return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise SupervisorError("cannot digest one verified launcher input") from exc
+
+
+def _sealed_payload_descriptor(payload: dict[str, object]) -> int:
+    raw = json.dumps(
+        payload,
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    if len(raw) > MAX_MASK_BYTES:
+        raise SupervisorError("mount launcher payload exceeds its bound")
+    try:
+        descriptor = os.memfd_create(
+            "external-codex-mount-launch",
+            os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING,
+        )
+        offset = 0
+        while offset < len(raw):
+            written = os.write(descriptor, raw[offset:])
+            if written <= 0:
+                raise OSError("mount payload write was incomplete")
+            offset += written
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        fcntl.fcntl(
+            descriptor,
+            fcntl.F_ADD_SEALS,
+            fcntl.F_SEAL_SEAL
+            | fcntl.F_SEAL_SHRINK
+            | fcntl.F_SEAL_GROW
+            | fcntl.F_SEAL_WRITE,
+        )
+        return descriptor
+    except OSError as exc:
+        if "descriptor" in locals():
+            os.close(descriptor)
+        raise SupervisorError("cannot seal the mount launcher payload") from exc
+
+
+def _await_mount_setup(
+    process: subprocess.Popen[bytes],
+    setup_fd: int,
+    *,
+    setup_callback: Callable[[], None] | None,
+) -> None:
+    try:
+        readable, _, _ = select.select(
+            [setup_fd],
+            [],
+            [],
+            MOUNT_SETUP_TIMEOUT_SECONDS,
+        )
+        if not readable or os.read(setup_fd, 1) != b"R":
+            raise SupervisorError("private mount launcher did not become ready")
+        if setup_callback is not None:
+            setup_callback()
+        if os.write(setup_fd, b"1") != 1:
+            raise SupervisorError("private mount launcher release was incomplete")
+        readable, _, _ = select.select(
+            [setup_fd],
+            [],
+            [],
+            MOUNT_SETUP_TIMEOUT_SECONDS,
+        )
+        if not readable or os.read(setup_fd, 1) != b"A":
+            raise SupervisorError("private mount launcher did not attach exact views")
+    except BaseException as exc:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=1)
+        if isinstance(exc, SupervisorError):
+            raise
+        if isinstance(exc, (OSError, RuntimeError)):
+            raise SupervisorError("private mount launcher setup failed") from exc
+        raise
+
+
 def _private_view_identity_matches(
     observed: os.stat_result,
     expected: object,
@@ -192,7 +370,14 @@ def _validated_private_directory_views(
     if not views:
         raise SupervisorError("private directory views are absent")
     return tuple(
-        sorted(views, key=lambda view: (len(Path(str(view["target"])).parts), str(view["target"])))
+        sorted(
+            views,
+            key=lambda view: (
+                len(Path(str(view["target"])).parts),
+                str(view["target"]),
+            ),
+            reverse=True,
+        )
     )
 
 
@@ -202,8 +387,12 @@ def _launch_verified_command(
     *,
     mount_wrapper: str | None = None,
     mount_wrapper_digest: str | None = None,
+    mount_launcher_digest: str | None = None,
     private_directory_views: tuple[dict[str, object], ...] = (),
     read_only_masks: tuple[tuple[str, str, str], ...] = (),
+    mount_setup_callback: Callable[[], None] | None = None,
+    workspace_fd: int | None = None,
+    workspace_coordinate: str | None = None,
 ) -> tuple[subprocess.Popen[bytes], int | None]:
     """Execute the digest-verified open file, not a later pathname lookup."""
 
@@ -213,7 +402,7 @@ def _launch_verified_command(
         label="Codex executable",
         maximum_bytes=MAX_EXECUTABLE_BYTES,
     )
-    if mount_wrapper is None:
+    if mount_wrapper is None and workspace_fd is None:
         try:
             process = subprocess.Popen(
                 command,
@@ -225,21 +414,51 @@ def _launch_verified_command(
             raise SupervisorError("Codex launch failed") from exc
         finally:
             os.close(descriptor)
+    has_private_views = bool(private_directory_views or read_only_masks)
     if (
         mount_wrapper_digest is None
-        or not private_directory_views
-        or not read_only_masks
+        or mount_launcher_digest is None
+        or (workspace_fd is None and not has_private_views)
+        or bool(private_directory_views) != bool(read_only_masks)
     ):
         os.close(descriptor)
         raise SupervisorError("mount wrapper configuration is incomplete")
+    if workspace_fd is not None:
+        try:
+            workspace_stat = os.fstat(workspace_fd)
+        except OSError as exc:
+            os.close(descriptor)
+            raise SupervisorError("actor workspace descriptor is unavailable") from exc
+        if (
+            not stat.S_ISDIR(workspace_stat.st_mode)
+            or workspace_coordinate != str(ACTOR_WORKSPACE_COORDINATE)
+        ):
+            os.close(descriptor)
+            raise SupervisorError("actor workspace descriptor binding is invalid")
     wrapper_descriptor, _ = _open_verified_file(
         mount_wrapper,
         mount_wrapper_digest,
         label="mount wrapper executable",
         maximum_bytes=MAX_EXECUTABLE_BYTES,
     )
+    launcher_descriptor, _ = _open_verified_file(
+        str(MOUNT_LAUNCHER_PATH),
+        mount_launcher_digest,
+        label="mount namespace launcher",
+        maximum_bytes=MAX_MOUNT_LAUNCHER_BYTES,
+    )
+    python_executable = Path(sys.executable).resolve()
+    python_descriptor, _ = _open_verified_file(
+        str(python_executable),
+        _path_digest(python_executable, maximum_bytes=MAX_EXECUTABLE_BYTES),
+        label="mount launcher Python executable",
+        maximum_bytes=MAX_EXECUTABLE_BYTES,
+    )
     mask_descriptors: list[int] = []
     view_descriptors: list[int] = []
+    payload_descriptor = -1
+    setup_parent_fd = -1
+    setup_child_fd = -1
     gate_read_socket, gate_write_socket = socket.socketpair(
         socket.AF_UNIX,
         socket.SOCK_STREAM,
@@ -264,21 +483,33 @@ def _launch_verified_command(
             str(descriptor),
             command[0],
         ]
+        if workspace_fd is not None:
+            wrapper_command.extend(
+                (
+                    "--tmpfs",
+                    "/tmp",
+                    "--dir",
+                    str(ACTOR_WORKSPACE_COORDINATE),
+                    "--bind-fd",
+                    str(workspace_fd),
+                    str(ACTOR_WORKSPACE_COORDINATE),
+                    "--chdir",
+                    str(ACTOR_WORKSPACE_COORDINATE),
+                )
+            )
         view_targets: set[Path] = set()
+        launcher_views: list[dict[str, object]] = []
         for view in private_directory_views:
             view_target = Path(str(view["target"]))
-            try:
-                view_stat = view_target.lstat()
-            except OSError as exc:
-                raise SupervisorError("private directory view became unavailable") from exc
-            if (
-                view_target.is_symlink()
-                or not stat.S_ISDIR(view_stat.st_mode)
-                or not _private_view_identity_matches(view_stat, view["identity"])
-            ):
-                raise SupervisorError("private directory view identity changed")
             view_targets.add(view_target)
-            wrapper_command.extend(("--tmpfs", str(view_target)))
+            launcher_view = {
+                "target": str(view_target),
+                "identity": view["identity"],
+                "attachments": [],
+            }
+            launcher_views.append(launcher_view)
+            launcher_attachments = launcher_view["attachments"]
+            assert isinstance(launcher_attachments, list)
             entries = view["entries"]
             assert isinstance(entries, list)
             for entry in entries:
@@ -286,7 +517,7 @@ def _launch_verified_command(
                 source = Path(str(entry["source"]))
                 target = Path(str(entry["target"]))
                 kind = str(entry["kind"])
-                flags = os.O_RDONLY | os.O_CLOEXEC
+                flags = os.O_PATH | os.O_CLOEXEC
                 if hasattr(os, "O_NOFOLLOW"):
                     flags |= os.O_NOFOLLOW
                 if kind == "directory" and hasattr(os, "O_DIRECTORY"):
@@ -308,8 +539,13 @@ def _launch_verified_command(
                     )
                 ):
                     raise SupervisorError("private directory view entry changed")
-                wrapper_command.extend(
-                    ("--ro-bind-fd", str(entry_descriptor), str(target))
+                launcher_attachments.append(
+                    {
+                        "name": target.name,
+                        "kind": kind,
+                        "source": str(source),
+                        "identity": entry["identity"],
+                    }
                 )
         for source, target, digest in read_only_masks:
             if (
@@ -317,45 +553,110 @@ def _launch_verified_command(
                 or Path(target).parent not in view_targets
             ):
                 raise SupervisorError("mount mask target is not absolute")
-            mask_descriptor, _ = _open_verified_file(
+            verified_mask_descriptor, verified_mask_stat = _sealed_verified_file_snapshot(
                 source,
                 digest,
                 label="mount mask source",
                 maximum_bytes=MAX_MASK_BYTES,
             )
+            mask_descriptor = verified_mask_descriptor
             mask_descriptors.append(mask_descriptor)
-            wrapper_command.extend(
-                ("--ro-bind-data", str(mask_descriptor), target)
+            launcher_view = next(
+                item
+                for item in launcher_views
+                if item["target"] == str(Path(target).parent)
+            )
+            launcher_attachments = launcher_view["attachments"]
+            assert isinstance(launcher_attachments, list)
+            launcher_attachments.append(
+                {
+                    "name": Path(target).name,
+                    "kind": "sealed_file",
+                    "snapshot_fd": mask_descriptor,
+                    "size": verified_mask_stat.st_size,
+                    "digest": digest,
+                }
             )
         wrapper_command.extend(("--", *command))
+        payload_descriptor = _sealed_payload_descriptor(
+            {
+                "schema_version": "abyss_stack_external_codex_mount_launcher_v1",
+                "mount_wrapper_fd": wrapper_descriptor,
+                "wrapper_argv": wrapper_command,
+                "views": launcher_views,
+            }
+        )
+        setup_parent_socket, setup_child_socket = socket.socketpair(
+            socket.AF_UNIX,
+            socket.SOCK_STREAM,
+        )
+        setup_parent_fd = setup_parent_socket.detach()
+        setup_child_fd = setup_child_socket.detach()
         process = subprocess.Popen(
-            wrapper_command,
-            executable=f"/proc/self/fd/{wrapper_descriptor}",
+            [
+                str(python_executable),
+                "-I",
+                "-B",
+                "-S",
+                f"/proc/self/fd/{launcher_descriptor}",
+                "--payload-fd",
+                str(payload_descriptor),
+                "--setup-fd",
+                str(setup_child_fd),
+            ],
+            executable=f"/proc/self/fd/{python_descriptor}",
             pass_fds=(
                 descriptor,
                 wrapper_descriptor,
+                launcher_descriptor,
+                python_descriptor,
+                payload_descriptor,
+                setup_child_fd,
                 gate_read_fd,
                 gate_write_fd,
-                *view_descriptors,
                 *mask_descriptors,
+                *((workspace_fd,) if workspace_fd is not None else ()),
             ),
         )
+        os.close(setup_child_fd)
+        setup_child_fd = -1
+        _await_mount_setup(
+            process,
+            setup_parent_fd,
+            setup_callback=mount_setup_callback,
+        )
+        os.close(setup_parent_fd)
+        setup_parent_fd = -1
         os.close(gate_read_fd)
         gate_read_fd = -1
         return process, gate_write_fd
     except OSError as exc:
-        os.close(gate_write_fd)
+        if gate_write_fd >= 0:
+            os.close(gate_write_fd)
+            gate_write_fd = -1
         raise SupervisorError("Codex launch failed") from exc
     except SupervisorError:
-        os.close(gate_write_fd)
+        if gate_write_fd >= 0:
+            os.close(gate_write_fd)
+            gate_write_fd = -1
         raise
     finally:
         os.close(descriptor)
         os.close(wrapper_descriptor)
+        os.close(launcher_descriptor)
+        os.close(python_descriptor)
+        if payload_descriptor >= 0:
+            os.close(payload_descriptor)
+        if setup_parent_fd >= 0:
+            os.close(setup_parent_fd)
+        if setup_child_fd >= 0:
+            os.close(setup_child_fd)
         for mask_descriptor in mask_descriptors:
             os.close(mask_descriptor)
         for view_descriptor in view_descriptors:
             os.close(view_descriptor)
+        if workspace_fd is not None:
+            os.close(workspace_fd)
         if gate_read_fd >= 0:
             os.close(gate_read_fd)
 
@@ -757,6 +1058,9 @@ def _arguments(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--executable-digest", required=True)
     parser.add_argument("--mount-wrapper")
     parser.add_argument("--mount-wrapper-digest")
+    parser.add_argument("--mount-launcher-digest")
+    parser.add_argument("--workspace-fd", type=int)
+    parser.add_argument("--workspace-coordinate")
     parser.add_argument(
         "--private-directory-view",
         action="append",
@@ -776,7 +1080,10 @@ def _arguments(argv: list[str]) -> argparse.Namespace:
     try:
         arguments.private_directory_views = _validated_private_directory_views(
             arguments.private_directory_view
-        ) if arguments.mount_wrapper is not None else ()
+        ) if (
+            arguments.mount_wrapper is not None
+            and arguments.private_directory_view
+        ) else ()
     except SupervisorError as exc:
         parser.error(str(exc))
     if (
@@ -786,12 +1093,30 @@ def _arguments(argv: list[str]) -> argparse.Namespace:
             arguments.identity_file is not None
             and not arguments.identity_file.is_absolute()
         )
-        or ((arguments.mount_wrapper is None) != (arguments.mount_wrapper_digest is None))
+        or sum(
+            value is None
+            for value in (
+                arguments.mount_wrapper,
+                arguments.mount_wrapper_digest,
+                arguments.mount_launcher_digest,
+            )
+        )
+        not in {0, 3}
         or (arguments.read_only_mask and arguments.mount_wrapper is None)
         or (arguments.private_directory_view and arguments.mount_wrapper is None)
         or (
             arguments.mount_wrapper is not None
             and not arguments.private_directory_views
+            and arguments.workspace_fd is None
+        )
+        or ((arguments.workspace_fd is None) != (arguments.workspace_coordinate is None))
+        or (
+            arguments.workspace_fd is not None
+            and (
+                arguments.workspace_fd < 3
+                or arguments.workspace_coordinate != str(ACTOR_WORKSPACE_COORDINATE)
+                or arguments.mount_wrapper is None
+            )
         )
         or any(
             not Path(source).is_absolute() or not Path(target).is_absolute()
@@ -834,8 +1159,11 @@ def main(argv: list[str] | None = None) -> int:
                 arguments.executable_digest,
                 mount_wrapper=arguments.mount_wrapper,
                 mount_wrapper_digest=arguments.mount_wrapper_digest,
+                mount_launcher_digest=arguments.mount_launcher_digest,
                 private_directory_views=arguments.private_directory_views,
                 read_only_masks=tuple(tuple(item) for item in arguments.read_only_mask),
+                workspace_fd=arguments.workspace_fd,
+                workspace_coordinate=arguments.workspace_coordinate,
             )
         except SupervisorError as exc:
             _fail(str(exc), SUPERVISOR_SETUP_FAILED)

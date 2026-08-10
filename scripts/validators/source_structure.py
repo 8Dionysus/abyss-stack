@@ -393,6 +393,9 @@ REQUIRED_FILE_PATHS = tuple(
         "mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py",
         "mechanics/governed-execution/parts/external-codex-agent/runtime-profile.v1.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-actor-launch-manifest.schema.json",
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-actor-delta.schema.json",
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-actor-input-envelope.schema.json",
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-actor-workspace-manifest.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-event.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-launch.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-parent-obligation.schema.json",
@@ -403,12 +406,17 @@ REQUIRED_FILE_PATHS = tuple(
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-result.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-resume.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-review-preparation.schema.json",
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-review-seed-envelope.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-runtime-profile.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-state.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-study-preparation.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-task.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-workspace-manifest.schema.json",
+        "mechanics/governed-execution/parts/external-codex-agent/external_codex_mount_launcher.py",
+        "mechanics/governed-execution/parts/external-codex-agent/external_codex_projection.py",
         "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py",
+        "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_mount_launcher.py",
+        "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_projection.py",
         "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_runtime_install.py",
         "scripts/aoa-external-actor-bind",
         "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
@@ -548,7 +556,6 @@ def required_files(root: Path) -> set[Path]:
     return {root / relative_path for relative_path in REQUIRED_FILE_PATHS}
 
 
-
 def validate_required_files(
     errors: list[str],
     *,
@@ -589,7 +596,9 @@ def validate_root_residual_topology(
         root / "AUDIT.md": "docs/routes/AUDIT.md",
         root / "Spark": ".agents/spark/",
         root / ".github" / "README.md": ".github/GITHUB_SURFACE.md",
-        root / "docs" / "START_HERE_ROUTE_CONTRACT.md": "docs/routes/START_HERE_ROUTE_CONTRACT.md",
+        root
+        / "docs"
+        / "START_HERE_ROUTE_CONTRACT.md": "docs/routes/START_HERE_ROUTE_CONTRACT.md",
         root / "docs" / "AUDIT.md": "docs/routes/AUDIT.md",
         root / "docs" / "ARCHITECTURE.md": "docs/runtime/ARCHITECTURE.md",
         root / "docs" / "MECHANICS.md": "docs/runtime/MECHANICS.md",
@@ -606,7 +615,9 @@ def validate_root_residual_topology(
         root / "docs" / "PROFILES.md": "docs/profiles/PROFILES.md",
         root / "docs" / "PROFILE_RECIPES.md": "docs/profiles/PROFILE_RECIPES.md",
         root / "docs" / "BRANCH_POLICY.md": "docs/governance/BRANCH_POLICY.md",
-        root / "docs" / "QUESTBOOK_STACK_INTEGRATION.md": "docs/governance/QUESTBOOK_STACK_INTEGRATION.md",
+        root
+        / "docs"
+        / "QUESTBOOK_STACK_INTEGRATION.md": "docs/governance/QUESTBOOK_STACK_INTEGRATION.md",
     }
     for path, target in forbidden_paths.items():
         if path.exists():

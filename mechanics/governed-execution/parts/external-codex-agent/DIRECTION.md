@@ -30,8 +30,9 @@ outside the initial contour.
 4. Preserve the now-proven controlled L2 yield: the parent obligation survives
    after Sol inference/process exit, non-significant events remain filtered,
    and only a configured event resumes the exact parent thread.
-5. Admit workspace-write only for exact paths/effects and a distinct
-   independent-review return.
+5. Admit workspace-write only for exact paths/effects in a runtime-owned
+   projection and a distinct independent-review return; keep source acceptance
+   separate from actor writes.
 6. Prove that two fresh Codex sessions can discover `aoa-agents-skills`, route
    through `aoa-summon`, and invoke the installed external contour without
    built-in spawn or a model-named command.
@@ -119,8 +120,13 @@ and immutable preservation of the interrupted receipt. After that repair, two
 fresh xhigh attempts showed that Codex 0.146.0 agent execution did not honor the
 beta permission-profile `:tmpdir` override even though direct
 `codex sandbox -P` did. Pytest therefore never reached collection. The current
-source separates the semantically read-only target checkout from an
-attempt-local writable Codex execution root and records both paths. Direct,
-symlink, hardlink, and rename probes preserved the target boundary, but these
-are transport/sandbox observations only. A new immutable closeout run and
-independent review remain required before comparison or fit work resumes.
+source materializes a runtime-owned actor projection for both read-only and
+workspace-write actors through open descriptors, constructs a private
+source-independent Git body, mounts the exact open inode at a stable child
+coordinate, and returns a durable actor baseline/final/delta while keeping the
+source checkout unchanged. Controller-issued review envelopes preserve the
+writer projection and evidence after the source disappears. Direct, symlink,
+hardlink, and rename probes remain transport observations; descriptor binding,
+source manifests, and final pathname identity form the current race boundary.
+A new immutable closeout run and independent review remain required before
+comparison or fit work resumes.

@@ -51,6 +51,8 @@ python -m py_compile \
   scripts/aoa-external-actor-bind \
   mechanics/governed-execution/parts/external-codex-agent/bind_external_actor_launch.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py \
+  mechanics/governed-execution/parts/external-codex-agent/external_codex_projection.py \
+  mechanics/governed-execution/parts/external-codex-agent/external_codex_mount_launcher.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py \
   mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py \
   mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py

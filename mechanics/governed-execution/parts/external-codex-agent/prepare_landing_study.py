@@ -75,10 +75,10 @@ from aoa_sdk.runtime_adapters import (  # noqa: E402
 from external_codex_agent import (  # noqa: E402
     STATE_SCHEMA_PATH,
     STATE_SCHEMA_VERSION,
+    ExternalCodexRuntime,
     ExternalCodexRuntimeError,
     assert_workspace_manifest,
     build_workspace_manifest,
-    compare_workspace_manifest,
     load_json,
     sha256_bytes,
     validate_json,
@@ -102,6 +102,20 @@ WORKSPACE_MANIFEST_SCHEMA_REF = (
 )
 WORKSPACE_MANIFEST_SCHEMA_PATH = (
     PART_ROOT / "schemas/external-codex-workspace-manifest.schema.json"
+)
+ACTOR_MANIFEST_SCHEMA_REF = (
+    "mechanics/governed-execution/parts/external-codex-agent/"
+    "schemas/external-codex-actor-workspace-manifest.schema.json"
+)
+ACTOR_MANIFEST_SCHEMA_PATH = (
+    PART_ROOT / "schemas/external-codex-actor-workspace-manifest.schema.json"
+)
+ACTOR_DELTA_SCHEMA_REF = (
+    "mechanics/governed-execution/parts/external-codex-agent/"
+    "schemas/external-codex-actor-delta.schema.json"
+)
+ACTOR_DELTA_SCHEMA_PATH = (
+    PART_ROOT / "schemas/external-codex-actor-delta.schema.json"
 )
 SDK_SUMMON_REQUEST_SCHEMA_RELATIVE_PATH = Path(
     "mechanics/checkpoint/parts/child-task-reentry/schemas/"
@@ -992,6 +1006,8 @@ def _adapt_plan_for_reviewer(
     reviewer_model_ref: ProvenanceRef,
     writer_result_ref: ProvenanceRef,
     writer_report_ref: ProvenanceRef,
+    writer_actor_final_ref: ProvenanceRef,
+    writer_actor_delta_ref: ProvenanceRef,
     review_manifest_ref: ProvenanceRef,
     identity_token: str,
 ) -> RunPlan:
@@ -1037,6 +1053,8 @@ def _adapt_plan_for_reviewer(
         tuple(replace(item) for item in base.snapshot.source_refs),
         writer_result_ref,
         writer_report_ref,
+        writer_actor_final_ref,
+        writer_actor_delta_ref,
         review_manifest_ref,
         old_summon_request_ref,
         old_summon_decision_ref,
@@ -1062,6 +1080,8 @@ def _adapt_plan_for_reviewer(
                 tuple(replace(item) for item in base.runtime_profile.constraint_refs),
                 writer_result_ref,
                 writer_report_ref,
+                writer_actor_final_ref,
+                writer_actor_delta_ref,
                 review_manifest_ref,
                 old_summon_request_ref,
                 old_summon_decision_ref,
@@ -2006,19 +2026,6 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
             "result_schema",
         )
     }
-    workspace = Path(str(writer_launch["workspace_path"])).resolve()
-    if not workspace.is_dir():
-        raise StudyPreparationError("writer workspace is unavailable")
-    for target in (output_root, state_root):
-        try:
-            target.relative_to(workspace)
-        except ValueError:
-            pass
-        else:
-            raise StudyPreparationError(
-                "review output/state roots must stay outside the workspace"
-            )
-
     writer_result = load_json(writer_result_path, label="writer runtime result")
     validate_json(writer_result, RESULT_SCHEMA_PATH, label="writer runtime result")
     if writer_result.get("admission_class") != "transport_study_fixture":
@@ -2052,6 +2059,18 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         raise StudyPreparationError(
             "writer result differs from its canonical durable runtime state"
         )
+    workspace = Path(str(writer_state["workspace_path"]))
+    if not workspace.is_absolute():
+        raise StudyPreparationError("writer historical workspace coordinate is not absolute")
+    for target in (output_root, state_root):
+        try:
+            target.relative_to(workspace)
+        except ValueError:
+            pass
+        else:
+            raise StudyPreparationError(
+                "review output/state roots must stay outside the historical workspace coordinate"
+            )
     if (
         writer_result.get("session_id") != writer_launch["session_id"]
         or writer_result.get("status") not in {"completed", "review_required"}
@@ -2111,33 +2130,89 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         raise StudyPreparationError("writer result and model report identities differ")
 
     writer_workspace_ref = writer_result.get("workspace_manifest_ref")
-    if not isinstance(writer_workspace_ref, dict):
+    writer_actor_final_ref = writer_result.get("actor_final_manifest_ref")
+    if not isinstance(writer_actor_final_ref, dict):
+        writer_actor_final_ref = writer_workspace_ref
+    writer_actor_delta_ref = writer_result.get("actor_delta_ref")
+    if not isinstance(writer_workspace_ref, dict) or not isinstance(
+        writer_actor_final_ref, dict
+    ) or not isinstance(writer_actor_delta_ref, dict):
         raise StudyPreparationError(
-            "writer result has no exact final workspace manifest reference"
+            "writer result has no exact actor final manifest and delta references"
         )
     writer_workspace_manifest_path = Path(
-        str(writer_workspace_ref.get("artifact_ref", ""))
+        str(writer_actor_final_ref.get("artifact_ref", ""))
     )
     if (
         not writer_workspace_manifest_path.is_absolute()
         or not writer_workspace_manifest_path.is_file()
         or writer_workspace_manifest_path.is_symlink()
         or _file_digest(writer_workspace_manifest_path)
-        != writer_workspace_ref.get("artifact_digest")
+        != writer_actor_final_ref.get("artifact_digest")
     ):
         raise StudyPreparationError(
-            "writer final workspace manifest bytes are unavailable or changed"
+            "writer final actor manifest bytes are unavailable or changed"
         )
     writer_final_manifest = load_json(
         writer_workspace_manifest_path,
-        label="writer final workspace manifest",
+        label="writer final actor manifest",
     )
-    try:
-        assert_workspace_manifest(writer_final_manifest, workspace)
-    except ExternalCodexRuntimeError as exc:
+    validate_json(
+        writer_final_manifest,
+        ACTOR_MANIFEST_SCHEMA_PATH,
+        label="writer final actor manifest",
+    )
+    writer_actor_delta_path = Path(str(writer_actor_delta_ref.get("artifact_ref", "")))
+    if (
+        not writer_actor_delta_path.is_absolute()
+        or not writer_actor_delta_path.is_file()
+        or writer_actor_delta_path.is_symlink()
+        or _file_digest(writer_actor_delta_path)
+        != writer_actor_delta_ref.get("artifact_digest")
+    ):
         raise StudyPreparationError(
-            "workspace changed after the writer terminal manifest was recorded"
-        ) from exc
+            "writer actor delta bytes are unavailable or changed"
+        )
+    writer_actor_delta = load_json(
+        writer_actor_delta_path,
+        label="writer actor delta",
+    )
+    validate_json(writer_actor_delta, ACTOR_DELTA_SCHEMA_PATH, label="writer actor delta")
+    writer_actor_final_provenance = _file_ref(
+        owner="abyss-stack",
+        artifact_ref=str(writer_workspace_manifest_path),
+        path=writer_workspace_manifest_path,
+        source_ref=writer_result_digest,
+        schema_ref=ACTOR_MANIFEST_SCHEMA_REF,
+        schema_version="abyss_stack_external_codex_actor_workspace_manifest_v2",
+    )
+    writer_actor_delta_provenance = _file_ref(
+        owner="abyss-stack",
+        artifact_ref=str(writer_actor_delta_path),
+        path=writer_actor_delta_path,
+        source_ref=writer_result_digest,
+        schema_ref=ACTOR_DELTA_SCHEMA_REF,
+        schema_version="abyss_stack_external_codex_actor_delta_v1",
+    )
+    writer_projection_path = Path(str(writer_state.get("actor_projection_path", "")))
+    if (
+        not writer_projection_path.is_absolute()
+        or writer_projection_path.is_symlink()
+        or not writer_projection_path.is_dir()
+        or writer_final_manifest.get("workspace_path") != str(writer_projection_path)
+        or writer_actor_delta.get("final_manifest_digest")
+        != sha256_bytes(
+            json.dumps(
+                writer_final_manifest,
+                ensure_ascii=True,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        )
+    ):
+        raise StudyPreparationError(
+            "writer actor projection is not bound to its exact final manifest and delta"
+        )
 
     reviewer_role_arg = getattr(args, "reviewer_role_contract", None)
     reviewer_realization_arg = getattr(args, "reviewer_model_realization", None)
@@ -2264,26 +2339,46 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         "review-workspace-manifest",
         "writer-runtime-result",
         "writer-model-report",
+        "writer-actor-final-manifest",
+        "writer-actor-delta",
     }
+    controller_inputs = writer_state.get("controller_materialized_task_inputs")
+    if not isinstance(controller_inputs, list):
+        raise StudyPreparationError(
+            "writer has no durable controller-owned immutable input set"
+        )
     for item in writer_task["immutable_inputs"]:
         input_id = str(item["input_id"])
         if input_id in reserved_ids or input_id in forwarded_ids:
             raise StudyPreparationError(
                 "writer immutable input ids collide with reviewer evidence ids"
             )
-        path = Path(str(item["local_path"]))
         provenance = ProvenanceRef.model_validate(item["provenance"])
+        controller_matches = [
+            candidate
+            for candidate in controller_inputs
+            if candidate.get("input_id") == input_id
+        ]
+        if len(controller_matches) != 1:
+            raise StudyPreparationError(
+                f"writer has no unique durable controller input: {input_id}"
+            )
+        controller_input = controller_matches[0]
+        path = Path(str(controller_input.get("path", "")))
         if (
             not path.is_absolute()
             or not path.is_file()
             or path.is_symlink()
+            or controller_input.get("provenance") != item["provenance"]
             or _file_digest(path) != provenance.artifact_digest
         ):
             raise StudyPreparationError(
                 f"writer immutable input changed before review: {input_id}"
             )
         forwarded_ids.add(input_id)
-        forwarded_inputs.append(dict(item))
+        forwarded_item = dict(item)
+        forwarded_item["local_path"] = str(path)
+        forwarded_inputs.append(forwarded_item)
         if input_id == writer_manifest_input_id:
             manifest_input = (path, provenance)
         elif input_id == "summon-request":
@@ -2303,8 +2398,9 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         writer_summon_schema_input
     )
     if (
-        writer_summon_schema_path != summon_request_schema_path
-        or writer_summon_schema_ref != summon_request_schema_ref
+        writer_summon_schema_ref != summon_request_schema_ref
+        or _file_digest(writer_summon_schema_path)
+        != summon_request_schema_ref.artifact_digest
         or writer_summon_ref.schema_ref
         != summon_request_schema_ref.artifact_ref
         or writer_summon_ref.schema_version
@@ -2358,9 +2454,10 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         raise StudyPreparationError(
             "writer baseline workspace manifest names another workspace or HEAD"
         )
-    observed_changed_paths = compare_workspace_manifest(
-        manifest, writer_final_manifest
-    )
+    observed_changed_paths = [
+        {"path": str(item["path"]), "status": str(item["status"])}
+        for item in writer_actor_delta["changes"]
+    ]
     if observed_changed_paths != writer_result.get("changed_paths"):
         raise StudyPreparationError(
             "writer result changed-path receipt differs from its exact final manifest"
@@ -2381,20 +2478,18 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     if writer_effect_class == "read_only":
         if (
             writer_result.get("workspace_manifest_match") is not True
-            or writer_final_manifest != manifest
+            or observed_changed_paths
         ):
             raise StudyPreparationError(
                 "read-only writer result is not an exact no-drift review input"
             )
-    elif writer_result.get("workspace_manifest_match") != (
-        writer_final_manifest == manifest
-    ):
+    elif writer_result.get("workspace_manifest_match") != (not observed_changed_paths):
         raise StudyPreparationError(
-            "repo-mutation writer manifest-match flag differs from exact manifests"
+            "repo-mutation writer actor manifest-match flag differs from exact delta"
         )
 
     review_manifest_path = output_root / "review-workspace-manifest.json"
-    _write_exact(review_manifest_path, _json_bytes(writer_final_manifest))
+    _write_exact(review_manifest_path, _json_bytes(manifest))
     review_manifest_ref = _file_ref(
         owner=writer_task["target_owner"],
         artifact_ref=str(review_manifest_path),
@@ -2403,6 +2498,16 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         schema_ref=WORKSPACE_MANIFEST_SCHEMA_REF,
         schema_version="abyss_stack_external_codex_workspace_manifest_v1",
     )
+    writer_actor_final_input = {
+        "input_id": "writer-actor-final-manifest",
+        "local_path": str(writer_workspace_manifest_path),
+        "provenance": writer_actor_final_provenance.model_dump(mode="json"),
+    }
+    writer_actor_delta_input = {
+        "input_id": "writer-actor-delta",
+        "local_path": str(writer_actor_delta_path),
+        "provenance": writer_actor_delta_provenance.model_dump(mode="json"),
+    }
 
     writer_result_ref = _file_ref(
         owner="abyss-stack",
@@ -2413,7 +2518,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
             "mechanics/governed-execution/parts/external-codex-agent/schemas/"
             "external-codex-result.schema.json"
         ),
-        schema_version="abyss_stack_external_codex_result_v1",
+        schema_version=str(writer_result["schema_version"]),
     )
     writer_report_ref = _file_ref(
         owner="abyss-stack",
@@ -2443,6 +2548,8 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
                 "local_path": str(review_manifest_path),
                 "provenance": review_manifest_ref.model_dump(mode="json"),
             },
+            writer_actor_final_input,
+            writer_actor_delta_input,
         )
     )
 
@@ -2589,6 +2696,8 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         reviewer_model_ref=reviewer_model_ref,
         writer_result_ref=writer_result_ref,
         writer_report_ref=writer_report_ref,
+        writer_actor_final_ref=writer_actor_final_provenance,
+        writer_actor_delta_ref=writer_actor_delta_provenance,
         review_manifest_ref=review_manifest_ref,
         identity_token=identity_token,
     )
@@ -2681,6 +2790,8 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         continuation_inputs,
         writer_result_ref,
         writer_report_ref,
+        writer_actor_final_provenance,
+        writer_actor_delta_provenance,
         review_manifest_ref,
         review_summon_request_ref,
         review_summon_decision_ref,
@@ -2770,6 +2881,16 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     )
     binding_path = output_root / "incarnation-binding.json"
     _write_exact(binding_path, _json_bytes(binding.model_dump(mode="json")))
+    writer_state_root = writer_state_path.parents[2]
+    requested_state_root = Path(args.state_root).resolve()
+    if requested_state_root != writer_state_root.resolve():
+        raise StudyPreparationError(
+            "reviewer must share the writer runtime state root so the controller can "
+            "revalidate the terminal writer under its exact session lock"
+        )
+    review_seed_ref = ExternalCodexRuntime(writer_state_root).issue_review_seed(
+        str(writer_result["session_id"])
+    )
     launch = {
         "schema_version": "abyss_stack_external_codex_launch_v1",
         "launch_id": f"launch:model-study:{identity_token}:independent-reviewer",
@@ -2786,6 +2907,10 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         "workspace_expected_head": writer_launch["workspace_expected_head"],
         "workspace_initial_posture": "exact_baseline",
         "workspace_manifest_input_id": "review-workspace-manifest",
+        "workspace_projection_seed": {
+            "envelope_path": str(review_seed_ref["artifact_ref"]),
+            "envelope_digest": str(review_seed_ref["artifact_digest"]),
+        },
         "codex_executable": writer_launch["codex_executable"],
         "codex_executable_digest": writer_launch["codex_executable_digest"],
         "codex_home": writer_launch["codex_home"],
@@ -2812,6 +2937,14 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         "writer_workspace_manifest_digest": _file_digest(
             writer_workspace_manifest_path
         ),
+        "writer_actor_final_manifest_path": str(writer_workspace_manifest_path),
+        "writer_actor_final_manifest_digest": _file_digest(
+            writer_workspace_manifest_path
+        ),
+        "writer_actor_delta_path": str(writer_actor_delta_path),
+        "writer_actor_delta_digest": _file_digest(writer_actor_delta_path),
+        "review_seed_envelope_path": str(review_seed_ref["artifact_ref"]),
+        "review_seed_envelope_digest": str(review_seed_ref["artifact_digest"]),
         "review_workspace_manifest_path": str(review_manifest_path),
         "review_workspace_manifest_digest": _file_digest(review_manifest_path),
         "review_instance_id": review_instance_id,
@@ -2852,7 +2985,8 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
             "Preparation starts no Codex process.",
             "Writer and reviewer session/incarnation identities differ.",
             "Every writer immutable input keeps its stable input id and exact provenance.",
-            "The reviewer binds a distinct exact post-writer workspace manifest.",
+            "The reviewer binds the exact post-writer actor projection manifest and delta.",
+            "The reviewer source baseline remains a separate owner-source manifest.",
             "The reviewer receives the exact writer runtime result and model report.",
             "The reviewer binds its own canonical SDK v4 summon request and decision while retaining the writer request as immutable evidence.",
             "Usage is observed without token, time, turn, output, or cost ceilings.",

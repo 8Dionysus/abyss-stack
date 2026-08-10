@@ -93,6 +93,38 @@ must not pre-empt the namespace layer owned by Codex's sandbox. That failed
 candidate remains portability counterevidence rather than a model-quality
 result.
 
+The source-isolation boundary is instead a runtime-owned actor projection. The
+controller records a source manifest before and after descriptor-relative
+materialization, rejects unsupported entries, and builds a private
+source-independent `.git` body whose HEAD, index status, and binary diff match
+the admitted source. It fails closed on any source or parent-directory identity
+change before inference. Projection staging/publication is relative to a pinned
+parent descriptor, and the authoritative baseline is inventoried from the
+retained staging inode before the public coordinate is admitted. Cleanup is
+bound to that inode and refuses a replacement. Publication is non-replacing,
+and a committed rename is recorded before verification so a post-rename error
+can clean only the exact staged inode. Controller originals remain
+outside the actor permission contour; the actor sees only schema-validated
+derivative envelopes whose parsed JSON keys and values omit source and ancestor
+coordinates and reject collisions. Arbitrary text and serialized derivatives
+use bounded nested JSON-escape decoding across mixed text, slash/hex-case
+variants, surrogate pairs, and invalid-UTF-8 binary shadows; excessive depth fails closed. Sources beneath Codex's built-in minimal-read system roots are not
+admitted. The actor baseline/final
+manifests and canonical delta remain durable; the source checkout stays the
+owner acceptance surface, while model cwd/target/validation all point to the
+projection. A reviewer can reuse the exact writer projection only through a
+controller-issued envelope binding the terminal writer result and evidence,
+without reopening or resolving the historical source checkout. Reviewed A2A
+export requires `landing_review`, recomputes the envelope under the writer lock,
+and under both writer/reviewer locks revalidates the seed, both summon
+request/schema pairs, and all exported artifacts before constructing the
+payload. For inference, the worker
+binds the exact open projection descriptor at one stable child coordinate and
+retains its own descriptor through closeout; a pathname/device/inode mismatch
+is authority-blocking evidence. This keeps the source race proof at the
+owner/runtime projection boundary without adding an outer PID/network namespace
+or moving role authority into the runtime.
+
 External effects remain disabled. Runtime success is execution evidence only;
 model fit and net benefit still require `aoa-evals`, and landing acceptance
 still requires the target owner and user.
@@ -149,28 +181,33 @@ denying the checkout, but `codex exec` 0.146.0 did not apply the same profile
 selection. Two real xhigh closeout attempts therefore failed before pytest
 collection. The runtime must not present that argv shape as proven support.
 
-Instead, semantic target authority and Codex's technical cwd are separated.
-For a read-only binding, Codex runs its internal `workspace-write` sandbox over
-one runtime-owned attempt-local execution root and `TMPDIR`; the exact target
-checkout is supplied as a separate read-only source path outside writable
-roots. A real 0.146.0 Luna xhigh probe created a tempfile, received `EROFS` on
-direct and symlink-mediated target writes, and received `EXDEV` on hardlink and
-rename attempts. The runtime records the execution root, rejects overlap with
-the target, keeps network disabled, and retains byte-level final target
-manifests. This technical `workspace-write` flag is not repo-mutation authority:
-the model realization, binding, task effect, artifacts, and owner review remain
-read-only. A fresh owner packet must still prove the full closeout lane.
+Instead, semantic target authority and Codex's technical cwd are separated by
+a runtime-owned actor projection for both read-only and workspace-write
+bindings. The projection omits `.git`, is materialized only after a source
+manifest and rechecked against a second source manifest, and is the only model
+target/cwd/validation root. This earlier form has now been superseded: the
+projection includes a private source-independent Git body and is mounted from
+its exact open descriptor at a fixed child coordinate. Source identity or byte
+races fail before inference; a projection pathname replacement after open is
+detected at closeout without changing the inode executed by the child. Actor
+baseline/final manifests and a canonical delta
+are durable, while the source checkout remains unchanged and owner acceptance
+surface. This technical `workspace-write` flag is not repo-mutation authority:
+the model realization, binding, task effect, artifacts, and owner review still
+govern which projection paths may change. A fresh owner packet must still prove
+the full closeout lane.
 
-Every terminal result carries a runtime-owned exact final workspace-manifest
-reference. Independent review selects a distinct post-writer manifest as its
-admission baseline while preserving the writer baseline under its original
-immutable input ID. A repo-mutation writer cannot pass its coder binding or
-workspace-write permissions into review: the preparer requires a caller-named,
-plan-bound reviewer contract and a same-model/same-effort read-only realization.
-Because the final manifest does not exist when the writer begins, the report
-may cite it only through the reserved
+Current result v2 carries runtime-owned actor and source provenance, with final
+manifest/delta refs mandatory for successful returns. Independent review uses a
+controller-issued envelope that binds the writer session, terminal result,
+projection, final manifest, delta, and source manifest; reviewer task/evidence
+must bind that same writer. A repo-mutation writer cannot
+pass its coder binding or workspace-write permissions into review: the preparer
+requires a caller-named, plan-bound reviewer contract and a same-model/
+same-effort read-only realization. Because the final actor manifest does not
+exist when the writer begins, the report may cite it only through the reserved
 `runtime:workspace-final-manifest#<anchor>` identity; the controller resolves
-that identity after process exit against the exact finalization artifact.
+that identity after process exit against the exact actor finalization artifact.
 The controller also derives one session-local output schema from the admitted
 canonical report schema and pins exact task/incarnation IDs before inference.
 An unchanged read-only reviewer rejected only for an identity-field mismatch

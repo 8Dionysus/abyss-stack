@@ -10,6 +10,7 @@ under an explicit state root.
 from __future__ import annotations
 
 import argparse
+import base64
 import fcntl
 import hashlib
 import http.client
@@ -44,10 +45,23 @@ from aoa_sdk.control_plane.incarnation import (
     assert_agent_incarnation_binding_matches_plan,
 )
 
-
 PART_ROOT = Path(__file__).resolve().parent
+if str(PART_ROOT) not in sys.path:
+    sys.path.insert(0, str(PART_ROOT))
+from external_codex_projection import (  # noqa: E402
+    ProjectionError,
+    build_actor_delta,
+    build_actor_manifest,
+    build_actor_manifest_from_descriptor,
+    materialize_actor_projection,
+    materialize_actor_projection_from_seed,
+    remove_actor_projection,
+)
+
 PROFILE_PATH = PART_ROOT / "runtime-profile.v1.json"
 SUPERVISOR_PATH = PART_ROOT / "external_codex_supervisor.py"
+MOUNT_LAUNCHER_PATH = PART_ROOT / "external_codex_mount_launcher.py"
+ACTOR_EXECUTION_ROOT = Path("/tmp/aoa-external-actor-workspace")
 SCHEMA_ROOT = PART_ROOT / "schemas"
 LAUNCH_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-launch.schema.json"
 TASK_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-task.schema.json"
@@ -64,12 +78,20 @@ PARENT_OBLIGATION_SCHEMA_PATH = (
     SCHEMA_ROOT / "external-codex-parent-obligation.schema.json"
 )
 PARENT_YIELD_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-parent-yield.schema.json"
-PARENT_REENTRY_SCHEMA_PATH = (
-    SCHEMA_ROOT / "external-codex-parent-reentry.schema.json"
-)
+PARENT_REENTRY_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-parent-reentry.schema.json"
 REENTRY_STATE_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-reentry-state.schema.json"
 WORKSPACE_MANIFEST_SCHEMA_PATH = (
     SCHEMA_ROOT / "external-codex-workspace-manifest.schema.json"
+)
+ACTOR_MANIFEST_SCHEMA_PATH = (
+    SCHEMA_ROOT / "external-codex-actor-workspace-manifest.schema.json"
+)
+ACTOR_DELTA_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-actor-delta.schema.json"
+REVIEW_SEED_ENVELOPE_SCHEMA_PATH = (
+    SCHEMA_ROOT / "external-codex-review-seed-envelope.schema.json"
+)
+ACTOR_INPUT_ENVELOPE_SCHEMA_PATH = (
+    SCHEMA_ROOT / "external-codex-actor-input-envelope.schema.json"
 )
 SDK_SUMMON_REQUEST_SCHEMA_REF = (
     "mechanics/checkpoint/parts/child-task-reentry/schemas/"
@@ -78,7 +100,8 @@ SDK_SUMMON_REQUEST_SCHEMA_REF = (
 SDK_SUMMON_REQUEST_SCHEMA_VERSION = "urn:aoa-sdk:a2a:summon-request:v4"
 
 LEGACY_STATE_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v1"
-STATE_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v2"
+LEGACY_STATE_V2_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v2"
+STATE_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v3"
 RESPONSE_SCHEMA_VERSION = "abyss_stack_external_codex_response_v1"
 LEGACY_REENTRY_STATE_SCHEMA_VERSION = "abyss_stack_external_codex_reentry_state_v1"
 REENTRY_STATE_SCHEMA_VERSION = "abyss_stack_external_codex_reentry_state_v2"
@@ -86,6 +109,7 @@ MAX_CONTROL_BYTES = 16 * 1024 * 1024
 MAX_ROLE_BYTES = 2 * 1024 * 1024
 MAX_EVENT_LINE_BYTES = 8 * 1024 * 1024
 MAX_MCP_PROXY_REQUEST_BYTES = 16 * 1024 * 1024
+MAX_JSON_ESCAPE_LAYERS = 32
 MCP_PROXY_CONNECT_TIMEOUT_SECONDS = 15
 SHELL_NESTING_INSPECTION_LIMIT = 4
 FOREGROUND_OBSERVATION_INTERVAL_SECONDS = 0.25
@@ -392,7 +416,9 @@ def _close_mcp_credential_proxies(proxies: list[_McpCredentialProxy]) -> None:
 RESUMABLE_STATES = {"paused", "interrupted", "review_required"}
 REVIEW_REPORT_RECOVERY_FAILURES = {"model_report_identity_mismatch"}
 SECRET_ENV_RE = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)", re.I)
-SOURCE_LINE_ANCHOR_RE = re.compile(r"^L(?P<start>[1-9][0-9]*)(?:-L(?P<end>[1-9][0-9]*))?$")
+SOURCE_LINE_ANCHOR_RE = re.compile(
+    r"^L(?P<start>[1-9][0-9]*)(?:-L(?P<end>[1-9][0-9]*))?$"
+)
 INPUT_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SHELL_NAMES = {"bash", "dash", "sh", "zsh"}
 SHELL_SEPARATORS = {"&", "&&", ";", "|", "||"}
@@ -424,6 +450,8 @@ def _plan_binds_active_summon_request(
         return typed == [request_ref]
     generic = [item for item in plan.scenario_binding.input_refs if item == request_ref]
     return generic == [request_ref]
+
+
 SECRET_FILE_NAMES = {
     ".env",
     ".netrc",
@@ -745,6 +773,19 @@ GIT_OPAQUE_GLOBAL_OPTIONS = {
     "--work-tree",
 }
 SYSTEM_PATH_PREFIXES = ("/etc", "/opt", "/usr", "/var/lib", "/var/run")
+CODEX_MINIMAL_READ_ROOTS = tuple(
+    Path(value)
+    for value in (
+        "/bin",
+        "/sbin",
+        "/usr",
+        "/etc",
+        "/lib",
+        "/lib64",
+        "/nix/store",
+        "/run/current-system/sw",
+    )
+)
 TRUSTED_EXECUTABLE_PREFIXES = (
     Path("/bin"),
     Path("/sbin"),
@@ -777,6 +818,57 @@ def parse_timestamp(value: str) -> datetime:
 
 def sha256_bytes(payload: bytes) -> str:
     return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+
+def _checked_actor_manifest(
+    projection_root: str | Path,
+    *,
+    source_manifest_digest: str,
+    source_git_head: str,
+    projection_fd: int | None = None,
+) -> dict[str, Any]:
+    """Translate projection inventory failures into runtime-owned errors."""
+
+    try:
+        if projection_fd is None:
+            return build_actor_manifest(
+                projection_root,
+                source_manifest_digest=source_manifest_digest,
+                source_git_head=source_git_head,
+            )
+        return build_actor_manifest_from_descriptor(
+            projection_fd,
+            workspace_path=projection_root,
+            source_manifest_digest=source_manifest_digest,
+            source_git_head=source_git_head,
+        )
+    except ProjectionError as exc:
+        raise ExternalCodexRuntimeError(
+            "actor_projection_observation_gap",
+            str(exc),
+        ) from exc
+
+
+def _assert_descriptor_coordinate(projection_fd: int, projection_root: Path) -> None:
+    """Prove that a durable pathname still names the exact open projection."""
+
+    try:
+        descriptor_stat = os.fstat(projection_fd)
+        coordinate_stat = os.stat(projection_root, follow_symlinks=False)
+    except OSError as exc:
+        raise ExternalCodexRuntimeError(
+            "actor_projection_coordinate_drift",
+            "runtime-owned actor projection coordinate became unavailable",
+        ) from exc
+    if (
+        not stat.S_ISDIR(coordinate_stat.st_mode)
+        or descriptor_stat.st_dev != coordinate_stat.st_dev
+        or descriptor_stat.st_ino != coordinate_stat.st_ino
+    ):
+        raise ExternalCodexRuntimeError(
+            "actor_projection_coordinate_drift",
+            "runtime-owned actor projection pathname no longer names its open inode",
+        )
 
 
 def sha256_file(path: Path) -> str:
@@ -982,9 +1074,7 @@ def specialize_report_schema(
     transition = properties.get("transition")
     finding_items = findings.get("items") if isinstance(findings, dict) else None
     finding_properties = (
-        finding_items.get("properties")
-        if isinstance(finding_items, dict)
-        else None
+        finding_items.get("properties") if isinstance(finding_items, dict) else None
     )
     transition_properties = (
         transition.get("properties") if isinstance(transition, dict) else None
@@ -1080,9 +1170,10 @@ def _snapshot_artifact_ref(
                     "runtime_result_evidence_invalid",
                     "prior runtime result evidence is not a regular file",
                 )
-            with os.fdopen(source_descriptor, "rb") as source_handle, os.fdopen(
-                descriptor, "wb"
-            ) as target_handle:
+            with (
+                os.fdopen(source_descriptor, "rb") as source_handle,
+                os.fdopen(descriptor, "wb") as target_handle,
+            ):
                 source_descriptor = -1
                 descriptor = -1
                 for chunk in iter(lambda: source_handle.read(1024 * 1024), b""):
@@ -1193,6 +1284,15 @@ def _verified_artifact_ref_path(
     return path
 
 
+def _verify_a2a_export_snapshot(
+    refs: Sequence[tuple[str, Mapping[str, Any]]],
+) -> None:
+    """Revalidate every byte reference immediately before A2A publication."""
+
+    for label, ref in refs:
+        _verified_artifact_ref_path(ref, label=label)
+
+
 def _load_verified_json_ref(
     ref: Mapping[str, Any],
     *,
@@ -1261,7 +1361,8 @@ def _owned_process_group_members(pgid: int, leader_start_ticks: int) -> tuple[in
 
     if pgid <= 1 or leader_start_ticks <= 0:
         raise ExternalCodexRuntimeError(
-            "codex_process_identity_invalid", "Codex process-group identity is incomplete"
+            "codex_process_identity_invalid",
+            "Codex process-group identity is incomplete",
         )
     leader = _process_group_identity(pgid)
     if leader is not None and leader[0] != "Z" and leader[3] != leader_start_ticks:
@@ -1408,7 +1509,9 @@ def _wait_for_process_identity_receipt(
         or launcher[3] != supervisor_pid
         or launcher[4] != launcher_start_ticks
     )
-    expected_codex_parent = supervisor_pid if codex_pid == launcher_pid else launcher_pid
+    expected_codex_parent = (
+        supervisor_pid if codex_pid == launcher_pid else launcher_pid
+    )
     codex_mismatch = codex is not None and (
         codex[1] != expected_codex_parent
         or codex[2] != supervisor_pid
@@ -1452,12 +1555,7 @@ def _session_token(session_id: str) -> str:
 
 def _relative_path_is_allowed(path: str, allowed: Sequence[str]) -> bool:
     def safe_parts(value: str) -> tuple[str, ...] | None:
-        if (
-            not value
-            or value.startswith("/")
-            or "\\" in value
-            or "\0" in value
-        ):
+        if not value or value.startswith("/") or "\\" in value or "\0" in value:
             return None
         parts = tuple(value.split("/"))
         if any(part in {"", ".", ".."} for part in parts):
@@ -1534,6 +1632,7 @@ def _validate_source_evidence_ref(
     workspace: str | Path,
     *,
     source_evidence_paths: Sequence[str],
+    workspace_fd: int | None = None,
 ) -> None:
     """Validate one anchored source reference against exact workspace bytes."""
 
@@ -1569,28 +1668,65 @@ def _validate_source_evidence_ref(
             "model_report_source_evidence_secret_shaped",
             "model report source evidence names a secret-shaped path",
         )
-    root = Path(workspace).resolve()
-    candidate = root.joinpath(*parts)
-    try:
-        resolved = candidate.resolve(strict=True)
-        resolved.relative_to(root)
-    except (OSError, ValueError) as exc:
-        raise ExternalCodexRuntimeError(
-            "model_report_source_evidence_unavailable",
-            f"model report source evidence is absent or outside the workspace: {relative}",
-        ) from exc
-    if resolved != candidate or candidate.is_symlink() or not candidate.is_file():
-        raise ExternalCodexRuntimeError(
-            "model_report_source_evidence_unavailable",
-            f"model report source evidence is not a regular workspace file: {relative}",
-        )
-    try:
-        raw = read_bounded(candidate)
-    except ExternalCodexRuntimeError as exc:
-        raise ExternalCodexRuntimeError(
-            "model_report_source_evidence_unavailable",
-            f"model report source evidence cannot be inspected: {relative}",
-        ) from exc
+    if workspace_fd is None:
+        root = Path(workspace).resolve()
+        candidate = root.joinpath(*parts)
+        try:
+            resolved = candidate.resolve(strict=True)
+            resolved.relative_to(root)
+        except (OSError, ValueError) as exc:
+            raise ExternalCodexRuntimeError(
+                "model_report_source_evidence_unavailable",
+                f"model report source evidence is absent or outside the workspace: {relative}",
+            ) from exc
+        if resolved != candidate or candidate.is_symlink() or not candidate.is_file():
+            raise ExternalCodexRuntimeError(
+                "model_report_source_evidence_unavailable",
+                f"model report source evidence is not a regular workspace file: {relative}",
+            )
+        try:
+            raw = read_bounded(candidate)
+        except ExternalCodexRuntimeError as exc:
+            raise ExternalCodexRuntimeError(
+                "model_report_source_evidence_unavailable",
+                f"model report source evidence cannot be inspected: {relative}",
+            ) from exc
+    else:
+        directory_fd = os.dup(workspace_fd)
+        file_fd = -1
+        try:
+            directory_flags = os.O_PATH | os.O_CLOEXEC | os.O_DIRECTORY
+            file_flags = os.O_RDONLY | os.O_CLOEXEC
+            if hasattr(os, "O_NOFOLLOW"):
+                directory_flags |= os.O_NOFOLLOW
+                file_flags |= os.O_NOFOLLOW
+            for component in parts[:-1]:
+                next_fd = os.open(component, directory_flags, dir_fd=directory_fd)
+                os.close(directory_fd)
+                directory_fd = next_fd
+            file_fd = os.open(parts[-1], file_flags, dir_fd=directory_fd)
+            if not stat.S_ISREG(os.fstat(file_fd).st_mode):
+                raise OSError("source evidence is not a regular file")
+            chunks: list[bytes] = []
+            remaining = MAX_CONTROL_BYTES + 1
+            while remaining:
+                chunk = os.read(file_fd, min(1024 * 1024, remaining))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            raw = b"".join(chunks)
+            if len(raw) > MAX_CONTROL_BYTES:
+                raise OSError("source evidence exceeds the bounded read limit")
+        except OSError as exc:
+            raise ExternalCodexRuntimeError(
+                "model_report_source_evidence_unavailable",
+                f"model report source evidence cannot be inspected: {relative}",
+            ) from exc
+        finally:
+            if file_fd >= 0:
+                os.close(file_fd)
+            os.close(directory_fd)
     _validate_evidence_anchor(
         raw,
         anchor,
@@ -1713,6 +1849,7 @@ def _validate_report_evidence_ref(
     state: Mapping[str, Any],
     source_evidence_paths: Sequence[str],
     runtime_evidence_paths: Mapping[str, Path],
+    workspace_fd: int | None = None,
 ) -> None:
     """Admit source, immutable-input, or reserved runtime evidence schemes."""
 
@@ -1721,6 +1858,7 @@ def _validate_report_evidence_ref(
             value,
             state["workspace_path"],
             source_evidence_paths=source_evidence_paths,
+            workspace_fd=workspace_fd,
         )
         return
     if value.startswith("immutable:"):
@@ -1871,9 +2009,7 @@ def _pattern_reader_git_config_file_access(tokens: Sequence[str]) -> bool:
         if (
             executable == "grep"
             and (lowered == "-e" or _long_option_prefix(value, "--regexp"))
-        ) or (
-            executable == "rg" and lowered in {"-e", "--regexp"}
-        ):
+        ) or (executable == "rg" and lowered in {"-e", "--regexp"}):
             explicit_program = True
             index += 1 if "=" in value else 2
             continue
@@ -1905,9 +2041,7 @@ def _pattern_reader_git_config_file_access(tokens: Sequence[str]) -> bool:
             explicit_program = True
             index += 1
             continue
-        if executable == "sed" and (
-            (lowered.startswith("-e") and lowered != "-e")
-        ):
+        if executable == "sed" and (lowered.startswith("-e") and lowered != "-e"):
             explicit_program = True
             index += 1
             continue
@@ -2096,7 +2230,12 @@ def _generic_mutator_git_metadata_access(tokens: Sequence[str]) -> bool:
             index += 1
             continue
         for option in separate_path_options:
-            if option.startswith("-") and not option.startswith("--") and lowered.startswith(option) and lowered != option:
+            if (
+                option.startswith("-")
+                and not option.startswith("--")
+                and lowered.startswith(option)
+                and lowered != option
+            ):
                 if _git_admin_metadata_path(value[len(option) :]):
                     return True
                 break
@@ -2127,8 +2266,7 @@ def _shell_inline_body(tokens: Sequence[str]) -> str | None:
                 len(shell_option) >= len("--i")
                 and "--init-file".startswith(shell_option)
             ) or (
-                len(shell_option) >= len("--rc")
-                and "--rcfile".startswith(shell_option)
+                len(shell_option) >= len("--rc") and "--rcfile".startswith(shell_option)
             ):
                 return None
         if token.startswith("--"):
@@ -2247,16 +2385,16 @@ def _executable_path_is_opaque(value: str) -> bool:
     if executable not in CLASSIFIABLE_DIRECT_EXECUTABLES:
         return True
     resolved_value = (
-        value
-        if "/" in value
-        else shutil.which(value, path=CODEX_EXECUTABLE_PATH)
+        value if "/" in value else shutil.which(value, path=CODEX_EXECUTABLE_PATH)
     )
     if not resolved_value:
         return True
     candidate = Path(resolved_value)
     if not candidate.is_absolute() or ".." in candidate.parts:
         return True
-    return not any(candidate.is_relative_to(root) for root in TRUSTED_EXECUTABLE_PREFIXES)
+    return not any(
+        candidate.is_relative_to(root) for root in TRUSTED_EXECUTABLE_PREFIXES
+    )
 
 
 def _shell_tokenizations(command: str) -> tuple[tuple[str, ...], ...]:
@@ -2366,7 +2504,11 @@ def _git_subcommand(tokens: Sequence[str]) -> tuple[str | None, tuple[str, ...]]
         if token in options_with_value:
             index += 2
             continue
-        if any(token.startswith(option + "=") for option in options_with_value if option.startswith("--")):
+        if any(
+            token.startswith(option + "=")
+            for option in options_with_value
+            if option.startswith("--")
+        ):
             index += 1
             continue
         if token.startswith("-"):
@@ -2439,9 +2581,8 @@ def _git_revision_walk_has_signature_dispatch(git_args: Sequence[str]) -> bool:
             break
         option, separator, attached_value = token.partition("=")
         lowered_option = option.lower()
-        if (
-            len(lowered_option) >= len("--show-s")
-            and "--show-signature".startswith(lowered_option)
+        if len(lowered_option) >= len("--show-s") and "--show-signature".startswith(
+            lowered_option
         ):
             return True
         is_format = lowered_option == "--format"
@@ -2560,17 +2701,15 @@ def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
         )
         if operation in {"delete", "drop", "expire", "write"}:
             return True
-        if (
-            operation in {None, "show"}
-        ) and _git_revision_walk_has_signature_dispatch(git_args):
+        if (operation in {None, "show"}) and _git_revision_walk_has_signature_dispatch(
+            git_args
+        ):
             return True
     if subcommand == "for-each-ref" and _git_for_each_ref_has_signature_dispatch(
         git_args
     ):
         return True
-    if subcommand == "rev-list" and _git_revision_walk_has_signature_dispatch(
-        git_args
-    ):
+    if subcommand == "rev-list" and _git_revision_walk_has_signature_dispatch(git_args):
         return True
     if subcommand in GIT_CONFIG_DRIVEN_HELPER_SUBCOMMANDS:
         return True
@@ -2588,9 +2727,7 @@ def _git_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
         for value in git_args
     ):
         return True
-    if subcommand == "grep" and "--textconv" in {
-        value.lower() for value in git_args
-    }:
+    if subcommand == "grep" and "--textconv" in {value.lower() for value in git_args}:
         return True
     if subcommand == "hash-object":
         try:
@@ -2675,9 +2812,11 @@ def _jq_has_opaque_environment_access(tokens: Sequence[str]) -> bool:
         if token == "--":
             index += 1
             break
-        if lowered in {"-f", "-l", "--from-file", "--run-tests"} or (
-            lowered.startswith(("-f", "-l")) and len(lowered) > 2
-        ) or lowered.startswith(("--from-file=", "--run-tests=")):
+        if (
+            lowered in {"-f", "-l", "--from-file", "--run-tests"}
+            or (lowered.startswith(("-f", "-l")) and len(lowered) > 2)
+            or lowered.startswith(("--from-file=", "--run-tests="))
+        ):
             return True
         if lowered in {"--arg", "--argjson", "--rawfile", "--slurpfile"}:
             index += 3
@@ -2692,10 +2831,13 @@ def _jq_has_opaque_environment_access(tokens: Sequence[str]) -> bool:
     if index >= len(tokens):
         return False
     program = tokens[index]
-    return re.search(
-        r"(?<![A-Za-z0-9_.$\"'])env(?![A-Za-z0-9_])|\$ENV(?![A-Za-z0-9_])",
-        program,
-    ) is not None
+    return (
+        re.search(
+            r"(?<![A-Za-z0-9_.$\"'])env(?![A-Za-z0-9_])|\$ENV(?![A-Za-z0-9_])",
+            program,
+        )
+        is not None
+    )
 
 
 def _sort_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
@@ -2756,16 +2898,58 @@ def _validation_wrapper_argv(
     )
 
 
+def _descriptor_validation_cwd(
+    workspace_coordinate: str | Path,
+    command_spec: Mapping[str, Any],
+) -> Path:
+    """Map an already-admitted relative cwd onto the child's stable coordinate."""
+
+    root = Path(workspace_coordinate)
+    relative = str(command_spec["cwd"])
+    if (
+        not root.is_absolute()
+        or Path(relative).is_absolute()
+        or ".." in Path(relative).parts
+    ):
+        raise ExternalCodexRuntimeError(
+            "task_validation_cwd_invalid",
+            "descriptor-bound validation cwd is outside the child coordinate",
+        )
+    return root if relative == "." else root.joinpath(*Path(relative).parts)
+
+
+def _descriptor_validation_wrapper_argv(
+    workspace_coordinate: str | Path,
+    command_spec: Mapping[str, Any],
+) -> tuple[str, ...]:
+    cwd = _descriptor_validation_cwd(workspace_coordinate, command_spec)
+    return (
+        "/usr/bin/env",
+        "-C",
+        str(cwd),
+        "--",
+        *(str(value) for value in command_spec["argv"]),
+    )
+
+
 def _annotate_validation_executions(
     commands: Sequence[Mapping[str, Any]],
     *,
     task: Mapping[str, Any],
     workspace: str | Path,
+    descriptor_bound_coordinate: bool = False,
 ) -> list[dict[str, Any]]:
     """Attach runtime-derived argv/cwd provenance to exact validation events."""
 
     specs = tuple(task["validation_commands"])
-    wrappers = tuple(_validation_wrapper_argv(workspace, item) for item in specs)
+    if descriptor_bound_coordinate:
+        root = Path(workspace)
+        wrappers = tuple(
+            _descriptor_validation_wrapper_argv(root, item) for item in specs
+        )
+    else:
+        root = _validation_cwd(workspace, {"cwd": "."})
+        wrappers = tuple(_validation_wrapper_argv(workspace, item) for item in specs)
     annotated: list[dict[str, Any]] = []
     for item in commands:
         record = {
@@ -2796,7 +2980,11 @@ def _annotate_validation_executions(
                 {
                     "validation_command_id": str(spec["command_id"]),
                     "validation_argv": [str(value) for value in spec["argv"]],
-                    "validation_cwd": str(_validation_cwd(workspace, spec)),
+                    "validation_cwd": str(
+                        _descriptor_validation_cwd(root, spec)
+                        if descriptor_bound_coordinate
+                        else _validation_cwd(workspace, spec)
+                    ),
                     "validation_wrapper_argv": list(wrapper),
                 }
             )
@@ -2845,9 +3033,15 @@ def _command_effects(command: str) -> set[str]:
             elif executable == "jq" and _jq_has_opaque_environment_access(segment):
                 detected.add("secret_access")
             elif executable == "gh":
-                if any(args[index : index + 2] == ("pr", "create") for index in range(len(args))):
+                if any(
+                    args[index : index + 2] == ("pr", "create")
+                    for index in range(len(args))
+                ):
                     detected.add("pull_request")
-                elif any(args[index : index + 2] == ("pr", "merge") for index in range(len(args))):
+                elif any(
+                    args[index : index + 2] == ("pr", "merge")
+                    for index in range(len(args))
+                ):
                     detected.add("merge")
                 elif "release" in args:
                     detected.add("release")
@@ -2858,54 +3052,74 @@ def _command_effects(command: str) -> set[str]:
                 or (executable == "twine" and args[:1] == ("upload",))
                 or (executable in {"docker", "podman"} and "push" in args)
                 or executable in {"scp", "sftp"}
-                or (executable == "rsync" and any(":" in value for value in segment[1:]))
+                or (
+                    executable == "rsync" and any(":" in value for value in segment[1:])
+                )
                 or executable in {"curl", "wget"}
             ):
                 detected.add("publication")
 
             if (
-                executable == "systemctl"
-                and any(
-                    value
+                (
+                    executable == "systemctl"
+                    and any(
+                        value
+                        in {
+                            "daemon-reload",
+                            "disable",
+                            "enable",
+                            "mask",
+                            "reload",
+                            "restart",
+                            "start",
+                            "stop",
+                            "unmask",
+                        }
+                        for value in args
+                    )
+                )
+                or (
+                    executable in {"docker", "podman"}
+                    and any(
+                        value
+                        in {
+                            "down",
+                            "kill",
+                            "rm",
+                            "restart",
+                            "run",
+                            "start",
+                            "stop",
+                            "up",
+                        }
+                        for value in args
+                    )
+                )
+                or (
+                    executable == "kubectl"
+                    and args[:1]
                     in {
-                        "daemon-reload",
-                        "disable",
-                        "enable",
-                        "mask",
-                        "reload",
-                        "restart",
-                        "start",
-                        "stop",
-                        "unmask",
+                        ("apply",),
+                        ("create",),
+                        ("delete",),
+                        ("patch",),
+                        ("replace",),
+                        ("rollout",),
+                        ("scale",),
                     }
-                    for value in args
                 )
-            ) or (
-                executable in {"docker", "podman"}
-                and any(
-                    value
-                    in {"down", "kill", "rm", "restart", "run", "start", "stop", "up"}
-                    for value in args
-                )
-            ) or (
-                executable == "kubectl"
-                and args[:1]
-                in {
-                    ("apply",),
-                    ("create",),
-                    ("delete",),
-                    ("patch",),
-                    ("replace",),
-                    ("rollout",),
-                    ("scale",),
-                }
-            ) or executable in {"launchctl", "service", "supervisorctl"}:
+                or executable in {"launchctl", "service", "supervisorctl"}
+            ):
                 detected.add("service_mutation")
 
-            if executable in {"op", "pass", "secret-tool", "vault"} or (
-                executable in {"aws", "gcloud"}
-                and any("secret" in value for value in args)
-            ) or executable in {"printenv"}:
+            if (
+                executable in {"op", "pass", "secret-tool", "vault"}
+                or (
+                    executable in {"aws", "gcloud"}
+                    and any("secret" in value for value in args)
+                )
+                or executable in {"printenv"}
+            ):
                 detected.add("secret_access")
             if _direct_git_config_file_access(segment):
                 detected.add("secret_access")
@@ -2998,8 +3212,7 @@ def _command_has_unclassified_indirection(command: str) -> bool:
             if _generic_mutator_git_metadata_access(segment):
                 return True
             if executable == "find" and any(
-                value in {"-exec", "-execdir", "-ok", "-okdir"}
-                for value in args
+                value in {"-exec", "-execdir", "-ok", "-okdir"} for value in args
             ):
                 return True
             if executable in {"eval", "xargs"}:
@@ -3067,11 +3280,7 @@ def _controller_git_environment(workspace: Path) -> dict[str, str]:
         )
     try:
         keys = sorted(
-            {
-                raw.decode("utf-8")
-                for raw in completed.stdout.split(b"\0")
-                if raw
-            }
+            {raw.decode("utf-8") for raw in completed.stdout.split(b"\0") if raw}
         )
     except UnicodeDecodeError as exc:
         raise ExternalCodexRuntimeError(
@@ -3176,7 +3385,11 @@ def _repository_git_output(
         env=_controller_git_environment(workspace),
     )
     value = completed.stdout.strip()
-    if completed.returncode not in allowed_returncodes or "\n" in value or "\r" in value:
+    if (
+        completed.returncode not in allowed_returncodes
+        or "\n" in value
+        or "\r" in value
+    ):
         raise ExternalCodexRuntimeError(
             "workspace_git_metadata_unavailable",
             "cannot resolve one bounded repository Git coordinate",
@@ -3222,9 +3435,7 @@ def _git_config_quoted(value: str) -> str:
 def _sanitized_repository_config(workspace: Path) -> str:
     """Retain only structural Git settings with closed value grammars."""
 
-    format_version = _repository_config_value(
-        workspace, "core.repositoryformatversion"
-    )
+    format_version = _repository_config_value(workspace, "core.repositoryformatversion")
     if format_version is None:
         format_version = "0"
     if format_version not in {"0", "1"}:
@@ -3324,9 +3535,7 @@ def _sanitized_repository_config(workspace: Path) -> str:
     ]
     if selected_extensions:
         lines.append("[extensions]")
-        lines.extend(
-            f"\t{name} = {value}" for _, name, value in selected_extensions
-        )
+        lines.extend(f"\t{name} = {value}" for _, name, value in selected_extensions)
     lines.extend(
         (
             "[diff]",
@@ -3415,15 +3624,15 @@ def _current_mount_aliases(
             relative = target.relative_to(mountpoint)
         except ValueError:
             continue
-        covering.append((len(mountpoint.parts), mount_id, entry_device, root / relative))
+        covering.append(
+            (len(mountpoint.parts), mount_id, entry_device, root / relative)
+        )
     if not covering:
         raise ExternalCodexRuntimeError(
             "workspace_git_metadata_unavailable",
             "repository config has no matching current mount coordinate",
         )
-    _, _, device, internal_path = max(
-        covering, key=lambda item: (item[0], item[1])
-    )
+    _, _, device, internal_path = max(covering, key=lambda item: (item[0], item[1]))
     if target_stat is not None and device != (
         f"{os.major(target_stat.st_dev)}:{os.minor(target_stat.st_dev)}"
     ):
@@ -3567,8 +3776,7 @@ def _private_directory_views(
                     "private Git metadata view entry became unavailable",
                 ) from exc
             if source.is_symlink() or not (
-                stat.S_ISREG(source_stat.st_mode)
-                or stat.S_ISDIR(source_stat.st_mode)
+                stat.S_ISREG(source_stat.st_mode) or stat.S_ISDIR(source_stat.st_mode)
             ):
                 raise ExternalCodexRuntimeError(
                     "actor_git_mask_unavailable",
@@ -3579,9 +3787,7 @@ def _private_directory_views(
                     "source": str(source),
                     "target": str(parent / source.name),
                     "kind": (
-                        "directory"
-                        if stat.S_ISDIR(source_stat.st_mode)
-                        else "file"
+                        "directory" if stat.S_ISDIR(source_stat.st_mode) else "file"
                     ),
                     "identity": _private_view_identity(source_stat),
                 }
@@ -3611,95 +3817,107 @@ def _run_actor_masked_command(
             "actor_git_mask_unavailable",
             "external actor Git mask lacks its private directory views",
         )
+    executable = Path(str(command_argv[0])) if command_argv else Path()
+    if (
+        not executable.is_absolute()
+        or not executable.is_file()
+        or executable.resolve() != executable
+        or not os.access(executable, os.X_OK)
+    ):
+        raise ExternalCodexRuntimeError(
+            "actor_git_mask_unavailable",
+            "masked controller command is not one exact executable",
+        )
+    contour_paths = {
+        "supervisor": SUPERVISOR_PATH,
+        "mount_launcher": MOUNT_LAUNCHER_PATH,
+        "mount_wrapper": MOUNT_WRAPPER_PATH,
+        "python": Path(sys.executable).resolve(),
+    }
+    if any(
+        not path.is_absolute()
+        or not path.is_file()
+        or path.resolve() != path
+        or (
+            label not in {"supervisor", "mount_launcher"}
+            and not os.access(path, os.X_OK)
+        )
+        for label, path in contour_paths.items()
+    ):
+        raise ExternalCodexRuntimeError(
+            "actor_git_mask_unavailable",
+            "masked controller command contour is unavailable",
+        )
     command = [
+        str(contour_paths["python"]),
+        str(SUPERVISOR_PATH),
+        "--parent-pid",
+        str(os.getpid()),
+        "--term-timeout-seconds",
+        "3.0",
+        "--kill-timeout-seconds",
+        "3.0",
+        "--executable-digest",
+        sha256_file(executable),
+        "--mount-wrapper",
         str(MOUNT_WRAPPER_PATH),
-        "--die-with-parent",
-        "--dev-bind",
-        "/",
-        "/",
+        "--mount-wrapper-digest",
+        sha256_file(contour_paths["mount_wrapper"]),
+        "--mount-launcher-digest",
+        sha256_file(contour_paths["mount_launcher"]),
     ]
-    descriptors: list[int] = []
+    view_targets: set[Path] = set()
+    for view in views:
+        target = Path(str(view.get("target", "")))
+        identity = view.get("identity")
+        entries = view.get("entries")
+        if (
+            not target.is_absolute()
+            or not isinstance(identity, dict)
+            or not isinstance(entries, list)
+        ):
+            raise ExternalCodexRuntimeError(
+                "actor_git_mask_unavailable",
+                "private Git metadata view has an invalid shape",
+            )
+        _assert_private_view_identity(target, identity, directory=True)
+        view_targets.add(target)
+        command.extend(
+            (
+                "--private-directory-view",
+                json.dumps(view, sort_keys=True, separators=(",", ":")),
+            )
+        )
+    for mask in masks:
+        source = Path(str(mask.get("source", "")))
+        target = Path(str(mask.get("target", "")))
+        digest = str(mask.get("digest", ""))
+        if (
+            target.parent not in view_targets
+            or not source.is_file()
+            or source.is_symlink()
+            or sha256_file(source) != digest
+        ):
+            raise ExternalCodexRuntimeError(
+                "actor_git_mask_unavailable",
+                "external actor Git mask changed before containment",
+            )
+        command.extend(("--read-only-mask", str(source), str(target), digest))
+    command.extend(("--", *command_argv))
     try:
-        for view in views:
-            target = Path(str(view.get("target", "")))
-            identity = view.get("identity")
-            entries = view.get("entries")
-            if (
-                not target.is_absolute()
-                or not isinstance(identity, dict)
-                or not isinstance(entries, list)
-            ):
-                raise ExternalCodexRuntimeError(
-                    "actor_git_mask_unavailable",
-                    "private Git metadata view has an invalid shape",
-                )
-            _assert_private_view_identity(target, identity, directory=True)
-            command.extend(("--tmpfs", str(target)))
-            for entry in entries:
-                source = Path(str(entry.get("source", "")))
-                entry_target = Path(str(entry.get("target", "")))
-                kind = str(entry.get("kind", ""))
-                entry_identity = entry.get("identity")
-                if (
-                    not source.is_absolute()
-                    or entry_target.parent != target
-                    or entry_target.name != source.name
-                    or kind not in {"file", "directory"}
-                    or not isinstance(entry_identity, dict)
-                ):
-                    raise ExternalCodexRuntimeError(
-                        "actor_git_mask_unavailable",
-                        "private Git metadata entry has an invalid shape",
-                    )
-                _assert_private_view_identity(
-                    source,
-                    entry_identity,
-                    directory=kind == "directory",
-                )
-                flags = os.O_RDONLY | os.O_CLOEXEC
-                if hasattr(os, "O_NOFOLLOW"):
-                    flags |= os.O_NOFOLLOW
-                if kind == "directory" and hasattr(os, "O_DIRECTORY"):
-                    flags |= os.O_DIRECTORY
-                descriptor = os.open(source, flags)
-                descriptors.append(descriptor)
-                if _private_view_identity(os.fstat(descriptor)) != entry_identity:
-                    raise ExternalCodexRuntimeError(
-                        "actor_git_mask_unavailable",
-                        "private Git metadata entry changed while being opened",
-                    )
-                command.extend(
-                    ("--ro-bind-fd", str(descriptor), str(entry_target))
-                )
-        view_targets = {Path(str(view["target"])) for view in views}
-        for mask in masks:
-            source = Path(str(mask.get("source", "")))
-            target = Path(str(mask.get("target", "")))
-            digest = str(mask.get("digest", ""))
-            if (
-                target.parent not in view_targets
-                or not source.is_file()
-                or source.is_symlink()
-                or sha256_file(source) != digest
-            ):
-                raise ExternalCodexRuntimeError(
-                    "actor_git_mask_unavailable",
-                    "external actor Git mask changed before containment",
-                )
-            command.extend(("--ro-bind", str(source), str(target)))
-        command.extend(("--", *command_argv))
         return subprocess.run(
             command,
-            pass_fds=tuple(descriptors),
             text=True,
             capture_output=True,
             check=False,
             timeout=30,
             env=dict(environment),
         )
-    finally:
-        for descriptor in descriptors:
-            os.close(descriptor)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ExternalCodexRuntimeError(
+            "actor_git_mask_unavailable",
+            "masked controller command containment failed",
+        ) from exc
 
 
 def _masked_git_command(
@@ -3824,25 +4042,69 @@ def _prepare_actor_git_mask(workspace: Path, scratch_root: Path) -> dict[str, An
     return actor_git_mask
 
 
-def _actor_codex_permission_profile(actor_git_mask: Mapping[str, Any]) -> str:
+def _actor_codex_permission_profile(
+    actor_git_mask: Mapping[str, Any] | None = None,
+    *,
+    sanitized_config_path: Path | None = None,
+    execution_root: Path | None = None,
+    readable_paths: Sequence[Path] = (),
+    writable_paths: Sequence[Path] = (),
+    denied_paths: Sequence[Path] = (),
+    workspace_access: Literal["read", "write"] = "write",
+) -> str:
     """Build the one named Codex profile shared by preflight and execution."""
 
-    sanitized_config_path = Path(
-        str(actor_git_mask.get("sanitized_config_path", ""))
-    )
+    if sanitized_config_path is None and actor_git_mask is not None:
+        sanitized_config_path = Path(
+            str(actor_git_mask.get("sanitized_config_path", ""))
+        )
+    if sanitized_config_path is None:
+        raise ExternalCodexRuntimeError(
+            "actor_codex_permission_profile_unavailable",
+            "external actor permission profile has no sanitized Git config path",
+        )
     if not sanitized_config_path.is_absolute():
         raise ExternalCodexRuntimeError(
             "actor_git_mask_unavailable",
             "external actor Git mask lacks an absolute sanitized config path",
         )
-    filesystem_entry = (
-        f'{json.dumps(str(sanitized_config_path), ensure_ascii=True)}="read"'
+    if execution_root is None or not execution_root.is_absolute():
+        raise ExternalCodexRuntimeError(
+            "actor_codex_permission_profile_unavailable",
+            "external actor permission profile has no absolute execution root",
+        )
+    entries: dict[str, str] = {
+        ":minimal": "read",
+        str(execution_root): workspace_access,
+        str(execution_root / ".git"): "read",
+        str(sanitized_config_path): "read",
+    }
+    for path in readable_paths:
+        if not path.is_absolute():
+            raise ExternalCodexRuntimeError(
+                "actor_codex_permission_profile_unavailable",
+                "external actor readable coordinate is not absolute",
+            )
+        entries[str(path)] = "read"
+    for path in writable_paths:
+        if not path.is_absolute():
+            raise ExternalCodexRuntimeError(
+                "actor_codex_permission_profile_unavailable",
+                "external actor writable coordinate is not absolute",
+            )
+        entries[str(path)] = "write"
+    for path in denied_paths:
+        if not path.is_absolute():
+            raise ExternalCodexRuntimeError(
+                "actor_codex_permission_profile_unavailable",
+                "external actor denied coordinate is not absolute",
+            )
+        entries[str(path)] = "deny"
+    filesystem = ",".join(
+        f"{json.dumps(path, ensure_ascii=True)}={json.dumps(access)}"
+        for path, access in sorted(entries.items())
     )
-    return (
-        '{extends=":workspace",filesystem={'
-        + filesystem_entry
-        + "},network={enabled=false}}"
-    )
+    return "{filesystem={" + filesystem + "},network={enabled=false}}"
 
 
 def _git_head(
@@ -4062,11 +4324,43 @@ def _workspace_filesystem_paths(workspace: Path) -> set[str]:
     return paths
 
 
+def _workspace_identity(workspace: Path) -> dict[str, Any]:
+    """Capture the source path anchors that a replacement directory cannot forge."""
+
+    anchors: list[dict[str, Any]] = []
+    current = workspace
+    while True:
+        try:
+            observed = current.lstat()
+        except OSError as exc:
+            raise ExternalCodexRuntimeError(
+                "workspace_manifest_failed",
+                "cannot capture the source workspace identity chain",
+            ) from exc
+        if not stat.S_ISDIR(observed.st_mode):
+            raise ExternalCodexRuntimeError(
+                "workspace_manifest_failed",
+                "source workspace identity chain contains a non-directory",
+            )
+        anchors.append(
+            {
+                "path": str(current),
+                "st_dev": int(observed.st_dev),
+                "st_ino": int(observed.st_ino),
+                "mode": stat.S_IMODE(observed.st_mode),
+            }
+        )
+        if current == current.parent:
+            break
+        current = current.parent
+    return {"root": anchors[0], "ancestors": anchors[1:]}
+
+
 def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
     """Describe exact HEAD plus every tracked, untracked, or ignored byte."""
 
     location = Path(workspace).resolve()
-    if not location.is_dir():
+    if not location.is_dir() or Path(workspace).is_symlink():
         raise ExternalCodexRuntimeError(
             "workspace_unavailable", "workspace manifest target is unavailable"
         )
@@ -4175,6 +4469,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
                     "kind": "symlink",
                     "size_bytes": len(target),
                     "sha256": sha256_bytes(target),
+                    "mode": stat.S_IMODE(path.lstat().st_mode),
                     "index_flags": index_flags,
                 }
             )
@@ -4193,6 +4488,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
                     "kind": "file",
                     "size_bytes": path.stat().st_size,
                     "sha256": sha256_file(resolved),
+                    "mode": stat.S_IMODE(path.stat().st_mode),
                     "index_flags": index_flags,
                 }
             )
@@ -4203,6 +4499,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
                     "kind": "directory",
                     "size_bytes": 0,
                     "sha256": None,
+                    "mode": stat.S_IMODE(path.stat().st_mode),
                     "index_flags": index_flags,
                 }
             )
@@ -4213,6 +4510,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
                     "kind": "missing",
                     "size_bytes": 0,
                     "sha256": None,
+                    "mode": None,
                     "index_flags": index_flags,
                 }
             )
@@ -4221,6 +4519,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
         "$schema": "schemas/external-codex-workspace-manifest.schema.json",
         "schema_version": "abyss_stack_external_codex_workspace_manifest_v1",
         "workspace_path": str(location),
+        "workspace_identity": _workspace_identity(location),
         "git_head": _git_head(location, git_env=git_env),
         "git_status_porcelain_sha256": sha256_bytes(status_raw),
         "git_diff_binary_sha256": sha256_bytes(diff_raw),
@@ -4261,12 +4560,10 @@ def compare_workspace_manifest(
         for item in current.get("status_entries", [])
     }
     baseline_content = {
-        str(item["path"]): dict(item)
-        for item in baseline.get("content_entries", [])
+        str(item["path"]): dict(item) for item in baseline.get("content_entries", [])
     }
     current_content = {
-        str(item["path"]): dict(item)
-        for item in current.get("content_entries", [])
+        str(item["path"]): dict(item) for item in current.get("content_entries", [])
     }
     changed: list[dict[str, str]] = []
     if baseline.get("git_head") != current.get("git_head"):
@@ -4291,9 +4588,7 @@ def compare_workspace_manifest(
             )
             changed.append({"path": path, "status": status})
     if baseline != current and not changed:
-        changed.append(
-            {"path": "<workspace-manifest>", "status": "manifest_changed"}
-        )
+        changed.append({"path": "<workspace-manifest>", "status": "manifest_changed"})
     return changed
 
 
@@ -4330,6 +4625,317 @@ def _command_text(item: Mapping[str, Any]) -> str | None:
         if isinstance(value, str) and value.strip():
             return value
     return None
+
+
+def _replace_prompt_source_path(
+    value: Any,
+    *,
+    source_path: str,
+    projection_path: str,
+) -> Any:
+    """Project source coordinates out of the model-facing task view."""
+
+    if isinstance(value, str):
+        return _replace_source_aliases_in_text(
+            value,
+            ((source_path, projection_path),),
+        )
+    if isinstance(value, list):
+        return [
+            _replace_prompt_source_path(
+                item,
+                source_path=source_path,
+                projection_path=projection_path,
+            )
+            for item in value
+        ]
+    if isinstance(value, dict):
+        projected: dict[str, Any] = {}
+        for key, item in value.items():
+            projected_key = _replace_prompt_source_path(
+                str(key),
+                source_path=source_path,
+                projection_path=projection_path,
+            )
+            if projected_key in projected:
+                raise ExternalCodexRuntimeError(
+                    "actor_input_key_collision",
+                    "source-coordinate removal collapsed distinct mapping keys",
+                )
+            projected[projected_key] = _replace_prompt_source_path(
+                item,
+                source_path=source_path,
+                projection_path=projection_path,
+            )
+        return projected
+    if isinstance(value, tuple):
+        return tuple(
+            _replace_prompt_source_path(
+                item,
+                source_path=source_path,
+                projection_path=projection_path,
+            )
+            for item in value
+        )
+    return value
+
+
+def _contains_source_path(value: Any, source_path: str) -> bool:
+    if isinstance(value, str):
+        return any(
+            source_path in candidate
+            for candidate in _json_escape_decoding_layers(value)
+        )
+    if isinstance(value, (list, tuple)):
+        return any(_contains_source_path(item, source_path) for item in value)
+    if isinstance(value, dict):
+        return any(
+            _contains_source_path(key, source_path)
+            or _contains_source_path(item, source_path)
+            for key, item in value.items()
+        )
+    return False
+
+
+def _decode_one_json_escape_layer(value: str) -> str:
+    """Decode one JSON string-escape layer without requiring a JSON document."""
+
+    decoded: list[str] = []
+    index = 0
+    simple = {
+        '"': '"',
+        "/": "/",
+        "\\": "\\",
+        "b": "\b",
+        "f": "\f",
+        "n": "\n",
+        "r": "\r",
+        "t": "\t",
+    }
+    while index < len(value):
+        if value[index] != "\\" or index + 1 >= len(value):
+            decoded.append(value[index])
+            index += 1
+            continue
+        escape = value[index + 1]
+        if escape in simple:
+            decoded.append(simple[escape])
+            index += 2
+            continue
+        if escape == "u" and index + 6 <= len(value):
+            digits = value[index + 2 : index + 6]
+            if re.fullmatch(r"[0-9A-Fa-f]{4}", digits):
+                code_unit = int(digits, 16)
+                next_index = index + 6
+                if 0xD800 <= code_unit <= 0xDBFF and next_index + 6 <= len(value):
+                    low_prefix = value[next_index : next_index + 2]
+                    low_digits = value[next_index + 2 : next_index + 6]
+                    if low_prefix == "\\u" and re.fullmatch(
+                        r"[0-9A-Fa-f]{4}", low_digits
+                    ):
+                        low_unit = int(low_digits, 16)
+                        if 0xDC00 <= low_unit <= 0xDFFF:
+                            decoded.append(
+                                chr(
+                                    0x10000
+                                    + ((code_unit - 0xD800) << 10)
+                                    + low_unit
+                                    - 0xDC00
+                                )
+                            )
+                            index = next_index + 6
+                            continue
+                if not 0xD800 <= code_unit <= 0xDFFF:
+                    decoded.append(chr(code_unit))
+                    index = next_index
+                    continue
+        decoded.append(value[index])
+        index += 1
+    return "".join(decoded)
+
+
+def _json_escape_decoding_layers(value: str) -> tuple[str, ...]:
+    """Expose bounded nested JSON escape spellings for source-alias checks."""
+
+    layers = [value]
+    current = value
+    for _ in range(MAX_JSON_ESCAPE_LAYERS):
+        decoded = _decode_one_json_escape_layer(current)
+        if decoded == current:
+            break
+        layers.append(decoded)
+        current = decoded
+    else:
+        if _decode_one_json_escape_layer(current) != current:
+            raise ExternalCodexRuntimeError(
+                "actor_input_escape_depth_exceeded",
+                "actor-facing text exceeded the bounded JSON escape depth",
+            )
+    return tuple(layers)
+
+
+def _replace_source_aliases_in_text(
+    value: str,
+    replacements: Sequence[tuple[str, str]],
+) -> str:
+    """Remove aliases revealed through literal or nested JSON string escapes."""
+
+    layers = _json_escape_decoding_layers(value)
+    if not any(alias in layer for alias, _ in replacements for layer in layers):
+        return value
+    matching_layers = [
+        layer for layer in layers if any(alias in layer for alias, _ in replacements)
+    ]
+    result = matching_layers[-1]
+    for alias, replacement in replacements:
+        result = result.replace(alias, replacement)
+    if any(
+        alias in layer
+        for alias, _ in replacements
+        for layer in _json_escape_decoding_layers(result)
+    ):
+        raise ExternalCodexRuntimeError(
+            "actor_source_path_exposed",
+            "source-coordinate removal did not eliminate every source alias",
+        )
+    return result
+
+
+def _actor_source_aliases(validated: Mapping[str, Any]) -> tuple[str, ...]:
+    """Return every admitted lexical/canonical source coordinate, longest first."""
+
+    aliases = {
+        str(validated["launch"]["workspace_path"]),
+        str(validated["workspace"]),
+        str(validated["workspace_manifest_baseline"].get("workspace_path", "")),
+    }
+    identity = validated["workspace_manifest_baseline"].get("workspace_identity", {})
+    if isinstance(identity, Mapping):
+        root = identity.get("root")
+        ancestors = identity.get("ancestors")
+        if isinstance(root, Mapping):
+            aliases.add(str(root.get("path", "")))
+        if isinstance(ancestors, list):
+            aliases.update(
+                str(item.get("path", ""))
+                for item in ancestors
+                if isinstance(item, Mapping)
+            )
+    return tuple(
+        sorted(
+            (value for value in aliases if value and value != "/"),
+            key=lambda value: (-len(value), value),
+        )
+    )
+
+
+def _sanitize_actor_value(
+    value: Any,
+    aliases: Sequence[str],
+    source_roots: frozenset[str],
+) -> Any:
+    if isinstance(value, str):
+        replacements = tuple(
+            (
+                alias,
+                str(ACTOR_EXECUTION_ROOT)
+                if alias in source_roots
+                else "<controller-path-redacted>",
+            )
+            for alias in aliases
+        )
+        return _replace_source_aliases_in_text(value, replacements)
+    if isinstance(value, list):
+        return [_sanitize_actor_value(item, aliases, source_roots) for item in value]
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for key, item in value.items():
+            original_key = str(key)
+            if original_key == "workspace_identity":
+                continue
+            sanitized_key = _sanitize_actor_value(
+                original_key,
+                aliases,
+                source_roots,
+            )
+            if sanitized_key in sanitized:
+                raise ExternalCodexRuntimeError(
+                    "actor_input_key_collision",
+                    "source-coordinate removal collapsed distinct mapping keys",
+                )
+            sanitized[sanitized_key] = _sanitize_actor_value(
+                item,
+                aliases,
+                source_roots,
+            )
+        return sanitized
+    return value
+
+
+def _actor_safe_input_envelope(
+    *,
+    input_id: str,
+    raw: bytes,
+    original_provenance: Mapping[str, Any],
+    aliases: Sequence[str],
+    source_roots: frozenset[str],
+) -> tuple[dict[str, Any], bytes]:
+    """Build one schema-checked derivative without controller coordinates."""
+
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        binary_text_shadow = raw.decode("utf-8", errors="surrogateescape")
+        if any(
+            alias.encode("utf-8") in raw
+            or _contains_source_path(binary_text_shadow, alias)
+            for alias in aliases
+        ):
+            raise ExternalCodexRuntimeError(
+                "actor_source_path_exposed",
+                "binary immutable input retained a source coordinate",
+            )
+        payload_kind = "base64"
+        payload: Any = base64.b64encode(raw).decode("ascii")
+    else:
+        try:
+            decoded = json.loads(text)
+        except json.JSONDecodeError:
+            payload_kind = "utf8_text"
+            payload = _sanitize_actor_value(text, aliases, source_roots)
+        else:
+            payload_kind = "json"
+            payload = _sanitize_actor_value(decoded, aliases, source_roots)
+    envelope = {
+        "$schema": "schemas/external-codex-actor-input-envelope.schema.json",
+        "schema_version": "abyss_stack_external_codex_actor_input_envelope_v1",
+        "input_id": input_id,
+        "payload_kind": payload_kind,
+        "source_artifact_digest": str(original_provenance["artifact_digest"]),
+        "source_schema_ref": str(original_provenance["schema_ref"]),
+        "source_schema_version": str(original_provenance["schema_version"]),
+        "payload": payload,
+    }
+    validate_json(
+        envelope,
+        ACTOR_INPUT_ENVELOPE_SCHEMA_PATH,
+        label=f"actor-safe immutable input {input_id}",
+    )
+    if any(_contains_source_path(envelope, alias) for alias in aliases):
+        raise ExternalCodexRuntimeError(
+            "actor_source_path_exposed",
+            "actor-safe immutable envelope retained a source coordinate",
+        )
+    encoded = (
+        json.dumps(envelope, ensure_ascii=True, sort_keys=True, indent=2) + "\n"
+    ).encode("utf-8")
+    encoded_text = encoded.decode("utf-8")
+    if any(_contains_source_path(encoded_text, alias) for alias in aliases):
+        raise ExternalCodexRuntimeError(
+            "actor_source_path_exposed",
+            "serialized actor-safe immutable envelope retained a source coordinate",
+        )
+    return envelope, encoded
 
 
 class ExternalCodexRuntime:
@@ -4378,6 +4984,183 @@ class ExternalCodexRuntime:
     def _session_dir(self, session_id: str) -> Path:
         return self.state_root / "sessions" / _session_token(session_id)
 
+    @staticmethod
+    def _projection_path_from_state(state: Mapping[str, Any]) -> Path:
+        value = state.get("actor_projection_path")
+        if not isinstance(value, str) or not value.startswith("/"):
+            raise ExternalCodexRuntimeError(
+                "legacy_projection_unavailable",
+                "runtime state has no safe runtime-owned actor projection",
+            )
+        path = Path(value)
+        if path.is_symlink() or not path.is_dir():
+            raise ExternalCodexRuntimeError(
+                "actor_projection_unavailable",
+                "runtime-owned actor projection is unavailable or symbolic",
+            )
+        return path
+
+    def _prepare_actor_projection(
+        self,
+        *,
+        validated: Mapping[str, Any],
+        session_dir: Path,
+    ) -> dict[str, Any]:
+        """Materialize one source-checked actor tree before any worker fork."""
+
+        review_seed = validated.get("review_seed")
+        source = Path(str(validated["workspace"]))
+        if review_seed is None:
+            source = source.resolve(strict=True)
+            try:
+                session_dir.resolve().relative_to(source)
+            except ValueError:
+                pass
+            else:
+                raise ExternalCodexRuntimeError(
+                    "workspace_projection_unsupported",
+                    "runtime session artifacts may not be materialized inside the source workspace",
+                )
+        source_before = dict(validated["workspace_manifest_baseline"])
+        source_before_path = session_dir / "source-manifest-before.json"
+        _atomic_write_json(source_before_path, source_before, mode=0o400)
+        source_before_ref = _artifact_ref(source_before_path)
+        projection_path = session_dir / "actor-workspace"
+        projection_identity: Mapping[str, Any] | None = None
+
+        def cleanup_projection() -> None:
+            try:
+                remove_actor_projection(
+                    projection_path,
+                    expected_identity=projection_identity,
+                )
+            except (OSError, ProjectionError) as exc:
+                raise ExternalCodexRuntimeError(
+                    "workspace_projection_cleanup_incomplete",
+                    "failed projection admission could not remove its unpublished actor tree",
+                ) from exc
+
+        def assert_projection_coordinate() -> None:
+            identity = projection_identity
+            try:
+                observed = projection_path.stat(follow_symlinks=False)
+            except OSError as exc:
+                raise ExternalCodexRuntimeError(
+                    "actor_projection_publication_drift",
+                    "published actor projection coordinate became unavailable",
+                ) from exc
+            if (
+                not isinstance(identity, Mapping)
+                or identity.get("st_dev") != observed.st_dev
+                or identity.get("st_ino") != observed.st_ino
+            ):
+                raise ExternalCodexRuntimeError(
+                    "actor_projection_publication_drift",
+                    "published actor projection coordinate no longer names its admitted inode",
+                )
+
+        try:
+            if review_seed is None:
+                projection, actor_baseline = materialize_actor_projection(
+                    source,
+                    projection_path,
+                    source_manifest=source_before,
+                    source_manifest_digest=str(source_before_ref["artifact_digest"]),
+                )
+            else:
+                seed_path = Path(str(review_seed["writer_projection_path"]))
+                seed_manifest_ref = review_seed["writer_final_manifest_ref"]
+                seed_manifest = _load_verified_json_ref(
+                    seed_manifest_ref,
+                    label="actor projection seed manifest",
+                    schema_path=ACTOR_MANIFEST_SCHEMA_PATH,
+                )
+                with self._lock(str(review_seed["writer_session_id"])):
+                    writer_state = self._load_state(
+                        str(review_seed["writer_session_id"])
+                    )
+                    if self._review_seed_envelope_locked(writer_state) != review_seed:
+                        raise ExternalCodexRuntimeError(
+                            "review_seed_envelope_drift",
+                            "writer changed before reviewer projection cloning",
+                        )
+                    projection, actor_baseline = materialize_actor_projection_from_seed(
+                        seed_path,
+                        projection_path,
+                        expected_manifest=seed_manifest,
+                    )
+                projection_identity = actor_baseline["workspace_identity"]
+                if (
+                    actor_baseline["content_entries"]
+                    != seed_manifest["content_entries"]
+                    or actor_baseline["private_git_digest"]
+                    != seed_manifest["private_git_digest"]
+                    or actor_baseline["source_git_head"]
+                    != seed_manifest["source_git_head"]
+                ):
+                    cleanup_projection()
+                    raise ExternalCodexRuntimeError(
+                        "actor_projection_seed_drift",
+                        "review projection differs from the exact writer projection seed",
+                    )
+                # The reviewer owns a new source-admission envelope, while its
+                # content is the exact writer projection.  Rebind only that
+                # controller-owned source digest; content entries remain byte
+                # identical to the writer seed.
+                actor_baseline["workspace_path"] = str(projection)
+                actor_baseline["source_manifest_digest"] = str(
+                    source_before_ref["artifact_digest"]
+                )
+            if projection_identity is None:
+                projection_identity = actor_baseline["workspace_identity"]
+        except (OSError, ProjectionError) as exc:
+            raise ExternalCodexRuntimeError(
+                "workspace_projection_unsupported",
+                str(exc),
+            ) from exc
+        if review_seed is None:
+            try:
+                source_after = build_workspace_manifest(source)
+            except ExternalCodexRuntimeError as exc:
+                cleanup_projection()
+                raise ExternalCodexRuntimeError(
+                    "workspace_source_race",
+                    "source workspace could not be revalidated after projection materialization",
+                ) from exc
+        else:
+            # A reviewer is admitted from the terminal writer envelope alone.
+            # The historical owner source is provenance, never a live input.
+            source_after = source_before
+        try:
+            assert_projection_coordinate()
+        except ExternalCodexRuntimeError:
+            cleanup_projection()
+            raise
+        source_after_path = session_dir / "source-manifest-after.json"
+        _atomic_write_json(source_after_path, source_after, mode=0o400)
+        source_after_ref = _artifact_ref(source_after_path)
+        if source_after != source_before:
+            cleanup_projection()
+            raise ExternalCodexRuntimeError(
+                "workspace_source_race",
+                "source workspace changed during actor projection materialization",
+            )
+        actor_baseline_path = session_dir / "actor-baseline-manifest.json"
+        validate_json(
+            actor_baseline,
+            ACTOR_MANIFEST_SCHEMA_PATH,
+            label="actor baseline manifest",
+        )
+        _atomic_write_json(actor_baseline_path, actor_baseline, mode=0o400)
+        actor_baseline_ref = _artifact_ref(actor_baseline_path)
+        return {
+            "source_manifest_before_ref": source_before_ref,
+            "source_manifest_after_ref": source_after_ref,
+            "actor_projection_path": str(projection),
+            "actor_baseline_manifest_ref": actor_baseline_ref,
+            "actor_baseline_manifest": actor_baseline,
+        }
+
     @contextmanager
     def _lock(self, session_id: str) -> Iterator[None]:
         session_dir = self._session_dir(session_id)
@@ -4421,7 +5204,11 @@ class ExternalCodexRuntime:
         validate_json(state, STATE_SCHEMA_PATH, label="runtime state")
         if (
             state.get("schema_version")
-            not in {LEGACY_STATE_SCHEMA_VERSION, STATE_SCHEMA_VERSION}
+            not in {
+                LEGACY_STATE_SCHEMA_VERSION,
+                LEGACY_STATE_V2_SCHEMA_VERSION,
+                STATE_SCHEMA_VERSION,
+            }
             or state.get("session_id") != session_id
         ):
             raise ExternalCodexRuntimeError(
@@ -4521,9 +5308,9 @@ class ExternalCodexRuntime:
         """Replay the semantic delta carried by one durable Codex event."""
 
         source_type = event.get("source_event_type")
-        if not isinstance(source_type, str) or not event.get("event_type", "").startswith(
-            "codex."
-        ):
+        if not isinstance(source_type, str) or not event.get(
+            "event_type", ""
+        ).startswith("codex."):
             return
         payload = event.get("payload")
         if not isinstance(payload, dict) or payload.get("type") != source_type:
@@ -4558,9 +5345,7 @@ class ExternalCodexRuntime:
                 "cannot save runtime state without its normalized event stream",
             )
         validate_json(candidate, STATE_SCHEMA_PATH, label="runtime state")
-        _atomic_write_json(
-            self._state_path(str(candidate["session_id"])), candidate
-        )
+        _atomic_write_json(self._state_path(str(candidate["session_id"])), candidate)
 
     def _failure_closeout_context(
         self,
@@ -4629,7 +5414,8 @@ class ExternalCodexRuntime:
             "sequence": sequence,
             "recorded_at": iso_now(),
             "session_id": state["session_id"],
-            "attempt_id": attempt_id or str(state.get("active_attempt_id") or "runtime"),
+            "attempt_id": attempt_id
+            or str(state.get("active_attempt_id") or "runtime"),
             "thread_id": thread_id if thread_id is not None else state.get("thread_id"),
             "event_type": event_type,
             "source_event_type": source_event_type,
@@ -4709,8 +5495,7 @@ class ExternalCodexRuntime:
             )
         external = owner_request["external_incarnation"]
         if (
-            external["runtime_interface"]
-            != "abyss_stack_external_codex_agent_v1"
+            external["runtime_interface"] != "abyss_stack_external_codex_agent_v1"
             or external["launches_separate_os_process"] is not True
             or external["uses_builtin_codex_subagents"] is not False
             or external["separate_cli_session"] is not True
@@ -4721,7 +5506,9 @@ class ExternalCodexRuntime:
                 "owner request does not admit this external process/session runtime",
             )
 
-        def exact_input(content_ref: Mapping[str, Any], *, label: str) -> Mapping[str, Any]:
+        def exact_input(
+            content_ref: Mapping[str, Any], *, label: str
+        ) -> Mapping[str, Any]:
             matches = [
                 item
                 for item in immutable_inputs
@@ -4776,12 +5563,9 @@ class ExternalCodexRuntime:
             transfer.get("schema_version") != "responsibility-transfer-v1"
             or transfer.get("state")
             != external["responsibility_transfer_ref"]["admitted_state"]
-            or transfer_holders
-            != external["responsibility_transfer_ref"]["holder_ids"]
-            or transfer.get("obligation_ref")
-            != external["obligation_ref"]["object_id"]
-            or transfer.get("mandate_ref")
-            != external["actor_mandate_ref"]["object_id"]
+            or transfer_holders != external["responsibility_transfer_ref"]["holder_ids"]
+            or transfer.get("obligation_ref") != external["obligation_ref"]["object_id"]
+            or transfer.get("mandate_ref") != external["actor_mandate_ref"]["object_id"]
             or transfer.get("task_local_dag_ref")
             != external["task_local_dag_ref"]["object_id"]
             or transfer.get("return_owner") != owner_request["return_owner"]
@@ -4791,9 +5575,7 @@ class ExternalCodexRuntime:
                 "responsibility-transfer bytes do not prove the admitted holder transition",
             )
 
-        obligation = load_json_bytes(
-            obligation_input["raw"], label="agent obligation"
-        )
+        obligation = load_json_bytes(obligation_input["raw"], label="agent obligation")
         if (
             obligation.get("schema_version") != "agent-obligation-v1"
             or obligation.get("obligation_id")
@@ -4811,16 +5593,11 @@ class ExternalCodexRuntime:
         mandate = load_json_bytes(mandate_input["raw"], label="actor mandate")
         if (
             mandate.get("schema_version") != "actor-mandate-v1"
-            or mandate.get("mandate_id")
-            != external["actor_mandate_ref"]["object_id"]
+            or mandate.get("mandate_id") != external["actor_mandate_ref"]["object_id"]
             or mandate.get("role_id") != binding.role_id
-            or mandate.get("obligation_ref")
-            != external["obligation_ref"]["object_id"]
+            or mandate.get("obligation_ref") != external["obligation_ref"]["object_id"]
             or mandate.get("domain_procedure_refs")
-            != [
-                item["object_id"]
-                for item in external["domain_procedure_refs"]
-            ]
+            != [item["object_id"] for item in external["domain_procedure_refs"]]
             or mandate.get("return_owner") != owner_request["return_owner"]
             or mandate.get("stop_line") != owner_request["child_stop_line"]
         ):
@@ -4879,10 +5656,9 @@ class ExternalCodexRuntime:
         exact_input(sdk_decision_ref, label="SDK summon decision")
 
         runtime_launch_ref = external["runtime_launch_ref"]
-        if (
-            runtime_launch_ref["object_id"] != launch["launch_id"]
-            or runtime_launch_ref["digest"] != sha256_bytes(launch_raw)
-        ):
+        if runtime_launch_ref["object_id"] != launch["launch_id"] or runtime_launch_ref[
+            "digest"
+        ] != sha256_bytes(launch_raw):
             raise ExternalCodexRuntimeError(
                 "owner_runtime_launch_mismatch",
                 "owner request does not bind these exact launch bytes",
@@ -4946,6 +5722,8 @@ class ExternalCodexRuntime:
         model_slug: str,
         reasoning_effort: str,
         tool_entry: Mapping[str, Any],
+        *,
+        repository_workspace: Path | None = None,
     ) -> dict[str, Any]:
         executable = Path(str(launch["codex_executable"]))
         if not executable.is_absolute() or not executable.is_file():
@@ -4957,7 +5735,9 @@ class ExternalCodexRuntime:
                 "codex_executable_not_resolved",
                 "Codex executable must be the resolved binary, not a symlink",
             )
-        executable_digest = sha256_bytes(read_bounded(executable, limit=512 * 1024 * 1024))
+        executable_digest = sha256_bytes(
+            read_bounded(executable, limit=512 * 1024 * 1024)
+        )
         if executable_digest != launch["codex_executable_digest"]:
             raise ExternalCodexRuntimeError(
                 "codex_executable_drift", "Codex executable digest changed"
@@ -4965,6 +5745,7 @@ class ExternalCodexRuntime:
         containment = self.profile["process_containment"]
         containment_paths = {
             "supervisor": PART_ROOT / str(containment["supervisor_ref"]),
+            "mount_launcher": MOUNT_LAUNCHER_PATH,
             "probe_executable": Path(str(containment["probe_executable"])),
             "python_executable": Path(sys.executable).resolve(),
             "mount_wrapper": MOUNT_WRAPPER_PATH,
@@ -4974,7 +5755,10 @@ class ExternalCodexRuntime:
                 not path.is_absolute()
                 or not path.is_file()
                 or path.resolve() != path
-                or (label != "supervisor" and not os.access(path, os.X_OK))
+                or (
+                    label not in {"supervisor", "mount_launcher"}
+                    and not os.access(path, os.X_OK)
+                )
             ):
                 raise ExternalCodexRuntimeError(
                     "process_containment_unavailable",
@@ -4985,7 +5769,13 @@ class ExternalCodexRuntime:
                 "process_containment_unavailable",
                 "runtime profile selected an unexpected supervisor source",
             )
+        if containment_paths["mount_launcher"] != MOUNT_LAUNCHER_PATH:
+            raise ExternalCodexRuntimeError(
+                "process_containment_unavailable",
+                "runtime profile selected an unexpected mount launcher source",
+            )
         mount_wrapper_digest = sha256_file(containment_paths["mount_wrapper"])
+        mount_launcher_digest = sha256_file(containment_paths["mount_launcher"])
         for server in tool_entry["mcp_server_configs"]:
             token_name = str(server["bearer_token_env_var"])
             if not os.environ.get(token_name):
@@ -4997,6 +5787,7 @@ class ExternalCodexRuntime:
             launch,
             self.state_root,
             tool_entry,
+            repository_workspace=repository_workspace,
         )
         probes: list[tuple[str, list[str]]] = [
             ("version", [str(executable), "--version"]),
@@ -5111,7 +5902,12 @@ class ExternalCodexRuntime:
             actor_git_mask["private_directory_views"] = _private_directory_views(
                 actor_git_mask["masks"]
             )
-            permission_profile = _actor_codex_permission_profile(actor_git_mask)
+            permission_profile = _actor_codex_permission_profile(
+                actor_git_mask,
+                execution_root=execution_root,
+                readable_paths=(sanitized_config,),
+                writable_paths=(preflight_root,),
+            )
             nested_sandbox_probe = [
                 str(executable),
                 "-c",
@@ -5135,6 +5931,7 @@ class ExternalCodexRuntime:
                         executable_digest=executable_digest,
                         actor_git_mask=actor_git_mask,
                         mount_wrapper_digest=mount_wrapper_digest,
+                        mount_launcher_digest=mount_launcher_digest,
                     ),
                     text=True,
                     capture_output=True,
@@ -5159,6 +5956,7 @@ class ExternalCodexRuntime:
             "reasoning_effort": reasoning_effort,
             "executable_digest": executable_digest,
             "mount_wrapper_digest": mount_wrapper_digest,
+            "mount_launcher_digest": mount_launcher_digest,
         }
 
     def _containment_command(
@@ -5169,6 +5967,8 @@ class ExternalCodexRuntime:
         identity_path: Path | None = None,
         actor_git_mask: Mapping[str, Any] | None = None,
         mount_wrapper_digest: str | None = None,
+        mount_launcher_digest: str | None = None,
+        workspace_fd: int | None = None,
     ) -> list[str]:
         containment = self.profile["process_containment"]
         if containment["strategy"] != "linux_subreaper_supervisor_v1":
@@ -5195,13 +5995,15 @@ class ExternalCodexRuntime:
                     "process identity receipt path must be absolute",
                 )
             supervisor_argv.extend(("--identity-file", str(identity_path)))
-        if actor_git_mask is not None:
+        if actor_git_mask is not None or workspace_fd is not None:
             if (
                 not MOUNT_WRAPPER_PATH.is_file()
                 or MOUNT_WRAPPER_PATH.resolve() != MOUNT_WRAPPER_PATH
                 or not os.access(MOUNT_WRAPPER_PATH, os.X_OK)
                 or mount_wrapper_digest is None
                 or sha256_file(MOUNT_WRAPPER_PATH) != mount_wrapper_digest
+                or mount_launcher_digest is None
+                or sha256_file(MOUNT_LAUNCHER_PATH) != mount_launcher_digest
             ):
                 raise ExternalCodexRuntimeError(
                     "actor_git_mask_unavailable",
@@ -5213,12 +6015,27 @@ class ExternalCodexRuntime:
                     str(MOUNT_WRAPPER_PATH),
                     "--mount-wrapper-digest",
                     mount_wrapper_digest,
+                    "--mount-launcher-digest",
+                    mount_launcher_digest,
                 )
             )
+            if workspace_fd is not None:
+                if workspace_fd < 3:
+                    raise ExternalCodexRuntimeError(
+                        "actor_projection_unavailable",
+                        "actor workspace descriptor is invalid",
+                    )
+                supervisor_argv.extend(
+                    (
+                        "--workspace-fd",
+                        str(workspace_fd),
+                        "--workspace-coordinate",
+                        str(ACTOR_EXECUTION_ROOT),
+                    )
+                )
+        if actor_git_mask is not None:
             masks = actor_git_mask.get("masks")
-            private_directory_views = actor_git_mask.get(
-                "private_directory_views"
-            )
+            private_directory_views = actor_git_mask.get("private_directory_views")
             if (
                 not isinstance(masks, list)
                 or not masks
@@ -5280,7 +6097,10 @@ class ExternalCodexRuntime:
     ) -> dict[str, Any]:
         launch_raw = read_bounded(launch_path)
         launch = load_json_bytes(launch_raw, label="external Codex launch")
-        if launch.get("admission_class") == "owner_contour" and owner_request_path is None:
+        if (
+            launch.get("admission_class") == "owner_contour"
+            and owner_request_path is None
+        ):
             raise ExternalCodexRuntimeError(
                 "owner_contour_admission_unbound",
                 "owner_contour requires the separate aoa-agents execution request",
@@ -5350,7 +6170,7 @@ class ExternalCodexRuntime:
                 "fixed validation argv/cwd pairs must be unique",
             )
         for item in task["validation_commands"]:
-            _validation_wrapper_argv(launch["workspace_path"], item)
+            _descriptor_validation_wrapper_argv(ACTOR_EXECUTION_ROOT, item)
         realization = coordinates["model_realization"][2]
 
         exact_refs = (
@@ -5374,8 +6194,7 @@ class ExternalCodexRuntime:
         if (
             len(task_contract_refs) != 1
             or task_contract_refs[0] not in plan.snapshot.source_refs
-            or task_contract_refs[0]
-            not in binding.continuation.immutable_input_refs
+            or task_contract_refs[0] not in binding.continuation.immutable_input_refs
         ):
             raise ExternalCodexRuntimeError(
                 "task_contract_unbound",
@@ -5408,7 +6227,10 @@ class ExternalCodexRuntime:
                 "task_authority_out_of_scope",
                 "task authority scope exceeds the continuation owner scope",
             )
-        if task["allowed_effect_class"] not in binding.permission_posture.allowed_effect_classes:
+        if (
+            task["allowed_effect_class"]
+            not in binding.permission_posture.allowed_effect_classes
+        ):
             raise ExternalCodexRuntimeError(
                 "task_effect_out_of_scope", "task effect exceeds incarnation permission"
             )
@@ -5506,16 +6328,20 @@ class ExternalCodexRuntime:
             or not isinstance(realization.get("configuration"), dict)
         ):
             raise ExternalCodexRuntimeError(
-                "model_realization_invalid", "aoa-models realization identity is invalid"
+                "model_realization_invalid",
+                "aoa-models realization identity is invalid",
             )
         configuration = realization["configuration"]
         runtime = configuration.get("runtime")
         tools = configuration.get("tools")
         permissions = configuration.get("permissions")
         access = configuration.get("access")
-        if not all(isinstance(item, dict) for item in (runtime, tools, permissions, access)):
+        if not all(
+            isinstance(item, dict) for item in (runtime, tools, permissions, access)
+        ):
             raise ExternalCodexRuntimeError(
-                "model_realization_invalid", "model realization configuration is incomplete"
+                "model_realization_invalid",
+                "model realization configuration is incomplete",
             )
         model_slug = str(runtime.get("model_slug"))
         effort = str(configuration.get("reasoning_effort"))
@@ -5530,7 +6356,8 @@ class ExternalCodexRuntime:
             not in model_admission["allowed_lifecycle_states"]
         ):
             raise ExternalCodexRuntimeError(
-                "model_realization_unsupported", "model realization is not the admitted Codex lane"
+                "model_realization_unsupported",
+                "model realization is not the admitted Codex lane",
             )
         if not model_slug or not effort:
             raise ExternalCodexRuntimeError(
@@ -5572,7 +6399,8 @@ class ExternalCodexRuntime:
             or list(binding.permission_posture.allowed_effect_classes)
             != tool_entry["allowed_effect_classes"]
             or binding.permission_posture.sandbox_mode != tool_entry["sandbox_mode"]
-            or binding.permission_posture.approval_policy != tool_entry["approval_policy"]
+            or binding.permission_posture.approval_policy
+            != tool_entry["approval_policy"]
             or binding.permission_posture.network_access != tool_entry["network_access"]
             or binding.permission_posture.external_effects is not False
             or permissions.get("sandbox_mode") != realization_sandbox_mode
@@ -5602,27 +6430,64 @@ class ExternalCodexRuntime:
         Draft202012Validator.check_schema(result_schema)
         if result_schema != load_schema(REPORT_SCHEMA_PATH):
             raise ExternalCodexRuntimeError(
-                "result_schema_mismatch", "launch result schema is not the admitted report schema"
+                "result_schema_mismatch",
+                "launch result schema is not the admitted report schema",
             )
 
         workspace = Path(str(launch["workspace_path"]))
-        if not workspace.is_absolute() or not workspace.is_dir():
+        projection_seed = launch.get("workspace_projection_seed")
+        if not workspace.is_absolute():
             raise ExternalCodexRuntimeError(
-                "workspace_unavailable", "workspace path is not an absolute directory"
+                "workspace_unavailable", "workspace path is not absolute"
             )
-        if _git_head(workspace) != launch["workspace_expected_head"]:
+        review_seed = None
+        if projection_seed is not None:
+            if not isinstance(projection_seed, dict):
+                raise ExternalCodexRuntimeError(
+                    "workspace_projection_seed_invalid",
+                    "workspace projection seed has no controller envelope",
+                )
+            review_seed = self._validate_review_seed(
+                projection_seed,
+                reviewer_session_id=str(launch["session_id"]),
+                task=task,
+                binding=binding,
+            )
+        else:
+            if workspace.is_symlink() or not workspace.is_dir():
+                raise ExternalCodexRuntimeError(
+                    "workspace_unavailable",
+                    "workspace path is not an absolute directory",
+                )
+            try:
+                workspace = workspace.resolve(strict=True)
+            except OSError as exc:
+                raise ExternalCodexRuntimeError(
+                    "workspace_unavailable",
+                    "workspace canonical coordinate is unavailable",
+                ) from exc
+            for minimal_root in CODEX_MINIMAL_READ_ROOTS:
+                try:
+                    workspace.relative_to(minimal_root)
+                except ValueError:
+                    continue
+                raise ExternalCodexRuntimeError(
+                    "workspace_minimal_read_root_unsupported",
+                    "source workspace may not be admitted beneath a Codex minimal-read root",
+                )
+        source_path = str(workspace)
+        if any(
+            _contains_source_path(item["argv"], source_path)
+            for item in task["validation_commands"]
+        ):
             raise ExternalCodexRuntimeError(
-                "workspace_head_mismatch", "workspace HEAD differs from the launch binding"
+                "task_validation_source_path_unsupported",
+                "fixed validation argv may not expose the source workspace path",
             )
         if binding.workspace_source_ref.source_ref != launch["workspace_expected_head"]:
             raise ExternalCodexRuntimeError(
                 "workspace_source_mismatch",
                 "incarnation workspace source does not name the exact Git HEAD",
-            )
-        baseline = _git_status(workspace)
-        if launch["workspace_initial_posture"] == "clean_required" and baseline:
-            raise ExternalCodexRuntimeError(
-                "workspace_not_clean", "launch requires a clean isolated workspace"
             )
         workspace_manifest_input_id = str(launch["workspace_manifest_input_id"])
         manifest_inputs = [
@@ -5644,20 +6509,60 @@ class ExternalCodexRuntime:
                 "workspace baseline may bind only one selected workspace manifest",
             )
         workspace_manifest_baseline: dict[str, Any]
-        if manifest_inputs:
+        if review_seed is not None:
+            workspace_manifest_baseline = _load_verified_json_ref(
+                review_seed["writer_source_manifest_ref"],
+                label="historical writer source manifest",
+                schema_path=WORKSPACE_MANIFEST_SCHEMA_PATH,
+            )
+            if (
+                workspace_manifest_baseline.get("git_head")
+                != launch["workspace_expected_head"]
+            ):
+                raise ExternalCodexRuntimeError(
+                    "review_seed_source_mismatch",
+                    "review seed historical source does not bind the requested Git HEAD",
+                )
+            baseline = {
+                str(item["path"]): str(item["status"])
+                for item in workspace_manifest_baseline.get("status_entries", [])
+            }
+        elif manifest_inputs:
             manifest = load_json_bytes(
                 manifest_inputs[0]["raw"], label="external Codex workspace manifest"
             )
             assert_workspace_manifest(manifest, workspace)
             workspace_manifest_baseline = manifest
+            baseline = _git_status(workspace)
         else:
             workspace_manifest_baseline = build_workspace_manifest(workspace)
+            baseline = _git_status(workspace)
+        if review_seed is None:
+            if _git_head(workspace) != launch["workspace_expected_head"]:
+                raise ExternalCodexRuntimeError(
+                    "workspace_head_mismatch",
+                    "workspace HEAD differs from the launch binding",
+                )
+            if launch["workspace_initial_posture"] == "clean_required" and baseline:
+                raise ExternalCodexRuntimeError(
+                    "workspace_not_clean", "launch requires a clean isolated workspace"
+                )
         codex_home = Path(str(launch["codex_home"]))
         if not codex_home.is_absolute() or not codex_home.is_dir():
             raise ExternalCodexRuntimeError(
                 "codex_home_unavailable", "explicit Codex home is unavailable"
             )
-        preflight = self._codex_preflight(launch, model_slug, effort, tool_entry)
+        preflight = self._codex_preflight(
+            launch,
+            model_slug,
+            effort,
+            tool_entry,
+            repository_workspace=(
+                Path(str(review_seed["writer_projection_path"]))
+                if review_seed is not None
+                else workspace
+            ),
+        )
         return {
             "launch": launch,
             "launch_raw": launch_raw,
@@ -5676,7 +6581,213 @@ class ExternalCodexRuntime:
             "preflight": preflight,
             "immutable_inputs": immutable_inputs,
             "owner_admission": owner_admission,
+            "review_seed": review_seed,
         }
+
+    def _review_seed_envelope_locked(
+        self,
+        state: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        session_id = str(state["session_id"])
+        if (
+            state.get("status") not in {"completed", "review_required"}
+            or state.get("active_attempt_id") is not None
+            or state.get("worker_pid") is not None
+            or state.get("supervisor_pid") is not None
+            or state.get("codex_pid") is not None
+            or not isinstance(state.get("thread_id"), str)
+            or not state.get("thread_id")
+        ):
+            raise ExternalCodexRuntimeError(
+                "review_seed_writer_not_terminal",
+                "review seed requires one terminal writer with no live process owner",
+            )
+        result_path = self._session_dir(session_id) / "result.json"
+        result = load_json(result_path, label="terminal writer result")
+        validate_json(result, RESULT_SCHEMA_PATH, label="terminal writer result")
+        if sha256_file(result_path) != state.get("result_digest"):
+            raise ExternalCodexRuntimeError(
+                "review_seed_writer_result_unbound",
+                "terminal writer result bytes differ from locked runtime state",
+            )
+        final_ref = state.get("actor_final_manifest_ref")
+        delta_ref = state.get("actor_delta_ref")
+        source_ref = state.get("source_manifest_before_ref")
+        if not all(
+            isinstance(item, dict) for item in (final_ref, delta_ref, source_ref)
+        ):
+            raise ExternalCodexRuntimeError(
+                "review_seed_writer_evidence_incomplete",
+                "terminal writer has no exact projection, delta, or source provenance",
+            )
+        if (
+            result.get("session_id") != session_id
+            or result.get("incarnation_id") != state.get("incarnation_id")
+            or result.get("thread_id") != state.get("thread_id")
+            or result.get("status") != state.get("status")
+            or result.get("actor_final_manifest_ref") != final_ref
+            or result.get("actor_delta_ref") != delta_ref
+            or result.get("source_manifest_before_ref") != source_ref
+            or result.get("actor_projection_path") != state.get("actor_projection_path")
+        ):
+            raise ExternalCodexRuntimeError(
+                "review_seed_writer_result_unbound",
+                "terminal writer result differs from its locked runtime state",
+            )
+        final_manifest = _load_verified_json_ref(
+            final_ref,
+            label="terminal writer actor final manifest",
+            schema_path=ACTOR_MANIFEST_SCHEMA_PATH,
+        )
+        _load_verified_json_ref(
+            delta_ref,
+            label="terminal writer actor delta",
+            schema_path=ACTOR_DELTA_SCHEMA_PATH,
+        )
+        source_manifest = _load_verified_json_ref(
+            source_ref,
+            label="terminal writer source manifest",
+            schema_path=WORKSPACE_MANIFEST_SCHEMA_PATH,
+        )
+        projection_path = self._projection_path_from_state(state)
+        projection_flags = os.O_PATH | os.O_CLOEXEC | os.O_DIRECTORY
+        if hasattr(os, "O_NOFOLLOW"):
+            projection_flags |= os.O_NOFOLLOW
+        try:
+            projection_fd = os.open(projection_path, projection_flags)
+        except OSError as exc:
+            raise ExternalCodexRuntimeError(
+                "review_seed_writer_projection_unavailable",
+                "terminal writer projection cannot be descriptor-bound",
+            ) from exc
+        try:
+            observed_manifest = _checked_actor_manifest(
+                projection_path,
+                source_manifest_digest=str(source_ref["artifact_digest"]),
+                source_git_head=str(source_manifest["git_head"]),
+                projection_fd=projection_fd,
+            )
+            _assert_descriptor_coordinate(projection_fd, projection_path)
+        finally:
+            os.close(projection_fd)
+        if observed_manifest != final_manifest:
+            raise ExternalCodexRuntimeError(
+                "review_seed_writer_projection_drift",
+                "terminal writer projection differs from its final manifest",
+            )
+        return {
+            "schema_version": "abyss_stack_external_codex_review_seed_envelope_v1",
+            "writer_session_id": session_id,
+            "writer_incarnation_id": str(state["incarnation_id"]),
+            "writer_thread_id": str(state["thread_id"]),
+            "writer_status": str(state["status"]),
+            "writer_result_ref": _artifact_ref(result_path),
+            "writer_projection_path": str(state["actor_projection_path"]),
+            "writer_final_manifest_ref": dict(final_ref),
+            "writer_delta_ref": dict(delta_ref),
+            "writer_source_manifest_ref": dict(source_ref),
+        }
+
+    def issue_review_seed(self, writer_session_id: str) -> dict[str, Any]:
+        """Issue one content-addressed reviewer capability under the writer lock."""
+
+        with self._lock(writer_session_id):
+            state = self._load_state(writer_session_id)
+            envelope = self._review_seed_envelope_locked(state)
+            validate_json(
+                envelope,
+                REVIEW_SEED_ENVELOPE_SCHEMA_PATH,
+                label="external Codex review seed envelope",
+            )
+            envelope_path = (
+                self._session_dir(writer_session_id) / "review-seed-envelope.json"
+            )
+            _atomic_write_json(envelope_path, envelope, mode=0o400)
+            return _artifact_ref(envelope_path)
+
+    def _validate_review_seed(
+        self,
+        seed: Mapping[str, Any],
+        *,
+        reviewer_session_id: str,
+        task: Mapping[str, Any],
+        binding: AgentIncarnationBinding,
+    ) -> dict[str, Any]:
+        if (
+            task.get("task_family") != "landing_review"
+            or task.get("execution_posture") != "independent_review"
+            or task.get("allowed_effect_class") != "read_only"
+            or binding.permission_posture.sandbox_mode != "read_only"
+        ):
+            raise ExternalCodexRuntimeError(
+                "workspace_projection_seed_forbidden",
+                "writer projection seeds are admitted only for a read-only independent landing reviewer",
+            )
+        envelope_path = Path(str(seed.get("envelope_path", "")))
+        envelope_ref = {
+            "owner_repo": "abyss-stack",
+            "artifact_ref": str(envelope_path),
+            "artifact_digest": str(seed.get("envelope_digest", "")),
+        }
+        envelope = _load_verified_json_ref(
+            envelope_ref,
+            label="external Codex review seed envelope",
+            schema_path=REVIEW_SEED_ENVELOPE_SCHEMA_PATH,
+        )
+        writer_session_id = str(envelope["writer_session_id"])
+        if writer_session_id == reviewer_session_id:
+            raise ExternalCodexRuntimeError(
+                "review_seed_session_reuse",
+                "reviewer must have a distinct session identity",
+            )
+        expected_path = (
+            self._session_dir(writer_session_id) / "review-seed-envelope.json"
+        )
+        if envelope_path != expected_path:
+            raise ExternalCodexRuntimeError(
+                "review_seed_envelope_unowned",
+                "review seed envelope is outside its exact writer session",
+            )
+        with self._lock(writer_session_id):
+            writer_state = self._load_state(writer_session_id)
+            expected = self._review_seed_envelope_locked(writer_state)
+            if envelope != expected:
+                raise ExternalCodexRuntimeError(
+                    "review_seed_envelope_drift",
+                    "review seed envelope differs from the locked terminal writer",
+                )
+            if task.get("parent_task_id") != writer_state.get("task_id"):
+                raise ExternalCodexRuntimeError(
+                    "review_seed_parent_task_mismatch",
+                    "reviewer task is not the child of the exact seeded writer task",
+                )
+            immutable_by_id = {
+                str(item.get("input_id")): item.get("provenance")
+                for item in task.get("immutable_inputs", [])
+                if isinstance(item, dict)
+            }
+            required_digests = {
+                "writer-runtime-result": envelope["writer_result_ref"][
+                    "artifact_digest"
+                ],
+                "writer-actor-final-manifest": envelope["writer_final_manifest_ref"][
+                    "artifact_digest"
+                ],
+                "writer-actor-delta": envelope["writer_delta_ref"]["artifact_digest"],
+                "review-workspace-manifest": envelope["writer_source_manifest_ref"][
+                    "artifact_digest"
+                ],
+            }
+            if any(
+                not isinstance(immutable_by_id.get(input_id), dict)
+                or immutable_by_id[input_id].get("artifact_digest") != digest
+                for input_id, digest in required_digests.items()
+            ):
+                raise ExternalCodexRuntimeError(
+                    "review_seed_evidence_mismatch",
+                    "reviewer immutable evidence does not bind the seeded writer result",
+                )
+        return envelope
 
     def preflight(
         self,
@@ -5740,6 +6851,15 @@ class ExternalCodexRuntime:
                     and state.get("active_attempt_id") is None
                     and state.get("worker_pid") is None
                 ):
+                    if state.get(
+                        "schema_version"
+                    ) != STATE_SCHEMA_VERSION or not isinstance(
+                        state.get("actor_projection_path"), str
+                    ):
+                        raise ExternalCodexRuntimeError(
+                            "legacy_projection_unavailable",
+                            "legacy session cannot receive a new inference attempt without a safe actor projection",
+                        )
                     self._spawn_worker(state, mode="start", resume_payload=None)
                 return self._public_state(state)
             inputs_dir = session_dir / "inputs"
@@ -5763,8 +6883,7 @@ class ExternalCodexRuntime:
                 task_id=str(validated["task"]["task_id"]),
                 incarnation_id=validated["binding"].incarnation_id,
                 immutable_input_ids=tuple(
-                    str(item["input_id"])
-                    for item in validated["immutable_inputs"]
+                    str(item["input_id"]) for item in validated["immutable_inputs"]
                 ),
             )
             _atomic_write_json(
@@ -5775,17 +6894,68 @@ class ExternalCodexRuntime:
             _atomic_write_bytes(
                 inputs_dir / "launch.json", validated["launch_raw"], mode=0o400
             )
+            controller_materialized_task_inputs: list[dict[str, Any]] = []
             materialized_task_inputs: list[dict[str, Any]] = []
+            source_aliases = _actor_source_aliases(validated)
+            source_roots = frozenset(
+                {
+                    str(validated["launch"]["workspace_path"]),
+                    str(validated["workspace"]),
+                    str(
+                        validated["workspace_manifest_baseline"].get(
+                            "workspace_path", ""
+                        )
+                    ),
+                }
+                - {""}
+            )
             for index, item in enumerate(validated["immutable_inputs"], start=1):
+                controller_target = (
+                    inputs_dir / "controller-immutable" / f"{index:03d}.input"
+                )
+                _atomic_write_bytes(controller_target, item["raw"], mode=0o400)
+                original_provenance = item["provenance"].model_dump(mode="json")
+                controller_materialized_task_inputs.append(
+                    {
+                        "input_id": item["input_id"],
+                        "path": str(controller_target),
+                        "provenance": original_provenance,
+                    }
+                )
                 target = inputs_dir / "immutable" / f"{index:03d}.input"
-                _atomic_write_bytes(target, item["raw"], mode=0o400)
+                _, actor_raw = _actor_safe_input_envelope(
+                    input_id=str(item["input_id"]),
+                    raw=item["raw"],
+                    original_provenance=original_provenance,
+                    aliases=source_aliases,
+                    source_roots=source_roots,
+                )
+                _atomic_write_bytes(target, actor_raw, mode=0o400)
                 materialized_task_inputs.append(
                     {
                         "input_id": item["input_id"],
                         "path": str(target),
-                        "provenance": item["provenance"].model_dump(mode="json"),
+                        "provenance": {
+                            "owner_repo": "abyss-stack",
+                            "artifact_ref": str(target),
+                            "source_ref": (
+                                "actor-safe-derivative-of:"
+                                + str(original_provenance["artifact_digest"])
+                            ),
+                            "artifact_digest": sha256_bytes(actor_raw),
+                            "schema_ref": (
+                                "schemas/external-codex-actor-input-envelope.schema.json"
+                            ),
+                            "schema_version": (
+                                "abyss_stack_external_codex_actor_input_envelope_v1"
+                            ),
+                        },
                     }
                 )
+            projection = self._prepare_actor_projection(
+                validated=validated,
+                session_dir=session_dir,
+            )
             failure_closeout = self._failure_closeout_context(
                 binding=validated["binding"],
                 task=validated["task"],
@@ -5814,13 +6984,36 @@ class ExternalCodexRuntime:
                 "workspace_path": str(validated["workspace"]),
                 "workspace_expected_head": launch["workspace_expected_head"],
                 "workspace_baseline": validated["baseline"],
-                "workspace_manifest_baseline": validated[
-                    "workspace_manifest_baseline"
+                "workspace_manifest_baseline": validated["workspace_manifest_baseline"],
+                "source_manifest_before_ref": projection["source_manifest_before_ref"],
+                "source_manifest_after_ref": projection["source_manifest_after_ref"],
+                "source_manifest_final_ref": None,
+                "actor_projection_path": projection["actor_projection_path"],
+                "actor_baseline_manifest_ref": projection[
+                    "actor_baseline_manifest_ref"
                 ],
+                "actor_final_manifest_ref": None,
+                "actor_delta_ref": None,
+                "review_seed_envelope_ref": (
+                    {
+                        "owner_repo": "abyss-stack",
+                        "artifact_ref": str(
+                            launch["workspace_projection_seed"]["envelope_path"]
+                        ),
+                        "artifact_digest": str(
+                            launch["workspace_projection_seed"]["envelope_digest"]
+                        ),
+                    }
+                    if validated["review_seed"] is not None
+                    else None
+                ),
                 "materialized_inputs": materialized,
                 "execution_result_schema_ref": _artifact_ref(
                     execution_result_schema_path,
                     owner="abyss-stack",
+                ),
+                "controller_materialized_task_inputs": (
+                    controller_materialized_task_inputs
                 ),
                 "materialized_task_inputs": materialized_task_inputs,
                 "failure_closeout": failure_closeout,
@@ -5880,8 +7073,11 @@ class ExternalCodexRuntime:
         attempt_dir.mkdir(parents=True, exist_ok=True)
         if resume_payload is not None:
             _atomic_write_json(attempt_dir / "resume.json", resume_payload, mode=0o400)
+        # The durable actor projection, not the owner source checkout, is the
+        # active attempt's mutable coordination surface.  Source-path flocking
+        # cannot defend against same-UID rename/replacement races.
         workspace_lock = self._acquire_workspace_attempt_lock(
-            state["workspace_path"]
+            state["actor_projection_path"]
         )
         try:
             read_fd, write_fd = os.pipe()
@@ -5991,7 +7187,11 @@ class ExternalCodexRuntime:
                     if mode == "resume"
                     else "external_agent.started"
                 ),
-                payload={"worker_pid": pid, "worker_start_ticks": start_ticks, "mode": mode},
+                payload={
+                    "worker_pid": pid,
+                    "worker_start_ticks": start_ticks,
+                    "mode": mode,
+                },
                 attempt_id=attempt_id,
                 significance="progress",
             )
@@ -6065,6 +7265,8 @@ class ExternalCodexRuntime:
         launch: Mapping[str, Any],
         scratch_root: Path,
         _tool_entry: Mapping[str, Any],
+        *,
+        repository_workspace: Path | None = None,
     ) -> dict[str, str]:
         environment: dict[str, str] = {}
         for key in launch.get("environment_allowlist", []):
@@ -6085,7 +7287,7 @@ class ExternalCodexRuntime:
             purpose="Git hooks directory",
         )
         repository_git_environment = _controller_git_environment(
-            Path(str(launch["workspace_path"]))
+            repository_workspace or Path(str(launch["workspace_path"]))
         )
         environment["HOME"] = str(shell_home)
         environment["PATH"] = CODEX_EXECUTABLE_PATH
@@ -6159,6 +7361,13 @@ class ExternalCodexRuntime:
                     "materialized_input_drift",
                     f"durable immutable input changed: {item['input_id']}",
                 )
+        for item in state.get("controller_materialized_task_inputs", []):
+            raw = read_bounded(Path(item["path"]))
+            if sha256_bytes(raw) != item["provenance"]["artifact_digest"]:
+                raise ExternalCodexRuntimeError(
+                    "materialized_input_drift",
+                    f"durable controller input changed: {item['input_id']}",
+                )
         plan = RunPlan.model_validate(payloads["plan"])
         binding = AgentIncarnationBinding.model_validate(
             payloads["incarnation_binding"]
@@ -6173,11 +7382,11 @@ class ExternalCodexRuntime:
         state: Mapping[str, Any],
         input_id: str,
     ) -> tuple[Path, bytes, ProvenanceRef]:
-        matches = [
-            item
-            for item in state["materialized_task_inputs"]
-            if item["input_id"] == input_id
-        ]
+        controller_inputs = state.get(
+            "controller_materialized_task_inputs",
+            state["materialized_task_inputs"],
+        )
+        matches = [item for item in controller_inputs if item["input_id"] == input_id]
         if len(matches) != 1:
             raise ExternalCodexRuntimeError(
                 "a2a_summon_request_unbound",
@@ -6188,7 +7397,11 @@ class ExternalCodexRuntime:
         immutable_root = (
             self._session_dir(str(state["session_id"]))
             / "inputs"
-            / "immutable"
+            / (
+                "controller-immutable"
+                if state.get("controller_materialized_task_inputs") is not None
+                else "immutable"
+            )
         ).resolve()
         try:
             resolved = path.resolve(strict=True)
@@ -6259,7 +7472,9 @@ class ExternalCodexRuntime:
                 )
         try:
             request = load_json_bytes(request_raw, label="canonical summon request")
-            schema = load_json_bytes(schema_raw, label="canonical summon request schema")
+            schema = load_json_bytes(
+                schema_raw, label="canonical summon request schema"
+            )
             validate_json(
                 request,
                 schema_path,
@@ -6374,8 +7589,7 @@ class ExternalCodexRuntime:
             task_id=str(state["task_id"]),
             incarnation_id=str(state["incarnation_id"]),
             immutable_input_ids=tuple(
-                str(item["input_id"])
-                for item in state["materialized_task_inputs"]
+                str(item["input_id"]) for item in state["materialized_task_inputs"]
             ),
         )
         if actual != expected:
@@ -6385,9 +7599,7 @@ class ExternalCodexRuntime:
             )
         return candidate
 
-    def _ensure_execution_result_schema_locked(
-        self, state: dict[str, Any]
-    ) -> Path:
+    def _ensure_execution_result_schema_locked(self, state: dict[str, Any]) -> Path:
         """Materialize exact identity constraints for a legacy resumable session."""
 
         if state.get("execution_result_schema_ref") is not None:
@@ -6401,8 +7613,7 @@ class ExternalCodexRuntime:
             task_id=str(state["task_id"]),
             incarnation_id=str(state["incarnation_id"]),
             immutable_input_ids=tuple(
-                str(item["input_id"])
-                for item in state["materialized_task_inputs"]
+                str(item["input_id"]) for item in state["materialized_task_inputs"]
             ),
         )
         path = (
@@ -6417,9 +7628,7 @@ class ExternalCodexRuntime:
         )
         return path
 
-    def _preserved_result_refs(
-        self, state: Mapping[str, Any]
-    ) -> list[dict[str, Any]]:
+    def _preserved_result_refs(self, state: Mapping[str, Any]) -> list[dict[str, Any]]:
         """Return exact prior terminal results retained across explicit resume."""
 
         session_dir = self._session_dir(str(state["session_id"]))
@@ -6428,11 +7637,7 @@ class ExternalCodexRuntime:
             attempt_number = attempt.get("attempt_number")
             if not isinstance(attempt_number, int):
                 continue
-            attempt_dir = (
-                session_dir
-                / "attempts"
-                / f"{attempt_number:03d}"
-            )
+            attempt_dir = session_dir / "attempts" / f"{attempt_number:03d}"
             result_paths = [attempt_dir / "runtime-result.json"]
             result_paths.extend(
                 sorted(attempt_dir.glob("runtime-result-revision-*.json"))
@@ -6440,9 +7645,7 @@ class ExternalCodexRuntime:
             for path in result_paths:
                 if path.is_file() and not path.is_symlink():
                     references.append(_artifact_ref(path))
-                closure_path = path.with_name(
-                    f"{path.stem}-evidence-closure.json"
-                )
+                closure_path = path.with_name(f"{path.stem}-evidence-closure.json")
                 if closure_path.is_file() and not closure_path.is_symlink():
                     references.append(_artifact_ref(closure_path))
         return references
@@ -6620,9 +7823,7 @@ class ExternalCodexRuntime:
                 )
         return _artifact_ref(closure_path)
 
-    def _owner_admission_ref(
-        self, state: Mapping[str, Any]
-    ) -> dict[str, Any] | None:
+    def _owner_admission_ref(self, state: Mapping[str, Any]) -> dict[str, Any] | None:
         path_value = state["materialized_inputs"].get("owner_execution_request")
         if path_value is None:
             return None
@@ -6694,38 +7895,119 @@ class ExternalCodexRuntime:
         self,
         *,
         state: Mapping[str, Any],
+        launch: Mapping[str, Any],
         binding: AgentIncarnationBinding,
         task: Mapping[str, Any],
         role_raw: bytes,
         execution_root: Path,
         resume_payload: Mapping[str, Any] | None,
     ) -> str:
-        role_text = role_raw.decode("utf-8", errors="replace")
-        continuation = binding.continuation.model_dump(mode="json")
+        actor_workspace = self._projection_path_from_state(state)
+        source_path = str(state["workspace_path"])
+        projection_path = str(execution_root)
+        source_paths = _actor_source_aliases(
+            {
+                "launch": launch,
+                "workspace": source_path,
+                "workspace_manifest_baseline": state["workspace_manifest_baseline"],
+            }
+        )
+        source_roots = tuple(
+            value
+            for value in dict.fromkeys(
+                (
+                    str(launch["workspace_path"]),
+                    source_path,
+                    str(state["workspace_manifest_baseline"].get("workspace_path", "")),
+                )
+            )
+            if value
+        )
+
+        def project_source_paths(value: Any) -> Any:
+            projected = value
+            for candidate in source_paths:
+                if candidate:
+                    projected = _replace_prompt_source_path(
+                        projected,
+                        source_path=candidate,
+                        projection_path=projection_path,
+                    )
+            return projected
+
+        def assert_control_view_is_source_free(value: Any) -> None:
+            if any(
+                _contains_source_path(value, candidate) for candidate in source_paths
+            ):
+                raise ExternalCodexRuntimeError(
+                    "actor_source_path_exposed",
+                    "model-facing control data retained a source coordinate",
+                )
+
+        role_text = project_source_paths(role_raw.decode("utf-8", errors="replace"))
+        continuation = project_source_paths(
+            binding.continuation.model_dump(mode="json")
+        )
         immutable_inputs = state["materialized_task_inputs"]
+        # The owner task remains durable and exact on disk, but its source-side
+        # local_path hints are not actor coordinates.  Give the model a
+        # projection-safe task view whose immutable inputs point only at the
+        # runtime materialization under the session directory.
+        prompt_task = project_source_paths(json.loads(json.dumps(task)))
+        assert_control_view_is_source_free(prompt_task)
+        materialized_by_id = {
+            str(item["input_id"]): str(item["path"]) for item in immutable_inputs
+        }
+        for item in prompt_task.get("immutable_inputs", []):
+            input_id = str(item.get("input_id", ""))
+            if input_id in materialized_by_id:
+                item["local_path"] = materialized_by_id[input_id]
+        prompt_validation_commands = [
+            project_source_paths(item) for item in task["validation_commands"]
+        ]
+        projected_resume_payload = (
+            project_source_paths(resume_payload) if resume_payload is not None else None
+        )
+        for control_view in (
+            role_text,
+            continuation,
+            prompt_validation_commands,
+            projected_resume_payload,
+        ):
+            assert_control_view_is_source_free(control_view)
         validation_execution_protocol = [
             {
                 "command_id": item["command_id"],
                 "task_argv": item["argv"],
                 "task_cwd": item["cwd"],
                 "execution_argv": list(
-                    _validation_wrapper_argv(state["workspace_path"], item)
+                    _replace_prompt_source_path(
+                        _validation_wrapper_argv(actor_workspace, item),
+                        source_path=str(actor_workspace),
+                        projection_path=str(execution_root),
+                    )
                 ),
             }
-            for item in task["validation_commands"]
+            for item in prompt_validation_commands
         ]
         resume_block = (
             "\nResume instruction:\n"
-            + json.dumps(resume_payload, ensure_ascii=False, indent=2)
+            + json.dumps(
+                projected_resume_payload,
+                ensure_ascii=False,
+                indent=2,
+            )
             if resume_payload is not None
             else ""
         )
         workspace_projection = {
-            "target_workspace": str(state["workspace_path"]),
+            "target_workspace": str(execution_root),
             "codex_execution_root": str(execution_root),
             "target_workspace_access": binding.permission_posture.sandbox_mode,
+            "projection_kind": "runtime_owned_actor_workspace",
+            "source_workspace_path": None,
         }
-        return f"""You are one external Codex process carrying a bounded AoA role incarnation.
+        prompt = f"""You are one external Codex process carrying a bounded AoA role incarnation.
 
 This is not a built-in Codex subagent workflow. Do not delegate, spawn subagents,
 or widen the task. The user remains the only human authority. Read the repository
@@ -6739,7 +8021,7 @@ Role source (exact delivered bytes):
 
 Task packet:
 <task>
-{json.dumps(task, ensure_ascii=False, indent=2)}
+{json.dumps(prompt_task, ensure_ascii=False, indent=2)}
 </task>
 
 Continuation obligation:
@@ -6752,7 +8034,7 @@ Runtime-materialized immutable inputs (read these paths, not mutable aliases):
 {json.dumps(immutable_inputs, ensure_ascii=False, indent=2)}
 </immutable_inputs>
 
-Workspace projection:
+Runtime-owned actor workspace projection (the only mutable repository view):
 <workspace_projection>
 {json.dumps(workspace_projection, ensure_ascii=False, indent=2)}
 </workspace_projection>
@@ -6764,13 +8046,14 @@ Fixed validation execution protocol:
 {resume_block}
 
 Hard stop-lines:
-- Keep the task inside its named workspace and authority scope. For repo-mutation
+- Keep the task inside the named actor projection and authority scope. For repo-mutation
   work, mutate only allowed_paths; for read-only work, mutate nothing.
-- Treat target_workspace above as the only repository under study. The Codex
-  process cwd may instead be a runtime-owned attempt-local execution root so
-  temporary tools can work without making target_workspace writable. Bind every
-  source exploration command explicitly to target_workspace; never cite or
-  return execution-root bytes as source evidence or a workspace artifact.
+- Treat target_workspace above as the only repository under study. It is a
+  runtime-owned projection with a private, read-only Git body that reproduces
+  the admitted baseline without retaining the owner checkout coordinate. Bind
+  every exploration and validation command to that projection; never cite or
+  return controller, source-checkout, or execution-root bytes as workspace
+  evidence.
 - Anchored source: refs may name only source_evidence_paths. When that optional
   field is absent, allowed_paths is the backward-compatible evidence scope.
 - Run every fixed validation through its exact execution_argv above. This
@@ -6807,10 +8090,20 @@ Hard stop-lines:
 - If owner meaning, architecture, scope, authority, rollback, or safety is
   ambiguous, return authority_blocked or review_required instead of guessing.
 - Return one JSON object matching the supplied output schema. Identity fields
-  must be task_id={task['task_id']!r} and incarnation_id={binding.incarnation_id!r}.
+  must be task_id={task["task_id"]!r} and incarnation_id={binding.incarnation_id!r}.
 
-Runtime session identity: {state['session_id']}
+Runtime session identity: {state["session_id"]}
 """
+        if any(
+            _contains_source_path(prompt, candidate)
+            for candidate in source_roots
+            if candidate
+        ):
+            raise ExternalCodexRuntimeError(
+                "actor_source_path_exposed",
+                "source workspace absolute path would be exposed to the actor",
+            )
+        return prompt
 
     def _codex_command(
         self,
@@ -6825,6 +8118,11 @@ Runtime session identity: {state['session_id']}
         thread_id: str | None,
         mcp_endpoint_overrides: Mapping[str, str] | None = None,
         actor_git_mask: Mapping[str, Any] | None = None,
+        sanitized_config_path: Path | None = None,
+        readable_paths: Sequence[Path] = (),
+        writable_paths: Sequence[Path] = (),
+        denied_paths: Sequence[Path] = (),
+        workspace_access: Literal["read", "write"] = "write",
     ) -> list[str]:
         executable = str(launch["codex_executable"])
         configuration = realization["configuration"]
@@ -6840,13 +8138,15 @@ Runtime session identity: {state['session_id']}
                 "codex_permission_profile_invalid",
                 "external actor runtime requires the workspace-derived Codex profile",
             )
-        if actor_git_mask is None:
-            raise ExternalCodexRuntimeError(
-                "actor_git_mask_unavailable",
-                "external actor launch lacks its attempt-local Git mask",
-            )
-        permission_profile = _actor_codex_permission_profile(actor_git_mask)
-        execution_root_mode = str(tool_entry["codex_execution_root"])
+        permission_profile = _actor_codex_permission_profile(
+            actor_git_mask,
+            sanitized_config_path=sanitized_config_path,
+            execution_root=execution_root,
+            readable_paths=readable_paths,
+            writable_paths=writable_paths,
+            denied_paths=denied_paths,
+            workspace_access=workspace_access,
+        )
         base.extend(
             [
                 "-C",
@@ -6890,14 +8190,11 @@ Runtime session identity: {state['session_id']}
                     "mcp_credential_proxy_unavailable",
                     f"role-scoped MCP server lacks an attempt-local proxy: {server_id}",
                 )
-            server_config = (
-                "{url=\""
-                + endpoint_url
-                + "\",enabled=true,required=true}"
-            )
+            server_config = '{url="' + endpoint_url + '",enabled=true,required=true}'
             common[0:0] = ["-c", f"mcp_servers.{server_id}={server_config}"]
-        if execution_root_mode == "attempt-local":
-            common.insert(0, "--skip-git-repo-check")
+        # The projection has its own exact, read-only Git body.  Codex and the
+        # actor can therefore use repository-local inspection without ever
+        # consulting or mutating the owner checkout's Git metadata.
         if mode == "resume":
             if not thread_id:
                 raise ExternalCodexRuntimeError(
@@ -6943,20 +8240,22 @@ Runtime session identity: {state['session_id']}
         session_dir = self._session_dir(session_id)
         attempt_dir = session_dir / "attempts" / f"{attempt_number:03d}"
         scratch = attempt_dir / "scratch"
-        execution_root = attempt_dir / "execution-root"
         scratch.mkdir(parents=True, exist_ok=True)
-        execution_root.mkdir(parents=True, exist_ok=True)
+        projection_descriptor = -1
+        child_workspace_descriptor = -1
         with self._lock(session_id):
             state = self._load_state(session_id)
             launch, _, binding, task, realization, role_raw = (
                 self._materialized_payloads(state)
             )
-            workspace_manifest_input_id = str(
-                launch["workspace_manifest_input_id"]
+            workspace_manifest_input_id = str(launch["workspace_manifest_input_id"])
+            controller_inputs = state.get(
+                "controller_materialized_task_inputs",
+                state["materialized_task_inputs"],
             )
             manifest_inputs = [
                 item
-                for item in state["materialized_task_inputs"]
+                for item in controller_inputs
                 if item["input_id"] == workspace_manifest_input_id
             ]
             if (
@@ -6967,28 +8266,43 @@ Runtime session identity: {state['session_id']}
                     "workspace_manifest_required",
                     "durable exact_baseline lost its workspace manifest",
                 )
-            if manifest_inputs:
-                manifest = load_json(
-                    Path(manifest_inputs[0]["path"]),
-                    label="materialized external Codex workspace manifest",
+            source_workspace = Path(state["workspace_path"])
+            if state.get("review_seed_envelope_ref") is None:
+                if manifest_inputs:
+                    manifest = load_json(
+                        Path(manifest_inputs[0]["path"]),
+                        label="materialized external Codex workspace manifest",
+                    )
+                    assert_workspace_manifest(manifest, source_workspace)
+                try:
+                    source_manifest = build_workspace_manifest(source_workspace)
+                except ExternalCodexRuntimeError as exc:
+                    self._worker_failure_locked(
+                        state,
+                        attempt_id=attempt_id,
+                        code="workspace_source_race",
+                        message=(
+                            "source workspace cannot be revalidated before inference: "
+                            f"{exc}"
+                        ),
+                    )
+                    return
+                if source_manifest != state["workspace_manifest_baseline"]:
+                    self._worker_failure_locked(
+                        state,
+                        attempt_id=attempt_id,
+                        code="workspace_source_race",
+                        message=(
+                            "source workspace changed between admission and Codex launch"
+                        ),
+                    )
+                    return
+            else:
+                _load_verified_json_ref(
+                    state["review_seed_envelope_ref"],
+                    label="durable reviewer seed envelope",
+                    schema_path=REVIEW_SEED_ENVELOPE_SCHEMA_PATH,
                 )
-                assert_workspace_manifest(manifest, state["workspace_path"])
-            if _git_head(Path(state["workspace_path"])) != state["workspace_expected_head"]:
-                self._worker_failure_locked(
-                    state,
-                    attempt_id=attempt_id,
-                    code="workspace_head_drift",
-                    message="workspace HEAD changed before Codex launch",
-                )
-                return
-            if _git_status(Path(state["workspace_path"])) != state["workspace_baseline"]:
-                self._worker_failure_locked(
-                    state,
-                    attempt_id=attempt_id,
-                    code="workspace_baseline_drift",
-                    message="workspace changed between admission and Codex launch",
-                )
-                return
             tool_entry = next(
                 item
                 for item in self.profile["tool_profiles"]
@@ -6999,14 +8313,17 @@ Runtime session identity: {state['session_id']}
                 str(state["model_slug"]),
                 str(state["reasoning_effort"]),
                 tool_entry,
+                repository_workspace=self._projection_path_from_state(state),
             )
             admitted_mount_wrapper_digest = state["preflight"].get(
                 "mount_wrapper_digest"
             )
+            admitted_mount_launcher_digest = state["preflight"].get(
+                "mount_launcher_digest"
+            )
             if (
                 not isinstance(admitted_mount_wrapper_digest, str)
-                or preflight["mount_wrapper_digest"]
-                != admitted_mount_wrapper_digest
+                or preflight["mount_wrapper_digest"] != admitted_mount_wrapper_digest
             ):
                 self._worker_failure_locked(
                     state,
@@ -7015,43 +8332,108 @@ Runtime session identity: {state['session_id']}
                     message="mount wrapper changed after durable admission",
                 )
                 return
-            current_manifest = build_workspace_manifest(state["workspace_path"])
-            if current_manifest != state["workspace_manifest_baseline"]:
-                self._worker_failure_locked(
-                    state,
-                    attempt_id=attempt_id,
-                    code="workspace_manifest_drift",
-                    message=(
-                        "workspace bytes changed between admission and Codex launch"
-                    ),
-                )
-                return
-            codex_execution_root = (
-                execution_root
-                if tool_entry["codex_execution_root"] == "attempt-local"
-                else Path(str(state["workspace_path"]))
-            )
-            target_workspace = Path(str(state["workspace_path"])).resolve()
-            resolved_execution_root = codex_execution_root.resolve()
             if (
-                tool_entry["codex_execution_root"] == "attempt-local"
-                and (
-                    resolved_execution_root.is_relative_to(target_workspace)
-                    or target_workspace.is_relative_to(resolved_execution_root)
-                )
+                not isinstance(admitted_mount_launcher_digest, str)
+                or preflight["mount_launcher_digest"] != admitted_mount_launcher_digest
             ):
                 self._worker_failure_locked(
                     state,
                     attempt_id=attempt_id,
-                    code="execution_root_workspace_overlap",
+                    code="mount_launcher_drift",
+                    message="mount launcher changed after durable admission",
+                )
+                return
+            if state.get("review_seed_envelope_ref") is None:
+                current_manifest = build_workspace_manifest(source_workspace)
+                if current_manifest != state["workspace_manifest_baseline"]:
+                    self._worker_failure_locked(
+                        state,
+                        attempt_id=attempt_id,
+                        code="workspace_source_race",
+                        message=(
+                            "workspace bytes changed between admission and Codex launch"
+                        ),
+                    )
+                    return
+            target_workspace = self._projection_path_from_state(state)
+            actor_baseline_ref = state.get("actor_baseline_manifest_ref")
+            if not isinstance(actor_baseline_ref, dict):
+                self._worker_failure_locked(
+                    state,
+                    attempt_id=attempt_id,
+                    code="legacy_projection_unavailable",
+                    message="no durable actor baseline manifest is available",
+                )
+                return
+            # The original baseline remains the origin for the cumulative
+            # terminal delta.  A resumed actor, however, must start from the
+            # exact final tree produced by its preceding attempt rather than
+            # being forced back to that origin.
+            attempt_baseline_ref = (
+                state.get("actor_final_manifest_ref")
+                if mode == "resume"
+                else actor_baseline_ref
+            )
+            if not isinstance(attempt_baseline_ref, dict):
+                self._worker_failure_locked(
+                    state,
+                    attempt_id=attempt_id,
+                    code="resume_projection_baseline_unavailable",
+                    message="resume has no exact preceding actor final manifest",
+                )
+                return
+            attempt_baseline = _load_verified_json_ref(
+                attempt_baseline_ref,
+                label="actor attempt baseline manifest",
+                schema_path=ACTOR_MANIFEST_SCHEMA_PATH,
+            )
+            projection_flags = os.O_PATH | os.O_CLOEXEC | os.O_DIRECTORY
+            if hasattr(os, "O_NOFOLLOW"):
+                projection_flags |= os.O_NOFOLLOW
+            try:
+                projection_descriptor = os.open(
+                    target_workspace,
+                    projection_flags,
+                )
+            except OSError:
+                self._worker_failure_locked(
+                    state,
+                    attempt_id=attempt_id,
+                    code="actor_projection_unavailable",
+                    message="runtime-owned actor projection cannot be descriptor-bound",
+                )
+                return
+            observed_attempt_baseline = _checked_actor_manifest(
+                target_workspace,
+                source_manifest_digest=str(
+                    state["source_manifest_before_ref"]["artifact_digest"]
+                ),
+                source_git_head=str(state["workspace_expected_head"]),
+                projection_fd=projection_descriptor,
+            )
+            if attempt_baseline != observed_attempt_baseline:
+                os.close(projection_descriptor)
+                projection_descriptor = -1
+                self._worker_failure_locked(
+                    state,
+                    attempt_id=attempt_id,
+                    code="actor_projection_drift",
                     message=(
-                        "attempt-local Codex execution root overlaps the target workspace"
+                        "runtime-owned actor projection differs from the exact "
+                        "attempt baseline before inference"
                     ),
                 )
                 return
-            actor_git_mask = _prepare_actor_git_mask(target_workspace, scratch)
+            codex_execution_root = ACTOR_EXECUTION_ROOT
+            sanitized_config_path = scratch / "actor-git-config"
+            _atomic_write_bytes(
+                sanitized_config_path,
+                b"[core]\n\trepositoryFormatVersion = 0\n\tbare = false\n",
+                mode=0o400,
+            )
             prompt = self._render_prompt(
                 state=state,
+                launch=launch,
                 binding=binding,
                 task=task,
                 role_raw=role_raw,
@@ -7076,16 +8458,41 @@ Runtime session identity: {state['session_id']}
                 mode=mode,
                 thread_id=state.get("thread_id"),
                 mcp_endpoint_overrides=mcp_endpoints,
-                actor_git_mask=actor_git_mask,
+                sanitized_config_path=sanitized_config_path,
+                readable_paths=(
+                    output_schema,
+                    *(
+                        Path(str(item["path"]))
+                        for item in state["materialized_task_inputs"]
+                    ),
+                ),
+                writable_paths=(attempt_dir, scratch),
+                denied_paths=(
+                    self._session_dir(str(state["session_id"]))
+                    / "inputs"
+                    / "controller-immutable",
+                ),
+                workspace_access=(
+                    "write"
+                    if binding.permission_posture.sandbox_mode == "workspace_write"
+                    else "read"
+                ),
             )
             process_identity_path = attempt_dir / "process-identity.json"
+            child_workspace_descriptor = os.dup(projection_descriptor)
             command = self._containment_command(
                 codex_command,
                 executable_digest=str(launch["codex_executable_digest"]),
                 identity_path=process_identity_path,
-                actor_git_mask=actor_git_mask,
-                mount_wrapper_digest=str(preflight["mount_wrapper_digest"]),
+                mount_wrapper_digest=str(state["preflight"]["mount_wrapper_digest"]),
+                mount_launcher_digest=str(state["preflight"]["mount_launcher_digest"]),
+                workspace_fd=child_workspace_descriptor,
             )
+            if str(source_workspace) in "\0".join(command):
+                raise ExternalCodexRuntimeError(
+                    "actor_source_path_exposed",
+                    "source workspace absolute path would be exposed in actor argv",
+                )
             attempt = state["attempts"][attempt_number - 1]
             attempt["status"] = "running"
             attempt["started_at"] = iso_now()
@@ -7100,6 +8507,7 @@ Runtime session identity: {state['session_id']}
             launch,
             scratch,
             tool_entry,
+            repository_workspace=target_workspace,
         )
         started = utc_now()
         runtime_failure_code: str | None = None
@@ -7110,14 +8518,20 @@ Runtime session identity: {state['session_id']}
             stderr_path.open("wb") as stderr_handle,
             raw_events_path.open("ab") as raw_handle,
         ):
-            process = subprocess.Popen(
-                command,
-                stdin=prompt_handle,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=environment,
-                start_new_session=True,
-            )
+            try:
+                process = subprocess.Popen(
+                    command,
+                    stdin=prompt_handle,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    env=environment,
+                    cwd=str(attempt_dir),
+                    start_new_session=True,
+                    pass_fds=(child_workspace_descriptor,),
+                )
+            finally:
+                os.close(child_workspace_descriptor)
+                child_workspace_descriptor = -1
             supervisor_start_ticks = _process_start_ticks(process.pid)
             if supervisor_start_ticks is None:
                 process.terminate()
@@ -7145,10 +8559,12 @@ Runtime session identity: {state['session_id']}
                 )
                 self._save_state(state)
             try:
-                process_identity, process_identity_ref = _wait_for_process_identity_receipt(
-                    process_identity_path,
-                    process=process,
-                    supervisor_start_ticks=supervisor_start_ticks,
+                process_identity, process_identity_ref = (
+                    _wait_for_process_identity_receipt(
+                        process_identity_path,
+                        process=process,
+                        supervisor_start_ticks=supervisor_start_ticks,
+                    )
                 )
             except ExternalCodexRuntimeError:
                 self._terminate_supervised_process(process, supervisor_start_ticks)
@@ -7191,7 +8607,8 @@ Runtime session identity: {state['session_id']}
                 ready = selector.select(timeout=0.25)
                 if not ready and process.poll() is not None:
                     ready = [
-                        (key, selectors.EVENT_READ) for key in selector.get_map().values()
+                        (key, selectors.EVENT_READ)
+                        for key in selector.get_map().values()
                     ]
                 for key, _ in ready:
                     stream = str(key.data)
@@ -7229,6 +8646,7 @@ Runtime session identity: {state['session_id']}
                                     attempt_id=attempt_id,
                                     attempt_number=attempt_number,
                                     line=line + b"\n",
+                                    projection_fd=projection_descriptor,
                                 )
                             except ExternalCodexRuntimeError as exc:
                                 runtime_failure_code = exc.code
@@ -7267,6 +8685,7 @@ Runtime session identity: {state['session_id']}
                         attempt_id=attempt_id,
                         attempt_number=attempt_number,
                         line=stdout_buffer,
+                        projection_fd=projection_descriptor,
                     )
             raw_handle.flush()
             stderr_handle.flush()
@@ -7310,7 +8729,10 @@ Runtime session identity: {state['session_id']}
                 raw_events_path=raw_events_path,
                 stderr_path=stderr_path,
                 runtime_failure_code=runtime_failure_code,
+                projection_fd=projection_descriptor,
             )
+        os.close(projection_descriptor)
+        projection_descriptor = -1
 
     @staticmethod
     def _terminate_supervised_process(
@@ -7343,7 +8765,8 @@ Runtime session identity: {state['session_id']}
             attempt = state["attempts"][attempt_number - 1]
             if attempt["attempt_id"] != attempt_id:
                 raise ExternalCodexRuntimeError(
-                    "attempt_identity_mismatch", "runtime output belongs to another attempt"
+                    "attempt_identity_mismatch",
+                    "runtime output belongs to another attempt",
                 )
             attempt["output_bytes"] = int(attempt.get("output_bytes", 0)) + byte_count
             state["output_bytes"] = int(state.get("output_bytes", 0)) + byte_count
@@ -7356,6 +8779,7 @@ Runtime session identity: {state['session_id']}
         *,
         payload: Mapping[str, Any],
         attempt_id: str,
+        projection_fd: int | None = None,
     ) -> dict[str, Any]:
         """Build the exact replayable state delta for one normalized event."""
 
@@ -7380,7 +8804,11 @@ Runtime session identity: {state['session_id']}
             usage = payload["usage"]
             for target in usage_delta:
                 value = usage.get(target)
-                if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                if (
+                    isinstance(value, int)
+                    and not isinstance(value, bool)
+                    and value >= 0
+                ):
                     usage_delta[target] = value
         command_record: dict[str, Any] | None = None
         item = payload.get("item")
@@ -7411,16 +8839,29 @@ Runtime session identity: {state['session_id']}
                     Path(state["materialized_inputs"]["task"]),
                     label="materialized task",
                 )
+                attempts = state.get("attempts")
+                execution_root = (
+                    attempts[-1].get("execution_root")
+                    if isinstance(attempts, list) and attempts
+                    else None
+                )
+                actor_workspace = self._projection_path_from_state(state)
                 wrappers = (
-                    _validation_wrapper_argv(state["workspace_path"], spec)
+                    _descriptor_validation_wrapper_argv(execution_root, spec)
+                    if execution_root
+                    else _validation_wrapper_argv(actor_workspace, spec)
                     for spec in task["validation_commands"]
                 )
-                if any(
-                    _command_matches_argv(command, wrapper)
-                    for wrapper in wrappers
-                ):
+                if any(_command_matches_argv(command, wrapper) for wrapper in wrappers):
                     command_record["workspace_manifest_digest"] = canonical_digest(
-                        build_workspace_manifest(state["workspace_path"])
+                        _checked_actor_manifest(
+                            actor_workspace,
+                            source_manifest_digest=str(
+                                state["source_manifest_before_ref"]["artifact_digest"]
+                            ),
+                            source_git_head=str(state["workspace_expected_head"]),
+                            projection_fd=projection_fd,
+                        )
                     )
         return {
             "thread_id": thread_delta,
@@ -7554,7 +8995,10 @@ Runtime session identity: {state['session_id']}
                 expected_record["item_id"] = item_id
             if source_type == "item.started":
                 expected_record["event_phase"] = "started"
-            if any(command_record.get(key) != value for key, value in expected_record.items()):
+            if any(
+                command_record.get(key) != value
+                for key, value in expected_record.items()
+            ):
                 raise ExternalCodexRuntimeError(
                     "runtime_event_semantic_recovery_invalid",
                     "Codex command delta differs from the source event",
@@ -7568,12 +9012,25 @@ Runtime session identity: {state['session_id']}
                 Path(state["materialized_inputs"]["task"]),
                 label="materialized task",
             )
-            is_fixed_validation = source_type == "item.completed" and bool(command) and any(
-                _command_matches_argv(
-                    command,
-                    _validation_wrapper_argv(state["workspace_path"], spec),
+            attempts = state.get("attempts")
+            execution_root = (
+                attempts[-1].get("execution_root")
+                if isinstance(attempts, list) and attempts
+                else None
+            )
+            actor_workspace = self._projection_path_from_state(state)
+            is_fixed_validation = (
+                source_type == "item.completed"
+                and bool(command)
+                and any(
+                    _command_matches_argv(
+                        command,
+                        _descriptor_validation_wrapper_argv(execution_root, spec)
+                        if execution_root
+                        else _validation_wrapper_argv(actor_workspace, spec),
+                    )
+                    for spec in task["validation_commands"]
                 )
-                for spec in task["validation_commands"]
             )
             manifest_digest = command_record.get("workspace_manifest_digest")
             if is_fixed_validation != isinstance(manifest_digest, str) or (
@@ -7615,6 +9072,7 @@ Runtime session identity: {state['session_id']}
         attempt_id: str,
         attempt_number: int,
         line: bytes,
+        projection_fd: int | None = None,
     ) -> None:
         try:
             payload = json.loads(line)
@@ -7641,6 +9099,7 @@ Runtime session identity: {state['session_id']}
                 state,
                 payload=payload,
                 attempt_id=attempt_id,
+                projection_fd=projection_fd,
             )
             self._apply_codex_state_delta(
                 state,
@@ -7652,8 +9111,18 @@ Runtime session identity: {state['session_id']}
             normalized_payload = dict(payload)
             normalized_payload["_runtime_state_delta_v1"] = delta
             significance: Literal[
-                "trace", "progress", "checkpoint", "review", "authority", "parent_wake", "terminal"
-            ] = "progress" if source_type in {"thread.started", "turn.started", "turn.completed"} else "trace"
+                "trace",
+                "progress",
+                "checkpoint",
+                "review",
+                "authority",
+                "parent_wake",
+                "terminal",
+            ] = (
+                "progress"
+                if source_type in {"thread.started", "turn.started", "turn.completed"}
+                else "trace"
+            )
             self._append_event(
                 state,
                 event_type=f"codex.{source_type}",
@@ -7687,7 +9156,9 @@ Runtime session identity: {state['session_id']}
             None,
         )
         action = (
-            condition.action if condition is not None else binding.wake_policy.default_action
+            condition.action
+            if condition is not None
+            else binding.wake_policy.default_action
         )
         return {
             "event_kind": event_kind,
@@ -7710,6 +9181,7 @@ Runtime session identity: {state['session_id']}
         binding: AgentIncarnationBinding,
         runtime_evidence_paths: Mapping[str, Path],
         final_workspace_manifest_digest: str | None,
+        projection_fd: int | None = None,
     ) -> None:
         def require_text(value: Any, label: str) -> None:
             if not isinstance(value, str) or not value.strip():
@@ -7718,12 +9190,14 @@ Runtime session identity: {state['session_id']}
                     f"model report contains an empty {label}",
                 )
 
+        actor_workspace = self._projection_path_from_state(state)
         if (
             report.get("task_id") != state["task_id"]
             or report.get("incarnation_id") != state["incarnation_id"]
         ):
             raise ExternalCodexRuntimeError(
-                "model_report_identity_mismatch", "model report identity differs from runtime state"
+                "model_report_identity_mismatch",
+                "model report identity differs from runtime state",
             )
         expected_decision = {
             "completed": "proceed",
@@ -7766,6 +9240,7 @@ Runtime session identity: {state['session_id']}
                     "source_evidence_paths", task["allowed_paths"]
                 ),
                 runtime_evidence_paths=runtime_evidence_paths,
+                workspace_fd=projection_fd,
             )
         for finding in report["findings"]:
             require_text(finding.get("category"), "finding category")
@@ -7785,6 +9260,7 @@ Runtime session identity: {state['session_id']}
                         "source_evidence_paths", task["allowed_paths"]
                     ),
                     runtime_evidence_paths=runtime_evidence_paths,
+                    workspace_fd=projection_fd,
                 )
         artifact_paths = report["artifact_paths"]
         if len(artifact_paths) != len(set(artifact_paths)):
@@ -7807,7 +9283,7 @@ Runtime session identity: {state['session_id']}
                     "model_report_artifact_forbidden_read_only",
                     "read-only work cannot claim a produced workspace artifact",
                 )
-            _workspace_artifact_path(state["workspace_path"], value)
+            _workspace_artifact_path(actor_workspace, value)
             if value not in changed_workspace_paths:
                 raise ExternalCodexRuntimeError(
                     "model_report_artifact_not_produced",
@@ -7823,14 +9299,18 @@ Runtime session identity: {state['session_id']}
                 "model_report_validation_claims_incomplete",
                 "model report validation claims must exactly cover fixed task commands in order",
             )
+        attempts = state.get("attempts")
+        execution_root = (
+            attempts[-1].get("execution_root")
+            if isinstance(attempts, list) and attempts
+            else None
+        )
         for command_spec, claim in zip(
             task["validation_commands"], validation_claims, strict=True
         ):
             require_text(claim.get("command_id"), "validation command id")
             require_text(claim.get("evidence_ref"), "validation evidence ref")
-            expected_evidence_ref = (
-                f"runtime:validation:{command_spec['command_id']}"
-            )
+            expected_evidence_ref = f"runtime:validation:{command_spec['command_id']}"
             if claim["evidence_ref"] != expected_evidence_ref:
                 raise ExternalCodexRuntimeError(
                     "model_report_validation_evidence_unbound",
@@ -7842,9 +9322,17 @@ Runtime session identity: {state['session_id']}
                 if item.get("validation_command_id") == command_spec["command_id"]
                 and item.get("validation_argv") == command_spec["argv"]
                 and item.get("validation_cwd")
-                == str(_validation_cwd(state["workspace_path"], command_spec))
+                == str(
+                    _descriptor_validation_cwd(execution_root, command_spec)
+                    if execution_root
+                    else _validation_cwd(actor_workspace, command_spec)
+                )
                 and item.get("validation_wrapper_argv")
-                == list(_validation_wrapper_argv(state["workspace_path"], command_spec))
+                == list(
+                    _descriptor_validation_wrapper_argv(execution_root, command_spec)
+                    if execution_root
+                    else _validation_wrapper_argv(actor_workspace, command_spec)
+                )
             ]
             if not executions:
                 raise ExternalCodexRuntimeError(
@@ -7879,7 +9367,8 @@ Runtime session identity: {state['session_id']}
             transition["from_status"] != expected["from_status"]
             or transition["owner"] != task["target_owner"]
             or transition["approval_posture"] != expected["approval_posture"]
-            or transition["rollback_reentry_route"] != expected["rollback_reentry_route"]
+            or transition["rollback_reentry_route"]
+            != expected["rollback_reentry_route"]
         ):
             raise ExternalCodexRuntimeError(
                 "model_report_transition_mismatch",
@@ -7931,10 +9420,9 @@ Runtime session identity: {state['session_id']}
         for item in commands:
             command = str(item.get("command") or "")
             detected.update(_command_effects(command) & RUNTIME_WIDE_FORBIDDEN_EFFECTS)
-            if (
-                item.get("validation_command_id") is None
-                and _command_has_unclassified_indirection(command)
-            ):
+            if item.get(
+                "validation_command_id"
+            ) is None and _command_has_unclassified_indirection(command):
                 detected.add("unclassified_indirect_effect")
         return sorted(detected)
 
@@ -7955,9 +9443,7 @@ Runtime session identity: {state['session_id']}
         for item in commands:
             command = str(item.get("command") or "")
             detected.update(_command_effects(command))
-            is_fixed_validation = isinstance(
-                item.get("workspace_manifest_digest"), str
-            )
+            is_fixed_validation = isinstance(item.get("workspace_manifest_digest"), str)
             if not is_fixed_validation and _command_has_unclassified_indirection(
                 command
             ):
@@ -7977,14 +9463,17 @@ Runtime session identity: {state['session_id']}
         raw_events_path: Path,
         stderr_path: Path,
         runtime_failure_code: str | None,
+        projection_fd: int | None = None,
     ) -> None:
         launch, _, binding, task, _, _ = self._materialized_payloads(state)
+        actor_workspace = self._projection_path_from_state(state)
+        attempt = state["attempts"][attempt_number - 1]
         state["executed_commands"] = _annotate_validation_executions(
             state["executed_commands"],
             task=task,
-            workspace=state["workspace_path"],
+            workspace=attempt["execution_root"] or ACTOR_EXECUTION_ROOT,
+            descriptor_bound_coordinate=True,
         )
-        attempt = state["attempts"][attempt_number - 1]
         attempt["finished_at"] = finished.isoformat().replace("+00:00", "Z")
         attempt["exit_code"] = exit_code
         state["supervisor_pid"] = None
@@ -7994,32 +9483,95 @@ Runtime session identity: {state['session_id']}
         state["worker_pid"] = None
         state["worker_start_ticks"] = None
         state["finished_at"] = finished.isoformat().replace("+00:00", "Z")
-        manifest_baseline = state["workspace_manifest_baseline"]
-        workspace_manifest_match: bool | None = None
+        actor_manifest_baseline_ref = state.get("actor_baseline_manifest_ref")
+        actor_manifest_baseline: dict[str, Any] | None = None
+        if isinstance(actor_manifest_baseline_ref, dict):
+            actor_manifest_baseline = _load_verified_json_ref(
+                actor_manifest_baseline_ref,
+                label="actor baseline manifest",
+                schema_path=ACTOR_MANIFEST_SCHEMA_PATH,
+            )
+        actor_manifest_match: bool | None = None
         workspace_manifest_ref: dict[str, Any] | None = None
         final_workspace_manifest_digest: str | None = None
+        actor_delta_ref: dict[str, Any] | None = None
+        actor_final_manifest_ref: dict[str, Any] | None = None
+        source_manifest_match: bool | None = None
+        source_manifest_final_ref: dict[str, Any] | None = None
         manifest_observation_gap = False
+        manifest_observation_failure_code: str | None = None
         head_drift = False
         try:
-            current_manifest = build_workspace_manifest(state["workspace_path"])
+            current_manifest = _checked_actor_manifest(
+                actor_workspace,
+                source_manifest_digest=str(
+                    state["source_manifest_before_ref"]["artifact_digest"]
+                ),
+                source_git_head=str(state["workspace_expected_head"]),
+                projection_fd=projection_fd,
+            )
+            if projection_fd is not None:
+                _assert_descriptor_coordinate(projection_fd, actor_workspace)
             final_manifest_path = (
                 self._session_dir(str(state["session_id"]))
-                / "workspace-final-manifest.json"
+                / "actor-final-manifest.json"
             )
             _atomic_write_json(final_manifest_path, current_manifest)
             workspace_manifest_ref = _artifact_ref(final_manifest_path)
+            actor_final_manifest_ref = workspace_manifest_ref
             final_workspace_manifest_digest = canonical_digest(current_manifest)
-            workspace_manifest_match = current_manifest == manifest_baseline
-            changed_paths = compare_workspace_manifest(
-                manifest_baseline,
+            if actor_manifest_baseline is None:
+                raise ExternalCodexRuntimeError(
+                    "legacy_projection_unavailable",
+                    "actor baseline manifest is unavailable at finalization",
+                )
+            actor_manifest_match = current_manifest == actor_manifest_baseline
+            delta = build_actor_delta(
+                actor_manifest_baseline,
                 current_manifest,
+                baseline_digest=canonical_digest(actor_manifest_baseline),
+                current_digest=final_workspace_manifest_digest,
             )
-            head_drift = (
-                manifest_baseline.get("git_head") != current_manifest.get("git_head")
+            validate_json(delta, ACTOR_DELTA_SCHEMA_PATH, label="actor delta")
+            delta_path = (
+                self._session_dir(str(state["session_id"])) / "actor-delta.json"
             )
-        except ExternalCodexRuntimeError:
+            _atomic_write_json(delta_path, delta)
+            actor_delta_ref = _artifact_ref(delta_path)
+            state["actor_final_manifest_ref"] = actor_final_manifest_ref
+            state["actor_delta_ref"] = actor_delta_ref
+            source_manifest = (
+                state["workspace_manifest_baseline"]
+                if state.get("review_seed_envelope_ref") is not None
+                else build_workspace_manifest(state["workspace_path"])
+            )
+            source_manifest_final_path = (
+                self._session_dir(str(state["session_id"]))
+                / "source-manifest-final.json"
+            )
+            _atomic_write_json(source_manifest_final_path, source_manifest, mode=0o400)
+            source_manifest_final_ref = _artifact_ref(source_manifest_final_path)
+            state["source_manifest_final_ref"] = source_manifest_final_ref
+            source_manifest_match = (
+                source_manifest == state["workspace_manifest_baseline"]
+            )
+            head_drift = not source_manifest_match
+        except (ExternalCodexRuntimeError, ProjectionError) as exc:
             changed_paths = []
             manifest_observation_gap = True
+            manifest_observation_failure_code = getattr(
+                exc,
+                "code",
+                "workspace_manifest_observation_gap",
+            )
+        else:
+            # Keep the result's long-standing compact receipt shape.  The
+            # actor delta is the durable source for before/after manifests,
+            # modes, types, and content digests.
+            changed_paths = [
+                {"path": str(item["path"]), "status": str(item["status"])}
+                for item in delta["changes"]
+            ]
         state["changed_paths"] = changed_paths
         failure_code: str | None = None
         failure_message: str | None = None
@@ -8046,6 +9598,7 @@ Runtime session identity: {state['session_id']}
                         else {}
                     ),
                     final_workspace_manifest_digest=final_workspace_manifest_digest,
+                    projection_fd=projection_fd,
                 )
             except ExternalCodexRuntimeError as exc:
                 failure_code = exc.code
@@ -8064,12 +9617,9 @@ Runtime session identity: {state['session_id']}
             for item in changed_paths
             if not _relative_path_is_allowed(item["path"], task["allowed_paths"])
         ]
-        read_only_drift = (
-            task["allowed_effect_class"] == "read_only"
-            and (
-                workspace_manifest_match is False
-                or (workspace_manifest_match is None and bool(changed_paths))
-            )
+        read_only_drift = task["allowed_effect_class"] == "read_only" and (
+            actor_manifest_match is False
+            or (actor_manifest_match is None and bool(changed_paths))
         )
         if (
             detected_effects
@@ -8083,7 +9633,10 @@ Runtime session identity: {state['session_id']}
             failure_code = (
                 "command_observation_gap"
                 if command_observation_gap
-                else "workspace_manifest_observation_gap"
+                else (
+                    manifest_observation_failure_code
+                    or "workspace_manifest_observation_gap"
+                )
                 if manifest_observation_gap
                 else failure_code or "authority_boundary_crossed"
             )
@@ -8097,9 +9650,9 @@ Runtime session identity: {state['session_id']}
         attempt_duration = max(0.0, (finished - started).total_seconds())
         attempt["active_wall_seconds"] = attempt_duration
         attempt["wall_time_accounted"] = True
-        state["active_wall_seconds"] = float(
-            state.get("active_wall_seconds", 0.0)
-        ) + attempt_duration
+        state["active_wall_seconds"] = (
+            float(state.get("active_wall_seconds", 0.0)) + attempt_duration
+        )
         state["status"] = status
         wake = self._wake_evaluation(binding, status)
         state["wake_evaluation"] = wake
@@ -8109,7 +9662,8 @@ Runtime session identity: {state['session_id']}
             "detected_forbidden_effects": detected_effects,
             "out_of_scope_paths": out_of_scope_paths,
             "read_only_drift": read_only_drift,
-            "workspace_manifest_match": workspace_manifest_match,
+            "workspace_manifest_match": actor_manifest_match,
+            "source_manifest_match": source_manifest_match,
             "workspace_head_drift": head_drift,
             "workspace_manifest_observation_gap": manifest_observation_gap,
             "command_observation_gap": command_observation_gap,
@@ -8137,7 +9691,9 @@ Runtime session identity: {state['session_id']}
             significance="parent_wake" if wake["wake_parent"] else "terminal",
         )
         events_path = self._events_path(str(state["session_id"]))
-        failure_path = self._session_dir(str(state["session_id"])) / "runtime-failure.json"
+        failure_path = (
+            self._session_dir(str(state["session_id"])) / "runtime-failure.json"
+        )
         if report is None:
             _atomic_write_json(
                 failure_path,
@@ -8163,18 +9719,30 @@ Runtime session identity: {state['session_id']}
             _artifact_ref(report_ref_path),
             _artifact_ref(events_path),
             _artifact_ref(stderr_path),
-            _artifact_ref(Path(state["materialized_inputs"]["task"]), owner=task["target_owner"]),
-            _artifact_ref(Path(state["materialized_inputs"]["incarnation_binding"]), owner="aoa-sdk"),
+            _artifact_ref(
+                Path(state["materialized_inputs"]["task"]), owner=task["target_owner"]
+            ),
+            _artifact_ref(
+                Path(state["materialized_inputs"]["incarnation_binding"]),
+                owner="aoa-sdk",
+            ),
             _artifact_ref(raw_events_path),
         ]
-        if workspace_manifest_ref is not None:
-            evidence_refs.append(workspace_manifest_ref)
+        for ref in (
+            workspace_manifest_ref,
+            actor_delta_ref,
+            state.get("source_manifest_before_ref"),
+            state.get("source_manifest_after_ref"),
+            source_manifest_final_ref,
+        ):
+            if isinstance(ref, dict):
+                evidence_refs.append(ref)
         owner_admission_ref = self._owner_admission_ref(state)
         if owner_admission_ref is not None:
             evidence_refs.append(owner_admission_ref)
         evidence_refs.extend(self._preserved_result_refs(state))
         result = {
-            "schema_version": "abyss_stack_external_codex_result_v1",
+            "schema_version": "abyss_stack_external_codex_result_v2",
             "session_id": state["session_id"],
             "admission_class": state["admission_class"],
             "incarnation_id": state["incarnation_id"],
@@ -8199,8 +9767,16 @@ Runtime session identity: {state['session_id']}
             "codex_invocations": self._codex_invocations(state),
             "executed_commands": state["executed_commands"],
             "changed_paths": changed_paths,
-            "workspace_manifest_match": workspace_manifest_match,
+            "workspace_manifest_match": actor_manifest_match,
+            "source_manifest_match": source_manifest_match,
             "workspace_manifest_ref": workspace_manifest_ref,
+            "actor_projection_path": str(actor_workspace),
+            "actor_baseline_manifest_ref": actor_manifest_baseline_ref,
+            "actor_final_manifest_ref": actor_final_manifest_ref,
+            "actor_delta_ref": actor_delta_ref,
+            "source_manifest_before_ref": state.get("source_manifest_before_ref"),
+            "source_manifest_after_ref": state.get("source_manifest_after_ref"),
+            "source_manifest_final_ref": source_manifest_final_ref,
             "owner_admission_ref": owner_admission_ref,
             "report_ref": evidence_refs[0],
             "events_ref": evidence_refs[1],
@@ -8234,9 +9810,7 @@ Runtime session identity: {state['session_id']}
                 cleanup_failed = True
                 code = exc.code
                 message = str(exc)
-        detected_effects = self._failure_authority_effects(
-            state["executed_commands"]
-        )
+        detected_effects = self._failure_authority_effects(state["executed_commands"])
         command_observation_gap = any(
             item.get("command") == "<unavailable>"
             for item in state["executed_commands"]
@@ -8309,31 +9883,93 @@ Runtime session identity: {state['session_id']}
                 "legacy_failure_closeout_unavailable",
                 "legacy runtime state has no admission-time failure closeout envelope",
             )
+        task = _load_verified_json_ref(
+            closeout["task_ref"],
+            label="failure-closeout task",
+            schema_path=TASK_SCHEMA_PATH,
+        )
         session_dir = self._session_dir(str(state["session_id"]))
         failure_path = session_dir / "runtime-failure.json"
         events_path = self._events_path(str(state["session_id"]))
         attempt_number = max(1, len(state["attempts"]))
-        worker_log_path = session_dir / "attempts" / f"{attempt_number:03d}" / "worker.log"
+        worker_log_path = (
+            session_dir / "attempts" / f"{attempt_number:03d}" / "worker.log"
+        )
         if not worker_log_path.exists():
             _atomic_write_bytes(worker_log_path, b"")
         workspace_manifest_match: bool | None = None
+        source_manifest_match: bool | None = None
         workspace_manifest_ref: dict[str, Any] | None = None
+        actor_delta_ref: dict[str, Any] | None = None
+        actor_baseline_ref = state.get("actor_baseline_manifest_ref")
+        actor_final_ref: dict[str, Any] | None = None
+        source_final_ref: dict[str, Any] | None = None
+        changed_paths: list[dict[str, str]] = []
         try:
-            current_manifest = build_workspace_manifest(state["workspace_path"])
-            final_manifest_path = session_dir / "workspace-final-manifest.json"
-            _atomic_write_json(final_manifest_path, current_manifest)
-            workspace_manifest_ref = _artifact_ref(final_manifest_path)
-            baseline_manifest = state["workspace_manifest_baseline"]
-            changed_paths = compare_workspace_manifest(
-                baseline_manifest, current_manifest
+            if isinstance(actor_baseline_ref, dict):
+                actor_baseline = _load_verified_json_ref(
+                    actor_baseline_ref,
+                    label="actor baseline manifest",
+                    schema_path=ACTOR_MANIFEST_SCHEMA_PATH,
+                )
+                actor_workspace = self._projection_path_from_state(state)
+                current_manifest = _checked_actor_manifest(
+                    actor_workspace,
+                    source_manifest_digest=str(
+                        state["source_manifest_before_ref"]["artifact_digest"]
+                    ),
+                    source_git_head=str(state["workspace_expected_head"]),
+                )
+                final_manifest_path = session_dir / "actor-final-manifest.json"
+                _atomic_write_json(final_manifest_path, current_manifest)
+                workspace_manifest_ref = _artifact_ref(final_manifest_path)
+                actor_final_ref = workspace_manifest_ref
+                workspace_manifest_match = current_manifest == actor_baseline
+                delta = build_actor_delta(
+                    actor_baseline,
+                    current_manifest,
+                    baseline_digest=canonical_digest(actor_baseline),
+                    current_digest=canonical_digest(current_manifest),
+                )
+                validate_json(delta, ACTOR_DELTA_SCHEMA_PATH, label="actor delta")
+                delta_path = session_dir / "actor-delta.json"
+                _atomic_write_json(delta_path, delta)
+                actor_delta_ref = _artifact_ref(delta_path)
+                changed_paths = [
+                    {"path": str(item["path"]), "status": str(item["status"])}
+                    for item in delta["changes"]
+                ]
+                state["actor_final_manifest_ref"] = actor_final_ref
+                state["actor_delta_ref"] = actor_delta_ref
+            else:
+                current_manifest = build_workspace_manifest(state["workspace_path"])
+                final_manifest_path = session_dir / "workspace-final-manifest.json"
+                _atomic_write_json(final_manifest_path, current_manifest)
+                workspace_manifest_ref = _artifact_ref(final_manifest_path)
+                baseline_manifest = state["workspace_manifest_baseline"]
+                changed_paths = compare_workspace_manifest(
+                    baseline_manifest, current_manifest
+                )
+                workspace_manifest_match = current_manifest == baseline_manifest
+            source_manifest = (
+                state["workspace_manifest_baseline"]
+                if state.get("review_seed_envelope_ref") is not None
+                else build_workspace_manifest(state["workspace_path"])
             )
-            workspace_manifest_match = current_manifest == baseline_manifest
-        except ExternalCodexRuntimeError as exc:
+            source_final_path = session_dir / "source-manifest-final.json"
+            _atomic_write_json(source_final_path, source_manifest, mode=0o400)
+            source_final_ref = _artifact_ref(source_final_path)
+            source_manifest_match = (
+                source_manifest == state["workspace_manifest_baseline"]
+            )
+            state["source_manifest_final_ref"] = source_final_ref
+        except (ExternalCodexRuntimeError, ProjectionError) as exc:
             changed_paths = []
             status = "authority_blocked"
+            observation_code = getattr(exc, "code", "actor_projection_observation_gap")
             message = (
                 f"original failure {code}: {message}; workspace manifest "
-                f"observation failed: {exc.code}: {exc}"
+                f"observation failed: {observation_code}: {exc}"
             )
             code = "workspace_manifest_observation_gap"
             state["status"] = status
@@ -8347,11 +9983,53 @@ Runtime session identity: {state['session_id']}
                 attempt_id=attempt_id,
                 significance="authority",
             )
+        out_of_scope_paths = [
+            item["path"]
+            for item in changed_paths
+            if not _relative_path_is_allowed(item["path"], task["allowed_paths"])
+        ]
+        read_only_drift = (
+            task["allowed_effect_class"] == "read_only"
+            and workspace_manifest_match is False
+        )
+        source_drift = source_manifest_match is False
+        if read_only_drift or out_of_scope_paths or source_drift:
+            original_code = code
+            status = "authority_blocked"
+            code = "authority_boundary_crossed"
+            drift_reasons: list[str] = []
+            if read_only_drift:
+                drift_reasons.append("read-only actor projection changed")
+            if out_of_scope_paths:
+                drift_reasons.append(
+                    "out-of-scope actor paths changed: " + ", ".join(out_of_scope_paths)
+                )
+            if source_drift:
+                drift_reasons.append("owner source changed during actor execution")
+            message = (
+                f"original failure {original_code}: {message}; authority drift: "
+                + "; ".join(drift_reasons)
+            )
+            state["status"] = status
+            for attempt in state["attempts"]:
+                if attempt["attempt_id"] == attempt_id:
+                    attempt["status"] = status
+            self._append_event(
+                state,
+                event_type="external_agent.failure_authority_drift_detected",
+                payload={
+                    "failure_code": code,
+                    "message": message,
+                    "out_of_scope_paths": out_of_scope_paths,
+                    "read_only_drift": read_only_drift,
+                    "source_drift": source_drift,
+                },
+                attempt_id=attempt_id,
+                significance="authority",
+            )
         wake_evaluations = closeout.get("wake_evaluations")
         wake = (
-            wake_evaluations.get(status)
-            if isinstance(wake_evaluations, dict)
-            else None
+            wake_evaluations.get(status) if isinstance(wake_evaluations, dict) else None
         )
         if not isinstance(wake, dict):
             raise ExternalCodexRuntimeError(
@@ -8377,14 +10055,21 @@ Runtime session identity: {state['session_id']}
             dict(closeout["task_ref"]),
             dict(closeout["incarnation_binding_ref"]),
         ]
-        if workspace_manifest_ref is not None:
-            evidence_refs.append(workspace_manifest_ref)
+        for ref in (
+            workspace_manifest_ref,
+            actor_delta_ref,
+            state.get("source_manifest_before_ref"),
+            state.get("source_manifest_after_ref"),
+            source_final_ref,
+        ):
+            if isinstance(ref, dict):
+                evidence_refs.append(ref)
         owner_admission_ref = self._owner_admission_ref(state)
         if owner_admission_ref is not None:
             evidence_refs.append(owner_admission_ref)
         evidence_refs.extend(self._preserved_result_refs(state))
         result = {
-            "schema_version": "abyss_stack_external_codex_result_v1",
+            "schema_version": "abyss_stack_external_codex_result_v2",
             "session_id": state["session_id"],
             "admission_class": state["admission_class"],
             "incarnation_id": state["incarnation_id"],
@@ -8415,7 +10100,15 @@ Runtime session identity: {state['session_id']}
             "executed_commands": state["executed_commands"],
             "changed_paths": changed_paths,
             "workspace_manifest_match": workspace_manifest_match,
+            "source_manifest_match": source_manifest_match,
             "workspace_manifest_ref": workspace_manifest_ref,
+            "actor_projection_path": state.get("actor_projection_path"),
+            "actor_baseline_manifest_ref": actor_baseline_ref,
+            "actor_final_manifest_ref": actor_final_ref,
+            "actor_delta_ref": actor_delta_ref,
+            "source_manifest_before_ref": state.get("source_manifest_before_ref"),
+            "source_manifest_after_ref": state.get("source_manifest_after_ref"),
+            "source_manifest_final_ref": source_final_ref,
             "owner_admission_ref": owner_admission_ref,
             "report_ref": evidence_refs[0],
             "events_ref": evidence_refs[1],
@@ -8470,9 +10163,9 @@ Runtime session identity: {state['session_id']}
             )
             attempt["active_wall_seconds"] = active_seconds
             attempt["wall_time_accounted"] = True
-            state["active_wall_seconds"] = float(
-                state.get("active_wall_seconds", 0.0)
-            ) + active_seconds
+            state["active_wall_seconds"] = (
+                float(state.get("active_wall_seconds", 0.0)) + active_seconds
+            )
             return
 
     def _recover_terminal_result_locked(self, state: dict[str, Any]) -> bool:
@@ -8603,6 +10296,16 @@ Runtime session identity: {state['session_id']}
         state["active_wall_seconds"] = float(result["active_wall_seconds"])
         state["executed_commands"] = list(result["executed_commands"])
         state["changed_paths"] = list(result["changed_paths"])
+        for key in (
+            "source_manifest_before_ref",
+            "source_manifest_after_ref",
+            "source_manifest_final_ref",
+            "actor_baseline_manifest_ref",
+            "actor_final_manifest_ref",
+            "actor_delta_ref",
+        ):
+            if key in result:
+                state[key] = result[key]
         state["wake_evaluation"] = dict(result["wake_evaluation"])
         state["result_path"] = str(result_path)
         state["result_digest"] = sha256_file(result_path)
@@ -8671,6 +10374,10 @@ Runtime session identity: {state['session_id']}
             "finished_at": state["finished_at"],
             "wake_evaluation": state.get("wake_evaluation"),
             "result_available": bool(state.get("result_path")),
+            "actor_projection_path": state.get("actor_projection_path"),
+            "actor_baseline_manifest_ref": state.get("actor_baseline_manifest_ref"),
+            "actor_final_manifest_ref": state.get("actor_final_manifest_ref"),
+            "actor_delta_ref": state.get("actor_delta_ref"),
         }
 
     def status(self, session_id: str) -> dict[str, Any]:
@@ -8729,13 +10436,20 @@ Runtime session identity: {state['session_id']}
             if state["schema_version"] != STATE_SCHEMA_VERSION:
                 raise ExternalCodexRuntimeError(
                     "legacy_session_resume_unsupported",
-                    "legacy session lacks the v2 admission-time failure closeout envelope",
+                    "legacy session has no v3 runtime-owned actor projection",
+                )
+            projection_path = self._projection_path_from_state(state)
+            if not isinstance(state.get("actor_baseline_manifest_ref"), dict):
+                raise ExternalCodexRuntimeError(
+                    "legacy_projection_unavailable",
+                    "resume cannot proceed without the original actor projection baseline",
                 )
             self._refresh_interrupted_locked(state)
             failed_review_followup = state["status"] == "failed"
             if state["status"] not in RESUMABLE_STATES and not failed_review_followup:
                 raise ExternalCodexRuntimeError(
-                    "resume_state_invalid", f"session is not resumable: {state['status']}"
+                    "resume_state_invalid",
+                    f"session is not resumable: {state['status']}",
                 )
             if (
                 resume["session_id"] != session_id
@@ -8743,7 +10457,8 @@ Runtime session identity: {state['session_id']}
                 or resume["after_event_sequence"] != state["last_event_sequence"]
             ):
                 raise ExternalCodexRuntimeError(
-                    "resume_identity_mismatch", "resume request differs from exact durable state"
+                    "resume_identity_mismatch",
+                    "resume request differs from exact durable state",
                 )
             if not state.get("thread_id"):
                 raise ExternalCodexRuntimeError(
@@ -8788,6 +10503,14 @@ Runtime session identity: {state['session_id']}
                 raise ExternalCodexRuntimeError(
                     "runtime_result_identity_mismatch",
                     "prior runtime result differs from the durable session identity",
+                )
+            if previous_result.get("actor_projection_path") not in {
+                None,
+                str(projection_path),
+            }:
+                raise ExternalCodexRuntimeError(
+                    "resume_projection_mismatch",
+                    "prior result names a different runtime-owned actor projection",
                 )
             requested_result_digest = resume.get("previous_result_digest")
             if (
@@ -8905,7 +10628,8 @@ Runtime session identity: {state['session_id']}
             state = self._load_state(session_id)
             if state["status"] != "running":
                 raise ExternalCodexRuntimeError(
-                    "interrupt_state_invalid", "only a running session can be interrupted"
+                    "interrupt_state_invalid",
+                    "only a running session can be interrupted",
                 )
             worker_pid = state.get("worker_pid")
             worker_ticks = state.get("worker_start_ticks")
@@ -9035,7 +10759,8 @@ Runtime session identity: {state['session_id']}
         reviewer = reviewer_runtime.result(reviewer_session_id)
         if writer is None or reviewer is None:
             raise ExternalCodexRuntimeError(
-                "a2a_review_incomplete", "writer and reviewer runtime results are required"
+                "a2a_review_incomplete",
+                "writer and reviewer runtime results are required",
             )
         reviewer_receipt_digest = sha256_bytes(
             (
@@ -9069,9 +10794,11 @@ Runtime session identity: {state['session_id']}
             or reviewer.get("thread_id") is None
             or writer["thread_id"] == reviewer["thread_id"]
             or reviewer.get("execution_posture") != "independent_review"
+            or reviewer.get("task_family") != "landing_review"
         ):
             raise ExternalCodexRuntimeError(
-                "a2a_review_not_independent", "A2A export requires a separate review thread"
+                "a2a_review_not_independent",
+                "A2A export requires a separate landing-review thread",
             )
         reviewer_report = _load_verified_json_ref(
             reviewer["report_ref"],
@@ -9125,19 +10852,42 @@ Runtime session identity: {state['session_id']}
                 reviewer_launch["admission_class"] != "transport_study_fixture"
                 or reviewer_state.get("result_path")
                 != str(
-                    reviewer_runtime._session_dir(reviewer_session_id)
-                    / "result.json"
+                    reviewer_runtime._session_dir(reviewer_session_id) / "result.json"
                 )
                 or reviewer_state.get("result_digest")
                 != sha256_file(Path(str(reviewer_state["result_path"])))
-                or reviewer_state.get("result_digest")
-                != reviewer_receipt_digest
+                or reviewer_state.get("result_digest") != reviewer_receipt_digest
                 or reviewer_state.get("incarnation_id")
                 != reviewer_binding.incarnation_id
+                or reviewer_state.get("task_family") != "landing_review"
+                or reviewer_task.get("task_family") != "landing_review"
             ):
                 raise ExternalCodexRuntimeError(
                     "a2a_review_state_unbound",
                     "reviewer durable state is not bound to its exact result/incarnation",
+                )
+            review_seed_ref = reviewer_state.get("review_seed_envelope_ref")
+            if not isinstance(review_seed_ref, dict):
+                raise ExternalCodexRuntimeError(
+                    "a2a_review_seed_required",
+                    "reviewed A2A return requires one controller-issued writer seed envelope",
+                )
+            review_seed_envelope = _load_verified_json_ref(
+                review_seed_ref,
+                label="reviewer seed envelope",
+                schema_path=REVIEW_SEED_ENVELOPE_SCHEMA_PATH,
+            )
+            launch_seed = reviewer_launch.get("workspace_projection_seed")
+            if (
+                not isinstance(launch_seed, dict)
+                or launch_seed.get("envelope_path")
+                != review_seed_ref.get("artifact_ref")
+                or launch_seed.get("envelope_digest")
+                != review_seed_ref.get("artifact_digest")
+            ):
+                raise ExternalCodexRuntimeError(
+                    "a2a_review_seed_unbound",
+                    "reviewer launch and durable state name different seed envelopes",
                 )
             (
                 reviewer_summon_request,
@@ -9159,6 +10909,10 @@ Runtime session identity: {state['session_id']}
                 "reviewer final workspace manifest",
                 reviewer["workspace_manifest_ref"],
             ),
+            ("writer actor final manifest", writer.get("actor_final_manifest_ref")),
+            ("writer actor delta", writer.get("actor_delta_ref")),
+            ("reviewer actor final manifest", reviewer.get("actor_final_manifest_ref")),
+            ("reviewer actor delta", reviewer.get("actor_delta_ref")),
         ):
             if not isinstance(ref, dict):
                 raise ExternalCodexRuntimeError(
@@ -9166,8 +10920,52 @@ Runtime session identity: {state['session_id']}
                     f"{label} has no exact terminal artifact reference",
                 )
             _verified_artifact_ref_path(ref, label=label)
+        writer_actor_final = _load_verified_json_ref(
+            writer["actor_final_manifest_ref"],
+            label="writer actor final manifest",
+            schema_path=ACTOR_MANIFEST_SCHEMA_PATH,
+        )
+        writer_actor_delta = _load_verified_json_ref(
+            writer["actor_delta_ref"],
+            label="writer actor delta",
+            schema_path=ACTOR_DELTA_SCHEMA_PATH,
+        )
+        reviewer_actor_final = _load_verified_json_ref(
+            reviewer["actor_final_manifest_ref"],
+            label="reviewer actor final manifest",
+            schema_path=ACTOR_MANIFEST_SCHEMA_PATH,
+        )
+        reviewer_actor_delta = _load_verified_json_ref(
+            reviewer["actor_delta_ref"],
+            label="reviewer actor delta",
+            schema_path=ACTOR_DELTA_SCHEMA_PATH,
+        )
+        if (
+            writer_actor_delta.get("final_manifest_digest")
+            != canonical_digest(writer_actor_final)
+            or reviewer_actor_final.get("content_entries")
+            != writer_actor_final.get("content_entries")
+            or reviewer_actor_final.get("private_git_digest")
+            != writer_actor_final.get("private_git_digest")
+            or reviewer_actor_delta.get("changes")
+            or reviewer_actor_delta.get("final_manifest_digest")
+            != canonical_digest(reviewer_actor_final)
+        ):
+            raise ExternalCodexRuntimeError(
+                "a2a_projection_not_bound",
+                "reviewer does not bind the exact writer actor projection and zero reviewer delta",
+            )
         with self._lock(writer_session_id):
             writer_state = self._load_state(writer_session_id)
+            if (
+                review_seed_envelope.get("writer_session_id") != writer_session_id
+                or self._review_seed_envelope_locked(writer_state)
+                != review_seed_envelope
+            ):
+                raise ExternalCodexRuntimeError(
+                    "a2a_review_seed_unbound",
+                    "reviewer seed no longer binds the exact locked writer return",
+                )
             (
                 writer_launch,
                 writer_plan,
@@ -9208,22 +11006,43 @@ Runtime session identity: {state['session_id']}
                 str(item["input_id"]): item["provenance"]["artifact_digest"]
                 for item in reviewer_task["immutable_inputs"]
             }
-            writer_workspace_manifest_digest = str(
-                writer["workspace_manifest_ref"]["artifact_digest"]
+            writer_source_manifest_digest = next(
+                (
+                    str(item["provenance"]["artifact_digest"])
+                    for item in writer_task["immutable_inputs"]
+                    if item["input_id"] == writer_launch["workspace_manifest_input_id"]
+                ),
+                None,
+            )
+            if writer_source_manifest_digest is None:
+                source_before_ref = writer_state.get("source_manifest_before_ref")
+                if isinstance(source_before_ref, dict):
+                    writer_source_manifest_digest = str(
+                        source_before_ref["artifact_digest"]
+                    )
+            writer_actor_final_digest = str(
+                (
+                    writer.get("actor_final_manifest_ref")
+                    or writer["workspace_manifest_ref"]
+                )["artifact_digest"]
+            )
+            writer_actor_delta_digest = str(
+                writer["actor_delta_ref"]["artifact_digest"]
             )
             if (
-                reviewer_inputs.get("writer-runtime-result")
-                != writer_result_digest
-                or reviewer_inputs.get("writer-model-report")
-                != writer_report_digest
+                reviewer_inputs.get("writer-runtime-result") != writer_result_digest
+                or reviewer_inputs.get("writer-model-report") != writer_report_digest
                 or reviewer_inputs.get("review-workspace-manifest")
-                != writer_workspace_manifest_digest
+                != writer_source_manifest_digest
+                or reviewer_inputs.get("writer-actor-final-manifest")
+                != writer_actor_final_digest
+                or reviewer_inputs.get("writer-actor-delta")
+                != writer_actor_delta_digest
                 or reviewer_task["parent_task_id"] != writer["task_id"]
                 or reviewer_task["target_owner"] != writer_task["target_owner"]
                 or reviewer_state["incarnation_id"] == writer_state["incarnation_id"]
                 or nested["parent_task_id"] != writer_task["parent_task_id"]
-                or reviewer_summon_nested["parent_task_id"]
-                != writer_task["task_id"]
+                or reviewer_summon_nested["parent_task_id"] != writer_task["task_id"]
                 or reviewer_summon_nested["reviewed_artifact_path"]
                 != str(writer_result_path)
             ):
@@ -9234,63 +11053,14 @@ Runtime session identity: {state['session_id']}
             returned = ["external_codex_agent_result", "independent_landing_review"]
             returned.extend(str(item) for item in writer_report["artifact_paths"])
             unique_returned = list(dict.fromkeys(returned))
-            if (
-                not set(writer_expected_outputs).issubset(unique_returned)
-                or not set(reviewer_expected_outputs).issubset(unique_returned)
-            ):
+            if not set(writer_expected_outputs).issubset(unique_returned) or not set(
+                reviewer_expected_outputs
+            ).issubset(unique_returned):
                 raise ExternalCodexRuntimeError(
                     "a2a_return_outputs_incomplete",
                     "returned artifacts do not satisfy the exact writer/reviewer summon requests",
                 )
             remote_state, outcome_name = review_outcome
-            payload = {
-                "reviewed": True,
-                "review_status": "reviewed",
-                "review_outcome": outcome_name,
-                "reviewer_status": reviewer["status"],
-                "reviewer_decision": reviewer_report["decision"],
-                "reviewed_artifact_path": str(writer_result_path),
-                "evidence_digests": {
-                    "writer_result": writer_result_digest,
-                    "writer_report": writer_report_digest,
-                    "reviewer_result": str(reviewer_state["result_digest"]),
-                    "reviewer_report": str(reviewer["report_ref"]["artifact_digest"]),
-                    "writer_workspace_manifest": str(
-                        writer["workspace_manifest_ref"]["artifact_digest"]
-                    ),
-                    "reviewer_workspace_manifest": str(
-                        reviewer["workspace_manifest_ref"]["artifact_digest"]
-                    ),
-                    "summon_request": summon_request_ref.artifact_digest,
-                    "summon_request_schema": summon_schema_ref.artifact_digest,
-                    "review_summon_request": (
-                        reviewer_summon_request_ref.artifact_digest
-                    ),
-                    "review_summon_request_schema": (
-                        reviewer_summon_schema_ref.artifact_digest
-                    ),
-                },
-                "summon_request_ref": summon_request_ref.model_dump(mode="json"),
-                "review_summon_request_ref": (
-                    reviewer_summon_request_ref.model_dump(mode="json")
-                ),
-                "remote_task": {
-                    "task_id": writer["task_id"],
-                    "state": remote_state,
-                    "agent_id": writer_state["incarnation_id"],
-                    "endpoint": f"codex://local/{writer['thread_id']}",
-                    "returned_artifacts": unique_returned,
-                    "context_id": writer["thread_id"],
-                    "parent_task_id": nested["parent_task_id"],
-                    "artifact_refs": [
-                        writer["report_ref"]["artifact_ref"],
-                        reviewer["report_ref"]["artifact_ref"],
-                        writer["events_ref"]["artifact_ref"],
-                        str(writer_result_path),
-                    ],
-                    "message_refs": [reviewer["events_ref"]["artifact_ref"]],
-                },
-            }
             output = Path(output_path)
             if not output.is_absolute():
                 raise ExternalCodexRuntimeError(
@@ -9299,13 +11069,6 @@ Runtime session identity: {state['session_id']}
             if output.is_symlink():
                 raise ExternalCodexRuntimeError(
                     "a2a_output_conflict", "A2A output must not be a symbolic link"
-                )
-            encoded = (
-                json.dumps(payload, ensure_ascii=True, sort_keys=True, indent=2) + "\n"
-            ).encode("utf-8")
-            if output.exists() and read_bounded(output) != encoded:
-                raise ExternalCodexRuntimeError(
-                    "a2a_output_conflict", "A2A output already contains different bytes"
                 )
             with reviewer_runtime._lock(reviewer_session_id):
                 current_reviewer_state = reviewer_runtime._load_state(
@@ -9325,20 +11088,156 @@ Runtime session identity: {state['session_id']}
                     != reviewer_receipt_digest
                     or current_reviewer_state.get("incarnation_id")
                     != reviewer_binding.incarnation_id
+                    or current_reviewer_state.get("review_seed_envelope_ref")
+                    != review_seed_ref
+                    or current_reviewer_state.get("task_family") != "landing_review"
+                    or reviewer.get("task_family") != "landing_review"
+                    or reviewer_task.get("task_family") != "landing_review"
                 ):
                     raise ExternalCodexRuntimeError(
                         "a2a_review_state_unbound",
                         "reviewer changed before its A2A export became durable",
                     )
-                for label, ref in (
-                    ("reviewer report", reviewer["report_ref"]),
-                    ("reviewer events", reviewer["events_ref"]),
+                _verify_a2a_export_snapshot(
                     (
-                        "reviewer final workspace manifest",
-                        reviewer["workspace_manifest_ref"],
-                    ),
+                        ("writer report", writer["report_ref"]),
+                        ("writer events", writer["events_ref"]),
+                        (
+                            "writer final workspace manifest",
+                            writer["workspace_manifest_ref"],
+                        ),
+                        (
+                            "writer actor final manifest",
+                            writer["actor_final_manifest_ref"],
+                        ),
+                        ("writer actor delta", writer["actor_delta_ref"]),
+                        ("reviewer report", reviewer["report_ref"]),
+                        ("reviewer events", reviewer["events_ref"]),
+                        (
+                            "reviewer final workspace manifest",
+                            reviewer["workspace_manifest_ref"],
+                        ),
+                        (
+                            "reviewer actor final manifest",
+                            reviewer["actor_final_manifest_ref"],
+                        ),
+                        ("reviewer actor delta", reviewer["actor_delta_ref"]),
+                        ("review seed envelope", review_seed_ref),
+                    )
+                )
+                current_seed = _load_verified_json_ref(
+                    review_seed_ref,
+                    label="reviewer seed envelope",
+                    schema_path=REVIEW_SEED_ENVELOPE_SCHEMA_PATH,
+                )
+                if current_seed != review_seed_envelope:
+                    raise ExternalCodexRuntimeError(
+                        "a2a_review_seed_unbound",
+                        "reviewer seed bytes changed before A2A publication",
+                    )
+                (
+                    current_summon_request,
+                    current_summon_request_ref,
+                    current_summon_schema_ref,
+                    _,
+                ) = self._validated_a2a_summon_request(
+                    state=writer_state,
+                    plan=writer_plan,
+                    binding=writer_binding,
+                    task=writer_task,
+                    request_input_id="summon-request",
+                    supplied_path=summon_request_path,
+                )
+                (
+                    current_review_summon_request,
+                    current_review_summon_request_ref,
+                    current_review_summon_schema_ref,
+                    _,
+                ) = reviewer_runtime._validated_a2a_summon_request(
+                    state=current_reviewer_state,
+                    plan=reviewer_plan,
+                    binding=reviewer_binding,
+                    task=reviewer_task,
+                    request_input_id="review-summon-request",
+                )
+                if (
+                    current_summon_request != summon_request
+                    or current_summon_request_ref != summon_request_ref
+                    or current_summon_schema_ref != summon_schema_ref
+                    or current_review_summon_request != reviewer_summon_request
+                    or current_review_summon_request_ref != reviewer_summon_request_ref
+                    or current_review_summon_schema_ref != reviewer_summon_schema_ref
                 ):
-                    _verified_artifact_ref_path(ref, label=label)
+                    raise ExternalCodexRuntimeError(
+                        "a2a_summon_request_unbound",
+                        "summon request bytes changed before A2A publication",
+                    )
+                payload = {
+                    "reviewed": True,
+                    "review_status": "reviewed",
+                    "review_outcome": outcome_name,
+                    "reviewer_status": reviewer["status"],
+                    "reviewer_decision": reviewer_report["decision"],
+                    "reviewed_artifact_path": str(writer_result_path),
+                    "evidence_digests": {
+                        "writer_result": writer_result_digest,
+                        "writer_report": writer_report_digest,
+                        "reviewer_result": str(current_reviewer_state["result_digest"]),
+                        "reviewer_report": str(
+                            reviewer["report_ref"]["artifact_digest"]
+                        ),
+                        "writer_workspace_manifest": str(
+                            writer["workspace_manifest_ref"]["artifact_digest"]
+                        ),
+                        "reviewer_workspace_manifest": str(
+                            reviewer["workspace_manifest_ref"]["artifact_digest"]
+                        ),
+                        "writer_actor_final_manifest": writer_actor_final_digest,
+                        "writer_actor_delta": writer_actor_delta_digest,
+                        "reviewer_actor_final_manifest": str(
+                            reviewer["actor_final_manifest_ref"]["artifact_digest"]
+                        ),
+                        "reviewer_actor_delta": str(
+                            reviewer["actor_delta_ref"]["artifact_digest"]
+                        ),
+                        "review_seed_envelope": str(review_seed_ref["artifact_digest"]),
+                        "summon_request": current_summon_request_ref.artifact_digest,
+                        "summon_request_schema": current_summon_schema_ref.artifact_digest,
+                        "review_summon_request": current_review_summon_request_ref.artifact_digest,
+                        "review_summon_request_schema": current_review_summon_schema_ref.artifact_digest,
+                    },
+                    "summon_request_ref": current_summon_request_ref.model_dump(
+                        mode="json"
+                    ),
+                    "review_summon_request_ref": current_review_summon_request_ref.model_dump(
+                        mode="json"
+                    ),
+                    "remote_task": {
+                        "task_id": writer["task_id"],
+                        "state": remote_state,
+                        "agent_id": writer_state["incarnation_id"],
+                        "endpoint": f"codex://local/{writer['thread_id']}",
+                        "returned_artifacts": unique_returned,
+                        "context_id": writer["thread_id"],
+                        "parent_task_id": nested["parent_task_id"],
+                        "artifact_refs": [
+                            writer["report_ref"]["artifact_ref"],
+                            reviewer["report_ref"]["artifact_ref"],
+                            writer["events_ref"]["artifact_ref"],
+                            str(writer_result_path),
+                        ],
+                        "message_refs": [reviewer["events_ref"]["artifact_ref"]],
+                    },
+                }
+                encoded = (
+                    json.dumps(payload, ensure_ascii=True, sort_keys=True, indent=2)
+                    + "\n"
+                ).encode("utf-8")
+                if output.exists() and read_bounded(output) != encoded:
+                    raise ExternalCodexRuntimeError(
+                        "a2a_output_conflict",
+                        "A2A output already contains different bytes",
+                    )
                 _atomic_write_bytes(output, encoded)
             return {
                 "child_task_result": payload,
@@ -9461,9 +11360,7 @@ class ExternalCodexParentReentry:
             state = self._recover_appended_events(state)
         return state
 
-    def _recover_appended_events(
-        self, state: Mapping[str, Any]
-    ) -> dict[str, Any]:
+    def _recover_appended_events(self, state: Mapping[str, Any]) -> dict[str, Any]:
         """Recover a crash between one durable event append and state save.
 
         Recovery admits only an intact, digest-matching prior JSONL prefix plus
@@ -9607,8 +11504,7 @@ class ExternalCodexParentReentry:
                         label="recovered distilled child return",
                     )
                     if distilled_path != (
-                        self._reentry_dir(reentry_id)
-                        / "distilled-child-return.json"
+                        self._reentry_dir(reentry_id) / "distilled-child-return.json"
                     ):
                         raise ExternalCodexRuntimeError(
                             "reentry_event_recovery_failed",
@@ -9644,8 +11540,7 @@ class ExternalCodexParentReentry:
                     label="recovered re-entry distilled return",
                 )
                 if distilled_path != (
-                    self._reentry_dir(reentry_id)
-                    / "distilled-child-return.json"
+                    self._reentry_dir(reentry_id) / "distilled-child-return.json"
                 ):
                     raise ExternalCodexRuntimeError(
                         "reentry_event_recovery_failed",
@@ -9679,7 +11574,9 @@ class ExternalCodexParentReentry:
         recovered["updated_at"] = iso_now()
         recovered["events_ref"] = _artifact_ref(path)
         validate_json(
-            recovered, REENTRY_STATE_SCHEMA_PATH, label="recovered parent re-entry state"
+            recovered,
+            REENTRY_STATE_SCHEMA_PATH,
+            label="recovered parent re-entry state",
         )
         _atomic_write_json(self._state_path(reentry_id), recovered, mode=0o600)
         return recovered
@@ -9690,7 +11587,9 @@ class ExternalCodexParentReentry:
         candidate["events_ref"] = _artifact_ref(
             self._events_path(str(candidate["reentry_id"]))
         )
-        validate_json(candidate, REENTRY_STATE_SCHEMA_PATH, label="parent re-entry state")
+        validate_json(
+            candidate, REENTRY_STATE_SCHEMA_PATH, label="parent re-entry state"
+        )
         _atomic_write_json(
             self._state_path(str(candidate["reentry_id"])), candidate, mode=0o600
         )
@@ -9783,8 +11682,7 @@ class ExternalCodexParentReentry:
             len(matching) != 1
             or matching[0].event_kind != obligation["expected_wake_event_kind"]
             or matching[0].action != "wake_parent"
-            or matching[0].condition_id
-            not in binding.wake_policy.escalation_conditions
+            or matching[0].condition_id not in binding.wake_policy.escalation_conditions
         ):
             raise ExternalCodexRuntimeError(
                 "reentry_wake_unbound",
@@ -9792,9 +11690,13 @@ class ExternalCodexParentReentry:
             )
 
         configuration = realization.get("configuration")
-        runtime = configuration.get("runtime") if isinstance(configuration, dict) else None
+        runtime = (
+            configuration.get("runtime") if isinstance(configuration, dict) else None
+        )
         permissions = (
-            configuration.get("permissions") if isinstance(configuration, dict) else None
+            configuration.get("permissions")
+            if isinstance(configuration, dict)
+            else None
         )
         if (
             realization.get("kind") != "ModelRealization"
@@ -9853,7 +11755,9 @@ class ExternalCodexParentReentry:
             values[key] = value
         return values
 
-    def _codex_environment(self, obligation: Mapping[str, Any], scratch: Path) -> dict[str, str]:
+    def _codex_environment(
+        self, obligation: Mapping[str, Any], scratch: Path
+    ) -> dict[str, str]:
         environment = {
             "CODEX_HOME": str(obligation["codex_home"]),
             "HOME": os.environ.get("HOME", "/nonexistent"),
@@ -9955,8 +11859,7 @@ class ExternalCodexParentReentry:
             completion.get("schema_version")
             != "abyss_stack_external_codex_parent_turn_completion_v1"
             or completion.get("kind") != kind
-            or completion.get("prompt_sha256")
-            != sha256_bytes(prompt.encode("utf-8"))
+            or completion.get("prompt_sha256") != sha256_bytes(prompt.encode("utf-8"))
             or not isinstance(completion.get("exit_code"), int)
             or isinstance(completion.get("exit_code"), bool)
         ):
@@ -10309,9 +12212,7 @@ class ExternalCodexParentReentry:
                     "child_task_id": task["task_id"],
                     "child_incarnation_id": binding.incarnation_id,
                     "expected_wake": {
-                        "condition_id": materialized[
-                            "expected_wake_condition_id"
-                        ],
+                        "condition_id": materialized["expected_wake_condition_id"],
                         "event_kind": materialized["expected_wake_event_kind"],
                         "action": "wake_parent",
                     },
@@ -10329,9 +12230,7 @@ class ExternalCodexParentReentry:
                     reentry_id,
                     event_type="external_parent.yield_prepared",
                     payload={
-                        "obligation_digest": state["obligation_ref"][
-                            "artifact_digest"
-                        ],
+                        "obligation_digest": state["obligation_ref"]["artifact_digest"],
                         "child_task_id": task["task_id"],
                     },
                     significance="progress",
@@ -10354,9 +12253,7 @@ class ExternalCodexParentReentry:
                     event_type="external_parent.inference_yielded",
                     payload={
                         "thread_id": turn["thread_id"],
-                        "turn_output_digest": turn["output_ref"][
-                            "artifact_digest"
-                        ],
+                        "turn_output_digest": turn["output_ref"]["artifact_digest"],
                         "turn": turn,
                     },
                     significance="checkpoint",
@@ -10458,9 +12355,8 @@ class ExternalCodexParentReentry:
         validate_json(child_result, RESULT_SCHEMA_PATH, label="child terminal result")
         session_id = str(child_result["session_id"])
         session_dir = child_result_path.parent
-        if (
-            session_dir.parent.name != "sessions"
-            or session_dir.name != _session_token(session_id)
+        if session_dir.parent.name != "sessions" or session_dir.name != _session_token(
+            session_id
         ):
             raise ExternalCodexRuntimeError(
                 "reentry_child_receipt_noncanonical",
@@ -10473,7 +12369,9 @@ class ExternalCodexParentReentry:
                 "canonical child runtime state receipt is unavailable",
             )
         child_state = load_json(state_path, label="child runtime state receipt")
-        validate_json(child_state, STATE_SCHEMA_PATH, label="child runtime state receipt")
+        validate_json(
+            child_state, STATE_SCHEMA_PATH, label="child runtime state receipt"
+        )
         result_digest = sha256_file(child_result_path)
         expected_events_path = session_dir / "events.jsonl"
         events_ref = child_result["events_ref"]
@@ -10481,16 +12379,14 @@ class ExternalCodexParentReentry:
             child_state.get("schema_version") != STATE_SCHEMA_VERSION
             or child_state.get("session_id") != session_id
             or child_state.get("status") != child_result["status"]
-            or child_state.get("status")
-            not in {*TERMINAL_STATES, "interrupted"}
+            or child_state.get("status") not in {*TERMINAL_STATES, "interrupted"}
             or child_state.get("incarnation_id") != child_result["incarnation_id"]
             or child_state.get("task_id") != child_result["task_id"]
             or child_state.get("thread_id") != child_result["thread_id"]
             or child_state.get("result_path") != str(child_result_path)
             or child_state.get("result_digest") != result_digest
             or events_ref.get("artifact_ref") != str(expected_events_path)
-            or child_state.get("events_digest")
-            != events_ref.get("artifact_digest")
+            or child_state.get("events_digest") != events_ref.get("artifact_digest")
         ):
             raise ExternalCodexRuntimeError(
                 "reentry_child_receipt_mismatch",
@@ -10518,9 +12414,7 @@ class ExternalCodexParentReentry:
                 "child event receipt differs from the durable terminal sequence",
             )
         attempt_dir = (
-            session_dir
-            / "attempts"
-            / f"{int(child_result['attempt_count']):03d}"
+            session_dir / "attempts" / f"{int(child_result['attempt_count']):03d}"
         )
         result_candidates = [attempt_dir / "runtime-result.json"]
         result_candidates.extend(
@@ -10558,7 +12452,9 @@ class ExternalCodexParentReentry:
                 "reentry_child_event_unbound",
                 "child result does not bind its event stream as terminal evidence",
             )
-        event_kind = ExternalCodexParentReentry._status_event_kind(str(result["status"]))
+        event_kind = ExternalCodexParentReentry._status_event_kind(
+            str(result["status"])
+        )
         condition = next(
             (
                 item
@@ -10685,7 +12581,9 @@ class ExternalCodexParentReentry:
                 "admitted child result is not an immutable attempt snapshot",
             )
         result = load_json(snapshot_path, label="admitted child result snapshot")
-        validate_json(result, RESULT_SCHEMA_PATH, label="admitted child result snapshot")
+        validate_json(
+            result, RESULT_SCHEMA_PATH, label="admitted child result snapshot"
+        )
         if (
             result.get("task_id") != state["child_task_id"]
             or result.get("incarnation_id") != state["child_incarnation_id"]
@@ -10720,8 +12618,7 @@ class ExternalCodexParentReentry:
                 ) from exc
             if (
                 isinstance(event, dict)
-                and event.get("event_type")
-                == "external_parent.child_event_admitted"
+                and event.get("event_type") == "external_parent.child_event_admitted"
                 and isinstance(event.get("payload"), dict)
             ):
                 admitted_payloads.append(event["payload"])
@@ -10756,8 +12653,7 @@ class ExternalCodexParentReentry:
         if (
             distilled.get("child_result_ref") != state.get("child_result_ref")
             or distilled.get("child_task_id") != state["child_task_id"]
-            or distilled.get("child_incarnation_id")
-            != state["child_incarnation_id"]
+            or distilled.get("child_incarnation_id") != state["child_incarnation_id"]
             or distilled.get("child_status") != child_result.get("status")
             or distilled.get("child_thread_id") != child_result.get("thread_id")
             or distilled.get("wake_evaluation") != state.get("wake_evaluation")
@@ -10928,7 +12824,9 @@ class ExternalCodexParentReentry:
                 self._save_state(state)
                 return self._status_locked(reentry_id)
 
-            distilled_path = self._reentry_dir(reentry_id) / "distilled-child-return.json"
+            distilled_path = (
+                self._reentry_dir(reentry_id) / "distilled-child-return.json"
+            )
             if distilled is None:
                 raise ExternalCodexRuntimeError(
                     "reentry_recovery_input_drift",
@@ -11044,7 +12942,9 @@ def _require(value: str | None, flag: str) -> str:
     return value
 
 
-def _write_response(*, ok: bool, result: Any = None, error: ExternalCodexRuntimeError | None = None) -> None:
+def _write_response(
+    *, ok: bool, result: Any = None, error: ExternalCodexRuntimeError | None = None
+) -> None:
     payload: dict[str, Any] = {
         "schema_version": RESPONSE_SCHEMA_VERSION,
         "ok": ok,
@@ -11067,18 +12967,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.state_root, profile_path=args.profile
             )
             if args.operation == "yield-parent":
-                result = reentry.yield_parent(
-                    _require(args.obligation, "--obligation")
-                )
+                result = reentry.yield_parent(_require(args.obligation, "--obligation"))
             elif args.operation == "reenter-parent":
                 result = reentry.reenter_parent(
                     _require(args.reentry_id, "--reentry-id"),
                     _require(args.child_result, "--child-result"),
                 )
             else:
-                result = reentry.status(
-                    _require(args.reentry_id, "--reentry-id")
-                )
+                result = reentry.status(_require(args.reentry_id, "--reentry-id"))
         else:
             runtime = ExternalCodexRuntime(args.state_root, profile_path=args.profile)
             if args.operation == "preflight":
@@ -11119,7 +13015,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                         args.reviewer_session_id, "--reviewer-session-id"
                     ),
                     reviewer_state_root=args.reviewer_state_root,
-                    summon_request_path=_require(args.summon_request, "--summon-request"),
+                    summon_request_path=_require(
+                        args.summon_request, "--summon-request"
+                    ),
                     output_path=_require(args.output, "--output"),
                 )
         _write_response(ok=True, result=result)

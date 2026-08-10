@@ -15,46 +15,47 @@ meaning into `abyss-stack`:
 | canonical result schema and session-local identity-bound derivative | `abyss-stack` | constrain the model-authored report shape and mechanically bind exact task/incarnation IDs |
 | runtime state/events/result and final workspace manifest | `abyss-stack` | record what process and thread actually ran, what bytes remained, and what it returned |
 
-For read-only execution, `abyss-stack` owns the projection between two exact
-paths: the target checkout remains outside Codex's writable roots, while an
-attempt-local execution root and `TMPDIR` admit ephemeral validation writes.
-The internal Codex sandbox is technically `workspace-write` only over that
-runtime-owned root. The model realization and binding continue to describe the
-semantic target-workspace posture as `read-only`; the runtime profile records
-the implementation projection without converting it into task mutation
-authority or `allowed_paths`.
+For every admitted posture, `abyss-stack` materializes a fresh runtime-owned
+actor projection from the admitted Git baseline after recording a source
+manifest. File traversal and copying are descriptor-relative. The projection
+rejects unsupported special entries or unsafe symlinks and receives a private
+`.git` body built from the admitted HEAD/index objects, without source config,
+remotes, alternates, logs, or coordinates. A second source manifest is recorded;
+any source byte, HEAD, or parent-directory identity change fails closed before
+inference. Staging and publication use one pinned parent descriptor, the
+baseline is built from the retained staging inode, publication is non-replacing,
+rename commitment precedes verification, and cleanup is device/inode-bound. The actor baseline and final manifests plus the canonical actor
+delta are durable runtime artifacts. The projection is the only model target,
+cwd, validation root, and mutable repository surface. The source checkout keeps
+owner acceptance authority; its Git metadata is never passed
+to the model as a target or cwd. Controller originals and schema-validated
+actor-input envelopes are stored separately. JSON derivatives are sanitized
+after parsing across keys and values, collisions fail closed, and text aliases
+are removed through bounded nested JSON-escape decoding before and after
+serialization. Mixed/case-varied escapes, escaped slashes, surrogate pairs, and
+invalid-UTF-8 binary shadows share that rule; model-facing control views use the
+same source aliases, workspace identity/ancestor coordinates are omitted, and each
+derivative names only its source digest/schema rather than its source path. A
+reviewer projection is cloned from
+a controller-issued writer envelope that binds terminal result, final manifest,
+delta, source manifest, parent task, and reviewer evidence; live source access
+is unnecessary after writer return.
 
-Repository config bytes remain target-owner state and are not model inputs.
-For every attempt, `abyss-stack` derives a credential-free config and opens it
-by exact digest in the supervisor. A verified filesystem-only bubblewrap parent
-reconstructs every affected Git metadata parent as a private `tmpfs` view,
-returning its unmasked top-level entries from identity-checked open descriptors,
-then binds sanitized bytes over every currently visible mount-table coordinate
-of the target's physical `config` and reserved `config.worktree` path before the
-separately identified Codex process is released. Only bounded structural Git
-settings are retained; credentials, remotes, includes, aliases, and configured
-programs are not propagated. An explicit `core.worktree` survives only when
-native Git resolves it to the exact admitted workspace; a redirected value is
-rejected. The same bytes reserve the config lock and absent
-worktree-config coordinates inside the private attempt namespace, without
-creating or changing those paths in the target-owner namespace.
-The real checkout continues to own HEAD, index, objects, and refs, and native
-Git discovery is unchanged; no `GIT_DIR`/`GIT_WORK_TREE` override contaminates
-nested or temporary repositories. Equality of controller status through the
-owner and masked views is an admission check, not a new repository truth.
-Rootless bubblewrap uses a user and mount namespace for this operation, but no
-outer PID or network namespace; the exact Codex process still owns and proves
-its inner sandbox. Admission executes a disposable, network-disabled named
-Codex sandbox through that same outer read-only mask, and the supervisor checks
-the exact parent identity and termination state again immediately before
-releasing the gated child. The admitted mount-wrapper digest is carried from
-that preflight into inference and checked again before and inside supervisor
-launch; pathname replacement cannot silently admit different contour bytes.
+Repository config bytes remain owner state and are not model inputs. The actor
+projection instead receives a minimal sanitized actor-local config, explicit
+Codex filesystem allowlist, disabled network, and scratch outside the projection.
+Sources under Codex's built-in minimal-read system roots are not admitted, and
+the controller-original input directory is explicitly denied to the child.
+The exact open projection inode is bound into bubblewrap at a fixed child-only
+coordinate and retained by the controller through descriptor-based final
+inventory. A pathname/device/inode mismatch fails closed. Historical result v1
+and state v1/v2 remain evidence-readable, but only result v2 is emitted and old
+state cannot receive a new inference attempt without a safe v3 projection.
 The gate is a Unix socket whose peer is retained by
 bubblewrap through `--sync-fd`, so supervisor EOF is not a release signal. An
 abort also retains the supervisor endpoint until the blocked wrapper is killed
 and reaped.
-Historical v2 state without this newer digest remains evidence-readable; it is
+Historical v2 state without these newer digests remains evidence-readable; it is
 not silently upgraded into authority for another inference attempt.
 
 The neutral binder consumes already selected coordinates and writes only the
@@ -66,6 +67,10 @@ The live Codex bundled model catalog and executable digest are currentness
 checks, not replacements for `aoa-models`. Runtime receipts are execution
 evidence, not `aoa-evals` verdicts. The A2A export preserves the existing
 downstream owner review rather than bypassing it.
+The reviewed export is restricted to `landing_review` and revalidates the
+review seed, both summon request/schema pairs, and all exported writer/reviewer
+artifacts while both session locks are held through payload construction and
+publication.
 
 The session-local output schema is derived only from the admitted canonical
 schema plus the exact task and incarnation identities already present in

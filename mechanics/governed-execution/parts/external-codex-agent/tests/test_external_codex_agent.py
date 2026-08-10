@@ -12,13 +12,14 @@ import re
 import shlex
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import threading
 import time
 import urllib.parse
 import urllib.request
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -68,8 +69,7 @@ PLAN_FIXTURE = (
 PROFILE_PATH = PART_ROOT / "runtime-profile.v1.json"
 REPORT_SCHEMA_PATH = PART_ROOT / "schemas/external-codex-report.schema.json"
 SUMMON_REQUEST_SCHEMA_PATH = (
-    SDK_ROOT
-    / "mechanics/checkpoint/parts/child-task-reentry/schemas/"
+    SDK_ROOT / "mechanics/checkpoint/parts/child-task-reentry/schemas/"
     "summon-request-v4.schema.json"
 )
 SUMMON_REQUEST_SCHEMA_REF = (
@@ -109,6 +109,7 @@ SUPERVISOR = _load_module(
     "abyss_stack_external_codex_supervisor_under_test",
     SUPERVISOR_PATH,
 )
+ACTOR_EXECUTION_ROOT = RUNTIME.ACTOR_EXECUTION_ROOT
 
 
 def _digest_bytes(raw: bytes) -> str:
@@ -146,9 +147,7 @@ def _write_model_realization(
         else "abyss-stack:external_codex_agent/bounded-source-readonly-v1"
     )
     required_tools = (
-        ["shell-read", "workspace-write"]
-        if workspace_write
-        else ["shell-read"]
+        ["shell-read", "workspace-write"] if workspace_write else ["shell-read"]
     )
     _write_json(
         path,
@@ -326,6 +325,11 @@ execution_root = Path(args[args.index("-C") + 1])
 workspace = Path(workspace_projection["target_workspace"])
 if execution_root != Path(workspace_projection["codex_execution_root"]):
     raise SystemExit(12)
+if "FAKE_REQUIRE_PRIVATE_GIT" in task["objective"]:
+    if not (workspace / ".git" / "HEAD").is_file():
+        raise SystemExit(13)
+    if workspace.joinpath("README.md").read_text(encoding="utf-8") != "# Landing fixture\n":
+        raise SystemExit(14)
 
 def emit(value):
     print(json.dumps(value), flush=True)
@@ -778,7 +782,7 @@ if "FAKE_OPAQUE_EVIDENCE" in task["objective"]:
     report["transition"]["evidence_refs"] = ["artifact:/tmp/unbound#L1"]
 if "FAKE_VALID_RUNTIME_FINAL_MANIFEST_EVIDENCE" in task["objective"]:
     report["transition"]["evidence_refs"] = [
-        "runtime:workspace-final-manifest#status_entries"
+        "runtime:workspace-final-manifest#content_entries"
     ]
 if "FAKE_INVALID_RUNTIME_FINAL_MANIFEST_ANCHOR" in task["objective"]:
     report["transition"]["evidence_refs"] = [
@@ -935,9 +939,7 @@ def _fixture(
     identity_suffix: str = "luna-max",
     state_root: Path | None = None,
     shared_workspace: Path | None = None,
-    extra_immutable_inputs: tuple[
-        tuple[str, Path, ProvenanceRef], ...
-    ] = (),
+    extra_immutable_inputs: tuple[tuple[str, Path, ProvenanceRef], ...] = (),
     workspace_write: bool = False,
     exact_baseline: bool = False,
     review_required: bool = False,
@@ -949,6 +951,7 @@ def _fixture(
     validate_summon_request: bool = True,
     owner_contour: bool = False,
     role_mcp: str | None = None,
+    workspace_projection_seed: Mapping[str, str] | None = None,
     responsibility_transfer_mutator: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     if role_mcp is not None and workspace_write:
@@ -1028,9 +1031,7 @@ def _fixture(
     reviewer_realization_path: Path | None = None
     if prepare_mutation_reviewer_sources:
         reviewer_role_path = (
-            tmp_path
-            / "aoa-agents"
-            / "agents/roles/reviewer/profile.json"
+            tmp_path / "aoa-agents" / "agents/roles/reviewer/profile.json"
         )
         _write_json(
             reviewer_role_path,
@@ -1052,9 +1053,7 @@ def _fixture(
             / "source/model-realizations/fixture-luna-max-readonly.json"
         )
         reviewer_realization_path.parent.mkdir(parents=True, exist_ok=True)
-        _write_model_realization(
-            reviewer_realization_path, workspace_write=False
-        )
+        _write_model_realization(reviewer_realization_path, workspace_write=False)
     workspace_ref = _provenance(
         "fixture-target",
         "workspace/HEAD",
@@ -1116,7 +1115,10 @@ def _fixture(
                 "authority": False,
                 "plan_id": "dag-0123456789abcdef",
                 "request": {"query": "Perform the admitted bounded duty."},
-                "source_graph": {"path": "generated/capability_graph.json", "content_hash": "0" * 64},
+                "source_graph": {
+                    "path": "generated/capability_graph.json",
+                    "content_hash": "0" * 64,
+                },
                 "status": "ready",
                 "selected_capabilities": ["mode.agents.transfer-responsibility"],
                 "nodes": [],
@@ -1140,18 +1142,18 @@ def _fixture(
         )
         transfer_path = tmp_path / "responsibility-transfer.json"
         responsibility_transfer = {
-                "schema_version": "responsibility-transfer-v1",
-                "transfer_id": "transfer:fixture:goal-owner-to-actor",
-                "state": "accepted",
-                "holder_ids": [
-                    "actor://fixture-goal-owner",
-                    f"actor://fixture/{role_id}",
-                ],
-                "obligation_ref": obligation_ref.artifact_ref,
-                "mandate_ref": role_ref.artifact_ref,
-                "task_local_dag_ref": dag_ref.artifact_ref,
-                "return_owner": "actor://fixture-goal-owner",
-            }
+            "schema_version": "responsibility-transfer-v1",
+            "transfer_id": "transfer:fixture:goal-owner-to-actor",
+            "state": "accepted",
+            "holder_ids": [
+                "actor://fixture-goal-owner",
+                f"actor://fixture/{role_id}",
+            ],
+            "obligation_ref": obligation_ref.artifact_ref,
+            "mandate_ref": role_ref.artifact_ref,
+            "task_local_dag_ref": dag_ref.artifact_ref,
+            "return_owner": "actor://fixture-goal-owner",
+        }
         if responsibility_transfer_mutator is not None:
             responsibility_transfer_mutator(responsibility_transfer)
         _write_json(transfer_path, responsibility_transfer)
@@ -1200,9 +1202,7 @@ def _fixture(
             ),
             schema_version="abyss_stack_external_codex_workspace_manifest_v1",
         )
-        fixture_extra_inputs.append(
-            ("workspace-manifest", manifest_path, manifest_ref)
-        )
+        fixture_extra_inputs.append(("workspace-manifest", manifest_path, manifest_ref))
     base = RunPlan.model_validate_json(PLAN_FIXTURE.read_text(encoding="utf-8"))
     continuation_id = f"continuation:fixture:{identity_suffix}"
     incarnation_id = f"incarnation:fixture:{identity_suffix}"
@@ -1369,7 +1369,11 @@ def _fixture(
         "immutable_inputs": immutable_inputs,
         "done_state": ["Return one schema-valid evidence-bearing report."],
         "validation_commands": [
-            {"command_id": "git-status", "argv": ["git", "status", "--short"], "cwd": "."}
+            {
+                "command_id": "git-status",
+                "argv": ["git", "status", "--short"],
+                "cwd": ".",
+            }
         ],
         "expected_artifacts": ["landing_report"],
         "forbidden_effects": [
@@ -1428,10 +1432,7 @@ def _fixture(
     )
     model_ref = load_model_realization_ref(
         realization_path,
-        artifact_ref=(
-            "source/model-realizations/"
-            + realization_path.name
-        ),
+        artifact_ref=("source/model-realizations/" + realization_path.name),
         source_ref="fixture-aoa-models-source",
     )
     stop_conditions = (
@@ -1541,9 +1542,7 @@ def _fixture(
                 if workspace_write
                 else ("shell-read",)
             ),
-            required_mcp_server_ids=(
-                (role_mcp,) if role_mcp is not None else ()
-            ),
+            required_mcp_server_ids=((role_mcp,) if role_mcp is not None else ()),
         ),
         usage_metering=IncarnationUsageMetering(
             metering_regime="chatgpt_quota",
@@ -1631,6 +1630,11 @@ def _fixture(
         "codex_executable_digest": _digest_path(fake_codex),
         "codex_home": str(codex_home),
         "environment_allowlist": ["HOME", "LANG", "PATH"],
+        **(
+            {"workspace_projection_seed": dict(workspace_projection_seed)}
+            if workspace_projection_seed is not None
+            else {}
+        ),
     }
     launch_path = tmp_path / "launch.json"
     _write_json(launch_path, launch)
@@ -1761,14 +1765,18 @@ def _fixture(
     }
 
 
-def _wait_terminal(runtime: Any, session_id: str, *, timeout: float = 10) -> dict[str, Any]:
+def _wait_terminal(
+    runtime: Any, session_id: str, *, timeout: float = 10
+) -> dict[str, Any]:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         state = runtime.status(session_id)
         if state["status"] != "running":
             return state
         time.sleep(0.05)
-    raise AssertionError(f"external Codex fixture did not stop: {runtime.status(session_id)}")
+    raise AssertionError(
+        f"external Codex fixture did not stop: {runtime.status(session_id)}"
+    )
 
 
 def test_supervisor_waits_on_signal_notification_without_20hz_procfs_scan(
@@ -1792,9 +1800,7 @@ def test_supervisor_waits_on_signal_notification_without_20hz_procfs_scan(
     monkeypatch.setattr(
         SUPERVISOR,
         "_reap_adopted_children",
-        lambda supervisor_pid, codex_pid: reaps.append(
-            (supervisor_pid, codex_pid)
-        ),
+        lambda supervisor_pid, codex_pid: reaps.append((supervisor_pid, codex_pid)),
     )
 
     def complete_after_notification(_read_fd: int, timeout_seconds: float) -> None:
@@ -1822,7 +1828,9 @@ def test_worker_reap_refuses_reused_pid(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     waits: list[tuple[int, int]] = []
-    monkeypatch.setattr(RUNTIME.os, "waitpid", lambda pid, flags: waits.append((pid, flags)))
+    monkeypatch.setattr(
+        RUNTIME.os, "waitpid", lambda pid, flags: waits.append((pid, flags))
+    )
     monkeypatch.setattr(
         RUNTIME,
         "_process_group_identity",
@@ -1968,6 +1976,7 @@ def test_supervisor_mount_wrapper_masks_target_before_releasing_command(
         _digest_path(executable),
         mount_wrapper=str(wrapper),
         mount_wrapper_digest=_digest_path(wrapper),
+        mount_launcher_digest=_digest_path(SUPERVISOR.MOUNT_LAUNCHER_PATH),
         private_directory_views=private_directory_views,
         read_only_masks=masks,
     )
@@ -1978,6 +1987,245 @@ def test_supervisor_mount_wrapper_masks_target_before_releasing_command(
     assert process.wait(timeout=5) == 0
     assert output.read_text(encoding="utf-8") == sanitized.read_text(encoding="utf-8")
     assert target.read_text(encoding="utf-8") == "credential-marker\n"
+
+
+def test_supervisor_mount_mask_preserves_verified_bytes_after_source_mutation(
+    tmp_path: Path,
+) -> None:
+    executable = Path(sys.executable).resolve()
+    wrapper = Path("/usr/bin/bwrap")
+    metadata = tmp_path / "metadata"
+    metadata.mkdir()
+    target = metadata / "repository-config"
+    sanitized = tmp_path / "sanitized-config"
+    output = tmp_path / "observed.txt"
+    target.write_text("credential-marker\n", encoding="utf-8")
+    sanitized.write_text("verified-safe-bytes\n", encoding="utf-8")
+    expected_digest = _digest_path(sanitized)
+    masks = ((str(sanitized), str(target), expected_digest),)
+    private_directory_views = tuple(
+        RUNTIME._private_directory_views(
+            [
+                {
+                    "source": str(sanitized),
+                    "target": str(target),
+                    "digest": expected_digest,
+                }
+            ]
+        )
+    )
+
+    process, gate_write_fd = SUPERVISOR._launch_verified_command(
+        [
+            str(executable),
+            "-c",
+            "import pathlib,sys; pathlib.Path(sys.argv[2]).write_text(pathlib.Path(sys.argv[1]).read_text())",
+            str(target),
+            str(output),
+        ],
+        _digest_path(executable),
+        mount_wrapper=str(wrapper),
+        mount_wrapper_digest=_digest_path(wrapper),
+        mount_launcher_digest=_digest_path(SUPERVISOR.MOUNT_LAUNCHER_PATH),
+        private_directory_views=private_directory_views,
+        read_only_masks=masks,
+        mount_setup_callback=lambda: sanitized.write_text(
+            "changed-after-readiness\n",
+            encoding="utf-8",
+        ),
+    )
+
+    assert gate_write_fd is not None
+    os.write(gate_write_fd, b"1")
+    os.close(gate_write_fd)
+    assert process.wait(timeout=5) == 0
+    assert output.read_text(encoding="utf-8") == "verified-safe-bytes\n"
+    assert sanitized.read_text(encoding="utf-8") == "changed-after-readiness\n"
+
+
+def test_supervisor_rejects_private_view_target_replaced_after_readiness(
+    tmp_path: Path,
+) -> None:
+    executable = Path(sys.executable).resolve()
+    wrapper = Path("/usr/bin/bwrap")
+    metadata = tmp_path / "metadata"
+    metadata.mkdir()
+    moved_metadata = tmp_path / "moved-metadata"
+    target = metadata / "repository-config"
+    moved_target = moved_metadata / target.name
+    sanitized = tmp_path / "sanitized-config"
+    output = tmp_path / "observed.txt"
+    target.write_text("credential-marker\n", encoding="utf-8")
+    sanitized.write_text("safe\n", encoding="utf-8")
+    masks = ((str(sanitized), str(target), _digest_path(sanitized)),)
+    private_directory_views = tuple(
+        RUNTIME._private_directory_views(
+            [
+                {
+                    "source": str(sanitized),
+                    "target": str(target),
+                    "digest": _digest_path(sanitized),
+                }
+            ]
+        )
+    )
+
+    def replace_during_setup() -> None:
+        metadata.rename(moved_metadata)
+        metadata.mkdir()
+        target.write_text("replacement-marker\n", encoding="utf-8")
+
+    with pytest.raises(
+        SUPERVISOR.SupervisorError,
+        match="did not attach exact views",
+    ):
+        SUPERVISOR._launch_verified_command(
+            [
+                str(executable),
+                "-c",
+                "import pathlib,sys; pathlib.Path(sys.argv[1]).write_text('ran')",
+                str(output),
+            ],
+            _digest_path(executable),
+            mount_wrapper=str(wrapper),
+            mount_wrapper_digest=_digest_path(wrapper),
+            mount_launcher_digest=_digest_path(SUPERVISOR.MOUNT_LAUNCHER_PATH),
+            private_directory_views=private_directory_views,
+            read_only_masks=masks,
+            mount_setup_callback=replace_during_setup,
+        )
+
+    assert not output.exists()
+    assert moved_target.read_text(encoding="utf-8") == "credential-marker\n"
+    assert target.read_text(encoding="utf-8") == "replacement-marker\n"
+
+
+def test_supervisor_masks_both_inode_and_live_path_across_post_open_rename(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    executable = Path(sys.executable).resolve()
+    wrapper = Path("/usr/bin/bwrap")
+    metadata = tmp_path / "metadata"
+    metadata.mkdir()
+    moved_metadata = tmp_path / "metadata-moved-race"
+    target = metadata / "repository-config"
+    moved_target = moved_metadata / target.name
+    sanitized = tmp_path / "sanitized-config"
+    output = tmp_path / "observed.txt"
+    target.write_text("original-secret\n", encoding="utf-8")
+    sanitized.write_text("safe\n", encoding="utf-8")
+    expected_digest = _digest_path(sanitized)
+    masks = ((str(sanitized), str(target), expected_digest),)
+    private_directory_views = tuple(
+        RUNTIME._private_directory_views(
+            [
+                {
+                    "source": str(sanitized),
+                    "target": str(target),
+                    "digest": expected_digest,
+                }
+            ]
+        )
+    )
+    launcher_source = SUPERVISOR.MOUNT_LAUNCHER_PATH.read_text(encoding="utf-8")
+    race_point = (
+        "            command_target_fd = "
+        "_command_visible_target_descriptor(view, target_fd)\n"
+    )
+    assert launcher_source.count(race_point) == 1
+    race_launcher = tmp_path / "race-mount-launcher.py"
+    race_launcher.write_text(
+        launcher_source.replace(
+            race_point,
+            race_point
+            + "            race_target = Path(str(view['target']))\n"
+            + "            race_moved = race_target.with_name(race_target.name + '-moved-race')\n"
+            + "            race_target.rename(race_moved)\n"
+            + "            race_target.mkdir()\n"
+            + "            (race_target / 'repository-config').write_text('replacement-secret\\n')\n",
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(SUPERVISOR, "MOUNT_LAUNCHER_PATH", race_launcher)
+
+    process, gate_write_fd = SUPERVISOR._launch_verified_command(
+        [
+            str(executable),
+            "-c",
+            (
+                "import pathlib,sys; "
+                "current=pathlib.Path(sys.argv[1]).read_text().strip(); "
+                "moved=pathlib.Path(sys.argv[2]).read_text().strip(); "
+                "pathlib.Path(sys.argv[3]).write_text(current + '|' + moved)"
+            ),
+            str(target),
+            str(moved_target),
+            str(output),
+        ],
+        _digest_path(executable),
+        mount_wrapper=str(wrapper),
+        mount_wrapper_digest=_digest_path(wrapper),
+        mount_launcher_digest=_digest_path(race_launcher),
+        private_directory_views=private_directory_views,
+        read_only_masks=masks,
+    )
+
+    assert gate_write_fd is not None
+    os.write(gate_write_fd, b"1")
+    os.close(gate_write_fd)
+    assert process.wait(timeout=5) == 0
+    assert output.read_text(encoding="utf-8") == "safe|safe"
+    assert target.read_text(encoding="utf-8") == "replacement-secret\n"
+    assert moved_target.read_text(encoding="utf-8") == "original-secret\n"
+
+
+def test_supervisor_rejects_private_view_replaced_before_exact_open(
+    tmp_path: Path,
+) -> None:
+    executable = Path(sys.executable).resolve()
+    wrapper = Path("/usr/bin/bwrap")
+    metadata = tmp_path / "metadata"
+    metadata.mkdir()
+    target = metadata / "repository-config"
+    sanitized = tmp_path / "sanitized-config"
+    target.write_text("credential-marker\n", encoding="utf-8")
+    sanitized.write_text("safe\n", encoding="utf-8")
+    masks = ((str(sanitized), str(target), _digest_path(sanitized)),)
+    private_directory_views = tuple(
+        RUNTIME._private_directory_views(
+            [
+                {
+                    "source": str(sanitized),
+                    "target": str(target),
+                    "digest": _digest_path(sanitized),
+                }
+            ]
+        )
+    )
+    moved_metadata = tmp_path / "moved-metadata"
+    metadata.rename(moved_metadata)
+    metadata.mkdir()
+    target.write_text("replacement-marker\n", encoding="utf-8")
+
+    with pytest.raises(
+        SUPERVISOR.SupervisorError,
+        match="mount launcher did not become ready",
+    ):
+        SUPERVISOR._launch_verified_command(
+            [str(executable), "-c", "raise SystemExit(99)"],
+            _digest_path(executable),
+            mount_wrapper=str(wrapper),
+            mount_wrapper_digest=_digest_path(wrapper),
+            mount_launcher_digest=_digest_path(SUPERVISOR.MOUNT_LAUNCHER_PATH),
+            private_directory_views=private_directory_views,
+            read_only_masks=masks,
+        )
+
+    assert (moved_metadata / target.name).read_text(encoding="utf-8") == (
+        "credential-marker\n"
+    )
+    assert target.read_text(encoding="utf-8") == "replacement-marker\n"
 
 
 def test_supervisor_refuses_launch_gate_after_parent_termination(
@@ -2016,8 +2264,7 @@ def _terminate_gated_test_wrapper(process: subprocess.Popen[bytes]) -> int:
         return_code = process.wait(timeout=5)
     deadline = time.monotonic() + 1.0
     while time.monotonic() < deadline and any(
-        SUPERVISOR._identity_matches(identity)
-        for identity in descendants.values()
+        SUPERVISOR._identity_matches(identity) for identity in descendants.values()
     ):
         time.sleep(0.01)
     live = {
@@ -2029,14 +2276,10 @@ def _terminate_gated_test_wrapper(process: subprocess.Popen[bytes]) -> int:
         assert SUPERVISOR._signal_descendants(live, signal.SIGKILL)
     deadline = time.monotonic() + 5.0
     while time.monotonic() < deadline and any(
-        SUPERVISOR._identity_matches(identity)
-        for identity in live.values()
+        SUPERVISOR._identity_matches(identity) for identity in live.values()
     ):
         time.sleep(0.01)
-    assert not any(
-        SUPERVISOR._identity_matches(identity)
-        for identity in live.values()
-    )
+    assert not any(SUPERVISOR._identity_matches(identity) for identity in live.values())
     return return_code
 
 
@@ -2068,12 +2311,9 @@ def test_supervisor_kills_gated_wrapper_before_abort_fd_close(
         _digest_path(executable),
         mount_wrapper=str(wrapper),
         mount_wrapper_digest=_digest_path(wrapper),
-        private_directory_views=tuple(
-            RUNTIME._private_directory_views([mask_entry])
-        ),
-        read_only_masks=(
-            (str(sanitized), str(target), _digest_path(sanitized)),
-        ),
+        mount_launcher_digest=_digest_path(SUPERVISOR.MOUNT_LAUNCHER_PATH),
+        private_directory_views=tuple(RUNTIME._private_directory_views([mask_entry])),
+        read_only_masks=((str(sanitized), str(target), _digest_path(sanitized)),),
     )
     assert gate_write_fd is not None
     monkeypatch.setattr(SUPERVISOR, "_termination_signal", signal.SIGTERM)
@@ -2116,12 +2356,9 @@ def test_supervisor_gate_eof_cannot_release_mount_wrapper(tmp_path: Path) -> Non
         _digest_path(executable),
         mount_wrapper=str(wrapper),
         mount_wrapper_digest=_digest_path(wrapper),
-        private_directory_views=tuple(
-            RUNTIME._private_directory_views([mask_entry])
-        ),
-        read_only_masks=(
-            (str(sanitized), str(target), _digest_path(sanitized)),
-        ),
+        mount_launcher_digest=_digest_path(SUPERVISOR.MOUNT_LAUNCHER_PATH),
+        private_directory_views=tuple(RUNTIME._private_directory_views([mask_entry])),
+        read_only_masks=((str(sanitized), str(target), _digest_path(sanitized)),),
     )
     assert gate_write_fd is not None
 
@@ -2137,14 +2374,19 @@ def test_supervisor_abort_keeps_gate_open_when_cleanup_is_incomplete(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     gate_read_fd, gate_write_fd = os.pipe()
-    monkeypatch.setattr(SUPERVISOR, "_cleanup_descendants", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        SUPERVISOR, "_cleanup_descendants", lambda *_args, **_kwargs: False
+    )
 
-    assert SUPERVISOR._abort_gated_launch(
-        object(),
-        gate_write_fd,
-        term_timeout_seconds=0.0,
-        kill_timeout_seconds=0.0,
-    ) is False
+    assert (
+        SUPERVISOR._abort_gated_launch(
+            object(),
+            gate_write_fd,
+            term_timeout_seconds=0.0,
+            kill_timeout_seconds=0.0,
+        )
+        is False
+    )
 
     os.set_blocking(gate_read_fd, False)
     with pytest.raises(BlockingIOError):
@@ -2178,6 +2420,7 @@ def test_preflight_rejects_path_replacement_after_controller_digest(
         identity_path: Path | None = None,
         actor_git_mask: Mapping[str, Any] | None = None,
         mount_wrapper_digest: str | None = None,
+        mount_launcher_digest: str | None = None,
     ) -> list[str]:
         if not replaced[0] and command[0] == fixture["launch"]["codex_executable"]:
             replacement = tmp_path / "replacement-codex"
@@ -2191,6 +2434,7 @@ def test_preflight_rejects_path_replacement_after_controller_digest(
             identity_path=identity_path,
             actor_git_mask=actor_git_mask,
             mount_wrapper_digest=mount_wrapper_digest,
+            mount_launcher_digest=mount_launcher_digest,
         )
 
     monkeypatch.setattr(runtime, "_containment_command", replace_before_supervisor_open)
@@ -2217,6 +2461,7 @@ def test_preflight_exercises_masked_nested_codex_sandbox(
         identity_path: Path | None = None,
         actor_git_mask: Mapping[str, Any] | None = None,
         mount_wrapper_digest: str | None = None,
+        mount_launcher_digest: str | None = None,
     ) -> list[str]:
         if actor_git_mask is not None:
             observed.append((list(command), actor_git_mask))
@@ -2226,6 +2471,7 @@ def test_preflight_exercises_masked_nested_codex_sandbox(
             identity_path=identity_path,
             actor_git_mask=actor_git_mask,
             mount_wrapper_digest=mount_wrapper_digest,
+            mount_launcher_digest=mount_launcher_digest,
         )
 
     monkeypatch.setattr(runtime, "_containment_command", observe_containment)
@@ -2270,6 +2516,36 @@ def test_containment_rejects_mount_wrapper_drift_after_preflight(
             executable_digest=fixture["launch"]["codex_executable_digest"],
             actor_git_mask=actor_git_mask,
             mount_wrapper_digest=preflight_digest,
+            mount_launcher_digest=_digest_path(RUNTIME.MOUNT_LAUNCHER_PATH),
+        )
+
+    assert exc_info.value.code == "actor_git_mask_unavailable"
+
+
+def test_containment_rejects_mount_launcher_drift_after_preflight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path / "fixture")
+    runtime = fixture["runtime"]
+    launcher = tmp_path / "mount-launcher.py"
+    launcher.write_text("ORIGINAL = True\n", encoding="utf-8")
+    preflight_digest = _digest_path(launcher)
+    workspace = Path(fixture["workspace"])
+    actor_git_mask = RUNTIME._prepare_actor_git_mask(
+        workspace,
+        tmp_path / "mask-scratch",
+    )
+    launcher.write_text("REPLACED = True\n", encoding="utf-8")
+    monkeypatch.setattr(RUNTIME, "MOUNT_LAUNCHER_PATH", launcher)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime._containment_command(
+            [fixture["launch"]["codex_executable"], "--version"],
+            executable_digest=fixture["launch"]["codex_executable_digest"],
+            actor_git_mask=actor_git_mask,
+            mount_wrapper_digest=_digest_path(RUNTIME.MOUNT_WRAPPER_PATH),
+            mount_launcher_digest=preflight_digest,
         )
 
     assert exc_info.value.code == "actor_git_mask_unavailable"
@@ -2302,6 +2578,33 @@ def test_worker_rejects_mount_wrapper_drift_after_durable_admission(
     assert result["failure_code"] == "mount_wrapper_drift"
 
 
+def test_worker_rejects_mount_launcher_drift_after_durable_admission(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path)
+    runtime = fixture["runtime"]
+    original_preflight = runtime._codex_preflight
+    calls = [0]
+
+    def drift_after_admission(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        observed = original_preflight(*args, **kwargs)
+        calls[0] += 1
+        if calls[0] > 1:
+            observed = {**observed, "mount_launcher_digest": ZERO_DIGEST}
+        return observed
+
+    monkeypatch.setattr(runtime, "_codex_preflight", drift_after_admission)
+
+    runtime.start(fixture["launch_path"])
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "failed"
+    assert result is not None
+    assert result["failure_code"] == "mount_launcher_drift"
+
+
 def test_existing_v2_state_without_mount_wrapper_digest_remains_readable(
     tmp_path: Path,
 ) -> None:
@@ -2313,6 +2616,7 @@ def test_existing_v2_state_without_mount_wrapper_digest_remains_readable(
     state_path = runtime._state_path(fixture["session_id"])
     state = json.loads(state_path.read_text(encoding="utf-8"))
     state["preflight"].pop("mount_wrapper_digest")
+    state["preflight"].pop("mount_launcher_digest")
     _write_json(state_path, state)
 
     observed = runtime.status(fixture["session_id"])
@@ -2400,7 +2704,9 @@ def test_live_supervisor_rejects_mismatched_child_identity_receipt(
     assert exc_info.value.code == "codex_process_identity_invalid"
 
 
-def test_preflight_and_separate_process_return_structured_result(tmp_path: Path) -> None:
+def test_preflight_and_separate_process_return_structured_result(
+    tmp_path: Path,
+) -> None:
     fixture = _fixture(tmp_path)
     runtime = fixture["runtime"]
     _git(
@@ -2427,6 +2733,16 @@ def test_preflight_and_separate_process_return_structured_result(tmp_path: Path)
 
     assert terminal["status"] == "completed"
     assert result is not None
+    assert result["schema_version"] == "abyss_stack_external_codex_result_v2"
+    for required_ref in (
+        "actor_baseline_manifest_ref",
+        "actor_final_manifest_ref",
+        "actor_delta_ref",
+        "source_manifest_before_ref",
+        "source_manifest_after_ref",
+        "source_manifest_final_ref",
+    ):
+        assert isinstance(result[required_ref], dict)
     assert result["status"] == "completed"
     assert isinstance(result["thread_id"], str) and result["thread_id"]
     assert result["attempt_count"] == 1
@@ -2446,18 +2762,15 @@ def test_preflight_and_separate_process_return_structured_result(tmp_path: Path)
     )
     assert argv[1] == str(PART_ROOT / "external_codex_supervisor.py")
     assert "--parent-pid" in argv
-    assert argv[argv.index("--executable-digest") + 1] == (
-        fixture["launch"]["codex_executable_digest"]
+    assert (
+        argv[argv.index("--executable-digest") + 1]
+        == (fixture["launch"]["codex_executable_digest"])
     )
     assert argv[argv.index("--mount-wrapper") + 1] == "/usr/bin/bwrap"
-    assert "--mount-wrapper-digest" in argv
-    private_view = json.loads(argv[argv.index("--private-directory-view") + 1])
-    assert Path(private_view["target"]).name == ".git"
-    assert private_view["entries"]
-    mask_index = argv.index("--read-only-mask")
-    sanitized_config = Path(argv[mask_index + 1])
-    assert argv[mask_index + 2] == f'{fixture["workspace"]}/.git/config'
-    assert argv[mask_index + 3] == _digest_path(sanitized_config)
+    assert "--workspace-fd" in argv
+    assert argv[argv.index("--workspace-coordinate") + 1] == str(ACTOR_EXECUTION_ROOT)
+    assert "--private-directory-view" not in argv
+    assert "--read-only-mask" not in argv
     assert "/usr/bin/unshare" not in argv
     assert "/usr/bin/setpriv" not in argv
     assert "exec" in argv
@@ -2467,15 +2780,15 @@ def test_preflight_and_separate_process_return_structured_result(tmp_path: Path)
     assert "spawn_agent" not in argv
     assert "-s" not in argv
     execution_root = Path(invocation["execution_root"])
-    assert execution_root.name == "execution-root"
-    assert execution_root.parent.name == "001"
+    actor_projection = Path(state["actor_projection_path"])
+    assert execution_root == ACTOR_EXECUTION_ROOT
+    assert actor_projection != execution_root
+    assert (actor_projection / ".git").is_dir()
     assert argv[argv.index("-C") + 1] == str(execution_root)
     assert execution_root != fixture["workspace"]
-    assert "--skip-git-repo-check" in argv
+    assert "--skip-git-repo-check" not in argv
     config_overrides = [
-        argv[index + 1]
-        for index, value in enumerate(argv[:-1])
-        if value == "-c"
+        argv[index + 1] for index, value in enumerate(argv[:-1]) if value == "-c"
     ]
     assert 'default_permissions="aoa_external_actor"' in config_overrides
     permission_override = next(
@@ -2483,7 +2796,22 @@ def test_preflight_and_separate_process_return_structured_result(tmp_path: Path)
         for value in config_overrides
         if value.startswith("permissions.aoa_external_actor=")
     )
-    assert f'{sanitized_config}"="read' in permission_override
+    sanitized_config = (
+        Path(state["actor_projection_path"]).parent
+        / "attempts"
+        / "001"
+        / "scratch"
+        / "actor-git-config"
+    )
+    assert f'"{sanitized_config}"="read"' in permission_override
+    assert f'"{execution_root}"="read"' in permission_override
+    assert f'"{execution_root / ".git"}"="read"' in permission_override
+    assert '":minimal"="read"' in permission_override
+    controller_original_root = (
+        runtime._session_dir(fixture["session_id"]) / "inputs" / "controller-immutable"
+    )
+    assert f'"{controller_original_root}"="deny"' in permission_override
+    assert str(fixture["workspace"]) not in permission_override
     assert sanitized_config.is_file()
     assert "FAKE_REPOSITORY_CONFIG_MARKER" not in sanitized_config.read_text(
         encoding="utf-8"
@@ -2496,11 +2824,30 @@ def test_preflight_and_separate_process_return_structured_result(tmp_path: Path)
     )
     assert process_identity["launcher_pid"] != process_identity["codex_pid"]
     prompt = (
-        execution_root.parent / "prompt.txt"
+        Path(state["actor_projection_path"]).parent / "attempts" / "001" / "prompt.txt"
     ).read_text(encoding="utf-8")
-    assert f'"target_workspace": "{fixture["workspace"]}"' in prompt
+    assert f'"target_workspace": "{execution_root}"' in prompt
+    assert str(fixture["workspace"]) not in prompt
+    assert str(fixture["workspace"]) not in "\0".join(argv)
     assert f'"codex_execution_root": "{execution_root}"' in prompt
     assert '"target_workspace_access": "read_only"' in prompt
+    assert result["source_manifest_match"] is True
+    actor_baseline = json.loads(
+        Path(result["actor_baseline_manifest_ref"]["artifact_ref"]).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert re.fullmatch(r"sha256:[0-9a-f]{64}", actor_baseline["private_git_digest"])
+    for immutable_input in state["materialized_task_inputs"]:
+        immutable_path = Path(immutable_input["path"])
+        assert immutable_path.parent.name == "immutable"
+        assert str(fixture["workspace"]) not in immutable_path.read_text(
+            encoding="utf-8"
+        )
+        assert f'"{immutable_path}"="read"' in permission_override
+    assert result["actor_delta_ref"]["artifact_digest"] == _digest_path(
+        Path(result["actor_delta_ref"]["artifact_ref"])
+    )
     assert "A line anchor is spelled exactly L<number>" in prompt
     assert "A bare numeric anchor such as #35" in prompt
     execution_schema_ref = state["execution_result_schema_ref"]
@@ -2511,8 +2858,9 @@ def test_preflight_and_separate_process_return_structured_result(tmp_path: Path)
     )
     assert argv[argv.index("--output-schema") + 1] == str(execution_schema_path)
     assert execution_schema["properties"]["task_id"]["const"] == fixture["task_id"]
-    assert execution_schema["properties"]["incarnation_id"]["const"] == (
-        state["incarnation_id"]
+    assert (
+        execution_schema["properties"]["incarnation_id"]["const"]
+        == (state["incarnation_id"])
     )
     finding_evidence_pattern = execution_schema["properties"]["findings"]["items"][
         "properties"
@@ -2530,25 +2878,470 @@ def test_preflight_and_separate_process_return_structured_result(tmp_path: Path)
                 evidence_pattern,
                 f"immutable:{input_id}#objective",
             )
+
         assert re.fullmatch(evidence_pattern, "source:AGENTS.md#L1")
         assert re.fullmatch(
             evidence_pattern,
             "runtime:workspace-final-manifest#git_head",
         )
-        assert re.fullmatch(
-            evidence_pattern,
-            "immutable:not-materialized#objective",
-        ) is None
+        assert (
+            re.fullmatch(
+                evidence_pattern,
+                "immutable:not-materialized#objective",
+            )
+            is None
+        )
     process_event = next(
-        item for item in events if item["event_type"] == "external_agent.process_started"
+        item
+        for item in events
+        if item["event_type"] == "external_agent.process_started"
     )
-    assert process_event["payload"]["supervisor_pid"] != (
-        process_event["payload"]["codex_pid"]
+    assert (
+        process_event["payload"]["supervisor_pid"]
+        != (process_event["payload"]["codex_pid"])
     )
     assert process_event["payload"]["codex_pid"] != os.getpid()
-    assert json.loads(PROFILE_PATH.read_text())["boundaries"][
-        "uses_builtin_codex_subagents"
-    ] is False
+    assert (
+        json.loads(PROFILE_PATH.read_text())["boundaries"][
+            "uses_builtin_codex_subagents"
+        ]
+        is False
+    )
+
+    legacy_result = dict(result)
+    legacy_result["schema_version"] = "abyss_stack_external_codex_result_v1"
+    for legacy_optional in (
+        "actor_projection_path",
+        "actor_baseline_manifest_ref",
+        "actor_final_manifest_ref",
+        "actor_delta_ref",
+        "source_manifest_before_ref",
+        "source_manifest_after_ref",
+        "source_manifest_final_ref",
+        "source_manifest_match",
+    ):
+        legacy_result.pop(legacy_optional)
+    RUNTIME.validate_json(
+        legacy_result,
+        PART_ROOT / "schemas/external-codex-result.schema.json",
+        label="legacy external Codex result",
+    )
+
+
+def test_source_race_fails_before_inference_and_persists_no_attempt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path, exact_baseline=True)
+    runtime = fixture["runtime"]
+    original_manifest = RUNTIME.build_workspace_manifest
+    calls = 0
+
+    def raced_manifest(path: str | Path) -> dict[str, Any]:
+        nonlocal calls
+        calls += 1
+        manifest = original_manifest(path)
+        manifest = json.loads(json.dumps(manifest))
+        if calls == 2:
+            manifest["workspace_identity"]["root"]["st_ino"] += 1
+        return manifest
+
+    monkeypatch.setattr(RUNTIME, "build_workspace_manifest", raced_manifest)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.start(fixture["launch_path"])
+
+    assert exc_info.value.code == "workspace_source_race"
+    assert calls >= 2
+    session_dir = runtime._session_dir(fixture["session_id"])
+    assert not (session_dir / "state.json").exists()
+    assert not (session_dir / "attempts").exists()
+    assert not (session_dir / "actor-baseline-manifest.json").exists()
+    assert not (session_dir / "actor-workspace").exists()
+
+
+def test_child_uses_open_projection_inode_and_closeout_rejects_path_replacement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path, objective_marker="FAKE_REQUIRE_PRIVATE_GIT")
+    runtime = fixture["runtime"]
+    original_popen = RUNTIME.subprocess.Popen
+
+    def replace_projection_before_supervisor(
+        command: Any,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        if (
+            isinstance(command, list)
+            and len(command) > 2
+            and command[1] == str(SUPERVISOR_PATH)
+            and "--workspace-fd" in command
+        ):
+            state = runtime._load_state(fixture["session_id"])
+            projection = Path(state["actor_projection_path"])
+            retired = projection.with_name("actor-workspace-open-inode")
+            projection.rename(retired)
+            projection.mkdir(mode=0o700)
+            (projection / "README.md").write_text(
+                "replacement pathname tree\n",
+                encoding="utf-8",
+            )
+        return original_popen(command, *args, **kwargs)
+
+    monkeypatch.setattr(
+        RUNTIME.subprocess, "Popen", replace_projection_before_supervisor
+    )
+    runtime.start(fixture["launch_path"])
+
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+    state = runtime._load_state(fixture["session_id"])
+    replacement = Path(state["actor_projection_path"])
+    retired = replacement.with_name("actor-workspace-open-inode")
+
+    assert terminal["status"] == "authority_blocked"
+    assert result is not None
+    assert result["failure_code"] == "actor_projection_coordinate_drift"
+    assert result["exit_code"] == 0
+    assert any(
+        item.get("validation_command_id") == "git-status"
+        and isinstance(item.get("workspace_manifest_digest"), str)
+        for item in result["executed_commands"]
+    )
+    assert (retired / ".git" / "HEAD").is_file()
+    assert not (replacement / ".git").exists()
+    assert replacement.joinpath("README.md").read_text(encoding="utf-8") == (
+        "replacement pathname tree\n"
+    )
+
+
+def test_projection_publication_swap_cannot_become_durable_actor_baseline(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path)
+    runtime = fixture["runtime"]
+    original_materialize = RUNTIME.materialize_actor_projection
+
+    def materialize_then_replace(*args: Any, **kwargs: Any) -> Any:
+        projection, manifest = original_materialize(*args, **kwargs)
+        retired = projection.with_name("actor-workspace-retired-after-publication")
+        projection.rename(retired)
+        projection.mkdir(mode=0o700)
+        (projection / "README.md").write_text(
+            "attacker replacement\n",
+            encoding="utf-8",
+        )
+        (projection / ".git").mkdir(mode=0o700)
+        return projection, manifest
+
+    monkeypatch.setattr(
+        RUNTIME,
+        "materialize_actor_projection",
+        materialize_then_replace,
+    )
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.start(fixture["launch_path"])
+
+    assert exc_info.value.code == "workspace_projection_cleanup_incomplete"
+    assert not runtime._state_path(fixture["session_id"]).exists()
+    assert (
+        runtime._session_dir(fixture["session_id"])
+        / "actor-workspace-retired-after-publication"
+        / ".git"
+    ).is_dir()
+
+
+def test_unicode_source_coordinate_is_removed_from_actor_envelopes_and_argv(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path / "данные")
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    state = runtime._load_state(fixture["session_id"])
+    source = str(fixture["workspace"].resolve())
+
+    for item in state["materialized_task_inputs"]:
+        raw = Path(item["path"]).read_bytes()
+        envelope = json.loads(raw)
+        assert envelope["schema_version"] == (
+            "abyss_stack_external_codex_actor_input_envelope_v1"
+        )
+        assert source not in json.dumps(envelope, ensure_ascii=False)
+        escaped_source = json.dumps(source, ensure_ascii=True)[1:-1].encode("utf-8")
+        assert escaped_source not in raw
+        if item["input_id"] == "workspace-manifest":
+            assert "workspace_identity" not in envelope["payload"]
+    assert all(
+        source not in argument
+        for attempt in state["attempts"]
+        for argument in (attempt.get("codex_argv") or [])
+    )
+
+
+def test_prompt_scrub_removes_json_escaped_unicode_source_coordinate() -> None:
+    source = "/home/д/repo"
+    actor = str(ACTOR_EXECUTION_ROOT)
+    raw_role = json.dumps({"workspace": source}, ensure_ascii=True)
+
+    projected = RUNTIME._replace_prompt_source_path(
+        raw_role,
+        source_path=source,
+        projection_path=actor,
+    )
+
+    assert source not in projected
+    assert json.dumps(source, ensure_ascii=True)[1:-1] not in projected
+    assert json.loads(projected)["workspace"] == actor
+
+
+@pytest.mark.parametrize(
+    "source_spelling",
+    (
+        r"\/tmp\/\u0434\u0430\u043d\u043d\u044b\u0435\/workspace",
+        r"/tmp/\u0434\u0430\u043D\u043D\u044B\u0435/workspace",
+        r"/tmp/\u0434а\u043dн\u044bе/workspace",
+        r"/tmp/\u005cu0434\u005cu0430\u005cu043d\u005cu043d\u005cu044b\u005cu0435/workspace",
+    ),
+)
+def test_actor_envelope_scrubs_preescaped_unicode_text_source_coordinate(
+    source_spelling: str,
+) -> None:
+    source = "/tmp/данные/workspace"
+    provenance = {
+        "artifact_digest": "sha256:" + "a" * 64,
+        "schema_ref": "fixture-v1",
+        "schema_version": "fixture-v1",
+    }
+
+    envelope, encoded = RUNTIME._actor_safe_input_envelope(
+        input_id="preescaped-unicode-text-fixture",
+        raw=f"TEXT {source_spelling} END".encode(),
+        original_provenance=provenance,
+        aliases=(source, "/tmp/данные"),
+        source_roots=frozenset({source}),
+    )
+
+    assert envelope["payload_kind"] == "utf8_text"
+    assert envelope["payload"] == f"TEXT {ACTOR_EXECUTION_ROOT} END"
+    assert not RUNTIME._contains_source_path(encoded.decode(), source)
+
+
+def test_actor_envelope_scrubs_surrogate_pair_source_coordinate() -> None:
+    source = "/tmp/😀/workspace"
+    provenance = {
+        "artifact_digest": "sha256:" + "a" * 64,
+        "schema_ref": "fixture-v1",
+        "schema_version": "fixture-v1",
+    }
+
+    envelope, encoded = RUNTIME._actor_safe_input_envelope(
+        input_id="surrogate-pair-text-fixture",
+        raw=rb"TEXT /tmp/\ud83d\ude00/workspace END",
+        original_provenance=provenance,
+        aliases=(source, "/tmp/😀"),
+        source_roots=frozenset({source}),
+    )
+
+    assert envelope["payload"] == f"TEXT {ACTOR_EXECUTION_ROOT} END"
+    assert not RUNTIME._contains_source_path(encoded.decode(), source)
+
+
+def test_actor_envelope_rejects_excessive_nested_escape_depth() -> None:
+    source = "/tmp/данные/workspace"
+    provenance = {
+        "artifact_digest": "sha256:" + "a" * 64,
+        "schema_ref": "fixture-v1",
+        "schema_version": "fixture-v1",
+    }
+    nested = r"\u0434"
+    for _ in range(RUNTIME.MAX_JSON_ESCAPE_LAYERS + 1):
+        nested = nested.replace("\\", r"\u005c")
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME._actor_safe_input_envelope(
+            input_id="excessive-escape-depth-fixture",
+            raw=f"TEXT /tmp/{nested}/workspace END".encode(),
+            original_provenance=provenance,
+            aliases=(source,),
+            source_roots=frozenset({source}),
+        )
+
+    assert exc_info.value.code == "actor_input_escape_depth_exceeded"
+
+
+def test_actor_envelope_rejects_escaped_source_in_binary_payload() -> None:
+    source = "/tmp/данные/workspace"
+    provenance = {
+        "artifact_digest": "sha256:" + "a" * 64,
+        "schema_ref": "fixture-v1",
+        "schema_version": "fixture-v1",
+    }
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME._actor_safe_input_envelope(
+            input_id="binary-escaped-source-fixture",
+            raw=(
+                b"\xffTEXT /tmp/"
+                rb"\u0434\u0430\u043d\u043d\u044b\u0435/workspace END"
+            ),
+            original_provenance=provenance,
+            aliases=(source,),
+            source_roots=frozenset({source}),
+        )
+
+    assert exc_info.value.code == "actor_source_path_exposed"
+
+
+def test_actor_envelope_scrubs_preescaped_ancestor_text() -> None:
+    source = "/tmp/данные/workspace"
+    ancestor = "/tmp/данные"
+    provenance = {
+        "artifact_digest": "sha256:" + "a" * 64,
+        "schema_ref": "fixture-v1",
+        "schema_version": "fixture-v1",
+    }
+
+    envelope, encoded = RUNTIME._actor_safe_input_envelope(
+        input_id="preescaped-ancestor-text-fixture",
+        raw=rb"TEXT /tmp/\u0434\u0430\u043d\u043d\u044b\u0435/notes END",
+        original_provenance=provenance,
+        aliases=(source, ancestor),
+        source_roots=frozenset({source}),
+    )
+
+    assert envelope["payload"] == "TEXT <controller-path-redacted>/notes END"
+    assert not RUNTIME._contains_source_path(encoded.decode(), ancestor)
+
+
+def test_actor_envelope_rejects_preescaped_mapping_key_collision() -> None:
+    source = "/tmp/данные/workspace"
+    provenance = {
+        "artifact_digest": "sha256:" + "a" * 64,
+        "schema_ref": "fixture-v1",
+        "schema_version": "fixture-v1",
+    }
+    preescaped_source = r"/tmp/\u0434\u0430\u043d\u043d\u044b\u0435/workspace"
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME._actor_safe_input_envelope(
+            input_id="preescaped-key-collision-fixture",
+            raw=json.dumps(
+                {preescaped_source: "source", str(ACTOR_EXECUTION_ROOT): "actor"}
+            ).encode(),
+            original_provenance=provenance,
+            aliases=(source,),
+            source_roots=frozenset({source}),
+        )
+
+    assert exc_info.value.code == "actor_input_key_collision"
+
+
+@pytest.mark.parametrize(
+    "source_spelling",
+    (
+        r"\/home\/\u0434\/repo",
+        r"/home/\u0434/repo",
+        r"/home/\u005cu0434/repo",
+    ),
+)
+def test_prompt_scrub_removes_unicode_escape_variants(
+    source_spelling: str,
+) -> None:
+    source = "/home/д/repo"
+
+    projected = RUNTIME._replace_prompt_source_path(
+        f"ROLE {source_spelling}",
+        source_path=source,
+        projection_path=str(ACTOR_EXECUTION_ROOT),
+    )
+
+    assert projected == f"ROLE {ACTOR_EXECUTION_ROOT}"
+    assert not RUNTIME._contains_source_path(projected, source)
+
+
+def test_actor_envelope_scrubs_unicode_source_keys_and_rejects_collisions() -> None:
+    source = "/tmp/данные/workspace"
+    ancestor = "/tmp/данные"
+    provenance = {
+        "artifact_digest": "sha256:" + "a" * 64,
+        "schema_ref": "fixture-v1",
+        "schema_version": "fixture-v1",
+    }
+    envelope, encoded = RUNTIME._actor_safe_input_envelope(
+        input_id="unicode-key-fixture",
+        raw=json.dumps(
+            {
+                source: "root-key",
+                ancestor + "/recorded": "ancestor-key",
+            },
+            ensure_ascii=True,
+        ).encode("utf-8"),
+        original_provenance=provenance,
+        aliases=(source, ancestor),
+        source_roots=frozenset({source}),
+    )
+
+    assert envelope["payload"] == {
+        str(ACTOR_EXECUTION_ROOT): "root-key",
+        "<controller-path-redacted>/recorded": "ancestor-key",
+    }
+    assert json.dumps(source, ensure_ascii=True)[1:-1].encode("utf-8") not in encoded
+    assert json.dumps(ancestor, ensure_ascii=True)[1:-1].encode("utf-8") not in encoded
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME._actor_safe_input_envelope(
+            input_id="colliding-key-fixture",
+            raw=json.dumps(
+                {source: "source", str(ACTOR_EXECUTION_ROOT): "actor"},
+                ensure_ascii=True,
+            ).encode("utf-8"),
+            original_provenance=provenance,
+            aliases=(source, ancestor),
+            source_roots=frozenset({source}),
+        )
+    assert exc_info.value.code == "actor_input_key_collision"
+
+
+def test_prompt_scrub_applies_recorded_source_ancestor_alias(
+    tmp_path: Path,
+) -> None:
+    fixture_root = tmp_path / "данные"
+    ancestor = str(fixture_root.resolve())
+    fixture = _fixture(
+        fixture_root,
+        objective_marker=f"RECORDED_SOURCE_ANCESTOR {ancestor}",
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    state = runtime._load_state(fixture["session_id"])
+    prompt = (
+        runtime._session_dir(fixture["session_id"]) / "attempts/001/prompt.txt"
+    ).read_text(encoding="utf-8")
+
+    assert f"RECORDED_SOURCE_ANCESTOR {ACTOR_EXECUTION_ROOT}" in prompt
+    assert ancestor in str(state["materialized_task_inputs"][0]["path"])
+
+
+def test_source_under_codex_minimal_read_root_is_not_admitted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path)
+    monkeypatch.setattr(
+        RUNTIME,
+        "CODEX_MINIMAL_READ_ROOTS",
+        (tmp_path.resolve(),),
+    )
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        fixture["runtime"].preflight(fixture["launch_path"])
+
+    assert exc_info.value.code == "workspace_minimal_read_root_unsupported"
 
 
 def test_role_scoped_mcp_requires_only_its_exact_credential(
@@ -3112,17 +3905,17 @@ def test_run_to_terminal_keeps_caller_until_terminal_receipt(tmp_path: Path) -> 
 def test_reviewer_preparation_forwards_exact_writer_evidence_without_starting(
     tmp_path: Path,
 ) -> None:
-    fixture = _fixture(
-        tmp_path / "writer", role_id="reviewer", exact_baseline=True
-    )
+    fixture = _fixture(tmp_path / "writer", role_id="reviewer", exact_baseline=True)
     writer_runtime = fixture["runtime"]
     writer_runtime.start(fixture["launch_path"])
-    assert _wait_terminal(writer_runtime, fixture["session_id"])["status"] == "completed"
+    assert (
+        _wait_terminal(writer_runtime, fixture["session_id"])["status"] == "completed"
+    )
     writer_result_path = (
         writer_runtime._session_dir(fixture["session_id"]) / "result.json"
     )
     output_root = tmp_path / "review-preparation"
-    reviewer_state_root = tmp_path / "reviewer-state"
+    reviewer_state_root = writer_runtime.state_root
 
     response = PREPARER._prepare_reviewer(
         argparse.Namespace(
@@ -3138,9 +3931,7 @@ def test_reviewer_preparation_forwards_exact_writer_evidence_without_starting(
     preparation = json.loads(
         Path(response["preparation_path"]).read_text(encoding="utf-8")
     )
-    launch = json.loads(
-        Path(preparation["launch_path"]).read_text(encoding="utf-8")
-    )
+    launch = json.loads(Path(preparation["launch_path"]).read_text(encoding="utf-8"))
     task = json.loads(Path(launch["task"]["path"]).read_text(encoding="utf-8"))
     binding = json.loads(
         Path(launch["incarnation_binding"]["path"]).read_text(encoding="utf-8")
@@ -3170,6 +3961,8 @@ def test_reviewer_preparation_forwards_exact_writer_evidence_without_starting(
         "writer-runtime-result",
         "writer-model-report",
         "review-workspace-manifest",
+        "writer-actor-final-manifest",
+        "writer-actor-delta",
     }
     assert task["task_family"] == "landing_review"
     assert task["review_required"] is False
@@ -3177,9 +3970,9 @@ def test_reviewer_preparation_forwards_exact_writer_evidence_without_starting(
         "review_required_source_repair"
     )
     assert task["parent_task_id"] == fixture["task_id"]
-    assert {
-        item["input_id"] for item in task["immutable_inputs"]
-    }.issuperset({"summon-request", "summon-request-schema", "review-summon-request"})
+    assert {item["input_id"] for item in task["immutable_inputs"]}.issuperset(
+        {"summon-request", "summon-request-schema", "review-summon-request"}
+    )
     assert preparation["review_summon_request_digest"] == _digest_path(
         Path(preparation["review_summon_request_path"])
     )
@@ -3190,17 +3983,27 @@ def test_reviewer_preparation_forwards_exact_writer_evidence_without_starting(
         Path(preparation["review_workspace_manifest_path"])
     )
     assert binding["usage_metering"]["execution_limit_policy"] == "none"
-    assert not reviewer_state_root.exists()
+    assert reviewer_state_root.exists()
+    seed = launch["workspace_projection_seed"]
+    assert Path(seed["envelope_path"]).parent == writer_result_path.parent
+    assert seed["envelope_digest"] == _digest_path(Path(seed["envelope_path"]))
+    assert preparation["review_seed_envelope_path"] == seed["envelope_path"]
+    assert preparation["review_seed_envelope_digest"] == seed["envelope_digest"]
 
+    retired_source = tmp_path / "retired-writer-source"
+    fixture["workspace"].rename(retired_source)
+    assert not fixture["workspace"].exists()
     reviewer_runtime = RUNTIME.ExternalCodexRuntime(reviewer_state_root)
-    assert reviewer_runtime.preflight(Path(preparation["launch_path"]))["admitted"] is True
+    assert (
+        reviewer_runtime.preflight(Path(preparation["launch_path"]))["admitted"] is True
+    )
 
     retry_response = PREPARER._prepare_reviewer(
         argparse.Namespace(
             writer_launch=str(fixture["launch_path"]),
             writer_result=str(writer_result_path),
             output_root=str(tmp_path / "review-preparation-retry"),
-            state_root=str(tmp_path / "reviewer-state-retry"),
+            state_root=str(reviewer_state_root),
             aoa_sdk_root=str(SDK_ROOT),
             review_instance_id="effect-observer-repair-1",
         )
@@ -3209,15 +4012,19 @@ def test_reviewer_preparation_forwards_exact_writer_evidence_without_starting(
         Path(retry_response["preparation_path"]).read_text(encoding="utf-8")
     )
     assert retry_preparation["review_instance_id"] == "effect-observer-repair-1"
-    assert retry_preparation["reviewer_session_id"] != preparation["reviewer_session_id"]
-    assert retry_preparation["reviewer_incarnation_id"] != preparation[
-        "reviewer_incarnation_id"
-    ]
+    assert (
+        retry_preparation["reviewer_session_id"] != preparation["reviewer_session_id"]
+    )
+    assert (
+        retry_preparation["reviewer_incarnation_id"]
+        != preparation["reviewer_incarnation_id"]
+    )
 
     reviewer_runtime.start(Path(preparation["launch_path"]))
-    assert _wait_terminal(
-        reviewer_runtime, preparation["reviewer_session_id"]
-    )["status"] == "completed"
+    assert (
+        _wait_terminal(reviewer_runtime, preparation["reviewer_session_id"])["status"]
+        == "completed"
+    )
     summon_path = fixture["summon_request_path"]
     exported = writer_runtime.export_a2a_result(
         fixture["session_id"],
@@ -3227,6 +4034,53 @@ def test_reviewer_preparation_forwards_exact_writer_evidence_without_starting(
         output_path=tmp_path / "cross-state-child-task-result.json",
     )
     assert exported["child_task_result"]["review_outcome"] == "proceed"
+
+
+def test_reviewer_preparation_uses_historical_coordinate_after_ancestor_retarget(
+    tmp_path: Path,
+) -> None:
+    source_parent = tmp_path / "source-parent"
+    source_parent.mkdir()
+    fixture = _fixture(
+        tmp_path / "writer-control",
+        role_id="reviewer",
+        exact_baseline=True,
+        state_root=tmp_path / "state",
+        shared_workspace=source_parent / "workspace",
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    writer_result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+
+    retired_parent = tmp_path / "retired-source-parent"
+    source_parent.rename(retired_parent)
+    decoy_parent = tmp_path / "decoy-source-parent"
+    (decoy_parent / "workspace").mkdir(parents=True)
+    source_parent.symlink_to(decoy_parent, target_is_directory=True)
+
+    response = PREPARER._prepare_reviewer(
+        argparse.Namespace(
+            writer_launch=str(fixture["launch_path"]),
+            writer_result=str(writer_result_path),
+            output_root=str(tmp_path / "review-preparation-retargeted"),
+            state_root=str(runtime.state_root),
+            aoa_sdk_root=str(SDK_ROOT),
+            review_instance_id="retargeted-ancestor",
+        )
+    )
+
+    assert response["prepared"] is True
+    preparation = json.loads(
+        Path(response["preparation_path"]).read_text(encoding="utf-8")
+    )
+    reviewer_launch = json.loads(
+        Path(preparation["launch_path"]).read_text(encoding="utf-8")
+    )
+    assert (
+        reviewer_launch["workspace_projection_seed"]["envelope_digest"]
+        == (preparation["review_seed_envelope_digest"])
+    )
 
 
 def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
@@ -3259,7 +4113,7 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
     assert writer_report["decision"] == "submit_for_review"
     assert writer_result["workspace_manifest_match"] is False
     assert writer_result["changed_paths"] == [
-        {"path": "landing-note.md", "status": "??"}
+        {"path": "landing-note.md", "status": "created"}
     ]
     assert writer_result["workspace_manifest_ref"]["artifact_digest"] == (
         _digest_path(Path(writer_result["workspace_manifest_ref"]["artifact_ref"]))
@@ -3273,9 +4127,7 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
             state_root=str(runtime.state_root),
             aoa_sdk_root=str(SDK_ROOT),
             reviewer_role_contract=str(fixture["reviewer_role_path"]),
-            reviewer_model_realization=str(
-                fixture["reviewer_realization_path"]
-            ),
+            reviewer_model_realization=str(fixture["reviewer_realization_path"]),
         )
     )
     preparation = json.loads(
@@ -3284,9 +4136,7 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
     reviewer_launch_path = Path(preparation["launch_path"])
     reviewer_launch = json.loads(reviewer_launch_path.read_text(encoding="utf-8"))
     reviewer_binding = json.loads(
-        Path(reviewer_launch["incarnation_binding"]["path"]).read_text(
-            encoding="utf-8"
-        )
+        Path(reviewer_launch["incarnation_binding"]["path"]).read_text(encoding="utf-8")
     )
     reviewer_task = json.loads(
         Path(reviewer_launch["task"]["path"]).read_text(encoding="utf-8")
@@ -3348,6 +4198,89 @@ def test_reviewer_preparation_requires_canonical_durable_writer_result(
         )
 
 
+def test_review_seed_rejects_live_writer_and_stale_terminal_result(
+    tmp_path: Path,
+) -> None:
+    live_writer = _fixture(
+        tmp_path / "live-writer",
+        objective_marker="FAKE_WAIT_FOR_INTERRUPT",
+        identity_suffix="live-seed-writer",
+    )
+    live_runtime = live_writer["runtime"]
+    live_runtime.start(live_writer["launch_path"])
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        if live_runtime.status(live_writer["session_id"])["codex_pid"]:
+            break
+        time.sleep(0.05)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        live_runtime.issue_review_seed(live_writer["session_id"])
+    assert exc_info.value.code == "review_seed_writer_not_terminal"
+    assert live_runtime.interrupt(live_writer["session_id"])["status"] == "interrupted"
+
+    writer = _fixture(
+        tmp_path / "terminal-writer",
+        identity_suffix="stale-seed-writer",
+    )
+    runtime = writer["runtime"]
+    runtime.start(writer["launch_path"])
+    assert _wait_terminal(runtime, writer["session_id"])["status"] == "completed"
+    result_path = runtime._session_dir(writer["session_id"]) / "result.json"
+    stale = json.loads(result_path.read_text(encoding="utf-8"))
+    stale["duration_seconds"] = float(stale["duration_seconds"]) + 1.0
+    _write_json(result_path, stale)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.issue_review_seed(writer["session_id"])
+    assert exc_info.value.code == "review_seed_writer_result_unbound"
+
+
+def test_review_seed_rejects_writer_session_reuse(tmp_path: Path) -> None:
+    shared_state = tmp_path / "shared-state"
+    writer = _fixture(
+        tmp_path / "writer",
+        identity_suffix="seed-session-reuse",
+        state_root=shared_state,
+    )
+    runtime = writer["runtime"]
+    runtime.start(writer["launch_path"])
+    assert _wait_terminal(runtime, writer["session_id"])["status"] == "completed"
+    seed_ref = runtime.issue_review_seed(writer["session_id"])
+    reviewer = _fixture(
+        tmp_path / "reviewer",
+        role_id="reviewer",
+        task_family="landing_review",
+        parent_task_id=writer["task_id"],
+        identity_suffix="seed-session-reuse",
+        state_root=shared_state,
+        shared_workspace=writer["workspace"],
+        workspace_projection_seed={
+            "envelope_path": seed_ref["artifact_ref"],
+            "envelope_digest": seed_ref["artifact_digest"],
+        },
+    )
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.preflight(reviewer["launch_path"])
+    assert exc_info.value.code == "review_seed_session_reuse"
+
+    foreign_reviewer = _fixture(
+        tmp_path / "foreign-reviewer",
+        role_id="reviewer",
+        task_family="landing_review",
+        parent_task_id="task:foreign-writer",
+        identity_suffix="foreign-seed-reviewer",
+        state_root=shared_state,
+        shared_workspace=writer["workspace"],
+        workspace_projection_seed={
+            "envelope_path": seed_ref["artifact_ref"],
+            "envelope_digest": seed_ref["artifact_digest"],
+        },
+    )
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.preflight(foreign_reviewer["launch_path"])
+    assert exc_info.value.code == "review_seed_parent_task_mismatch"
+
+
 def test_reviewer_preparation_rejects_non_fixture_writer_admission(
     tmp_path: Path,
 ) -> None:
@@ -3396,14 +4329,11 @@ def test_neutral_binder_reproduces_exact_owner_contour_launch(tmp_path: Path) ->
         "schema_version": "abyss_stack_external_actor_launch_manifest_v1",
         "launch_id": launch["launch_id"],
         "session_id": launch["session_id"],
-        "artifacts": {
-            key: launch[key]["path"]
-            for key in BINDER.COORDINATE_KEYS
-        },
+        "artifacts": {key: launch[key]["path"] for key in BINDER.COORDINATE_KEYS},
         "owner_contract_paths": {
-            "owner_execution_request_schema": launch[
-                "owner_execution_request_schema"
-            ]["path"],
+            "owner_execution_request_schema": launch["owner_execution_request_schema"][
+                "path"
+            ],
             "task_local_dag_schema": launch["task_local_dag_schema"]["path"],
         },
         "workspace_path": launch["workspace_path"],
@@ -3622,7 +4552,7 @@ def test_prepared_session_retries_launch_after_spawn_failure(
     assert calls == 2
 
 
-def test_active_attempt_exclusively_holds_its_exact_workspace(
+def test_active_attempts_use_distinct_runtime_owned_projections(
     tmp_path: Path,
 ) -> None:
     workspace = tmp_path / "shared-workspace"
@@ -3649,13 +4579,19 @@ def test_active_attempt_exclusively_holds_its_exact_workspace(
         time.sleep(0.05)
     assert running["codex_pid"]
 
-    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
-        second["runtime"].start(second["launch_path"])
-    assert exc_info.value.code == "workspace_active_attempt_conflict"
+    second_started = second["runtime"].start(second["launch_path"])
+    assert second_started["status"] in {"prepared", "running"}
+    first_state = runtime._load_state(first["session_id"])
+    second_state = second["runtime"]._load_state(second["session_id"])
+    assert first_state["actor_projection_path"] != second_state["actor_projection_path"]
+    assert Path(first_state["actor_projection_path"]).is_dir()
+    assert Path(second_state["actor_projection_path"]).is_dir()
+    assert (Path(first_state["actor_projection_path"]) / ".git").is_dir()
+    assert (Path(second_state["actor_projection_path"]) / ".git").is_dir()
 
     interrupted = runtime.interrupt(first["session_id"])
     assert interrupted["status"] == "interrupted"
-    terminal = second["runtime"].run_to_terminal(second["launch_path"])
+    terminal = _wait_terminal(second["runtime"], second["session_id"])
     assert terminal["status"] == "completed"
 
 
@@ -3753,9 +4689,9 @@ def test_recovered_codex_events_replay_thread_usage_and_command_state(
             "exit_code": 0,
         }
     ]
-    assert runtime._forbidden_effects(
-        recovered["executed_commands"], task
-    ) == ["unclassified_indirect_effect"]
+    assert runtime._forbidden_effects(recovered["executed_commands"], task) == [
+        "unclassified_indirect_effect"
+    ]
     with runtime._lock(fixture["session_id"]):
         failed_state = runtime._load_state(fixture["session_id"])
         runtime._worker_failure_locked(
@@ -3870,9 +4806,7 @@ def test_finalization_detects_same_status_byte_mutation(tmp_path: Path) -> None:
     assert terminal["status"] == "authority_blocked"
     assert result is not None
     assert result["workspace_manifest_match"] is False
-    assert result["changed_paths"] == [
-        {"path": "dirty-note.txt", "status": "content_changed"}
-    ]
+    assert result["changed_paths"] == [{"path": "dirty-note.txt", "status": "modified"}]
 
 
 def test_allowed_path_rejects_embedded_parent_traversal() -> None:
@@ -3933,7 +4867,7 @@ def test_read_only_workspace_drift_is_authority_blocked(tmp_path: Path) -> None:
 
     assert terminal["status"] == "authority_blocked"
     assert result is not None and result["status"] == "authority_blocked"
-    assert result["changed_paths"] == [{"path": "unexpected.txt", "status": "??"}]
+    assert result["changed_paths"] == [{"path": "unexpected.txt", "status": "created"}]
     assert result["wake_evaluation"]["wake_parent"] is True
 
 
@@ -3949,7 +4883,7 @@ def test_special_workspace_entry_is_authority_blocked_at_closeout(
 
     assert terminal["status"] == "authority_blocked"
     assert result is not None
-    assert result["failure_code"] == "workspace_manifest_observation_gap"
+    assert result["failure_code"] == "actor_projection_observation_gap"
     assert result["workspace_manifest_match"] is None
 
 
@@ -3970,19 +4904,29 @@ def test_workspace_write_preparation_stays_inside_allowed_paths(tmp_path: Path) 
 
     assert terminal["status"] == "completed"
     assert result is not None and result["status"] == "completed"
-    assert result["changed_paths"] == [{"path": "landing-note.md", "status": "??"}]
+    assert result["changed_paths"] == [{"path": "landing-note.md", "status": "created"}]
     invocation = result["codex_invocations"][0]
     argv = invocation["argv"]
     assert "-s" not in argv
     assert 'default_permissions="aoa_external_actor"' in argv
     assert any(
         value.startswith("permissions.aoa_external_actor=")
-        and 'network={enabled=false}' in value
+        and "network={enabled=false}" in value
         for value in argv
     )
-    assert invocation["execution_root"] == str(fixture["workspace"])
-    assert argv[argv.index("-C") + 1] == str(fixture["workspace"])
+    state = runtime._load_state(fixture["session_id"])
+    projection = Path(state["actor_projection_path"])
+    assert invocation["execution_root"] == str(ACTOR_EXECUTION_ROOT)
+    assert argv[argv.index("-C") + 1] == str(ACTOR_EXECUTION_ROOT)
+    assert projection != fixture["workspace"]
     assert "--skip-git-repo-check" not in argv
+    permission_override = next(
+        value for value in argv if value.startswith("permissions.aoa_external_actor=")
+    )
+    assert f'"{ACTOR_EXECUTION_ROOT}"="write"' in permission_override
+    assert f'"{ACTOR_EXECUTION_ROOT / ".git"}"="read"' in permission_override
+    assert not (fixture["workspace"] / "landing-note.md").exists()
+    assert result["source_manifest_match"] is True
 
 
 @pytest.mark.parametrize(
@@ -4026,7 +4970,9 @@ def test_report_cannot_claim_preexisting_workspace_artifact(
     assert isinstance(failure["message"], str) and failure["message"]
 
 
-def test_workspace_write_report_accepts_actual_produced_artifact(tmp_path: Path) -> None:
+def test_workspace_write_report_accepts_actual_produced_artifact(
+    tmp_path: Path,
+) -> None:
     fixture = _fixture(
         tmp_path,
         objective_marker="FAKE_WRITE_ALLOWED FAKE_ARTIFACT_PRODUCED",
@@ -4067,7 +5013,7 @@ def test_source_evidence_scope_is_distinct_from_mutation_scope(
 
     assert terminal["status"] == "completed"
     assert result is not None
-    assert result["changed_paths"] == [{"path": "landing-note.md", "status": "??"}]
+    assert result["changed_paths"] == [{"path": "landing-note.md", "status": "created"}]
 
 
 def test_runtime_final_workspace_manifest_is_admitted_evidence(
@@ -4274,11 +5220,11 @@ def test_fixed_validation_receipt_records_exact_argv_and_cwd(tmp_path: Path) -> 
         if item.get("validation_command_id") == "git-status"
     )
     assert execution["validation_argv"] == ["git", "status", "--short"]
-    assert execution["validation_cwd"] == str(fixture["workspace"])
+    assert execution["validation_cwd"] == str(ACTOR_EXECUTION_ROOT)
     assert execution["validation_wrapper_argv"] == [
         "/usr/bin/env",
         "-C",
-        str(fixture["workspace"]),
+        str(ACTOR_EXECUTION_ROOT),
         "--",
         "git",
         "status",
@@ -4325,7 +5271,7 @@ def test_forbidden_effect_observer_handles_wrappers_and_effect_families(
         "/usr/bin/env PYTHONDONTWRITEBYTECODE=1 /usr/bin/python -m pytest -q",
         "/usr/bin/rg -n secret_access mechanics/runtime.py",
         (
-            "/usr/bin/zsh -lc \"/usr/bin/nl -ba docs/ONE.md | "
+            '/usr/bin/zsh -lc "/usr/bin/nl -ba docs/ONE.md | '
             "/usr/bin/sed -n '1,5p'; /usr/bin/nl -ba docs/TWO.md | "
             "/usr/bin/sed -n '6,10p'\""
         ),
@@ -4335,12 +5281,17 @@ def test_effect_observer_does_not_block_fixed_read_commands(command: str) -> Non
     assert RUNTIME._command_effects(command) == set()
 
 
-def test_indirect_interpreter_effect_is_unclassified_but_fixed_validation_is_admitted() -> None:
+def test_indirect_interpreter_effect_is_unclassified_but_fixed_validation_is_admitted() -> (
+    None
+):
     command = "/usr/bin/python3 -c 'print(42)'"
     assert RUNTIME._command_has_unclassified_indirection(command) is True
-    assert RUNTIME._command_has_unclassified_indirection(
-        "/usr/bin/zsh -lc '/usr/bin/rg -n fixture README.md'"
-    ) is False
+    assert (
+        RUNTIME._command_has_unclassified_indirection(
+            "/usr/bin/zsh -lc '/usr/bin/rg -n fixture README.md'"
+        )
+        is False
+    )
 
 
 def test_attached_shell_separator_does_not_hide_forbidden_effect() -> None:
@@ -4428,9 +5379,9 @@ def test_sort_compression_program_dispatch_is_fail_closed(command: str) -> None:
 
 
 def test_ordinary_sort_remains_classifiable() -> None:
-    assert RUNTIME._command_has_unclassified_indirection(
-        "/usr/bin/sort -u input"
-    ) is False
+    assert (
+        RUNTIME._command_has_unclassified_indirection("/usr/bin/sort -u input") is False
+    )
 
 
 @pytest.mark.parametrize(
@@ -4446,9 +5397,10 @@ def test_git_update_ref_is_fail_closed(command: str) -> None:
 
 
 def test_git_show_ref_remains_classifiable() -> None:
-    assert RUNTIME._command_has_unclassified_indirection(
-        "/usr/bin/git show-ref --heads"
-    ) is False
+    assert (
+        RUNTIME._command_has_unclassified_indirection("/usr/bin/git show-ref --heads")
+        is False
+    )
 
 
 @pytest.mark.parametrize(
@@ -4690,9 +5642,12 @@ def test_allowlisted_system_commands_remain_classifiable(command: str) -> None:
 
 
 def test_ordinary_git_cat_file_remains_classifiable() -> None:
-    assert RUNTIME._command_has_unclassified_indirection(
-        "/usr/bin/git cat-file -p HEAD:README.md"
-    ) is False
+    assert (
+        RUNTIME._command_has_unclassified_indirection(
+            "/usr/bin/git cat-file -p HEAD:README.md"
+        )
+        is False
+    )
 
 
 @pytest.mark.parametrize(
@@ -4771,29 +5726,31 @@ def test_git_signature_verifier_program_is_neutralized_for_signed_commit(
         + b"\n"
         + message
     )
-    signed_oid = subprocess.run(
-        [
-            "/usr/bin/git",
-            "-C",
-            str(workspace),
-            "hash-object",
-            "-t",
-            "commit",
-            "-w",
-            "--stdin",
-        ],
-        input=signed_commit,
-        check=True,
-        capture_output=True,
-        text=False,
-    ).stdout.decode("ascii").strip()
+    signed_oid = (
+        subprocess.run(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(workspace),
+                "hash-object",
+                "-t",
+                "commit",
+                "-w",
+                "--stdin",
+            ],
+            input=signed_commit,
+            check=True,
+            capture_output=True,
+            text=False,
+        )
+        .stdout.decode("ascii")
+        .strip()
+    )
     _git(workspace, "update-ref", "HEAD", signed_oid)
     marker = tmp_path / "configured-verifier-ran"
     helper = tmp_path / "configured-verifier"
     helper.write_text(
-        "#!/bin/sh\n"
-        f"/usr/bin/touch {shlex.quote(str(marker))}\n"
-        "exit 1\n",
+        f"#!/bin/sh\n/usr/bin/touch {shlex.quote(str(marker))}\nexit 1\n",
         encoding="utf-8",
     )
     helper.chmod(0o700)
@@ -4942,9 +5899,7 @@ def test_codex_environment_isolates_shell_startup_and_repository_hooks(
     filter_marker = tmp_path / "smudge-filter-ran"
     filter_helper = tmp_path / "smudge-filter"
     filter_helper.write_text(
-        "#!/bin/sh\n"
-        f"/usr/bin/touch {shlex.quote(str(filter_marker))}\n"
-        "/bin/cat\n",
+        f"#!/bin/sh\n/usr/bin/touch {shlex.quote(str(filter_marker))}\n/bin/cat\n",
         encoding="utf-8",
     )
     filter_helper.chmod(0o700)
@@ -5156,9 +6111,9 @@ def test_git_editor_runner_and_verifier_dispatch_is_fail_closed(
 
 
 def test_direct_secret_file_encoder_is_classified() -> None:
-    assert RUNTIME._command_effects(
-        "/usr/bin/base64 /home/operator/.ssh/id_rsa"
-    ) == {"secret_access"}
+    assert RUNTIME._command_effects("/usr/bin/base64 /home/operator/.ssh/id_rsa") == {
+        "secret_access"
+    }
 
 
 def test_direct_repository_git_config_reader_is_fail_closed() -> None:
@@ -5288,6 +6243,22 @@ def test_actor_git_mask_preserves_linked_worktree_and_masks_both_configs(
     )
     assert observed.returncode == 0
     assert RUNTIME._parse_git_status(observed.stdout) == RUNTIME._git_status(linked)
+    for config_path in (common_config, worktree_config):
+        direct = RUNTIME._run_actor_masked_command(
+            mask,
+            ("/usr/bin/cat", str(config_path)),
+            environment=dict(os.environ),
+        )
+        assert direct.returncode == 0
+        assert "FAKE_WORKTREE_CONFIG_MARKER" not in direct.stdout
+    nested_write_probe = worktree_config.parent / "actor-write-probe"
+    direct = RUNTIME._run_actor_masked_command(
+        mask,
+        ("/usr/bin/touch", str(nested_write_probe)),
+        environment=dict(os.environ),
+    )
+    assert direct.returncode != 0
+    assert not nested_write_probe.exists()
 
 
 def test_actor_git_mask_preserves_native_split_index_and_refs(tmp_path: Path) -> None:
@@ -5333,7 +6304,7 @@ def test_actor_git_mask_hides_existing_config_lockfiles(tmp_path: Path) -> None:
     config_lock = workspace / ".git" / "config.lock"
     config_lock.write_text(
         config.read_text(encoding="utf-8")
-        + "[http \"https://example.invalid/\"]\n"
+        + '[http "https://example.invalid/"]\n'
         + "\textraHeader = Authorization: Bearer FAKE_LOCK_MARKER\n",
         encoding="utf-8",
     )
@@ -5632,12 +6603,13 @@ def test_generic_repository_git_metadata_writers_are_fail_closed(
 
 
 def test_ordinary_source_reader_and_writer_remain_classifiable() -> None:
-    assert RUNTIME._command_has_unclassified_indirection(
-        "/usr/bin/cat README.md"
-    ) is False
-    assert RUNTIME._command_has_unclassified_indirection(
-        "/usr/bin/tee landing-note.md"
-    ) is False
+    assert (
+        RUNTIME._command_has_unclassified_indirection("/usr/bin/cat README.md") is False
+    )
+    assert (
+        RUNTIME._command_has_unclassified_indirection("/usr/bin/tee landing-note.md")
+        is False
+    )
 
 
 def test_runtime_forbidden_effects_do_not_trust_a_task_subset() -> None:
@@ -5708,9 +6680,7 @@ def test_started_command_survives_interruption_and_blocks_authority(
     assert result is not None
     assert result["status"] == "authority_blocked"
     assert result["executed_commands"][0]["event_phase"] == "started"
-    assert "push" in runtime._failure_authority_effects(
-        result["executed_commands"]
-    )
+    assert "push" in runtime._failure_authority_effects(result["executed_commands"])
 
 
 @pytest.mark.parametrize(
@@ -5826,10 +6796,17 @@ def test_clean_required_rechecks_hidden_bytes_after_worker_preflight(
     terminal = _wait_terminal(runtime, fixture["session_id"])
     result = runtime.result(fixture["session_id"])
 
-    assert terminal["status"] == "failed"
+    assert terminal["status"] == "authority_blocked"
     assert result is not None
-    assert result["failure_code"] == "workspace_manifest_drift"
+    assert result["failure_code"] == "authority_boundary_crossed"
+    assert result["source_manifest_match"] is False
     assert result["thread_id"] is None
+    authority_events = [
+        event
+        for event in runtime.events(fixture["session_id"], after_sequence=-1)
+        if event["event_type"] == "external_agent.failure_authority_drift_detected"
+    ]
+    assert authority_events[-1]["payload"]["source_drift"] is True
     assert not (
         runtime._session_dir(fixture["session_id"])
         / "attempts"
@@ -5857,9 +6834,7 @@ def test_ignored_workspace_bytes_are_manifested_and_drift_is_blocked(
     assert terminal["status"] == "authority_blocked"
     assert result is not None
     assert result["workspace_manifest_match"] is False
-    assert {item["path"] for item in result["changed_paths"]} == {
-        "cache/output.txt"
-    }
+    assert {item["path"] for item in result["changed_paths"]} == {"cache/output.txt"}
 
 
 def test_secret_shaped_ignored_path_blocks_manifest_without_hashing(
@@ -5908,9 +6883,7 @@ def test_workspace_manifest_disables_repository_diff_and_filter_programs(
     filter_marker = tmp_path / "clean-filter-ran"
     filter_helper = tmp_path / "clean-filter"
     filter_helper.write_text(
-        "#!/bin/sh\n"
-        f"/usr/bin/touch {shlex.quote(str(filter_marker))}\n"
-        "/bin/cat\n",
+        f"#!/bin/sh\n/usr/bin/touch {shlex.quote(str(filter_marker))}\n/bin/cat\n",
         encoding="utf-8",
     )
     filter_helper.chmod(0o700)
@@ -5944,9 +6917,7 @@ def test_workspace_manifest_disables_promisor_lazy_fetch_helpers(
     marker = tmp_path / "promisor-helper-ran"
     helper = tmp_path / "promisor-helper"
     helper.write_text(
-        "#!/bin/sh\n"
-        f"/usr/bin/touch {shlex.quote(str(marker))}\n"
-        "exit 1\n",
+        f"#!/bin/sh\n/usr/bin/touch {shlex.quote(str(marker))}\nexit 1\n",
         encoding="utf-8",
     )
     helper.chmod(0o700)
@@ -6008,14 +6979,10 @@ def test_workspace_manifest_hashes_tracked_bytes_hidden_by_index_flags(
     current = RUNTIME.build_workspace_manifest(workspace)
 
     baseline_entry = next(
-        item
-        for item in baseline["content_entries"]
-        if item["path"] == "tracked.txt"
+        item for item in baseline["content_entries"] if item["path"] == "tracked.txt"
     )
     current_entry = next(
-        item
-        for item in current["content_entries"]
-        if item["path"] == "tracked.txt"
+        item for item in current["content_entries"] if item["path"] == "tracked.txt"
     )
     assert current_entry["sha256"] != baseline_entry["sha256"]
     assert current_entry["index_flags"]
@@ -6241,8 +7208,10 @@ def test_failure_closeout_blocks_when_workspace_manifest_is_unobservable(
     assert result is not None
     assert result["status"] == "authority_blocked"
     assert result["failure_code"] == "workspace_manifest_observation_gap"
-    assert result["workspace_manifest_match"] is None
-    assert result["workspace_manifest_ref"] is None
+    assert result["workspace_manifest_match"] is True
+    assert result["source_manifest_match"] is None
+    assert result["actor_final_manifest_ref"] is not None
+    assert result["source_manifest_final_ref"] is None
     assert any(
         event["event_type"] == "external_agent.failure_manifest_unobserved"
         for event in runtime.events(fixture["session_id"], after_sequence=-1)
@@ -6279,12 +7248,14 @@ def test_validation_receipt_must_match_final_workspace_bytes(
         attempt_id: str,
         attempt_number: int,
         line: bytes,
+        projection_fd: int | None = None,
     ) -> None:
         original_record_codex_event(
             session_id,
             attempt_id=attempt_id,
             attempt_number=attempt_number,
             line=line,
+            projection_fd=projection_fd,
         )
         payload = json.loads(line)
         item = payload.get("item") if payload.get("type") == "item.completed" else None
@@ -6293,7 +7264,10 @@ def test_validation_receipt_must_match_final_workspace_bytes(
             and item.get("type") == "command_execution"
             and str(item.get("command", "")).endswith("git status --short")
         ):
-            (fixture["workspace"] / "landing-note.md").write_text(
+            actor_projection = Path(
+                runtime._load_state(session_id)["actor_projection_path"]
+            )
+            (actor_projection / "landing-note.md").write_text(
                 "mutation after validation receipt\n", encoding="utf-8"
             )
 
@@ -6315,7 +7289,9 @@ def test_validation_receipt_must_match_final_workspace_bytes(
     assert result["failure_code"] == "model_report_validation_workspace_unbound"
 
 
-def test_high_token_use_is_counted_without_truncating_agent_work(tmp_path: Path) -> None:
+def test_high_token_use_is_counted_without_truncating_agent_work(
+    tmp_path: Path,
+) -> None:
     fixture = _fixture(
         tmp_path,
         objective_marker="FAKE_TOKEN_OVERRUN",
@@ -6335,7 +7311,9 @@ def test_high_token_use_is_counted_without_truncating_agent_work(tmp_path: Path)
     assert Path(result["report_ref"]["artifact_ref"]).is_file()
 
 
-def test_multiple_turns_are_counted_without_truncating_agent_work(tmp_path: Path) -> None:
+def test_multiple_turns_are_counted_without_truncating_agent_work(
+    tmp_path: Path,
+) -> None:
     fixture = _fixture(
         tmp_path,
         objective_marker="FAKE_TURN_OVERRUN",
@@ -6383,6 +7361,9 @@ def test_interrupted_process_resumes_exact_thread(tmp_path: Path) -> None:
     interrupted = runtime.interrupt(fixture["session_id"])
     assert interrupted["status"] == "interrupted"
     assert RUNTIME._process_start_ticks(descendant_pid) is None
+    interrupted_state = runtime._load_state(fixture["session_id"])
+    projection_path = interrupted_state["actor_projection_path"]
+    projection_manifest_ref = interrupted_state["actor_baseline_manifest_ref"]
     interrupted_result = runtime.result(fixture["session_id"])
     assert interrupted_result is not None
     assert interrupted_result["usage_observation"]["status"] == "partial"
@@ -6419,16 +7400,19 @@ def test_interrupted_process_resumes_exact_thread(tmp_path: Path) -> None:
     assert result["thread_id"] == interrupted["thread_id"]
     assert result["attempt_count"] == 2
     assert result["turn_count"] == 1
+    resumed_state = runtime._load_state(fixture["session_id"])
+    assert resumed_state["actor_projection_path"] == projection_path
+    assert resumed_state["actor_baseline_manifest_ref"] == projection_manifest_ref
+    assert {item["execution_root"] for item in result["codex_invocations"]} == {
+        str(ACTOR_EXECUTION_ROOT)
+    }
     assert result["usage_observation"]["status"] == "partial"
     assert len(result["usage_observation"]["gap_reasons"]) == 1
     preserved_path = (
-        runtime._session_dir(fixture["session_id"])
-        / "attempts/001/runtime-result.json"
+        runtime._session_dir(fixture["session_id"]) / "attempts/001/runtime-result.json"
     )
     assert _digest_path(preserved_path) == first_result_digest
-    closure_path = preserved_path.with_name(
-        "runtime-result-evidence-closure.json"
-    )
+    closure_path = preserved_path.with_name("runtime-result-evidence-closure.json")
     closure = json.loads(closure_path.read_text(encoding="utf-8"))
     RUNTIME.validate_json(
         closure,
@@ -6443,12 +7427,14 @@ def test_interrupted_process_resumes_exact_thread(tmp_path: Path) -> None:
         if item["source_ref"] == prior_events_ref
     )
     assert events_snapshot_ref["artifact_digest"] == prior_events_ref["artifact_digest"]
-    assert _digest_path(Path(events_snapshot_ref["artifact_ref"])) == prior_events_ref[
-        "artifact_digest"
-    ]
-    assert _digest_path(Path(prior_events_ref["artifact_ref"])) != prior_events_ref[
-        "artifact_digest"
-    ]
+    assert (
+        _digest_path(Path(events_snapshot_ref["artifact_ref"]))
+        == prior_events_ref["artifact_digest"]
+    )
+    assert (
+        _digest_path(Path(prior_events_ref["artifact_ref"]))
+        != prior_events_ref["artifact_digest"]
+    )
     assert any(
         item["artifact_ref"] == str(preserved_path)
         and item["artifact_digest"] == first_result_digest
@@ -6459,6 +7445,65 @@ def test_interrupted_process_resumes_exact_thread(tmp_path: Path) -> None:
         event["event_type"] == "external_agent.resume_source_preserved"
         for event in runtime.events(fixture["session_id"], after_sequence=-1)
     )
+
+
+def test_workspace_write_resume_continues_from_exact_prior_actor_tree(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker="FAKE_WRITE_ALLOWED FAKE_ARTIFACT_PRODUCED",
+        role_id="coder",
+        task_family="landing_preparation",
+        workspace_write=True,
+        exact_baseline=True,
+        review_required=True,
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    first_terminal = _wait_terminal(runtime, fixture["session_id"])
+    first_result = runtime.result(fixture["session_id"])
+
+    assert first_terminal["status"] == "review_required"
+    assert first_result is not None
+    assert first_result["changed_paths"] == [
+        {"path": "landing-note.md", "status": "created"}
+    ]
+    first_final_ref = first_result["actor_final_manifest_ref"]
+    first_delta_ref = first_result["actor_delta_ref"]
+    result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    resume = {
+        "schema_version": "abyss_stack_external_codex_resume_v1",
+        "session_id": fixture["session_id"],
+        "thread_id": first_terminal["thread_id"],
+        "after_event_sequence": first_terminal["last_event_sequence"],
+        "reason": "review_followup",
+        "instruction": "Continue the same bounded writer obligation in its exact actor tree.",
+        "previous_result_digest": _digest_path(result_path),
+    }
+    resume_path = tmp_path / "workspace-write-resume.json"
+    _write_json(resume_path, resume)
+
+    resumed = runtime.resume(fixture["session_id"], resume_path)
+    assert resumed["status"] == "running"
+    second_terminal = _wait_terminal(runtime, fixture["session_id"])
+    second_result = runtime.result(fixture["session_id"])
+
+    assert second_terminal["status"] == "review_required"
+    assert second_result is not None
+    assert second_result["attempt_count"] == 2
+    assert second_result["thread_id"] == first_result["thread_id"]
+    assert second_result["changed_paths"] == first_result["changed_paths"]
+    assert second_result["source_manifest_match"] is True
+    assert not (fixture["workspace"] / "landing-note.md").exists()
+    preserved_closure = (
+        runtime._session_dir(fixture["session_id"])
+        / "attempts/001/runtime-result-evidence-closure.json"
+    )
+    closure = json.loads(preserved_closure.read_text(encoding="utf-8"))
+    preserved_sources = [item["source_ref"] for item in closure["preserved_evidence"]]
+    assert first_final_ref in preserved_sources
+    assert first_delta_ref in preserved_sources
 
 
 def test_failed_read_only_review_identity_can_resume_exact_thread(
@@ -6508,8 +7553,7 @@ def test_failed_read_only_review_identity_can_resume_exact_thread(
     assert result["thread_id"] == failed["thread_id"]
     assert result["attempt_count"] == 2
     preserved_path = (
-        runtime._session_dir(fixture["session_id"])
-        / "attempts/001/runtime-result.json"
+        runtime._session_dir(fixture["session_id"]) / "attempts/001/runtime-result.json"
     )
     assert _digest_path(preserved_path) == first_result_digest
     assert any(
@@ -6671,6 +7715,80 @@ def test_unexpected_worker_death_cleans_codex_group_and_returns_failure(
     assert RUNTIME._process_start_ticks(descendant_pid) is None
 
 
+@pytest.mark.parametrize("workspace_write", [False, True])
+def test_worker_death_promotes_projection_authority_drift(
+    tmp_path: Path,
+    workspace_write: bool,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker="FAKE_WAIT_FOR_INTERRUPT",
+        workspace_write=workspace_write,
+    )
+    runtime = fixture["runtime"]
+    running = runtime.start(fixture["launch_path"])
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        running = runtime.status(fixture["session_id"])
+        if running["worker_pid"] and running["codex_pid"]:
+            break
+        time.sleep(0.05)
+    assert isinstance(running["worker_pid"], int)
+    actor_workspace = Path(str(running["actor_projection_path"]))
+    (actor_workspace / "unexpected.txt").write_text(
+        "authority drift before worker death\n",
+        encoding="utf-8",
+    )
+
+    os.kill(running["worker_pid"], signal.SIGKILL)
+    terminal = runtime.status(fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "authority_blocked"
+    assert result is not None
+    assert result["status"] == "authority_blocked"
+    assert result["failure_code"] == "authority_boundary_crossed"
+    assert result["workspace_manifest_match"] is False
+    assert result["changed_paths"] == [{"path": "unexpected.txt", "status": "created"}]
+
+
+def test_worker_death_promotes_owner_source_drift(tmp_path: Path) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker="FAKE_WAIT_FOR_INTERRUPT",
+    )
+    runtime = fixture["runtime"]
+    running = runtime.start(fixture["launch_path"])
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        running = runtime.status(fixture["session_id"])
+        if running["worker_pid"] and running["codex_pid"]:
+            break
+        time.sleep(0.05)
+    assert isinstance(running["worker_pid"], int)
+    (fixture["workspace"] / "README.md").write_text(
+        "owner source drift before worker death\n",
+        encoding="utf-8",
+    )
+
+    os.kill(running["worker_pid"], signal.SIGKILL)
+    terminal = runtime.status(fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "authority_blocked"
+    assert result is not None
+    assert result["status"] == "authority_blocked"
+    assert result["failure_code"] == "authority_boundary_crossed"
+    assert result["workspace_manifest_match"] is True
+    assert result["source_manifest_match"] is False
+    authority_events = [
+        event
+        for event in runtime.events(fixture["session_id"], after_sequence=-1)
+        if event["event_type"] == "external_agent.failure_authority_drift_detected"
+    ]
+    assert authority_events[-1]["payload"]["source_drift"] is True
+
+
 def test_terminal_result_recovers_when_final_state_save_is_lost(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -6770,6 +7888,11 @@ def test_a2a_export_requires_exact_independent_review_result(
     writer_result_path = runtime._session_dir(writer["session_id"]) / "result.json"
     writer_result = runtime.result(writer["session_id"])
     assert writer_result is not None
+    review_seed_ref = runtime.issue_review_seed(writer["session_id"])
+    workspace_projection_seed = {
+        "envelope_path": review_seed_ref["artifact_ref"],
+        "envelope_digest": review_seed_ref["artifact_digest"],
+    }
     writer_result_ref = _provenance(
         "abyss-stack",
         "runtime-results/fixture-writer-result.json",
@@ -6779,7 +7902,7 @@ def test_a2a_export_requires_exact_independent_review_result(
             "mechanics/governed-execution/parts/external-codex-agent/schemas/"
             "external-codex-result.schema.json"
         ),
-        schema_version="abyss_stack_external_codex_result_v1",
+        schema_version=str(writer_result["schema_version"]),
     )
     writer_report_path = Path(str(writer_result["report_ref"]["artifact_ref"]))
     writer_report_ref = _provenance(
@@ -6793,19 +7916,55 @@ def test_a2a_export_requires_exact_independent_review_result(
         ),
         schema_version="abyss_stack_external_codex_report_v1",
     )
-    writer_workspace_manifest_path = Path(
-        str(writer_result["workspace_manifest_ref"]["artifact_ref"])
+    writer_source_manifest_path = Path(
+        str(writer_result["source_manifest_before_ref"]["artifact_ref"])
     )
-    writer_workspace_manifest_ref = _provenance(
+    writer_source_manifest_ref = _provenance(
         "abyss-stack",
         "runtime-results/fixture-writer-workspace-manifest.json",
-        digest=_digest_path(writer_workspace_manifest_path),
+        digest=_digest_path(writer_source_manifest_path),
         source_ref=str(writer_result["thread_id"]),
         schema_ref=(
             "mechanics/governed-execution/parts/external-codex-agent/schemas/"
             "external-codex-workspace-manifest.schema.json"
         ),
         schema_version="abyss_stack_external_codex_workspace_manifest_v1",
+    )
+    writer_actor_final_path = Path(
+        str(writer_result["actor_final_manifest_ref"]["artifact_ref"])
+    )
+    writer_actor_final_ref = _provenance(
+        "abyss-stack",
+        "runtime-results/fixture-writer-actor-final-manifest.json",
+        digest=_digest_path(writer_actor_final_path),
+        source_ref=str(writer_result["thread_id"]),
+        schema_ref=(
+            "mechanics/governed-execution/parts/external-codex-agent/schemas/"
+            "external-codex-actor-workspace-manifest.schema.json"
+        ),
+        schema_version="abyss_stack_external_codex_actor_workspace_manifest_v2",
+    )
+    writer_actor_delta_path = Path(
+        str(writer_result["actor_delta_ref"]["artifact_ref"])
+    )
+    writer_actor_delta_ref = _provenance(
+        "abyss-stack",
+        "runtime-results/fixture-writer-actor-delta.json",
+        digest=_digest_path(writer_actor_delta_path),
+        source_ref=str(writer_result["thread_id"]),
+        schema_ref=(
+            "mechanics/governed-execution/parts/external-codex-agent/schemas/"
+            "external-codex-actor-delta.schema.json"
+        ),
+        schema_version="abyss_stack_external_codex_actor_delta_v1",
+    )
+    reviewer_actor_inputs = (
+        (
+            "writer-actor-final-manifest",
+            writer_actor_final_path,
+            writer_actor_final_ref,
+        ),
+        ("writer-actor-delta", writer_actor_delta_path, writer_actor_delta_ref),
     )
     reviewer = _fixture(
         tmp_path / "reviewer",
@@ -6814,14 +7973,17 @@ def test_a2a_export_requires_exact_independent_review_result(
         parent_task_id=writer["task_id"],
         identity_suffix="reviewer",
         state_root=shared_state,
+        shared_workspace=writer["workspace"],
+        workspace_projection_seed=workspace_projection_seed,
         extra_immutable_inputs=(
             ("writer-runtime-result", writer_result_path, writer_result_ref),
             ("writer-model-report", writer_report_path, writer_report_ref),
             (
                 "review-workspace-manifest",
-                writer_workspace_manifest_path,
-                writer_workspace_manifest_ref,
+                writer_source_manifest_path,
+                writer_source_manifest_ref,
             ),
+            *reviewer_actor_inputs,
         ),
     )
     reviewer_runtime = reviewer["runtime"]
@@ -6844,9 +8006,7 @@ def test_a2a_export_requires_exact_independent_review_result(
     ) -> None:
         nonlocal reviewer_lock_observed
         if Path(path) == output_path:
-            lock_path = (
-                runtime._session_dir(reviewer["session_id"]) / "session.lock"
-            )
+            lock_path = runtime._session_dir(reviewer["session_id"]) / "session.lock"
             with lock_path.open("a+b") as competing_lock:
                 with pytest.raises(BlockingIOError):
                     fcntl.flock(
@@ -6873,24 +8033,159 @@ def test_a2a_export_requires_exact_independent_review_result(
     assert exported["child_task_result"]["reviewed"] is True
     assert exported["child_task_result"]["review_outcome"] == "proceed"
     assert exported["child_task_result"]["remote_task"]["state"] == "completed"
-    assert (
-        exported["child_task_result"]["reviewed_artifact_path"]
-        == str(writer_result_path)
+    assert exported["child_task_result"]["reviewed_artifact_path"] == str(
+        writer_result_path
     )
     assert output_path.is_file()
     assert reviewer_lock_observed is True
     monkeypatch.setattr(RUNTIME, "_atomic_write_bytes", original_atomic_write)
 
+    family_result_path = runtime._session_dir(reviewer["session_id"]) / "result.json"
+    family_state_path = runtime._state_path(reviewer["session_id"])
+    original_family_result = family_result_path.read_bytes()
+    original_family_state = family_state_path.read_bytes()
+    alternate_family_result = json.loads(original_family_result)
+    alternate_family_result["task_family"] = "eval_review"
+    _write_json(family_result_path, alternate_family_result)
+    alternate_family_state = json.loads(original_family_state)
+    alternate_family_state["result_digest"] = _digest_path(family_result_path)
+    _write_json(family_state_path, alternate_family_state)
+    try:
+        with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+            runtime.export_a2a_result(
+                writer["session_id"],
+                reviewer_session_id=reviewer["session_id"],
+                summon_request_path=summon_path,
+                output_path=tmp_path / "wrong-family-a2a.json",
+            )
+        assert exc_info.value.code == "a2a_review_not_independent"
+    finally:
+        family_result_path.write_bytes(original_family_result)
+        family_state_path.write_bytes(original_family_state)
+
+    wrong_family_reviewer = _fixture(
+        tmp_path / "wrong-family-reviewer",
+        role_id="reviewer",
+        task_family="eval_review",
+        parent_task_id=writer["task_id"],
+        identity_suffix="wrong-family-reviewer",
+        state_root=shared_state,
+        shared_workspace=writer["workspace"],
+        workspace_projection_seed=workspace_projection_seed,
+        extra_immutable_inputs=(
+            ("writer-runtime-result", writer_result_path, writer_result_ref),
+            ("writer-model-report", writer_report_path, writer_report_ref),
+            (
+                "review-workspace-manifest",
+                writer_source_manifest_path,
+                writer_source_manifest_ref,
+            ),
+            *reviewer_actor_inputs,
+        ),
+    )
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.start(wrong_family_reviewer["launch_path"])
+    assert exc_info.value.code == "workspace_projection_seed_forbidden"
+
+    writer_state = runtime._load_state(writer["session_id"])
+    reviewer_state = runtime._load_state(reviewer["session_id"])
+
+    def controller_input_path(state: Mapping[str, Any], input_id: str) -> Path:
+        return next(
+            Path(str(item["path"]))
+            for item in state["controller_materialized_task_inputs"]
+            if item["input_id"] == input_id
+        )
+
+    final_publication_refs = (
+        Path(str(review_seed_ref["artifact_ref"])),
+        Path(str(writer_result["actor_final_manifest_ref"]["artifact_ref"])),
+        Path(str(writer_result["actor_delta_ref"]["artifact_ref"])),
+        Path(
+            str(
+                runtime.result(reviewer["session_id"])["actor_final_manifest_ref"][
+                    "artifact_ref"
+                ]
+            )
+        ),
+        Path(
+            str(
+                runtime.result(reviewer["session_id"])["actor_delta_ref"][
+                    "artifact_ref"
+                ]
+            )
+        ),
+        controller_input_path(writer_state, "summon-request"),
+        controller_input_path(writer_state, "summon-request-schema"),
+        controller_input_path(reviewer_state, "review-summon-request"),
+        controller_input_path(reviewer_state, "summon-request-schema"),
+    )
+    original_snapshot_verify = RUNTIME._verify_a2a_export_snapshot
+    for index, artifact_path in enumerate(final_publication_refs, start=1):
+        original = artifact_path.read_bytes()
+        original_mode = stat.S_IMODE(artifact_path.stat().st_mode)
+        injected = False
+
+        def mutate_before_final_snapshot(
+            refs: Sequence[tuple[str, Mapping[str, Any]]],
+        ) -> None:
+            nonlocal injected
+            if not injected:
+                artifact_path.chmod(0o600)
+                artifact_path.write_bytes(original + b"\n")
+                injected = True
+            original_snapshot_verify(refs)
+
+        monkeypatch.setattr(
+            RUNTIME,
+            "_verify_a2a_export_snapshot",
+            mutate_before_final_snapshot,
+        )
+        try:
+            with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+                runtime.export_a2a_result(
+                    writer["session_id"],
+                    reviewer_session_id=reviewer["session_id"],
+                    summon_request_path=summon_path,
+                    output_path=tmp_path / f"interleaved-evidence-{index}.json",
+                )
+            assert exc_info.value.code in {
+                "a2a_artifact_drift",
+                "materialized_input_drift",
+            }
+        finally:
+            artifact_path.chmod(0o600)
+            artifact_path.write_bytes(original)
+            artifact_path.chmod(original_mode)
+    monkeypatch.setattr(
+        RUNTIME,
+        "_verify_a2a_export_snapshot",
+        original_snapshot_verify,
+    )
+
     reviewer_result_path = runtime._session_dir(reviewer["session_id"]) / "result.json"
     reviewer_state_path = runtime._state_path(reviewer["session_id"])
     original_reviewer_result = reviewer_result_path.read_bytes()
     original_reviewer_state = reviewer_state_path.read_bytes()
+    unseeded_state = json.loads(original_reviewer_state)
+    unseeded_state["review_seed_envelope_ref"] = None
+    _write_json(reviewer_state_path, unseeded_state)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.export_a2a_result(
+            writer["session_id"],
+            reviewer_session_id=reviewer["session_id"],
+            summon_request_path=summon_path,
+            output_path=tmp_path / "unseeded-reviewer-result.json",
+        )
+    assert exc_info.value.code == "a2a_review_seed_required"
+    reviewer_state_path.write_bytes(original_reviewer_state)
+
     stale_reviewer = runtime.result(reviewer["session_id"])
     assert stale_reviewer is not None
     changed_reviewer = json.loads(original_reviewer_result)
-    changed_reviewer["duration_seconds"] = float(
-        changed_reviewer["duration_seconds"]
-    ) + 1.0
+    changed_reviewer["duration_seconds"] = (
+        float(changed_reviewer["duration_seconds"]) + 1.0
+    )
     _write_json(reviewer_result_path, changed_reviewer)
     changed_state = json.loads(original_reviewer_state)
     changed_state["result_digest"] = _digest_path(reviewer_result_path)
@@ -6917,7 +8212,7 @@ def test_a2a_export_requires_exact_independent_review_result(
 
     mismatched_manifest_path = tmp_path / "mismatched-review-workspace-manifest.json"
     mismatched_manifest = json.loads(
-        writer_workspace_manifest_path.read_text(encoding="utf-8")
+        writer_source_manifest_path.read_text(encoding="utf-8")
     )
     mismatched_manifest["git_diff_binary_sha256"] = "sha256:" + ("0" * 64)
     _write_json(mismatched_manifest_path, mismatched_manifest)
@@ -6947,12 +8242,12 @@ def test_a2a_export_requires_exact_independent_review_result(
                 mismatched_manifest_path,
                 mismatched_manifest_ref,
             ),
+            *reviewer_actor_inputs,
         ),
     )
     runtime.start(unbound_reviewer["launch_path"])
     assert (
-        _wait_terminal(runtime, unbound_reviewer["session_id"])["status"]
-        == "completed"
+        _wait_terminal(runtime, unbound_reviewer["session_id"])["status"] == "completed"
     )
     with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
         runtime.export_a2a_result(
@@ -6961,14 +8256,12 @@ def test_a2a_export_requires_exact_independent_review_result(
             summon_request_path=summon_path,
             output_path=tmp_path / "unbound-manifest-child-task-result.json",
         )
-    assert exc_info.value.code == "a2a_review_not_bound"
+    assert exc_info.value.code == "a2a_review_seed_required"
 
     substituted_summon_path = tmp_path / "substituted-summon-request.json"
     substituted_summon = json.loads(summon_path.read_text(encoding="utf-8"))
     substituted_summon["audit_refs"].append("fixture:substituted")
-    substituted_summon["summon_request"]["audit_refs"].append(
-        "fixture:substituted"
-    )
+    substituted_summon["summon_request"]["audit_refs"].append("fixture:substituted")
     _write_json(substituted_summon_path, substituted_summon)
     with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
         runtime.export_a2a_result(
@@ -7029,14 +8322,17 @@ def test_a2a_export_requires_exact_independent_review_result(
         parent_task_id=writer["task_id"],
         identity_suffix="repair-reviewer",
         state_root=shared_state,
+        shared_workspace=writer["workspace"],
+        workspace_projection_seed=workspace_projection_seed,
         extra_immutable_inputs=(
             ("writer-runtime-result", writer_result_path, writer_result_ref),
             ("writer-model-report", writer_report_path, writer_report_ref),
             (
                 "review-workspace-manifest",
-                writer_workspace_manifest_path,
-                writer_workspace_manifest_ref,
+                writer_source_manifest_path,
+                writer_source_manifest_ref,
             ),
+            *reviewer_actor_inputs,
         ),
     )
     runtime.start(repair_reviewer["launch_path"])
@@ -7050,9 +8346,7 @@ def test_a2a_export_requires_exact_independent_review_result(
         summon_request_path=summon_path,
         output_path=tmp_path / "repair-child-task-result.json",
     )
-    assert repair_export["child_task_result"]["review_outcome"] == (
-        "return_for_repair"
-    )
+    assert repair_export["child_task_result"]["review_outcome"] == ("return_for_repair")
     assert repair_export["child_task_result"]["remote_task"]["state"] == "failed"
 
     failed_reviewer = _fixture(
@@ -7063,14 +8357,17 @@ def test_a2a_export_requires_exact_independent_review_result(
         parent_task_id=writer["task_id"],
         identity_suffix="failed-reviewer",
         state_root=shared_state,
+        shared_workspace=writer["workspace"],
+        workspace_projection_seed=workspace_projection_seed,
         extra_immutable_inputs=(
             ("writer-runtime-result", writer_result_path, writer_result_ref),
             ("writer-model-report", writer_report_path, writer_report_ref),
             (
                 "review-workspace-manifest",
-                writer_workspace_manifest_path,
-                writer_workspace_manifest_ref,
+                writer_source_manifest_path,
+                writer_source_manifest_ref,
             ),
+            *reviewer_actor_inputs,
         ),
     )
     runtime.start(failed_reviewer["launch_path"])
@@ -7198,9 +8495,7 @@ def test_parent_inference_yields_and_exact_authority_event_reenters_same_thread(
 
     assert reentered["status"] == "reentered"
     assert len(reentered["turns"]) == 2
-    assert {turn["thread_id"] for turn in reentered["turns"]} == {
-        parent_thread_id
-    }
+    assert {turn["thread_id"] for turn in reentered["turns"]} == {parent_thread_id}
     assert reentered["wake_evaluation"]["event_kind"] == "run.authority_required"
     assert reentered["wake_evaluation"]["wake_parent"] is True
     admitted_result_path = Path(reentered["child_result_ref"]["artifact_ref"])
@@ -7302,7 +8597,9 @@ def test_parent_reentry_recovers_admitted_snapshot_without_live_child_result(
     recovered = bridge.reenter_parent(reentry_id, child_result_path)["state"]
     events = [
         json.loads(line)
-        for line in bridge._events_path(reentry_id).read_text(encoding="utf-8").splitlines()
+        for line in bridge._events_path(reentry_id)
+        .read_text(encoding="utf-8")
+        .splitlines()
     ]
 
     assert recovered["status"] == "reentered"
@@ -7355,7 +8652,9 @@ def test_parent_reentry_recovers_started_event_before_state_save(
     completed = bridge.reenter_parent(reentry_id, child_result_path)["state"]
     events = [
         json.loads(line)
-        for line in bridge._events_path(reentry_id).read_text(encoding="utf-8").splitlines()
+        for line in bridge._events_path(reentry_id)
+        .read_text(encoding="utf-8")
+        .splitlines()
     ]
 
     assert completed["status"] == "reentered"
@@ -7384,9 +8683,7 @@ def test_parent_yield_retries_from_durable_state_without_rewriting_partial_attem
     bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
     original_run_parent_turn = bridge._run_parent_turn
     partial_attempt = (
-        bridge._reentry_dir(reentry_id)
-        / "turns"
-        / "001-yield-attempt-001"
+        bridge._reentry_dir(reentry_id) / "turns" / "001-yield-attempt-001"
     )
 
     def crash_after_pre_yield_state(*args: Any, **kwargs: Any) -> Any:
@@ -7480,9 +8777,7 @@ def test_parent_yield_recovers_completed_turn_event_without_second_inference(
     assert recovered["status"] == "waiting"
     assert len(recovered["turns"]) == 1
     attempts = list(
-        (bridge._reentry_dir(reentry_id) / "turns").glob(
-            "001-yield-attempt-*"
-        )
+        (bridge._reentry_dir(reentry_id) / "turns").glob("001-yield-attempt-*")
     )
     assert len(attempts) == 1
 
@@ -7525,7 +8820,9 @@ def test_parent_reentry_resumes_after_crash_before_turn_materialization(
     recovered = bridge.reenter_parent(reentry_id, child_result_path)["state"]
     events = [
         json.loads(line)
-        for line in bridge._events_path(reentry_id).read_text(encoding="utf-8").splitlines()
+        for line in bridge._events_path(reentry_id)
+        .read_text(encoding="utf-8")
+        .splitlines()
     ]
 
     assert recovered["status"] == "reentered"
@@ -7571,9 +8868,7 @@ def test_parent_reentry_recovers_completed_turn_artifacts_without_second_inferen
     with pytest.raises(KeyboardInterrupt, match="post-turn"):
         bridge.reenter_parent(reentry_id, child_result_path)
     attempts = list(
-        (bridge._reentry_dir(reentry_id) / "turns").glob(
-            "002-reentry-attempt-*"
-        )
+        (bridge._reentry_dir(reentry_id) / "turns").glob("002-reentry-attempt-*")
     )
     assert len(attempts) == 1
 
@@ -7581,13 +8876,16 @@ def test_parent_reentry_recovers_completed_turn_artifacts_without_second_inferen
     recovered = bridge.reenter_parent(reentry_id, child_result_path)["state"]
 
     assert recovered["status"] == "reentered"
-    assert len(
-        list(
-            (bridge._reentry_dir(reentry_id) / "turns").glob(
-                "002-reentry-attempt-*"
+    assert (
+        len(
+            list(
+                (bridge._reentry_dir(reentry_id) / "turns").glob(
+                    "002-reentry-attempt-*"
+                )
             )
         )
-    ) == 1
+        == 1
+    )
 
 
 def test_parent_admits_child_event_while_canonical_child_lock_is_held(

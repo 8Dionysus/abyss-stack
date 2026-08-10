@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-actor-input-envelope.schema.json",
+  "title": "Controller-derived immutable input exposed to one external actor",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "input_id",
+    "payload_kind",
+    "source_artifact_digest",
+    "source_schema_ref",
+    "source_schema_version",
+    "payload"
+  ],
+  "properties": {
+    "$schema": {"const": "schemas/external-codex-actor-input-envelope.schema.json"},
+    "schema_version": {"const": "abyss_stack_external_codex_actor_input_envelope_v1"},
+    "input_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "payload_kind": {"enum": ["json", "utf8_text", "base64"]},
+    "source_artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_schema_ref": {"type": "string", "minLength": 1},
+    "source_schema_version": {"type": "string", "minLength": 1},
+    "payload": {}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"payload_kind": {"enum": ["utf8_text", "base64"]}}},
+      "then": {"properties": {"payload": {"type": "string"}}}
+    }
+  ]
+}

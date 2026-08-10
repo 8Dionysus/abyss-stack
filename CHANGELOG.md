@@ -39,6 +39,35 @@ Tracking starts with the community-docs baseline for this repository.
   mount-wrapper digest proven by nested-sandbox preflight is retained through
   inference launch, so a replacement between those phases fails closed, while
   older durable v2 states remain readable for observation and result recovery.
+  The actor now materializes a runtime-owned projection through open source
+  descriptors and constructs a source-independent private `.git` body whose
+  status/diff match the admitted baseline. Source manifests are recorded before
+  and after materialization, and source-byte, parent-identity, orphan-staging,
+  publication ABA, or post-open projection-path races fail closed. Projection
+  publication is pinned to a parent descriptor and its baseline to the retained
+  staging inode; non-replacing publication records rename commitment before
+  verification and cleans only that inode after failure. Actor-facing immutable
+  inputs are schema-validated derivatives that structurally remove
+  source/ancestor coordinates from keys and values, reject collisions, and
+  normalize bounded nested Unicode/string escapes—including mixed text,
+  slash/hex-case variants, surrogate pairs, and invalid-UTF-8 binary shadows—
+  across arbitrary text and model-facing control views; controller
+  originals stay denied. Actor baseline/final manifests
+  and a canonical before/after delta are durable;
+  create/modify/delete/binary/mode/symlink changes stay in the projection and
+  the source checkout remains unchanged. Reviewer launches reuse an exact
+  controller-issued writer projection envelope and bind terminal result,
+  actor-manifest/delta, source-manifest, parent task, and reviewer evidence.
+  Reviewer preparation/execution no longer needs the historical source checkout.
+  Reviewed A2A export now binds `landing_review` at admission and final export,
+  and revalidates that exact seed, all exported writer/reviewer artifacts, and
+  both summon request/schema pairs under the writer/reviewer locks. Worker-death
+  closeout promotes observed read-only, source, or out-of-scope drift to
+  `authority_blocked`.
+  Inference mounts the exact open actor inode at a stable child coordinate and
+  finalization rejects pathname/inode replacement. Result v2 requires successful
+  projection provenance while legacy result v1 and state v1/v2 remain readable;
+  old state cannot start inference without a safe v3 projection.
 - Recover the exact modern MCP read fleet after a cold start outlives registry
   or contour currentness. The admission backstop now resets only an expired
   registry to claim-free shadow state, uses the existing manual bootstrap

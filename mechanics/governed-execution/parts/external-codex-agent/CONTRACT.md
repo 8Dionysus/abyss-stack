@@ -192,43 +192,64 @@ sandbox, `--ignore-user-config`, `--ignore-rules`, `--strict-config`, and
 environment; secret-shaped variable names are excluded again from the Codex
 shell environment. No TUI or built-in `spawn_agent` surface participates.
 
-Every inference attempt also receives a runtime-generated named Codex
-permission profile rather than the undifferentiated `-s workspace-write`
-shortcut. The profile extends Codex's workspace posture, keeps network
-disabled, and makes the attempt-local sanitized Git config source read-only.
-The supervisor then creates a filesystem-only outer bubblewrap contour: the
-exact digest-verified Codex executable inode is mounted over its launch
-coordinate. For every parent directory containing a current or reserved config
-coordinate, it mounts a namespace-private `tmpfs`, then returns every unmasked
-top-level metadata entry through a pre-opened, identity-checked read-only file
-descriptor. A minimal config is copied from an opened, digest-verified
-descriptor only into that private view over every current mount-table
-coordinate for the physical repository `config` and reserved
-`config.worktree` path. Their `.lock` coordinates are reserved by the same
-private read-only bytes for the whole attempt without creating host files, so
-an active or stale Git config replacement cannot expose pre-rename credentials.
-The visible config contains no remote URL, credential header, alias, verifier,
-hook, pager, or include configuration. It retains only closed-grammar
-structural settings such as repository/object/ref format, file mode, case
-handling, sparse-checkout, symlink, and worktree semantics. An explicit
-`core.worktree` is retained only when Git resolves it to the exact admitted
-workspace; any redirected worktree is rejected rather than normalized away.
-Native Git
-discovery, HEAD, index,
-split-index, objects, refs, nested repositories, and temporary repositories
-remain intact;
-no process-wide `GIT_DIR` or `GIT_WORK_TREE` is exported. Before inference the
-controller requires masked and owner-view `git status` to agree. Thus normal
-source reads, `git status`/`diff`, and bounded source writes remain available,
-while a raw `.git/config` reader sees only sanitized bytes and Codex's own
-sandbox keeps repository metadata read-only. This is a structural runtime
-boundary; command observation additionally classifies every explicit Git config
-or config-lock file operand, including jq file-loading, GNU-abbreviated
-pattern and pattern-file options, and multiple-input reader forms, and generic `.git`
-writers including attached
-destination options as counterevidence without mistaking a search pattern or
-printed literal for a file read, and without claiming that argv spelling alone
-is exhaustive isolation.
+Every inference attempt receives a runtime-generated named Codex permission
+profile rather than the undifferentiated `-s workspace-write` shortcut. Before
+the worker or model starts, the controller materializes a fresh runtime-owned
+actor projection of the admitted exact Git-worktree baseline, rejecting
+unsupported special entries or unsafe symlinks. It copies content through open
+directory/file descriptors and constructs a private `.git` body from the exact
+admitted HEAD and index objects; private Git config, remotes, alternates, logs,
+and source coordinates are excluded. It records a source
+manifest before and after materialization and fails closed if those source
+bytes or directory identities differ. Projection staging is created and
+renamed relative to one pinned parent descriptor. The authoritative baseline is
+built from the retained staging descriptor before publication; the public
+coordinate is published with non-replacing `renameat2`, and must then name the
+same device/inode. Rename commitment is recorded before post-publication
+verification, so cleanup uses the pinned parent descriptor and exact staged
+inode even when verification fails. Cleanup is identity-bound and
+refuses a replaced coordinate, producing typed contaminated admission instead
+of deleting an unowned tree. The actor baseline, final manifest, and
+canonical before/after delta are durable session artifacts. The projection is
+the only model target, cwd, validation root, and mutable repository surface;
+the source checkout remains the owner acceptance surface and is never passed
+as a model coordinate. A reviewer may clone an exact writer projection only
+from a controller-issued envelope binding the terminal writer session, result,
+final manifest, delta, source manifest, and projection. The envelope is
+recomputed under the writer lock, and reviewer immutable evidence must bind the
+same writer duty. Neither review preparation nor execution needs the historical
+source checkout after the writer has returned.
+
+Controller-original immutable inputs and actor inputs are separate authority
+surfaces. The actor receives only
+`abyss_stack_external_codex_actor_input_envelope_v1`: JSON payloads are parsed,
+source and ancestor coordinates are removed structurally from mapping keys as
+well as values, and post-sanitization key collisions fail closed. Text is
+sanitized through bounded nested JSON string-escape decoding, including mixed
+literal/escaped text, escaped slashes, hex-case variants, and surrogate pairs;
+excessive escape depth fails closed. Binary payloads whose byte shadow contains
+a literal or JSON-escaped source coordinate are rejected before reversible
+base64 materialization. The same decoded alias check runs after serialization. The same
+complete alias set is projected out of model-facing role, task, continuation,
+validation, and resume control views without rewriting runtime-owned paths to
+already-sanitized envelopes. Every
+derivative is validated against its own schema and digest. The original bytes
+remain controller-only for A2A and closeout. A non-review source is canonicalized
+once during admission; workspaces beneath Codex's built-in minimal-read system
+roots are rejected, and the controller-original directory is explicitly denied
+to the child permission profile.
+
+The projection receives sanitized actor-local Git configuration, network remains
+disabled, and the attempt-local scratch area is separate. The worker opens the
+projection with `O_PATH|O_DIRECTORY|O_NOFOLLOW`, inventories the open inode,
+passes a duplicate descriptor through the supervisor/mount launcher, and asks
+bubblewrap to bind that descriptor at the fixed child-only coordinate
+`/tmp/aoa-external-actor-workspace`. The worker retains its original descriptor
+through terminal inventory. Closeout verifies that the durable host pathname
+still names the same device/inode and fails closed on replacement. Command
+observation still classifies explicit Git config/config-lock operands and
+generic `.git` writers as counterevidence; this classification does not turn
+the old mount launcher into a pathname-race proof.
 
 On an unprivileged host, bubblewrap realizes this filesystem contour with a
 user namespace plus a mount namespace. It adds no outer PID or network
@@ -247,24 +268,17 @@ use that path directly. The relay forwards streaming response bytes as they
 become available. Before terminal finalization it stops admission, closes all
 active client and upstream sockets, and joins its handler threads, so neither
 the path nor an already-authenticated connection survives the attempt. Ambient
-MCPs and the other role servers remain absent. For
-`read-only`, the runtime does not make the target
-checkout the Codex writable root. It creates a distinct attempt-local execution
-root, launches Codex's internal `workspace-write` sandbox there, and sets
-`TMPDIR` to the sibling attempt-local scratch directory. The target checkout is
-passed separately as the exact repository under study and remains outside all
-writable roots. This lets test runners create ephemeral capture/temp files
-without granting target-workspace mutation authority. The invocation receipt
-records the actual execution root, and overlap between that root and the target
-fails closed. For semantic `workspace-write`, Codex instead uses the exact
-target checkout as its execution root, and a reviewed local preparation may be
-made inside task `allowed_paths`. Those paths govern mutation and declared
-workspace artifacts; they do not double as the source-evidence boundary. The
-runtime acquires one nonblocking advisory lock on the canonical target
-workspace directory inode before fork, without adding checkout bytes. The worker retains that lock through terminal
-receipt finalization, so another session cannot concurrently read or mutate the
-same evidence surface; a conflicting start fails as
-`workspace_active_attempt_conflict` before it launches a process. The
+MCPs and the other role servers remain absent. For both `read-only` and
+semantic `workspace-write`, Codex uses the stable child-only descriptor mount
+as its execution root and receives `TMPDIR` in the sibling attempt-local
+scratch directory. The source checkout is passed to the controller only for
+owner-side manifest checks; it is never the actor cwd or writable root. A
+workspace-write actor may change only task `allowed_paths` inside the projection;
+the controller returns those changes as the canonical actor delta and leaves the
+source checkout unchanged. The invocation receipt records the fixed child
+coordinate while result evidence records the controller-owned host projection.
+The descriptor is the child binding; the final pathname/device/inode comparison
+is the durable closeout binding. The
 optional `source_evidence_paths` field governs anchored workspace citations and
 falls back to `allowed_paths` only for older v1 tasks. Neither field authorizes
 commit, push, PR, merge, tag, release, publication, service mutation, secret
@@ -291,18 +305,25 @@ exit cannot turn EOF into permission; only the successful path writes the
 release byte.
 The version, auth, and model-catalog preflight probes use the same verified-fd
 route. Preflight also performs one network-disabled `codex sandbox -P` command
-through the same outer read-only bind mask used for inference, so nested
-bubblewrap compatibility is exercised rather than inferred from installed
-files. Its exact mount-wrapper digest is retained through inference command
-construction and rechecked both before supervisor launch and against the
-supervisor's opened inode. A later replacement of either original pathname
-therefore cannot change the bytes selected for `exec` or receive the preflight
-environment.
+through the outer read-only bind contour, so nested bubblewrap
+compatibility is exercised rather than inferred from installed files. Its exact
+mount-wrapper and mount-launcher digests are retained and rechecked before
+supervisor launch. Inference additionally binds the exact open actor workspace
+descriptor and never re-resolves the host pathname in the child. The retained
+controller descriptor plus final pathname identity check turns a same-UID
+replacement into typed authority-blocked evidence.
 
-Durable v2 states created before mount-wrapper identity became part of the
-preflight receipt remain readable for status, event, and terminal-result
-recovery. They cannot start another attempt without that admission identity;
-the attempt fails closed instead of inventing or backfilling historical proof.
+Durable v1/v2 states remain readable for status, event, and terminal-result
+recovery. They cannot start another attempt without a safe v3 runtime-owned
+projection and baseline; the attempt fails closed instead of inventing or
+backfilling historical projection proof.
+
+The runtime emits result v2. Every v2 receipt carries the actor projection,
+baseline, source-before, and source-after references; completed,
+review-required, paused, and interrupted receipts additionally require exact
+final actor manifest, actor delta, source-final manifest, and non-null manifest
+match observations. Legacy result v1 remains readable but is never emitted by
+the current runtime.
 
 On normal exit, controlled termination, or worker death, the supervisor adopts
 or enumerates the exact descendant closure in `/proc`, checks PID start ticks,
@@ -314,7 +335,10 @@ resume. Unexpected worker death produces a typed failed result and is not
 misrepresented as a controlled checkpoint. If its recovered command history
 contains a forbidden, unavailable, or unclassifiable indirect effect, that
 death closes as `authority_blocked` instead of erasing the authority breach
-behind an ordinary process failure.
+behind an ordinary process failure. Failure closeout also evaluates the final
+actor delta and source manifest before choosing the wake route: read-only drift,
+an out-of-scope writer path, or source drift promotes the result to
+`authority_blocked` even when the original process failure was ordinary.
 
 While Codex is live, signal handlers notify a nonblocking self-pipe for child
 state and termination events. The supervisor therefore sleeps in `select`
@@ -600,8 +624,12 @@ before it can emit a child result.
 The exporter also serializes the initially loaded reviewer result to its exact
 artifact digest and requires the later locked durable state to retain that
 same digest. Immediately before output publication, it reacquires the reviewer
-session lock, revalidates the canonical result plus every exported reviewer
-artifact, and holds that lock through the atomic output write. A reviewer
+session lock while retaining the writer lock, revalidates the canonical result,
+review seed, both summon requests and schemas, and every exported writer and
+reviewer report/event/workspace/actor-final/actor-delta artifact, constructs the
+payload from that locked snapshot, and holds both locks through the atomic
+output write. Result, task, durable state, and final locked state must all retain
+task family `landing_review`. A reviewer
 continuation racing the export therefore either precedes a failed revalidation
 or follows a durable export; it cannot mix a stale verdict with newer bytes.
 
@@ -617,8 +645,13 @@ An export requires:
 - different incarnation IDs and different Codex thread IDs;
 - reviewer task family `landing_review`;
 - reviewer immutable inputs bound to the exact writer `result.json`, model
-  report, and runtime-owned final-workspace-manifest digests;
-- exact writer and reviewer final-workspace-manifest artifact digests;
+  report, source manifest, actor final manifest, and actor delta digests;
+- one controller-issued review-seed envelope, recomputed under the writer lock
+  and bound to the writer session, incarnation, thread, result, final actor
+  manifest, actor delta, source manifest, reviewer launch, and durable reviewer
+  state;
+- exact writer and reviewer actor-final-manifest artifact digests, identical
+  content/private-Git state, and a zero reviewer delta;
 - reviewer parent task ID equal to the writer task ID;
 - exact writer and reviewer SDK v4 summon request/schema bindings, with every
   requested output present in the child result;
