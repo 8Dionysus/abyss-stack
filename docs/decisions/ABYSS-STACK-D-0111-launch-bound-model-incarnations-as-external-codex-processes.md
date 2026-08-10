@@ -1,6 +1,6 @@
 # Launch Bound Model Incarnations as External Codex Processes
 
-- Decision ID: ABYSS-STACK-D-0110
+- Decision ID: ABYSS-STACK-D-0111
 - Status: accepted
 - Date: 2026-08-01
 - Owner surface: `mechanics/governed-execution/parts/external-codex-agent/`
@@ -14,11 +14,11 @@
 - Guard families: exact binding, owner provenance, process isolation, effect ceiling, durable resume, independent review
 - Posture: accepted source-local runtime with reviewed nonproduction machine-local vertical proof; model fit and production admission remain external
 
-Decision [ABYSS-STACK-D-0109](ABYSS-STACK-D-0109-admit-external-actors-through-role-first-owner-contours.md)
+Decision [ABYSS-STACK-D-0110](ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md)
 extends this process-boundary decision and supersedes only its fixture-only,
 landing-first admission posture. The external process/session boundary remains
 accepted; current owner admission law lives at the source surfaces named by
-D-0109.
+D-0110.
 
 ## Context
 

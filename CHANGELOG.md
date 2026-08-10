@@ -39,6 +39,15 @@ Tracking starts with the community-docs baseline for this repository.
   mount-wrapper digest proven by nested-sandbox preflight is retained through
   inference launch, so a replacement between those phases fails closed, while
   older durable v2 states remain readable for observation and result recovery.
+- Recover the exact modern MCP read fleet after a cold start outlives registry
+  or contour currentness. The admission backstop now resets only an expired
+  registry to claim-free shadow state, uses the existing manual bootstrap
+  units to rebuild an 11-of-11 preflight catalog, then requires a complete
+  production handoff and production PID/start canary family before publishing
+  final admission and rebuilding the managed catalog. Candidate and effect
+  contours remain untouched, bootstrap units remain unenabled, and every
+  partial recovery stops bootstrap plus any controller-started production
+  handoff before failing closed.
 - Allow the admission composer to renew an already-admitted contour only after
   its currentness window has expired according to the normalized composition
   clock. The refresh remains bound to the exact predecessor digest and the

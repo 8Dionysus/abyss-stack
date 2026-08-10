@@ -1,6 +1,6 @@
 # Admit External Actors Through Role-First Owner Contours
 
-- Decision ID: ABYSS-STACK-D-0109
+- Decision ID: ABYSS-STACK-D-0110
 - Status: accepted
 - Date: 2026-08-08
 - Owner surface: `mechanics/governed-execution/parts/external-codex-agent/`

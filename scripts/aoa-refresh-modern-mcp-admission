@@ -10,12 +10,169 @@ PUBLIC_KEY="$STACK/Secrets/Configs/abyss-stack-mcp-canary-ed25519-public-key.pem
 ROOT="$STACK/Logs/mcp/fleet-admission"
 RUN="$ROOT/runs/$(date -u +%Y%m%dT%H%M%SZ)"
 LOCK="$ROOT/.refresh.lock"
+REBASE_DECISION_REF="owner://abyss-stack/decision/ABYSS-STACK-D-0109"
+REBASE_TTL_SECONDS=86400
 
 organs=(
   abyss-stack abyss-machine aoa-decisions aoa-memo aoa-session-memory
   aoa-evals aoa-kag aoa-stats aoa-4pda-connector aoa-telegram-connector
   aoa-discord-connector
 )
+
+production_units=(abyss-stack-mcp-read.service)
+bootstrap_units=(abyss-stack-mcp-read-bootstrap.service)
+for organ in "${organs[@]:1}"; do
+  production_units+=("aoa-organ-mcp-read@${organ}.service")
+  bootstrap_units+=("aoa-organ-mcp-read-bootstrap@${organ}.service")
+done
+
+bootstrap_started=0
+production_handoff_started=0
+rebase_staging=""
+
+cleanup_recovery() {
+  if [[ "$production_handoff_started" -eq 1 ]]; then
+    systemctl --user stop "${production_units[@]}" >/dev/null 2>&1 || true
+  fi
+  if [[ "$bootstrap_started" -eq 1 ]]; then
+    systemctl --user stop "${bootstrap_units[@]}" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "$rebase_staging" ]]; then
+    rm -f -- "$rebase_staging"
+  fi
+}
+
+trap cleanup_recovery EXIT
+
+active_production_count() {
+  local count=0
+  local unit
+  for unit in "${production_units[@]}"; do
+    if systemctl --user is-active --quiet "$unit"; then
+      ((count += 1))
+    fi
+  done
+  printf '%s\n' "$count"
+}
+
+capture_canary_family() {
+  local process_unit=$1
+  local current_root=$2
+  local lkg_root=$3
+  local stdout_root=$4
+  local organ
+  local lkg_record
+  local current_record
+
+  mkdir -p "$current_root" "$lkg_root" "$stdout_root"
+  chmod 0700 "$current_root" "$lkg_root" "$stdout_root"
+  for organ in "${organs[@]}"; do
+    "$VENV/abyss-stack-mcp-canary" \
+      --organ "$organ" \
+      --process-unit "$process_unit" \
+      --purpose last-known-good \
+      --ttl-seconds 3600 > "$stdout_root/${organ}-lkg.json"
+    "$VENV/abyss-stack-mcp-canary" \
+      --organ "$organ" \
+      --process-unit "$process_unit" \
+      --ttl-seconds 3600 > "$stdout_root/${organ}-current.json"
+    lkg_record=$(jq -er .record_path "$stdout_root/${organ}-lkg.json")
+    current_record=$(jq -er .record_path "$stdout_root/${organ}-current.json")
+    install -m 0600 "$lkg_record" "$lkg_root/${organ}.read.json"
+    install -m 0600 "$current_record" "$current_root/${organ}.read.json"
+  done
+}
+
+publish_admission() {
+  local current_root=$1
+  local lkg_root=$2
+  local label=$3
+
+  "$VENV/abyss-stack-mcp-fleet-admission" \
+    --registry "$REGISTRY" \
+    --deployment-manifest "$DEPLOYMENT" \
+    --runtime-targets "$TARGETS" \
+    --current-canary-root "$current_root" \
+    --lkg-canary-root "$lkg_root" \
+    --canary-public-key "$PUBLIC_KEY" \
+    --evidence-root "$RUN/evidence-$label" \
+    --output "$RUN/organ-registry.v2.$label.json" \
+    --report "$RUN/report-$label.json" \
+    --publish
+}
+
+rebase_expired_registry() {
+  local now_iso
+  local expiry_iso
+  local predecessor_digest
+  local live_digest
+  local rebased="$RUN/organ-registry.v2.rebased-shadow.json"
+
+  now_iso=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  expiry_iso=$(date -u -d "@$((now_epoch + REBASE_TTL_SECONDS))" +%Y-%m-%dT%H:%M:%SZ)
+  predecessor_digest=$(sha256sum "$REGISTRY" | cut -d ' ' -f 1)
+  install -m 0600 "$REGISTRY" "$RUN/organ-registry.v2.expired-predecessor.json"
+  "$VENV/aoa" organs registry-rebase-expired-v2 "$REGISTRY" \
+    --owner-decision-ref "$REBASE_DECISION_REF" \
+    --authored-at "$now_iso" \
+    --expires-at "$expiry_iso" \
+    --output "$rebased"
+  "$VENV/aoa" organs registry-v2-validate "$rebased"
+  live_digest=$(sha256sum "$REGISTRY" | cut -d ' ' -f 1)
+  if [[ "$live_digest" != "$predecessor_digest" ]]; then
+    printf 'modern MCP expired-registry predecessor changed during rebase\n' >&2
+    exit 1
+  fi
+  rebase_staging="${REGISTRY}.rebase.$$"
+  install -m 0600 "$rebased" "$rebase_staging"
+  mv -T -- "$rebase_staging" "$REGISTRY"
+  rebase_staging=""
+}
+
+build_preflight() {
+  local label=$1
+  local output="$RUN/${label}-admission-automation.json"
+
+  "$VENV/python" -I -B -m abyss_stack_mcp.admission_automation \
+    --registry "$REGISTRY" \
+    --deployment-manifest "$DEPLOYMENT" \
+    --runtime-targets "$TARGETS" \
+    --canary-root "$STACK/Logs/mcp/canaries/latest" \
+    --canary-public-key "$PUBLIC_KEY" \
+    --deployed-root "$STACK" \
+    --output-root "$STACK/Logs/mcp/admission" \
+    --keeper-inbox-root "$STACK/Logs/mcp/admission/keeper-inbox" \
+    > "$output"
+  jq -e '.preflight.all_eligible == true and .preflight.eligible_count == 11 and .preflight.blocked_count == 0' \
+    "$output" >/dev/null
+}
+
+catalog_matches_current_canaries() {
+  local catalog="$STACK/Logs/mcp/admission/managed-contours.json"
+  local latest_canary
+  local organ
+  local observed_at
+  local receipt_id
+
+  [[ -f "$catalog" && ! -L "$catalog" ]] || return 1
+  for organ in "${organs[@]}"; do
+    latest_canary="$STACK/Logs/mcp/canaries/latest/${organ}.read.json"
+    [[ -f "$latest_canary" && ! -L "$latest_canary" ]] || return 1
+    receipt_id=$(jq -er .receipt_id "$latest_canary") || return 1
+    observed_at=$(jq -er .observed_at "$latest_canary") || return 1
+    jq -e \
+      --arg organ "$organ" \
+      --arg receipt_id "$receipt_id" \
+      --arg observed_at "$observed_at" '
+        [.contours[] | select(
+          .organ_id == $organ
+          and .contour_id == "read"
+          and .canary_receipt_id == $receipt_id
+          and .canary_observed_at == $observed_at
+        )] | length == 1
+      ' "$catalog" >/dev/null || return 1
+  done
+}
 
 if [[ ! -f "$REGISTRY" || -L "$REGISTRY" ]]; then
   printf 'modern MCP admission registry is unavailable or unsafe\n' >&2
@@ -47,6 +204,7 @@ flock --exclusive "$refresh_lock_fd"
 now_epoch=$(date -u +%s)
 deployment_manifest_id=$(jq -er .manifest_id "$DEPLOYMENT")
 minimum_expiry=$(jq -r '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted") | .currentness_expires_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601] | min // 0' "$REGISTRY")
+registry_expiry=$(jq -r '.expires_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601' "$REGISTRY")
 admitted_count=$(jq -r '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted")] | length' "$REGISTRY")
 production_identity_count=$(jq -r '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted") | .runtime_identity.process_identity | select(contains("bootstrap") | not)] | length' "$REGISTRY")
 deployment_identity_count=$(jq -r --arg manifest_id "$deployment_manifest_id" '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted" and .runtime_identity.deployment_manifest_digest == $manifest_id)] | length' "$REGISTRY")
@@ -73,33 +231,57 @@ if [[ "$admitted_count" -eq 11 \
       && "$deployment_identity_count" -eq 11 \
       && "$current_canary_count" -eq 11 \
       && "$active_unit_count" -eq 11 \
-      && "$minimum_expiry" -gt "$now_epoch" ]]; then
+      && "$minimum_expiry" -gt "$now_epoch" \
+      && "$registry_expiry" -gt "$now_epoch" ]] \
+    && catalog_matches_current_canaries; then
   exit 0
 fi
 
-mkdir -p "$RUN/current" "$RUN/lkg" "$RUN/stdout" "$ROOT/evidence"
-chmod 0700 "$ROOT" "$ROOT/runs" "$RUN" "$RUN/current" "$RUN/lkg" "$RUN/stdout" "$ROOT/evidence"
+mkdir -p "$RUN" "$RUN/evidence-bootstrap" "$RUN/evidence-production"
+chmod 0700 "$ROOT" "$ROOT/runs" "$RUN" "$RUN/evidence-bootstrap" "$RUN/evidence-production"
 
-for organ in "${organs[@]}"; do
-  "$VENV/abyss-stack-mcp-canary" --organ "$organ" --process-unit production --purpose last-known-good --ttl-seconds 3600 > "$RUN/stdout/${organ}-lkg.json"
-  "$VENV/abyss-stack-mcp-canary" --organ "$organ" --process-unit production --ttl-seconds 3600 > "$RUN/stdout/${organ}-current.json"
-  lkg_record=$(jq -er .record_path "$RUN/stdout/${organ}-lkg.json")
-  current_record=$(jq -er .record_path "$RUN/stdout/${organ}-current.json")
-  install -m 0600 "$lkg_record" "$RUN/lkg/${organ}.read.json"
-  install -m 0600 "$current_record" "$RUN/current/${organ}.read.json"
-done
+if [[ "$registry_expiry" -le "$now_epoch" ]]; then
+  rebase_expired_registry
+fi
 
-"$VENV/abyss-stack-mcp-fleet-admission" \
-  --registry "$REGISTRY" \
-  --deployment-manifest "$DEPLOYMENT" \
-  --runtime-targets "$TARGETS" \
-  --current-canary-root "$RUN/current" \
-  --lkg-canary-root "$RUN/lkg" \
-  --canary-public-key "$PUBLIC_KEY" \
-  --evidence-root "$ROOT/evidence" \
-  --output "$RUN/organ-registry.v2.candidate.json" \
-  --report "$RUN/report.json" \
-  --publish
+active_unit_count=$(active_production_count)
+if [[ "$active_unit_count" -ne 11 ]]; then
+  if [[ "$minimum_expiry" -gt "$now_epoch" && "$registry_expiry" -gt "$now_epoch" ]]; then
+    printf 'modern MCP production recovery refused while admission is still current\n' >&2
+    exit 1
+  fi
+  systemctl --user reset-failed "${bootstrap_units[@]}" "${production_units[@]}"
+  bootstrap_started=1
+  systemctl --user start "${bootstrap_units[@]}"
+  [[ "$(active_production_count)" -eq 0 ]] || {
+    printf 'modern MCP bootstrap recovery did not isolate production units\n' >&2
+    exit 1
+  }
+  capture_canary_family \
+    bootstrap \
+    "$RUN/bootstrap-current" \
+    "$RUN/bootstrap-lkg" \
+    "$RUN/bootstrap-stdout"
+  publish_admission "$RUN/bootstrap-current" "$RUN/bootstrap-lkg" bootstrap
+  build_preflight bootstrap
+  systemctl --user stop "${bootstrap_units[@]}"
+  bootstrap_started=0
+  production_handoff_started=1
+  systemctl --user start "${production_units[@]}"
+  [[ "$(active_production_count)" -eq 11 ]] || {
+    printf 'modern MCP production handoff did not start the exact fleet\n' >&2
+    exit 1
+  }
+fi
+
+capture_canary_family \
+  production \
+  "$RUN/production-current" \
+  "$RUN/production-lkg" \
+  "$RUN/production-stdout"
+publish_admission "$RUN/production-current" "$RUN/production-lkg" production
+build_preflight production
 
 "$VENV/aoa" organs registry-v2-validate "$REGISTRY"
-ln -sfn "runs/${RUN##*/}/report.json" "$ROOT/latest-report.json"
+ln -sfn "runs/${RUN##*/}/report-production.json" "$ROOT/latest-report.json"
+production_handoff_started=0
