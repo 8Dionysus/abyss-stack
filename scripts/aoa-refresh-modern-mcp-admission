@@ -27,9 +27,13 @@ for organ in "${organs[@]:1}"; do
 done
 
 bootstrap_started=0
+production_handoff_started=0
 rebase_staging=""
 
-cleanup_bootstrap() {
+cleanup_recovery() {
+  if [[ "$production_handoff_started" -eq 1 ]]; then
+    systemctl --user stop "${production_units[@]}" >/dev/null 2>&1 || true
+  fi
   if [[ "$bootstrap_started" -eq 1 ]]; then
     systemctl --user stop "${bootstrap_units[@]}" >/dev/null 2>&1 || true
   fi
@@ -38,7 +42,7 @@ cleanup_bootstrap() {
   fi
 }
 
-trap cleanup_bootstrap EXIT
+trap cleanup_recovery EXIT
 
 active_production_count() {
   local count=0
@@ -125,7 +129,10 @@ rebase_expired_registry() {
   rebase_staging=""
 }
 
-build_bootstrap_preflight() {
+build_preflight() {
+  local label=$1
+  local output="$RUN/${label}-admission-automation.json"
+
   "$VENV/python" -I -B -m abyss_stack_mcp.admission_automation \
     --registry "$REGISTRY" \
     --deployment-manifest "$DEPLOYMENT" \
@@ -135,9 +142,36 @@ build_bootstrap_preflight() {
     --deployed-root "$STACK" \
     --output-root "$STACK/Logs/mcp/admission" \
     --keeper-inbox-root "$STACK/Logs/mcp/admission/keeper-inbox" \
-    > "$RUN/bootstrap-admission-automation.json"
+    > "$output"
   jq -e '.preflight.all_eligible == true and .preflight.eligible_count == 11 and .preflight.blocked_count == 0' \
-    "$RUN/bootstrap-admission-automation.json" >/dev/null
+    "$output" >/dev/null
+}
+
+catalog_matches_current_canaries() {
+  local catalog="$STACK/Logs/mcp/admission/managed-contours.json"
+  local latest_canary
+  local organ
+  local observed_at
+  local receipt_id
+
+  [[ -f "$catalog" && ! -L "$catalog" ]] || return 1
+  for organ in "${organs[@]}"; do
+    latest_canary="$STACK/Logs/mcp/canaries/latest/${organ}.read.json"
+    [[ -f "$latest_canary" && ! -L "$latest_canary" ]] || return 1
+    receipt_id=$(jq -er .receipt_id "$latest_canary") || return 1
+    observed_at=$(jq -er .observed_at "$latest_canary") || return 1
+    jq -e \
+      --arg organ "$organ" \
+      --arg receipt_id "$receipt_id" \
+      --arg observed_at "$observed_at" '
+        [.contours[] | select(
+          .organ_id == $organ
+          and .contour_id == "read"
+          and .canary_receipt_id == $receipt_id
+          and .canary_observed_at == $observed_at
+        )] | length == 1
+      ' "$catalog" >/dev/null || return 1
+  done
 }
 
 if [[ ! -f "$REGISTRY" || -L "$REGISTRY" ]]; then
@@ -197,7 +231,9 @@ if [[ "$admitted_count" -eq 11 \
       && "$deployment_identity_count" -eq 11 \
       && "$current_canary_count" -eq 11 \
       && "$active_unit_count" -eq 11 \
-      && "$minimum_expiry" -gt "$now_epoch" ]]; then
+      && "$minimum_expiry" -gt "$now_epoch" \
+      && "$registry_expiry" -gt "$now_epoch" ]] \
+    && catalog_matches_current_canaries; then
   exit 0
 fi
 
@@ -227,9 +263,10 @@ if [[ "$active_unit_count" -ne 11 ]]; then
     "$RUN/bootstrap-lkg" \
     "$RUN/bootstrap-stdout"
   publish_admission "$RUN/bootstrap-current" "$RUN/bootstrap-lkg" bootstrap
-  build_bootstrap_preflight
+  build_preflight bootstrap
   systemctl --user stop "${bootstrap_units[@]}"
   bootstrap_started=0
+  production_handoff_started=1
   systemctl --user start "${production_units[@]}"
   [[ "$(active_production_count)" -eq 11 ]] || {
     printf 'modern MCP production handoff did not start the exact fleet\n' >&2
@@ -243,6 +280,8 @@ capture_canary_family \
   "$RUN/production-lkg" \
   "$RUN/production-stdout"
 publish_admission "$RUN/production-current" "$RUN/production-lkg" production
+build_preflight production
 
 "$VENV/aoa" organs registry-v2-validate "$REGISTRY"
 ln -sfn "runs/${RUN##*/}/report-production.json" "$ROOT/latest-report.json"
+production_handoff_started=0

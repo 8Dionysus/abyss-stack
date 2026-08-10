@@ -47,8 +47,12 @@ canaries bound to the bootstrap PIDs, publishes one temporary read admission,
 and requires the derived preflight catalog to report exactly eleven eligible
 and zero blocked contours. It stops all bootstrap units before starting the
 fixed production set. Final publication requires a second distinct canary
-family bound to the production PID/start identities. Bootstrap units remain
-manual and unenabled. A trap stops them after every incomplete transaction.
+family bound to the production PID/start identities and a rebuilt managed
+catalog that matches those receipt IDs and reports exactly eleven eligible and
+zero blocked contours. Bootstrap units remain manual and unenabled. A trap
+stops bootstrap after every incomplete transaction and also stops a production
+fleet started by the controller until final publication, catalog rebuild, and
+registry validation all succeed.
 
 The controller cannot accept organ, unit, endpoint, credential, tool, contour,
 or policy inputs. It cannot touch candidate or internal-effect processes. The
@@ -76,6 +80,9 @@ contains the new lifecycle effect to the same read fleet already admitted by
   predecessor digest check.
 - Partial bootstrap, preflight, or production handoff leaves the fleet
   unavailable rather than widening authority.
+- The fast path requires the managed catalog to match every current production
+  receipt, so it repairs catalog drift instead of accepting registry currentness
+  alone.
 - This decision grants no candidate, Tasks, durable-write, internal-effect, or
   external-effect authority.
 

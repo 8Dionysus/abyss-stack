@@ -463,7 +463,10 @@ resets the expired registry to claim-free shadow state when required, admits
 only bootstrap-bound evidence long enough to rebuild an 11-of-11 eligible
 preflight catalog, stops every bootstrap unit, starts the exact production
 fleet, and replaces all bootstrap identities with production PID/start
-receipts. Any partial step stops bootstrap and remains fail-closed.
+receipts. It rebuilds the managed catalog from those final receipt IDs before
+completion. Any partial bootstrap step stops bootstrap; any incomplete
+production handoff stops the production fleet that the controller started and
+remains fail-closed.
 
 For example:
 

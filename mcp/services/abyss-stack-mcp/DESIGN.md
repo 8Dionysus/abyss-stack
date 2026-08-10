@@ -171,8 +171,9 @@ bootstrap units, reset an expired registry to claim-free shadow state, rebuild
 an eligible catalog, hand off to the exact production units, and replace every
 bootstrap process identity with a production receipt. It cannot select units,
 organs, contours, tools, credentials, endpoints, candidate planes, or effect
-planes at runtime; any incomplete handoff stops bootstrap and remains
-fail-closed.
+planes at runtime. Completion also requires the managed catalog to match every
+final production receipt. Any incomplete handoff stops bootstrap and any
+production fleet started by the controller, then remains fail-closed.
 
 Codex integration consumes this observation through the owner-composed handoff
 in `docs/CODEX_CONSUMER_HANDOFF.md`. The stack may issue canary and runtime
