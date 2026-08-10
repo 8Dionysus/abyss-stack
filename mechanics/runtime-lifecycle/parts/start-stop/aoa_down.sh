@@ -11,3 +11,14 @@ aoa_parse_profile_args "$@"
 aoa_resolve_modules "${AOA_STACK_PROFILE}"
 aoa_print_profile_summary
 aoa_compose down "${AOA_FORWARD_ARGS[@]}"
+
+for module in "${AOA_PROFILE_MODULE_NAMES[@]}"; do
+  if [[ "$module" == "31-intel-inference.yml" ]]; then
+    systemctl --user stop \
+      abyss-ovms.socket \
+      abyss-ovms-unix.socket \
+      abyss-ovms-proxy.service \
+      abyss-ovms.service
+    break
+  fi
+done

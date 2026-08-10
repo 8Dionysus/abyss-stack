@@ -95,16 +95,18 @@ def _load_names(file_path: Path) -> list[str]:
 
 
 def _compose_service_names(file_path: Path) -> set[str]:
+    """Return compose services plus explicit non-compose owner workloads."""
     service_names: set[str] = set()
-    in_services = False
+    in_runtime_section = False
     for raw in file_path.read_text(encoding="utf-8").splitlines():
-        if raw.strip() == "services:":
-            in_services = True
+        if raw.strip() in {"services:", "x-abyss-owner-workloads:"}:
+            in_runtime_section = True
             continue
-        if not in_services:
+        if not in_runtime_section:
             continue
         if raw and not raw.startswith(" "):
-            break
+            in_runtime_section = False
+            continue
         match = re.match(r"^  ([A-Za-z0-9_.-]+):\s*$", raw)
         if match:
             service_names.add(match.group(1))

@@ -298,6 +298,15 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Changed
 
+- The promoted OVMS embeddings lane is now a rootless Quadlet activated by
+  loopback and private Unix sockets. A real request performs owner admission
+  and cold start; after the idle proxy exits, systemd removes the complete
+  container cgroup. Routine smoke and monitoring no longer wake the model,
+  and no hard memory ceiling or resident custom controller was added. OVMS and
+  its client now share one read-only API-key file, with source tests and the
+  isolated canary requiring unauthenticated requests to be rejected. A bounded
+  idempotent admission wait keeps transient pressure from immediately dropping
+  a socket-activated foreground request without adding a resident waiter.
 - Routing federation health is now check-only over the admitted SDK-canonical
   materialization: ordinary sync cannot produce or repair routing bytes,
   governed execution no longer exposes a predecessor mutation target, and the

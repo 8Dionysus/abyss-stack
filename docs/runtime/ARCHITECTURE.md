@@ -47,7 +47,7 @@ Local and accelerator-aware model serving:
 - Ollama remains a retained fallback/control serving lane, not the default
   AbyssOS substrate
 - llama.cpp as the canonical local GGUF-serving path for bounded local-worker flows
-- OVMS as the current reviewed Intel/OpenVINO-oriented serving seam, currently exercised for embeddings in the promoted Intel presets
+- OVMS as the current reviewed Intel/OpenVINO-oriented serving seam, currently exercised for embeddings in the promoted Intel presets and activated on demand by rootless systemd rather than kept resident by Compose
 - broader Intel serving lanes across OVMS, OpenVINO, and future OpenVINO GenAI may host other model classes through separate reviewed profile, machine-fit, or rollout changes
 - a future OpenVINO GenAI migration or promotion of a non-llama.cpp Intel-served text lane is a separate stack change, not part of the current promoted path
 

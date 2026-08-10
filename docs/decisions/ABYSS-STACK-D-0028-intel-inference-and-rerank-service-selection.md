@@ -99,6 +99,29 @@ service-native budgets, soft reclaim reservations, health, and reversible
 lifecycle controls, but clear hard CPU and memory ceilings. Static ceilings
 remain valid only for an explicit measured lab or disposable workload.
 
+## 2026-08 OVMS Lifecycle Amendment
+
+Two owner-local release candidates were compared on the current GPU route.
+OVMS config reload preserved embedding parity but returned only about 80 MiB
+while roughly 1.7 GiB remained charged, mostly as shared memory. Stopping the
+whole container returned the owner cgroup instead. The selected embedding lane
+therefore moves from a resident Compose service to a rootless Quadlet activated
+through systemd TCP and Unix sockets. `systemd-socket-proxyd` keeps active
+connections alive and exits after idle; `StopWhenUnneeded=yes` then stops the
+container. A bounded runtime-only `abyss-machine` admission lease protects each
+cold load and is released after readiness or failure.
+
+This amendment does not authorize generic process eviction, a hard memory
+ceiling, periodic health wakes, or a resident custom controller. Compose keeps
+an explicit owner-workload marker so profile selection remains reviewable;
+systemd owns process lifecycle and `langchain-api` uses the private Unix socket.
+Both services consume the same rootless Podman secret provisioned from the
+mode-`0600` `ovms_api_key.txt` owner file; no direct non-root bind or duplicate
+env secret is maintained, and missing or drifted runtime secrets fail closed.
+When admission is temporarily unavailable, the invocation-scoped adapter keeps
+the socket-activated request queued for a bounded interval and retries with one
+idempotency identity; it never bypasses the host reserve decision.
+
 ## Source surfaces
 
 - `docs/runtime/SERVICE_SELECTION.md`
@@ -107,6 +130,11 @@ remain valid only for an explicit measured lab or disposable workload.
 - `compose/profiles/reranking.txt`
 - `compose/tuning/llamacpp.gemma4-e2b.intel-285h.vulkan.yml`
 - `compose/tuning/intel-worker.thin-host.yml`
+- `compose/modules/31-intel-inference.yml`
+- `systemd/user/abyss-ovms.container`
+- `systemd/user/abyss-ovms.socket`
+- `systemd/user/abyss-ovms-unix.socket`
+- `systemd/user/abyss-ovms-proxy.service`
 - `compose/tuning/federation.thin-host.yml`
 - `compose/tuning/observability.thin-host.yml`
 - `compose/tuning/storage.intel-285h.resource-guard.yml`

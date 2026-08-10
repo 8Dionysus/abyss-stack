@@ -32,7 +32,10 @@ The repository also includes:
 - `aoa-render-config`
 
 These helpers make it easy to see what a preset, profile, or profile-combination will activate before you start it.
-`aoa-render-services` and `aoa-render-config` are the deeper runtime-truth layer because they come from the composed runtime view rather than just docs or module lists.
+`aoa-render-services` and `aoa-render-config` are the deeper Compose runtime
+view. A module may additionally declare `x-abyss-owner-workloads`; those
+workloads are resolved through their named systemd units rather than rendered
+as resident Compose services.
 
 You may optionally layer bounded overlays after the canonical module list through `AOA_EXTRA_COMPOSE_FILES` on Linux or `-Overlay` on the Windows bridge.
 
@@ -81,6 +84,12 @@ Presets expand before direct `--profile` additions.
 Post-start model warmup follows the selected modules. `llama.cpp` warms by
 default for local-worker selections. Ollama fallback warmup is disabled unless
 the operator sets `AOA_OLLAMA_WARMUP_ENABLED=true`.
+
+For `intel-worker`, `aoa-up` starts OVMS activation sockets before Compose so
+`langchain-api` can mount the Unix socket. It does not start the model. A real
+embedding request activates the proxy and Quadlet container; idle proxy exit
+stops the full OVMS process. `aoa-down` stops both sockets and the owner
+workload after the Compose clients are down.
 
 ## Low-level canonical path
 

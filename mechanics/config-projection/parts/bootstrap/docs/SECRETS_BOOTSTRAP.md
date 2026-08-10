@@ -45,31 +45,27 @@ cp env/langchain-api.env.example /srv/AbyssOS/abyss-stack/Secrets/Configs/langch
 chmod 600 /srv/AbyssOS/abyss-stack/Secrets/Configs/langchain-api.env
 ```
 
-### 3. OVMS API env
-
-Real location:
-- `/srv/AbyssOS/abyss-stack/Secrets/Configs/ovms-api.env`
-
-Bootstrap from example:
-
-```bash
-cp env/ovms-api.env.example /srv/AbyssOS/abyss-stack/Secrets/Configs/ovms-api.env
-chmod 600 /srv/AbyssOS/abyss-stack/Secrets/Configs/ovms-api.env
-```
-
-### 4. OVMS raw API key file
+### 3. OVMS API key file
 
 Real location:
 - `/srv/AbyssOS/abyss-stack/Secrets/Configs/ovms_api_key.txt`
 
-Create it manually and keep permissions tight:
+Create it manually with a generated bearer value and keep permissions tight:
 
 ```bash
-printf '%s\n' 'CHANGE_ME_REAL_VALUE' > /srv/AbyssOS/abyss-stack/Secrets/Configs/ovms_api_key.txt
+python3 -c 'import secrets; print(secrets.token_urlsafe(48))' > /srv/AbyssOS/abyss-stack/Secrets/Configs/ovms_api_key.txt
 chmod 600 /srv/AbyssOS/abyss-stack/Secrets/Configs/ovms_api_key.txt
 ```
 
-### 5. ToS graph helper env
+`aoa-up` provisions or verifies the rootless Podman secret
+`abyss-ovms-api-key` before it opens the OVMS activation sockets. Quadlet and
+Compose mount that one runtime secret with consumer-specific ownership; the
+mode-`0600` owner file is not bound directly into either container. Do not
+duplicate its value in either service env file. A missing, invalid, or drifted
+secret is a deployment error; stop both consumers before an explicit key
+rotation so they cannot observe different values.
+
+### 4. ToS graph helper env
 
 Real location:
 - `/srv/AbyssOS/abyss-stack/Secrets/Configs/tos-graph.env`
@@ -91,7 +87,7 @@ If `TOS_GRAPH_NEO4J_PASSWORD` is omitted from `tos-graph.env`, the helper
 derives Neo4j credentials from the mounted stack-level `NEO4J_AUTH` value at
 runtime instead of duplicating the secret into a second committed example.
 
-### 6. Optional authenticated MCP HTTP bearer
+### 5. Optional authenticated MCP HTTP bearer
 
 Real location:
 

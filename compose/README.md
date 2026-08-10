@@ -50,8 +50,9 @@ A profile is only a list of module filenames in activation order.
 bring-up: storage only. `workflows` is the optional n8n workflow automation
 layer, including its storage dependency so it can run on its own or compose over
 `substrate`. `local-worker` is the canonical `llama.cpp` plus `langchain-api`
-worker layer. `intel-worker` is the reviewed OVMS embeddings layer over the
-canonical local worker. `fallback-gateway` keeps the retained Ollama plus
+worker layer. `intel-worker` selects the reviewed systemd-owned,
+socket-activated OVMS embeddings workload over the canonical local worker;
+Compose does not keep that model container resident. `fallback-gateway` keeps the retained Ollama plus
 LiteLLM control path explicit. `core`, `agentic`, and `intel` remain
 compatibility bundles for older operator habits; current presets compose
 `substrate` plus worker layers directly and do not include `workflows`.

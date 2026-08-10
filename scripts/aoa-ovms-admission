@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+exec python3 "${SOURCE_ROOT}/mechanics/runtime-lifecycle/parts/user-unit/aoa_ovms_admission.py" "$@"

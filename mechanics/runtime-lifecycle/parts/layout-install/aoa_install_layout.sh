@@ -21,6 +21,7 @@ mkdir -p \
   "${AOA_STACK_ROOT}/Configs/monitoring/tempo" \
   "${AOA_STACK_ROOT}/Configs/tts" \
   "${AOA_STACK_ROOT}/Configs/ollama" \
+  "${AOA_STACK_ROOT}/Configs/ovms" \
   "${AOA_STACK_ROOT}/Configs/tos-graph" \
   "${AOA_STACK_ROOT}/Secrets/Configs" \
   "${AOA_STACK_ROOT}/Services" \

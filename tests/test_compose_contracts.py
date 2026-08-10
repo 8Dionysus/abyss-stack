@@ -4,6 +4,8 @@ import unittest
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from tests.compose_yaml_subset import load_compose_services
 
 
@@ -143,17 +145,77 @@ class ComposeContractsTests(unittest.TestCase):
                 data = load_compose(path)
                 services = data.get("services")
                 self.assertIsInstance(services, dict)
-                self.assertTrue(services, f"{path.name} has no services")
+                full_data = yaml.safe_load(path.read_text(encoding="utf-8"))
+                owner_workloads = full_data.get("x-abyss-owner-workloads")
+                self.assertTrue(
+                    services or isinstance(owner_workloads, dict) and owner_workloads,
+                    f"{path.name} has neither compose services nor owner workloads",
+                )
 
     def test_browser_helper_uses_container_init_reaper(self) -> None:
         service = load_compose(MODULE_DIR / "51-browser-tools.yml")["services"]["aoa-browser"]
         self.assertEqual(service.get("init"), "true")
 
-    def test_ovms_uses_soft_reclaim_protection_without_a_hard_memory_cap(self) -> None:
-        service = load_compose(TUNING_DIR / "intel-worker.thin-host.yml")["services"]["ovms"]
-        self.assertEqual(service.get("cpus"), "0")
-        self.assertNotIn("mem_limit", service)
-        self.assertEqual(service.get("mem_reservation"), "${AOA_OVMS_MEM_RESERVATION:-1g}")
+    def test_ovms_is_a_socket_activated_owner_workload_without_hard_caps(self) -> None:
+        module = yaml.safe_load(
+            (MODULE_DIR / "31-intel-inference.yml").read_text(encoding="utf-8")
+        )
+        owner = module["x-abyss-owner-workloads"]["ovms"]
+        self.assertEqual(module["services"], {})
+        self.assertEqual(owner["container_unit"], "abyss-ovms.service")
+        self.assertEqual(
+            owner["activation_sockets"],
+            ["abyss-ovms.socket", "abyss-ovms-unix.socket"],
+        )
+
+        quadlet = (REPO_ROOT / "systemd/user/abyss-ovms.container").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("StopWhenUnneeded=yes", quadlet)
+        self.assertIn("Notify=healthy", quadlet)
+        self.assertIn("ExecStartPre=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-ovms-admission reserve", quadlet)
+        self.assertNotIn("EnvironmentFile=", quadlet)
+        self.assertIn("Secret=abyss-ovms-api-key", quadlet)
+        self.assertNotIn("MemoryMax=", quadlet)
+        self.assertNotIn("MemoryHigh=", quadlet)
+        self.assertNotIn("MemorySwapMax=", quadlet)
+
+    def test_langchain_uses_unix_activation_socket_without_ovms_dependency(self) -> None:
+        module = yaml.safe_load(
+            (MODULE_DIR / "42-agent-api-intel.yml").read_text(encoding="utf-8")
+        )
+        service = module["services"]["langchain-api"]
+        self.assertEqual(
+            service["environment"]["OVMS_EMBEDDINGS_UNIX_SOCKET"],
+            "/run/abyss-stack/ovms.sock",
+        )
+        self.assertEqual(
+            service["environment"]["OVMS_EMBEDDINGS_API_KEY_FILE"],
+            "/run/secrets/ovms_api_key",
+        )
+        self.assertEqual(service["environment"]["OVMS_EMBEDDINGS_TIMEOUT_S"], "180")
+        self.assertTrue(any("ovms.sock:/run/abyss-stack/ovms.sock:z" in volume for volume in service["volumes"]))
+        self.assertEqual(
+            service["secrets"],
+            [
+                {
+                    "source": "abyss-ovms-api-key",
+                    "target": "/run/secrets/ovms_api_key",
+                    "uid": "0",
+                    "gid": "0",
+                    "mode": "0400",
+                }
+            ],
+        )
+        self.assertEqual(module["secrets"]["abyss-ovms-api-key"], {"external": True})
+        self.assertNotIn("ovms", service["depends_on"])
+
+    def test_monitoring_does_not_wake_idle_ovms(self) -> None:
+        monitoring = (REPO_ROOT / "config-templates/Configs/monitoring/prometheus.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("job_name: ovms", monitoring)
+        self.assertNotIn("ovms:8000", monitoring)
 
     def test_gemma4_uses_native_sleep_and_soft_reclaim_protection(self) -> None:
         service = load_compose(

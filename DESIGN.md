@@ -58,7 +58,8 @@ The runtime body has these organs:
   by this repo, with workflow automation, local workers, federation seams,
   tools, and observability layered through explicit profiles or presets
 - **lifecycle control**: start, stop, wait, smoke, logs, status, warmup, and
-  systemd-user flows
+  systemd-user flows; reloadable model owners may use request activation and
+  become fully absent while idle instead of remaining resident under Compose
 - **machine fit**: host facts, reference-platform posture, bridge capture,
   platform adaptation, and bounded local tuning
 - **inference pilots**: local trials, promotion loops, and model-route evidence

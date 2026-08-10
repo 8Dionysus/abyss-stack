@@ -495,7 +495,9 @@ fsynced after every rollback rename.
 
 ### `scripts/aoa-install-systemd`
 
-Links the user-unit skeleton into `~/.config/systemd/user/` and reloads the user daemon.
+Links ordinary user-unit skeletons into `~/.config/systemd/user/`, routes
+rootless Quadlet `.container` sources into `~/.config/containers/systemd/`,
+and reloads the user daemon.
 Use `--enable-now` if you want it enabled and started immediately.
 Use `--restart-now` when the unit is already active and you want the newly
 written selection to take effect immediately.
@@ -515,6 +517,11 @@ This links every unit in `systemd/user/managed-units.txt` from
 `${AOA_CONFIGS_ROOT}/systemd/user` into `~/.config/systemd/user` and runs
 `systemctl --user daemon-reload`. It intentionally does not start, stop,
 restart, enable, disable, or mask services.
+
+The default install also links the OVMS Quadlet and activation units needed by
+`intel-worker`. `aoa-up` starts only the empty sockets; the first real
+embedding request starts the container after `abyss-machine` cold-load
+admission. `aoa-smoke` checks socket readiness without waking the model.
 
 Use `--provision-abyss-stack-mcp-auth` before canarying the stack-owned MCP
 read or candidate process. It creates separate read and candidate bearer
@@ -742,6 +749,13 @@ the current host preset and layer the federation profile:
 
 ```bash
 scripts/aoa-install-systemd --preset intel-full --profile federation --enable-now --restart-now
+```
+
+After this route, inspect OVMS without waking it:
+
+```bash
+systemctl --user status abyss-ovms.socket abyss-ovms-unix.socket --no-pager
+systemctl --user is-active abyss-ovms.service || true
 ```
 
 For a bounded Intel full-stack route, keep the same preset/profile selection and

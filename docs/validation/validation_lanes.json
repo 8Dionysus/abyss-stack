@@ -302,6 +302,7 @@
           "scripts/aoa-bootstrap-configs",
           "scripts/aoa-check-layout",
           "scripts/aoa-install-systemd",
+          "scripts/aoa-ovms-admission",
           "scripts/aoa-first-run",
           "scripts/aoa-warmup",
           "scripts/aoa-preset-profiles",

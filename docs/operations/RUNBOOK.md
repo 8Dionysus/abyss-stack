@@ -65,6 +65,20 @@ aoa-smoke --with-internal --preset agent-full
 aoa-logs --profile substrate
 ```
 
+For an `intel-worker` selection, inspect OVMS lifecycle without triggering a
+cold start:
+
+```bash
+systemctl --user is-active abyss-ovms.socket abyss-ovms-unix.socket
+systemctl --user show abyss-ovms.service -p ActiveState -p SubState -p MemoryCurrent
+abyss-machine resource admission status --json
+```
+
+Only an intentional embedding request should open port `8200` or the private
+Unix socket. After the configured idle window, `abyss-ovms-proxy.service`,
+`abyss-ovms.service`, and the `ovms` container should be absent/inactive while
+both sockets remain ready.
+
 For rendered config output:
 
 ```bash

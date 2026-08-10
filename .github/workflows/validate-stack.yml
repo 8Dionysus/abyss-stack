@@ -79,13 +79,12 @@ jobs:
           cp env/stack.env.example "$AOA_STACK_ROOT/Secrets/Configs/stack.env"
           ln -sfn "$AOA_STACK_ROOT/Secrets/Configs/stack.env" "$AOA_STACK_ROOT/Configs/stack.env"
           cp env/langchain-api.env.example "$AOA_STACK_ROOT/Secrets/Configs/langchain-api.env"
-          cp env/ovms-api.env.example "$AOA_STACK_ROOT/Secrets/Configs/ovms-api.env"
-          printf '%s\n' 'TEST_KEY' > "$AOA_STACK_ROOT/Secrets/Configs/ovms_api_key.txt"
+          printf '%s\n' 'CI_ONLY_OVMS_API_KEY_0123456789012345678901234567890123456789' > "$AOA_STACK_ROOT/Secrets/Configs/ovms_api_key.txt"
           chmod 600 \
             "$AOA_STACK_ROOT/Secrets/Configs/stack.env" \
             "$AOA_STACK_ROOT/Secrets/Configs/langchain-api.env" \
-            "$AOA_STACK_ROOT/Secrets/Configs/ovms-api.env" \
             "$AOA_STACK_ROOT/Secrets/Configs/ovms_api_key.txt"
+          scripts/aoa-install-systemd --provision-ovms-auth
 
           scripts/aoa-check-layout --strict --profile substrate
           scripts/aoa-check-layout --strict --profile workflows
@@ -194,13 +193,12 @@ jobs:
           cp env/stack.env.example "$AOA_STACK_ROOT/Secrets/Configs/stack.env"
           ln -sfn "$AOA_STACK_ROOT/Secrets/Configs/stack.env" "$AOA_STACK_ROOT/Configs/stack.env"
           cp env/langchain-api.env.example "$AOA_STACK_ROOT/Secrets/Configs/langchain-api.env"
-          cp env/ovms-api.env.example "$AOA_STACK_ROOT/Secrets/Configs/ovms-api.env"
-          printf '%s\n' 'TEST_KEY' > "$AOA_STACK_ROOT/Secrets/Configs/ovms_api_key.txt"
+          printf '%s\n' 'CI_ONLY_OVMS_API_KEY_0123456789012345678901234567890123456789' > "$AOA_STACK_ROOT/Secrets/Configs/ovms_api_key.txt"
           chmod 600 \
             "$AOA_STACK_ROOT/Secrets/Configs/stack.env" \
             "$AOA_STACK_ROOT/Secrets/Configs/langchain-api.env" \
-            "$AOA_STACK_ROOT/Secrets/Configs/ovms-api.env" \
             "$AOA_STACK_ROOT/Secrets/Configs/ovms_api_key.txt"
+          scripts/aoa-install-systemd --provision-ovms-auth
 
           export AOA_EXTRA_COMPOSE_FILES="compose/tuning/llamacpp.cpu.yml"
           scripts/aoa-render-config --profile substrate --profile local-worker >/dev/null

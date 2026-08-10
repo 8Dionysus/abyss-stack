@@ -5,6 +5,10 @@ This directory stores user-unit skeletons for the deployed runtime.
 ## Current units
 
 - `podman-compose-abyss.service`
+- `abyss-ovms.container`, the rootless Quadlet source for the cold embeddings
+  container
+- `abyss-ovms.socket`, `abyss-ovms-unix.socket`, and
+  `abyss-ovms-proxy.service`, the no-wake host/container activation boundary
 - `abyss-stack-resource-guards-apply.service`
 - `aoa-mcp-http@.service`, the non-startable tombstone for the retired
   ambient-Python/shared-bearer route
@@ -37,6 +41,10 @@ Copy or symlink the unit into:
 ```text
 ~/.config/systemd/user/
 ```
+
+Quadlet sources use `~/.config/containers/systemd/`; `aoa-install-systemd`
+routes `.container` entries there automatically and links ordinary units into
+`~/.config/systemd/user/`.
 
 Then reload and enable:
 
@@ -85,6 +93,9 @@ replaced with source links.
 The current allowlist covers the local working surface:
 
 - `podman-compose-abyss.service`
+- the OVMS Quadlet, its two activation sockets, and its idle proxy; the sockets
+  are started only for selections containing `31-intel-inference.yml`, and a
+  real connection performs cold-load admission before the container starts
 - `abyss-stack-resource-guards-apply.service`, a manual one-shot unit that runs
   `aoa-apply-resource-guards --wait-game-guard-clear` and applies staged cgroup
   limits only after the game guard clears

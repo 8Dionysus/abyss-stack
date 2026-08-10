@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -98,6 +99,10 @@ STACK_RUNTIME_DROPIN = (
 GEMMA_DIGEST_UNIT = REPO_ROOT / "systemd" / "user" / "abyss-gemma4-spark-digest.service"
 STORAGE_MONITOR_UNIT = REPO_ROOT / "systemd" / "user" / "abyss-storage-monitor.service"
 MANAGED_USER_UNITS = REPO_ROOT / "systemd" / "user" / "managed-units.txt"
+OVMS_QUADLET = REPO_ROOT / "systemd" / "user" / "abyss-ovms.container"
+OVMS_TCP_SOCKET = REPO_ROOT / "systemd" / "user" / "abyss-ovms.socket"
+OVMS_UNIX_SOCKET = REPO_ROOT / "systemd" / "user" / "abyss-ovms-unix.socket"
+OVMS_PROXY_UNIT = REPO_ROOT / "systemd" / "user" / "abyss-ovms-proxy.service"
 MCP_HTTP_AUTH_BUILDER = (
     REPO_ROOT / "mcp" / "services" / "_shared" / "build_http_auth_vendors.py"
 )
@@ -404,6 +409,15 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "[Service]\nType=oneshot\nExecStart=/usr/bin/true\n",
                 encoding="utf-8",
             )
+            for name in (
+                "abyss-ovms.container",
+                "abyss-ovms.socket",
+                "abyss-ovms-unix.socket",
+                "abyss-ovms-proxy.service",
+            ):
+                (unit_source / name).write_text(
+                    "[Unit]\nDescription=test\n", encoding="utf-8"
+                )
             dropin_source = unit_source / "podman-compose-abyss.service.d"
             dropin_source.mkdir()
             lifecycle_source = dropin_source / "99-runtime-lifecycle.conf"
@@ -446,6 +460,113 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 / "99-runtime-lifecycle.conf"
             )
             self.assertEqual(os.readlink(lifecycle_target), str(lifecycle_source))
+
+            quadlet_target = root / "xdg-config" / "containers" / "systemd" / "abyss-ovms.container"
+            self.assertEqual(os.readlink(quadlet_target), str(unit_source / "abyss-ovms.container"))
+
+    def test_ovms_units_use_native_idle_lifecycle_and_safe_kill_mode(self) -> None:
+        quadlet = OVMS_QUADLET.read_text(encoding="utf-8")
+        proxy = OVMS_PROXY_UNIT.read_text(encoding="utf-8")
+        tcp_socket = OVMS_TCP_SOCKET.read_text(encoding="utf-8")
+        unix_socket = OVMS_UNIX_SOCKET.read_text(encoding="utf-8")
+
+        self.assertIn("StopWhenUnneeded=yes", quadlet)
+        self.assertIn("Notify=healthy", quadlet)
+        self.assertIn("ExecStartPost=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-ovms-admission release", quadlet)
+        self.assertIn("Environment=AOA_OVMS_ADMISSION_WAIT_SEC=120", quadlet)
+        self.assertIn("TimeoutStartSec=300", quadlet)
+        self.assertEqual(quadlet.count('Authorization: Bearer $${key}'), 2)
+        self.assertNotIn("EnvironmentFile=", quadlet)
+        self.assertIn(
+            "Secret=abyss-ovms-api-key,type=mount,target=/run/secrets/ovms_api_key,uid=5000,gid=5000,mode=0400",
+            quadlet,
+        )
+        self.assertNotIn("Secrets/Configs/ovms_api_key.txt:/run/secrets", quadlet)
+        self.assertNotIn("KillMode=none", quadlet + proxy)
+        self.assertIn("--exit-idle-time=15min", proxy)
+        self.assertIn("ListenStream=127.0.0.1:8200", tcp_socket)
+        self.assertIn("ListenStream=%t/abyss-stack/ovms.sock", unix_socket)
+        self.assertIn("SocketMode=0600", unix_socket)
+
+    def test_ovms_auth_provision_is_rootless_idempotent_and_detects_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            secret_dir = stack_root / "Secrets" / "Configs"
+            secret_dir.mkdir(parents=True)
+            canonical = secret_dir / "ovms_api_key.txt"
+            canonical.write_text("A" * 48 + "\n", encoding="utf-8")
+            canonical.chmod(0o644)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            state = root / "podman-secret"
+            podman = fake_bin / "podman"
+            podman.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+[[ "$1" == secret ]]
+case "$2" in
+  inspect)
+    if [[ "${3:-}" == --showsecret ]]; then
+      python3 -I -c 'import json, pathlib, sys; print(json.dumps(pathlib.Path(sys.argv[1]).read_text()))' "$FAKE_PODMAN_SECRET_STATE"
+    else
+      [[ -f "$FAKE_PODMAN_SECRET_STATE" ]]
+    fi
+    ;;
+  create)
+    cp -- "${@: -1}" "$FAKE_PODMAN_SECRET_STATE"
+    ;;
+  *) exit 64 ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            podman.chmod(0o755)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CONFIGS_ROOT": str(root / "configs"),
+                    "FAKE_PODMAN_SECRET_STATE": str(state),
+                    "PATH": f"{fake_bin}:{env['PATH']}",
+                }
+            )
+
+            first = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--provision-ovms-auth"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(first.returncode, 0, first.stderr)
+            self.assertEqual(state.read_text(encoding="utf-8"), canonical.read_text(encoding="utf-8"))
+            self.assertEqual(stat.S_IMODE(canonical.stat().st_mode), 0o600)
+
+            second = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--provision-ovms-auth"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertIn("already matches", second.stdout)
+
+            canonical.write_text("B" * 48 + "\n", encoding="utf-8")
+            drift = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--provision-ovms-auth"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(drift.returncode, 0)
+            self.assertIn("differs from the installed Podman secret", drift.stderr)
+            self.assertEqual(state.read_text(encoding="utf-8"), "A" * 48 + "\n")
 
     def test_gemma_digest_reserves_background_model_wake(self) -> None:
         unit = GEMMA_DIGEST_UNIT.read_text(encoding="utf-8")
