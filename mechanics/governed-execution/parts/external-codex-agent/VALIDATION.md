@@ -46,7 +46,9 @@ ceilings, secret-shaped ignored
 input refusal, complete runtime-wide forbidden-set admission plus subset-resistant
 terminal classification, direct secret-path encoder classification, exact-open-inode
 Codex preflight and inference execution across a pathname replacement plus
-pre-exec digest-drift refusal,
+pre-exec digest-drift refusal, a real masked outer-bubblewrap plus inner named
+Codex-sandbox preflight command, retention of that preflighted mount-wrapper
+digest through inference, and replacement refusal between those phases,
 exclusive same-workspace active-attempt admission across distinct
 session identities, wrapped effect-family observation, exact validation-claim
 binding to final workspace bytes, authority-blocked failure closeout when the
@@ -59,8 +61,11 @@ semantic replay of a lost thread, usage, turn, and indirect command state save,
 authority-blocked interruption after a forbidden command was durably observed
 at `item.started`, attached shell-separator effect recognition,
 authority-blocked worker-death closeout after a recovered command, retry of
-a durable attempt-free `prepared` session after launch failure, and an exact
-pre-fork child launch gate,
+a durable attempt-free `prepared` session after launch failure, an exact
+pre-fork child launch gate, and refusal to release the mount gate after a parent
+termination signal or supervisor-endpoint EOF, using a bubblewrap-retained peer
+and killing the complete blocked wrapper test tree before closing the supervisor
+endpoint,
 incremental recovery and observation of cumulative event history without an
 aggregate control-file read, recovery of an exact atomically written terminal
 result when the final state save is lost without fabricating worker death,
@@ -103,6 +108,17 @@ revision-walker refusal, and fixed false OpenPGP/X.509/SSH verifier coordinates,
 GNU sort compression-program dispatch refusal with ordinary sort preserved,
 hidden Git ref mutation refusal with ordinary ref inspection preserved,
 credential-bearing Git config read refusal alongside config-write refusal,
+argument-role distinction between a Git-config search literal and an actual
+file operand, all multi-file, explicit-pattern, GNU-abbreviated pattern and pattern-file,
+and jq file-loading reader forms,
+attached generic-mutator destination options, existing and
+reserved config-lock masking, complete masking of both coordinates of a
+bind-mounted repository config inode, preservation of reftable repository
+structure, case-handling status semantics, normalization of local rename-display
+preferences across owner and masked probes, exact-workspace preservation and
+redirect refusal for `core.worktree`, namespace-private reservation of absent
+config coordinates with no host `.git` mutation and a still-working owner
+`git config`,
 credential-bearing Git remote URL refusal with name listing preserved,
 jq env/$ENV secret-access refusal with ordinary data transforms preserved,
 abbreviated Git cat-file filter/textconv and hash-object path refusal,
@@ -123,7 +139,13 @@ validation including a source scope wider than mutation scope, reserved
 runtime final-manifest evidence with false-anchor refusal, signal-notified
 steady-state supervisor waiting, status-selected
 wake binding, failed-reviewer A2A refusal, absence of an outer namespace that
-would conflict with Codex sandboxing, and a separately bound review/A2A export.
+would conflict with Codex sandboxing (the filesystem boundary uses rootless
+user+mount namespaces but adds no PID or network namespace), native
+nested-repository Git behavior,
+and a separately bound review/A2A export.
+Compatibility proof also loads a completed pre-change v2 state without a
+mount-wrapper digest for status and terminal-result recovery, without granting
+it a new inference attempt.
 It also proves parent obligation admission, durable pre-inference `yielding`
 state, preservation and retry beyond a partial yield attempt, recovery of a
 complete yield event without a second inference, a completed yield turn followed

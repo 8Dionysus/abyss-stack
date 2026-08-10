@@ -24,6 +24,39 @@ semantic target-workspace posture as `read-only`; the runtime profile records
 the implementation projection without converting it into task mutation
 authority or `allowed_paths`.
 
+Repository config bytes remain target-owner state and are not model inputs.
+For every attempt, `abyss-stack` derives a credential-free config and opens it
+by exact digest in the supervisor. A verified filesystem-only bubblewrap parent
+reconstructs every affected Git metadata parent as a private `tmpfs` view,
+returning its unmasked top-level entries from identity-checked open descriptors,
+then binds sanitized bytes over every currently visible mount-table coordinate
+of the target's physical `config` and reserved `config.worktree` path before the
+separately identified Codex process is released. Only bounded structural Git
+settings are retained; credentials, remotes, includes, aliases, and configured
+programs are not propagated. An explicit `core.worktree` survives only when
+native Git resolves it to the exact admitted workspace; a redirected value is
+rejected. The same bytes reserve the config lock and absent
+worktree-config coordinates inside the private attempt namespace, without
+creating or changing those paths in the target-owner namespace.
+The real checkout continues to own HEAD, index, objects, and refs, and native
+Git discovery is unchanged; no `GIT_DIR`/`GIT_WORK_TREE` override contaminates
+nested or temporary repositories. Equality of controller status through the
+owner and masked views is an admission check, not a new repository truth.
+Rootless bubblewrap uses a user and mount namespace for this operation, but no
+outer PID or network namespace; the exact Codex process still owns and proves
+its inner sandbox. Admission executes a disposable, network-disabled named
+Codex sandbox through that same outer read-only mask, and the supervisor checks
+the exact parent identity and termination state again immediately before
+releasing the gated child. The admitted mount-wrapper digest is carried from
+that preflight into inference and checked again before and inside supervisor
+launch; pathname replacement cannot silently admit different contour bytes.
+The gate is a Unix socket whose peer is retained by
+bubblewrap through `--sync-fd`, so supervisor EOF is not a release signal. An
+abort also retains the supervisor endpoint until the blocked wrapper is killed
+and reaped.
+Historical v2 state without this newer digest remains evidence-readable; it is
+not silently upgraded into authority for another inference attempt.
+
 The neutral binder consumes already selected coordinates and writes only the
 runtime launch. Its response explicitly returns to `aoa-agents` to form the
 separate owner execution request; it cannot choose the obligation, role,

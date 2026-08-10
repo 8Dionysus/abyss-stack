@@ -3,8 +3,13 @@
 
 The worker launches this process as the attempt session leader.  The supervisor
 is a Linux child subreaper and asks the kernel for ``SIGTERM`` if its exact
-worker parent dies.  It deliberately does not create another user or PID
+worker parent dies.  It deliberately does not create another PID or network
 namespace: Codex must remain free to construct its own bubblewrap sandbox.
+When repository configuration must be hidden, the supervisor may add one
+filesystem-only bubblewrap parent around Codex.  Rootless bubblewrap implements
+that contour with user and mount namespaces; it adds no process or network
+policy and does not replace the separately identified Codex process in the
+durable receipt.
 """
 
 from __future__ import annotations
@@ -16,6 +21,7 @@ import json
 import os
 import select
 import signal
+import socket
 import stat
 import subprocess
 import sys
@@ -32,6 +38,16 @@ SUPERVISOR_CLEANUP_INCOMPLETE = 126
 POLL_INTERVAL_SECONDS = 0.05
 ADOPTED_REAP_INTERVAL_SECONDS = 1.0
 MAX_EXECUTABLE_BYTES = 512 * 1024 * 1024
+MAX_MASK_BYTES = 2 * 1024 * 1024
+IDENTITY_DISCOVERY_TIMEOUT_SECONDS = 5.0
+PRIVATE_VIEW_IDENTITY_FIELDS = {
+    "device": "st_dev",
+    "inode": "st_ino",
+    "mode": "st_mode",
+    "size": "st_size",
+    "mtime_ns": "st_mtime_ns",
+    "ctime_ns": "st_ctime_ns",
+}
 
 _termination_signal: int | None = None
 _child_state_changed = True
@@ -41,8 +57,14 @@ class SupervisorError(RuntimeError):
     """One process-containment failure safe to expose on stderr."""
 
 
-def _open_verified_executable(path: str, expected_digest: str) -> int:
-    """Open and hash the exact executable inode that will be passed to exec."""
+def _open_verified_file(
+    path: str,
+    expected_digest: str,
+    *,
+    label: str,
+    maximum_bytes: int,
+) -> tuple[int, os.stat_result]:
+    """Open and hash one exact regular inode for later descriptor-bound use."""
 
     executable = Path(path)
     if (
@@ -51,18 +73,18 @@ def _open_verified_executable(path: str, expected_digest: str) -> int:
         or not expected_digest.startswith("sha256:")
         or len(expected_digest) != 71
     ):
-        raise SupervisorError("Codex executable identity is invalid")
+        raise SupervisorError(f"{label} identity is invalid")
     flags = os.O_RDONLY | os.O_CLOEXEC
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:
         descriptor = os.open(executable, flags)
     except OSError as exc:
-        raise SupervisorError("cannot open the exact Codex executable") from exc
+        raise SupervisorError(f"cannot open the exact {label}") from exc
     try:
         before = os.fstat(descriptor)
         if not stat.S_ISREG(before.st_mode):
-            raise SupervisorError("Codex executable is not a regular file")
+            raise SupervisorError(f"{label} is not a regular file")
         digest = hashlib.sha256()
         observed_bytes = 0
         while True:
@@ -70,8 +92,8 @@ def _open_verified_executable(path: str, expected_digest: str) -> int:
             if not chunk:
                 break
             observed_bytes += len(chunk)
-            if observed_bytes > MAX_EXECUTABLE_BYTES:
-                raise SupervisorError("Codex executable exceeds the digest limit")
+            if observed_bytes > maximum_bytes:
+                raise SupervisorError(f"{label} exceeds the digest limit")
             digest.update(chunk)
         after = os.fstat(descriptor)
         identity_fields = (
@@ -83,34 +105,297 @@ def _open_verified_executable(path: str, expected_digest: str) -> int:
             "st_ctime_ns",
         )
         if any(getattr(before, field) != getattr(after, field) for field in identity_fields):
-            raise SupervisorError("Codex executable changed while being verified")
+            raise SupervisorError(f"{label} changed while being verified")
         actual_digest = "sha256:" + digest.hexdigest()
         if actual_digest != expected_digest:
-            raise SupervisorError("Codex executable digest changed before exec")
+            raise SupervisorError(f"{label} digest changed before use")
         os.lseek(descriptor, 0, os.SEEK_SET)
-        return descriptor
+        return descriptor, after
     except BaseException:
         os.close(descriptor)
         raise
 
 
+def _open_verified_executable(path: str, expected_digest: str) -> int:
+    """Compatibility helper used by focused verifier tests."""
+
+    descriptor, _ = _open_verified_file(
+        path,
+        expected_digest,
+        label="Codex executable",
+        maximum_bytes=MAX_EXECUTABLE_BYTES,
+    )
+    return descriptor
+
+
+def _private_view_identity_matches(
+    observed: os.stat_result,
+    expected: object,
+) -> bool:
+    return isinstance(expected, dict) and set(expected) == set(
+        PRIVATE_VIEW_IDENTITY_FIELDS
+    ) and all(
+        isinstance(expected[key], int)
+        and expected[key] == getattr(observed, field)
+        for key, field in PRIVATE_VIEW_IDENTITY_FIELDS.items()
+    )
+
+
+def _validated_private_directory_views(
+    raw_views: list[str],
+) -> tuple[dict[str, object], ...]:
+    views: list[dict[str, object]] = []
+    targets: set[Path] = set()
+    for raw in raw_views:
+        try:
+            view = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise SupervisorError("private directory view is invalid JSON") from exc
+        if not isinstance(view, dict) or set(view) != {
+            "target",
+            "identity",
+            "entries",
+        }:
+            raise SupervisorError("private directory view has an unsupported shape")
+        target = Path(str(view["target"]))
+        entries = view["entries"]
+        if (
+            not target.is_absolute()
+            or target in targets
+            or not isinstance(entries, list)
+            or not isinstance(view["identity"], dict)
+        ):
+            raise SupervisorError("private directory view identity is invalid")
+        targets.add(target)
+        entry_targets: set[Path] = set()
+        for entry in entries:
+            if not isinstance(entry, dict) or set(entry) != {
+                "source",
+                "target",
+                "kind",
+                "identity",
+            }:
+                raise SupervisorError("private directory entry has an unsupported shape")
+            source = Path(str(entry["source"]))
+            entry_target = Path(str(entry["target"]))
+            if (
+                not source.is_absolute()
+                or entry_target.parent != target
+                or entry_target.name != source.name
+                or entry_target in entry_targets
+                or entry["kind"] not in {"file", "directory"}
+                or not isinstance(entry["identity"], dict)
+            ):
+                raise SupervisorError("private directory entry identity is invalid")
+            entry_targets.add(entry_target)
+        views.append(view)
+    if not views:
+        raise SupervisorError("private directory views are absent")
+    return tuple(
+        sorted(views, key=lambda view: (len(Path(str(view["target"])).parts), str(view["target"])))
+    )
+
+
 def _launch_verified_command(
     command: list[str],
     expected_digest: str,
-) -> subprocess.Popen[bytes]:
+    *,
+    mount_wrapper: str | None = None,
+    mount_wrapper_digest: str | None = None,
+    private_directory_views: tuple[dict[str, object], ...] = (),
+    read_only_masks: tuple[tuple[str, str, str], ...] = (),
+) -> tuple[subprocess.Popen[bytes], int | None]:
     """Execute the digest-verified open file, not a later pathname lookup."""
 
-    descriptor = _open_verified_executable(command[0], expected_digest)
+    descriptor, _ = _open_verified_file(
+        command[0],
+        expected_digest,
+        label="Codex executable",
+        maximum_bytes=MAX_EXECUTABLE_BYTES,
+    )
+    if mount_wrapper is None:
+        try:
+            process = subprocess.Popen(
+                command,
+                executable=f"/proc/self/fd/{descriptor}",
+                pass_fds=(descriptor,),
+            )
+            return process, None
+        except OSError as exc:
+            raise SupervisorError("Codex launch failed") from exc
+        finally:
+            os.close(descriptor)
+    if (
+        mount_wrapper_digest is None
+        or not private_directory_views
+        or not read_only_masks
+    ):
+        os.close(descriptor)
+        raise SupervisorError("mount wrapper configuration is incomplete")
+    wrapper_descriptor, _ = _open_verified_file(
+        mount_wrapper,
+        mount_wrapper_digest,
+        label="mount wrapper executable",
+        maximum_bytes=MAX_EXECUTABLE_BYTES,
+    )
+    mask_descriptors: list[int] = []
+    view_descriptors: list[int] = []
+    gate_read_socket, gate_write_socket = socket.socketpair(
+        socket.AF_UNIX,
+        socket.SOCK_STREAM,
+    )
+    gate_read_fd = gate_read_socket.detach()
+    gate_write_fd = gate_write_socket.detach()
     try:
-        return subprocess.Popen(
-            command,
-            executable=f"/proc/self/fd/{descriptor}",
-            pass_fds=(descriptor,),
+        wrapper_command = [
+            mount_wrapper,
+            "--die-with-parent",
+            "--dev-bind",
+            "/",
+            "/",
+            "--block-fd",
+            str(gate_read_fd),
+            # Keep the peer endpoint inside bwrap itself.  If the supervisor
+            # dies or closes its duplicate before an explicit release byte,
+            # the blocked endpoint therefore cannot observe EOF as success.
+            "--sync-fd",
+            str(gate_write_fd),
+            "--ro-bind-fd",
+            str(descriptor),
+            command[0],
+        ]
+        view_targets: set[Path] = set()
+        for view in private_directory_views:
+            view_target = Path(str(view["target"]))
+            try:
+                view_stat = view_target.lstat()
+            except OSError as exc:
+                raise SupervisorError("private directory view became unavailable") from exc
+            if (
+                view_target.is_symlink()
+                or not stat.S_ISDIR(view_stat.st_mode)
+                or not _private_view_identity_matches(view_stat, view["identity"])
+            ):
+                raise SupervisorError("private directory view identity changed")
+            view_targets.add(view_target)
+            wrapper_command.extend(("--tmpfs", str(view_target)))
+            entries = view["entries"]
+            assert isinstance(entries, list)
+            for entry in entries:
+                assert isinstance(entry, dict)
+                source = Path(str(entry["source"]))
+                target = Path(str(entry["target"]))
+                kind = str(entry["kind"])
+                flags = os.O_RDONLY | os.O_CLOEXEC
+                if hasattr(os, "O_NOFOLLOW"):
+                    flags |= os.O_NOFOLLOW
+                if kind == "directory" and hasattr(os, "O_DIRECTORY"):
+                    flags |= os.O_DIRECTORY
+                try:
+                    entry_descriptor = os.open(source, flags)
+                except OSError as exc:
+                    raise SupervisorError(
+                        "cannot open a private directory view entry"
+                    ) from exc
+                view_descriptors.append(entry_descriptor)
+                entry_stat = os.fstat(entry_descriptor)
+                if (
+                    (kind == "directory" and not stat.S_ISDIR(entry_stat.st_mode))
+                    or (kind == "file" and not stat.S_ISREG(entry_stat.st_mode))
+                    or not _private_view_identity_matches(
+                        entry_stat,
+                        entry["identity"],
+                    )
+                ):
+                    raise SupervisorError("private directory view entry changed")
+                wrapper_command.extend(
+                    ("--ro-bind-fd", str(entry_descriptor), str(target))
+                )
+        for source, target, digest in read_only_masks:
+            if (
+                not Path(target).is_absolute()
+                or Path(target).parent not in view_targets
+            ):
+                raise SupervisorError("mount mask target is not absolute")
+            mask_descriptor, _ = _open_verified_file(
+                source,
+                digest,
+                label="mount mask source",
+                maximum_bytes=MAX_MASK_BYTES,
+            )
+            mask_descriptors.append(mask_descriptor)
+            wrapper_command.extend(
+                ("--ro-bind-data", str(mask_descriptor), target)
+            )
+        wrapper_command.extend(("--", *command))
+        process = subprocess.Popen(
+            wrapper_command,
+            executable=f"/proc/self/fd/{wrapper_descriptor}",
+            pass_fds=(
+                descriptor,
+                wrapper_descriptor,
+                gate_read_fd,
+                gate_write_fd,
+                *view_descriptors,
+                *mask_descriptors,
+            ),
         )
+        os.close(gate_read_fd)
+        gate_read_fd = -1
+        return process, gate_write_fd
     except OSError as exc:
+        os.close(gate_write_fd)
         raise SupervisorError("Codex launch failed") from exc
+    except SupervisorError:
+        os.close(gate_write_fd)
+        raise
     finally:
         os.close(descriptor)
+        os.close(wrapper_descriptor)
+        for mask_descriptor in mask_descriptors:
+            os.close(mask_descriptor)
+        for view_descriptor in view_descriptors:
+            os.close(view_descriptor)
+        if gate_read_fd >= 0:
+            os.close(gate_read_fd)
+
+
+def _release_launch_gate(gate_write_fd: int, *, parent_pid: int) -> None:
+    """Release a mount-gated child only while the exact worker parent is alive."""
+
+    if _termination_signal is not None or os.getppid() != parent_pid:
+        raise SupervisorError("worker parent died before launch gate release")
+    try:
+        written = os.write(gate_write_fd, b"1")
+        if written != 1:
+            raise SupervisorError("mount wrapper launch gate write was incomplete")
+    except OSError as exc:
+        raise SupervisorError("mount wrapper launch gate failed") from exc
+    os.close(gate_write_fd)
+
+
+def _abort_gated_launch(
+    process: subprocess.Popen[bytes],
+    gate_write_fd: int | None,
+    *,
+    term_timeout_seconds: float,
+    kill_timeout_seconds: float,
+) -> bool:
+    """Close a failed launch gate only after every descendant is gone.
+
+    The wrapper also retains its peer endpoint through ``--sync-fd``.  Thus an
+    abnormal supervisor exit cannot turn descriptor EOF into a release even if
+    kernel cleanup cannot be confirmed within the bounded attempt.
+    """
+
+    cleanup_complete = _cleanup_descendants(
+        process,
+        term_timeout_seconds=term_timeout_seconds,
+        kill_timeout_seconds=kill_timeout_seconds,
+    )
+    if cleanup_complete and gate_write_fd is not None:
+        os.close(gate_write_fd)
+    return cleanup_complete
 
 
 @dataclass(frozen=True)
@@ -375,25 +660,46 @@ def _bounded_timeout(value: str) -> float:
 def _write_process_identity_receipt(
     path: Path,
     process: subprocess.Popen[bytes],
+    *,
+    gated_mount_child: bool = False,
 ) -> None:
-    """Publish the exact supervisor/Codex identities before event forwarding."""
+    """Publish exact supervisor, launcher, and Codex identities."""
 
     if not path.is_absolute() or path.exists() or path.is_symlink():
         raise SupervisorError("process identity receipt path is not fresh and absolute")
     supervisor = _proc_identity(os.getpid())
-    codex = _proc_identity(process.pid)
+    launcher = _proc_identity(process.pid)
     if (
         supervisor is None
-        or codex is None
-        or codex.parent_pid != supervisor.pid
+        or launcher is None
+        or launcher.parent_pid != supervisor.pid
         or supervisor.state == "Z"
-        or codex.state == "Z"
+        or launcher.state == "Z"
     ):
-        raise SupervisorError("cannot bind exact supervisor and Codex process identities")
+        raise SupervisorError("cannot bind exact supervisor and launcher identities")
+    codex: ProcessIdentity | None = launcher if not gated_mount_child else None
+    deadline = time.monotonic() + IDENTITY_DISCOVERY_TIMEOUT_SECONDS
+    while codex is None:
+        descendants = _descendants(supervisor.pid)
+        matches = [
+            identity
+            for identity in descendants.values()
+            if identity.parent_pid == launcher.pid and identity.state != "Z"
+        ]
+        if len(matches) == 1:
+            codex = matches[0]
+            break
+        if len(matches) > 1:
+            raise SupervisorError("mount launcher created multiple gated command children")
+        if process.poll() is not None or time.monotonic() >= deadline:
+            raise SupervisorError("cannot identify the exact Codex descendant")
+        time.sleep(0.01)
     payload = {
-        "schema_version": "abyss_stack_external_codex_process_identity_v1",
+        "schema_version": "abyss_stack_external_codex_process_identity_v2",
         "supervisor_pid": supervisor.pid,
         "supervisor_start_ticks": supervisor.start_ticks,
+        "launcher_pid": launcher.pid,
+        "launcher_start_ticks": launcher.start_ticks,
         "codex_pid": codex.pid,
         "codex_start_ticks": codex.start_ticks,
     }
@@ -449,16 +755,47 @@ def _arguments(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument("--identity-file", type=Path)
     parser.add_argument("--executable-digest", required=True)
+    parser.add_argument("--mount-wrapper")
+    parser.add_argument("--mount-wrapper-digest")
+    parser.add_argument(
+        "--private-directory-view",
+        action="append",
+        default=[],
+    )
+    parser.add_argument(
+        "--read-only-mask",
+        nargs=3,
+        action="append",
+        default=[],
+        metavar=("SOURCE", "TARGET", "DIGEST"),
+    )
     parser.add_argument("command", nargs=argparse.REMAINDER)
     arguments = parser.parse_args(argv)
     if arguments.command[:1] == ["--"]:
         arguments.command = arguments.command[1:]
+    try:
+        arguments.private_directory_views = _validated_private_directory_views(
+            arguments.private_directory_view
+        ) if arguments.mount_wrapper is not None else ()
+    except SupervisorError as exc:
+        parser.error(str(exc))
     if (
         arguments.parent_pid <= 1
         or not arguments.command
         or (
             arguments.identity_file is not None
             and not arguments.identity_file.is_absolute()
+        )
+        or ((arguments.mount_wrapper is None) != (arguments.mount_wrapper_digest is None))
+        or (arguments.read_only_mask and arguments.mount_wrapper is None)
+        or (arguments.private_directory_view and arguments.mount_wrapper is None)
+        or (
+            arguments.mount_wrapper is not None
+            and not arguments.private_directory_views
+        )
+        or any(
+            not Path(source).is_absolute() or not Path(target).is_absolute()
+            for source, target, _digest in arguments.read_only_mask
         )
     ):
         parser.error("an exact parent PID and command are required")
@@ -492,21 +829,58 @@ def main(argv: list[str] | None = None) -> int:
         if os.getppid() != arguments.parent_pid or _termination_signal is not None:
             _fail("worker parent died during setup", SUPERVISOR_SETUP_FAILED)
         try:
-            process = _launch_verified_command(
+            process, gate_write_fd = _launch_verified_command(
                 arguments.command,
                 arguments.executable_digest,
+                mount_wrapper=arguments.mount_wrapper,
+                mount_wrapper_digest=arguments.mount_wrapper_digest,
+                private_directory_views=arguments.private_directory_views,
+                read_only_masks=tuple(tuple(item) for item in arguments.read_only_mask),
             )
         except SupervisorError as exc:
             _fail(str(exc), SUPERVISOR_SETUP_FAILED)
         if arguments.identity_file is not None:
             try:
-                _write_process_identity_receipt(arguments.identity_file, process)
-            except SupervisorError as exc:
-                _cleanup_descendants(
+                _write_process_identity_receipt(
+                    arguments.identity_file,
                     process,
+                    gated_mount_child=gate_write_fd is not None,
+                )
+            except SupervisorError as exc:
+                if not _abort_gated_launch(
+                    process,
+                    gate_write_fd,
                     term_timeout_seconds=arguments.term_timeout_seconds,
                     kill_timeout_seconds=arguments.kill_timeout_seconds,
+                ):
+                    print(
+                        "external-codex-supervisor: descendant cleanup remained "
+                        "incomplete while aborting identity publication",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    return SUPERVISOR_CLEANUP_INCOMPLETE
+                _fail(str(exc), SUPERVISOR_SETUP_FAILED)
+        if gate_write_fd is not None:
+            try:
+                _release_launch_gate(
+                    gate_write_fd,
+                    parent_pid=arguments.parent_pid,
                 )
+            except SupervisorError as exc:
+                if not _abort_gated_launch(
+                    process,
+                    gate_write_fd,
+                    term_timeout_seconds=arguments.term_timeout_seconds,
+                    kill_timeout_seconds=arguments.kill_timeout_seconds,
+                ):
+                    print(
+                        "external-codex-supervisor: descendant cleanup remained "
+                        "incomplete while aborting launch gate",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    return SUPERVISOR_CLEANUP_INCOMPLETE
                 _fail(str(exc), SUPERVISOR_SETUP_FAILED)
 
         codex_return_code = _wait_for_codex(

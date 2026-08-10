@@ -64,22 +64,50 @@ The controller:
   on the exact workspace through each active worker attempt so separate
   sessions cannot overlap their evidence or mutations, and runs Codex beneath a Linux
   parent-death/subreaper supervisor that
-  adopts and cleans detached descendants without placing an outer namespace in
-  front of Codex's own sandbox, while retaining exact PGID/SID TERM/KILL
+  adopts and cleans detached descendants without placing an outer PID or
+  network namespace in front of Codex's own sandbox, while retaining exact PGID/SID TERM/KILL
   observation; every Codex preflight probe and inference launch goes through a
   supervisor which opens and re-hashes the executable immediately before exec
   and executes that verified open inode through procfs, so a pathname
-  replacement cannot substitute different Codex bytes;
+  replacement cannot substitute different Codex bytes; inference additionally
+  uses a filesystem-only bubblewrap parent (rootless user+mount namespaces,
+  but no PID/network namespace) whose launcher and future Codex child are
+  separately recorded before a launch gate is released; the exact worker PPID
+  and pending termination state are checked again immediately before release;
+  a self-peered Unix-socket gate retained through bubblewrap `--sync-fd` makes
+  supervisor EOF non-releasing, while an abort kills and reaps the blocked
+  wrapper before closing the still-unreleased supervisor endpoint;
+  preflight executes the same outer mask plus Codex's own inner named
+  bubblewrap/private-PID sandbox instead of merely checking their binaries, and
+  its exact mount-wrapper digest remains pinned through inference launch;
 - keeps read-only target-workspace authority while running Codex from a distinct
   runtime-created attempt-local execution root; Codex's internal
   `workspace-write` sandbox can write only that execution root and its
   attempt-local `TMPDIR`, while the target checkout remains outside writable
   roots and network remains disabled;
+- launches every inference with a generated named permission profile which
+  makes its credential-free config source read-only, masks the physical
+  repository config at every current bind-mount coordinate from a
+  digest-verified descriptor, reconstructs each affected Git metadata parent
+  as a private `tmpfs` view from identity-checked open descriptors, reserves
+  config-lock and absent worktree-config coordinates only inside that view,
+  preserves only
+  closed-grammar repository and worktree structural settings, preserves
+  `core.worktree` only when it resolves to the exact admitted workspace, rejects
+  redirected worktrees, and proves native
+  Git yields the same exact workspace status under an explicit no-rename display
+  on both views; ordinary source writes, nested or
+  temporary repositories, split indexes, reftable refs, case-handling semantics,
+  and Git inspection remain available without exposing remote auth/configured
+  helpers or making owner Git metadata writable;
 - resumes only the exact durable thread and event cursor, with one explicit
   digest-bound follow-up route for an unchanged read-only review rejected only
   by an identity-field mismatch, and preserves every prior terminal result plus
   a digest-bound snapshot closure for all referenced evidence in its attempt
   directory before any admitted continuation;
+- continues to read pre-existing durable v2 states that lack the newer
+  mount-wrapper digest for observation and terminal-result recovery, while
+  refusing a new attempt whose historical admission did not bind that identity;
 - turns read-only drift, out-of-scope paths, forbidden effects, identity drift,
   or report-contract drift into typed failure or authority-blocked evidence;
   non-owner-fixed interpreter, script, process-launch wrapper, `find -exec`,
@@ -95,8 +123,9 @@ The controller:
   plus literal command newlines remain opaque while quoted or escaped literals
   stay classifiable,
   jq environment builtins and externally supplied jq programs/modules are
-  opaque and classified as secret access, while ordinary inline jq data
-  transforms remain admitted,
+  opaque and classified as secret access; jq file-loading and ordinary input
+  operands that name repository Git config are likewise refused, while ordinary
+  inline jq data transforms remain admitted,
   sourced shell bodies through `source` or `.` remain opaque, and Bash
   `--rcfile`/`--init-file` startup code is opaque even before an otherwise
   classifiable `-c` body,
@@ -135,13 +164,16 @@ The controller:
   they launch an unobserved helper,
   build/package/test/task runners remain opaque unless they are an exact
   owner-fixed validation,
-  all model-issued Git config access plus alias/external-subcommand dispatch
+  all model-issued Git config access, including jq file-loading forms, plus
+  alias/external-subcommand dispatch
   and ambient environment assignment fail closed because config reads may
   expose credential- or command-bearing values; `git remote` retains only
   read-only name listing, while URL output and every mutating or
   transport-dispatching form are opaque; `git update-ref` is opaque because it
   mutates repository state below
-  the manifest-visible worktree; mutating `symbolic-ref` and `reflog` forms,
+  the manifest-visible worktree; generic mutators also parse attached
+  destination options before admitting `.git` writes; mutating `symbolic-ref`
+  and `reflog` forms,
   ref/temporary-object helpers whose effects stay below `.git`, and explicit
   hidden-object write options are also opaque while explicitly filter-free
   read-only hashing remains admitted; Git help forms are opaque as well because configured

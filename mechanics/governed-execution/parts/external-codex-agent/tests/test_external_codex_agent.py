@@ -18,7 +18,7 @@ import threading
 import time
 import urllib.parse
 import urllib.request
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -254,6 +254,8 @@ if args[:3] == ["debug", "models", "--bundled"]:
             {"effort": "max"}
         ]}
     ]}))
+    raise SystemExit(0)
+if "sandbox" in args:
     raise SystemExit(0)
 
 prompt = sys.stdin.read()
@@ -1869,12 +1871,17 @@ def test_process_identity_receipt_retries_partial_kernel_writes(
     monkeypatch.setattr(SUPERVISOR.os, "write", partial_write)
     receipt_path = tmp_path / "process-identity.json"
 
-    SUPERVISOR._write_process_identity_receipt(receipt_path, FakeProcess())
+    SUPERVISOR._write_process_identity_receipt(
+        receipt_path,
+        FakeProcess(),
+    )
 
     assert json.loads(receipt_path.read_text(encoding="utf-8")) == {
-        "schema_version": "abyss_stack_external_codex_process_identity_v1",
+        "schema_version": "abyss_stack_external_codex_process_identity_v2",
         "supervisor_pid": 31337,
         "supervisor_start_ticks": 111,
+        "launcher_pid": 4242,
+        "launcher_start_ticks": 222,
         "codex_pid": 4242,
         "codex_start_ticks": 222,
     }
@@ -1915,13 +1922,235 @@ def test_supervisor_executes_verified_open_inode_after_path_replacement(
         replace_after_verified_open,
     )
 
-    process = SUPERVISOR._launch_verified_command(
+    process, gate_write_fd = SUPERVISOR._launch_verified_command(
         [str(executable), str(output)],
         expected_digest,
     )
 
+    assert gate_write_fd is None
     assert process.wait(timeout=5) == 0
     assert output.read_text(encoding="utf-8") == "verified-open-inode\n"
+
+
+def test_supervisor_mount_wrapper_masks_target_before_releasing_command(
+    tmp_path: Path,
+) -> None:
+    executable = Path(sys.executable).resolve()
+    wrapper = Path("/usr/bin/bwrap")
+    metadata = tmp_path / "metadata"
+    metadata.mkdir()
+    target = metadata / "repository-config"
+    sanitized = tmp_path / "sanitized-config"
+    output = tmp_path / "observed.txt"
+    target.write_text("credential-marker\n", encoding="utf-8")
+    sanitized.write_text("[core]\n\tbare = false\n", encoding="utf-8")
+    masks = ((str(sanitized), str(target), _digest_path(sanitized)),)
+    private_directory_views = tuple(
+        RUNTIME._private_directory_views(
+            [
+                {
+                    "source": str(sanitized),
+                    "target": str(target),
+                    "digest": _digest_path(sanitized),
+                }
+            ]
+        )
+    )
+
+    process, gate_write_fd = SUPERVISOR._launch_verified_command(
+        [
+            str(executable),
+            "-c",
+            "import pathlib,sys; pathlib.Path(sys.argv[2]).write_text(pathlib.Path(sys.argv[1]).read_text())",
+            str(target),
+            str(output),
+        ],
+        _digest_path(executable),
+        mount_wrapper=str(wrapper),
+        mount_wrapper_digest=_digest_path(wrapper),
+        private_directory_views=private_directory_views,
+        read_only_masks=masks,
+    )
+
+    assert gate_write_fd is not None
+    os.write(gate_write_fd, b"1")
+    os.close(gate_write_fd)
+    assert process.wait(timeout=5) == 0
+    assert output.read_text(encoding="utf-8") == sanitized.read_text(encoding="utf-8")
+    assert target.read_text(encoding="utf-8") == "credential-marker\n"
+
+
+def test_supervisor_refuses_launch_gate_after_parent_termination(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    gate_read_fd, gate_write_fd = os.pipe()
+    monkeypatch.setattr(SUPERVISOR, "_termination_signal", signal.SIGTERM)
+
+    with pytest.raises(
+        SUPERVISOR.SupervisorError,
+        match="parent died before launch gate release",
+    ):
+        SUPERVISOR._release_launch_gate(
+            gate_write_fd,
+            parent_pid=os.getppid(),
+        )
+
+    os.set_blocking(gate_read_fd, False)
+    with pytest.raises(BlockingIOError):
+        os.read(gate_read_fd, 1)
+    os.close(gate_write_fd)
+    assert os.read(gate_read_fd, 1) == b""
+    os.close(gate_read_fd)
+
+
+def _terminate_gated_test_wrapper(process: subprocess.Popen[bytes]) -> int:
+    """Stop the direct-launch test tree without relying on supervisor adoption."""
+
+    descendants = SUPERVISOR._descendants(process.pid)
+    assert SUPERVISOR._signal_descendants(descendants, signal.SIGTERM)
+    process.terminate()
+    try:
+        return_code = process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        return_code = process.wait(timeout=5)
+    deadline = time.monotonic() + 1.0
+    while time.monotonic() < deadline and any(
+        SUPERVISOR._identity_matches(identity)
+        for identity in descendants.values()
+    ):
+        time.sleep(0.01)
+    live = {
+        pid: identity
+        for pid, identity in descendants.items()
+        if SUPERVISOR._identity_matches(identity)
+    }
+    if live:
+        assert SUPERVISOR._signal_descendants(live, signal.SIGKILL)
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline and any(
+        SUPERVISOR._identity_matches(identity)
+        for identity in live.values()
+    ):
+        time.sleep(0.01)
+    assert not any(
+        SUPERVISOR._identity_matches(identity)
+        for identity in live.values()
+    )
+    return return_code
+
+
+def test_supervisor_kills_gated_wrapper_before_abort_fd_close(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    executable = Path(sys.executable).resolve()
+    wrapper = Path("/usr/bin/bwrap")
+    metadata = tmp_path / "metadata"
+    metadata.mkdir()
+    target = metadata / "repository-config"
+    sanitized = tmp_path / "sanitized-config"
+    output = tmp_path / "must-not-exist.txt"
+    target.write_text("credential-marker\n", encoding="utf-8")
+    sanitized.write_text("safe\n", encoding="utf-8")
+    mask_entry = {
+        "source": str(sanitized),
+        "target": str(target),
+        "digest": _digest_path(sanitized),
+    }
+    process, gate_write_fd = SUPERVISOR._launch_verified_command(
+        [
+            str(executable),
+            "-c",
+            "import pathlib,sys; pathlib.Path(sys.argv[1]).write_text('launched')",
+            str(output),
+        ],
+        _digest_path(executable),
+        mount_wrapper=str(wrapper),
+        mount_wrapper_digest=_digest_path(wrapper),
+        private_directory_views=tuple(
+            RUNTIME._private_directory_views([mask_entry])
+        ),
+        read_only_masks=(
+            (str(sanitized), str(target), _digest_path(sanitized)),
+        ),
+    )
+    assert gate_write_fd is not None
+    monkeypatch.setattr(SUPERVISOR, "_termination_signal", signal.SIGTERM)
+
+    with pytest.raises(SUPERVISOR.SupervisorError):
+        SUPERVISOR._release_launch_gate(
+            gate_write_fd,
+            parent_pid=os.getppid(),
+        )
+    time.sleep(0.1)
+    assert process.poll() is None
+    assert not output.exists()
+    assert _terminate_gated_test_wrapper(process) != 0
+    os.close(gate_write_fd)
+    assert not output.exists()
+
+
+def test_supervisor_gate_eof_cannot_release_mount_wrapper(tmp_path: Path) -> None:
+    executable = Path(sys.executable).resolve()
+    wrapper = Path("/usr/bin/bwrap")
+    metadata = tmp_path / "metadata"
+    metadata.mkdir()
+    target = metadata / "repository-config"
+    sanitized = tmp_path / "sanitized-config"
+    output = tmp_path / "must-not-exist.txt"
+    target.write_text("credential-marker\n", encoding="utf-8")
+    sanitized.write_text("safe\n", encoding="utf-8")
+    mask_entry = {
+        "source": str(sanitized),
+        "target": str(target),
+        "digest": _digest_path(sanitized),
+    }
+    process, gate_write_fd = SUPERVISOR._launch_verified_command(
+        [
+            str(executable),
+            "-c",
+            "import pathlib,sys; pathlib.Path(sys.argv[1]).write_text('launched')",
+            str(output),
+        ],
+        _digest_path(executable),
+        mount_wrapper=str(wrapper),
+        mount_wrapper_digest=_digest_path(wrapper),
+        private_directory_views=tuple(
+            RUNTIME._private_directory_views([mask_entry])
+        ),
+        read_only_masks=(
+            (str(sanitized), str(target), _digest_path(sanitized)),
+        ),
+    )
+    assert gate_write_fd is not None
+
+    os.close(gate_write_fd)
+    time.sleep(0.1)
+    assert process.poll() is None
+    assert not output.exists()
+    assert _terminate_gated_test_wrapper(process) != 0
+    assert not output.exists()
+
+
+def test_supervisor_abort_keeps_gate_open_when_cleanup_is_incomplete(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    gate_read_fd, gate_write_fd = os.pipe()
+    monkeypatch.setattr(SUPERVISOR, "_cleanup_descendants", lambda *_args, **_kwargs: False)
+
+    assert SUPERVISOR._abort_gated_launch(
+        object(),
+        gate_write_fd,
+        term_timeout_seconds=0.0,
+        kill_timeout_seconds=0.0,
+    ) is False
+
+    os.set_blocking(gate_read_fd, False)
+    with pytest.raises(BlockingIOError):
+        os.read(gate_read_fd, 1)
+    os.close(gate_write_fd)
+    os.close(gate_read_fd)
 
 
 def test_supervisor_rejects_executable_digest_drift(tmp_path: Path) -> None:
@@ -1947,6 +2176,8 @@ def test_preflight_rejects_path_replacement_after_controller_digest(
         *,
         executable_digest: str,
         identity_path: Path | None = None,
+        actor_git_mask: Mapping[str, Any] | None = None,
+        mount_wrapper_digest: str | None = None,
     ) -> list[str]:
         if not replaced[0] and command[0] == fixture["launch"]["codex_executable"]:
             replacement = tmp_path / "replacement-codex"
@@ -1958,6 +2189,8 @@ def test_preflight_rejects_path_replacement_after_controller_digest(
             command,
             executable_digest=executable_digest,
             identity_path=identity_path,
+            actor_git_mask=actor_git_mask,
+            mount_wrapper_digest=mount_wrapper_digest,
         )
 
     monkeypatch.setattr(runtime, "_containment_command", replace_before_supervisor_open)
@@ -1966,6 +2199,127 @@ def test_preflight_rejects_path_replacement_after_controller_digest(
         runtime.preflight(fixture["launch_path"])
 
     assert exc_info.value.code == "codex_preflight_failed"
+
+
+def test_preflight_exercises_masked_nested_codex_sandbox(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path)
+    runtime = fixture["runtime"]
+    original_containment_command = runtime._containment_command
+    observed: list[tuple[list[str], Mapping[str, Any]]] = []
+
+    def observe_containment(
+        command: Any,
+        *,
+        executable_digest: str,
+        identity_path: Path | None = None,
+        actor_git_mask: Mapping[str, Any] | None = None,
+        mount_wrapper_digest: str | None = None,
+    ) -> list[str]:
+        if actor_git_mask is not None:
+            observed.append((list(command), actor_git_mask))
+        return original_containment_command(
+            command,
+            executable_digest=executable_digest,
+            identity_path=identity_path,
+            actor_git_mask=actor_git_mask,
+            mount_wrapper_digest=mount_wrapper_digest,
+        )
+
+    monkeypatch.setattr(runtime, "_containment_command", observe_containment)
+
+    runtime.preflight(fixture["launch_path"])
+
+    assert len(observed) == 1
+    command, actor_git_mask = observed[0]
+    assert "sandbox" in command
+    assert command[command.index("-P") + 1] == "aoa_external_actor"
+    assert "--strict-config" not in command
+    assert "--disable" in command
+    assert command[command.index("--disable") + 1] == "use_legacy_landlock"
+    assert actor_git_mask["masks"]
+    assert actor_git_mask["private_directory_views"]
+
+
+def test_containment_rejects_mount_wrapper_drift_after_preflight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path / "fixture")
+    runtime = fixture["runtime"]
+    wrapper = tmp_path / "bwrap"
+    wrapper.write_bytes(Path("/usr/bin/bwrap").read_bytes())
+    wrapper.chmod(0o700)
+    preflight_digest = _digest_path(wrapper)
+    workspace = Path(fixture["workspace"])
+    actor_git_mask = RUNTIME._prepare_actor_git_mask(
+        workspace,
+        tmp_path / "mask-scratch",
+    )
+    replacement = tmp_path / "replacement-bwrap"
+    replacement.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    replacement.chmod(0o700)
+    replacement.replace(wrapper)
+    monkeypatch.setattr(RUNTIME, "MOUNT_WRAPPER_PATH", wrapper)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime._containment_command(
+            [fixture["launch"]["codex_executable"], "--version"],
+            executable_digest=fixture["launch"]["codex_executable_digest"],
+            actor_git_mask=actor_git_mask,
+            mount_wrapper_digest=preflight_digest,
+        )
+
+    assert exc_info.value.code == "actor_git_mask_unavailable"
+
+
+def test_worker_rejects_mount_wrapper_drift_after_durable_admission(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path)
+    runtime = fixture["runtime"]
+    original_preflight = runtime._codex_preflight
+    calls = [0]
+
+    def drift_after_admission(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        observed = original_preflight(*args, **kwargs)
+        calls[0] += 1
+        if calls[0] > 1:
+            observed = {**observed, "mount_wrapper_digest": ZERO_DIGEST}
+        return observed
+
+    monkeypatch.setattr(runtime, "_codex_preflight", drift_after_admission)
+
+    runtime.start(fixture["launch_path"])
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "failed"
+    assert result is not None
+    assert result["failure_code"] == "mount_wrapper_drift"
+
+
+def test_existing_v2_state_without_mount_wrapper_digest_remains_readable(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path)
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    assert terminal["status"] == "completed"
+    state_path = runtime._state_path(fixture["session_id"])
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["preflight"].pop("mount_wrapper_digest")
+    _write_json(state_path, state)
+
+    observed = runtime.status(fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert observed["status"] == "completed"
+    assert result is not None and result["status"] == "completed"
 
 
 @pytest.mark.parametrize("supervisor_return_code", (0, 17))
@@ -1982,9 +2336,11 @@ def test_completed_supervisor_preserves_terminal_child_identity_receipt(
 
     receipt_path = tmp_path / "process-identity.json"
     receipt = {
-        "schema_version": "abyss_stack_external_codex_process_identity_v1",
+        "schema_version": "abyss_stack_external_codex_process_identity_v2",
         "supervisor_pid": 31337,
         "supervisor_start_ticks": 111,
+        "launcher_pid": 4242,
+        "launcher_start_ticks": 222,
         "codex_pid": 4242,
         "codex_start_ticks": 222,
     }
@@ -2019,9 +2375,11 @@ def test_live_supervisor_rejects_mismatched_child_identity_receipt(
     _write_json(
         receipt_path,
         {
-            "schema_version": "abyss_stack_external_codex_process_identity_v1",
+            "schema_version": "abyss_stack_external_codex_process_identity_v2",
             "supervisor_pid": 31337,
             "supervisor_start_ticks": 111,
+            "launcher_pid": 4242,
+            "launcher_start_ticks": 222,
             "codex_pid": 4242,
             "codex_start_ticks": 222,
         },
@@ -2045,6 +2403,12 @@ def test_live_supervisor_rejects_mismatched_child_identity_receipt(
 def test_preflight_and_separate_process_return_structured_result(tmp_path: Path) -> None:
     fixture = _fixture(tmp_path)
     runtime = fixture["runtime"]
+    _git(
+        fixture["workspace"],
+        "config",
+        "http.https://example.invalid/.extraHeader",
+        "Authorization: Bearer FAKE_REPOSITORY_CONFIG_MARKER",
+    )
     preflight = runtime.preflight(fixture["launch_path"])
 
     assert preflight["admitted"] is True
@@ -2085,6 +2449,15 @@ def test_preflight_and_separate_process_return_structured_result(tmp_path: Path)
     assert argv[argv.index("--executable-digest") + 1] == (
         fixture["launch"]["codex_executable_digest"]
     )
+    assert argv[argv.index("--mount-wrapper") + 1] == "/usr/bin/bwrap"
+    assert "--mount-wrapper-digest" in argv
+    private_view = json.loads(argv[argv.index("--private-directory-view") + 1])
+    assert Path(private_view["target"]).name == ".git"
+    assert private_view["entries"]
+    mask_index = argv.index("--read-only-mask")
+    sanitized_config = Path(argv[mask_index + 1])
+    assert argv[mask_index + 2] == f'{fixture["workspace"]}/.git/config'
+    assert argv[mask_index + 3] == _digest_path(sanitized_config)
     assert "/usr/bin/unshare" not in argv
     assert "/usr/bin/setpriv" not in argv
     assert "exec" in argv
@@ -2092,7 +2465,7 @@ def test_preflight_and_separate_process_return_structured_result(tmp_path: Path)
     assert "use_linux_sandbox_bwrap" not in argv
     assert "use_legacy_landlock" in argv
     assert "spawn_agent" not in argv
-    assert argv[argv.index("-s") + 1] == "workspace-write"
+    assert "-s" not in argv
     execution_root = Path(invocation["execution_root"])
     assert execution_root.name == "execution-root"
     assert execution_root.parent.name == "001"
@@ -2104,8 +2477,24 @@ def test_preflight_and_separate_process_return_structured_result(tmp_path: Path)
         for index, value in enumerate(argv[:-1])
         if value == "-c"
     ]
-    assert "sandbox_workspace_write.network_access=false" in config_overrides
-    assert not any(value.startswith("default_permissions=") for value in config_overrides)
+    assert 'default_permissions="aoa_external_actor"' in config_overrides
+    permission_override = next(
+        value
+        for value in config_overrides
+        if value.startswith("permissions.aoa_external_actor=")
+    )
+    assert f'{sanitized_config}"="read' in permission_override
+    assert sanitized_config.is_file()
+    assert "FAKE_REPOSITORY_CONFIG_MARKER" not in sanitized_config.read_text(
+        encoding="utf-8"
+    )
+    process_identity = json.loads(
+        Path(identity_ref["artifact_ref"]).read_text(encoding="utf-8")
+    )
+    assert process_identity["schema_version"] == (
+        "abyss_stack_external_codex_process_identity_v2"
+    )
+    assert process_identity["launcher_pid"] != process_identity["codex_pid"]
     prompt = (
         execution_root.parent / "prompt.txt"
     ).read_text(encoding="utf-8")
@@ -3584,8 +3973,13 @@ def test_workspace_write_preparation_stays_inside_allowed_paths(tmp_path: Path) 
     assert result["changed_paths"] == [{"path": "landing-note.md", "status": "??"}]
     invocation = result["codex_invocations"][0]
     argv = invocation["argv"]
-    assert argv[argv.index("-s") + 1] == "workspace-write"
-    assert "sandbox_workspace_write.network_access=false" in argv
+    assert "-s" not in argv
+    assert 'default_permissions="aoa_external_actor"' in argv
+    assert any(
+        value.startswith("permissions.aoa_external_actor=")
+        and 'network={enabled=false}' in value
+        for value in argv
+    )
     assert invocation["execution_root"] == str(fixture["workspace"])
     assert argv[argv.index("-C") + 1] == str(fixture["workspace"])
     assert "--skip-git-repo-check" not in argv
@@ -4478,6 +4872,20 @@ def test_ordinary_jq_remains_classifiable(command: str) -> None:
     assert RUNTIME._command_has_unclassified_indirection(command) is False
 
 
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/jq --rawfile cfg .git/config -n '$cfg'",
+        "/usr/bin/jq --slurpfile cfg .git/config.worktree -n '$cfg'",
+        "/usr/bin/jq --argfile cfg .git/config.lock -n '$cfg'",
+        "/usr/bin/jq . .git/config",
+    ),
+)
+def test_jq_git_config_file_inputs_are_fail_closed(command: str) -> None:
+    assert RUNTIME._command_effects(command) == {"secret_access"}
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
 def test_allowlisted_but_unavailable_system_command_fails_closed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -4751,6 +5159,485 @@ def test_direct_secret_file_encoder_is_classified() -> None:
     assert RUNTIME._command_effects(
         "/usr/bin/base64 /home/operator/.ssh/id_rsa"
     ) == {"secret_access"}
+
+
+def test_direct_repository_git_config_reader_is_fail_closed() -> None:
+    command = "/usr/bin/cat .git/config"
+
+    assert RUNTIME._command_effects(command) == {"secret_access"}
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+def test_repository_git_config_lock_reader_is_fail_closed() -> None:
+    command = "/usr/bin/cat .git/config.lock"
+
+    assert RUNTIME._command_effects(command) == {"secret_access"}
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/rg -n '.git/config' README.md",
+        "/usr/bin/rg -g '*.md' '.git/config' README.md",
+        "/usr/bin/echo .git/config",
+        "/usr/bin/printf '%s\\n' .git/config",
+    ),
+)
+def test_git_config_text_without_a_file_operand_remains_classifiable(
+    command: str,
+) -> None:
+    assert RUNTIME._command_effects(command) == set()
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/rg credential .git/config",
+        "/usr/bin/rg credential .git/config README.md",
+        "/usr/bin/rg -ecredential .git/config",
+        "/usr/bin/rg -necredential .git/config",
+        "/usr/bin/grep -e credential .git/config.worktree",
+        "/usr/bin/grep -necredential .git/config.worktree",
+        "/usr/bin/grep credential .git/config.worktree",
+        "/usr/bin/sed --sandbox -n p .git/config",
+        "/usr/bin/sed --sandbox -ep .git/config",
+        "/usr/bin/sed --sandbox -nep .git/config",
+        "/usr/bin/rg --ignore-file .git/config credential README.md",
+        "/usr/bin/grep --exclude-f=.git/config credential README.md",
+        "/usr/bin/grep --exclude-f .git/config credential README.md",
+        "/usr/bin/grep --reg=credential .git/config",
+        "/usr/bin/grep --reg=credential /other/repo/.git/config",
+        "/usr/bin/sed --sandbox --fil=.git/config README.md",
+        "/usr/bin/sed --sandbox --expr=p .git/config",
+    ),
+)
+def test_pattern_reader_git_config_file_operands_are_fail_closed(
+    command: str,
+) -> None:
+    assert RUNTIME._command_effects(command) == {"secret_access"}
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/cp --target-directory=.git shallow",
+        "/usr/bin/cp --target=.git shallow",
+        "/usr/bin/cp -t.git shallow",
+        "/usr/bin/mv -t .git shallow",
+        "/usr/bin/install --target-directory=.git shallow",
+        "/usr/bin/ln --target-directory=.git shallow",
+    ),
+)
+def test_attached_git_metadata_mutator_destinations_are_fail_closed(
+    command: str,
+) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+def test_actor_git_mask_preserves_linked_worktree_and_masks_both_configs(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    _git(repository, "init", "-b", "main")
+    _git(repository, "config", "user.email", "fixture@example.invalid")
+    _git(repository, "config", "user.name", "Fixture")
+    (repository / "README.md").write_text("# fixture\n", encoding="utf-8")
+    _git(repository, "add", "README.md")
+    _git(repository, "commit", "-m", "fixture")
+    linked = tmp_path / "linked"
+    _git(repository, "worktree", "add", "-b", "actor", str(linked))
+    _git(repository, "config", "extensions.worktreeConfig", "true")
+    _git(
+        linked,
+        "config",
+        "--worktree",
+        "http.https://example.invalid/.extraHeader",
+        "Authorization: Bearer FAKE_WORKTREE_CONFIG_MARKER",
+    )
+    (linked / "landing-note.md").write_text("bounded change\n", encoding="utf-8")
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+
+    mask = RUNTIME._prepare_actor_git_mask(linked, scratch)
+    targets = {Path(item["target"]) for item in mask["masks"]}
+    common_config = Path(_git(linked, "rev-parse", "--git-path", "config")).resolve()
+    worktree_config = Path(
+        _git(linked, "rev-parse", "--git-path", "config.worktree")
+    ).resolve()
+    sanitized_config = Path(mask["sanitized_config_path"])
+
+    assert {
+        common_config,
+        common_config.with_name("config.lock"),
+        worktree_config,
+        worktree_config.with_name("config.worktree.lock"),
+    }.issubset(targets)
+    assert "FAKE_WORKTREE_CONFIG_MARKER" not in sanitized_config.read_text(
+        encoding="utf-8"
+    )
+    observed = RUNTIME._masked_git_command(
+        linked,
+        mask,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+    )
+    assert observed.returncode == 0
+    assert RUNTIME._parse_git_status(observed.stdout) == RUNTIME._git_status(linked)
+
+
+def test_actor_git_mask_preserves_native_split_index_and_refs(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "README.md").write_text("# fixture\n", encoding="utf-8")
+    _git(workspace, "add", "README.md")
+    _git(workspace, "commit", "-m", "fixture")
+    _git(workspace, "update-ref", "refs/remotes/origin/main", "HEAD")
+    _git(workspace, "update-index", "--split-index")
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+
+    mask = RUNTIME._prepare_actor_git_mask(workspace, scratch)
+    source_shared_indexes = tuple((workspace / ".git").glob("sharedindex.*"))
+
+    assert source_shared_indexes
+    resolved_remote = RUNTIME._masked_git_command(
+        workspace,
+        mask,
+        "rev-parse",
+        "origin/main",
+    )
+    assert resolved_remote.returncode == 0
+    assert resolved_remote.stdout.strip() == _git(workspace, "rev-parse", "HEAD")
+    completed = RUNTIME._masked_git_command(
+        workspace,
+        mask,
+        "diff",
+        "origin/main...HEAD",
+    )
+    assert completed.returncode == 0
+
+
+def test_actor_git_mask_hides_existing_config_lockfiles(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    config = workspace / ".git" / "config"
+    config_lock = workspace / ".git" / "config.lock"
+    config_lock.write_text(
+        config.read_text(encoding="utf-8")
+        + "[http \"https://example.invalid/\"]\n"
+        + "\textraHeader = Authorization: Bearer FAKE_LOCK_MARKER\n",
+        encoding="utf-8",
+    )
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+
+    mask = RUNTIME._prepare_actor_git_mask(workspace, scratch)
+    targets = {Path(item["target"]) for item in mask["masks"]}
+    observed = RUNTIME._run_actor_masked_command(
+        mask,
+        ("/usr/bin/cat", str(config_lock)),
+        environment=dict(os.environ),
+    )
+
+    assert config_lock in targets
+    assert workspace / ".git" / "config.worktree.lock" in targets
+    assert observed.returncode == 0
+    assert "FAKE_LOCK_MARKER" not in observed.stdout
+    assert "FAKE_LOCK_MARKER" in config_lock.read_text(encoding="utf-8")
+
+
+def test_actor_git_mask_keeps_absent_reserved_targets_out_of_host(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    reserved = (
+        workspace / ".git" / "config.lock",
+        workspace / ".git" / "config.worktree",
+        workspace / ".git" / "config.worktree.lock",
+    )
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+
+    mask = RUNTIME._prepare_actor_git_mask(workspace, scratch)
+    observed = RUNTIME._run_actor_masked_command(
+        mask,
+        ("/usr/bin/true",),
+        environment=dict(os.environ),
+    )
+
+    assert observed.returncode == 0
+    assert not any(path.exists() for path in reserved)
+    _git(workspace, "config", "test.private-view", "preserved")
+    assert _git(workspace, "config", "--get", "test.private-view") == "preserved"
+
+
+def test_actor_git_mask_preserves_reftable_repository_structure(
+    tmp_path: Path,
+) -> None:
+    git_init_help = subprocess.run(
+        ["/usr/bin/git", "init", "-h"],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=15,
+    )
+    if "--ref-format" not in git_init_help.stdout + git_init_help.stderr:
+        pytest.skip("installed Git cannot create a reftable repository")
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "--ref-format=reftable", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "README.md").write_text("# fixture\n", encoding="utf-8")
+    _git(workspace, "add", "README.md")
+    _git(workspace, "commit", "-m", "fixture")
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+
+    mask = RUNTIME._prepare_actor_git_mask(workspace, scratch)
+    sanitized = Path(mask["sanitized_config_path"]).read_text(encoding="utf-8")
+    observed = RUNTIME._masked_git_command(
+        workspace,
+        mask,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+    )
+
+    assert "repositoryFormatVersion = 1" in sanitized
+    assert "refStorage = reftable" in sanitized
+    assert observed.returncode == 0
+    assert RUNTIME._parse_git_status(observed.stdout) == RUNTIME._git_status(workspace)
+
+
+def test_actor_git_mask_preserves_case_sensitivity_semantics(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "foo").write_text("tracked\n", encoding="utf-8")
+    _git(workspace, "add", "foo")
+    _git(workspace, "commit", "-m", "fixture")
+    _git(workspace, "config", "core.ignoreCase", "true")
+    (workspace / "FOO").write_text("case variant\n", encoding="utf-8")
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+
+    mask = RUNTIME._prepare_actor_git_mask(workspace, scratch)
+    sanitized = Path(mask["sanitized_config_path"]).read_text(encoding="utf-8")
+    observed = RUNTIME._masked_git_command(
+        workspace,
+        mask,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+    )
+
+    assert "ignoreCase = true" in sanitized
+    assert RUNTIME._parse_git_status(observed.stdout) == RUNTIME._git_status(workspace)
+
+
+def test_actor_git_mask_normalizes_local_status_rename_display(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "before.txt").write_text("rename fixture\n", encoding="utf-8")
+    _git(workspace, "add", "before.txt")
+    _git(workspace, "commit", "-m", "fixture")
+    _git(workspace, "mv", "before.txt", "after.txt")
+    _git(workspace, "config", "status.renames", "false")
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+
+    mask = RUNTIME._prepare_actor_git_mask(workspace, scratch)
+    observed = RUNTIME._masked_git_command(
+        workspace,
+        mask,
+        "status",
+        "--no-renames",
+        "--porcelain=v1",
+        "--untracked-files=all",
+    )
+
+    assert observed.returncode == 0
+    assert RUNTIME._parse_git_status(observed.stdout) == RUNTIME._git_status(workspace)
+
+
+def test_actor_git_mask_rejects_core_worktree_redirect(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    redirected = tmp_path / "redirected"
+    workspace.mkdir()
+    redirected.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "README.md").write_text("same\n", encoding="utf-8")
+    (redirected / "README.md").write_text("same\n", encoding="utf-8")
+    _git(workspace, "add", "README.md")
+    _git(workspace, "commit", "-m", "fixture")
+    _git(workspace, "config", "core.worktree", str(redirected))
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME._prepare_actor_git_mask(workspace, scratch)
+
+    assert exc_info.value.code == "workspace_git_metadata_invalid"
+
+
+def test_actor_git_mask_preserves_exact_core_worktree(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "core.worktree", str(workspace))
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+
+    mask = RUNTIME._prepare_actor_git_mask(workspace, scratch)
+    sanitized = Path(mask["sanitized_config_path"]).read_text(encoding="utf-8")
+
+    assert f'workTree = "{workspace}"' in sanitized
+
+
+def test_current_mount_aliases_cover_bind_mounted_repository_alias(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    _git(repository, "init", "-b", "main")
+    _git(
+        repository,
+        "config",
+        "http.https://example.invalid/.extraHeader",
+        "Authorization: Bearer FAKE_BIND_ALIAS_MARKER",
+    )
+    alias = tmp_path / "alias"
+    alias.mkdir()
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    script = (
+        "import importlib.util,json,pathlib,sys;"
+        f"p=pathlib.Path({str(CONTROLLER_PATH)!r});"
+        "s=importlib.util.spec_from_file_location('mount_alias_runtime',p);"
+        "m=importlib.util.module_from_spec(s);sys.modules[s.name]=m;"
+        "s.loader.exec_module(m);"
+        f"w=pathlib.Path({str(alias)!r});"
+        f"x=pathlib.Path({str(scratch)!r});"
+        "mask=m._prepare_actor_git_mask(w,x);"
+        "print(json.dumps({'targets':[v['target'] for v in mask['masks']],"
+        "'sanitized':pathlib.Path(mask['sanitized_config_path']).read_text()}))"
+    )
+    completed = subprocess.run(
+        [
+            "/usr/bin/bwrap",
+            "--die-with-parent",
+            "--dev-bind",
+            "/",
+            "/",
+            "--bind",
+            str(repository),
+            str(alias),
+            "--",
+            str(Path(sys.executable).resolve()),
+            "-c",
+            script,
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+        env=dict(os.environ),
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    targets = {Path(value) for value in result["targets"]}
+    assert {
+        repository / ".git" / "config",
+        repository / ".git" / "config.lock",
+        alias / ".git" / "config",
+        alias / ".git" / "config.lock",
+    }.issubset(targets)
+    assert "FAKE_BIND_ALIAS_MARKER" not in result["sanitized"]
+
+
+def test_actor_git_mask_does_not_redirect_nested_repository_commands(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "README.md").write_text("# fixture\n", encoding="utf-8")
+    _git(workspace, "add", "README.md")
+    _git(workspace, "commit", "-m", "fixture")
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    mask = RUNTIME._prepare_actor_git_mask(workspace, scratch)
+    nested = tmp_path / "nested"
+
+    initialized = RUNTIME._masked_git_command(
+        workspace,
+        mask,
+        "init",
+        "-b",
+        "nested",
+        str(nested),
+    )
+    observed = RUNTIME._masked_git_command(
+        workspace,
+        mask,
+        "-C",
+        str(nested),
+        "status",
+        "--short",
+    )
+
+    assert initialized.returncode == 0
+    assert observed.returncode == 0
+    assert (nested / ".git" / "HEAD").read_text(encoding="utf-8") == (
+        "ref: refs/heads/nested\n"
+    )
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/tee .git/HEAD",
+        "/usr/bin/touch .git/refs/heads/redirected",
+        "/usr/bin/sed -i s/main/other/ .git/HEAD",
+    ),
+)
+def test_generic_repository_git_metadata_writers_are_fail_closed(
+    command: str,
+) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+def test_ordinary_source_reader_and_writer_remain_classifiable() -> None:
+    assert RUNTIME._command_has_unclassified_indirection(
+        "/usr/bin/cat README.md"
+    ) is False
+    assert RUNTIME._command_has_unclassified_indirection(
+        "/usr/bin/tee landing-note.md"
+    ) is False
 
 
 def test_runtime_forbidden_effects_do_not_trust_a_task_subset() -> None:

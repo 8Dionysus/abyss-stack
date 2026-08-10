@@ -101,9 +101,15 @@ Each CLI call writes one `abyss_stack_external_codex_response_v1` JSON object.
 `start` returns after the independent worker is durably recorded; later calls
 observe the persisted session. If a caller stops after the exact `prepared`
 state is durable but before any worker attempt exists, a later `start` with the
-same launch digest retries that launch. The forked child remains behind a
-one-byte gate and exits on EOF; it cannot form a Codex process group until the
-parent has durably recorded its PID and start ticks. `run-to-terminal` starts the same durable
+same launch digest retries that launch. The forked worker remains behind a
+one-byte pipe gate and exits on EOF; it cannot form a Codex process group until
+the parent has durably recorded its PID and start ticks. The later bubblewrap
+mount gate uses a Unix socket whose peer endpoint is retained by bubblewrap via
+`--sync-fd`: only an explicit byte releases `--block-fd`, while supervisor EOF
+cannot. Immediately before writing that byte, the supervisor again requires the
+exact worker PPID and no pending termination signal. An abort additionally keeps
+the supervisor endpoint open until the gated wrapper is killed and reaped.
+`run-to-terminal` starts the same durable
 session but keeps the caller alive until one runtime-owned semantic terminal
 state is recorded. It is the compatible entry point for transient service
 launchers whose cgroup is torn down when their main process exits. Its polling
@@ -127,8 +133,9 @@ Before launch the controller verifies:
 6. the resolved Codex executable digest, reported version, auth status, and
    bundled live model catalog match the binding;
 7. the exact profile-bound Linux subreaper supervisor and probe executable are
-   available, and a disposable parent-death/subreaper containment probe
-   succeeds before inference;
+   available, a disposable parent-death/subreaper containment probe succeeds,
+   and the exact Codex executable successfully constructs its inner named
+   sandbox through the outer read-only mount-mask contour before inference;
 8. the workspace is an exact Git worktree at the pinned HEAD and requested
    clean/exact baseline, selected by one explicit immutable manifest input ID;
 9. every additional immutable input is pinned by the continuation and copied
@@ -185,6 +192,49 @@ sandbox, `--ignore-user-config`, `--ignore-rules`, `--strict-config`, and
 environment; secret-shaped variable names are excluded again from the Codex
 shell environment. No TUI or built-in `spawn_agent` surface participates.
 
+Every inference attempt also receives a runtime-generated named Codex
+permission profile rather than the undifferentiated `-s workspace-write`
+shortcut. The profile extends Codex's workspace posture, keeps network
+disabled, and makes the attempt-local sanitized Git config source read-only.
+The supervisor then creates a filesystem-only outer bubblewrap contour: the
+exact digest-verified Codex executable inode is mounted over its launch
+coordinate. For every parent directory containing a current or reserved config
+coordinate, it mounts a namespace-private `tmpfs`, then returns every unmasked
+top-level metadata entry through a pre-opened, identity-checked read-only file
+descriptor. A minimal config is copied from an opened, digest-verified
+descriptor only into that private view over every current mount-table
+coordinate for the physical repository `config` and reserved
+`config.worktree` path. Their `.lock` coordinates are reserved by the same
+private read-only bytes for the whole attempt without creating host files, so
+an active or stale Git config replacement cannot expose pre-rename credentials.
+The visible config contains no remote URL, credential header, alias, verifier,
+hook, pager, or include configuration. It retains only closed-grammar
+structural settings such as repository/object/ref format, file mode, case
+handling, sparse-checkout, symlink, and worktree semantics. An explicit
+`core.worktree` is retained only when Git resolves it to the exact admitted
+workspace; any redirected worktree is rejected rather than normalized away.
+Native Git
+discovery, HEAD, index,
+split-index, objects, refs, nested repositories, and temporary repositories
+remain intact;
+no process-wide `GIT_DIR` or `GIT_WORK_TREE` is exported. Before inference the
+controller requires masked and owner-view `git status` to agree. Thus normal
+source reads, `git status`/`diff`, and bounded source writes remain available,
+while a raw `.git/config` reader sees only sanitized bytes and Codex's own
+sandbox keeps repository metadata read-only. This is a structural runtime
+boundary; command observation additionally classifies every explicit Git config
+or config-lock file operand, including jq file-loading, GNU-abbreviated
+pattern and pattern-file options, and multiple-input reader forms, and generic `.git`
+writers including attached
+destination options as counterevidence without mistaking a search pattern or
+printed literal for a file read, and without claiming that argv spelling alone
+is exhaustive isolation.
+
+On an unprivileged host, bubblewrap realizes this filesystem contour with a
+user namespace plus a mount namespace. It adds no outer PID or network
+namespace and no role authority. Codex 0.147 must still create its own inner
+bubblewrap/private-PID sandbox; failure to do so rejects the runtime contour.
+
 Semantic profiles admit only `read-only` or bounded `workspace-write` target
 authority with model-shell network disabled. A role-scoped read profile may
 configure exactly one loopback AoA MCP (`aoa_evals`, `aoa_stats`, or
@@ -221,8 +271,9 @@ commit, push, PR, merge, tag, release, publication, service mutation, secret
 access, or global config mutation.
 
 Codex runs beneath a Linux supervisor that owns a separate process group but
-does not create an outer user or PID namespace. This leaves Codex's own
-`codex-linux-sandbox`/bubblewrap namespace construction intact. The exact Codex
+does not create an outer PID or network namespace. Inference adds only the
+rootless user+mount contour described above. Live proof must show that this
+still leaves Codex's own `codex-linux-sandbox`/bubblewrap namespace construction intact. The exact Codex
 0.147 invocation disables legacy Landlock fallback; for this bounded filesystem
 posture that version requires bubblewrap. Model commands therefore run in its
 private PID and network namespaces, or the attempt fails rather than exposing
@@ -233,9 +284,25 @@ checks the PPID again to close the parent-death setup race. It then opens the
 resolved executable without following symlinks, re-hashes that exact file
 descriptor against the admitted digest, checks that the inode did not change
 during hashing, and executes `/proc/self/fd/<fd>` with the descriptor inherited.
+If identity publication or the final parent check fails, the supervisor retains
+its launch-gate endpoint until the blocked wrapper has been killed and reaped.
+The wrapper itself retains the peer endpoint, so even an abnormal supervisor
+exit cannot turn EOF into permission; only the successful path writes the
+release byte.
 The version, auth, and model-catalog preflight probes use the same verified-fd
-route. A later replacement of the original pathname therefore cannot change
-the bytes selected for `exec` or receive the preflight environment.
+route. Preflight also performs one network-disabled `codex sandbox -P` command
+through the same outer read-only bind mask used for inference, so nested
+bubblewrap compatibility is exercised rather than inferred from installed
+files. Its exact mount-wrapper digest is retained through inference command
+construction and rechecked both before supervisor launch and against the
+supervisor's opened inode. A later replacement of either original pathname
+therefore cannot change the bytes selected for `exec` or receive the preflight
+environment.
+
+Durable v2 states created before mount-wrapper identity became part of the
+preflight receipt remain readable for status, event, and terminal-result
+recovery. They cannot start another attempt without that admission identity;
+the attempt fails closed instead of inventing or backfilling historical proof.
 
 On normal exit, controlled termination, or worker death, the supervisor adopts
 or enumerates the exact descendant closure in `/proc`, checks PID start ticks,
@@ -373,9 +440,11 @@ own exact Git observations remain outside model-issued command
 admission, but run with `GIT_NO_LAZY_FETCH=1` so a missing promisor object
 cannot dispatch a repository-configured remote helper before admission.
 Jq `env`/`$ENV` access remains opaque and classified as secret access under the
-runtime's general environment-observation policy. Jq file, module-path, and
-test-program options are also opaque; ordinary inline jq transforms, including
-`.env` data fields and literal `"env"` keys, remain classifiable. Codex command
+runtime's general environment-observation policy. Jq program/module sources are
+opaque, while Git-config coordinates supplied through `--rawfile`,
+`--slurpfile`, `--argfile`, or ordinary input-file operands are classified as
+secret access. Ordinary inline jq transforms, including `.env` data fields and
+literal `"env"` keys, remain classifiable. Codex command
 events do not carry their effective working directory, so this runtime does not
 claim exhaustive semantic recognition of procfs path aliases. Credential
 separation is instead enforced structurally by removing the upstream bearer

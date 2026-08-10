@@ -568,7 +568,55 @@ CLASSIFIABLE_DIRECT_EXECUTABLES = frozenset(
         "zsh",
     }
 )
+GENERIC_GIT_METADATA_MUTATORS = frozenset(
+    {
+        "chmod",
+        "cp",
+        "install",
+        "ln",
+        "mkdir",
+        "mv",
+        "rm",
+        "rmdir",
+        "sed",
+        "tee",
+        "touch",
+    }
+)
+DIRECT_GIT_CONFIG_READERS = frozenset(
+    {
+        "base64",
+        "cat",
+        "cmp",
+        "cut",
+        "diff",
+        "file",
+        "head",
+        "sort",
+        "stat",
+        "tail",
+        "uniq",
+        "wc",
+    }
+)
+PATTERN_GIT_CONFIG_READERS = frozenset({"grep", "rg", "sed"})
+SAFE_GIT_BOOLEAN_CONFIG_KEYS = (
+    "core.filemode",
+    "core.ignorecase",
+    "core.precomposeunicode",
+    "core.sparsecheckout",
+    "core.sparsecheckoutcone",
+    "core.symlinks",
+    "extensions.relativeworktrees",
+    "extensions.worktreeconfig",
+)
+SAFE_GIT_ENUM_CONFIG_KEYS = {
+    "extensions.compatobjectformat": frozenset({"sha1", "sha256"}),
+    "extensions.objectformat": frozenset({"sha1", "sha256"}),
+    "extensions.refstorage": frozenset({"files", "reftable"}),
+}
 CODEX_EXECUTABLE_PATH = "/usr/local/bin:/usr/bin:/bin"
+MOUNT_WRAPPER_PATH = Path("/usr/bin/bwrap")
 OPAQUE_PROCESS_LAUNCH_WRAPPERS = {
     "chrt",
     "ionice",
@@ -1319,22 +1367,30 @@ def _wait_for_process_identity_receipt(
         "schema_version",
         "supervisor_pid",
         "supervisor_start_ticks",
+        "launcher_pid",
+        "launcher_start_ticks",
         "codex_pid",
         "codex_start_ticks",
     }
     if set(receipt) != expected_keys or receipt.get("schema_version") != (
-        "abyss_stack_external_codex_process_identity_v1"
+        "abyss_stack_external_codex_process_identity_v2"
     ):
         raise ExternalCodexRuntimeError(
             "codex_process_identity_invalid",
             "process identity receipt has an unsupported shape",
         )
     supervisor_pid = receipt.get("supervisor_pid")
+    launcher_pid = receipt.get("launcher_pid")
+    launcher_start_ticks = receipt.get("launcher_start_ticks")
     codex_pid = receipt.get("codex_pid")
     codex_start_ticks = receipt.get("codex_start_ticks")
     if (
         supervisor_pid != process.pid
         or receipt.get("supervisor_start_ticks") != supervisor_start_ticks
+        or not isinstance(launcher_pid, int)
+        or launcher_pid <= 1
+        or not isinstance(launcher_start_ticks, int)
+        or launcher_start_ticks <= 0
         or not isinstance(codex_pid, int)
         or codex_pid <= 1
         or not isinstance(codex_start_ticks, int)
@@ -1344,13 +1400,22 @@ def _wait_for_process_identity_receipt(
             "codex_process_identity_invalid",
             "process identity receipt differs from the launched supervisor",
         )
-    current = _process_parent_identity(codex_pid)
-    if current is not None and (
-        current[1] != supervisor_pid
-        or current[2] != supervisor_pid
-        or current[3] != supervisor_pid
-        or current[4] != codex_start_ticks
-    ):
+    launcher = _process_parent_identity(launcher_pid)
+    codex = _process_parent_identity(codex_pid)
+    launcher_mismatch = launcher is not None and (
+        launcher[1] != supervisor_pid
+        or launcher[2] != supervisor_pid
+        or launcher[3] != supervisor_pid
+        or launcher[4] != launcher_start_ticks
+    )
+    expected_codex_parent = supervisor_pid if codex_pid == launcher_pid else launcher_pid
+    codex_mismatch = codex is not None and (
+        codex[1] != expected_codex_parent
+        or codex[2] != supervisor_pid
+        or codex[3] != supervisor_pid
+        or codex[4] != codex_start_ticks
+    )
+    if launcher_mismatch or codex_mismatch:
         # A short-lived Codex may already have been reaped and its PID reused,
         # or its terminal zombie may have been reparented, by the time the
         # durable receipt becomes visible.  That is a valid terminal handoff
@@ -1359,7 +1424,7 @@ def _wait_for_process_identity_receipt(
         if process.poll() is None:
             raise ExternalCodexRuntimeError(
                 "codex_process_identity_invalid",
-                "live Codex identity differs from the supervisor receipt",
+                "live launcher or Codex identity differs from the supervisor receipt",
             )
     return receipt, _artifact_ref(path)
 
@@ -1688,6 +1753,355 @@ def _secret_shaped_path(value: str) -> bool:
         or name.startswith(".env.")
         or name.endswith((".jks", ".kdbx", ".key", ".p12", ".pem"))
     )
+
+
+def _git_admin_metadata_path(value: str) -> bool:
+    """Recognize explicit paths into a repository's private Git state."""
+
+    normalized = value.replace("\\", "/").strip().rstrip("/").lower()
+    if not normalized:
+        return False
+    parts = tuple(part for part in normalized.split("/") if part not in {"", "."})
+    return ".git" in parts
+
+
+def _git_config_metadata_path(value: str) -> bool:
+    """Recognize direct reads of credential- or helper-bearing Git config."""
+
+    normalized = value.replace("\\", "/").strip().rstrip("/").lower()
+    if not _git_admin_metadata_path(normalized):
+        return False
+    return normalized.rsplit("/", 1)[-1] in {
+        "config",
+        "config.lock",
+        "config.worktree",
+        "config.worktree.lock",
+    }
+
+
+def _long_option_prefix(value: str, canonical: str) -> bool:
+    """Match an exact or conservatively abbreviated GNU long option."""
+
+    option = value.lower().split("=", 1)[0]
+    return option.startswith("--") and len(option) >= 3 and canonical.startswith(option)
+
+
+def _pattern_reader_git_config_file_access(tokens: Sequence[str]) -> bool:
+    """Inspect every actual rg, grep, or sed input-file coordinate."""
+
+    executable = Path(tokens[0]).name.lower()
+    short_flags_without_values = {
+        "grep": frozenset("EFGHhIiJLlnoqRrsvVwxyUZz"),
+        "rg": frozenset("FHINnqSuvVwz"),
+        "sed": frozenset("Ensu"),
+    }
+    separate_value_options = {
+        "grep": frozenset(
+            {
+                "-A",
+                "-B",
+                "-C",
+                "-d",
+                "-D",
+                "-m",
+                "--after-context",
+                "--before-context",
+                "--binary-files",
+                "--context",
+                "--devices",
+                "--directories",
+                "--exclude",
+                "--exclude-dir",
+                "--group-separator",
+                "--include",
+                "--label",
+                "--max-count",
+            }
+        ),
+        "rg": frozenset(
+            {
+                "-A",
+                "-B",
+                "-C",
+                "-E",
+                "-M",
+                "-T",
+                "-g",
+                "-j",
+                "-m",
+                "-r",
+                "-t",
+                "--after-context",
+                "--before-context",
+                "--colors",
+                "--context",
+                "--context-separator",
+                "--encoding",
+                "--engine",
+                "--field-context-separator",
+                "--field-match-separator",
+                "--glob",
+                "--max-columns",
+                "--max-count",
+                "--max-depth",
+                "--max-filesize",
+                "--path-separator",
+                "--regexp",
+                "--replace",
+                "--sort",
+                "--sortr",
+                "--threads",
+                "--type",
+                "--type-add",
+                "--type-clear",
+                "--type-not",
+            }
+        ),
+        "sed": frozenset({"-l", "--line-length"}),
+    }
+    explicit_program = False
+    operands: list[str] = []
+    index = 1
+    while index < len(tokens):
+        value = tokens[index]
+        lowered = value.lower()
+        if value == "--":
+            operands.extend(tokens[index + 1 :])
+            break
+        if (
+            executable == "grep"
+            and (lowered == "-e" or _long_option_prefix(value, "--regexp"))
+        ) or (
+            executable == "rg" and lowered in {"-e", "--regexp"}
+        ):
+            explicit_program = True
+            index += 1 if "=" in value else 2
+            continue
+        if executable == "sed" and (
+            lowered == "-e" or _long_option_prefix(value, "--expression")
+        ):
+            explicit_program = True
+            index += 1 if "=" in value else 2
+            continue
+        if executable in {"grep", "rg", "sed"} and (
+            lowered == "-f" or _long_option_prefix(value, "--file")
+        ):
+            file_value = (
+                value.split("=", 1)[1]
+                if "=" in value
+                else tokens[index + 1]
+                if index + 1 < len(tokens)
+                else ""
+            )
+            if _git_config_metadata_path(file_value):
+                return True
+            explicit_program = True
+            index += 1 if "=" in value else 2
+            continue
+        if executable in {"grep", "rg"} and (
+            (lowered.startswith("-e") and lowered != "-e")
+            or (executable == "rg" and lowered.startswith("--regexp="))
+        ):
+            explicit_program = True
+            index += 1
+            continue
+        if executable == "sed" and (
+            (lowered.startswith("-e") and lowered != "-e")
+        ):
+            explicit_program = True
+            index += 1
+            continue
+        if executable in {"grep", "rg", "sed"} and (
+            lowered.startswith("-f") and lowered != "-f"
+        ):
+            pattern_file = value[2:]
+            if _git_config_metadata_path(pattern_file):
+                return True
+            explicit_program = True
+            index += 1
+            continue
+        if value.startswith("-") and not value.startswith("--"):
+            short_body = value[1:]
+            prefix_flags = short_flags_without_values.get(executable, frozenset())
+            for offset, option in enumerate(short_body):
+                if option not in {"e", "f"}:
+                    if option not in prefix_flags:
+                        break
+                    continue
+                option_value = short_body[offset + 1 :]
+                if not option_value and index + 1 < len(tokens):
+                    option_value = tokens[index + 1]
+                    index += 1
+                if option == "f" and _git_config_metadata_path(option_value):
+                    return True
+                explicit_program = True
+                index += 1
+                break
+            else:
+                option = ""
+            if option in {"e", "f"}:
+                continue
+        if executable == "rg" and lowered in {"--ignore-file", "--pre-glob"}:
+            if index + 1 < len(tokens) and _git_config_metadata_path(tokens[index + 1]):
+                return True
+            index += 2
+            continue
+        if executable == "rg" and lowered.startswith(("--ignore-file=", "--pre-glob=")):
+            if _git_config_metadata_path(value.split("=", 1)[1]):
+                return True
+            index += 1
+            continue
+        if executable == "grep" and _long_option_prefix(value, "--exclude-from"):
+            file_value = (
+                value.split("=", 1)[1]
+                if "=" in value
+                else tokens[index + 1]
+                if index + 1 < len(tokens)
+                else ""
+            )
+            if _git_config_metadata_path(file_value):
+                return True
+            index += 1 if "=" in value else 2
+            continue
+        value_options = separate_value_options.get(executable, frozenset())
+        if value in value_options or lowered in {
+            option for option in value_options if option.startswith("--")
+        }:
+            index += 2
+            continue
+        if any(
+            lowered.startswith(option + "=")
+            for option in value_options
+            if option.startswith("--")
+        ):
+            index += 1
+            continue
+        if value.startswith("-"):
+            index += 1
+            continue
+        operands.append(value)
+        index += 1
+    file_operands = operands if explicit_program else operands[1:]
+    return any(_git_config_metadata_path(value) for value in file_operands)
+
+
+def _direct_git_config_file_access(tokens: Sequence[str]) -> bool:
+    """Distinguish a Git-config file operand from harmless pattern text."""
+
+    if not tokens:
+        return False
+    executable = Path(tokens[0]).name.lower()
+    if executable in DIRECT_GIT_CONFIG_READERS:
+        return any(_git_config_metadata_path(value) for value in tokens[1:])
+    if executable == "jq":
+        return _jq_git_config_file_access(tokens)
+    if executable not in PATTERN_GIT_CONFIG_READERS:
+        return False
+    return _pattern_reader_git_config_file_access(tokens)
+
+
+def _jq_git_config_file_access(tokens: Sequence[str]) -> bool:
+    """Inspect jq input files and explicit file-loading option coordinates."""
+
+    program_seen = False
+    program_from_file = False
+    index = 1
+    while index < len(tokens):
+        value = tokens[index]
+        lowered = value.lower()
+        if not program_seen and value == "--":
+            program_seen = program_from_file
+            index += 1
+            continue
+        if lowered in {"--rawfile", "--slurpfile", "--argfile"}:
+            if index + 2 < len(tokens) and _git_config_metadata_path(tokens[index + 2]):
+                return True
+            index += 3
+            continue
+        if lowered in {"--arg", "--argjson"}:
+            index += 3
+            continue
+        if lowered in {"-f", "--from-file"}:
+            if index + 1 < len(tokens) and _git_config_metadata_path(tokens[index + 1]):
+                return True
+            program_from_file = True
+            program_seen = True
+            index += 2
+            continue
+        if lowered.startswith(("--from-file=", "-f")) and lowered != "-f":
+            source = value.split("=", 1)[1] if "=" in value else value[2:]
+            if _git_config_metadata_path(source):
+                return True
+            program_from_file = True
+            program_seen = True
+            index += 1
+            continue
+        if not program_seen and lowered in {"-l", "--library-path", "--indent"}:
+            index += 2
+            continue
+        if not program_seen and value.startswith("-"):
+            index += 1
+            continue
+        if not program_seen:
+            program_seen = True
+            index += 1
+            continue
+        if _git_config_metadata_path(value):
+            return True
+        index += 1
+    return False
+
+
+def _generic_mutator_git_metadata_access(tokens: Sequence[str]) -> bool:
+    """Recognize path-bearing mutator operands, including attached options."""
+
+    if not tokens:
+        return False
+    executable = Path(tokens[0]).name.lower()
+    if executable not in GENERIC_GIT_METADATA_MUTATORS:
+        return False
+    if any(_git_admin_metadata_path(value) for value in tokens[1:]):
+        return True
+    separate_path_options = {
+        "chmod": frozenset({"--reference"}),
+        "cp": frozenset({"-t", "--target-directory"}),
+        "install": frozenset({"-t", "--target-directory"}),
+        "ln": frozenset({"-t", "--target-directory"}),
+        "mv": frozenset({"-t", "--target-directory"}),
+        "sed": frozenset({"-f", "--file"}),
+        "touch": frozenset({"-r", "--reference"}),
+    }.get(executable, frozenset())
+    index = 1
+    while index < len(tokens):
+        value = tokens[index]
+        lowered = value.lower()
+        long_option = next(
+            (
+                option
+                for option in separate_path_options
+                if option.startswith("--") and _long_option_prefix(value, option)
+            ),
+            None,
+        )
+        if lowered in separate_path_options or (
+            long_option is not None and "=" not in lowered
+        ):
+            if index + 1 < len(tokens) and _git_admin_metadata_path(tokens[index + 1]):
+                return True
+            index += 2
+            continue
+        if long_option is not None and "=" in lowered:
+            if _git_admin_metadata_path(value.split("=", 1)[1]):
+                return True
+            index += 1
+            continue
+        for option in separate_path_options:
+            if option.startswith("-") and not option.startswith("--") and lowered.startswith(option) and lowered != option:
+                if _git_admin_metadata_path(value[len(option) :]):
+                    return True
+                break
+        index += 1
+    return False
 
 
 def _shell_inline_body(tokens: Sequence[str]) -> str | None:
@@ -2493,6 +2907,8 @@ def _command_effects(command: str) -> set[str]:
                 and any("secret" in value for value in args)
             ) or executable in {"printenv"}:
                 detected.add("secret_access")
+            if _direct_git_config_file_access(segment):
+                detected.add("secret_access")
             if any(
                 _secret_shaped_path(value)
                 for value in segment[1:]
@@ -2576,6 +2992,10 @@ def _command_has_unclassified_indirection(command: str) -> bool:
             if executable == "jq" and _jq_has_opaque_environment_access(segment):
                 return True
             if executable == "sort" and _sort_has_opaque_dispatch(segment):
+                return True
+            if _direct_git_config_file_access(segment):
+                return True
+            if _generic_mutator_git_metadata_access(segment):
                 return True
             if executable == "find" and any(
                 value in {"-exec", "-execdir", "-ok", "-okdir"}
@@ -2678,6 +3098,753 @@ def _controller_git_environment(workspace: Path) -> dict[str, str]:
     return environment
 
 
+def _repository_git_path(workspace: Path, name: str) -> Path:
+    """Resolve one Git-owned path without trusting repository shell helpers."""
+
+    completed = subprocess.run(
+        ["/usr/bin/git", "-C", str(workspace), "rev-parse", "--git-path", name],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=15,
+        env=_controller_git_environment(workspace),
+    )
+    value = completed.stdout.strip()
+    if completed.returncode != 0 or not value or "\n" in value or "\r" in value:
+        raise ExternalCodexRuntimeError(
+            "workspace_git_metadata_unavailable",
+            f"cannot resolve repository Git metadata path: {name}",
+        )
+    candidate = Path(value)
+    if not candidate.is_absolute():
+        candidate = workspace / candidate
+    return candidate.absolute()
+
+
+def _physical_git_metadata_file(
+    path: Path,
+    *,
+    purpose: str,
+    required: bool,
+) -> Path | None:
+    """Admit only one non-aliased physical Git metadata file."""
+
+    try:
+        path_stat = path.lstat()
+    except FileNotFoundError:
+        if not required:
+            return None
+        raise ExternalCodexRuntimeError(
+            "workspace_git_metadata_unavailable",
+            f"required repository {purpose} is absent",
+        ) from None
+    except OSError as exc:
+        raise ExternalCodexRuntimeError(
+            "workspace_git_metadata_unavailable",
+            f"cannot inspect repository {purpose}",
+        ) from exc
+    if (
+        not stat.S_ISREG(path_stat.st_mode)
+        or path.is_symlink()
+        or path_stat.st_nlink != 1
+    ):
+        raise ExternalCodexRuntimeError(
+            "workspace_git_metadata_aliased",
+            f"repository {purpose} must be one non-aliased regular file",
+        )
+    try:
+        resolved = path.resolve(strict=True)
+    except OSError as exc:
+        raise ExternalCodexRuntimeError(
+            "workspace_git_metadata_unavailable",
+            f"cannot resolve repository {purpose}",
+        ) from exc
+    return resolved
+
+
+def _repository_git_output(
+    workspace: Path,
+    *args: str,
+    allowed_returncodes: frozenset[int] = frozenset({0}),
+) -> tuple[int, str]:
+    completed = subprocess.run(
+        ["/usr/bin/git", "-C", str(workspace), *args],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=15,
+        env=_controller_git_environment(workspace),
+    )
+    value = completed.stdout.strip()
+    if completed.returncode not in allowed_returncodes or "\n" in value or "\r" in value:
+        raise ExternalCodexRuntimeError(
+            "workspace_git_metadata_unavailable",
+            "cannot resolve one bounded repository Git coordinate",
+        )
+    return completed.returncode, value
+
+
+def _repository_config_value(
+    workspace: Path,
+    key: str,
+    *,
+    boolean: bool = False,
+    normalize_lower: bool = True,
+) -> str | None:
+    arguments = ["config"]
+    if boolean:
+        arguments.append("--bool")
+    arguments.extend(("--get", key))
+    returncode, value = _repository_git_output(
+        workspace,
+        *arguments,
+        allowed_returncodes=frozenset({0, 1}),
+    )
+    if returncode == 1:
+        if value:
+            raise ExternalCodexRuntimeError(
+                "workspace_git_metadata_invalid",
+                f"repository {key} has an ambiguous absent value",
+            )
+        return None
+    if not value:
+        raise ExternalCodexRuntimeError(
+            "workspace_git_metadata_invalid",
+            f"repository {key} has an empty structural value",
+        )
+    return value.lower() if normalize_lower else value
+
+
+def _git_config_quoted(value: str) -> str:
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _sanitized_repository_config(workspace: Path) -> str:
+    """Retain only structural Git settings with closed value grammars."""
+
+    format_version = _repository_config_value(
+        workspace, "core.repositoryformatversion"
+    )
+    if format_version is None:
+        format_version = "0"
+    if format_version not in {"0", "1"}:
+        raise ExternalCodexRuntimeError(
+            "workspace_git_metadata_invalid",
+            "repository format version is outside the admitted grammar",
+        )
+
+    configured_worktree = _repository_config_value(
+        workspace,
+        "core.worktree",
+        normalize_lower=False,
+    )
+    preserved_worktree: str | None = None
+    if configured_worktree is not None:
+        _, top_level = _repository_git_output(
+            workspace,
+            "rev-parse",
+            "--show-toplevel",
+        )
+        try:
+            resolved_top_level = Path(top_level).resolve(strict=True)
+        except OSError as exc:
+            raise ExternalCodexRuntimeError(
+                "workspace_git_metadata_invalid",
+                "repository core.worktree does not resolve to one worktree",
+            ) from exc
+        if resolved_top_level != workspace.resolve(strict=True):
+            raise ExternalCodexRuntimeError(
+                "workspace_git_metadata_invalid",
+                "repository core.worktree redirects Git outside the exact workspace",
+            )
+        preserved_worktree = str(resolved_top_level)
+
+    boolean_values: dict[str, str] = {}
+    for key in SAFE_GIT_BOOLEAN_CONFIG_KEYS:
+        value = _repository_config_value(workspace, key, boolean=True)
+        if value is not None:
+            if value not in {"true", "false"}:
+                raise ExternalCodexRuntimeError(
+                    "workspace_git_metadata_invalid",
+                    f"repository {key} is not a bounded boolean",
+                )
+            boolean_values[key] = value
+
+    enum_values: dict[str, str] = {}
+    for key, allowed_values in SAFE_GIT_ENUM_CONFIG_KEYS.items():
+        value = _repository_config_value(workspace, key)
+        if value is not None:
+            if value not in allowed_values:
+                raise ExternalCodexRuntimeError(
+                    "workspace_git_metadata_invalid",
+                    f"repository {key} is outside the admitted grammar",
+                )
+            enum_values[key] = value
+
+    core_names = {
+        "core.filemode": "fileMode",
+        "core.ignorecase": "ignoreCase",
+        "core.precomposeunicode": "precomposeUnicode",
+        "core.sparsecheckout": "sparseCheckout",
+        "core.sparsecheckoutcone": "sparseCheckoutCone",
+        "core.symlinks": "symlinks",
+    }
+    extension_names = {
+        "extensions.compatobjectformat": "compatObjectFormat",
+        "extensions.objectformat": "objectFormat",
+        "extensions.refstorage": "refStorage",
+        "extensions.relativeworktrees": "relativeWorktrees",
+        "extensions.worktreeconfig": "worktreeConfig",
+    }
+    lines = [
+        "[core]",
+        f"\trepositoryFormatVersion = {format_version}",
+        "\tbare = false",
+        f"\tfileMode = {boolean_values.get('core.filemode', 'true')}",
+    ]
+    if preserved_worktree is not None:
+        lines.append(f"\tworkTree = {_git_config_quoted(preserved_worktree)}")
+    for key, name in core_names.items():
+        if key == "core.filemode":
+            continue
+        if key in boolean_values:
+            lines.append(f"\t{name} = {boolean_values[key]}")
+    lines.extend(
+        (
+            "\thooksPath = /dev/null",
+            "\tfsmonitor = false",
+            "\tattributesFile = /dev/null",
+        )
+    )
+    extension_values = {**enum_values, **boolean_values}
+    selected_extensions = [
+        (key, extension_names[key], extension_values[key])
+        for key in extension_names
+        if key in extension_values
+    ]
+    if selected_extensions:
+        lines.append("[extensions]")
+        lines.extend(
+            f"\t{name} = {value}" for _, name, value in selected_extensions
+        )
+    lines.extend(
+        (
+            "[diff]",
+            "\tignoreSubmodules = all",
+            "[status]",
+            "\tsubmoduleSummary = false",
+        )
+    )
+    return "\n".join(lines) + "\n"
+
+
+def _decode_mountinfo_path(value: str) -> str:
+    escapes = {"040": " ", "011": "\t", "012": "\n", "134": "\\"}
+    return re.sub(r"\\(040|011|012|134)", lambda match: escapes[match.group(1)], value)
+
+
+def _current_mount_aliases(
+    path: Path,
+    *,
+    required: bool = True,
+) -> tuple[Path, ...]:
+    """Enumerate current mount coordinates for an existing or reserved path."""
+
+    target = path.absolute()
+    try:
+        target_stat = target.stat()
+    except FileNotFoundError:
+        target_stat = None
+        if required:
+            raise ExternalCodexRuntimeError(
+                "workspace_git_metadata_unavailable",
+                "required repository config coordinate is absent",
+            ) from None
+        try:
+            target = target.parent.resolve(strict=True) / target.name
+        except OSError as exc:
+            raise ExternalCodexRuntimeError(
+                "workspace_git_metadata_unavailable",
+                "cannot resolve a reserved repository config coordinate",
+            ) from exc
+    except OSError as exc:
+        raise ExternalCodexRuntimeError(
+            "workspace_git_metadata_unavailable",
+            "cannot inspect a repository config coordinate",
+        ) from exc
+    try:
+        raw_mountinfo = Path("/proc/self/mountinfo").read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ExternalCodexRuntimeError(
+            "workspace_git_metadata_unavailable",
+            "cannot inspect current repository mount aliases",
+        ) from exc
+    if target_stat is not None and not stat.S_ISREG(target_stat.st_mode):
+        raise ExternalCodexRuntimeError(
+            "workspace_git_metadata_aliased",
+            "repository config mount target is not a regular file",
+        )
+    entries: list[tuple[int, str, Path, Path]] = []
+    for line in raw_mountinfo.splitlines():
+        left, separator, _ = line.partition(" - ")
+        fields = left.split()
+        if not separator or len(fields) < 6:
+            raise ExternalCodexRuntimeError(
+                "workspace_git_metadata_unavailable",
+                "current mount table has an unsupported record",
+            )
+        root = Path(_decode_mountinfo_path(fields[3]))
+        mountpoint = Path(_decode_mountinfo_path(fields[4]))
+        if not root.is_absolute() or not mountpoint.is_absolute():
+            raise ExternalCodexRuntimeError(
+                "workspace_git_metadata_unavailable",
+                "current mount table contains a relative coordinate",
+            )
+        try:
+            mount_id = int(fields[0])
+        except ValueError as exc:
+            raise ExternalCodexRuntimeError(
+                "workspace_git_metadata_unavailable",
+                "current mount table has an invalid mount identity",
+            ) from exc
+        entries.append((mount_id, fields[2], root, mountpoint))
+
+    covering: list[tuple[int, int, str, Path]] = []
+    for mount_id, entry_device, root, mountpoint in entries:
+        try:
+            relative = target.relative_to(mountpoint)
+        except ValueError:
+            continue
+        covering.append((len(mountpoint.parts), mount_id, entry_device, root / relative))
+    if not covering:
+        raise ExternalCodexRuntimeError(
+            "workspace_git_metadata_unavailable",
+            "repository config has no matching current mount coordinate",
+        )
+    _, _, device, internal_path = max(
+        covering, key=lambda item: (item[0], item[1])
+    )
+    if target_stat is not None and device != (
+        f"{os.major(target_stat.st_dev)}:{os.minor(target_stat.st_dev)}"
+    ):
+        raise ExternalCodexRuntimeError(
+            "workspace_git_metadata_unavailable",
+            "repository config inode differs from its active mount coordinate",
+        )
+
+    aliases = {target}
+    for _, entry_device, root, mountpoint in entries:
+        if entry_device != device:
+            continue
+        try:
+            relative = internal_path.relative_to(root)
+        except ValueError:
+            continue
+        candidate = (mountpoint / relative).absolute()
+        try:
+            candidate_stat = candidate.stat()
+        except FileNotFoundError:
+            if target_stat is not None:
+                continue
+            try:
+                parent_stat = candidate.parent.stat()
+            except OSError:
+                continue
+            if (
+                stat.S_ISDIR(parent_stat.st_mode)
+                and f"{os.major(parent_stat.st_dev)}:{os.minor(parent_stat.st_dev)}"
+                == device
+            ):
+                aliases.add(candidate)
+            continue
+        except OSError:
+            continue
+        if target_stat is None:
+            raise ExternalCodexRuntimeError(
+                "workspace_git_metadata_aliased",
+                "reserved repository config coordinate has inconsistent aliases",
+            )
+        if stat.S_ISREG(candidate_stat.st_mode) and (
+            candidate_stat.st_dev == target_stat.st_dev
+            and candidate_stat.st_ino == target_stat.st_ino
+        ):
+            aliases.add(candidate)
+    return tuple(sorted(aliases))
+
+
+PRIVATE_VIEW_IDENTITY_FIELDS = (
+    "device",
+    "inode",
+    "mode",
+    "size",
+    "mtime_ns",
+    "ctime_ns",
+)
+
+
+def _private_view_identity(observed: os.stat_result) -> dict[str, int]:
+    return {
+        "device": observed.st_dev,
+        "inode": observed.st_ino,
+        "mode": observed.st_mode,
+        "size": observed.st_size,
+        "mtime_ns": observed.st_mtime_ns,
+        "ctime_ns": observed.st_ctime_ns,
+    }
+
+
+def _assert_private_view_identity(
+    path: Path,
+    expected: Mapping[str, Any],
+    *,
+    directory: bool,
+) -> os.stat_result:
+    try:
+        observed = path.lstat()
+    except OSError as exc:
+        raise ExternalCodexRuntimeError(
+            "actor_git_mask_unavailable",
+            "private Git metadata view changed before containment",
+        ) from exc
+    expected_keys = set(PRIVATE_VIEW_IDENTITY_FIELDS)
+    if (
+        set(expected) != expected_keys
+        or any(not isinstance(expected[key], int) for key in expected_keys)
+        or _private_view_identity(observed) != dict(expected)
+        or path.is_symlink()
+        or (directory and not stat.S_ISDIR(observed.st_mode))
+        or (not directory and not stat.S_ISREG(observed.st_mode))
+    ):
+        raise ExternalCodexRuntimeError(
+            "actor_git_mask_unavailable",
+            "private Git metadata view identity drifted before containment",
+        )
+    return observed
+
+
+def _private_directory_views(
+    masks: Sequence[Mapping[str, str]],
+) -> list[dict[str, Any]]:
+    """Describe namespace-private parent views for every masked coordinate."""
+
+    grouped: dict[Path, set[str]] = {}
+    for mask in masks:
+        target = Path(str(mask["target"]))
+        if not target.is_absolute() or target.name in {"", ".", ".."}:
+            raise ExternalCodexRuntimeError(
+                "actor_git_mask_unavailable",
+                "external actor Git mask has an invalid target coordinate",
+            )
+        grouped.setdefault(target.parent, set()).add(target.name)
+    views: list[dict[str, Any]] = []
+    for parent, masked_names in sorted(
+        grouped.items(), key=lambda item: (len(item[0].parts), str(item[0]))
+    ):
+        try:
+            parent_stat = parent.lstat()
+            directory_entries = tuple(
+                sorted(parent.iterdir(), key=lambda path: path.name)
+            )
+        except OSError as exc:
+            raise ExternalCodexRuntimeError(
+                "actor_git_mask_unavailable",
+                "cannot inspect one private Git metadata view",
+            ) from exc
+        if parent.is_symlink() or not stat.S_ISDIR(parent_stat.st_mode):
+            raise ExternalCodexRuntimeError(
+                "actor_git_mask_unavailable",
+                "private Git metadata view parent is not a physical directory",
+            )
+        entries: list[dict[str, Any]] = []
+        for source in directory_entries:
+            if source.name in masked_names:
+                continue
+            try:
+                source_stat = source.lstat()
+            except OSError as exc:
+                raise ExternalCodexRuntimeError(
+                    "actor_git_mask_unavailable",
+                    "private Git metadata view entry became unavailable",
+                ) from exc
+            if source.is_symlink() or not (
+                stat.S_ISREG(source_stat.st_mode)
+                or stat.S_ISDIR(source_stat.st_mode)
+            ):
+                raise ExternalCodexRuntimeError(
+                    "actor_git_mask_unavailable",
+                    "private Git metadata view contains an unsupported entry",
+                )
+            entries.append(
+                {
+                    "source": str(source),
+                    "target": str(parent / source.name),
+                    "kind": (
+                        "directory"
+                        if stat.S_ISDIR(source_stat.st_mode)
+                        else "file"
+                    ),
+                    "identity": _private_view_identity(source_stat),
+                }
+            )
+        views.append(
+            {
+                "target": str(parent),
+                "identity": _private_view_identity(parent_stat),
+                "entries": entries,
+            }
+        )
+    return views
+
+
+def _run_actor_masked_command(
+    actor_git_mask: Mapping[str, Any],
+    command_argv: Sequence[str],
+    *,
+    environment: Mapping[str, str],
+) -> subprocess.CompletedProcess[str]:
+    """Run one command through a namespace-private descriptor-bound mask view."""
+
+    views = actor_git_mask.get("private_directory_views")
+    masks = actor_git_mask.get("masks")
+    if not isinstance(views, list) or not views or not isinstance(masks, list):
+        raise ExternalCodexRuntimeError(
+            "actor_git_mask_unavailable",
+            "external actor Git mask lacks its private directory views",
+        )
+    command = [
+        str(MOUNT_WRAPPER_PATH),
+        "--die-with-parent",
+        "--dev-bind",
+        "/",
+        "/",
+    ]
+    descriptors: list[int] = []
+    try:
+        for view in views:
+            target = Path(str(view.get("target", "")))
+            identity = view.get("identity")
+            entries = view.get("entries")
+            if (
+                not target.is_absolute()
+                or not isinstance(identity, dict)
+                or not isinstance(entries, list)
+            ):
+                raise ExternalCodexRuntimeError(
+                    "actor_git_mask_unavailable",
+                    "private Git metadata view has an invalid shape",
+                )
+            _assert_private_view_identity(target, identity, directory=True)
+            command.extend(("--tmpfs", str(target)))
+            for entry in entries:
+                source = Path(str(entry.get("source", "")))
+                entry_target = Path(str(entry.get("target", "")))
+                kind = str(entry.get("kind", ""))
+                entry_identity = entry.get("identity")
+                if (
+                    not source.is_absolute()
+                    or entry_target.parent != target
+                    or entry_target.name != source.name
+                    or kind not in {"file", "directory"}
+                    or not isinstance(entry_identity, dict)
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "actor_git_mask_unavailable",
+                        "private Git metadata entry has an invalid shape",
+                    )
+                _assert_private_view_identity(
+                    source,
+                    entry_identity,
+                    directory=kind == "directory",
+                )
+                flags = os.O_RDONLY | os.O_CLOEXEC
+                if hasattr(os, "O_NOFOLLOW"):
+                    flags |= os.O_NOFOLLOW
+                if kind == "directory" and hasattr(os, "O_DIRECTORY"):
+                    flags |= os.O_DIRECTORY
+                descriptor = os.open(source, flags)
+                descriptors.append(descriptor)
+                if _private_view_identity(os.fstat(descriptor)) != entry_identity:
+                    raise ExternalCodexRuntimeError(
+                        "actor_git_mask_unavailable",
+                        "private Git metadata entry changed while being opened",
+                    )
+                command.extend(
+                    ("--ro-bind-fd", str(descriptor), str(entry_target))
+                )
+        view_targets = {Path(str(view["target"])) for view in views}
+        for mask in masks:
+            source = Path(str(mask.get("source", "")))
+            target = Path(str(mask.get("target", "")))
+            digest = str(mask.get("digest", ""))
+            if (
+                target.parent not in view_targets
+                or not source.is_file()
+                or source.is_symlink()
+                or sha256_file(source) != digest
+            ):
+                raise ExternalCodexRuntimeError(
+                    "actor_git_mask_unavailable",
+                    "external actor Git mask changed before containment",
+                )
+            command.extend(("--ro-bind", str(source), str(target)))
+        command.extend(("--", *command_argv))
+        return subprocess.run(
+            command,
+            pass_fds=tuple(descriptors),
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=30,
+            env=dict(environment),
+        )
+    finally:
+        for descriptor in descriptors:
+            os.close(descriptor)
+
+
+def _masked_git_command(
+    workspace: Path,
+    actor_git_mask: Mapping[str, Any],
+    *arguments: str,
+) -> subprocess.CompletedProcess[str]:
+    """Run one controller-side Git probe under the same mount-mask shape."""
+
+    return _run_actor_masked_command(
+        actor_git_mask,
+        (
+            "/usr/bin/git",
+            "-c",
+            "core.quotePath=false",
+            "-C",
+            str(workspace),
+            *arguments,
+        ),
+        environment=_controller_git_environment(workspace),
+    )
+
+
+def _prepare_actor_git_mask(workspace: Path, scratch_root: Path) -> dict[str, Any]:
+    """Mask credential-bearing Git config without changing native discovery."""
+
+    workspace = workspace.resolve(strict=True)
+    config_coordinate = _repository_git_path(workspace, "config")
+    actual_config = _physical_git_metadata_file(
+        config_coordinate,
+        purpose="config",
+        required=True,
+    )
+    assert actual_config is not None
+    worktree_config_coordinate = _repository_git_path(workspace, "config.worktree")
+    worktree_config = _physical_git_metadata_file(
+        worktree_config_coordinate,
+        purpose="worktree config",
+        required=False,
+    )
+    config_lock = _physical_git_metadata_file(
+        actual_config.with_name(f"{actual_config.name}.lock"),
+        purpose="config lock",
+        required=False,
+    )
+    worktree_lock_coordinate = worktree_config_coordinate.with_name(
+        f"{worktree_config_coordinate.name}.lock"
+    )
+    worktree_config_lock = _physical_git_metadata_file(
+        worktree_lock_coordinate,
+        purpose="worktree config lock",
+        required=False,
+    )
+    mask_root = scratch_root / "git-config-mask"
+    if mask_root.exists() or mask_root.is_symlink():
+        raise ExternalCodexRuntimeError(
+            "actor_git_mask_collision",
+            "attempt-local actor Git mask path is not fresh",
+        )
+    try:
+        mask_root.mkdir(parents=True, mode=0o700)
+    except OSError as exc:
+        raise ExternalCodexRuntimeError(
+            "actor_git_mask_unavailable",
+            "cannot establish the attempt-local credential-free Git mask",
+        ) from exc
+    sanitized_config = _sanitized_repository_config(workspace)
+    sanitized_path = mask_root / "config"
+    _atomic_write_bytes(sanitized_path, sanitized_config.encode("utf-8"), mode=0o400)
+    targets = list(_current_mount_aliases(actual_config))
+    targets.extend(
+        _current_mount_aliases(
+            config_lock or actual_config.with_name(f"{actual_config.name}.lock"),
+            required=False,
+        )
+    )
+    targets.extend(
+        _current_mount_aliases(
+            worktree_config or worktree_config_coordinate,
+            required=False,
+        )
+    )
+    targets.extend(
+        _current_mount_aliases(
+            worktree_config_lock or worktree_lock_coordinate,
+            required=False,
+        )
+    )
+    masks = [
+        {
+            "source": str(sanitized_path),
+            "target": str(target),
+            "digest": sha256_file(sanitized_path),
+        }
+        for target in sorted(set(targets))
+    ]
+    owner_status = _git_status(workspace)
+    actor_git_mask = {
+        "masks": masks,
+        "sanitized_config_path": str(sanitized_path),
+        "private_directory_views": _private_directory_views(masks),
+    }
+    observed = _masked_git_command(
+        workspace,
+        actor_git_mask,
+        "status",
+        "--no-renames",
+        "--porcelain=v1",
+        "--untracked-files=all",
+    )
+    if observed.returncode != 0:
+        raise ExternalCodexRuntimeError(
+            "actor_git_mask_unavailable",
+            "credential-free mount mask rejected the native repository",
+        )
+    masked_status = _parse_git_status(observed.stdout)
+    if masked_status != owner_status:
+        raise ExternalCodexRuntimeError(
+            "actor_git_mask_mismatch",
+            "attempt-local Git mask does not preserve exact workspace status",
+        )
+    return actor_git_mask
+
+
+def _actor_codex_permission_profile(actor_git_mask: Mapping[str, Any]) -> str:
+    """Build the one named Codex profile shared by preflight and execution."""
+
+    sanitized_config_path = Path(
+        str(actor_git_mask.get("sanitized_config_path", ""))
+    )
+    if not sanitized_config_path.is_absolute():
+        raise ExternalCodexRuntimeError(
+            "actor_git_mask_unavailable",
+            "external actor Git mask lacks an absolute sanitized config path",
+        )
+    filesystem_entry = (
+        f'{json.dumps(str(sanitized_config_path), ensure_ascii=True)}="read"'
+    )
+    return (
+        '{extends=":workspace",filesystem={'
+        + filesystem_entry
+        + "},network={enabled=false}}"
+    )
+
+
 def _git_head(
     workspace: Path,
     *,
@@ -2699,6 +3866,17 @@ def _git_head(
     return value
 
 
+def _parse_git_status(payload: str) -> dict[str, str]:
+    status: dict[str, str] = {}
+    for line in payload.splitlines():
+        if len(line) < 4:
+            continue
+        code = line[:2]
+        path = line[3:].split(" -> ")[-1]
+        status[path] = code
+    return status
+
+
 def _git_status(
     workspace: Path,
     *,
@@ -2712,6 +3890,7 @@ def _git_status(
             "-C",
             str(workspace),
             "status",
+            "--no-renames",
             "--porcelain=v1",
             "--untracked-files=all",
         ],
@@ -2725,14 +3904,7 @@ def _git_status(
         raise ExternalCodexRuntimeError(
             "workspace_status_failed", "cannot inspect exact workspace status"
         )
-    status: dict[str, str] = {}
-    for line in completed.stdout.splitlines():
-        if len(line) < 4:
-            continue
-        code = line[:2]
-        path = line[3:].split(" -> ")[-1]
-        status[path] = code
-    return status
+    return _parse_git_status(completed.stdout)
 
 
 def _git_bytes(
@@ -3795,6 +4967,7 @@ class ExternalCodexRuntime:
             "supervisor": PART_ROOT / str(containment["supervisor_ref"]),
             "probe_executable": Path(str(containment["probe_executable"])),
             "python_executable": Path(sys.executable).resolve(),
+            "mount_wrapper": MOUNT_WRAPPER_PATH,
         }
         for label, path in containment_paths.items():
             if (
@@ -3812,6 +4985,7 @@ class ExternalCodexRuntime:
                 "process_containment_unavailable",
                 "runtime profile selected an unexpected supervisor source",
             )
+        mount_wrapper_digest = sha256_file(containment_paths["mount_wrapper"])
         for server in tool_entry["mcp_server_configs"]:
             token_name = str(server["bearer_token_env_var"])
             if not os.environ.get(token_name):
@@ -3909,12 +5083,82 @@ class ExternalCodexRuntime:
                 "process_containment_unavailable",
                 "Linux subreaper-supervisor containment probe was rejected",
             )
+        with tempfile.TemporaryDirectory(
+            prefix=".external-codex-preflight-",
+            dir=self.state_root,
+        ) as temporary:
+            preflight_root = Path(temporary)
+            execution_root = preflight_root / "execution-root"
+            execution_root.mkdir(mode=0o700)
+            target_config = execution_root / "repository-config"
+            target_config.write_text("credential-marker\n", encoding="utf-8")
+            sanitized_config = preflight_root / "sanitized-config"
+            sanitized_config.write_text(
+                "[core]\n\trepositoryFormatVersion = 0\n\tbare = false\n",
+                encoding="utf-8",
+            )
+            sanitized_config.chmod(0o400)
+            actor_git_mask = {
+                "masks": [
+                    {
+                        "source": str(sanitized_config),
+                        "target": str(target_config),
+                        "digest": sha256_file(sanitized_config),
+                    }
+                ],
+                "sanitized_config_path": str(sanitized_config),
+            }
+            actor_git_mask["private_directory_views"] = _private_directory_views(
+                actor_git_mask["masks"]
+            )
+            permission_profile = _actor_codex_permission_profile(actor_git_mask)
+            nested_sandbox_probe = [
+                str(executable),
+                "-c",
+                'default_permissions="aoa_external_actor"',
+                "-c",
+                f"permissions.aoa_external_actor={permission_profile}",
+                "--disable",
+                "use_legacy_landlock",
+                "sandbox",
+                "-P",
+                "aoa_external_actor",
+                "-C",
+                str(execution_root),
+                "--",
+                str(containment_paths["probe_executable"]),
+            ]
+            try:
+                nested = subprocess.run(
+                    self._containment_command(
+                        nested_sandbox_probe,
+                        executable_digest=executable_digest,
+                        actor_git_mask=actor_git_mask,
+                        mount_wrapper_digest=mount_wrapper_digest,
+                    ),
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                    timeout=30,
+                    env=env,
+                )
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                raise ExternalCodexRuntimeError(
+                    "process_containment_unavailable",
+                    "masked nested Codex sandbox preflight failed",
+                ) from exc
+            if nested.returncode != 0:
+                raise ExternalCodexRuntimeError(
+                    "process_containment_unavailable",
+                    "masked nested Codex sandbox preflight was rejected",
+                )
         return {
             "version": version,
             "auth_regime": "chatgpt_login",
             "model_slug": model_slug,
             "reasoning_effort": reasoning_effort,
             "executable_digest": executable_digest,
+            "mount_wrapper_digest": mount_wrapper_digest,
         }
 
     def _containment_command(
@@ -3923,6 +5167,8 @@ class ExternalCodexRuntime:
         *,
         executable_digest: str,
         identity_path: Path | None = None,
+        actor_git_mask: Mapping[str, Any] | None = None,
+        mount_wrapper_digest: str | None = None,
     ) -> list[str]:
         containment = self.profile["process_containment"]
         if containment["strategy"] != "linux_subreaper_supervisor_v1":
@@ -3949,6 +5195,81 @@ class ExternalCodexRuntime:
                     "process identity receipt path must be absolute",
                 )
             supervisor_argv.extend(("--identity-file", str(identity_path)))
+        if actor_git_mask is not None:
+            if (
+                not MOUNT_WRAPPER_PATH.is_file()
+                or MOUNT_WRAPPER_PATH.resolve() != MOUNT_WRAPPER_PATH
+                or not os.access(MOUNT_WRAPPER_PATH, os.X_OK)
+                or mount_wrapper_digest is None
+                or sha256_file(MOUNT_WRAPPER_PATH) != mount_wrapper_digest
+            ):
+                raise ExternalCodexRuntimeError(
+                    "actor_git_mask_unavailable",
+                    "preflighted mount wrapper identity is unavailable",
+                )
+            supervisor_argv.extend(
+                (
+                    "--mount-wrapper",
+                    str(MOUNT_WRAPPER_PATH),
+                    "--mount-wrapper-digest",
+                    mount_wrapper_digest,
+                )
+            )
+            masks = actor_git_mask.get("masks")
+            private_directory_views = actor_git_mask.get(
+                "private_directory_views"
+            )
+            if (
+                not isinstance(masks, list)
+                or not masks
+                or not isinstance(private_directory_views, list)
+                or not private_directory_views
+            ):
+                raise ExternalCodexRuntimeError(
+                    "actor_git_mask_unavailable",
+                    "external actor Git mask contains no private mount view",
+                )
+            view_targets: set[Path] = set()
+            for view in private_directory_views:
+                target = Path(str(view.get("target", "")))
+                identity = view.get("identity")
+                entries = view.get("entries")
+                if (
+                    not target.is_absolute()
+                    or not isinstance(identity, dict)
+                    or not isinstance(entries, list)
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "actor_git_mask_unavailable",
+                        "external actor private mount view has an invalid shape",
+                    )
+                _assert_private_view_identity(target, identity, directory=True)
+                view_targets.add(target)
+                supervisor_argv.extend(
+                    (
+                        "--private-directory-view",
+                        json.dumps(view, sort_keys=True, separators=(",", ":")),
+                    )
+                )
+            for mask in masks:
+                source = Path(str(mask.get("source", "")))
+                target = Path(str(mask.get("target", "")))
+                digest = str(mask.get("digest", ""))
+                if (
+                    not source.is_absolute()
+                    or not target.is_absolute()
+                    or target.parent not in view_targets
+                    or not source.is_file()
+                    or source.is_symlink()
+                    or sha256_file(source) != digest
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "actor_git_mask_unavailable",
+                        "external actor Git mask changed before containment",
+                    )
+                supervisor_argv.extend(
+                    ("--read-only-mask", str(source), str(target), digest)
+                )
         return [*supervisor_argv, "--", *command]
 
     def _validate_launch(
@@ -5503,6 +6824,7 @@ Runtime session identity: {state['session_id']}
         mode: Literal["start", "resume"],
         thread_id: str | None,
         mcp_endpoint_overrides: Mapping[str, str] | None = None,
+        actor_git_mask: Mapping[str, Any] | None = None,
     ) -> list[str]:
         executable = str(launch["codex_executable"])
         configuration = realization["configuration"]
@@ -5512,9 +6834,18 @@ Runtime session identity: {state['session_id']}
             executable,
             "-a",
             "never",
-            "-s",
-            str(tool_entry["codex_sandbox"]),
         ]
+        if tool_entry["codex_sandbox"] != "workspace-write":
+            raise ExternalCodexRuntimeError(
+                "codex_permission_profile_invalid",
+                "external actor runtime requires the workspace-derived Codex profile",
+            )
+        if actor_git_mask is None:
+            raise ExternalCodexRuntimeError(
+                "actor_git_mask_unavailable",
+                "external actor launch lacks its attempt-local Git mask",
+            )
+        permission_profile = _actor_codex_permission_profile(actor_git_mask)
         execution_root_mode = str(tool_entry["codex_execution_root"])
         base.extend(
             [
@@ -5524,6 +6855,10 @@ Runtime session identity: {state['session_id']}
             ]
         )
         common = [
+            "-c",
+            'default_permissions="aoa_external_actor"',
+            "-c",
+            f"permissions.aoa_external_actor={permission_profile}",
             "--ignore-user-config",
             "--ignore-rules",
             "--strict-config",
@@ -5563,11 +6898,6 @@ Runtime session identity: {state['session_id']}
             common[0:0] = ["-c", f"mcp_servers.{server_id}={server_config}"]
         if execution_root_mode == "attempt-local":
             common.insert(0, "--skip-git-repo-check")
-        if tool_entry["codex_sandbox"] == "workspace-write":
-            common[0:0] = [
-                "-c",
-                "sandbox_workspace_write.network_access=false",
-            ]
         if mode == "resume":
             if not thread_id:
                 raise ExternalCodexRuntimeError(
@@ -5664,12 +6994,27 @@ Runtime session identity: {state['session_id']}
                 for item in self.profile["tool_profiles"]
                 if item["profile_id"] == state["tool_profile_id"]
             )
-            self._codex_preflight(
+            preflight = self._codex_preflight(
                 launch,
                 str(state["model_slug"]),
                 str(state["reasoning_effort"]),
                 tool_entry,
             )
+            admitted_mount_wrapper_digest = state["preflight"].get(
+                "mount_wrapper_digest"
+            )
+            if (
+                not isinstance(admitted_mount_wrapper_digest, str)
+                or preflight["mount_wrapper_digest"]
+                != admitted_mount_wrapper_digest
+            ):
+                self._worker_failure_locked(
+                    state,
+                    attempt_id=attempt_id,
+                    code="mount_wrapper_drift",
+                    message="mount wrapper changed after durable admission",
+                )
+                return
             current_manifest = build_workspace_manifest(state["workspace_path"])
             if current_manifest != state["workspace_manifest_baseline"]:
                 self._worker_failure_locked(
@@ -5704,6 +7049,7 @@ Runtime session identity: {state['session_id']}
                     ),
                 )
                 return
+            actor_git_mask = _prepare_actor_git_mask(target_workspace, scratch)
             prompt = self._render_prompt(
                 state=state,
                 binding=binding,
@@ -5730,12 +7076,15 @@ Runtime session identity: {state['session_id']}
                 mode=mode,
                 thread_id=state.get("thread_id"),
                 mcp_endpoint_overrides=mcp_endpoints,
+                actor_git_mask=actor_git_mask,
             )
             process_identity_path = attempt_dir / "process-identity.json"
             command = self._containment_command(
                 codex_command,
                 executable_digest=str(launch["codex_executable_digest"]),
                 identity_path=process_identity_path,
+                actor_git_mask=actor_git_mask,
+                mount_wrapper_digest=str(preflight["mount_wrapper_digest"]),
             )
             attempt = state["attempts"][attempt_number - 1]
             attempt["status"] = "running"

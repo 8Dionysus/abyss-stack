@@ -26,7 +26,19 @@ Tracking starts with the community-docs baseline for this repository.
   ambient `LD_*` injection before its first dynamic exec; and verified release
   bytes are mounted at a namespace-private read-only `/mnt` coordinate rather
   than overlaying a host-visible release path that could be renamed or
-  replaced.
+  replaced. The external actor's Git-config mask now reconstructs affected
+  metadata parents inside namespace-private `tmpfs` views, so reserving absent
+  config and lock coordinates cannot create host files. Jq and GNU-abbreviated
+  pattern and pattern-file operands plus attached generic-mutator destinations
+  can no longer hide Git-config reads or metadata writes. Owner and masked
+  status comparison now fixes rename display explicitly, so harmless local
+  `status.renames` preferences cannot reject a valid repository. The mount gate now uses a
+  bubblewrap-retained socket peer,
+  so supervisor EOF cannot release a rejected launch; abort still kills and
+  reaps the gated wrapper before closing the supervisor endpoint. The exact
+  mount-wrapper digest proven by nested-sandbox preflight is retained through
+  inference launch, so a replacement between those phases fails closed, while
+  older durable v2 states remain readable for observation and result recovery.
 - Allow the admission composer to renew an already-admitted contour only after
   its currentness window has expired according to the normalized composition
   clock. The refresh remains bound to the exact predecessor digest and the
