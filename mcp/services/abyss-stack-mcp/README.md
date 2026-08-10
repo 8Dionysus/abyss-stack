@@ -456,7 +456,14 @@ preflight result, stop bootstrap, then start the normal unit and immediately
 issue a second receipt bound to the production PID/start identity.
 Only that second receipt can enter final proof, acceptance, rollback, and
 admission. Bootstrap is not a general recovery bypass and must never be
-enabled.
+enabled. The bounded `ABYSS-STACK-D-0109` cold-start controller may start the
+same exact manual units transiently only after the registry source or admitted
+read currentness has expired and the production fleet cannot start. It first
+resets the expired registry to claim-free shadow state when required, admits
+only bootstrap-bound evidence long enough to rebuild an 11-of-11 eligible
+preflight catalog, stops every bootstrap unit, starts the exact production
+fleet, and replaces all bootstrap identities with production PID/start
+receipts. Any partial step stops bootstrap and remains fail-closed.
 
 For example:
 
@@ -485,8 +492,12 @@ The command never starts or stops a unit, changes consumer configuration,
 merges the overlay into the production observation, invokes the owner
 reviewer, or admits the registry entry.
 
-Production refresh uses `abyss-stack-mcp-observation.service` and its two-minute
-timer. Runtime provisioning creates the private mode-`0700` observation
+Production observation refresh uses `abyss-stack-mcp-observation.service` and
+its two-minute timer. Admission currentness uses the separate
+`abyss-mcp-modern-admission-refresh.timer`: ordinary runs only refresh exact
+production evidence, while an expired cold start follows the bounded
+bootstrap-to-production recovery above. Runtime provisioning creates the
+private mode-`0700` observation
 directory but neither starts nor enables the producer. Run the oneshot once
 before starting a stack MCP plane; enable the timer only as an explicit
 rollout action. Both stack MCP planes have a `ConditionPathExists` guard for

@@ -9,6 +9,14 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Recover the exact modern MCP read fleet after a cold start outlives registry
+  or contour currentness. The admission backstop now resets only an expired
+  registry to claim-free shadow state, uses the existing manual bootstrap
+  units to rebuild an 11-of-11 preflight catalog, then requires a complete
+  production handoff and production PID/start canary family before publishing
+  final admission. Candidate and effect contours remain untouched, bootstrap
+  units remain unenabled, and every partial recovery stops bootstrap and fails
+  closed.
 - Allow the admission composer to renew an already-admitted contour only after
   its currentness window has expired according to the normalized composition
   clock. The refresh remains bound to the exact predecessor digest and the

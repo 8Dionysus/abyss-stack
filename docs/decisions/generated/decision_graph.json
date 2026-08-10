@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 108,
-  "edge_count": 2439,
+  "decision_count": 109,
+  "edge_count": 2463,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 929,
-    "DATED": 108,
-    "GUARDED_BY": 322,
-    "HAS_STATUS": 108,
-    "HAS_SURFACE_CLASS": 282,
-    "IN_STACK_LANE": 245,
-    "NEXT_DECISION": 107,
-    "OWNED_BY_SURFACE": 114,
-    "OWNS_DECISION": 108,
+    "CITES_SOURCE_SURFACE": 936,
+    "DATED": 109,
+    "GUARDED_BY": 327,
+    "HAS_STATUS": 109,
+    "HAS_SURFACE_CLASS": 285,
+    "IN_STACK_LANE": 248,
+    "NEXT_DECISION": 108,
+    "OWNED_BY_SURFACE": 115,
+    "OWNS_DECISION": 109,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 114
+    "UNDER_MECHANIC_PARENT": 115
   },
   "edges": [
     {
@@ -11663,11 +11663,126 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0108",
+      "target": "decision:ABYSS-STACK-D-0109",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0108",
       "target": "owner_surface:mcp/services/_shared/modern_runtime.py",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0108",
+      "target": "mechanic_parent:runtime-lifecycle",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "source_surface:mcp/services/abyss-stack-mcp/DESIGN.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "source_surface:mcp/services/abyss-stack-mcp/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "source_surface:scripts/aoa-refresh-modern-mcp-admission",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "source_surface:systemd/user/abyss-mcp-modern-admission-refresh.service",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "source_surface:systemd/user/abyss-mcp-modern-admission-refresh.timer",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "source_surface:systemd/user/abyss-stack-mcp-read-bootstrap.service",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "source_surface:systemd/user/aoa-organ-mcp-read-bootstrap%40.service",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "date:2026-08-10",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "guard_family:bootstrap%20handoff",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "guard_family:cold%20start",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "guard_family:exact%20identity",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "guard_family:fail%20closed",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "guard_family:rollback",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "surface_class:MCP%20access%20plane",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "surface_class:admission%20recovery",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "surface_class:runtime%20lifecycle",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "stack_lane:MCP%20services",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "stack_lane:organ%20access%20fabric",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "stack_lane:runtime%20lifecycle",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "owner_surface:scripts/aoa-refresh-modern-mcp-admission",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
       "target": "mechanic_parent:runtime-lifecycle",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -12210,21 +12325,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0108",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0109",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1086,
+  "node_count": 1097,
   "node_type_counts": {
-    "date": 33,
-    "decision": 108,
-    "guard_family": 160,
+    "date": 34,
+    "decision": 109,
+    "guard_family": 162,
     "mechanic_parent": 10,
-    "owner_surface": 60,
+    "owner_surface": 61,
     "repo": 1,
-    "source_surface": 553,
+    "source_surface": 558,
     "stack_lane": 45,
     "status": 3,
-    "surface_class": 113
+    "surface_class": 114
   },
   "nodes": [
     {
@@ -12390,6 +12510,11 @@
     {
       "id": "date:2026-08-09",
       "label": "2026-08-09",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-08-10",
+      "label": "2026-08-10",
       "type": "date"
     },
     {
@@ -13473,6 +13598,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-10",
+      "id": "decision:ABYSS-STACK-D-0109",
+      "label": "ABYSS-STACK-D-0109",
+      "path": "docs/decisions/ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md",
+      "posture": "accepted bounded cold-start recovery",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0109 Recover Expired Modern MCP Read Admission",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -13548,6 +13683,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:bootstrap%20handoff",
+      "label": "bootstrap handoff",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:bounded%20context",
       "label": "bounded context",
       "type": "guard_family"
@@ -13575,6 +13715,11 @@
     {
       "id": "guard_family:canonical%20fallback",
       "label": "canonical fallback",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:cold%20start",
+      "label": "cold start",
       "type": "guard_family"
     },
     {
@@ -14490,6 +14635,11 @@
     {
       "id": "owner_surface:mechanics/runtime-lifecycle/parts/user-unit/",
       "label": "mechanics/runtime-lifecycle/parts/user-unit/",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:scripts/aoa-refresh-modern-mcp-admission",
+      "label": "scripts/aoa-refresh-modern-mcp-admission",
       "type": "owner_surface"
     },
     {
@@ -16904,6 +17054,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:scripts/aoa-refresh-modern-mcp-admission",
+      "label": "scripts/aoa-refresh-modern-mcp-admission",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:scripts/aoa-routing-canary",
       "label": "scripts/aoa-routing-canary",
       "type": "source_surface"
@@ -17154,6 +17309,16 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:systemd/user/abyss-mcp-modern-admission-refresh.service",
+      "label": "systemd/user/abyss-mcp-modern-admission-refresh.service",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:systemd/user/abyss-mcp-modern-admission-refresh.timer",
+      "label": "systemd/user/abyss-mcp-modern-admission-refresh.timer",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:systemd/user/abyss-stack-mcp-%2A.service",
       "label": "systemd/user/abyss-stack-mcp-*.service",
       "type": "source_surface"
@@ -17161,6 +17326,11 @@
     {
       "id": "source_surface:systemd/user/abyss-stack-mcp-internal-effect.service",
       "label": "systemd/user/abyss-stack-mcp-internal-effect.service",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:systemd/user/abyss-stack-mcp-read-bootstrap.service",
+      "label": "systemd/user/abyss-stack-mcp-read-bootstrap.service",
       "type": "source_surface"
     },
     {
@@ -17201,6 +17371,11 @@
     {
       "id": "source_surface:systemd/user/aoa-organ-mcp-read%40.service",
       "label": "systemd/user/aoa-organ-mcp-read@.service",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:systemd/user/aoa-organ-mcp-read-bootstrap%40.service",
+      "label": "systemd/user/aoa-organ-mcp-read-bootstrap@.service",
       "type": "source_surface"
     },
     {
@@ -17696,6 +17871,11 @@
     {
       "id": "surface_class:active%20topology%20language",
       "label": "active topology language",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:admission%20recovery",
+      "label": "admission recovery",
       "type": "surface_class"
     },
     {
