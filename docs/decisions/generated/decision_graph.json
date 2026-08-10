@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 111,
-  "edge_count": 2512,
+  "decision_count": 112,
+  "edge_count": 2535,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 948,
-    "DATED": 111,
-    "GUARDED_BY": 338,
-    "HAS_STATUS": 111,
-    "HAS_SURFACE_CLASS": 293,
-    "IN_STACK_LANE": 254,
-    "NEXT_DECISION": 110,
-    "OWNED_BY_SURFACE": 117,
-    "OWNS_DECISION": 111,
+    "CITES_SOURCE_SURFACE": 953,
+    "DATED": 112,
+    "GUARDED_BY": 343,
+    "HAS_STATUS": 112,
+    "HAS_SURFACE_CLASS": 297,
+    "IN_STACK_LANE": 257,
+    "NEXT_DECISION": 111,
+    "OWNED_BY_SURFACE": 118,
+    "OWNS_DECISION": 112,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 117
+    "UNDER_MECHANIC_PARENT": 118
   },
   "edges": [
     {
@@ -12013,11 +12013,121 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0111",
+      "target": "decision:ABYSS-STACK-D-0112",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0111",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0111",
+      "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/runtime-profile.v1.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "date:2026-08-10",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "guard_family:exact%20binding",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "guard_family:model-fit%20evidence",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "guard_family:owner%20provenance",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "guard_family:responsibility%20transfer",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "guard_family:semantic%20digest",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "surface_class:actor%20admission",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "surface_class:content%20identity",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "surface_class:incarnation%20evidence",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "surface_class:runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "stack_lane:review",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "stack_lane:source",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
       "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -12575,21 +12685,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0111",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0112",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1128,
+  "node_count": 1136,
   "node_type_counts": {
     "date": 34,
-    "decision": 111,
-    "guard_family": 171,
+    "decision": 112,
+    "guard_family": 174,
     "mechanic_parent": 10,
     "owner_surface": 62,
     "repo": 1,
-    "source_surface": 569,
+    "source_surface": 571,
     "stack_lane": 46,
     "status": 3,
-    "surface_class": 121
+    "surface_class": 123
   },
   "nodes": [
     {
@@ -13873,6 +13988,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-10",
+      "id": "decision:ABYSS-STACK-D-0112",
+      "label": "ABYSS-STACK-D-0112",
+      "path": "docs/decisions/ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md",
+      "posture": "accepted source-local admission ABI; clean owner landing and live role proof remain open",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0112 Require Evidence-Complete Owner-Contour Incarnations",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -14313,6 +14438,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:model-fit%20evidence",
+      "label": "model-fit evidence",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:mutable%20control%20projection",
       "label": "mutable control projection",
       "type": "guard_family"
@@ -14528,6 +14658,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:responsibility%20transfer",
+      "label": "responsibility transfer",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:return-policy",
       "label": "return-policy",
       "type": "guard_family"
@@ -14620,6 +14755,11 @@
     {
       "id": "guard_family:script%20topology",
       "label": "script topology",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:semantic%20digest",
+      "label": "semantic digest",
       "type": "guard_family"
     },
     {
@@ -16949,6 +17089,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/runtime-profile.v1.json",
       "label": "mechanics/governed-execution/parts/external-codex-agent/runtime-profile.v1.json",
       "type": "source_surface"
@@ -16961,6 +17106,11 @@
     {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-launch.schema.json",
       "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-launch.schema.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py",
       "type": "source_surface"
     },
     {
@@ -18344,6 +18494,11 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:content%20identity",
+      "label": "content identity",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:cross-organ%20orchestration",
       "label": "cross-organ orchestration",
       "type": "surface_class"
@@ -18461,6 +18616,11 @@
     {
       "id": "surface_class:human%20review%20interface",
       "label": "human review interface",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:incarnation%20evidence",
+      "label": "incarnation evidence",
       "type": "surface_class"
     },
     {

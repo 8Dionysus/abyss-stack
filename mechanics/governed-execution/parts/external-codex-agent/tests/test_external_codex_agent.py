@@ -32,6 +32,7 @@ from aoa_sdk.a2a.rebase import (
     build_summon_request_payload,
 )
 from aoa_sdk.contracts.control_plane import (
+    ContentRef,
     ProvenanceRef,
     RunPlan,
     canonical_digest,
@@ -45,6 +46,7 @@ from aoa_sdk.control_plane import (
     WakeCondition,
     WakeEscalationPolicy,
     build_agent_incarnation_binding,
+    build_agent_incarnation_binding_v2,
     load_model_realization_ref,
 )
 from aoa_sdk.runtime_adapters import (
@@ -78,7 +80,7 @@ SUMMON_REQUEST_SCHEMA_REF = (
 )
 SUMMON_REQUEST_SCHEMA_VERSION = "urn:aoa-sdk:a2a:summon-request:v4"
 OWNER_EXECUTION_REQUEST_SCHEMA_PATH = (
-    AGENTS_ROOT / "skills/aoa-summon/references/summon-request-v3.schema.json"
+    AGENTS_ROOT / "skills/aoa-summon/references/summon-request-v4.schema.json"
 )
 TASK_LOCAL_DAG_SCHEMA_PATH = SKILLS_ROOT / "schemas/task_local_dag_v2.schema.json"
 CONTROLLER_PATH = PART_ROOT / "external_codex_agent.py"
@@ -118,6 +120,20 @@ def _digest_bytes(raw: bytes) -> str:
 
 def _digest_path(path: Path) -> str:
     return _digest_bytes(path.read_bytes())
+
+
+def _semantic_digest(value: Any) -> str:
+    raw = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return _digest_bytes(raw)
+
+
+def _self_digest(value: Mapping[str, Any], field: str) -> str:
+    return _semantic_digest(dict(value) | {field: ZERO_DIGEST})
 
 
 def _write_json(path: Path, value: Any) -> None:
@@ -950,10 +966,13 @@ def _fixture(
     summon_request_mutator: Callable[[dict[str, Any]], None] | None = None,
     validate_summon_request: bool = True,
     owner_contour: bool = False,
+    owner_binding_v1: bool = False,
     role_mcp: str | None = None,
     workspace_projection_seed: Mapping[str, str] | None = None,
     responsibility_transfer_mutator: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
+    if owner_binding_v1 and not owner_contour:
+        raise AssertionError("owner_binding_v1 is only meaningful for owner-contour tests")
     if role_mcp is not None and workspace_write:
         raise AssertionError("role-scoped MCP fixtures are read-only")
     if owner_contour and (
@@ -994,38 +1013,22 @@ def _fixture(
         )
 
     role_path = tmp_path / "role.json"
-    _write_json(
-        role_path,
-        (
+    role_ref: ProvenanceRef
+    if not owner_contour:
+        _write_json(
+            role_path,
             {
-                "schema_version": "actor-mandate-v1",
-                "mandate_id": f"mandate:fixture:{role_id}",
-                "role_id": role_id,
-                "obligation_ref": "obligation:fixture:bounded-duty",
-                "authority": ["bounded owner-local evidence and effects only"],
-                "domain_procedure_refs": ["procedure:fixture:bounded-duty"],
-                "continuity_posture": "role-continuity",
-                "return_owner": "actor://fixture-goal-owner",
-                "stop_line": "Stop before any undelegated or external effect.",
-            }
-            if owner_contour
-            else {
                 "schema_version": "fixture-role-v1",
                 "role_id": role_id,
                 "obligation": "Return a bounded landing assessment without owner claims.",
-            }
-        ),
-    )
-    role_ref = _provenance(
-        "aoa-agents",
-        (
-            f"mandate:fixture:{role_id}"
-            if owner_contour
-            else f"generated/agent_catalog.min.json#agents/{role_id}"
-        ),
-        digest=_digest_path(role_path),
-        schema_version=("actor-mandate-v1" if owner_contour else "fixture-v1"),
-    )
+            },
+        )
+        role_ref = _provenance(
+            "aoa-agents",
+            f"generated/agent_catalog.min.json#agents/{role_id}",
+            digest=_digest_path(role_path),
+            schema_version="fixture-v1",
+        )
     extra_role_refs: tuple[tuple[str, ProvenanceRef], ...] = ()
     reviewer_role_path: Path | None = None
     reviewer_realization_path: Path | None = None
@@ -1084,28 +1087,109 @@ def _fixture(
     dag_ref: ProvenanceRef | None = None
     transfer_ref: ProvenanceRef | None = None
     procedure_ref: ProvenanceRef | None = None
+    role_resolution_ref: ProvenanceRef | None = None
+    model_fit_query_ref: ProvenanceRef | None = None
+    model_fit_projection_ref: ProvenanceRef | None = None
     if owner_contour:
+        holder_ref = {
+            "object_id": "actor://fixture-goal-owner",
+            "owner_repo": "fixture-target",
+            "schema_version": "actor-holder-v1",
+            "digest": ZERO_DIGEST,
+        }
+        goal_ref = {
+            "object_id": parent_task_id,
+            "owner_repo": "fixture-target",
+            "schema_version": "goal-anchor-v1",
+            "digest": ZERO_DIGEST,
+        }
         obligation_path = tmp_path / "agent-obligation.json"
-        _write_json(
-            obligation_path,
-            {
-                "schema_version": "agent-obligation-v1",
-                "obligation_id": "obligation:fixture:bounded-duty",
-                "goal_anchor": parent_task_id,
-                "phase": "execution",
-                "duty": "Perform one independently held bounded owner duty.",
-                "domain_owner": "fixture-target",
-                "current_holder": "actor://fixture-goal-owner",
-                "trigger_strength": "master_decision",
-                "return_owner": "actor://fixture-goal-owner",
-                "stop_line": "Stop before undelegated effects.",
+        obligation = {
+            "schema_version": "agent-obligation-v1",
+            "obligation_id": "obligation:fixture:bounded-duty",
+            "goal_ref": goal_ref,
+            "phase": "execution",
+            "duty": "Perform one independently held bounded owner duty.",
+            "domain_owner": "fixture-target",
+            "current_holder": holder_ref,
+            "responsibility_boundary": "One bounded owner-local duty and its exact return.",
+            "missed_consequence": "The independent duty would remain without a holder.",
+            "independence_findings": {
+                "positive_signals": ["distinct responsibility holder required"],
+                "negative_signals": [],
+                "rejected_ordinary_step": "The duty must remain independently addressable.",
             },
+            "trigger": {
+                "strength": "master_decision",
+                "authority_ref": holder_ref,
+            },
+            "expected_outcomes": ["external_codex_agent_result"],
+            "return_owner": holder_ref,
+            "lifecycle_posture": "role-continuity",
+            "stop_line": "Stop before any undelegated or external effect.",
+            "evidence_refs": [],
+            "uncertainty": [],
+            "next_route": "form_actor",
+            "obligation_digest": ZERO_DIGEST,
+        }
+        obligation["obligation_digest"] = _self_digest(
+            obligation, "obligation_digest"
         )
+        _write_json(obligation_path, obligation)
         obligation_ref = _provenance(
             "aoa-agents",
             "obligation:fixture:bounded-duty",
             digest=_digest_path(obligation_path),
             schema_version="agent-obligation-v1",
+        )
+        owner_source_ref = "a" * 40
+        base_role_ref = {
+            "owner_repo": "aoa-agents",
+            "artifact_ref": f"agents/roles/{role_id}/profile.json",
+            "source_ref": owner_source_ref,
+            "artifact_digest": "sha256:" + "1" * 64,
+            "schema_ref": "schemas/agent-profile.schema.json",
+            "schema_version": "aoa_agent_profile_v1",
+        }
+        tier_ref = {
+            "owner_repo": "aoa-agents",
+            "artifact_ref": "agents/operating-model/tiers/executor.json",
+            "source_ref": owner_source_ref,
+            "artifact_digest": "sha256:" + "2" * 64,
+            "schema_ref": "schemas/model-tier.schema.json",
+            "schema_version": "aoa_model_tier_v1",
+        }
+        role_resolution_path = tmp_path / "role-resolution.json"
+        role_resolution = {
+            "schema_version": "aoa_role_resolution_v1",
+            "resolution_id": f"role-resolution:{role_id}",
+            "owner_repo": "aoa-agents",
+            "owner_source_ref": owner_source_ref,
+            "role_id": role_id,
+            "base_role_ref": base_role_ref,
+            "specialization_id": None,
+            "specialization_ref": None,
+            "tier_id": "executor",
+            "tier_ref": tier_ref,
+            "capability_pack_refs": [],
+            "selection_authority": {
+                "semantic_selection_performed": False,
+                "model_selection_performed": False,
+                "runtime_activation_performed": False,
+            },
+            "resolution_digest": ZERO_DIGEST,
+        }
+        role_resolution["resolution_digest"] = _self_digest(
+            role_resolution, "resolution_digest"
+        )
+        _write_json(role_resolution_path, role_resolution)
+        role_resolution_ref = _provenance(
+            "aoa-agents",
+            role_resolution["resolution_id"],
+            digest=_digest_path(role_resolution_path),
+            source_ref=owner_source_ref,
+            schema_ref="skills/aoa-agents-skills/references/role-resolution-v1.schema.json",
+            schema_version="aoa_role_resolution_v1",
         )
         dag_path = tmp_path / "task-local-dag.json"
         _write_json(
@@ -1150,7 +1234,7 @@ def _fixture(
                 f"actor://fixture/{role_id}",
             ],
             "obligation_ref": obligation_ref.artifact_ref,
-            "mandate_ref": role_ref.artifact_ref,
+            "mandate_ref": f"mandate:fixture:{role_id}",
             "task_local_dag_ref": dag_ref.artifact_ref,
             "return_owner": "actor://fixture-goal-owner",
         }
@@ -1179,10 +1263,112 @@ def _fixture(
             digest=_digest_path(procedure_path),
             schema_version="owner-procedure-v1",
         )
+        mandate = {
+            "schema_version": "actor-mandate-v1",
+            "mandate_id": f"mandate:fixture:{role_id}",
+            "obligation_ref": {
+                "object_id": obligation["obligation_id"],
+                "owner_repo": "aoa-agents",
+                "schema_version": "agent-obligation-v1",
+                "digest": obligation["obligation_digest"],
+            },
+            "goal_ref": goal_ref,
+            "role_resolution_ref": {
+                "object_id": role_resolution["resolution_id"],
+                "owner_repo": "aoa-agents",
+                "schema_version": "aoa_role_resolution_v1",
+                "digest": role_resolution["resolution_digest"],
+            },
+            "role_binding": {
+                "role_id": role_id,
+                "specialization_id": None,
+                "tier_id": "executor",
+                "base_role_ref": base_role_ref,
+                "specialization_ref": None,
+                "tier_ref": tier_ref,
+                "capability_pack_refs": [],
+            },
+            "identity_posture": "role-continuity",
+            "domain_owner": "fixture-target",
+            "domain_procedure_refs": [
+                {
+                    "object_id": procedure_ref.artifact_ref,
+                    "owner_repo": procedure_ref.owner_repo,
+                    "schema_version": procedure_ref.schema_version,
+                    "digest": procedure_ref.artifact_digest,
+                }
+            ],
+            "required_executor_properties": [
+                {
+                    "property_id": "bounded-owner-work",
+                    "requirement": "Perform the exact owner-local procedure.",
+                    "verification_route": "Validate the named runtime return.",
+                }
+            ],
+            "model_fit_relation": {
+                "task_family": "landing",
+                "relation_to_duty": "The bounded duty is one landing-family operation.",
+                "relation_authority_ref": holder_ref,
+            },
+            "authority": {
+                "permissions": ["inspect exact inputs"],
+                "allowed_effects": [
+                    "repo_mutation" if workspace_write else "read_only"
+                ],
+                "prohibited_effects": ["undelegated external effect"],
+                "stop_line": "Stop before any undelegated or external effect.",
+            },
+            "environment": {
+                "sandbox_mode": "workspace-write" if workspace_write else "read-only",
+                "workspace_requirement": "Use the exact isolated fixture workspace.",
+                "required_tools": [
+                    "shell-read",
+                    *(["workspace-write"] if workspace_write else []),
+                ],
+                "required_mcp_servers": [role_mcp] if role_mcp else [],
+                "state_root_posture": "Use one explicit runtime-owned state root.",
+            },
+            "continuity": {
+                "posture": "role-continuity",
+                "identity_key": f"actor://fixture/{role_id}",
+                "state_ref": None,
+            },
+            "named_outputs": [
+                {
+                    "name": "external_codex_agent_result",
+                    "description": "One exact runtime-owned actor result.",
+                    "acceptance_route": "Return through the goal owner.",
+                }
+            ],
+            "return_owner": holder_ref,
+            "review_policy": "Review every returned named output.",
+            "refusal_policy": "Refuse work outside the mandate.",
+            "wake_policy": "Wake the parent at an authority boundary.",
+            "review_after": "Review after the external process returns.",
+            "uncertainty": [],
+            "compiler_authority": {
+                "obligation_detection_performed": False,
+                "role_selection_performed": False,
+                "model_selection_performed": False,
+                "runtime_activation_performed": False,
+            },
+            "mandate_digest": ZERO_DIGEST,
+        }
+        mandate["mandate_digest"] = _self_digest(mandate, "mandate_digest")
+        _write_json(role_path, mandate)
+        role_ref = _provenance(
+            "aoa-agents",
+            mandate["mandate_id"],
+            digest=_digest_path(role_path),
+            source_ref=owner_source_ref,
+            schema_ref="skills/aoa-agents-skills/references/actor-mandate-v1.schema.json",
+            schema_version="actor-mandate-v1",
+        )
         fixture_extra_inputs.extend(
             (
                 ("agent-obligation", obligation_path, obligation_ref),
                 ("actor-mandate", role_path, role_ref),
+                ("role-resolution", role_resolution_path, role_resolution_ref),
                 ("task-local-dag", dag_path, dag_ref),
                 ("responsibility-transfer", transfer_path, transfer_ref),
                 ("domain-procedure", procedure_path, procedure_ref),
@@ -1293,6 +1479,135 @@ def _fixture(
         )
         fixture_extra_inputs.append(
             ("summon-decision", summon_decision_path, summon_decision_ref)
+        )
+    realization_path = tmp_path / "model-realization.json"
+    _write_model_realization(
+        realization_path,
+        workspace_write=workspace_write,
+        role_mcp=role_mcp,
+    )
+    model_ref = load_model_realization_ref(
+        realization_path,
+        artifact_ref=("source/model-realizations/" + realization_path.name),
+        source_ref="b" * 40,
+    )
+    if owner_contour:
+        model_fit_projection_path = tmp_path / "model-fit-projection.json"
+        model_fit_projection = {
+            "$schema": "https://schemas.aoa.local/models/model-fit-projection.schema.json",
+            "schema_version": "aoa_model_fit_projection_v1",
+            "kind": "ModelFitProjection",
+            "model_fit_projection_id": "model-fit-projection:fixture/luna/max",
+            "subject_realization_ref": model_ref.artifact_ref,
+            "consumers": ["aoa-agents", "aoa-sdk", "abyss-stack"],
+            "generated_from_claim_refs": [
+                "source/model-claims/fixture-landing-fit.json"
+            ],
+            "study_refs": [],
+            "posture": "candidate",
+            "effect_family": "candidate" if workspace_write else "read",
+            "task_fit": [
+                {
+                    "task_family": "landing",
+                    "claim_posture": "hypothesis",
+                    "conditions": ["bounded owner procedure"],
+                    "exclusions": ["owner acceptance"],
+                    "escalation_required": True,
+                }
+            ],
+            "authority": {
+                "informational_only": True,
+                "activation_authority": False,
+                "proof_authority": False,
+                "acceptance_authority": False,
+            },
+            "freshness": {"status": "current", "review_by": None},
+            "must_not_claim": ["owner acceptance or general model benefit"],
+            "generated_at": "2026-08-10T00:00:00Z",
+        }
+        _write_json(model_fit_projection_path, model_fit_projection)
+        model_fit_projection_ref = _provenance(
+            "aoa-models",
+            "generated/model-fit-projections/fixture-luna-max.json",
+            digest=_digest_path(model_fit_projection_path),
+            source_ref=model_ref.source_ref,
+            schema_ref="schemas/model-fit-projection.schema.json",
+            schema_version="aoa_model_fit_projection_v1",
+        )
+        fit_query = {
+            "schema_version": "aoa_model_fit_query_v1",
+            "task_family": "landing",
+            "runtime_product": "codex-cli",
+            "runtime_version": "0.147.0",
+            "reasoning_effort": "max",
+            "sandbox_mode": "workspace-write" if workspace_write else "read-only",
+            "required_tools": [
+                "shell-read",
+                *(["workspace-write"] if workspace_write else []),
+            ],
+            "required_mcp_servers": [role_mcp] if role_mcp else [],
+        }
+        fit_candidate = {
+            "realization_ref": model_ref.artifact_ref,
+            "projection_ref": model_fit_projection_ref.artifact_ref,
+            "realization_provenance": model_ref.model_dump(mode="json"),
+            "projection_provenance": model_fit_projection_ref.model_dump(mode="json"),
+            "fit_evidence_refs": [
+                model_fit_projection_ref.model_dump(mode="json")
+            ],
+            "model_slug": "gpt-5.6-luna",
+            "reasoning_effort": "max",
+            "sandbox_mode": fit_query["sandbox_mode"],
+            "lifecycle_state": "declared",
+            "projection_posture": "candidate",
+            "freshness": "current",
+            "task_fit": model_fit_projection["task_fit"],
+            "limitations": ["fit remains a bounded hypothesis"],
+        }
+        fit_query_result = {
+            "schema_version": "aoa_model_fit_query_result_v2",
+            "result_id": "model-fit-query-result:" + "3" * 32,
+            "query_digest": _semantic_digest(fit_query),
+            "query": fit_query,
+            "candidate_count": 1,
+            "candidates": [fit_candidate],
+            "authority": {
+                "informational_only": True,
+                "activation_authority": False,
+                "routing_authority": False,
+                "proof_authority": False,
+                "acceptance_authority": False,
+            },
+            "owner_source_ref": model_ref.source_ref,
+            "catalog_digest": "sha256:" + "4" * 64,
+            "result_digest": ZERO_DIGEST,
+        }
+        fit_query_result["result_digest"] = _self_digest(
+            fit_query_result, "result_digest"
+        )
+        model_fit_query_path = tmp_path / "model-fit-query-result.json"
+        _write_json(model_fit_query_path, fit_query_result)
+        model_fit_query_ref = _provenance(
+            "aoa-models",
+            fit_query_result["result_id"],
+            digest=_digest_path(model_fit_query_path),
+            source_ref=model_ref.source_ref,
+            schema_ref="schemas/model-fit-query-result.schema.json",
+            schema_version="aoa_model_fit_query_result_v2",
+        )
+        fixture_extra_inputs.extend(
+            (
+                (
+                    "model-fit-query-result",
+                    model_fit_query_path,
+                    model_fit_query_ref,
+                ),
+                (
+                    "model-fit-projection",
+                    model_fit_projection_path,
+                    model_fit_projection_ref,
+                ),
+            )
         )
     summon_request_schema_ref = _provenance(
         "aoa-sdk",
@@ -1424,17 +1739,6 @@ def _fixture(
     )
     plan_path = tmp_path / "plan.json"
     _write_json(plan_path, plan.model_dump(mode="json"))
-    realization_path = tmp_path / "model-realization.json"
-    _write_model_realization(
-        realization_path,
-        workspace_write=workspace_write,
-        role_mcp=role_mcp,
-    )
-    model_ref = load_model_realization_ref(
-        realization_path,
-        artifact_ref=("source/model-realizations/" + realization_path.name),
-        source_ref="fixture-aoa-models-source",
-    )
     stop_conditions = (
         IncarnationStopCondition(
             condition_id="authority-boundary",
@@ -1505,18 +1809,17 @@ def _fixture(
         return_owner=workspace_ref,
         rollback_reentry_anchor=workspace_ref,
     )
-    binding = build_agent_incarnation_binding(
-        plan,
-        binding_id=f"binding:fixture:{identity_suffix}",
-        incarnation_id=incarnation_id,
-        causation_id=f"causation:fixture:{identity_suffix}",
-        trace_id=f"trace:fixture:{identity_suffix}",
-        task_request_ref=summon_request_ref,
-        role_id=role_id,
-        role_contract_ref=role_ref,
-        model_realization_ref=model_ref,
-        workspace_source_ref=workspace_ref,
-        permission_posture=IncarnationPermissionPosture(
+    binding_kwargs = {
+        "binding_id": f"binding:fixture:{identity_suffix}",
+        "incarnation_id": incarnation_id,
+        "causation_id": f"causation:fixture:{identity_suffix}",
+        "trace_id": f"trace:fixture:{identity_suffix}",
+        "task_request_ref": summon_request_ref,
+        "role_id": role_id,
+        "role_contract_ref": role_ref,
+        "model_realization_ref": model_ref,
+        "workspace_source_ref": workspace_ref,
+        "permission_posture": IncarnationPermissionPosture(
             sandbox_mode="workspace_write" if workspace_write else "read_only",
             approval_policy="never",
             allowed_effect_classes=(
@@ -1524,7 +1827,7 @@ def _fixture(
             ),
             network_access="disabled",
         ),
-        tool_profile=IncarnationToolProfile(
+        "tool_profile": IncarnationToolProfile(
             profile_id=(
                 {
                     "aoa_evals": "abyss-stack:external_codex_agent/eval-reader-v1",
@@ -1544,7 +1847,7 @@ def _fixture(
             ),
             required_mcp_server_ids=((role_mcp,) if role_mcp is not None else ()),
         ),
-        usage_metering=IncarnationUsageMetering(
+        "usage_metering": IncarnationUsageMetering(
             metering_regime="chatgpt_quota",
             dimensions=(
                 "input_tokens",
@@ -1556,16 +1859,51 @@ def _fixture(
                 "executed_commands",
             ),
         ),
-        stop_conditions=stop_conditions,
-        expected_result_schema_ref=report_schema_ref,
-        continuation=continuation,
-        wake_policy=wake_policy,
-        provenance=_provenance(
+        "stop_conditions": stop_conditions,
+        "expected_result_schema_ref": report_schema_ref,
+        "continuation": continuation,
+        "wake_policy": wake_policy,
+        "provenance": _provenance(
             "aoa-sdk",
             f"bindings/fixture-{identity_suffix}.json",
             digest=ZERO_DIGEST,
         ),
-    )
+    }
+    if owner_contour and not owner_binding_v1:
+        assert role_resolution_ref is not None
+        assert model_fit_query_ref is not None
+        assert model_fit_projection_ref is not None
+        binding = build_agent_incarnation_binding_v2(
+            plan,
+            **binding_kwargs,
+            agent_obligation_ref=ContentRef(
+                object_id=obligation["obligation_id"],
+                owner_repo="aoa-agents",
+                schema_version="agent-obligation-v1",
+                digest=obligation["obligation_digest"],
+            ),
+            actor_mandate_ref=ContentRef(
+                object_id=mandate["mandate_id"],
+                owner_repo="aoa-agents",
+                schema_version="actor-mandate-v1",
+                digest=mandate["mandate_digest"],
+            ),
+            role_resolution_ref=ContentRef(
+                object_id=role_resolution["resolution_id"],
+                owner_repo="aoa-agents",
+                schema_version="aoa_role_resolution_v1",
+                digest=role_resolution["resolution_digest"],
+            ),
+            model_fit_query_result_ref=ContentRef(
+                object_id=fit_query_result["result_id"],
+                owner_repo="aoa-models",
+                schema_version="aoa_model_fit_query_result_v2",
+                digest=fit_query_result["result_digest"],
+            ),
+            model_fit_projection_ref=model_fit_projection_ref,
+        )
+    else:
+        binding = build_agent_incarnation_binding(plan, **binding_kwargs)
     binding_path = tmp_path / "binding.json"
     _write_json(binding_path, binding.model_dump(mode="json"))
     fake_codex = tmp_path / "fake-codex"
@@ -1604,9 +1942,9 @@ def _fixture(
                     "path": str(OWNER_EXECUTION_REQUEST_SCHEMA_PATH),
                     "digest": _digest_path(OWNER_EXECUTION_REQUEST_SCHEMA_PATH),
                     "owner_repo": "aoa-agents",
-                    "artifact_ref": "skills/aoa-summon/references/summon-request-v3.schema.json",
-                    "source_ref": "84321efcb463b44a3491bdc1bbe825bf576886e7",
-                    "schema_version": "summon-request-v3",
+                    "artifact_ref": "skills/aoa-summon/references/summon-request-v4.schema.json",
+                    "source_ref": "596043a3ca5fc34917c48194e4fe2e2d01646042",
+                    "schema_version": "summon-request-v4",
                 },
                 "task_local_dag_schema": {
                     "path": str(TASK_LOCAL_DAG_SCHEMA_PATH),
@@ -1645,6 +1983,9 @@ def _fixture(
         assert transfer_ref is not None
         assert procedure_ref is not None
         assert summon_decision_ref is not None
+        assert role_resolution_ref is not None
+        assert model_fit_query_ref is not None
+        assert model_fit_projection_ref is not None
 
         def content_ref(
             provenance: ProvenanceRef,
@@ -1698,13 +2039,36 @@ def _fixture(
             "child_stop_line": "Stop before any undelegated or external effect.",
             "child_inputs": [],
             "external_incarnation": {
-                "obligation_ref": content_ref(obligation_ref),
-                "actor_mandate_ref": content_ref(role_ref),
+                "obligation_ref": {
+                    "object_id": obligation["obligation_id"],
+                    "owner_repo": "aoa-agents",
+                    "schema_version": "agent-obligation-v1",
+                    "digest": obligation["obligation_digest"],
+                },
+                "actor_mandate_ref": {
+                    "object_id": mandate["mandate_id"],
+                    "owner_repo": "aoa-agents",
+                    "schema_version": "actor-mandate-v1",
+                    "digest": mandate["mandate_digest"],
+                },
+                "role_resolution_ref": {
+                    "object_id": role_resolution["resolution_id"],
+                    "owner_repo": "aoa-agents",
+                    "schema_version": "aoa_role_resolution_v1",
+                    "digest": role_resolution["resolution_digest"],
+                },
+                "model_fit_query_result_ref": {
+                    "object_id": fit_query_result["result_id"],
+                    "owner_repo": "aoa-models",
+                    "schema_version": "aoa_model_fit_query_result_v2",
+                    "digest": fit_query_result["result_digest"],
+                },
+                "model_fit_projection_ref": content_ref(model_fit_projection_ref),
                 "task_local_dag_ref": content_ref(dag_ref),
                 "incarnation_binding_ref": content_ref(
                     binding.provenance,
                     digest=_digest_path(binding_path),
-                    schema_version="aoa_agent_incarnation_binding_v1",
+                    schema_version="aoa_agent_incarnation_binding_v2",
                 ),
                 "sdk_summon_request_ref": content_ref(summon_request_ref),
                 "sdk_summon_decision_ref": content_ref(summon_decision_ref),
@@ -4420,6 +4784,27 @@ def test_owner_contour_admits_exact_role_first_request_and_runs_separate_process
         owner_request_path
     )
     assert result["usage"]["input_tokens"] == 120
+
+
+@pytest.mark.skipif(
+    not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
+    or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file(),
+    reason="paired owner-contour proof requires aoa-agents and aoa-skills source roots",
+)
+def test_owner_contour_rejects_historical_v1_incarnation_binding(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True, owner_binding_v1=True)
+    owner_request_path = fixture["owner_execution_request_path"]
+    assert owner_request_path is not None
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        fixture["runtime"].preflight(
+            fixture["launch_path"],
+            owner_request_path=owner_request_path,
+        )
+
+    assert exc_info.value.code == "owner_incarnation_binding_v2_required"
 
 
 @pytest.mark.skipif(

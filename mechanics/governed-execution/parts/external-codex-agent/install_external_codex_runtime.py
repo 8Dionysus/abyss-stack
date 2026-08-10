@@ -39,13 +39,14 @@ RUNTIME_FILES = (
 )
 SDK_CONTRACT_FILES = (
     "mechanics/boundary-bridge/parts/agent-incarnation-binding/schemas/agent-incarnation-binding.schema.json",
+    "mechanics/boundary-bridge/parts/agent-incarnation-binding/schemas/agent-incarnation-binding-v2.schema.json",
     "mechanics/checkpoint/parts/child-task-reentry/schemas/summon-request-v4.schema.json",
     "mechanics/checkpoint/parts/child-task-reentry/schemas/summon-result-v4.schema.json",
 )
 OWNER_CONTRACT_FILES = (
     (
         "aoa-agents",
-        "skills/aoa-summon/references/summon-request-v3.schema.json",
+        "skills/aoa-summon/references/summon-request-v4.schema.json",
     ),
     ("aoa-skills", "schemas/task_local_dag_v2.schema.json"),
 )

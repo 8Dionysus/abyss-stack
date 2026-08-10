@@ -147,12 +147,16 @@ Before launch the controller verifies:
 11. the task carries the complete runtime-wide forbidden-effect set; terminal
     classification applies that same set independently of task input;
 12. `transport_study_fixture` is admitted only as bounded compatibility
-    evidence. `owner_contour` additionally requires a separate exact
-    `aoa-agents` `summon-request-v3`, validated against its runtime-profile-
-    pinned owner bytes, whose obligation, mandate, ready task-local DAG,
-    accepted responsibility transfer, domain procedure refs, child scope,
-    external-process/session posture, and observe-only usage semantics match
-    the launch and continuation exactly.
+    evidence and may retain historical SDK incarnation binding v1 receipts.
+    `owner_contour` additionally requires a separate exact `aoa-agents`
+    `summon-request-v4`, validated against its runtime-profile-pinned owner
+    bytes, plus SDK incarnation binding v2. Their obligation, mandate, exact
+    role resolution, informational model-fit query and chosen projection,
+    ready task-local DAG, accepted responsibility transfer, domain procedure
+    refs, child scope, external-process/session posture, and observe-only usage
+    semantics must match the launch and continuation exactly. Owner semantic
+    self-digests and immutable transport-byte digests remain distinct and both
+    are verified.
 
 The two request-shaped objects are intentionally not collapsed. The
 `AgentIncarnationBinding.task_request_ref` is the canonical schema-valid SDK

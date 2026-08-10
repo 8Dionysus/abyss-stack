@@ -40,7 +40,10 @@ from typing import Any, Literal
 from jsonschema import Draft202012Validator, FormatChecker
 
 from aoa_sdk.contracts.control_plane import ProvenanceRef, RunPlan
-from aoa_sdk.contracts.incarnation import AgentIncarnationBinding
+from aoa_sdk.contracts.incarnation import (
+    AgentIncarnationBinding,
+    AgentIncarnationBindingV2,
+)
 from aoa_sdk.control_plane.incarnation import (
     assert_agent_incarnation_binding_matches_plan,
 )
@@ -98,6 +101,8 @@ SDK_SUMMON_REQUEST_SCHEMA_REF = (
     "summon-request-v4.schema.json"
 )
 SDK_SUMMON_REQUEST_SCHEMA_VERSION = "urn:aoa-sdk:a2a:summon-request:v4"
+
+IncarnationBinding = AgentIncarnationBinding | AgentIncarnationBindingV2
 
 LEGACY_STATE_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v1"
 LEGACY_STATE_V2_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v2"
@@ -892,6 +897,34 @@ def canonical_digest(value: Any) -> str:
         separators=(",", ":"),
     ).encode("utf-8")
     return sha256_bytes(raw)
+
+
+def owner_object_digest(value: Mapping[str, Any], digest_field: str) -> str:
+    """Recompute an owner object's semantic digest without conflating raw bytes."""
+
+    candidate = dict(value)
+    candidate[digest_field] = "sha256:" + "0" * 64
+    raw = json.dumps(
+        candidate,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return sha256_bytes(raw)
+
+
+def parse_incarnation_binding(value: Mapping[str, Any]) -> IncarnationBinding:
+    """Parse historical v1 receipts and evidence-complete v2 bindings exactly."""
+
+    schema_version = value.get("schema_version")
+    if schema_version == "aoa_agent_incarnation_binding_v1":
+        return AgentIncarnationBinding.model_validate(value)
+    if schema_version == "aoa_agent_incarnation_binding_v2":
+        return AgentIncarnationBindingV2.model_validate(value)
+    raise ExternalCodexRuntimeError(
+        "incarnation_binding_schema_unsupported",
+        "incarnation binding must use the exact v1 or v2 owner schema",
+    )
 
 
 def read_bounded(path: Path, *, limit: int = MAX_CONTROL_BYTES) -> bytes:
@@ -5350,7 +5383,7 @@ class ExternalCodexRuntime:
     def _failure_closeout_context(
         self,
         *,
-        binding: AgentIncarnationBinding,
+        binding: IncarnationBinding,
         task: Mapping[str, Any],
         materialized_inputs: Mapping[str, str],
         session_dir: Path,
@@ -5450,7 +5483,7 @@ class ExternalCodexRuntime:
         launch_raw: bytes,
         coordinates: Mapping[str, tuple[Path, bytes, dict[str, Any]]],
         plan: RunPlan,
-        binding: AgentIncarnationBinding,
+        binding: IncarnationBinding,
         task: Mapping[str, Any],
         immutable_inputs: Sequence[Mapping[str, Any]],
     ) -> dict[str, Any]:
@@ -5505,6 +5538,11 @@ class ExternalCodexRuntime:
                 "owner_execution_runtime_mismatch",
                 "owner request does not admit this external process/session runtime",
             )
+        if not isinstance(binding, AgentIncarnationBindingV2):
+            raise ExternalCodexRuntimeError(
+                "owner_incarnation_binding_v2_required",
+                "new owner-contour execution requires an evidence-complete SDK v2 binding",
+            )
 
         def exact_input(
             content_ref: Mapping[str, Any], *, label: str
@@ -5515,20 +5553,52 @@ class ExternalCodexRuntime:
                 if item["provenance"].owner_repo == content_ref["owner_repo"]
                 and item["provenance"].artifact_ref == content_ref["object_id"]
                 and item["provenance"].schema_version == content_ref["schema_version"]
-                and item["provenance"].artifact_digest == content_ref["digest"]
             ]
             if len(matches) != 1:
                 raise ExternalCodexRuntimeError(
                     "owner_content_ref_unbound",
                     f"{label} is not one exact continuation-bound immutable input",
                 )
-            return matches[0]
+            matched = matches[0]
+            semantic_digest_fields = {
+                "agent-obligation-v1": "obligation_digest",
+                "actor-mandate-v1": "mandate_digest",
+                "aoa_role_resolution_v1": "resolution_digest",
+                "aoa_model_fit_query_result_v2": "result_digest",
+            }
+            digest_field = semantic_digest_fields.get(content_ref["schema_version"])
+            if digest_field is None:
+                digest_matches = (
+                    matched["provenance"].artifact_digest == content_ref["digest"]
+                )
+            else:
+                payload = load_json_bytes(matched["raw"], label=label)
+                expected_digest = owner_object_digest(payload, digest_field)
+                digest_matches = (
+                    payload.get(digest_field) == expected_digest
+                    and content_ref["digest"] == expected_digest
+                )
+            if not digest_matches:
+                raise ExternalCodexRuntimeError(
+                    "owner_content_ref_digest_invalid",
+                    f"{label} semantic digest differs from its exact immutable bytes",
+                )
+            return matched
 
         obligation_input = exact_input(
             external["obligation_ref"], label="agent obligation"
         )
         mandate_input = exact_input(
             external["actor_mandate_ref"], label="actor mandate"
+        )
+        role_resolution_input = exact_input(
+            external["role_resolution_ref"], label="role resolution"
+        )
+        model_fit_query_input = exact_input(
+            external["model_fit_query_result_ref"], label="model-fit query result"
+        )
+        model_fit_projection_input = exact_input(
+            external["model_fit_projection_ref"], label="model-fit projection"
         )
         dag_input = exact_input(external["task_local_dag_ref"], label="task-local DAG")
         transfer_input = exact_input(
@@ -5580,10 +5650,13 @@ class ExternalCodexRuntime:
             obligation.get("schema_version") != "agent-obligation-v1"
             or obligation.get("obligation_id")
             != external["obligation_ref"]["object_id"]
-            or obligation.get("goal_anchor") != task["parent_task_id"]
+            or obligation.get("goal_ref", {}).get("object_id")
+            != task["parent_task_id"]
             or obligation.get("domain_owner") != task["target_owner"]
-            or obligation.get("current_holder") != transfer_holders[0]
-            or obligation.get("return_owner") != owner_request["return_owner"]
+            or obligation.get("current_holder", {}).get("object_id")
+            != transfer_holders[0]
+            or obligation.get("return_owner", {}).get("object_id")
+            != owner_request["return_owner"]
         ):
             raise ExternalCodexRuntimeError(
                 "agent_obligation_content_mismatch",
@@ -5594,12 +5667,20 @@ class ExternalCodexRuntime:
         if (
             mandate.get("schema_version") != "actor-mandate-v1"
             or mandate.get("mandate_id") != external["actor_mandate_ref"]["object_id"]
-            or mandate.get("role_id") != binding.role_id
-            or mandate.get("obligation_ref") != external["obligation_ref"]["object_id"]
+            or mandate.get("role_binding", {}).get("role_id") != binding.role_id
+            or mandate.get("obligation_ref") != external["obligation_ref"]
+            or mandate.get("goal_ref") != obligation.get("goal_ref")
+            or mandate.get("role_resolution_ref")
+            != external["role_resolution_ref"]
             or mandate.get("domain_procedure_refs")
-            != [item["object_id"] for item in external["domain_procedure_refs"]]
-            or mandate.get("return_owner") != owner_request["return_owner"]
-            or mandate.get("stop_line") != owner_request["child_stop_line"]
+            != external["domain_procedure_refs"]
+            or mandate.get("return_owner") != obligation.get("return_owner")
+            or mandate.get("return_owner", {}).get("object_id")
+            != owner_request["return_owner"]
+            or mandate.get("authority", {}).get("stop_line")
+            != owner_request["child_stop_line"]
+            or mandate.get("model_fit_relation", {}).get("relation_authority_ref")
+            != obligation.get("current_holder")
         ):
             raise ExternalCodexRuntimeError(
                 "actor_mandate_content_mismatch",
@@ -5612,11 +5693,127 @@ class ExternalCodexRuntime:
             or binding.role_contract_ref.owner_repo != "aoa-agents"
             or binding.role_contract_ref.artifact_ref != mandate_ref["object_id"]
             or binding.role_contract_ref.schema_version != "actor-mandate-v1"
-            or launch["role_contract"]["digest"] != mandate_ref["digest"]
+            or launch["role_contract"]["digest"]
+            != binding.role_contract_ref.artifact_digest
         ):
             raise ExternalCodexRuntimeError(
                 "actor_mandate_binding_mismatch",
                 "incarnation role contract is not the exact admitted actor mandate",
+            )
+
+        role_resolution = load_json_bytes(
+            role_resolution_input["raw"], label="role resolution"
+        )
+        role_binding = mandate["role_binding"]
+        if (
+            role_resolution.get("schema_version") != "aoa_role_resolution_v1"
+            or role_resolution.get("resolution_id")
+            != external["role_resolution_ref"]["object_id"]
+            or role_resolution.get("role_id") != role_binding["role_id"]
+            or role_resolution.get("specialization_id")
+            != role_binding["specialization_id"]
+            or role_resolution.get("tier_id") != role_binding["tier_id"]
+            or role_resolution.get("base_role_ref") != role_binding["base_role_ref"]
+            or role_resolution.get("specialization_ref")
+            != role_binding["specialization_ref"]
+            or role_resolution.get("tier_ref") != role_binding["tier_ref"]
+            or role_resolution.get("capability_pack_refs")
+            != role_binding["capability_pack_refs"]
+        ):
+            raise ExternalCodexRuntimeError(
+                "role_resolution_content_mismatch",
+                "role-resolution bytes differ from the exact admitted mandate role binding",
+            )
+
+        environment = mandate["environment"]
+        sandbox_mode = environment["sandbox_mode"].replace("-", "_")
+        named_outputs = {item["name"] for item in mandate["named_outputs"]}
+        if (
+            sandbox_mode != binding.permission_posture.sandbox_mode
+            or set(environment["required_tools"])
+            != set(binding.tool_profile.required_tool_ids)
+            or set(environment["required_mcp_servers"])
+            != set(binding.tool_profile.required_mcp_server_ids)
+            or set(mandate["authority"]["allowed_effects"])
+            != set(binding.permission_posture.allowed_effect_classes)
+            or not named_outputs.issubset(set(owner_request["expected_outputs"]))
+        ):
+            raise ExternalCodexRuntimeError(
+                "actor_mandate_incarnation_mismatch",
+                "mandate environment, effects, tools, or outputs differ from the incarnation",
+            )
+
+        binding_content_refs = (
+            (binding.agent_obligation_ref, external["obligation_ref"]),
+            (binding.actor_mandate_ref, external["actor_mandate_ref"]),
+            (binding.role_resolution_ref, external["role_resolution_ref"]),
+            (
+                binding.model_fit_query_result_ref,
+                external["model_fit_query_result_ref"],
+            ),
+        )
+        if any(
+            bound.model_dump(mode="json") != admitted
+            for bound, admitted in binding_content_refs
+        ):
+            raise ExternalCodexRuntimeError(
+                "owner_incarnation_evidence_mismatch",
+                "SDK incarnation names different obligation, mandate, role, or fit evidence",
+            )
+        projection_ref = external["model_fit_projection_ref"]
+        if (
+            binding.model_fit_projection_ref.owner_repo
+            != projection_ref["owner_repo"]
+            or binding.model_fit_projection_ref.artifact_ref
+            != projection_ref["object_id"]
+            or binding.model_fit_projection_ref.schema_version
+            != projection_ref["schema_version"]
+            or binding.model_fit_projection_ref.artifact_digest
+            != projection_ref["digest"]
+        ):
+            raise ExternalCodexRuntimeError(
+                "owner_model_fit_projection_mismatch",
+                "SDK incarnation names another model-fit projection",
+            )
+
+        model_fit_query = load_json_bytes(
+            model_fit_query_input["raw"], label="model-fit query result"
+        )
+        model_fit_projection = load_json_bytes(
+            model_fit_projection_input["raw"], label="model-fit projection"
+        )
+        fit_family = mandate["model_fit_relation"]["task_family"]
+        candidates = [
+            candidate
+            for candidate in model_fit_query.get("candidates", [])
+            if candidate.get("projection_provenance")
+            == binding.model_fit_projection_ref.model_dump(mode="json")
+            and candidate.get("realization_provenance")
+            == binding.model_realization_ref.model_dump(mode="json")
+        ]
+        if (
+            model_fit_query.get("schema_version")
+            != "aoa_model_fit_query_result_v2"
+            or model_fit_query.get("query", {}).get("task_family") != fit_family
+            or model_fit_query.get("candidate_count")
+            != len(model_fit_query.get("candidates", []))
+            or model_fit_query.get("authority", {}).get("informational_only")
+            is not True
+            or model_fit_query.get("authority", {}).get("activation_authority")
+            is not False
+            or len(candidates) != 1
+            or model_fit_projection.get("schema_version")
+            != "aoa_model_fit_projection_v1"
+            or model_fit_projection.get("subject_realization_ref")
+            != candidates[0]["realization_ref"]
+            or not any(
+                item.get("task_family") == fit_family
+                for item in model_fit_projection.get("task_fit", [])
+            )
+        ):
+            raise ExternalCodexRuntimeError(
+                "model_fit_evidence_chain_invalid",
+                "model-fit query, projection, realization, and mandate are not one exact chain",
             )
 
         incarnation_ref = external["incarnation_binding_ref"]
@@ -6136,9 +6333,7 @@ class ExternalCodexRuntime:
                 "runtime_profile_mismatch", "launch profile is not this runtime profile"
             )
         plan = RunPlan.model_validate(coordinates["plan"][2])
-        binding = AgentIncarnationBinding.model_validate(
-            coordinates["incarnation_binding"][2]
-        )
+        binding = parse_incarnation_binding(coordinates["incarnation_binding"][2])
         assert_agent_incarnation_binding_matches_plan(binding, plan)
         task = coordinates["task"][2]
         validate_json(task, TASK_SCHEMA_PATH, label="external Codex task")
@@ -6711,7 +6906,7 @@ class ExternalCodexRuntime:
         *,
         reviewer_session_id: str,
         task: Mapping[str, Any],
-        binding: AgentIncarnationBinding,
+        binding: IncarnationBinding,
     ) -> dict[str, Any]:
         if (
             task.get("task_family") != "landing_review"
@@ -6801,7 +6996,7 @@ class ExternalCodexRuntime:
                 Path(owner_request_path) if owner_request_path is not None else None
             ),
         )
-        binding: AgentIncarnationBinding = validated["binding"]
+        binding: IncarnationBinding = validated["binding"]
         return {
             "admitted": True,
             "launch_digest": validated["launch_digest"],
@@ -7316,7 +7511,7 @@ class ExternalCodexRuntime:
     ) -> tuple[
         dict[str, Any],
         RunPlan,
-        AgentIncarnationBinding,
+        IncarnationBinding,
         dict[str, Any],
         dict[str, Any],
         bytes,
@@ -7369,9 +7564,7 @@ class ExternalCodexRuntime:
                     f"durable controller input changed: {item['input_id']}",
                 )
         plan = RunPlan.model_validate(payloads["plan"])
-        binding = AgentIncarnationBinding.model_validate(
-            payloads["incarnation_binding"]
-        )
+        binding = parse_incarnation_binding(payloads["incarnation_binding"])
         task = payloads["task"]
         realization = payloads["model_realization"]
         assert_agent_incarnation_binding_matches_plan(binding, plan)
@@ -7435,7 +7628,7 @@ class ExternalCodexRuntime:
         *,
         state: Mapping[str, Any],
         plan: RunPlan,
-        binding: AgentIncarnationBinding,
+        binding: IncarnationBinding,
         task: Mapping[str, Any],
         request_input_id: str,
         supplied_path: str | Path | None = None,
@@ -7896,7 +8089,7 @@ class ExternalCodexRuntime:
         *,
         state: Mapping[str, Any],
         launch: Mapping[str, Any],
-        binding: AgentIncarnationBinding,
+        binding: IncarnationBinding,
         task: Mapping[str, Any],
         role_raw: bytes,
         execution_root: Path,
@@ -9136,7 +9329,7 @@ Runtime session identity: {state["session_id"]}
 
     def _wake_evaluation(
         self,
-        binding: AgentIncarnationBinding,
+        binding: IncarnationBinding,
         status: str,
     ) -> dict[str, Any]:
         event_kind = {
@@ -9178,7 +9371,7 @@ Runtime session identity: {state["session_id"]}
         *,
         state: Mapping[str, Any],
         task: Mapping[str, Any],
-        binding: AgentIncarnationBinding,
+        binding: IncarnationBinding,
         runtime_evidence_paths: Mapping[str, Path],
         final_workspace_manifest_digest: str | None,
         projection_fd: int | None = None,
@@ -11637,7 +11830,7 @@ class ExternalCodexParentReentry:
 
     def _validate_obligation(
         self, obligation: Mapping[str, Any]
-    ) -> tuple[dict[str, Any], AgentIncarnationBinding, dict[str, Any]]:
+    ) -> tuple[dict[str, Any], IncarnationBinding, dict[str, Any]]:
         task = _load_verified_json_ref(
             obligation["child_task_ref"],
             label="child task",
@@ -11648,7 +11841,7 @@ class ExternalCodexParentReentry:
             label="child incarnation binding",
         )
         try:
-            binding = AgentIncarnationBinding.model_validate(binding_raw)
+            binding = parse_incarnation_binding(binding_raw)
         except Exception as exc:
             raise ExternalCodexRuntimeError(
                 "reentry_binding_invalid", "child incarnation binding is invalid"
@@ -12070,7 +12263,7 @@ class ExternalCodexParentReentry:
     def _yield_prompt(
         obligation: Mapping[str, Any],
         task: Mapping[str, Any],
-        binding: AgentIncarnationBinding,
+        binding: IncarnationBinding,
     ) -> str:
         payload = {
             "reentry_id": obligation["reentry_id"],
@@ -12103,7 +12296,7 @@ class ExternalCodexParentReentry:
         output: Mapping[str, Any],
         obligation: Mapping[str, Any],
         task: Mapping[str, Any],
-        binding: AgentIncarnationBinding,
+        binding: IncarnationBinding,
     ) -> None:
         if (
             output["reentry_id"] != obligation["reentry_id"]
@@ -12445,7 +12638,7 @@ class ExternalCodexParentReentry:
 
     @staticmethod
     def _verify_child_wake_event(
-        result: Mapping[str, Any], binding: AgentIncarnationBinding
+        result: Mapping[str, Any], binding: IncarnationBinding
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         if result["events_ref"] not in result["evidence_refs"]:
             raise ExternalCodexRuntimeError(
