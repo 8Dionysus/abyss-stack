@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26932092,
+  "allowed_tracked_bytes": 33544660,
+  "approved_by": "repository-owner",
+  "base_ref": "340990b98e46443dcd832c3adc2bdfdbb9a79214",
+  "changed_generated_bytes": 26932092,
+  "changed_generated_files": 367,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "f606fa2ce3f1e59bc50fb3985fa73741751c0f66fc8adf68cbf5d7676f29b737",
+  "reason": "Refresh the complete deterministic portable KAG family after merging current main with the long-lived external actor runtime source, decision lineage, tests, and release evidence; preserve owner navigation and full generated parity rather than truncating the indexed change.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 33544660,
+  "tracked_bytes_max": 24117248
+}
