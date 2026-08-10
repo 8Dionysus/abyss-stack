@@ -63,6 +63,12 @@ MCP_ADMISSION_KEEPER_UNIT = (
 MCP_ADMISSION_KEEPER_PATH = (
     REPO_ROOT / "systemd" / "user" / "abyss-mcp-admission-keeper.path"
 )
+MCP_MODERN_ADMISSION_REFRESH_UNIT = (
+    REPO_ROOT / "systemd" / "user" / "abyss-mcp-modern-admission-refresh.service"
+)
+MCP_MODERN_ADMISSION_REFRESH_SCRIPT = (
+    REPO_ROOT / "scripts" / "aoa-refresh-modern-mcp-admission"
+)
 STACK_MCP_RUNTIME_TARGETS = (
     REPO_ROOT
     / "mcp"
@@ -2572,6 +2578,69 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertIn("ProtectHome=read-only", stack_bootstrap)
         self.assertIn("IPAddressDeny=any", stack_bootstrap)
         self.assertIn("IPAddressAllow=localhost", stack_bootstrap)
+
+    def test_modern_mcp_expired_recovery_is_exact_two_phase_and_fail_closed(
+        self,
+    ) -> None:
+        script = MCP_MODERN_ADMISSION_REFRESH_SCRIPT.read_text(encoding="utf-8")
+        unit = MCP_MODERN_ADMISSION_REFRESH_UNIT.read_text(encoding="utf-8")
+
+        self.assertIn(
+            'REBASE_DECISION_REF="owner://abyss-stack/decision/ABYSS-STACK-D-0109"',
+            script,
+        )
+        self.assertIn("registry-rebase-expired-v2", script)
+        self.assertIn("organ-registry.v2.expired-predecessor.json", script)
+        self.assertIn("predecessor_digest=$(sha256sum", script)
+        self.assertIn("live_digest=$(sha256sum", script)
+        self.assertIn("trap cleanup_recovery EXIT", script)
+        self.assertIn("--process-unit \"$process_unit\"", script)
+        self.assertIn("capture_canary_family", script)
+        self.assertIn("    bootstrap \\", script)
+        self.assertIn("publish_admission \"$RUN/bootstrap-current\"", script)
+        self.assertIn("build_preflight bootstrap", script)
+        self.assertIn(".preflight.eligible_count == 11", script)
+        self.assertIn(".preflight.blocked_count == 0", script)
+        self.assertIn("catalog_matches_current_canaries", script)
+        self.assertIn(".canary_receipt_id == $receipt_id", script)
+        self.assertIn(".canary_observed_at == $observed_at", script)
+        self.assertIn("systemctl --user stop \"${bootstrap_units[@]}\"", script)
+        self.assertIn("systemctl --user start \"${production_units[@]}\"", script)
+        self.assertIn("  production \\", script)
+        self.assertIn("build_preflight production", script)
+        self.assertIn("report-production.json", script)
+        self.assertNotIn("mcp-candidate.service", script)
+        self.assertNotIn("mcp-internal-effect.service", script)
+        self.assertIn("TimeoutStartSec=10min", unit)
+
+        cleanup_start = script.index("cleanup_recovery()")
+        cleanup_end = script.index("trap cleanup_recovery EXIT")
+        cleanup = script[cleanup_start:cleanup_end]
+        self.assertIn('if [[ "$production_handoff_started" -eq 1 ]]', cleanup)
+        self.assertIn('systemctl --user stop "${production_units[@]}"', cleanup)
+
+        handoff_start = script.index("production_handoff_started=1")
+        production_start = script.index(
+            'systemctl --user start "${production_units[@]}"', handoff_start
+        )
+        final_publication = script.index(
+            'publish_admission "$RUN/production-current"', production_start
+        )
+        production_catalog = script.index(
+            "build_preflight production", final_publication
+        )
+        registry_validation = script.index(
+            '"$VENV/aoa" organs registry-v2-validate "$REGISTRY"',
+            production_catalog,
+        )
+        handoff_complete = script.index(
+            "production_handoff_started=0", registry_validation
+        )
+        self.assertLess(handoff_start, production_start)
+        self.assertLess(production_start, final_publication)
+        self.assertLess(final_publication, production_catalog)
+        self.assertLess(production_catalog, registry_validation)
+        self.assertLess(registry_validation, handoff_complete)
 
     def test_stack_mcp_units_keep_all_contours_disjoint(self) -> None:
         read_unit = STACK_MCP_READ_UNIT.read_text(encoding="utf-8")

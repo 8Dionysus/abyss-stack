@@ -10,36 +10,36 @@ Decision records own rationale; this directory contains generated graph read mod
 
 ## Counts
 
-- Decisions: 108
-- Nodes: 1086
-- Edges: 2439
+- Decisions: 109
+- Nodes: 1097
+- Edges: 2463
 
 ## Node Types
 
-- `date`: 33
-- `decision`: 108
-- `guard_family`: 160
+- `date`: 34
+- `decision`: 109
+- `guard_family`: 162
 - `mechanic_parent`: 10
-- `owner_surface`: 60
+- `owner_surface`: 61
 - `repo`: 1
-- `source_surface`: 553
+- `source_surface`: 558
 - `stack_lane`: 45
 - `status`: 3
-- `surface_class`: 113
+- `surface_class`: 114
 
 ## Edge Types
 
-- `CITES_SOURCE_SURFACE`: 929
-- `DATED`: 108
-- `GUARDED_BY`: 322
-- `HAS_STATUS`: 108
-- `HAS_SURFACE_CLASS`: 282
-- `IN_STACK_LANE`: 245
-- `NEXT_DECISION`: 107
-- `OWNED_BY_SURFACE`: 114
-- `OWNS_DECISION`: 108
+- `CITES_SOURCE_SURFACE`: 936
+- `DATED`: 109
+- `GUARDED_BY`: 327
+- `HAS_STATUS`: 109
+- `HAS_SURFACE_CLASS`: 285
+- `IN_STACK_LANE`: 248
+- `NEXT_DECISION`: 108
+- `OWNED_BY_SURFACE`: 115
+- `OWNS_DECISION`: 109
 - `SUPERSEDED_BY`: 2
-- `UNDER_MECHANIC_PARENT`: 114
+- `UNDER_MECHANIC_PARENT`: 115
 
 ## Boundary
 

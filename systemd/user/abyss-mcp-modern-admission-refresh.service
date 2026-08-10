@@ -9,6 +9,7 @@ ConditionPathExists=/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json
 Type=oneshot
 Environment=PYTHONDONTWRITEBYTECODE=1
 ExecStart=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-refresh-modern-mcp-admission
+TimeoutStartSec=10min
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=read-only
