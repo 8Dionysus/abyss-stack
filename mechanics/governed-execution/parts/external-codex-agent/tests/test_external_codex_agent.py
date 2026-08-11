@@ -819,6 +819,10 @@ if "FAKE_VALID_RUNTIME_FINAL_MANIFEST_EVIDENCE" in task["objective"]:
     report["transition"]["evidence_refs"] = [
         "runtime:workspace-final-manifest#content_entries"
     ]
+if "FAKE_VALID_RUNTIME_FINAL_MANIFEST_PATH_EVIDENCE" in task["objective"]:
+    report["transition"]["evidence_refs"] = [
+        "runtime:workspace-final-manifest#landing-note.md"
+    ]
 if "FAKE_PARTIAL_RUNTIME_FINAL_MANIFEST_ANCHOR" in task["objective"]:
     report["transition"]["evidence_refs"] = [
         "runtime:workspace-final-manifest#git_head"
@@ -5786,6 +5790,38 @@ def test_runtime_final_workspace_manifest_is_admitted_evidence(
     assert result is not None
     assert result["workspace_manifest_ref"]["artifact_digest"] == _digest_path(
         Path(result["workspace_manifest_ref"]["artifact_ref"])
+    )
+
+
+def test_runtime_final_workspace_manifest_exact_content_path_is_admitted_evidence(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker=(
+            "FAKE_WRITE_ALLOWED FAKE_ARTIFACT_PRODUCED "
+            "FAKE_VALID_RUNTIME_FINAL_MANIFEST_PATH_EVIDENCE"
+        ),
+        role_id="coder",
+        task_family="landing_preparation",
+        workspace_write=True,
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "completed"
+    assert result is not None
+    final_manifest = json.loads(
+        Path(result["workspace_manifest_ref"]["artifact_ref"]).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert any(
+        entry.get("path") == "landing-note.md"
+        for entry in final_manifest["content_entries"]
     )
 
 

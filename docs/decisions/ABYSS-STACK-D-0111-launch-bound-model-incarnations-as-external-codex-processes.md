@@ -207,7 +207,8 @@ requires a caller-named, plan-bound reviewer contract and a same-model/
 same-effort read-only realization. Because the final actor manifest does not
 exist when the writer begins, the report may cite it only through the reserved
 `runtime:workspace-final-manifest#<anchor>` identity; the controller resolves
-that identity after process exit against the exact actor finalization artifact.
+that identity after process exit against an exact top-level member or an exact
+`content_entries[].path` in the actor finalization artifact.
 The controller also derives one session-local output schema from the admitted
 canonical report schema and pins exact task/incarnation IDs before inference.
 An unchanged read-only reviewer rejected only for an identity-field mismatch

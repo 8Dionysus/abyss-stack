@@ -1916,11 +1916,19 @@ def _validate_runtime_evidence_ref(
             "model_report_runtime_evidence_anchor_invalid",
             "runtime workspace final manifest is not valid JSON",
         ) from exc
-    if anchor not in manifest:
-        raise ExternalCodexRuntimeError(
-            "model_report_runtime_evidence_anchor_invalid",
-            "model report evidence names no exact top-level final-manifest member",
-        )
+    if anchor in manifest:
+        return
+    content_entries = manifest.get("content_entries")
+    if isinstance(content_entries, list) and any(
+        isinstance(item, dict) and item.get("path") == anchor
+        for item in content_entries
+    ):
+        return
+    raise ExternalCodexRuntimeError(
+        "model_report_runtime_evidence_anchor_invalid",
+        "model report evidence names neither an exact top-level final-manifest "
+        "member nor an exact content-entry path",
+    )
 
 
 def _validate_report_evidence_ref(

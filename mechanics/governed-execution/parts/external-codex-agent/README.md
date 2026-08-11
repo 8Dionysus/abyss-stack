@@ -228,9 +228,9 @@ The controller:
   `source_evidence_paths`, with a backward-compatible fallback for older task
   packets, and binds claims about post-exit workspace state through the single
   controller-owned `runtime:workspace-final-manifest#...` evidence identity;
-  symbolic anchors on that JSON artifact name an exact top-level member rather
-  than an arbitrary byte substring, while bounded line anchors retain their
-  ordinary meaning;
+  symbolic anchors on that JSON artifact name either an exact top-level member
+  or an exact `content_entries[].path`, never an arbitrary byte substring,
+  while bounded line anchors retain their ordinary meaning;
 - binds every validation claim to an exact observed argv/exit state and the
   workspace-manifest digest observed when that command completed. Every
   receipt normally matches the final manifest; when transient command-sandbox

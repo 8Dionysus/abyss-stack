@@ -569,9 +569,10 @@ remain `immutable:<input-id>#<anchor>`. A report may additionally cite only the
 reserved `runtime:workspace-final-manifest#<anchor>` identity for post-exit
 workspace state. The controller creates that manifest before report admission
 and validates a line anchor against the exact runtime-owned bytes. A symbolic
-anchor must name one exact top-level JSON member; substring matches such as
-`git_head` inside `source_git_head` are false anchors. Arbitrary runtime paths
-or aliases remain inadmissible.
+anchor must name either one exact top-level JSON member or one exact
+`content_entries[].path`; substring matches such as `git_head` inside
+`source_git_head`, and partial path matches, are false anchors. Arbitrary
+runtime paths or aliases remain inadmissible.
 
 Evidence-reference arrays are non-empty and every occurrence is independently
 resolved against its exact source, immutable-input, or runtime-owned bytes.
