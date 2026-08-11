@@ -4718,6 +4718,12 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
     assert reviewer_launch["workspace_manifest_input_id"] == (
         "review-workspace-manifest"
     )
+    assert reviewer_launch["runtime_profile"] == PREPARER._artifact_coordinate(
+        PREPARER.PROFILE_PATH
+    )
+    assert reviewer_binding["runtime_profile_ref"] == reviewer_plan[
+        "runtime_profile"
+    ]["provenance"]
     assert reviewer_launch["model_realization"]["path"] == str(
         fixture["reviewer_realization_path"]
     )

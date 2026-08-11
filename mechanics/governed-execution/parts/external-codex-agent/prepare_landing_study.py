@@ -46,6 +46,7 @@ from aoa_sdk.contracts.control_plane import (  # noqa: E402
     RouteCandidate,
     RouteDecision,
     RunPlan,
+    RuntimeProfile,
     ScenarioArtifactBinding,
     ScenarioBinding,
     ScenarioConditionBinding,
@@ -1001,6 +1002,7 @@ def _verified_launch_coordinate(
 def _adapt_plan_for_reviewer(
     base: RunPlan,
     *,
+    reviewer_runtime_profile: RuntimeProfile,
     writer_role_id: str,
     reviewer_role_id: str,
     reviewer_role_ref: ProvenanceRef,
@@ -1031,6 +1033,8 @@ def _adapt_plan_for_reviewer(
             return review_summon_decision_ref
         if value == old_model_ref:
             return reviewer_model_ref
+        if value == base.runtime_profile.provenance:
+            return reviewer_runtime_profile.provenance
         return value
 
     reviewer_agents = tuple(
@@ -1112,7 +1116,7 @@ def _adapt_plan_for_reviewer(
             )
         }
     )
-    runtime_profile = base.runtime_profile.model_copy(
+    runtime_profile = reviewer_runtime_profile.model_copy(
         update={
             "constraint_refs": _append_unique_refs(
                 tuple(replace(item) for item in base.runtime_profile.constraint_refs),
@@ -2356,6 +2360,9 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         )
     reviewer_tool_profile_id = str(reviewer_tools.get("profile_ref", ""))
     runtime_profile_payload = load_json(PROFILE_PATH, label="runtime profile")
+    reviewer_runtime_profile = load_abyss_stack_external_codex_runtime_profile(
+        PROFILE_PATH
+    )
     reviewer_tool_entries = [
         item
         for item in runtime_profile_payload["tool_profiles"]
@@ -2874,6 +2881,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     )
     review_plan = _adapt_plan_for_reviewer(
         base_plan,
+        reviewer_runtime_profile=reviewer_runtime_profile,
         writer_role_id=base_binding.role_id,
         reviewer_role_id="reviewer",
         reviewer_role_ref=reviewer_role_ref,
@@ -2977,6 +2985,8 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         if item == writer_task_ref
         else reviewer_model_ref
         if item == base_binding.model_realization_ref
+        else reviewer_runtime_profile.provenance
+        if item == base_plan.runtime_profile.provenance
         else item
         for item in base_binding.continuation.immutable_input_refs
     )
@@ -3095,7 +3105,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         "incarnation_binding": _artifact_coordinate(binding_path),
         "model_realization": _artifact_coordinate(reviewer_realization_path),
         "task": _artifact_coordinate(task_path),
-        "runtime_profile": writer_launch["runtime_profile"],
+        "runtime_profile": _artifact_coordinate(PROFILE_PATH),
         "role_contract": _artifact_coordinate(reviewer_role_path),
         "result_schema": writer_launch["result_schema"],
         "workspace_path": str(workspace),

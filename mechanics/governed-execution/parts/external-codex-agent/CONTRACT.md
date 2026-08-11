@@ -707,6 +707,10 @@ or transport-fixture mixed bindings remain rejected.
 
 The reviewer receives its own canonical SDK v4 summon request and decision;
 the writer request remains immutable review evidence. The derived reviewer plan
+and launch bind the current admitted runtime profile required by the new
+incarnation; they never reuse an older writer profile as active authority. The
+historical writer launch, result, and plan remain immutable review evidence.
+The derived reviewer plan
 reassigns only the active writer
 task/request step from the writer role to the exact plan-bound reviewer role as
 `read_only`. Existing reviewer-bound steps are normalized to the same read-only
