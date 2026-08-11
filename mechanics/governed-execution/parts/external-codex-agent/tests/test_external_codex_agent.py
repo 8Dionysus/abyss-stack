@@ -2761,7 +2761,7 @@ def test_preflight_exercises_masked_nested_codex_sandbox(
     fixture = _fixture(tmp_path)
     runtime = fixture["runtime"]
     original_containment_command = runtime._containment_command
-    observed: list[tuple[list[str], Mapping[str, Any]]] = []
+    observed: list[tuple[list[str], Mapping[str, Any], bool]] = []
 
     def observe_containment(
         command: Any,
@@ -2773,7 +2773,10 @@ def test_preflight_exercises_masked_nested_codex_sandbox(
         mount_launcher_digest: str | None = None,
     ) -> list[str]:
         if actor_git_mask is not None:
-            observed.append((list(command), actor_git_mask))
+            execution_root = Path(command[command.index("-C") + 1])
+            observed.append(
+                (list(command), actor_git_mask, (execution_root / ".git").is_dir())
+            )
         return original_containment_command(
             command,
             executable_digest=executable_digest,
@@ -2788,7 +2791,7 @@ def test_preflight_exercises_masked_nested_codex_sandbox(
     runtime.preflight(fixture["launch_path"])
 
     assert len(observed) == 1
-    command, actor_git_mask = observed[0]
+    command, actor_git_mask, git_directory_present = observed[0]
     assert "sandbox" in command
     assert command[command.index("-P") + 1] == "aoa_external_actor"
     assert "--strict-config" not in command
@@ -2801,6 +2804,7 @@ def test_preflight_exercises_masked_nested_codex_sandbox(
         and command[index + 1].startswith("permissions.aoa_external_actor=")
     )
     assert f'"{fixture["launch"]["codex_executable"]}"="read"' in permission_override
+    assert git_directory_present is True
     assert actor_git_mask["masks"]
     assert actor_git_mask["private_directory_views"]
 

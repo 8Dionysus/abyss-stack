@@ -6119,6 +6119,7 @@ class ExternalCodexRuntime:
             preflight_root = Path(temporary)
             execution_root = preflight_root / "execution-root"
             execution_root.mkdir(mode=0o700)
+            (execution_root / ".git").mkdir(mode=0o700)
             target_config = execution_root / "repository-config"
             target_config.write_text("credential-marker\n", encoding="utf-8")
             sanitized_config = preflight_root / "sanitized-config"
