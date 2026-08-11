@@ -124,6 +124,8 @@ refusal, and final locked equality of the derived writer and active reviewer
 schema copies, explicit owner-only mixed typed-request/generic-decision
 compatibility with task/snapshot/continuation binding, and workspace-root `.`
 scope parity between writer execution and reviewer preparation,
+single-step owner plans whose active writer task/request step is rebound to the
+exact selected read-only reviewer without rewriting unrelated DAG steps,
 nonterminal/stale/foreign review-seed refusal,
 an explicit transport-study or owner-contour workspace-write coder to a
 plan-bound read-only reviewer transition with a

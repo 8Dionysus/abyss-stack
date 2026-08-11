@@ -706,10 +706,14 @@ the plan snapshot and incarnation continuation. Missing, duplicated, foreign,
 or transport-fixture mixed bindings remain rejected.
 
 The reviewer receives its own canonical SDK v4 summon request and decision;
-the writer request remains immutable review evidence. A2A export verifies the
-materialized request/schema bytes, typed plan binding, role/incarnation/task
-semantics, requested outputs, and the caller-supplied writer request digest
-before it can emit a child result.
+the writer request remains immutable review evidence. The derived reviewer plan
+reassigns only the active writer
+task/request step from the writer role to the exact plan-bound reviewer role as
+`read_only`. Existing reviewer-bound steps are normalized to the same read-only
+effect posture required by the incarnation; non-reviewer DAG roles and steps
+remain unchanged. A2A export verifies the materialized request/schema bytes,
+typed plan binding, role/incarnation/task semantics, requested outputs, and the
+caller-supplied writer request digest before it can emit a child result.
 Symbolic named outputs come from the already admitted runtime task and remain
 separate from model-authored workspace artifact paths; the exporter returns
 both and requires the writer and reviewer summon requests to be satisfied.

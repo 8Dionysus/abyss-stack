@@ -4708,6 +4708,9 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
     reviewer_binding = json.loads(
         Path(reviewer_launch["incarnation_binding"]["path"]).read_text(encoding="utf-8")
     )
+    reviewer_plan = json.loads(
+        Path(reviewer_launch["plan"]["path"]).read_text(encoding="utf-8")
+    )
     reviewer_task = json.loads(
         Path(reviewer_launch["task"]["path"]).read_text(encoding="utf-8")
     )
@@ -4723,6 +4726,23 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
     assert reviewer_binding["permission_posture"]["allowed_effect_classes"] == [
         "read_only"
     ]
+    selected_reviewer = next(
+        item
+        for item in reviewer_plan["scenario_binding"]["agent_refs"]
+        if item["agent_id"] == "reviewer"
+        and item["provenance"] == reviewer_binding["role_contract_ref"]
+    )
+    active_reviewer_steps = [
+        step
+        for step in reviewer_plan["steps"]
+        if reviewer_binding["task_request_ref"] in step["input_refs"]
+    ]
+    assert active_reviewer_steps
+    assert all(
+        selected_reviewer in step["agent_refs"]
+        and step["effect_class"] == "read_only"
+        for step in active_reviewer_steps
+    )
     assert reviewer_task["source_evidence_paths"] == ["README.md"]
     assert set(preparation["forwarded_input_ids"]).issuperset(
         {

@@ -1001,7 +1001,9 @@ def _verified_launch_coordinate(
 def _adapt_plan_for_reviewer(
     base: RunPlan,
     *,
+    writer_role_id: str,
     reviewer_role_id: str,
+    reviewer_role_ref: ProvenanceRef,
     old_task_ref: ProvenanceRef,
     task_ref: ProvenanceRef,
     old_summon_request_ref: ProvenanceRef,
@@ -1031,6 +1033,18 @@ def _adapt_plan_for_reviewer(
             return reviewer_model_ref
         return value
 
+    reviewer_agents = tuple(
+        item
+        for item in base.scenario_binding.agent_refs
+        if item.agent_id == reviewer_role_id
+        and item.provenance == reviewer_role_ref
+    )
+    if len(reviewer_agents) != 1:
+        raise StudyPreparationError(
+            "reviewer plan does not bind one exact selected reviewer role"
+        )
+    reviewer_agent = reviewer_agents[0]
+
     scenario = base.scenario_binding.model_copy(
         update={
             "input_refs": tuple(
@@ -1042,22 +1056,36 @@ def _adapt_plan_for_reviewer(
             ),
         }
     )
-    steps = tuple(
-        step.model_copy(
-            update={
-                "input_refs": tuple(replace(item) for item in step.input_refs),
-                **(
-                    {"effect_class": "read_only"}
-                    if any(
-                        item.agent_id == reviewer_role_id
-                        for item in step.agent_refs
-                    )
-                    else {}
-                ),
-            }
+    steps = []
+    for step in base.steps:
+        active_writer_step = (
+            any(item.agent_id == writer_role_id for item in step.agent_refs)
+            and (
+                old_task_ref in step.input_refs
+                or old_summon_request_ref in step.input_refs
+            )
         )
-        for step in base.steps
-    )
+        agent_refs = list(step.agent_refs)
+        if active_writer_step:
+            agent_refs = [
+                reviewer_agent if item.agent_id == writer_role_id else item
+                for item in agent_refs
+            ]
+            agent_refs = list(dict.fromkeys(agent_refs))
+        reviewer_bound_step = reviewer_agent in agent_refs
+        steps.append(
+            step.model_copy(
+                update={
+                    "agent_refs": tuple(agent_refs),
+                    "input_refs": tuple(replace(item) for item in step.input_refs),
+                    **(
+                        {"effect_class": "read_only"}
+                        if reviewer_bound_step
+                        else {}
+                    ),
+                }
+            )
+        )
     source_refs = _append_unique_refs(
         tuple(replace(item) for item in base.snapshot.source_refs),
         writer_result_ref,
@@ -1109,7 +1137,7 @@ def _adapt_plan_for_reviewer(
             "scenario_binding": scenario,
             "runtime_profile": runtime_profile,
             "snapshot": snapshot,
-            "steps": steps,
+            "steps": tuple(steps),
             "plan_digest": ZERO_DIGEST,
         }
     )
@@ -2846,7 +2874,9 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     )
     review_plan = _adapt_plan_for_reviewer(
         base_plan,
+        writer_role_id=base_binding.role_id,
         reviewer_role_id="reviewer",
+        reviewer_role_ref=reviewer_role_ref,
         old_task_ref=writer_task_ref,
         task_ref=task_ref,
         old_summon_request_ref=writer_summon_ref,
