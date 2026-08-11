@@ -71,6 +71,17 @@ installer re-enumerates every selected input, requires all four Git posture
 snapshots to remain exact, and re-hashes every source byte against the release
 manifest. A checkout or byte race may leave an unactivated content-addressed
 release, but it cannot publish a falsely attributed active release.
+For a host-admitted canary, `stage` stops at that immutable release and a
+read-only staged record; it must not publish wrappers or `active.json`.
+`activate-admitted` then recomputes the artifact-subject aggregate from the
+exact release manifest and invokes the named non-symlink `abyss-machine`
+executable with fixed `runtime_canary`, `abyss-stack`, exact source-ref,
+host-managed trust-root, registry, and subject-digest arguments. Activation
+requires an allow-or-warn decision with no blocker or manual-review residue,
+the selected record still latest, the subject store present, all declared
+controls verified, and every source/content/record identity bound. The gate
+receipt is preserved in the active record. An ordinary `activate` is rollback
+compatibility only and carries no artifact-admission claim.
 `install_external_codex_runtime.py status`
 requires the release tree to contain exactly the manifest files and their
 necessary parent directories, rejects every symlink or extra entry, and

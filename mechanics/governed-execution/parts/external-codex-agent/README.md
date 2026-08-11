@@ -327,6 +327,19 @@ non-symlink wrappers in `~/.local/bin`:
 - `aoa-external-actor-bind` for model-neutral launch binding;
 - `aoa-external-codex-study` for the canonical study preparer.
 
+Host-admitted canaries use a two-phase path instead of `install`. `stage`
+materializes and records the exact immutable release without writing
+`active.json` or publishing any wrapper. After `abyss-machine` has built,
+signed, verified, promoted, materialized, re-promoted, and admitted that exact
+release-manifest subject, `activate-admitted` runs a fresh fixed-argument
+`runtime_canary` trust-gate query itself. It recomputes the subject aggregate
+from the staged release manifest and requires the gate's latest record, source
+commit, host-managed trust root, verified controls, subject store, and record
+identity to bind that same release before wrapper publication. The full gate
+result and exact argv are retained in `active.json`; a denied, stale,
+source-mismatched, dirty, or malformed admission leaves the release staged but
+inactive.
+
 Each installed wrapper is a minimal static x86_64 Linux ELF with no dynamic
 interpreter. Before its first dynamic exec it removes every ambient `LD_*`
 loader variable, derives its adjacent non-executable read-only Python
@@ -356,8 +369,10 @@ also a valid `--aoa-sdk-root` for study
 preparation because it carries the exact non-Python contracts consumed there.
 `status` rejects extra files, directories, symlinks, or missing entries,
 re-hashes every released file, and verifies all three launcher/companion pairs.
-`activate --release-id ...` provides release rollback without deleting later
-releases; release IDs must be exact SHA-256 identifiers whose resolved
+`activate --release-id ...` remains the explicit local rollback path and does
+not claim host artifact admission. `activate-admitted --release-id ...` is the
+only path that records a fresh host canary verdict. Both retain later releases;
+release IDs must be exact SHA-256 identifiers whose resolved
 directory and manifest identity remain inside the release root. Installation
 also verifies that the packaged `aoa-agents` and `aoa-skills` schema bytes have
 the exact digests pinned by the runtime profile. Install, activation, and

@@ -128,6 +128,89 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
     return source, sdk, agents, skills
 
 
+def artifact_gate_payload(
+    release_root: Path,
+    source_ref: str,
+    *,
+    admitted_subject_digest: str | None = None,
+) -> dict[str, object]:
+    artifact_subjects_digest = (
+        admitted_subject_digest
+        or runtime_install.release_artifact_subject_digest(release_root)
+    )
+    signed_subject_digest = "sha256:" + "b" * 64
+    record_id = runtime_install.sha256_bytes(
+        runtime_install.canonical_bytes(
+            {
+                "artifact_class": runtime_install.ARTIFACT_CLASS,
+                "subject_digest": signed_subject_digest,
+                "bundle_manifest_ref": runtime_install.ARTIFACT_BUNDLE_MANIFEST_REF,
+            }
+        )
+    )
+    record = {
+        "record_id": record_id,
+        "artifact_class": runtime_install.ARTIFACT_CLASS,
+        "artifact_subjects_digest": artifact_subjects_digest,
+        "subject_digest": signed_subject_digest,
+        "bundle_manifest_ref": runtime_install.ARTIFACT_BUNDLE_MANIFEST_REF,
+        "source_repo": runtime_install.ARTIFACT_SOURCE_REPO,
+        "source_ref": source_ref,
+        "trust_root_mode": runtime_install.ARTIFACT_TRUST_ROOT_MODE,
+        "lifecycle_state": "manually-verified",
+        "latest_eligible": True,
+        "terminal_state": False,
+        "verification_ok": True,
+        "required_controls": sorted(runtime_install.ARTIFACT_REQUIRED_CONTROLS),
+        "verified_controls": sorted(runtime_install.ARTIFACT_REQUIRED_CONTROLS),
+    }
+    return {
+        "ok": True,
+        "schema": runtime_install.ARTIFACT_GATE_SCHEMA_VERSION,
+        "verdict": "allow",
+        "decision": {
+            "allow": True,
+            "verdict": "allow",
+            "consumer_intent": runtime_install.ARTIFACT_CONSUMER_INTENT,
+            "blockers": [],
+            "manual_review": [],
+        },
+        "artifact_class": runtime_install.ARTIFACT_CLASS,
+        "consumer_intent": runtime_install.ARTIFACT_CONSUMER_INTENT,
+        "subject_digest": artifact_subjects_digest,
+        "record_id": record_id,
+        "latest_record_id": record_id,
+        "blockers": [],
+        "manual_review": [],
+        "warnings": [],
+        "record": record,
+        "inspected_claims": {
+            "registry_latest": {"selected_record_is_latest": True},
+            "subject_identity": {"subject_digest_matched": True},
+            "source": {
+                "source_repo_matched": True,
+                "source_ref_matched": True,
+            },
+            "trust_root": {"trust_root_mode_matched": True},
+            "artifact_subject_store": {
+                "ok": True,
+                "aggregate_digest": artifact_subjects_digest,
+            },
+            "verification": {"ok": True},
+        },
+    }
+
+
+def write_artifact_gate(path: Path, payload: dict[str, object]) -> None:
+    path.write_text(
+        "#!/usr/bin/python3\n"
+        "import json\n"
+        f"print(json.dumps({payload!r}, sort_keys=True))\n",
+        encoding="utf-8",
+    )
+    path.chmod(0o700)
+
+
 def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> None:
     source, sdk, agents, skills = make_sources(tmp_path)
     runtime_root = tmp_path / "runtime"
@@ -155,7 +238,9 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
         runtime_install.verify_release(release_root)["release_id"]
         == active["release_id"]
     )
-    assert runtime_install.status(runtime_root, bin_dir)["healthy"] is True
+    status = runtime_install.status(runtime_root, bin_dir)
+    assert status["healthy"] is True
+    assert status["artifact_admission"]["status"] == "not_recorded"
     for relative in runtime_install.SDK_CONTRACT_FILES:
         assert (release_root / "sdk" / relative).is_file()
     for owner, relative in runtime_install.OWNER_CONTRACT_FILES:
@@ -266,6 +351,108 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
     )
     assert repeated["release_created"] is False
     assert repeated["active"]["release_id"] == active["release_id"]
+
+
+def test_stage_then_artifact_admitted_activation_is_fail_closed(
+    tmp_path: Path,
+) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    runtime_root = tmp_path / "runtime"
+    bin_dir = tmp_path / "bin"
+    staged_result = runtime_install.stage(
+        source,
+        sdk,
+        agents,
+        skills,
+        runtime_root,
+        Path(sys.executable),
+        allow_dirty_source=False,
+        allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
+    )
+    staged = staged_result["staged"]
+    release_root = Path(staged["release_root"])
+    source_ref = str(staged["source"]["head"])
+    assert not (runtime_root / "active.json").exists()
+    assert not bin_dir.exists()
+    assert Path(staged_result["staged_record"]).stat().st_mode & 0o777 == 0o444
+
+    registry = tmp_path / "registry"
+    registry.mkdir()
+    gate = tmp_path / "abyss-machine"
+    write_artifact_gate(gate, artifact_gate_payload(release_root, source_ref))
+    activated = runtime_install.activate_admitted(
+        runtime_root,
+        bin_dir,
+        str(staged["release_id"]),
+        Path(sys.executable),
+        gate,
+        registry,
+    )
+
+    active = activated["active"]
+    admission = active["artifact_admission"]
+    assert activated["operation"] == "activate-admitted"
+    assert active["nonproduction_dirty_source"] is False
+    assert admission["artifact_subjects_digest"] == (
+        runtime_install.release_artifact_subject_digest(release_root)
+    )
+    assert admission["gate"]["verdict"] == "allow"
+    assert admission["gate_command"][1:3] == ["artifacts", "trust-gate"]
+    status = runtime_install.status(runtime_root, bin_dir)
+    assert status["healthy"] is True
+    assert status["artifact_admission"]["status"] == "recorded_and_bound"
+
+
+def test_artifact_admitted_activation_rejects_unbound_subject_before_publication(
+    tmp_path: Path,
+) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    runtime_root = tmp_path / "runtime"
+    bin_dir = tmp_path / "bin"
+    staged_result = runtime_install.stage(
+        source,
+        sdk,
+        agents,
+        skills,
+        runtime_root,
+        Path(sys.executable),
+        allow_dirty_source=False,
+        allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
+    )
+    staged = staged_result["staged"]
+    release_root = Path(staged["release_root"])
+    source_ref = str(staged["source"]["head"])
+    registry = tmp_path / "registry"
+    registry.mkdir()
+    gate = tmp_path / "abyss-machine"
+    write_artifact_gate(
+        gate,
+        artifact_gate_payload(
+            release_root,
+            source_ref,
+            admitted_subject_digest="sha256:" + "c" * 64,
+        ),
+    )
+
+    with pytest.raises(
+        runtime_install.InstallError,
+        match="does not bind the staged release",
+    ):
+        runtime_install.activate_admitted(
+            runtime_root,
+            bin_dir,
+            str(staged["release_id"]),
+            Path(sys.executable),
+            gate,
+            registry,
+        )
+
+    assert not (runtime_root / "active.json").exists()
+    assert not bin_dir.exists()
 
 
 def test_activate_release_without_packaged_static_source_uses_rollback_compatibility(

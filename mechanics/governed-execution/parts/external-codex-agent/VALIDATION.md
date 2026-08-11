@@ -212,7 +212,10 @@ is also proven not to create bytecode inside the immutable release. A
 clean-checkout race between initial posture capture and release
 hashing is proven to fail before wrapper or active-receipt publication. The
 suite also rejects an unmanifested importable file from an otherwise
-content-addressed release.
+content-addressed release. It separately proves that `stage` materializes no
+active record or stable wrapper, that `activate-admitted` binds a fresh exact
+host trust-gate result to the staged source and release-manifest aggregate, and
+that a mismatched admitted subject fails before publication.
 
 It also proves role-scoped MCP argv isolation: the selected AoA server alone is
 configured through an attempt-local relay, its exact upstream token is required

@@ -22,7 +22,20 @@ from typing import Iterable, Iterator, Sequence
 
 SCHEMA_VERSION = "abyss_stack_external_codex_runtime_install_v1"
 ACTIVE_SCHEMA_VERSION = "abyss_stack_external_codex_active_release_v1"
+STAGED_SCHEMA_VERSION = "abyss_stack_external_codex_staged_release_v1"
 MANIFEST_SCHEMA_VERSION = "abyss_stack_external_codex_release_manifest_v1"
+ARTIFACT_GATE_SCHEMA_VERSION = "abyss_machine_artifact_trust_gate_v1"
+ARTIFACT_CLASS = "runtime_or_container_artifact"
+ARTIFACT_CONSUMER_INTENT = "runtime_canary"
+ARTIFACT_SOURCE_REPO = "abyss-stack"
+ARTIFACT_TRUST_ROOT_MODE = "host_managed"
+ARTIFACT_BUNDLE_MANIFEST_REF = (
+    "manifests/artifact_bundles/abyss_stack_external_codex_agent.bundle.json"
+)
+ARTIFACT_SUBJECT_ROLE = "external_codex_agent_release_manifest"
+ARTIFACT_REQUIRED_CONTROLS = frozenset(
+    {"abi_signature", "sbom", "slsa_in_toto", "sigstore_cosign"}
+)
 DEFAULT_RUNTIME_ROOT = Path(
     "/srv/abyss-machine/runtimes/abyss-stack/external-codex-agent"
 )
@@ -1410,13 +1423,12 @@ def backup_existing_wrapper(path: Path, runtime_root: Path) -> str | None:
     return str(backup)
 
 
-def install(
+def prepare_release(
     source_root: Path,
     sdk_root: Path,
     agents_root: Path,
     skills_root: Path,
     runtime_root: Path,
-    bin_dir: Path,
     python_executable: Path,
     *,
     allow_dirty_source: bool,
@@ -1429,7 +1441,6 @@ def install(
     agents_root = require_absolute_directory(agents_root, "aoa-agents source root")
     skills_root = require_absolute_directory(skills_root, "aoa-skills source root")
     runtime_root = runtime_root.resolve()
-    bin_dir = bin_dir.resolve()
     python_executable, python_identity = require_python_executable(
         python_executable
     )
@@ -1475,6 +1486,139 @@ def install(
     assert_release_inputs_unchanged(files, current_files, manifest)
     verify_release(release_root)
     assert_python_identity_unchanged(python_executable, python_identity)
+    return {
+        "release_root": release_root,
+        "release_created": created,
+        "manifest": manifest,
+        "source": source_posture,
+        "sdk": sdk_posture,
+        "agents": agents_posture,
+        "skills": skills_posture,
+        "python_executable": python_executable,
+        "python_identity": python_identity,
+    }
+
+
+def stage(
+    source_root: Path,
+    sdk_root: Path,
+    agents_root: Path,
+    skills_root: Path,
+    runtime_root: Path,
+    python_executable: Path,
+    *,
+    allow_dirty_source: bool,
+    allow_dirty_sdk: bool,
+    allow_dirty_agents: bool,
+    allow_dirty_skills: bool,
+) -> dict[str, object]:
+    runtime_root = runtime_root.resolve()
+    prepared = prepare_release(
+        source_root,
+        sdk_root,
+        agents_root,
+        skills_root,
+        runtime_root,
+        python_executable,
+        allow_dirty_source=allow_dirty_source,
+        allow_dirty_sdk=allow_dirty_sdk,
+        allow_dirty_agents=allow_dirty_agents,
+        allow_dirty_skills=allow_dirty_skills,
+    )
+    manifest = prepared["manifest"]
+    release_root = prepared["release_root"]
+    if not isinstance(manifest, dict) or not isinstance(release_root, Path):
+        raise InstallError("prepared release result is invalid")
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    dirty = any(
+        bool(prepared[name].get("dirty"))
+        for name in ("source", "sdk", "agents", "skills")
+        if isinstance(prepared[name], dict)
+    )
+    staged = {
+        "schema_version": STAGED_SCHEMA_VERSION,
+        "release_id": manifest["release_id"],
+        "release_digest": manifest["release_digest"],
+        "release_root": str(release_root),
+        "python_executable": str(prepared["python_executable"]),
+        "python_identity": prepared["python_identity"],
+        "source": prepared["source"],
+        "sdk": prepared["sdk"],
+        "agents": prepared["agents"],
+        "skills": prepared["skills"],
+        "staged_at": now,
+        "nonproduction_dirty_source": dirty,
+    }
+    staged_path = runtime_root / "staged" / f"{manifest['release_id']}.json"
+    atomic_write(
+        staged_path,
+        (json.dumps(staged, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode(
+            "utf-8"
+        ),
+        0o444,
+    )
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "operation": "stage",
+        "staged": staged,
+        "staged_record": str(staged_path),
+        "release_created": prepared["release_created"],
+    }
+
+
+def install(
+    source_root: Path,
+    sdk_root: Path,
+    agents_root: Path,
+    skills_root: Path,
+    runtime_root: Path,
+    bin_dir: Path,
+    python_executable: Path,
+    *,
+    allow_dirty_source: bool,
+    allow_dirty_sdk: bool,
+    allow_dirty_agents: bool,
+    allow_dirty_skills: bool,
+) -> dict[str, object]:
+    runtime_root = runtime_root.resolve()
+    bin_dir = bin_dir.resolve()
+    prepared = prepare_release(
+        source_root,
+        sdk_root,
+        agents_root,
+        skills_root,
+        runtime_root,
+        python_executable,
+        allow_dirty_source=allow_dirty_source,
+        allow_dirty_sdk=allow_dirty_sdk,
+        allow_dirty_agents=allow_dirty_agents,
+        allow_dirty_skills=allow_dirty_skills,
+    )
+    manifest = prepared["manifest"]
+    release_root = prepared["release_root"]
+    python_executable = prepared["python_executable"]
+    python_identity = prepared["python_identity"]
+    source_posture = prepared["source"]
+    sdk_posture = prepared["sdk"]
+    agents_posture = prepared["agents"]
+    skills_posture = prepared["skills"]
+    created = bool(prepared["release_created"])
+    if (
+        not isinstance(manifest, dict)
+        or not isinstance(release_root, Path)
+        or not isinstance(python_executable, Path)
+        or not isinstance(python_identity, dict)
+        or not all(
+            isinstance(posture, dict)
+            for posture in (
+                source_posture,
+                sdk_posture,
+                agents_posture,
+                skills_posture,
+            )
+        )
+    ):
+        raise InstallError("prepared release result is invalid")
     previous_active = None
     active_path = runtime_root / "active.json"
     if active_path.exists():
@@ -1552,19 +1696,227 @@ def install(
     return receipt
 
 
-def activate(
-    runtime_root: Path,
-    bin_dir: Path,
-    release_id: str,
-    python_executable: Path,
-) -> dict[str, object]:
-    runtime_root = runtime_root.resolve()
+def release_artifact_subject_digest(release_root: Path) -> str:
+    manifest_path = require_regular_file(
+        release_root / "release-manifest.json",
+        "release manifest",
+    )
+    digest = sha256_file(manifest_path)
+    entry = {
+        "path": "release-manifest.json",
+        "role": ARTIFACT_SUBJECT_ROLE,
+        "bytes": manifest_path.stat().st_size,
+        "sha256": digest,
+        "sha256_hex": digest.removeprefix("sha256:"),
+    }
+    return sha256_bytes(canonical_bytes([entry]))
+
+
+def require_release_id(release_id: str) -> str:
     if (
         not release_id.startswith("sha256-")
         or len(release_id) != 71
         or any(character not in "0123456789abcdef" for character in release_id[7:])
     ):
         raise InstallError("release id must be one exact sha256 content address")
+    return release_id
+
+
+def staged_release(runtime_root: Path, release_id: str) -> dict[str, object]:
+    require_release_id(release_id)
+    path = require_regular_file(
+        runtime_root / "staged" / f"{release_id}.json",
+        "staged release record",
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("schema_version") != STAGED_SCHEMA_VERSION:
+        raise InstallError("staged release schema mismatch")
+    if payload.get("release_id") != release_id:
+        raise InstallError("staged release id mismatch")
+    if payload.get("nonproduction_dirty_source") is not False:
+        raise InstallError("artifact-admitted activation requires clean staged sources")
+    for owner in ("source", "sdk", "agents", "skills"):
+        posture = payload.get(owner)
+        if not isinstance(posture, dict) or posture.get("dirty") is not False:
+            raise InstallError(
+                f"artifact-admitted activation requires a clean staged {owner} posture"
+            )
+    source = payload.get("source")
+    if not isinstance(source, dict):
+        raise InstallError("staged abyss-stack source posture is missing")
+    source_ref = source.get("head")
+    if (
+        not isinstance(source_ref, str)
+        or re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", source_ref) is None
+    ):
+        raise InstallError("staged abyss-stack source ref is not one exact commit")
+    return payload
+
+
+def artifact_gate_admission(
+    abyss_machine_executable: Path,
+    registry_dir: Path,
+    release_root: Path,
+    source_ref: str,
+) -> dict[str, object]:
+    if not abyss_machine_executable.is_absolute():
+        raise InstallError("abyss-machine artifact gate executable must be absolute")
+    executable = require_regular_file(
+        abyss_machine_executable,
+        "abyss-machine artifact gate executable",
+    ).resolve()
+    if not os.access(executable, os.X_OK):
+        raise InstallError(
+            f"abyss-machine artifact gate executable is not executable: {executable}"
+        )
+    registry_dir = require_absolute_directory(registry_dir, "artifact registry")
+    subject_digest = release_artifact_subject_digest(release_root)
+    command = [
+        str(executable),
+        "artifacts",
+        "trust-gate",
+        "--registry-dir",
+        str(registry_dir),
+        "--artifact-class",
+        ARTIFACT_CLASS,
+        "--consumer-intent",
+        ARTIFACT_CONSUMER_INTENT,
+        "--source-repo",
+        ARTIFACT_SOURCE_REPO,
+        "--source-ref",
+        source_ref,
+        "--trust-root-mode",
+        ARTIFACT_TRUST_ROOT_MODE,
+        "--subject-digest",
+        subject_digest,
+        "--json",
+    ]
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=60,
+            env={
+                "HOME": "/nonexistent",
+                "LANG": "C.UTF-8",
+                "PATH": "/usr/bin:/bin",
+            },
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise InstallError("abyss-machine artifact trust gate could not run") from exc
+    try:
+        gate = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise InstallError("abyss-machine artifact trust gate returned invalid JSON") from exc
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or str(gate.get("error") or "denied")
+        raise InstallError(f"abyss-machine artifact trust gate failed: {detail}")
+    if not isinstance(gate, dict):
+        raise InstallError("abyss-machine artifact trust gate returned a non-object")
+    decision = gate.get("decision")
+    record = gate.get("record")
+    inspected = gate.get("inspected_claims")
+    if not isinstance(decision, dict) or not isinstance(record, dict):
+        raise InstallError("artifact trust gate omitted decision or record evidence")
+    if not isinstance(inspected, dict):
+        raise InstallError("artifact trust gate omitted inspected claims")
+    if (
+        gate.get("schema") != ARTIFACT_GATE_SCHEMA_VERSION
+        or gate.get("ok") is not True
+        or gate.get("verdict") not in {"allow", "warn"}
+        or decision.get("allow") is not True
+        or decision.get("verdict") != gate.get("verdict")
+        or decision.get("consumer_intent") != ARTIFACT_CONSUMER_INTENT
+        or decision.get("blockers") != []
+        or decision.get("manual_review") != []
+        or gate.get("blockers") != []
+        or gate.get("manual_review") != []
+    ):
+        raise InstallError("artifact trust gate did not admit runtime_canary activation")
+    expected_record_id = record.get("record_id")
+    registry_latest = inspected.get("registry_latest")
+    subject_identity = inspected.get("subject_identity")
+    source_claim = inspected.get("source")
+    trust_root = inspected.get("trust_root")
+    subject_store = inspected.get("artifact_subject_store")
+    verification = inspected.get("verification")
+    if not all(
+        isinstance(value, dict)
+        for value in (
+            registry_latest,
+            subject_identity,
+            source_claim,
+            trust_root,
+            subject_store,
+            verification,
+        )
+    ):
+        raise InstallError("artifact trust gate inspected claims are incomplete")
+    required_controls = set(record.get("required_controls") or [])
+    verified_controls = set(record.get("verified_controls") or [])
+    record_subject_digest = record.get("subject_digest")
+    record_id_payload = {
+        "artifact_class": ARTIFACT_CLASS,
+        "subject_digest": record_subject_digest,
+        "bundle_manifest_ref": ARTIFACT_BUNDLE_MANIFEST_REF,
+    }
+    computed_record_id = sha256_bytes(canonical_bytes(record_id_payload))
+    if (
+        gate.get("artifact_class") != ARTIFACT_CLASS
+        or gate.get("consumer_intent") != ARTIFACT_CONSUMER_INTENT
+        or gate.get("subject_digest") != subject_digest
+        or gate.get("record_id") != expected_record_id
+        or gate.get("latest_record_id") != expected_record_id
+        or record.get("artifact_class") != ARTIFACT_CLASS
+        or record.get("artifact_subjects_digest") != subject_digest
+        or record.get("bundle_manifest_ref") != ARTIFACT_BUNDLE_MANIFEST_REF
+        or record.get("source_repo") != ARTIFACT_SOURCE_REPO
+        or record.get("source_ref") != source_ref
+        or record.get("trust_root_mode") != ARTIFACT_TRUST_ROOT_MODE
+        or record.get("lifecycle_state") != "manually-verified"
+        or record.get("latest_eligible") is not True
+        or record.get("terminal_state") is not False
+        or record.get("verification_ok") is not True
+        or not ARTIFACT_REQUIRED_CONTROLS.issubset(required_controls)
+        or not ARTIFACT_REQUIRED_CONTROLS.issubset(verified_controls)
+        or expected_record_id != computed_record_id
+        or registry_latest.get("selected_record_is_latest") is not True
+        or subject_identity.get("subject_digest_matched") is not True
+        or source_claim.get("source_repo_matched") is not True
+        or source_claim.get("source_ref_matched") is not True
+        or trust_root.get("trust_root_mode_matched") is not True
+        or subject_store.get("ok") is not True
+        or subject_store.get("aggregate_digest") != subject_digest
+        or verification.get("ok") is not True
+    ):
+        raise InstallError("artifact trust gate evidence does not bind the staged release")
+    return {
+        "schema_version": "abyss_stack_external_codex_artifact_admission_v1",
+        "gate": gate,
+        "gate_command": command,
+        "release_manifest_sha256": sha256_file(
+            release_root / "release-manifest.json"
+        ),
+        "artifact_subjects_digest": subject_digest,
+        "source_repo": ARTIFACT_SOURCE_REPO,
+        "source_ref": source_ref,
+    }
+
+
+def activate(
+    runtime_root: Path,
+    bin_dir: Path,
+    release_id: str,
+    python_executable: Path,
+    *,
+    artifact_admission: dict[str, object] | None = None,
+    staged: dict[str, object] | None = None,
+) -> dict[str, object]:
+    runtime_root = runtime_root.resolve()
+    require_release_id(release_id)
     releases_root = (runtime_root / "releases").resolve()
     release_root = (releases_root / release_id).resolve()
     try:
@@ -1607,11 +1959,16 @@ def activate(
         "release_root": str(release_root),
         "python_executable": str(python_executable),
         "python_identity": python_identity,
-        "source": None,
-        "sdk": None,
+        "source": staged.get("source") if staged else None,
+        "sdk": staged.get("sdk") if staged else None,
+        "agents": staged.get("agents") if staged else None,
+        "skills": staged.get("skills") if staged else None,
         "installed_at": now,
         "previous_release_id": previous.get("release_id") if previous else None,
-        "nonproduction_dirty_source": True,
+        "nonproduction_dirty_source": (
+            staged.get("nonproduction_dirty_source") if staged else True
+        ),
+        "artifact_admission": artifact_admission,
     }
     atomic_write(
         active_path,
@@ -1619,6 +1976,112 @@ def activate(
         0o644,
     )
     return {"schema_version": SCHEMA_VERSION, "operation": "activate", "active": active}
+
+
+def activate_admitted(
+    runtime_root: Path,
+    bin_dir: Path,
+    release_id: str,
+    python_executable: Path,
+    abyss_machine_executable: Path,
+    registry_dir: Path,
+) -> dict[str, object]:
+    runtime_root = runtime_root.resolve()
+    staged = staged_release(runtime_root, release_id)
+    release_root = Path(str(staged.get("release_root") or ""))
+    expected_root = (runtime_root / "releases" / release_id).resolve()
+    if release_root != expected_root:
+        raise InstallError("staged release root does not match the activation target")
+    manifest = verify_release(release_root)
+    if (
+        manifest.get("release_id") != staged.get("release_id")
+        or manifest.get("release_digest") != staged.get("release_digest")
+    ):
+        raise InstallError("staged release record differs from its verified manifest")
+    staged_python = staged.get("python_executable")
+    if (
+        not isinstance(staged_python, str)
+        or python_executable.resolve() != Path(staged_python)
+    ):
+        raise InstallError("activation Python differs from the staged interpreter")
+    source = staged.get("source")
+    if not isinstance(source, dict) or not isinstance(source.get("head"), str):
+        raise InstallError("staged source ref is missing")
+    admission = artifact_gate_admission(
+        abyss_machine_executable,
+        registry_dir,
+        release_root,
+        source["head"],
+    )
+    result = activate(
+        runtime_root,
+        bin_dir,
+        release_id,
+        python_executable,
+        artifact_admission=admission,
+        staged=staged,
+    )
+    result["operation"] = "activate-admitted"
+    return result
+
+
+def recorded_artifact_admission_status(
+    active: dict[str, object],
+    release_root: Path,
+) -> dict[str, object]:
+    admission = active.get("artifact_admission")
+    if admission is None:
+        return {"status": "not_recorded", "admitted": False}
+    if not isinstance(admission, dict):
+        raise InstallError("active artifact admission is invalid")
+    gate = admission.get("gate")
+    source = active.get("source")
+    if not isinstance(gate, dict) or not isinstance(source, dict):
+        raise InstallError("active artifact admission lost gate or source evidence")
+    record = gate.get("record")
+    if not isinstance(record, dict):
+        raise InstallError("active artifact admission lost registry record evidence")
+    expected_subject_digest = release_artifact_subject_digest(release_root)
+    expected_manifest_digest = sha256_file(release_root / "release-manifest.json")
+    source_ref = source.get("head")
+    record_id_payload = {
+        "artifact_class": ARTIFACT_CLASS,
+        "subject_digest": record.get("subject_digest"),
+        "bundle_manifest_ref": ARTIFACT_BUNDLE_MANIFEST_REF,
+    }
+    expected_record_id = sha256_bytes(canonical_bytes(record_id_payload))
+    if (
+        admission.get("schema_version")
+        != "abyss_stack_external_codex_artifact_admission_v1"
+        or admission.get("artifact_subjects_digest") != expected_subject_digest
+        or admission.get("release_manifest_sha256") != expected_manifest_digest
+        or admission.get("source_repo") != ARTIFACT_SOURCE_REPO
+        or admission.get("source_ref") != source_ref
+        or gate.get("schema") != ARTIFACT_GATE_SCHEMA_VERSION
+        or gate.get("ok") is not True
+        or gate.get("verdict") not in {"allow", "warn"}
+        or gate.get("artifact_class") != ARTIFACT_CLASS
+        or gate.get("consumer_intent") != ARTIFACT_CONSUMER_INTENT
+        or gate.get("subject_digest") != expected_subject_digest
+        or gate.get("record_id") != expected_record_id
+        or gate.get("latest_record_id") != expected_record_id
+        or record.get("record_id") != expected_record_id
+        or record.get("artifact_subjects_digest") != expected_subject_digest
+        or record.get("source_repo") != ARTIFACT_SOURCE_REPO
+        or record.get("source_ref") != source_ref
+        or record.get("trust_root_mode") != ARTIFACT_TRUST_ROOT_MODE
+        or record.get("terminal_state") is not False
+    ):
+        raise InstallError("active artifact admission differs from the verified release")
+    return {
+        "status": "recorded_and_bound",
+        "admitted": True,
+        "verdict": gate.get("verdict"),
+        "record_id": expected_record_id,
+        "artifact_subjects_digest": expected_subject_digest,
+        "source_ref": source_ref,
+        "warnings": gate.get("warnings") or [],
+    }
 
 
 def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
@@ -1657,6 +2120,7 @@ def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
     manifest = verify_release(release_root)
     if manifest["release_id"] != release_id:
         raise InstallError("active release id differs from verified manifest")
+    artifact_admission = recorded_artifact_admission_status(active, release_root)
     wrappers = {
         "aoa-external-codex-agent": "agent-entrypoint.py",
         "aoa-external-actor-bind": "bind-entrypoint.py",
@@ -1674,6 +2138,7 @@ def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
         "healthy": True,
         "active": active,
         "manifest": manifest,
+        "artifact_admission": artifact_admission,
         "wrappers": wrapper_status,
     }
 
@@ -1693,6 +2158,17 @@ def parser() -> argparse.ArgumentParser:
     install_parser.add_argument("--allow-dirty-sdk", action="store_true")
     install_parser.add_argument("--allow-dirty-agents", action="store_true")
     install_parser.add_argument("--allow-dirty-skills", action="store_true")
+    stage_parser = subparsers.add_parser("stage")
+    stage_parser.add_argument("--source-root", type=Path, required=True)
+    stage_parser.add_argument("--sdk-root", type=Path, required=True)
+    stage_parser.add_argument("--agents-root", type=Path, required=True)
+    stage_parser.add_argument("--skills-root", type=Path, required=True)
+    stage_parser.add_argument("--runtime-root", type=Path, default=DEFAULT_RUNTIME_ROOT)
+    stage_parser.add_argument("--python", type=Path, default=Path(sys.executable))
+    stage_parser.add_argument("--allow-dirty-source", action="store_true")
+    stage_parser.add_argument("--allow-dirty-sdk", action="store_true")
+    stage_parser.add_argument("--allow-dirty-agents", action="store_true")
+    stage_parser.add_argument("--allow-dirty-skills", action="store_true")
     status_parser = subparsers.add_parser("status")
     status_parser.add_argument("--runtime-root", type=Path, default=DEFAULT_RUNTIME_ROOT)
     status_parser.add_argument("--bin-dir", type=Path, default=DEFAULT_BIN_DIR)
@@ -1701,6 +2177,13 @@ def parser() -> argparse.ArgumentParser:
     activate_parser.add_argument("--bin-dir", type=Path, default=DEFAULT_BIN_DIR)
     activate_parser.add_argument("--release-id", required=True)
     activate_parser.add_argument("--python", type=Path, default=Path(sys.executable))
+    admitted_parser = subparsers.add_parser("activate-admitted")
+    admitted_parser.add_argument("--runtime-root", type=Path, default=DEFAULT_RUNTIME_ROOT)
+    admitted_parser.add_argument("--bin-dir", type=Path, default=DEFAULT_BIN_DIR)
+    admitted_parser.add_argument("--release-id", required=True)
+    admitted_parser.add_argument("--python", type=Path, default=Path(sys.executable))
+    admitted_parser.add_argument("--abyss-machine", type=Path, required=True)
+    admitted_parser.add_argument("--artifact-registry-dir", type=Path, required=True)
     return result
 
 
@@ -1721,8 +2204,30 @@ def main(argv: Sequence[str] | None = None) -> int:
                 allow_dirty_agents=args.allow_dirty_agents,
                 allow_dirty_skills=args.allow_dirty_skills,
             )
+        elif args.command == "stage":
+            payload = stage(
+                args.source_root,
+                args.sdk_root,
+                args.agents_root,
+                args.skills_root,
+                args.runtime_root,
+                args.python,
+                allow_dirty_source=args.allow_dirty_source,
+                allow_dirty_sdk=args.allow_dirty_sdk,
+                allow_dirty_agents=args.allow_dirty_agents,
+                allow_dirty_skills=args.allow_dirty_skills,
+            )
         elif args.command == "activate":
             payload = activate(args.runtime_root, args.bin_dir, args.release_id, args.python)
+        elif args.command == "activate-admitted":
+            payload = activate_admitted(
+                args.runtime_root,
+                args.bin_dir,
+                args.release_id,
+                args.python,
+                args.abyss_machine,
+                args.artifact_registry_dir,
+            )
         else:
             payload = status(args.runtime_root, args.bin_dir)
     except (InstallError, OSError, ValueError, json.JSONDecodeError) as exc:
