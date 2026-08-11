@@ -696,6 +696,13 @@ copy remain byte-identical and provenance-bound during the final locked
 revalidation. This exception does not apply to transport fixtures and does not
 widen task, role, model, permission, effect, or owner scope.
 
+The same early owner-contour compatibility window admits a mixed summon
+binding in which the exact request is the sole typed `summon_request` artifact
+while its SDK v4 decision remains a generic scenario input. The decision must
+also be the exact controller-owned writer task input and appear unchanged in
+the plan snapshot and incarnation continuation. Missing, duplicated, foreign,
+or transport-fixture mixed bindings remain rejected.
+
 The reviewer receives its own canonical SDK v4 summon request and decision;
 the writer request remains immutable review evidence. A2A export verifies the
 materialized request/schema bytes, typed plan binding, role/incarnation/task

@@ -322,7 +322,9 @@ runtime state and `writer-summon-request-schema` from the exact selected SDK
 schema. Those new IDs describe reviewer inputs; they never backfill or rewrite
 the writer task. The reviewer receives its own active `summon-request-schema`,
 and A2A export requires both schema copies to remain byte-identical under the
-reviewer lock. Every mismatch fails closed.
+reviewer lock. An early owner plan may also carry a typed summon request and a
+generic summon decision only when that exact decision remains bound as writer
+task, snapshot, and continuation evidence. Every mismatch fails closed.
 It also builds a fresh canonical reviewer summon request/decision against the
 same exact SDK v4 schemas while retaining the writer request as immutable
 evidence; it never substitutes either request with the runtime-owner task.

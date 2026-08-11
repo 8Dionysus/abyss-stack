@@ -50,6 +50,10 @@ otherwise admitted `owner_contour` writer:
   names that schema identity and version;
 - the reviewer receives a separate active `summon-request-schema` input for
   its own SDK v4 request.
+- an early mixed plan may keep the exact request in the typed summon binding
+  while carrying its decision through generic scenario refs, but only when the
+  same decision is also one exact writer task input, snapshot ref, and
+  continuation input.
 
 These are new review inputs, not backfilled claims about the writer task. Their
 reserved IDs cannot collide with writer-owned inputs. The derived provenance

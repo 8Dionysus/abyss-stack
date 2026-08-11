@@ -415,6 +415,7 @@ def _writer_summon_decision_ref(
     plan: RunPlan,
     task_request_ref: ProvenanceRef,
     writer_summon_ref: ProvenanceRef,
+    allow_mixed_binding: bool = False,
 ) -> ProvenanceRef:
     """Resolve summon responsibility from either A2A or domain scenario ABI."""
 
@@ -429,11 +430,16 @@ def _writer_summon_decision_ref(
         if item.artifact_kind == "summon_decision"
     ]
     if typed_requests or typed_decisions:
-        if typed_requests != [writer_summon_ref] or len(typed_decisions) != 1:
+        if typed_requests != [writer_summon_ref] or len(typed_decisions) > 1:
             raise StudyPreparationError(
                 "writer plan does not bind one exact canonical summon request/decision"
             )
-        return typed_decisions[0]
+        if typed_decisions:
+            return typed_decisions[0]
+        if not allow_mixed_binding:
+            raise StudyPreparationError(
+                "writer plan does not bind one exact canonical summon request/decision"
+            )
 
     generic_requests = [
         item for item in plan.scenario_binding.input_refs if item == writer_summon_ref
@@ -2346,6 +2352,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     manifest_input: tuple[Path, ProvenanceRef] | None = None
     writer_summon_input: tuple[Path, ProvenanceRef] | None = None
     writer_summon_schema_input: tuple[Path, ProvenanceRef] | None = None
+    writer_summon_decision_input: tuple[Path, ProvenanceRef] | None = None
     controller_derived_refs: list[ProvenanceRef] = []
     writer_schema_recovered = False
     writer_manifest_input_id = str(writer_launch["workspace_manifest_input_id"])
@@ -2406,6 +2413,8 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
             writer_summon_input = (path, provenance)
         elif input_id == "summon-request-schema":
             writer_summon_schema_input = (path, provenance)
+        elif input_id == "summon-decision":
+            writer_summon_decision_input = (path, provenance)
     if writer_summon_input is None:
         raise StudyPreparationError(
             "writer has no exact canonical SDK v4 summon request input"
@@ -2548,7 +2557,25 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         plan=base_plan,
         task_request_ref=base_binding.task_request_ref,
         writer_summon_ref=writer_summon_ref,
+        allow_mixed_binding=writer_admission_class == "owner_contour",
     )
+    writer_uses_mixed_summon_binding = (
+        writer_admission_class == "owner_contour"
+        and not any(
+            item.artifact_kind == "summon_decision"
+            for item in base_plan.scenario_binding.input_artifact_bindings
+        )
+    )
+    if writer_uses_mixed_summon_binding and (
+        writer_summon_decision_input is None
+        or writer_summon_decision_input[1] != writer_summon_decision_ref
+        or writer_summon_decision_ref not in base_plan.snapshot.source_refs
+        or writer_summon_decision_ref
+        not in base_binding.continuation.immutable_input_refs
+    ):
+        raise StudyPreparationError(
+            "owner-contour writer mixed summon decision is not exact task, snapshot, and continuation evidence"
+        )
     writer_task_refs = [
         item
         for item in base_plan.runtime_profile.constraint_refs

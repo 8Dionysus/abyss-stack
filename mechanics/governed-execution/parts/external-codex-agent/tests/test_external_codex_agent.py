@@ -1528,6 +1528,7 @@ def _fixture(
             f"runtime-studies/fixtures/{identity_suffix}/summon-decision.json",
             digest=_digest_path(summon_decision_path),
             source_ref=summon_request_ref.artifact_digest,
+            schema_ref=PREPARER.SDK_SUMMON_RESULT_SCHEMA_RELATIVE_PATH.as_posix(),
             schema_version="urn:aoa-sdk:a2a:summon-result:v4",
         )
         fixture_extra_inputs.append(
@@ -1798,6 +1799,31 @@ def _fixture(
         report_schema_ref=report_schema_ref,
         extra_role_refs=extra_role_refs,
     )
+    if omit_historical_reviewer_inputs:
+        assert summon_decision_ref is not None
+        mixed_input_refs = list(plan.scenario_binding.input_refs)
+        for ref in (summon_request_ref, summon_decision_ref):
+            if ref not in mixed_input_refs:
+                mixed_input_refs.append(ref)
+        mixed_scenario = plan.scenario_binding.model_copy(
+            update={
+                "input_refs": tuple(mixed_input_refs),
+                "input_artifact_bindings": tuple(
+                    item
+                    for item in plan.scenario_binding.input_artifact_bindings
+                    if item.artifact_kind != "summon_decision"
+                ),
+            }
+        )
+        plan = plan.model_copy(
+            update={
+                "scenario_binding": mixed_scenario,
+                "plan_digest": ZERO_DIGEST,
+            }
+        )
+        plan = plan.model_copy(
+            update={"plan_digest": canonical_digest(plan, exclude={"plan_digest"})}
+        )
     plan_path = tmp_path / "plan.json"
     _write_json(plan_path, plan.model_dump(mode="json"))
     stop_conditions = (
@@ -10038,6 +10064,55 @@ def test_domain_scenario_resolves_summon_responsibility_from_exact_refs() -> Non
         plan=generic_plan,
         task_request_ref=by_kind["summon_request"],
         writer_summon_ref=by_kind["summon_request"],
+    )
+
+    assert decision_ref == summon_decision_ref
+
+
+def test_owner_contour_mixed_summon_binding_requires_explicit_compatibility() -> None:
+    base = RunPlan.model_validate_json(PLAN_FIXTURE.read_text(encoding="utf-8"))
+    by_kind = {
+        item.artifact_kind: item.artifact_ref
+        for item in base.scenario_binding.input_artifact_bindings
+    }
+    summon_request_ref = by_kind["summon_request"]
+    summon_decision_ref = by_kind["summon_decision"].model_copy(
+        update={
+            "schema_ref": PREPARER.SDK_SUMMON_RESULT_SCHEMA_RELATIVE_PATH.as_posix(),
+            "schema_version": PREPARER.SDK_SUMMON_RESULT_SCHEMA_VERSION,
+        }
+    )
+    mixed_scenario = base.scenario_binding.model_copy(
+        update={
+            "input_artifact_bindings": tuple(
+                item
+                for item in base.scenario_binding.input_artifact_bindings
+                if item.artifact_kind != "summon_decision"
+            ),
+            "input_refs": (
+                *base.scenario_binding.input_refs,
+                summon_request_ref,
+                summon_decision_ref,
+            ),
+        }
+    )
+    mixed_plan = base.model_copy(update={"scenario_binding": mixed_scenario})
+
+    with pytest.raises(
+        PREPARER.StudyPreparationError,
+        match="one exact canonical summon request/decision",
+    ):
+        PREPARER._writer_summon_decision_ref(
+            plan=mixed_plan,
+            task_request_ref=summon_request_ref,
+            writer_summon_ref=summon_request_ref,
+        )
+
+    decision_ref = PREPARER._writer_summon_decision_ref(
+        plan=mixed_plan,
+        task_request_ref=summon_request_ref,
+        writer_summon_ref=summon_request_ref,
+        allow_mixed_binding=True,
     )
 
     assert decision_ref == summon_decision_ref
