@@ -7906,6 +7906,45 @@ def test_workspace_write_resume_continues_from_exact_prior_actor_tree(
     assert first_delta_ref in preserved_sources
 
 
+def test_parent_can_resume_exact_authority_blocked_continuation(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        task_family="landing_ambiguity_stop",
+        identity_suffix="authority-parent-followup",
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    first_terminal = _wait_terminal(runtime, fixture["session_id"])
+
+    assert first_terminal["status"] == "authority_blocked"
+    result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    resume_path = tmp_path / "authority-parent-followup.json"
+    _write_json(
+        resume_path,
+        {
+            "schema_version": "abyss_stack_external_codex_resume_v1",
+            "session_id": fixture["session_id"],
+            "thread_id": first_terminal["thread_id"],
+            "after_event_sequence": first_terminal["last_event_sequence"],
+            "reason": "bounded_repair",
+            "instruction": "Apply the exact parent follow-up without widening authority.",
+            "previous_result_digest": _digest_path(result_path),
+        },
+    )
+
+    resumed = runtime.resume(fixture["session_id"], resume_path)
+    assert resumed["status"] == "running"
+    second_terminal = _wait_terminal(runtime, fixture["session_id"])
+    second_result = runtime.result(fixture["session_id"])
+
+    assert second_terminal["status"] == "authority_blocked"
+    assert second_result is not None
+    assert second_result["thread_id"] == first_terminal["thread_id"]
+    assert second_result["attempt_count"] == 2
+
+
 def test_failed_read_only_review_identity_can_resume_exact_thread(
     tmp_path: Path,
 ) -> None:

@@ -418,7 +418,7 @@ def _close_mcp_credential_proxies(proxies: list[_McpCredentialProxy]) -> None:
     proxies.clear()
 
 
-RESUMABLE_STATES = {"paused", "interrupted", "review_required"}
+RESUMABLE_STATES = {"paused", "interrupted", "review_required", "authority_blocked"}
 REVIEW_REPORT_RECOVERY_FAILURES = {"model_report_identity_mismatch"}
 SECRET_ENV_RE = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)", re.I)
 SOURCE_LINE_ANCHOR_RE = re.compile(
