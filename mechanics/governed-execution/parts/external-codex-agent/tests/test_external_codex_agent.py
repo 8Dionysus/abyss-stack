@@ -4749,6 +4749,7 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
         and step["effect_class"] == "read_only"
         for step in active_reviewer_steps
     )
+    assert reviewer_task["indirect_command_policy"] == "sandbox_confined"
     assert reviewer_task["source_evidence_paths"] == ["README.md"]
     assert set(preparation["forwarded_input_ids"]).issuperset(
         {
@@ -6027,6 +6028,49 @@ def test_sandbox_confined_policy_admits_local_indirection_only_under_exact_postu
         task,
         binding,
     ) == ["publication"]
+
+
+def test_prepared_read_only_reviewer_admits_real_composite_command_shape_only_under_exact_posture() -> (
+    None
+):
+    command = (
+        "/usr/bin/zsh -lc \"base=/srv/actor-inputs; "
+        "for id in 001 002; do /usr/bin/wc -l < \\\"$base/$id.input\\\"; done\""
+    )
+    task = {
+        "allowed_effect_class": "read_only",
+        "indirect_command_policy": "sandbox_confined",
+        "forbidden_effects": sorted(RUNTIME.RUNTIME_WIDE_FORBIDDEN_EFFECTS),
+    }
+    exact_binding = SimpleNamespace(
+        permission_posture=IncarnationPermissionPosture(
+            sandbox_mode="read_only",
+            approval_policy="never",
+            allowed_effect_classes=("read_only",),
+            network_access="disabled",
+            secret_access=False,
+            external_effects=False,
+        )
+    )
+    widened_binding = SimpleNamespace(
+        permission_posture=SimpleNamespace(
+            sandbox_mode="read_only",
+            approval_policy="never",
+            allowed_effect_classes=("read_only",),
+            network_access="enabled",
+            secret_access=False,
+            external_effects=False,
+        )
+    )
+    commands = [{"command": command, "status": "completed", "exit_code": 0}]
+
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+    assert RUNTIME.ExternalCodexRuntime._forbidden_effects(
+        None, commands, task, exact_binding
+    ) == []
+    assert RUNTIME.ExternalCodexRuntime._forbidden_effects(
+        None, commands, task, widened_binding
+    ) == ["unclassified_indirect_effect"]
 
 
 def test_indirect_interpreter_effect_is_unclassified_but_fixed_validation_is_admitted() -> (

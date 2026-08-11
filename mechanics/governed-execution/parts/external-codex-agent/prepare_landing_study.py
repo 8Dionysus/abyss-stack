@@ -2845,6 +2845,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         "target_owner": writer_task["target_owner"],
         "authority_scope": writer_task["authority_scope"],
         "allowed_effect_class": "read_only",
+        "indirect_command_policy": "sandbox_confined",
         "allowed_paths": writer_task["allowed_paths"],
         "source_evidence_paths": writer_task.get(
             "source_evidence_paths", writer_task["allowed_paths"]

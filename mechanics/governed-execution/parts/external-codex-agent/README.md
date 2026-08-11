@@ -140,6 +140,8 @@ The controller:
   admit `sandbox_confined` local indirection only when the exact incarnation
   binding proves a matching read-only or workspace-write sandbox, approval
   `never`, disabled network, and no secret or external-effect authority;
+  canonical landing-review preparation binds that policy into its newly
+  generated read-only task rather than inheriting the writer task's policy;
   explicit forbidden command families and abnormal failure closeout still
   fail closed. Shell separators remain
   visible even when attached to arguments, redirection remains an opaque

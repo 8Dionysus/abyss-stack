@@ -9,6 +9,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Carry the existing `sandbox_confined` indirect-command policy into every
+  canonically prepared read-only landing reviewer. Composite local inspection
+  commands remain admitted only under the exact read-only, approval-never,
+  network-disabled, secret-free, external-effect-free incarnation posture;
+  wider postures, known forbidden command families, and abnormal worker-death
+  closeout still fail closed.
 - Bind a fixed validation return either to one unchanged final actor manifest
   at every command receipt or to the exact complete terminal validation suffix
   whose last receipt binds the final manifest. This preserves refusal of later

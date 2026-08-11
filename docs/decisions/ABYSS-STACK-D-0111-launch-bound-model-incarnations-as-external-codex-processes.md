@@ -334,6 +334,19 @@ execution budget. This closes the bounded installed process/session/reviewed-
 return mechanism question. It does not establish Luna net benefit, general
 landing fit, production admission, owner acceptance, or effect authority.
 
+The first independent reviewer of the preserved owner-contour landing writer
+then returned a substantive `review_required/return_for_repair` report and
+changed no actor-workspace path, but its runtime result remained
+`authority_blocked`. Canonical reviewer preparation had omitted the already
+admitted task-local `sandbox_confined` policy, so ordinary composite read-only
+inspection commands were classified as unclassified indirect effects even
+though the exact incarnation proved read-only sandboxing, approval `never`,
+disabled network, and no secret or external-effect authority. That terminal
+receipt remains counterevidence and cannot authorize A2A export. Reviewer
+preparation now binds the policy explicitly in the new reviewer task while
+known forbidden command families and abnormal worker-death closeout remain
+fail-closed; a fresh independent reviewer is still required.
+
 ## Source surfaces
 
 The first live ambiguity-stop L2 study tested the parent lifecycle itself. Its

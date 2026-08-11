@@ -459,8 +459,11 @@ are separately admitted by their owner identity. A task-local
 `indirect_command_policy: sandbox_confined` may admit opaque local execution
 only when the exact incarnation binding proves the matching read-only or
 workspace-write sandbox, approval `never`, disabled network, and no secret or
-external-effect authority. Explicit forbidden families remain blocking, and
-unexpected worker death retains the stricter unclassified-effect closeout.
+external-effect authority. Canonical landing-review preparation selects this
+policy explicitly for its newly generated read-only task; it does not inherit
+the writer task's effect-class policy. Explicit forbidden families remain
+blocking, and unexpected worker death retains the stricter unclassified-effect
+closeout.
 The sandbox remains the primary effect boundary, and command observation is
 retained as auditable counterevidence.
 Any command argument that names a secret-shaped path is classified as secret
