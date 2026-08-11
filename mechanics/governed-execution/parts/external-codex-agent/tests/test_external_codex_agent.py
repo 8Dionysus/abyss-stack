@@ -2794,6 +2794,13 @@ def test_preflight_exercises_masked_nested_codex_sandbox(
     assert "--strict-config" not in command
     assert "--disable" in command
     assert command[command.index("--disable") + 1] == "use_legacy_landlock"
+    permission_override = next(
+        command[index + 1]
+        for index, value in enumerate(command[:-1])
+        if value == "-c"
+        and command[index + 1].startswith("permissions.aoa_external_actor=")
+    )
+    assert f'"{fixture["launch"]["codex_executable"]}"="read"' in permission_override
     assert actor_git_mask["masks"]
     assert actor_git_mask["private_directory_views"]
 
@@ -3113,6 +3120,7 @@ def test_preflight_and_separate_process_return_structured_result(
         / "actor-git-config"
     )
     assert f'"{sanitized_config}"="read"' in permission_override
+    assert f'"{fixture["launch"]["codex_executable"]}"="read"' in permission_override
     assert f'"{execution_root}"="read"' in permission_override
     assert f'"{execution_root / ".git"}"="read"' in permission_override
     assert '":minimal"="read"' in permission_override
