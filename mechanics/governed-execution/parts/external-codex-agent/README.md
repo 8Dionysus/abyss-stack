@@ -293,12 +293,15 @@ model, form the owner execution request, or start the actor. `aoa-summon` then
 forms the separate semantic request and calls `preflight`, `start`, or
 `run-to-terminal` with both exact paths.
 
-The runtime admits model-neutral exact aliases for the initial write contours:
-`landing-workspace-write-v2` binds the existing landing realization, while
+The runtime admits model-neutral exact aliases for the initial model-organ
+contours:
+`landing-readonly-v2` binds the independent reviewer realization,
+`landing-workspace-write-v2` binds the writer realization, while
 `structured-owner-duty-workspace-write-v1` binds an already selected task-local
-role for bounded eval, stats, or memo canaries. Both expose the same isolated
-projection and effect posture; the names preserve model-organ ABI and do not
-select a role, model, procedure, route, or acceptance outcome.
+role for bounded eval, stats, or memo canaries. All three expose the same
+isolated projection posture as their corresponding generic read or write
+contour; the names preserve model-organ ABI and do not select a role, model,
+procedure, route, or acceptance outcome.
 
 `prepare_landing_study.py prepare-reviewer` is the canonical non-starting
 review preparation path for both historical transport-study writers and admitted

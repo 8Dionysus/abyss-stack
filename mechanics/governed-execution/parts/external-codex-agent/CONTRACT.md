@@ -299,13 +299,15 @@ falls back to `allowed_paths` only for older v1 tasks. Neither field authorizes
 commit, push, PR, merge, tag, release, publication, service mutation, secret
 access, or global config mutation.
 
-The write contour exposes two exact model-organ ABI aliases:
-`landing-workspace-write-v2` and
+The initial model-organ contours expose exact ABI aliases:
+`landing-readonly-v2`, `landing-workspace-write-v2`, and
 `structured-owner-duty-workspace-write-v1`. Each retains the same bounded
-`workspace_write`, `repo_mutation`, no-MCP, no-network, no-external-effect
-posture. The alias must match the realization and incarnation binding exactly;
-it does not choose the task family, selected role chain, domain procedure, or
-model-fit outcome.
+generic posture for its effect class: the read alias is `read_only` with
+`read_only` effects, while the write aliases are `workspace_write` with
+`repo_mutation` effects. All remain no-MCP, no-network, and
+no-external-effect. The alias must match the realization and incarnation
+binding exactly; it does not choose the task family, selected role chain,
+domain procedure, or model-fit outcome.
 
 Codex runs beneath a Linux supervisor that owns a separate process group but
 does not create an outer PID or network namespace. Inference adds only the

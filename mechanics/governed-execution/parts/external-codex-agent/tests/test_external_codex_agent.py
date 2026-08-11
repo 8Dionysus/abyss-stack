@@ -986,6 +986,7 @@ def _fixture(
     review_required: bool = False,
     ignored_baseline: bool = False,
     prepare_mutation_reviewer_sources: bool = False,
+    reviewer_tool_profile_id: str | None = None,
     allowed_paths: tuple[str, ...] = ("README.md", "landing-note.md"),
     source_evidence_paths: tuple[str, ...] | None = None,
     summon_request_mutator: Callable[[dict[str, Any]], None] | None = None,
@@ -1004,6 +1005,10 @@ def _fixture(
         raise AssertionError("role-scoped MCP fixtures are read-only")
     if tool_profile_id is not None and role_mcp is not None:
         raise AssertionError("an explicit tool profile cannot also select a role MCP")
+    if reviewer_tool_profile_id is not None and not prepare_mutation_reviewer_sources:
+        raise AssertionError(
+            "an explicit reviewer tool profile requires reviewer source preparation"
+        )
     if owner_contour and (
         not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
         or SUMMON_COMPILER is None
@@ -1086,7 +1091,11 @@ def _fixture(
             / "source/model-realizations/fixture-luna-max-readonly.json"
         )
         reviewer_realization_path.parent.mkdir(parents=True, exist_ok=True)
-        _write_model_realization(reviewer_realization_path, workspace_write=False)
+        _write_model_realization(
+            reviewer_realization_path,
+            workspace_write=False,
+            tool_profile_id=reviewer_tool_profile_id,
+        )
     workspace_ref = _provenance(
         "fixture-target",
         "workspace/HEAD",
@@ -4356,6 +4365,24 @@ def test_runtime_tool_profile_ids_are_model_neutral() -> None:
     assert all("luna" not in item and "sol" not in item for item in profile_ids)
 
 
+def test_model_organ_landing_readonly_profile_admits_exact_runtime_binding(
+    tmp_path: Path,
+) -> None:
+    tool_profile_id = "abyss-stack:external_codex_agent/landing-readonly-v2"
+    fixture = _fixture(tmp_path, tool_profile_id=tool_profile_id)
+
+    admission = fixture["runtime"].preflight(fixture["launch_path"])
+    terminal = fixture["runtime"].run_to_terminal(fixture["launch_path"])
+    result = fixture["runtime"].result(fixture["session_id"])
+
+    assert admission["admitted"] is True
+    assert admission["tool_profile_id"] == tool_profile_id
+    assert terminal["status"] == "completed"
+    assert result is not None
+    assert result["status"] == "completed"
+    assert result["changed_paths"] == []
+
+
 @pytest.mark.parametrize(
     "tool_profile_id",
     (
@@ -4592,6 +4619,9 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
         exact_baseline=True,
         review_required=True,
         prepare_mutation_reviewer_sources=True,
+        reviewer_tool_profile_id=(
+            "abyss-stack:external_codex_agent/landing-readonly-v2"
+        ),
         source_evidence_paths=("README.md",),
         owner_contour=True,
     )

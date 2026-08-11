@@ -62,6 +62,23 @@
       "external_effects": false
     },
     {
+      "profile_id": "abyss-stack:external_codex_agent/landing-readonly-v2",
+      "sandbox_mode": "read_only",
+      "codex_sandbox": "workspace-write",
+      "codex_execution_root": "attempt-local",
+      "approval_policy": "never",
+      "allowed_effect_classes": [
+        "read_only"
+      ],
+      "required_tool_ids": [
+        "shell-read"
+      ],
+      "required_mcp_server_ids": [],
+      "mcp_server_configs": [],
+      "network_access": "disabled",
+      "external_effects": false
+    },
+    {
       "profile_id": "abyss-stack:external_codex_agent/bounded-repo-write-v1",
       "sandbox_mode": "workspace_write",
       "codex_sandbox": "workspace-write",
