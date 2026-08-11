@@ -21,7 +21,7 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 from typing import Any
 
 import pytest
@@ -5687,6 +5687,53 @@ def test_forbidden_effect_observer_handles_wrappers_and_effect_families(
 )
 def test_effect_observer_does_not_block_fixed_read_commands(command: str) -> None:
     assert RUNTIME._command_effects(command) == set()
+
+
+def test_git_tag_listing_is_read_only_but_creation_remains_forbidden() -> None:
+    assert RUNTIME._command_effects("/usr/bin/git tag --list") == set()
+    assert RUNTIME._command_effects("/usr/bin/git tag v1") == {"tag"}
+    assert RUNTIME._command_effects("/usr/bin/git tag --list --delete v1") == {"tag"}
+
+
+def test_sandbox_confined_policy_admits_local_indirection_only_under_exact_posture() -> (
+    None
+):
+    command = "/usr/bin/python3 -c 'print(42)'"
+    task = {
+        "allowed_effect_class": "repo_mutation",
+        "indirect_command_policy": "sandbox_confined",
+        "forbidden_effects": sorted(RUNTIME.RUNTIME_WIDE_FORBIDDEN_EFFECTS),
+    }
+    binding = SimpleNamespace(
+        permission_posture=IncarnationPermissionPosture(
+            sandbox_mode="workspace_write",
+            approval_policy="never",
+            allowed_effect_classes=("repo_mutation",),
+            network_access="disabled",
+            secret_access=False,
+            external_effects=False,
+        )
+    )
+    commands = [{"command": command, "status": "completed", "exit_code": 0}]
+
+    assert RUNTIME.ExternalCodexRuntime._forbidden_effects(
+        None, commands, task, binding
+    ) == []
+    assert RUNTIME.ExternalCodexRuntime._forbidden_effects(
+        None, commands, {**task, "indirect_command_policy": "fail_closed"}, binding
+    ) == ["unclassified_indirect_effect"]
+    assert RUNTIME.ExternalCodexRuntime._forbidden_effects(
+        None,
+        [
+            {
+                "command": "/usr/bin/curl -X POST https://example.invalid/upload",
+                "status": "completed",
+                "exit_code": 0,
+            }
+        ],
+        task,
+        binding,
+    ) == ["publication"]
 
 
 def test_indirect_interpreter_effect_is_unclassified_but_fixed_validation_is_admitted() -> (

@@ -3071,7 +3071,7 @@ def _command_effects(command: str) -> set[str]:
                     detected.add("push")
                 elif subcommand == "merge":
                     detected.add("merge")
-                elif subcommand == "tag":
+                elif subcommand == "tag" and _git_tag_is_mutating(git_args):
                     detected.add("tag")
                 elif subcommand == "config" and any(
                     value in {"--global", "--system"} for value in lowered
@@ -3200,6 +3200,75 @@ def _command_effects(command: str) -> set[str]:
             ):
                 detected.add("global_config_mutation")
     return detected
+
+
+def _git_tag_is_mutating(args: Sequence[str]) -> bool:
+    """Separate ordinary tag listing from tag creation, deletion, or signing."""
+
+    lowered = tuple(value.lower() for value in args)
+    if not lowered:
+        return False
+    mutation_modes = {
+        "-a",
+        "--annotate",
+        "-d",
+        "--delete",
+        "-f",
+        "--force",
+        "-s",
+        "--sign",
+        "-u",
+        "--local-user",
+        "--create-reflog",
+    }
+    if any(
+        value in mutation_modes
+        or any(value.startswith(prefix + "=") for prefix in mutation_modes)
+        for value in lowered
+    ):
+        return True
+    read_only_modes = {
+        "-l",
+        "--list",
+        "--contains",
+        "--no-contains",
+        "--merged",
+        "--no-merged",
+        "--points-at",
+    }
+    if any(
+        value in read_only_modes
+        or any(value.startswith(prefix + "=") for prefix in read_only_modes)
+        for value in lowered
+    ):
+        return False
+    return True
+
+
+def _sandbox_confined_indirection_is_admitted(
+    task: Mapping[str, Any],
+    binding: Any,
+) -> bool:
+    """Admit opaque local work only under an exact deny-external sandbox binding."""
+
+    if task.get("indirect_command_policy") != "sandbox_confined":
+        return False
+    posture = getattr(binding, "permission_posture", None)
+    if posture is None:
+        return False
+    sandbox_mode = getattr(posture, "sandbox_mode", None)
+    expected_sandbox = (
+        "read_only"
+        if task.get("allowed_effect_class") == "read_only"
+        else "workspace_write"
+    )
+    return bool(
+        sandbox_mode == expected_sandbox
+        and getattr(posture, "approval_policy", None) == "never"
+        and getattr(posture, "network_access", None) == "disabled"
+        and getattr(posture, "secret_access", None) is False
+        and getattr(posture, "external_effects", None) is False
+    )
 
 
 def _command_has_unclassified_indirection(command: str) -> bool:
@@ -9652,14 +9721,20 @@ Runtime session identity: {state["session_id"]}
         self,
         commands: Sequence[Mapping[str, Any]],
         task: Mapping[str, Any],
+        binding: Any = None,
     ) -> list[str]:
         detected: set[str] = set()
+        allow_sandboxed_indirection = _sandbox_confined_indirection_is_admitted(
+            task, binding
+        )
         for item in commands:
             command = str(item.get("command") or "")
             detected.update(_command_effects(command) & RUNTIME_WIDE_FORBIDDEN_EFFECTS)
             if item.get(
                 "validation_command_id"
-            ) is None and _command_has_unclassified_indirection(command):
+            ) is None and not allow_sandboxed_indirection and (
+                _command_has_unclassified_indirection(command)
+            ):
                 detected.add("unclassified_indirect_effect")
         return sorted(detected)
 
@@ -9844,7 +9919,9 @@ Runtime session identity: {state["session_id"]}
         elif failure_code is None:
             failure_code = "model_report_missing"
 
-        detected_effects = self._forbidden_effects(state["executed_commands"], task)
+        detected_effects = self._forbidden_effects(
+            state["executed_commands"], task, binding
+        )
         command_observation_gap = any(
             item.get("command") == "<unavailable>"
             for item in state["executed_commands"]

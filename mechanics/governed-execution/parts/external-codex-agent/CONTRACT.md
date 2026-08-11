@@ -436,9 +436,15 @@ Git and GitHub effects plus publication, service, secret-access, and global
 configuration command families. Non-owner-fixed interpreter or script bodies,
 `find -exec`, `eval`, `xargs`, and process-launch wrappers such as `nice`,
 `nohup`, `setsid`, and `stdbuf` are treated as unclassified indirect effects
-and authority-block the terminal result; exact fixed validation argv are
-separately admitted by their owner identity. The sandbox remains the primary effect
-boundary, and command observation is retained as auditable counterevidence.
+and authority-block the terminal result by default; exact fixed validation argv
+are separately admitted by their owner identity. A task-local
+`indirect_command_policy: sandbox_confined` may admit opaque local execution
+only when the exact incarnation binding proves the matching read-only or
+workspace-write sandbox, approval `never`, disabled network, and no secret or
+external-effect authority. Explicit forbidden families remain blocking, and
+unexpected worker death retains the stricter unclassified-effect closeout.
+The sandbox remains the primary effect boundary, and command observation is
+retained as auditable counterevidence.
 Any command argument that names a secret-shaped path is classified as secret
 access regardless of the executable name; this prevents an unenumerated direct
 reader or encoder from weakening the runtime-wide secret stop-line.

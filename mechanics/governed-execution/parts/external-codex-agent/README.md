@@ -132,7 +132,12 @@ The controller:
   non-owner-fixed interpreter, script, process-launch wrapper, `find -exec`,
   `eval`, and `xargs`
   commands whose indirect effects cannot be classified are retained as
-  counterevidence and authority-block the result, shell separators remain
+  counterevidence and authority-block the result by default. A task may instead
+  admit `sandbox_confined` local indirection only when the exact incarnation
+  binding proves a matching read-only or workspace-write sandbox, approval
+  `never`, disabled network, and no secret or external-effect authority;
+  explicit forbidden command families and abnormal failure closeout still
+  fail closed. Shell separators remain
   visible even when attached to arguments, redirection remains an opaque
   authority signal, `env --split-string` cannot smuggle an executable past the
   observer, value-taking `timeout` options cannot hide the wrapped command,
