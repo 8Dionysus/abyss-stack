@@ -227,7 +227,11 @@ The controller:
   packets, and binds claims about post-exit workspace state through the single
   controller-owned `runtime:workspace-final-manifest#...` evidence identity;
 - binds every validation claim to an exact observed argv/exit state and the
-  workspace-manifest digest observed when that command completed, keeps full
+  workspace-manifest digest observed when that command completed. Every
+  receipt normally matches the final manifest; when transient command-sandbox
+  teardown settles between receipts, only the complete exact validation suite
+  as the terminal command suffix is accepted, and its last receipt must match
+  the final manifest. Any later command or final drift still fails. The runtime keeps full
   fail-closed projection inventory while retrying only a bounded regular-file
   read/identity or disappearing-directory enumeration race; a retry rebuilds
   the entire manifest, and

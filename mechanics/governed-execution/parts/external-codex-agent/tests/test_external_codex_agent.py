@@ -996,6 +996,7 @@ def _fixture(
     tool_profile_id: str | None = None,
     workspace_projection_seed: Mapping[str, str] | None = None,
     responsibility_transfer_mutator: Callable[[dict[str, Any]], None] | None = None,
+    validation_commands: tuple[Mapping[str, Any], ...] | None = None,
 ) -> dict[str, Any]:
     if owner_binding_v1 and not owner_contour:
         raise AssertionError("owner_binding_v1 is only meaningful for owner-contour tests")
@@ -1719,11 +1720,17 @@ def _fixture(
         "immutable_inputs": immutable_inputs,
         "done_state": ["Return one schema-valid evidence-bearing report."],
         "validation_commands": [
-            {
-                "command_id": "git-status",
-                "argv": ["git", "status", "--short"],
-                "cwd": ".",
-            }
+            dict(item)
+            for item in (
+                validation_commands
+                or (
+                    {
+                        "command_id": "git-status",
+                        "argv": ["git", "status", "--short"],
+                        "cwd": ".",
+                    },
+                )
+            )
         ],
         "expected_artifacts": ["landing_report"],
         "forbidden_effects": [
@@ -7882,6 +7889,98 @@ def test_validation_receipt_must_match_final_workspace_bytes(
     assert terminal["status"] == "failed"
     assert result is not None
     assert result["failure_code"] == "model_report_validation_workspace_unbound"
+
+
+def test_terminal_validation_suite_may_settle_on_final_workspace_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        validation_commands=(
+            {
+                "command_id": "git-status-short",
+                "argv": ["git", "status", "--short"],
+                "cwd": ".",
+            },
+            {
+                "command_id": "git-status-no-untracked",
+                "argv": ["git", "status", "--short", "--untracked-files=no"],
+                "cwd": ".",
+            },
+        ),
+    )
+    runtime = fixture["runtime"]
+    original_record_codex_event = runtime._record_codex_event
+    first_validation_observed = False
+
+    def settle_after_first_validation_receipt(
+        session_id: str,
+        *,
+        attempt_id: str,
+        attempt_number: int,
+        line: bytes,
+        projection_fd: int | None = None,
+    ) -> None:
+        nonlocal first_validation_observed
+        payload = json.loads(line)
+        item = payload.get("item") if payload.get("type") == "item.completed" else None
+        first_validation = (
+            not first_validation_observed
+            and isinstance(item, dict)
+            and item.get("type") == "command_execution"
+            and str(item.get("command", "")).endswith("git status --short")
+        )
+        actor_projection = Path(
+            runtime._load_state(session_id)["actor_projection_path"]
+        )
+        transient_path = actor_projection / "landing-note.md"
+        if first_validation:
+            first_validation_observed = True
+            transient_path.write_text(
+                "controller-observed transient command state\n",
+                encoding="utf-8",
+            )
+        original_record_codex_event(
+            session_id,
+            attempt_id=attempt_id,
+            attempt_number=attempt_number,
+            line=line,
+            projection_fd=projection_fd,
+        )
+        if first_validation:
+            transient_path.unlink()
+
+    # The first fixed-command receipt sees a transient controller-side state;
+    # the exact second/final command and terminal manifest see the restored
+    # bytes. The suite is admissible only because the two exact validations
+    # form the complete terminal command suffix and its final receipt binds the
+    # final manifest.
+    monkeypatch.setattr(
+        runtime,
+        "_record_codex_event",
+        settle_after_first_validation_receipt,
+    )
+    runtime.start(fixture["launch_path"])
+
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "completed"
+    assert result is not None
+    assert result["failure_code"] is None
+    validation_executions = [
+        item
+        for item in result["executed_commands"]
+        if item.get("validation_command_id") is not None
+    ]
+    assert [
+        item["validation_command_id"] for item in validation_executions
+    ] == ["git-status-short", "git-status-no-untracked"]
+    assert (
+        validation_executions[0]["workspace_manifest_digest"]
+        != validation_executions[1]["workspace_manifest_digest"]
+    )
 
 
 def test_high_token_use_is_counted_without_truncating_agent_work(

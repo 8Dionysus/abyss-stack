@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 115,
-  "edge_count": 2598,
+  "decision_count": 116,
+  "edge_count": 2618,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 969,
-    "DATED": 115,
-    "GUARDED_BY": 353,
-    "HAS_STATUS": 115,
-    "HAS_SURFACE_CLASS": 307,
-    "IN_STACK_LANE": 266,
-    "NEXT_DECISION": 114,
-    "OWNED_BY_SURFACE": 121,
-    "OWNS_DECISION": 115,
+    "CITES_SOURCE_SURFACE": 974,
+    "DATED": 116,
+    "GUARDED_BY": 356,
+    "HAS_STATUS": 116,
+    "HAS_SURFACE_CLASS": 310,
+    "IN_STACK_LANE": 269,
+    "NEXT_DECISION": 115,
+    "OWNED_BY_SURFACE": 122,
+    "OWNS_DECISION": 116,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 121
+    "UNDER_MECHANIC_PARENT": 122
   },
   "edges": [
     {
@@ -12423,11 +12423,106 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0115",
+      "target": "decision:ABYSS-STACK-D-0116",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0115",
+      "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
+      "target": "date:2026-08-11",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
+      "target": "guard_family:fail%20closed",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
+      "target": "guard_family:fixed%20validation",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
+      "target": "guard_family:full%20manifest",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
+      "target": "surface_class:actor%20projection",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
+      "target": "surface_class:runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
+      "target": "surface_class:validation%20evidence",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
+      "target": "stack_lane:evidence",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
       "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -13005,14 +13100,19 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0115",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0116",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1153,
+  "node_count": 1155,
   "node_type_counts": {
     "date": 35,
-    "decision": 115,
-    "guard_family": 179,
+    "decision": 116,
+    "guard_family": 180,
     "mechanic_parent": 10,
     "owner_surface": 62,
     "repo": 1,
@@ -14348,6 +14448,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-11",
+      "id": "decision:ABYSS-STACK-D-0116",
+      "label": "ABYSS-STACK-D-0116",
+      "path": "docs/decisions/ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md",
+      "posture": "accepted terminal-suite binding; no arbitrary command relaxation",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0116 Bind Terminal Validation Suite After Command-Sandbox Settlement",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -14695,6 +14805,11 @@
     {
       "id": "guard_family:filesystem%20write%20allowlist",
       "label": "filesystem write allowlist",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:fixed%20validation",
+      "label": "fixed validation",
       "type": "guard_family"
     },
     {

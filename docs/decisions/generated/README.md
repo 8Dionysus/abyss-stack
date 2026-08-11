@@ -10,15 +10,15 @@ Decision records own rationale; this directory contains generated graph read mod
 
 ## Counts
 
-- Decisions: 115
-- Nodes: 1153
-- Edges: 2598
+- Decisions: 116
+- Nodes: 1155
+- Edges: 2618
 
 ## Node Types
 
 - `date`: 35
-- `decision`: 115
-- `guard_family`: 179
+- `decision`: 116
+- `guard_family`: 180
 - `mechanic_parent`: 10
 - `owner_surface`: 62
 - `repo`: 1
@@ -29,17 +29,17 @@ Decision records own rationale; this directory contains generated graph read mod
 
 ## Edge Types
 
-- `CITES_SOURCE_SURFACE`: 969
-- `DATED`: 115
-- `GUARDED_BY`: 353
-- `HAS_STATUS`: 115
-- `HAS_SURFACE_CLASS`: 307
-- `IN_STACK_LANE`: 266
-- `NEXT_DECISION`: 114
-- `OWNED_BY_SURFACE`: 121
-- `OWNS_DECISION`: 115
+- `CITES_SOURCE_SURFACE`: 974
+- `DATED`: 116
+- `GUARDED_BY`: 356
+- `HAS_STATUS`: 116
+- `HAS_SURFACE_CLASS`: 310
+- `IN_STACK_LANE`: 269
+- `NEXT_DECISION`: 115
+- `OWNED_BY_SURFACE`: 122
+- `OWNS_DECISION`: 116
 - `SUPERSEDED_BY`: 2
-- `UNDER_MECHANIC_PARENT`: 121
+- `UNDER_MECHANIC_PARENT`: 122
 
 ## Boundary
 

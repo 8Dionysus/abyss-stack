@@ -9,6 +9,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Bind a fixed validation return either to one unchanged final actor manifest
+  at every command receipt or to the exact complete terminal validation suffix
+  whose last receipt binds the final manifest. This preserves refusal of later
+  model commands and post-validation workspace drift while tolerating
+  controller-visible transient command-sandbox cleanup between exact
+  owner-fixed validation commands.
 - Preserve a bounded repo-mutation actor's exact role and Codex thread when an
   otherwise authority-safe terminal return fails only model-report admission.
   The same-role `bounded_repair` route requires the exact prior result digest,

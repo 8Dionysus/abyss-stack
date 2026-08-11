@@ -113,6 +113,8 @@ semantic failure messages,
 digest-bound same-thread recovery from one unchanged read-only reviewer
 identity typo and from one authority-safe bounded writer model-report error,
 while preserving each failed result and refusing any writer path widening,
+exact terminal validation-suffix admission when an earlier fixed receipt sees
+transient command-sandbox state, while post-validation mutation still fails,
 canonical non-starting reviewer preparation with controller-owned immutable
 copies and stable forwarded input IDs, reviewer operation after the historical
 source checkout disappears or an historical ancestor is retargeted,

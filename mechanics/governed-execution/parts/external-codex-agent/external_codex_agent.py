@@ -9638,6 +9638,8 @@ Runtime session identity: {state["session_id"]}
             if isinstance(attempts, list) and attempts
             else None
         )
+        selected_validation_executions: list[dict[str, Any]] = []
+        validation_workspace_mismatch = False
         for command_spec, claim in zip(
             task["validation_commands"], validation_claims, strict=True
         ):
@@ -9673,15 +9675,13 @@ Runtime session identity: {state["session_id"]}
                     "fixed validation command has no exact argv/cwd execution receipt",
                 )
             last_execution = executions[-1]
+            selected_validation_executions.append(last_execution)
             if (
                 not isinstance(final_workspace_manifest_digest, str)
                 or last_execution.get("workspace_manifest_digest")
                 != final_workspace_manifest_digest
             ):
-                raise ExternalCodexRuntimeError(
-                    "model_report_validation_workspace_unbound",
-                    "fixed validation command was not observed against final workspace bytes",
-                )
+                validation_workspace_mismatch = True
             observed_status = (
                 "passed"
                 if last_execution.get("status") == "completed"
@@ -9692,6 +9692,32 @@ Runtime session identity: {state["session_id"]}
                 raise ExternalCodexRuntimeError(
                     "model_report_validation_claim_unbound",
                     "model report validation status differs from the exact observed command",
+                )
+        if validation_workspace_mismatch:
+            current_attempt_id = str(state["attempts"][-1]["attempt_id"])
+            completed_attempt_commands = [
+                item
+                for item in state["executed_commands"]
+                if item.get("attempt_id") == current_attempt_id
+                and item.get("exit_code") is not None
+            ]
+            terminal_validation_suffix = completed_attempt_commands[
+                -len(expected_command_ids) :
+            ]
+            if (
+                len(terminal_validation_suffix) != len(expected_command_ids)
+                or terminal_validation_suffix != selected_validation_executions
+                or [
+                    item.get("validation_command_id")
+                    for item in terminal_validation_suffix
+                ]
+                != expected_command_ids
+                or terminal_validation_suffix[-1].get("workspace_manifest_digest")
+                != final_workspace_manifest_digest
+            ):
+                raise ExternalCodexRuntimeError(
+                    "model_report_validation_workspace_unbound",
+                    "fixed validation commands neither share the final manifest nor form an exact terminal suite ending on it",
                 )
         for value in report["residuals"]:
             require_text(value, "residual")

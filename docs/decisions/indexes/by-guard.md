@@ -446,6 +446,7 @@
 - [ABYSS-STACK-D-0108 Modern-Only MCP Organ Runtime](../ABYSS-STACK-D-0108-modern-only-mcp-organ-runtime.md) (`docs/decisions/ABYSS-STACK-D-0108-modern-only-mcp-organ-runtime.md`)
 - [ABYSS-STACK-D-0109 Recover Expired Modern MCP Read Admission](../ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md) (`docs/decisions/ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md`)
 - [ABYSS-STACK-D-0114 Retry Only Transient Actor-Manifest Observation Races](../ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md) (`docs/decisions/ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md`)
+- [ABYSS-STACK-D-0116 Bind Terminal Validation Suite After Command-Sandbox Settlement](../ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md) (`docs/decisions/ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md`)
 
 ## fail-closed freshness
 
@@ -468,9 +469,14 @@
 
 - [ABYSS-STACK-D-0092 Memo and Evals Candidate Contour Isolation](../ABYSS-STACK-D-0092-memo-and-evals-candidate-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0092-memo-and-evals-candidate-contour-isolation.md`)
 
+## fixed validation
+
+- [ABYSS-STACK-D-0116 Bind Terminal Validation Suite After Command-Sandbox Settlement](../ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md) (`docs/decisions/ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md`)
+
 ## full manifest
 
 - [ABYSS-STACK-D-0114 Retry Only Transient Actor-Manifest Observation Races](../ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md) (`docs/decisions/ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md`)
+- [ABYSS-STACK-D-0116 Bind Terminal Validation Suite After Command-Sandbox Settlement](../ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md) (`docs/decisions/ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md`)
 
 ## generated index handoff
 

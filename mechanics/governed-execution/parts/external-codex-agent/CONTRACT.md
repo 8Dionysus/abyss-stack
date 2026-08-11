@@ -424,9 +424,17 @@ filesystem tree instead of trusting Git to enumerate every entry; FIFO,
 Unix-domain socket, device, and other unsupported special entries fail closed.
 Every workspace symlink must resolve to an existing target inside
 the exact checkout; an absent or outward target fails admission as
-`workspace_symlink_target_unsupported`. The receipt recorded for each exact validation command carries the
-workspace-manifest digest observed at command completion; report admission
-requires the final manifest to retain that digest. A manifest read that proves
+`workspace_symlink_target_unsupported`. The receipt recorded for each exact
+validation command carries the workspace-manifest digest observed at command
+completion. Report admission normally requires every such digest to equal the
+final manifest. If controller-visible command-sandbox teardown settles between
+fixed-command receipts, the runtime may instead admit only the selected exact
+validation executions that form the complete terminal command suffix in the
+task-declared order and whose last receipt equals the final manifest. A later
+model command, an incomplete or reordered suffix, or a final mismatch remains
+`model_report_validation_workspace_unbound`. Exact owner-fixed validation argv
+remain separately classified from model-selected commands, and finalization
+still inventories the complete content and private Git body. A manifest read that proves
 one regular file changed while its bytes or identity were being inventoried,
 or a queued directory disappeared before `scandir`, is retried only within one
 short bounded observation window. A stable retry is a new complete manifest,
