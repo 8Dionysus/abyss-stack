@@ -998,9 +998,18 @@ def _fixture(
     workspace_projection_seed: Mapping[str, str] | None = None,
     responsibility_transfer_mutator: Callable[[dict[str, Any]], None] | None = None,
     validation_commands: tuple[Mapping[str, Any], ...] | None = None,
+    omit_historical_reviewer_inputs: bool = False,
 ) -> dict[str, Any]:
     if owner_binding_v1 and not owner_contour:
         raise AssertionError("owner_binding_v1 is only meaningful for owner-contour tests")
+    if omit_historical_reviewer_inputs and not owner_contour:
+        raise AssertionError(
+            "historical reviewer-input omission is only meaningful for owner contour"
+        )
+    if omit_historical_reviewer_inputs and exact_baseline:
+        raise AssertionError(
+            "historical reviewer-input omission uses the clean writer posture"
+        )
     if role_mcp is not None and workspace_write:
         raise AssertionError("role-scoped MCP fixtures are read-only")
     if tool_profile_id is not None and role_mcp is not None:
@@ -1679,24 +1688,25 @@ def _fixture(
         }
         for input_id, path, provenance in fixture_extra_inputs
     )
-    immutable_inputs.extend(
-        (
-            {
-                "input_id": (
-                    "review-summon-request"
-                    if task_family == "landing_review"
-                    else "summon-request"
-                ),
-                "local_path": str(summon_request_path),
-                "provenance": summon_request_ref.model_dump(mode="json"),
-            },
+    immutable_inputs.append(
+        {
+            "input_id": (
+                "review-summon-request"
+                if task_family == "landing_review"
+                else "summon-request"
+            ),
+            "local_path": str(summon_request_path),
+            "provenance": summon_request_ref.model_dump(mode="json"),
+        }
+    )
+    if not omit_historical_reviewer_inputs:
+        immutable_inputs.append(
             {
                 "input_id": "summon-request-schema",
                 "local_path": str(SUMMON_REQUEST_SCHEMA_PATH),
                 "provenance": summon_request_schema_ref.model_dump(mode="json"),
-            },
+            }
         )
-    )
     task = {
         "schema_version": "abyss_stack_external_codex_task_v1",
         "task_id": task_id,
@@ -4616,9 +4626,9 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
         role_id="coder",
         task_family="landing_preparation",
         workspace_write=True,
-        exact_baseline=True,
         review_required=True,
         prepare_mutation_reviewer_sources=True,
+        omit_historical_reviewer_inputs=True,
         reviewer_tool_profile_id=(
             "abyss-stack:external_codex_agent/landing-readonly-v2"
         ),
@@ -4687,6 +4697,22 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
         "read_only"
     ]
     assert reviewer_task["source_evidence_paths"] == ["README.md"]
+    assert set(preparation["forwarded_input_ids"]).issuperset(
+        {
+            "writer-source-baseline-manifest",
+            "writer-summon-request-schema",
+        }
+    )
+    assert "workspace-manifest" not in preparation["forwarded_input_ids"]
+    assert "summon-request-schema" not in preparation["forwarded_input_ids"]
+    reviewer_input_ids = {
+        item["input_id"] for item in reviewer_task["immutable_inputs"]
+    }
+    assert {
+        "writer-source-baseline-manifest",
+        "writer-summon-request-schema",
+        "review-workspace-manifest",
+    }.issubset(reviewer_input_ids)
 
     reviewer_runtime = RUNTIME.ExternalCodexRuntime(runtime.state_root)
     assert reviewer_runtime.preflight(reviewer_launch_path)["admitted"] is True
@@ -4706,6 +4732,43 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
         output_path=tmp_path / "child-task-result.json",
     )
     assert exported["child_task_result"]["review_outcome"] == "proceed"
+
+
+def test_owner_contour_reviewer_recovery_rejects_changed_source_baseline(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "writer",
+        role_id="reviewer",
+        owner_contour=True,
+        omit_historical_reviewer_inputs=True,
+    )
+    runtime = fixture["runtime"]
+    owner_request_path = fixture["owner_execution_request_path"]
+    assert owner_request_path is not None
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=owner_request_path,
+    )
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    writer_result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    source_before_path = writer_result_path.parent / "source-manifest-before.json"
+    source_before_path.chmod(0o600)
+    source_before_path.write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(
+        PREPARER.StudyPreparationError,
+        match="source baseline is unavailable or changed",
+    ):
+        PREPARER._prepare_reviewer(
+            argparse.Namespace(
+                writer_launch=str(fixture["launch_path"]),
+                writer_result=str(writer_result_path),
+                output_root=str(tmp_path / "review-preparation"),
+                state_root=str(runtime.state_root),
+                aoa_sdk_root=str(SDK_ROOT),
+            )
+        )
 
 
 def test_reviewer_preparation_requires_canonical_durable_writer_result(

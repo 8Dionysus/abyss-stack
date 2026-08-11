@@ -315,6 +315,14 @@ read-only realization; the reviewer never inherits coder permissions. The
 preparer compiles a distinct reviewer task, plan, binding, session, and launch
 with observe-only usage metering, carries the writer's source-evidence scope
 without widening its mutation scope, and starts no process.
+For an evidence-complete `owner_contour` writer compiled before the baseline
+manifest and SDK request schema became mandatory task inputs, the preparer may
+derive `writer-source-baseline-manifest` from the digest-bound canonical
+runtime state and `writer-summon-request-schema` from the exact selected SDK
+schema. Those new IDs describe reviewer inputs; they never backfill or rewrite
+the writer task. The reviewer receives its own active `summon-request-schema`,
+and A2A export requires both schema copies to remain byte-identical under the
+reviewer lock. Every mismatch fails closed.
 It also builds a fresh canonical reviewer summon request/decision against the
 same exact SDK v4 schemas while retaining the writer request as immutable
 evidence; it never substitutes either request with the runtime-owner task.

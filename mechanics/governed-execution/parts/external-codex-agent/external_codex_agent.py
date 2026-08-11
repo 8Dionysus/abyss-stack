@@ -7762,6 +7762,7 @@ class ExternalCodexRuntime:
         task: Mapping[str, Any],
         request_input_id: str,
         supplied_path: str | Path | None = None,
+        schema_material: tuple[Path, bytes, ProvenanceRef] | None = None,
     ) -> tuple[dict[str, Any], ProvenanceRef, ProvenanceRef, tuple[str, ...]]:
         """Validate one materialized SDK v4 request and its active plan binding."""
 
@@ -7769,10 +7770,24 @@ class ExternalCodexRuntime:
             state,
             request_input_id,
         )
-        schema_path, schema_raw, schema_ref = self._materialized_task_input(
-            state,
-            "summon-request-schema",
-        )
+        if schema_material is None:
+            schema_path, schema_raw, schema_ref = self._materialized_task_input(
+                state,
+                "summon-request-schema",
+            )
+        else:
+            schema_path, schema_raw, schema_ref = schema_material
+        if (
+            not schema_path.is_absolute()
+            or schema_path.is_symlink()
+            or not schema_path.is_file()
+            or read_bounded(schema_path) != schema_raw
+            or sha256_bytes(schema_raw) != schema_ref.artifact_digest
+        ):
+            raise ExternalCodexRuntimeError(
+                "a2a_summon_request_unbound",
+                "summon request schema material is unavailable or changed",
+            )
         if supplied_path is not None:
             supplied = Path(supplied_path)
             if (
@@ -11335,6 +11350,42 @@ Runtime session identity: {state["session_id"]}
                 task=reviewer_task,
                 request_input_id="review-summon-request",
             )
+            compatibility_schema_matches = [
+                item
+                for item in reviewer_task["immutable_inputs"]
+                if item["input_id"] == "writer-summon-request-schema"
+            ]
+            writer_schema_material = None
+            compatibility_schema_ref = None
+            if compatibility_schema_matches:
+                if len(compatibility_schema_matches) != 1:
+                    raise ExternalCodexRuntimeError(
+                        "a2a_summon_request_unbound",
+                        "reviewer has no unique controller-derived writer schema",
+                    )
+                compatibility_schema_material = (
+                    reviewer_runtime._materialized_task_input(
+                        reviewer_state,
+                        "writer-summon-request-schema",
+                    )
+                )
+                compatibility_schema_ref = compatibility_schema_material[2]
+                writer_schema_material = reviewer_runtime._materialized_task_input(
+                    reviewer_state,
+                    "summon-request-schema",
+                )
+                if (
+                    compatibility_schema_material[1] != writer_schema_material[1]
+                    or compatibility_schema_ref.owner_repo != "abyss-stack"
+                    or compatibility_schema_material[2].schema_ref
+                    != writer_schema_material[2].artifact_ref
+                    or compatibility_schema_material[2].schema_version
+                    != SDK_SUMMON_REQUEST_SCHEMA_VERSION
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "a2a_summon_request_unbound",
+                        "controller-derived writer schema differs from the active reviewer SDK schema",
+                    )
         for label, ref in (
             ("writer events", writer["events_ref"]),
             ("reviewer events", reviewer["events_ref"]),
@@ -11431,6 +11482,14 @@ Runtime session identity: {state["session_id"]}
                 task=writer_task,
                 request_input_id="summon-request",
                 supplied_path=summon_request_path,
+                schema_material=(
+                    None
+                    if any(
+                        item["input_id"] == "summon-request-schema"
+                        for item in writer_task["immutable_inputs"]
+                    )
+                    else writer_schema_material
+                ),
             )
             nested = summon_request["summon_request"]
             reviewer_summon_nested = reviewer_summon_request["summon_request"]
@@ -11472,6 +11531,25 @@ Runtime session identity: {state["session_id"]}
                 != writer_actor_final_digest
                 or reviewer_inputs.get("writer-actor-delta")
                 != writer_actor_delta_digest
+                or (
+                    not any(
+                        item["input_id"] == "summon-request-schema"
+                        for item in writer_task["immutable_inputs"]
+                    )
+                    and reviewer_inputs.get("writer-summon-request-schema")
+                    != summon_schema_ref.artifact_digest
+                )
+                or (
+                    not any(
+                        item["input_id"] == "summon-request-schema"
+                        for item in writer_task["immutable_inputs"]
+                    )
+                    and (
+                        compatibility_schema_ref is None
+                        or compatibility_schema_ref.source_ref
+                        != writer_result_digest
+                    )
+                )
                 or reviewer_task["parent_task_id"] != writer["task_id"]
                 or reviewer_task["target_owner"] != writer_task["target_owner"]
                 or reviewer_state["incarnation_id"] == writer_state["incarnation_id"]
@@ -11570,6 +11648,39 @@ Runtime session identity: {state["session_id"]}
                         "a2a_review_seed_unbound",
                         "reviewer seed bytes changed before A2A publication",
                     )
+                current_writer_schema_material = None
+                if not any(
+                    item["input_id"] == "summon-request-schema"
+                    for item in writer_task["immutable_inputs"]
+                ):
+                    current_compatibility_schema = (
+                        reviewer_runtime._materialized_task_input(
+                            current_reviewer_state,
+                            "writer-summon-request-schema",
+                        )
+                    )
+                    current_writer_schema_material = (
+                        reviewer_runtime._materialized_task_input(
+                            current_reviewer_state,
+                            "summon-request-schema",
+                        )
+                    )
+                    if (
+                        current_compatibility_schema[1]
+                        != current_writer_schema_material[1]
+                        or current_compatibility_schema[2].owner_repo
+                        != "abyss-stack"
+                        or current_compatibility_schema[2].source_ref
+                        != writer_result_digest
+                        or current_compatibility_schema[2].schema_ref
+                        != current_writer_schema_material[2].artifact_ref
+                        or current_compatibility_schema[2].schema_version
+                        != SDK_SUMMON_REQUEST_SCHEMA_VERSION
+                    ):
+                        raise ExternalCodexRuntimeError(
+                            "a2a_summon_request_unbound",
+                            "controller-derived writer schema changed before A2A publication",
+                        )
                 (
                     current_summon_request,
                     current_summon_request_ref,
@@ -11582,6 +11693,7 @@ Runtime session identity: {state["session_id"]}
                     task=writer_task,
                     request_input_id="summon-request",
                     supplied_path=summon_request_path,
+                    schema_material=current_writer_schema_material,
                 )
                 (
                     current_review_summon_request,

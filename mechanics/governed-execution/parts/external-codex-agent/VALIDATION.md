@@ -118,6 +118,10 @@ transient command-sandbox state, while post-validation mutation still fails,
 canonical non-starting reviewer preparation with controller-owned immutable
 copies and stable forwarded input IDs, reviewer operation after the historical
 source checkout disappears or an historical ancestor is retargeted,
+owner-contour review-input compatibility from an exact durable source baseline
+and selected SDK v4 schema without historical writer mutation, changed-baseline
+refusal, and final locked equality of the derived writer and active reviewer
+schema copies,
 nonterminal/stale/foreign review-seed refusal,
 an explicit transport-study or owner-contour workspace-write coder to a
 plan-bound read-only reviewer transition with a

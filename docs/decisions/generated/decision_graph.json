@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 116,
-  "edge_count": 2618,
+  "decision_count": 117,
+  "edge_count": 2640,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 974,
-    "DATED": 116,
-    "GUARDED_BY": 356,
-    "HAS_STATUS": 116,
-    "HAS_SURFACE_CLASS": 310,
-    "IN_STACK_LANE": 269,
-    "NEXT_DECISION": 115,
-    "OWNED_BY_SURFACE": 122,
-    "OWNS_DECISION": 116,
+    "CITES_SOURCE_SURFACE": 980,
+    "DATED": 117,
+    "GUARDED_BY": 360,
+    "HAS_STATUS": 117,
+    "HAS_SURFACE_CLASS": 313,
+    "IN_STACK_LANE": 272,
+    "NEXT_DECISION": 116,
+    "OWNED_BY_SURFACE": 123,
+    "OWNS_DECISION": 117,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 122
+    "UNDER_MECHANIC_PARENT": 123
   },
   "edges": [
     {
@@ -12518,11 +12518,116 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0116",
+      "target": "decision:ABYSS-STACK-D-0117",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0116",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0116",
+      "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "date:2026-08-11",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "guard_family:exact%20binding",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "guard_family:fail%20closed",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "guard_family:immutable%20inputs",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "guard_family:owner%20provenance",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "surface_class:evidence%20compatibility",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "surface_class:independent%20review",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "surface_class:runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "stack_lane:evidence",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "stack_lane:review",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
       "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -13105,21 +13210,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0116",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0117",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1155,
+  "node_count": 1158,
   "node_type_counts": {
     "date": 35,
-    "decision": 116,
-    "guard_family": 180,
+    "decision": 117,
+    "guard_family": 181,
     "mechanic_parent": 10,
     "owner_surface": 62,
     "repo": 1,
     "source_surface": 574,
     "stack_lane": 47,
     "status": 3,
-    "surface_class": 127
+    "surface_class": 128
   },
   "nodes": [
     {
@@ -14458,6 +14568,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-11",
+      "id": "decision:ABYSS-STACK-D-0117",
+      "label": "ABYSS-STACK-D-0117",
+      "path": "docs/decisions/ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md",
+      "posture": "accepted controller-derived review compatibility; no historical rewrite",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0117 Recover Review Inputs Without Rewriting Owner Writers",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -14855,6 +14975,11 @@
     {
       "id": "guard_family:immutable%20evidence",
       "label": "immutable evidence",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:immutable%20inputs",
+      "label": "immutable inputs",
       "type": "guard_family"
     },
     {
@@ -19046,6 +19171,11 @@
     {
       "id": "surface_class:eval%20candidate",
       "label": "eval candidate",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:evidence%20compatibility",
+      "label": "evidence compatibility",
       "type": "surface_class"
     },
     {

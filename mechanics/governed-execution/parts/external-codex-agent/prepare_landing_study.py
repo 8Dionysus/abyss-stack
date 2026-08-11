@@ -1010,6 +1010,7 @@ def _adapt_plan_for_reviewer(
     writer_actor_final_ref: ProvenanceRef,
     writer_actor_delta_ref: ProvenanceRef,
     review_manifest_ref: ProvenanceRef,
+    additional_input_refs: Sequence[ProvenanceRef] = (),
     identity_token: str,
 ) -> RunPlan:
     def replace(value: ProvenanceRef) -> ProvenanceRef:
@@ -1063,6 +1064,7 @@ def _adapt_plan_for_reviewer(
         review_summon_decision_ref,
         summon_request_schema_ref,
         summon_result_schema_ref,
+        *additional_input_refs,
     )
     snapshot = base.snapshot.model_copy(
         update={"source_refs": source_refs, "snapshot_digest": ZERO_DIGEST}
@@ -1090,6 +1092,7 @@ def _adapt_plan_for_reviewer(
                 review_summon_decision_ref,
                 summon_request_schema_ref,
                 summon_result_schema_ref,
+                *additional_input_refs,
             )
         }
     )
@@ -2343,6 +2346,8 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     manifest_input: tuple[Path, ProvenanceRef] | None = None
     writer_summon_input: tuple[Path, ProvenanceRef] | None = None
     writer_summon_schema_input: tuple[Path, ProvenanceRef] | None = None
+    controller_derived_refs: list[ProvenanceRef] = []
+    writer_schema_recovered = False
     writer_manifest_input_id = str(writer_launch["workspace_manifest_input_id"])
     reserved_ids = {
         "review-summon-request",
@@ -2351,7 +2356,13 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         "writer-model-report",
         "writer-actor-final-manifest",
         "writer-actor-delta",
+        "writer-source-baseline-manifest",
+        "writer-summon-request-schema",
     }
+    if writer_manifest_input_id in reserved_ids:
+        raise StudyPreparationError(
+            "writer manifest input id collides with reviewer evidence ids"
+        )
     controller_inputs = writer_state.get("controller_materialized_task_inputs")
     if not isinstance(controller_inputs, list):
         raise StudyPreparationError(
@@ -2395,22 +2406,127 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
             writer_summon_input = (path, provenance)
         elif input_id == "summon-request-schema":
             writer_summon_schema_input = (path, provenance)
-    if manifest_input is None:
+    if writer_summon_input is None:
         raise StudyPreparationError(
-            "writer has no exact selected workspace manifest input"
-        )
-    if writer_summon_input is None or writer_summon_schema_input is None:
-        raise StudyPreparationError(
-            "writer has no exact canonical SDK v4 summon request/schema inputs"
+            "writer has no exact canonical SDK v4 summon request input"
         )
     writer_summon_path, writer_summon_ref = writer_summon_input
+    if manifest_input is None:
+        if writer_admission_class != "owner_contour":
+            raise StudyPreparationError(
+                "writer has no exact selected workspace manifest input"
+            )
+        source_before_ref = writer_state.get("source_manifest_before_ref")
+        source_before_path = writer_state_path.parent / "source-manifest-before.json"
+        source_before_digest = (
+            source_before_ref.get("artifact_digest")
+            if isinstance(source_before_ref, dict)
+            else None
+        )
+        if (
+            source_before_ref != writer_result.get("source_manifest_before_ref")
+            or not isinstance(source_before_ref, dict)
+            or source_before_ref.get("owner_repo") != "abyss-stack"
+            or source_before_ref.get("artifact_ref") != str(source_before_path)
+            or not source_before_path.is_file()
+            or source_before_path.is_symlink()
+            or _file_digest(source_before_path) != source_before_digest
+        ):
+            raise StudyPreparationError(
+                "owner-contour writer source baseline is unavailable or changed"
+            )
+        source_before = load_json(
+            source_before_path,
+            label="owner-contour writer source baseline",
+        )
+        validate_json(
+            source_before,
+            WORKSPACE_MANIFEST_SCHEMA_PATH,
+            label="owner-contour writer source baseline",
+        )
+        if source_before != writer_state.get("workspace_manifest_baseline"):
+            raise StudyPreparationError(
+                "owner-contour writer source baseline differs from durable state"
+            )
+        recovered_manifest_path = (
+            output_root / "writer-source-baseline-manifest.json"
+        )
+        _write_exact(recovered_manifest_path, source_before_path.read_bytes())
+        recovered_manifest_ref = _file_ref(
+            owner="abyss-stack",
+            artifact_ref=str(recovered_manifest_path),
+            path=recovered_manifest_path,
+            source_ref=writer_result_digest,
+            schema_ref=WORKSPACE_MANIFEST_SCHEMA_REF,
+            schema_version="abyss_stack_external_codex_workspace_manifest_v1",
+        )
+        manifest_input = (recovered_manifest_path, recovered_manifest_ref)
+        forwarded_ids.add("writer-source-baseline-manifest")
+        forwarded_inputs.append(
+            {
+                "input_id": "writer-source-baseline-manifest",
+                "local_path": str(recovered_manifest_path),
+                "provenance": recovered_manifest_ref.model_dump(mode="json"),
+            }
+        )
+        controller_derived_refs.append(recovered_manifest_ref)
+    if writer_summon_schema_input is None:
+        if writer_admission_class != "owner_contour":
+            raise StudyPreparationError(
+                "writer has no exact canonical SDK v4 summon request/schema inputs"
+            )
+        if (
+            writer_summon_ref.schema_ref
+            != summon_request_schema_ref.artifact_ref
+            or writer_summon_ref.schema_version
+            != SDK_SUMMON_REQUEST_SCHEMA_VERSION
+        ):
+            raise StudyPreparationError(
+                "owner-contour writer request does not name the selected SDK v4 schema"
+            )
+        recovered_schema_path = output_root / "writer-summon-request-schema.json"
+        _write_exact(recovered_schema_path, summon_request_schema_path.read_bytes())
+        recovered_schema_ref = _file_ref(
+            owner="abyss-stack",
+            artifact_ref=str(recovered_schema_path),
+            path=recovered_schema_path,
+            source_ref=writer_result_digest,
+            schema_ref=summon_request_schema_ref.artifact_ref,
+            schema_version=SDK_SUMMON_REQUEST_SCHEMA_VERSION,
+        )
+        writer_summon_schema_input = (
+            recovered_schema_path,
+            recovered_schema_ref,
+        )
+        writer_schema_recovered = True
+        forwarded_ids.add("writer-summon-request-schema")
+        forwarded_inputs.append(
+            {
+                "input_id": "writer-summon-request-schema",
+                "local_path": str(recovered_schema_path),
+                "provenance": recovered_schema_ref.model_dump(mode="json"),
+            }
+        )
+        controller_derived_refs.append(recovered_schema_ref)
     writer_summon_schema_path, writer_summon_schema_ref = (
         writer_summon_schema_input
     )
     if (
-        writer_summon_schema_ref != summon_request_schema_ref
+        (
+            not writer_schema_recovered
+            and writer_summon_schema_ref != summon_request_schema_ref
+        )
         or _file_digest(writer_summon_schema_path)
         != summon_request_schema_ref.artifact_digest
+        or (
+            writer_schema_recovered
+            and (
+                writer_summon_schema_ref.schema_ref
+                != summon_request_schema_ref.artifact_ref
+                or writer_summon_schema_ref.schema_version
+                != SDK_SUMMON_REQUEST_SCHEMA_VERSION
+            )
+        )
         or writer_summon_ref.schema_ref
         != summon_request_schema_ref.artifact_ref
         or writer_summon_ref.schema_version
@@ -2614,6 +2730,17 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     review_summon_decision_ref = review_summon["decision_ref"]
     reviewer_inputs = [
         *forwarded_inputs,
+        *(
+            (
+                {
+                    "input_id": "summon-request-schema",
+                    "local_path": str(summon_request_schema_path),
+                    "provenance": summon_request_schema_ref.model_dump(mode="json"),
+                },
+            )
+            if writer_schema_recovered
+            else ()
+        ),
         {
             "input_id": "review-summon-request",
             "local_path": str(review_summon_request_path),
@@ -2709,6 +2836,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         writer_actor_final_ref=writer_actor_final_provenance,
         writer_actor_delta_ref=writer_actor_delta_provenance,
         review_manifest_ref=review_manifest_ref,
+        additional_input_refs=tuple(controller_derived_refs),
         identity_token=identity_token,
     )
     plan_path = output_root / "run-plan.json"
@@ -2807,6 +2935,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         review_summon_decision_ref,
         summon_request_schema_ref,
         summon_result_schema_ref,
+        *controller_derived_refs,
     )
     continuation = ContinuationObligation(
         continuation_id=continuation_id,

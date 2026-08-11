@@ -678,6 +678,24 @@ export accepts only the historical fixture pair or the exact
 writer: its owner request, SDK v4 transport preference, binding v2, durable
 state, report, and terminal actor evidence remain required and digest-bound.
 
+An evidence-complete `owner_contour` writer may predate the reviewer input ABI
+without losing its role continuum. If its task lacks the selected workspace
+manifest input, review preparation may create
+`writer-source-baseline-manifest` only from the canonical
+`source-manifest-before.json` whose path and digest match result and state,
+whose value equals the durable `workspace_manifest_baseline`, and whose
+workspace and HEAD match the launch. If its task lacks
+`summon-request-schema`, preparation may create
+`writer-summon-request-schema` only from the exact selected SDK v4 bytes and
+only when the writer request already names that schema identity and version.
+Both are controller-derived reviewer inputs with new provenance; neither is
+reported as an original writer input. The reviewer also receives a distinct
+active `summon-request-schema` for its own request. A2A export admits the
+compatibility schema only when the derived writer copy and active reviewer SDK
+copy remain byte-identical and provenance-bound during the final locked
+revalidation. This exception does not apply to transport fixtures and does not
+widen task, role, model, permission, effect, or owner scope.
+
 The reviewer receives its own canonical SDK v4 summon request and decision;
 the writer request remains immutable review evidence. A2A export verifies the
 materialized request/schema bytes, typed plan binding, role/incarnation/task
