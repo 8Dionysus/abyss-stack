@@ -167,13 +167,14 @@ def _write_model_realization(
     *,
     workspace_write: bool,
     role_mcp: str | None = None,
+    tool_profile_id: str | None = None,
 ) -> None:
     mcp_profiles = {
         "aoa_evals": "abyss-stack:external_codex_agent/eval-reader-v1",
         "aoa_stats": "abyss-stack:external_codex_agent/stats-reader-v1",
         "aoa_memo": "abyss-stack:external_codex_agent/memo-reader-v1",
     }
-    profile_id = (
+    profile_id = tool_profile_id or (
         mcp_profiles[role_mcp]
         if role_mcp is not None
         else "abyss-stack:external_codex_agent/bounded-repo-write-v1"
@@ -986,6 +987,7 @@ def _fixture(
     owner_contour: bool = False,
     owner_binding_v1: bool = False,
     role_mcp: str | None = None,
+    tool_profile_id: str | None = None,
     workspace_projection_seed: Mapping[str, str] | None = None,
     responsibility_transfer_mutator: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
@@ -993,6 +995,8 @@ def _fixture(
         raise AssertionError("owner_binding_v1 is only meaningful for owner-contour tests")
     if role_mcp is not None and workspace_write:
         raise AssertionError("role-scoped MCP fixtures are read-only")
+    if tool_profile_id is not None and role_mcp is not None:
+        raise AssertionError("an explicit tool profile cannot also select a role MCP")
     if owner_contour and (
         not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
         or SUMMON_COMPILER is None
@@ -1509,6 +1513,7 @@ def _fixture(
         realization_path,
         workspace_write=workspace_write,
         role_mcp=role_mcp,
+        tool_profile_id=tool_profile_id,
     )
     model_ref = load_model_realization_ref(
         realization_path,
@@ -1852,7 +1857,7 @@ def _fixture(
             network_access="disabled",
         ),
         "tool_profile": IncarnationToolProfile(
-            profile_id=(
+            profile_id=tool_profile_id or (
                 {
                     "aoa_evals": "abyss-stack:external_codex_agent/eval-reader-v1",
                     "aoa_stats": "abyss-stack:external_codex_agent/stats-reader-v1",
@@ -4190,6 +4195,35 @@ def test_runtime_tool_profile_ids_are_model_neutral() -> None:
     profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
     profile_ids = [item["profile_id"] for item in profile["tool_profiles"]]
     assert all("luna" not in item and "sol" not in item for item in profile_ids)
+
+
+@pytest.mark.parametrize(
+    "tool_profile_id",
+    (
+        "abyss-stack:external_codex_agent/landing-workspace-write-v2",
+        "abyss-stack:external_codex_agent/structured-owner-duty-workspace-write-v1",
+    ),
+)
+def test_model_organ_workspace_write_profiles_admit_exact_runtime_binding(
+    tmp_path: Path,
+    tool_profile_id: str,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        workspace_write=True,
+        tool_profile_id=tool_profile_id,
+    )
+
+    admission = fixture["runtime"].preflight(fixture["launch_path"])
+    terminal = fixture["runtime"].run_to_terminal(fixture["launch_path"])
+    result = fixture["runtime"].result(fixture["session_id"])
+
+    assert admission["admitted"] is True
+    assert admission["tool_profile_id"] == tool_profile_id
+    assert terminal["status"] == "completed"
+    assert result is not None
+    assert result["status"] == "completed"
+    assert result["usage_observation"]["status"] == "complete"
 
 
 def test_run_to_terminal_keeps_caller_until_terminal_receipt(tmp_path: Path) -> None:

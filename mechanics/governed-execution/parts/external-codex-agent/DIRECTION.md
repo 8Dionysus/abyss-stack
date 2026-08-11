@@ -17,6 +17,11 @@ real load; bounded repo-write preparation follows with independent review.
 Commit, push, merge, release, publication, and general network effects remain
 outside the initial contour.
 
+The initial write ABI now keeps separate model-neutral aliases for landing and
+structured owner-duty canaries. This preserves exact realization binding while
+leaving role selection and domain meaning upstream; it does not fork the
+runtime into task-owned launchers.
+
 ## Proof sequence
 
 1. Maintain source-local schema, owner-admission, binder, process, drift,

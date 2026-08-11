@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Bind the external Codex runtime to the exact model-organ write-profile IDs
+  used by landing and structured owner-duty Luna realizations, while keeping
+  both aliases model-neutral, projection-isolated, network-disabled,
+  external-effect-free, and observe-only in usage accounting.
 - Harden the external Codex contour against hidden pre-execution and
   observation escape seams: opaque `git ls-remote` transport-helper dispatch now fails
   closed; ripgrep preprocessor, hostname-helper, and decompressor modes are
