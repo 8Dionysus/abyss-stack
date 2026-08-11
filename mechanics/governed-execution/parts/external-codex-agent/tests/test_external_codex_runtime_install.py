@@ -227,6 +227,16 @@ def test_release_identity_covers_wrapper_bootstrap_material(
     assert changed["release_digest"] != baseline["release_digest"]
 
 
+def test_wrapper_snapshot_avoids_per_file_permission_arguments() -> None:
+    bootstrap = runtime_install.wrapper_bootstrap_text(
+        Path("/runtime/active.json"),
+        "agent-entrypoint.py",
+    )
+
+    assert '"--ro-bind-data"' in bootstrap
+    assert '"0444"' not in bootstrap
+
+
 def make_specialized_environment_sources(
     tmp_path: Path,
 ) -> tuple[Path, Path, Path, Path, Path, Path]:

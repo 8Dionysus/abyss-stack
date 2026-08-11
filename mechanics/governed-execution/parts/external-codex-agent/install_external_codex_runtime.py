@@ -1355,10 +1355,11 @@ for relative in sorted(expected_directories, key=lambda item: (len(item.parts), 
     bwrap_arguments.extend(("--dir", str(snapshot_root / relative)))
 for relative, descriptor in sorted(snapshot_descriptors, key=lambda item: str(item[0])):
     os.set_inheritable(descriptor, True)
+    # The enclosing snapshot tmpfs is remounted read-only before execution.
+    # Avoid two repeated --perms arguments per file so a large verified owner
+    # environment remains below bubblewrap's fixed argv ceiling.
     bwrap_arguments.extend(
         (
-            "--perms",
-            "0444",
             "--ro-bind-data",
             str(descriptor),
             str(snapshot_root / relative),
