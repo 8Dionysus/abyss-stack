@@ -72,8 +72,9 @@ same-source sessions use distinct projections, rather than treating a source
 flock as a rename defense,
 exclusive same-projection active-attempt admission across distinct
 session identities, wrapped effect-family observation, exact validation-claim
-binding to final workspace bytes, bounded recovery from one transient regular-
-file inventory race with immediate refusal of nontransient projection errors,
+binding to final workspace bytes, bounded recovery from transient regular-file
+inventory and disappearing-directory enumeration races with immediate refusal
+of nontransient projection errors,
 authority-blocked failure closeout when the
 final manifest is unobservable or a dying worker leaves read-only/out-of-scope
 projection drift, final-lock rejection of changed review seed, actor

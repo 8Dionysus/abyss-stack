@@ -16,11 +16,10 @@
 
 ## Context
 
-An owner-contour landing writer wrote its final named artifacts and then began
-the fixed validation pass required to bind validation claims to final workspace
-bytes. At completion of the first post-write command, the controller's full
-projection inventory observed a regular file changing during its read and
-terminated the otherwise healthy actor as
+Owner-contour landing writers exposed two short-lived inventory races while
+binding fixed validation claims to workspace bytes. One attempt observed a
+regular file changing during its read. A later attempt queued a directory that
+disappeared before `scandir`. Both terminated otherwise healthy actors as
 `actor_projection_observation_gap`.
 
 The inventory correctly refuses partial or inconsistent bytes. Treating every
@@ -34,21 +33,23 @@ diagnosis.
 - Keep one-shot inventory and require actors to add arbitrary sleeps before
   every validation command.
 - Retry every projection error until a manifest can be built.
-- Retry only the two regular-file identity/read race classes for a small fixed
-  number of attempts, rebuilding the entire manifest each time.
+- Retry only regular-file identity/read races and a disappearing-directory
+  enumeration race for a small fixed number of attempts, rebuilding the entire
+  manifest each time.
 
 ## Decision
 
 Actor-manifest observation receives three total attempts separated by a short
 fixed delay only when `external_codex_projection` proves that a regular file
-changed while being read or while its post-read identity was being checked.
-Every attempt rebuilds the complete descriptor-bound manifest; no bytes from a
-failed attempt are admitted.
+changed while being read, its post-read identity changed, or a directory
+disappeared before its queued enumeration. Every attempt rebuilds the complete
+descriptor-bound manifest; no bytes from a failed attempt are admitted.
 
 All other projection errors remain immediately terminal, including unsafe or
-outward symlinks, special entries, missing coordinates, enumeration failures,
-private Git-body drift, path replacement, and source identity drift. A
-regular-file race that persists through the bounded attempts also remains
+outward symlinks, special entries, missing coordinates, enumeration failures
+other than the exact absent-directory race, private Git-body drift, path
+replacement, and source identity drift. A qualifying race that persists
+through the bounded attempts also remains
 `actor_projection_observation_gap`.
 
 When event observation terminates an actor, the runtime carries the original
@@ -59,14 +60,17 @@ error text into the durable failure report alongside its stable failure code.
 The retry handles temporal instability in observation, not uncertainty about
 authority or admissible content. Rebuilding the entire manifest after the tree
 stabilizes preserves the same proof target. Restricting retry eligibility to
-two explicit regular-file race messages prevents a transient special entry or
+explicit race messages and distinguishing `FileNotFoundError` from other
+`scandir` failures prevents a transient special entry, permission failure, or
 coordinate violation from being laundered by disappearance before a later
-snapshot.
+snapshot. The manifest proves state at the command-completion observation
+point; it is not a history of every temporary inode created and removed by an
+admitted command.
 
 ## Consequences
 
 - Positive: real workspace-write actors can validate final artifacts without
-  failing on one narrow inventory race.
+  failing on narrow file-read or directory-enumeration races.
 - Positive: exact validation-command receipts still bind to one complete
   content-addressed manifest.
 - Positive: durable failures retain actionable observation detail.

@@ -52,6 +52,37 @@ def _source_repo(tmp_path: Path) -> tuple[Path, dict[str, object]]:
     return source, build_workspace_manifest(source)
 
 
+def test_inventory_distinguishes_disappearing_directory_from_other_scandir_errors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "actor-workspace"
+    volatile = root / ".pytest_cache" / "v" / "cache"
+    volatile.mkdir(parents=True)
+    original_scandir = PROJECTION.os.scandir
+
+    def missing_scandir(path: Path) -> object:
+        if Path(path) == volatile:
+            raise FileNotFoundError(str(path))
+        return original_scandir(path)
+
+    monkeypatch.setattr(PROJECTION.os, "scandir", missing_scandir)
+    with pytest.raises(
+        ProjectionError,
+        match=r"directory disappeared before enumeration: \.pytest_cache/v/cache",
+    ):
+        PROJECTION._inventory(root)
+
+    def denied_scandir(path: Path) -> object:
+        if Path(path) == volatile:
+            raise PermissionError(str(path))
+        return original_scandir(path)
+
+    monkeypatch.setattr(PROJECTION.os, "scandir", denied_scandir)
+    with pytest.raises(ProjectionError, match="cannot enumerate its tree"):
+        PROJECTION._inventory(root)
+
+
 def test_projection_owns_private_git_and_survives_source_parent_replacement(
     tmp_path: Path,
 ) -> None:

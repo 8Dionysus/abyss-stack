@@ -224,8 +224,9 @@ The controller:
   controller-owned `runtime:workspace-final-manifest#...` evidence identity;
 - binds every validation claim to an exact observed argv/exit state and the
   workspace-manifest digest observed when that command completed, keeps full
-  fail-closed projection inventory while retrying only a bounded
-  regular-file read/identity race; a retry rebuilds the entire manifest, and
+  fail-closed projection inventory while retrying only a bounded regular-file
+  read/identity or disappearing-directory enumeration race; a retry rebuilds
+  the entire manifest, and
   unsupported entries, coordinate drift, Git-body drift, or repeated change
   still terminate observation; preserves `review_required` as a real gate,
   distinguishes a non-review writer's

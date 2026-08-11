@@ -2119,6 +2119,68 @@ def test_actor_manifest_retries_one_transient_descriptor_inventory_race(
     assert sleeps == [RUNTIME.ACTOR_MANIFEST_TRANSIENT_RETRY_SECONDS]
 
 
+def test_actor_manifest_retries_transient_directory_enumeration_race(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = {"schema_version": "test-actor-manifest"}
+    calls: list[int] = []
+
+    def fake_manifest(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        calls.append(1)
+        if len(calls) == 1:
+            raise RUNTIME.ProjectionError(
+                "actor projection directory disappeared before enumeration: "
+                ".pytest_cache/v/cache"
+            )
+        return expected
+
+    monkeypatch.setattr(RUNTIME, "build_actor_manifest_from_descriptor", fake_manifest)
+    monkeypatch.setattr(RUNTIME.time, "sleep", lambda _: None)
+
+    observed = RUNTIME._checked_actor_manifest(
+        tmp_path,
+        source_manifest_digest="sha256:" + "0" * 64,
+        source_git_head="a" * 40,
+        projection_fd=7,
+    )
+
+    assert observed == expected
+    assert len(calls) == 2
+
+
+def test_actor_manifest_does_not_retry_other_directory_enumeration_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[int] = []
+    sleeps: list[float] = []
+
+    def fake_manifest(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        calls.append(1)
+        raise RUNTIME.ProjectionError(
+            "actor projection cannot enumerate its tree"
+        )
+
+    monkeypatch.setattr(RUNTIME, "build_actor_manifest_from_descriptor", fake_manifest)
+    monkeypatch.setattr(RUNTIME.time, "sleep", sleeps.append)
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexRuntimeError,
+        match="cannot enumerate its tree",
+    ) as exc_info:
+        RUNTIME._checked_actor_manifest(
+            tmp_path,
+            source_manifest_digest="sha256:" + "0" * 64,
+            source_git_head="a" * 40,
+            projection_fd=7,
+        )
+
+    assert exc_info.value.code == "actor_projection_observation_gap"
+    assert len(calls) == 1
+    assert sleeps == []
+
+
 def test_actor_manifest_does_not_retry_nontransient_projection_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

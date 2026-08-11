@@ -214,6 +214,12 @@ def _inventory(
         current = pending.pop()
         try:
             children = sorted(os.scandir(current), key=lambda item: item.name)
+        except FileNotFoundError as exc:
+            relative = current.relative_to(root).as_posix()
+            raise ProjectionError(
+                "actor projection directory disappeared before enumeration: "
+                f"{relative}"
+            ) from exc
         except OSError as exc:
             raise ProjectionError("actor projection cannot enumerate its tree") from exc
         for child in children:

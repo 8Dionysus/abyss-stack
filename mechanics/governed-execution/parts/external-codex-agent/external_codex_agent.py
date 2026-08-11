@@ -802,6 +802,7 @@ TRUSTED_EXECUTABLE_PREFIXES = (
 ACTOR_MANIFEST_TRANSIENT_ATTEMPTS = 3
 ACTOR_MANIFEST_TRANSIENT_RETRY_SECONDS = 0.02
 ACTOR_MANIFEST_TRANSIENT_ERRORS = (
+    "actor projection directory disappeared before enumeration:",
     "changed while being read:",
     "changed while being inventoried:",
 )
