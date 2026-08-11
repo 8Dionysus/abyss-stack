@@ -1978,7 +1978,7 @@ def _fixture(
                     "digest": _digest_path(OWNER_EXECUTION_REQUEST_SCHEMA_PATH),
                     "owner_repo": "aoa-agents",
                     "artifact_ref": "skills/aoa-summon/references/summon-request-v4.schema.json",
-                    "source_ref": "1d01bd0ff2654bc24710cd3849cba3495c8087be",
+                    "source_ref": "6aec46d84a89dbe3bd75112e6367c7b158d3779e",
                     "schema_version": "summon-request-v4",
                 },
                 "task_local_dag_schema": {
