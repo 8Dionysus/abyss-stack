@@ -275,6 +275,7 @@ def make_specialized_environment_sources(
             "specialized_environment": {
                 "environment_id": "test/landing-validation-v1",
                 "pythonpath_ref": "environments/landing-validation-v1/pythonpath",
+                "sdk_pythonpath_ref": "sdk/src",
                 "python_packages": [
                     {
                         "distribution": "pytest",
@@ -294,6 +295,7 @@ def make_specialized_environment_sources(
                 "environment_variables": {
                     "PYTHONDONTWRITEBYTECODE": "1",
                     "PYTHONNOUSERSITE": "1",
+                    "PYTEST_ADDOPTS": "-p no:cacheprovider",
                 },
             },
         }
@@ -352,6 +354,7 @@ def test_stage_packages_profile_bound_specialized_environment(tmp_path: Path) ->
 
     release = Path(result["staged"]["release_root"])
     assert (release / "environments/landing-validation-v1/pythonpath/pytest/__init__.py").is_file()
+    assert (release / "sdk/src/aoa_sdk/__init__.py").is_file()
     assert (release / "owners/aoa-stats/validator.py").is_file()
     assert result["staged"]["stats"]["head"] == stats_head
     assert result["staged"]["nonproduction_dirty_source"] is False
@@ -375,6 +378,36 @@ def test_stage_refuses_missing_specialized_environment_inputs(tmp_path: Path) ->
             allow_dirty_sdk=False,
             allow_dirty_agents=False,
             allow_dirty_skills=False,
+        )
+
+
+def test_stage_refuses_drifted_specialized_sdk_python_path(tmp_path: Path) -> None:
+    source, sdk, agents, skills, stats, validation_python = (
+        make_specialized_environment_sources(tmp_path)
+    )
+    profile_path = (
+        source
+        / "mechanics/governed-execution/parts/external-codex-agent/runtime-profile.v1.json"
+    )
+    profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    profile["tool_profiles"][0]["specialized_environment"][
+        "sdk_pythonpath_ref"
+    ] = "sdk/other"
+    profile_path.write_text(json.dumps(profile, sort_keys=True) + "\n", encoding="utf-8")
+    commit_all(source)
+
+    with pytest.raises(
+        runtime_install.InstallError,
+        match="SDK Python path is invalid",
+    ):
+        stage_specialized_environment(
+            source,
+            sdk,
+            agents,
+            skills,
+            stats,
+            validation_python,
+            tmp_path / "runtime",
         )
 
 

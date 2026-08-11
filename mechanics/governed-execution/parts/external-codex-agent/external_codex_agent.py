@@ -4336,9 +4336,18 @@ def _specialized_environment(
             )
         return resolved
 
-    pythonpath = resolve_directory(candidate.get("pythonpath_ref"), "validation Python path")
-    resolved_environment["PYTHONPATH"] = str(pythonpath)
-    readable_paths.append(pythonpath)
+    validation_pythonpath = resolve_directory(
+        candidate.get("pythonpath_ref"),
+        "validation Python path",
+    )
+    sdk_pythonpath = resolve_directory(
+        candidate.get("sdk_pythonpath_ref"),
+        "SDK Python path",
+    )
+    resolved_environment["PYTHONPATH"] = os.pathsep.join(
+        (str(validation_pythonpath), str(sdk_pythonpath))
+    )
+    readable_paths.extend((validation_pythonpath, sdk_pythonpath))
     for owner_root in candidate.get("owner_roots", []):
         if not isinstance(owner_root, dict):
             raise ExternalCodexRuntimeError(
@@ -4354,8 +4363,13 @@ def _specialized_environment(
         root = resolve_directory(owner_root.get("root_ref"), f"owner root {variable}")
         resolved_environment[variable] = str(root)
         readable_paths.append(root)
+    fixed_variables = {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONNOUSERSITE": "1",
+        "PYTEST_ADDOPTS": "-p no:cacheprovider",
+    }
     for key, value in candidate.get("environment_variables", {}).items():
-        if key not in {"PYTHONDONTWRITEBYTECODE", "PYTHONNOUSERSITE"} or value != "1":
+        if fixed_variables.get(str(key)) != value:
             raise ExternalCodexRuntimeError(
                 "specialized_environment_invalid",
                 "specialized environment contains an unsupported fixed variable",

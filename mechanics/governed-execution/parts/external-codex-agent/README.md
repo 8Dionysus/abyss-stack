@@ -384,10 +384,12 @@ as one immutable content-addressed release below
 `/srv/abyss-machine/runtimes/abyss-stack/external-codex-agent/releases/`.
 When a tool profile names a specialized environment, the same release also
 contains its version-pinned Python package roots and the tracked files of each
-exact owner snapshot. The first landing environment binds pytest plus a clean
-`aoa-stats` source ref. The child receives their release-snapshot coordinates
-as `PYTHONPATH` and `AOA_STATS_ROOT`; it does not inherit the user's Python
-site, mutable owner checkout, or general host paths. These bytes provide tools
+exact owner snapshot. The first landing environment binds pytest, the packaged
+`aoa_sdk`, and a clean `aoa-stats` source ref. The child receives their
+release-snapshot coordinates as a composed `PYTHONPATH` and `AOA_STATS_ROOT`,
+with pytest's cache provider disabled so fixed validation cannot leave actor
+workspace residue; it does not inherit the user's Python site, mutable owner
+checkout, or general host paths. These bytes provide tools
 only: `aoa-stats` keeps validator and measurement authority.
 It atomically updates a regular-file `active.json` receipt and three stable
 non-symlink wrappers in `~/.local/bin`:

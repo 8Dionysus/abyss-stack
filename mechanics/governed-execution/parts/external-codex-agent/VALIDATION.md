@@ -38,9 +38,10 @@ The focused suite uses disposable Git repositories and a fake Codex-compatible
 binary. It proves exact fixture admission plus separate owner-contour semantic
 admission against pinned `aoa-agents` and `aoa-skills` schemas, a neutral
 profile-bound specialized-environment release containing exact Python package
-metadata and a clean tracked owner snapshot, refusal of missing, drifted, or
-dirty specialized inputs, child environment injection without user-site
-inheritance, and read-only permission coordinates for those release roots; a neutral
+metadata, the packaged SDK Python root, and a clean tracked owner snapshot,
+refusal of missing, drifted, or dirty specialized inputs, child environment
+injection without user-site inheritance or pytest cache residue, and read-only
+permission coordinates for those release roots; a neutral
 non-starting binder, accepted responsibility transfer with two exact holders,
 a ready task-local DAG and exact domain procedure refs, a distinct OS process,
 structured events and output, no built-in multi-agent flag, byte-aware

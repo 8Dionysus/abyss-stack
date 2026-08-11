@@ -775,6 +775,8 @@ def source_files(
             or pythonpath_ref.parts[0] != "environments"
         ):
             raise InstallError("specialized environment pythonpath_ref is unsafe")
+        if Path(str(environment.get("sdk_pythonpath_ref") or "")) != Path("sdk/src"):
+            raise InstallError("specialized environment SDK Python path is invalid")
         packages = environment.get("python_packages")
         if not isinstance(packages, list) or not packages:
             raise InstallError("specialized environment has no Python packages")

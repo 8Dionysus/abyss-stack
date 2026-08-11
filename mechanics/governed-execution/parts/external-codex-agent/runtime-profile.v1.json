@@ -66,6 +66,7 @@
       "specialized_environment": {
         "environment_id": "abyss-stack:external_codex_agent/landing-validation-v1",
         "pythonpath_ref": "environments/landing-validation-v1/pythonpath",
+        "sdk_pythonpath_ref": "sdk/src",
         "python_packages": [
           {"distribution": "pytest", "version": "9.0.3", "paths": ["_pytest", "py.py", "pytest", "pytest-9.0.3.dist-info"]},
           {"distribution": "pluggy", "version": "1.6.0", "paths": ["pluggy", "pluggy-1.6.0.dist-info"]},
@@ -84,7 +85,8 @@
         ],
         "environment_variables": {
           "PYTHONDONTWRITEBYTECODE": "1",
-          "PYTHONNOUSERSITE": "1"
+          "PYTHONNOUSERSITE": "1",
+          "PYTEST_ADDOPTS": "-p no:cacheprovider"
         }
       },
       "sandbox_mode": "read_only",
@@ -125,6 +127,7 @@
       "specialized_environment": {
         "environment_id": "abyss-stack:external_codex_agent/landing-validation-v1",
         "pythonpath_ref": "environments/landing-validation-v1/pythonpath",
+        "sdk_pythonpath_ref": "sdk/src",
         "python_packages": [
           {"distribution": "pytest", "version": "9.0.3", "paths": ["_pytest", "py.py", "pytest", "pytest-9.0.3.dist-info"]},
           {"distribution": "pluggy", "version": "1.6.0", "paths": ["pluggy", "pluggy-1.6.0.dist-info"]},
@@ -143,7 +146,8 @@
         ],
         "environment_variables": {
           "PYTHONDONTWRITEBYTECODE": "1",
-          "PYTHONNOUSERSITE": "1"
+          "PYTHONNOUSERSITE": "1",
+          "PYTEST_ADDOPTS": "-p no:cacheprovider"
         }
       },
       "sandbox_mode": "workspace_write",

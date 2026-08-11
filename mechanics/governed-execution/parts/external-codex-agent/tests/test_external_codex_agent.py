@@ -4438,6 +4438,7 @@ def _enable_specialized_test_release(
 ) -> Path:
     release = tmp_path / "verified-release"
     (release / "environments/landing-validation-v1/pythonpath").mkdir(parents=True)
+    (release / "sdk/src").mkdir(parents=True)
     (release / "owners/aoa-stats").mkdir(parents=True)
     monkeypatch.setenv("AOA_EXTERNAL_CODEX_VERIFIED_RELEASE_ROOT", str(release))
     return release
@@ -4465,13 +4466,18 @@ def test_landing_specialized_environment_is_release_bound(
         "AOA_STATS_ROOT": str((release / "owners/aoa-stats").resolve()),
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONNOUSERSITE": "1",
-        "PYTHONPATH": str(
-            (release / "environments/landing-validation-v1/pythonpath").resolve()
+        "PYTEST_ADDOPTS": "-p no:cacheprovider",
+        "PYTHONPATH": os.pathsep.join(
+            (
+                str((release / "environments/landing-validation-v1/pythonpath").resolve()),
+                str((release / "sdk/src").resolve()),
+            )
         ),
     }
     assert set(readable) == {
         (release / "owners/aoa-stats").resolve(),
         (release / "environments/landing-validation-v1/pythonpath").resolve(),
+        (release / "sdk/src").resolve(),
     }
 
 
@@ -4498,9 +4504,11 @@ def test_model_organ_landing_readonly_profile_admits_exact_runtime_binding(
         "shell_environment_policy.set="
         '{"AOA_STATS_ROOT"="'
         + str((release / "owners/aoa-stats").resolve())
-        + '","PYTHONDONTWRITEBYTECODE"="1","PYTHONNOUSERSITE"="1",'
-        '"PYTHONPATH"="'
+        + '","PYTEST_ADDOPTS"="-p no:cacheprovider",'
+        '"PYTHONDONTWRITEBYTECODE"="1","PYTHONNOUSERSITE"="1","PYTHONPATH"="'
         + str((release / "environments/landing-validation-v1/pythonpath").resolve())
+        + os.pathsep
+        + str((release / "sdk/src").resolve())
         + '"}'
     ) in codex_argv
 

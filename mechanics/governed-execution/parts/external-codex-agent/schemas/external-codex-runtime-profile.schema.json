@@ -174,10 +174,11 @@
     "specializedEnvironment": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["environment_id", "pythonpath_ref", "python_packages", "owner_roots", "environment_variables"],
+      "required": ["environment_id", "pythonpath_ref", "sdk_pythonpath_ref", "python_packages", "owner_roots", "environment_variables"],
       "properties": {
         "environment_id": {"type": "string", "minLength": 1},
         "pythonpath_ref": {"type": "string", "pattern": "^environments/[A-Za-z0-9._/-]+/pythonpath$"},
+        "sdk_pythonpath_ref": {"const": "sdk/src"},
         "python_packages": {
           "type": "array",
           "minItems": 1,
@@ -213,10 +214,11 @@
         "environment_variables": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["PYTHONDONTWRITEBYTECODE", "PYTHONNOUSERSITE"],
+          "required": ["PYTHONDONTWRITEBYTECODE", "PYTHONNOUSERSITE", "PYTEST_ADDOPTS"],
           "properties": {
             "PYTHONDONTWRITEBYTECODE": {"const": "1"},
-            "PYTHONNOUSERSITE": {"const": "1"}
+            "PYTHONNOUSERSITE": {"const": "1"},
+            "PYTEST_ADDOPTS": {"const": "-p no:cacheprovider"}
           }
         }
       }

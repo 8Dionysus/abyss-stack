@@ -22,7 +22,8 @@ structured owner-duty canaries. This preserves exact realization binding while
 leaving role selection and domain meaning upstream; it does not fork the
 runtime into task-owned launchers. Landing now supplies its first actual
 specialized validation environment from the same verified release: exact
-pytest bytes and a pinned read-only `aoa-stats` owner snapshot. This repairs a
+pytest and `aoa_sdk` bytes, cache-free validation, and a pinned read-only
+`aoa-stats` owner snapshot. This repairs a
 missing capability exposed by real work, rather than weakening the isolated
 session or growing a general-purpose host allowlist.
 
