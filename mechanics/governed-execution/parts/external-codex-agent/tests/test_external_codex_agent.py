@@ -743,7 +743,9 @@ if "FAKE_STATUS_DECISION_MISMATCH" in task["objective"]:
     report["decision"] = "return_for_repair"
 if "FAKE_IDENTITY_MISMATCH_ON_START" in task["objective"] and not resume:
     report["incarnation_id"] = incarnation_id.replace("incarnation:", "incation:", 1)
-if "FAKE_REVIEW_TRANSITION_MISMATCH" in task["objective"]:
+if "FAKE_REVIEW_TRANSITION_MISMATCH" in task["objective"] and not (
+    "FAKE_REVIEW_TRANSITION_MISMATCH_ON_START" in task["objective"] and resume
+):
     report["status"] = "review_required"
     report["decision"] = (
         "return_for_repair"
@@ -8569,6 +8571,64 @@ def test_failed_read_only_review_identity_can_resume_exact_thread(
         and item["artifact_digest"] == first_result_digest
         for item in result["evidence_refs"]
     )
+    assert any(
+        event["event_type"] == "external_agent.failed_review_resume_admitted"
+        for event in runtime.events(fixture["session_id"], after_sequence=-1)
+    )
+
+
+def test_failed_read_only_review_transition_can_resume_exact_thread(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker="FAKE_REVIEW_TRANSITION_MISMATCH_ON_START",
+        role_id="reviewer",
+        task_family="landing_review",
+        identity_suffix="review-transition-followup",
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    failed = _wait_terminal(runtime, fixture["session_id"])
+    first_result = runtime.result(fixture["session_id"])
+
+    assert failed["status"] == "failed"
+    assert first_result is not None
+    assert first_result["failure_code"] == "model_report_transition_mismatch"
+    assert first_result["workspace_manifest_match"] is True
+    assert first_result["changed_paths"] == []
+    result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    first_result_digest = _digest_path(result_path)
+    resume_path = tmp_path / "review-transition-followup.json"
+    _write_json(
+        resume_path,
+        {
+            "schema_version": "abyss_stack_external_codex_resume_v1",
+            "session_id": fixture["session_id"],
+            "thread_id": failed["thread_id"],
+            "after_event_sequence": failed["last_event_sequence"],
+            "reason": "review_followup",
+            "instruction": (
+                "Preserve the review findings and return them with the exact "
+                "task-owned transition binding."
+            ),
+            "previous_result_digest": first_result_digest,
+        },
+    )
+
+    assert runtime.resume(fixture["session_id"], resume_path)["status"] == "running"
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "completed"
+    assert result is not None
+    assert result["thread_id"] == failed["thread_id"]
+    assert result["attempt_count"] == 2
+    assert result["changed_paths"] == []
+    preserved_path = (
+        runtime._session_dir(fixture["session_id"]) / "attempts/001/runtime-result.json"
+    )
+    assert _digest_path(preserved_path) == first_result_digest
     assert any(
         event["event_type"] == "external_agent.failed_review_resume_admitted"
         for event in runtime.events(fixture["session_id"], after_sequence=-1)

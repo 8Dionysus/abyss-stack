@@ -647,8 +647,9 @@ interruption, or review receipt that justified re-entry.
 A failed session is not generally resumable. Two explicit same-thread report
 recovery routes exist; neither retries automatically. A `review_followup` may
 continue a read-only `independent_review` incarnation rejected only as
-`model_report_identity_mismatch`, with no changed paths and an exact matching
-final workspace manifest. A `bounded_repair` may continue a
+`model_report_identity_mismatch` or `model_report_transition_mismatch`, with no
+changed paths and an exact matching final workspace manifest. A
+`bounded_repair` may continue a
 `bounded_execution`/`repo_mutation` incarnation rejected by model-report
 admission only when the owner source still matches, actor final-manifest and
 delta evidence are present, and every observed changed path remains inside the
@@ -776,7 +777,7 @@ An export requires:
 - the same target owner and a terminal review decision.
 
 A failed reviewer runtime is preserved as review counterevidence but cannot be
-exported as a reviewed A2A result. If the narrowly admitted identity-only
+exported as a reviewed A2A result. If the narrowly admitted identity/transition
 follow-up above later produces an accepted terminal review, export uses that
 final result while its evidence chain retains the exact failed result. The
 accepted reviewer `report_ref` itself must contain the terminal review

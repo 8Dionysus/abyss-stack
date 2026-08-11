@@ -211,10 +211,11 @@ that identity after process exit against an exact top-level member or an exact
 `content_entries[].path` in the actor finalization artifact.
 The controller also derives one session-local output schema from the admitted
 canonical report schema and pins exact task/incarnation IDs before inference.
-An unchanged read-only reviewer rejected only for an identity-field mismatch
-may continue the same thread through an explicit prior-result-digest-bound
-follow-up; the failed result remains preserved evidence and no automatic retry
-or broader failed-session resume is admitted.
+An unchanged read-only reviewer rejected only for an identity-field or exact
+task-owned transition-field mismatch may continue the same thread through an
+explicit prior-result-digest-bound follow-up; the failed result remains
+preserved evidence and no automatic retry or broader failed-session resume is
+admitted.
 
 ## Rationale
 

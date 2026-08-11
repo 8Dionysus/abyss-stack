@@ -419,7 +419,10 @@ def _close_mcp_credential_proxies(proxies: list[_McpCredentialProxy]) -> None:
 
 
 RESUMABLE_STATES = {"paused", "interrupted", "review_required", "authority_blocked"}
-REVIEW_REPORT_RECOVERY_FAILURES = {"model_report_identity_mismatch"}
+REVIEW_REPORT_RECOVERY_FAILURES = {
+    "model_report_identity_mismatch",
+    "model_report_transition_mismatch",
+}
 WRITER_REPORT_RECOVERY_FAILURE_PREFIX = "model_report_"
 SECRET_ENV_RE = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)", re.I)
 SOURCE_LINE_ANCHOR_RE = re.compile(
@@ -11027,7 +11030,8 @@ Runtime session identity: {state["session_id"]}
                 if failed_review_candidate and not failed_review_followup:
                     raise ExternalCodexRuntimeError(
                         "failed_review_resume_unsupported",
-                        "only an unchanged read-only review identity failure is recoverable",
+                        "only an unchanged read-only review identity or transition "
+                        "binding failure is recoverable",
                     )
                 if failed_writer_report_candidate and not failed_writer_report_followup:
                     raise ExternalCodexRuntimeError(
