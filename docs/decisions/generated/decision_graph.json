@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 114,
-  "edge_count": 2578,
+  "decision_count": 115,
+  "edge_count": 2598,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 964,
-    "DATED": 114,
-    "GUARDED_BY": 350,
-    "HAS_STATUS": 114,
-    "HAS_SURFACE_CLASS": 304,
-    "IN_STACK_LANE": 263,
-    "NEXT_DECISION": 113,
-    "OWNED_BY_SURFACE": 120,
-    "OWNS_DECISION": 114,
+    "CITES_SOURCE_SURFACE": 969,
+    "DATED": 115,
+    "GUARDED_BY": 353,
+    "HAS_STATUS": 115,
+    "HAS_SURFACE_CLASS": 307,
+    "IN_STACK_LANE": 266,
+    "NEXT_DECISION": 114,
+    "OWNED_BY_SURFACE": 121,
+    "OWNS_DECISION": 115,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 120
+    "UNDER_MECHANIC_PARENT": 121
   },
   "edges": [
     {
@@ -12328,11 +12328,106 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0114",
+      "target": "decision:ABYSS-STACK-D-0115",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0114",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0114",
+      "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
+      "target": "date:2026-08-11",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
+      "target": "guard_family:bounded%20authority",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
+      "target": "guard_family:evidence%20closure",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
+      "target": "guard_family:exact-thread%20resume",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
+      "target": "surface_class:A2A%20return",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
+      "target": "surface_class:actor%20continuity",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
+      "target": "surface_class:runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
+      "target": "stack_lane:evidence",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0115",
       "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -12905,21 +13000,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0114",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0115",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1148,
+  "node_count": 1153,
   "node_type_counts": {
     "date": 35,
-    "decision": 114,
-    "guard_family": 176,
+    "decision": 115,
+    "guard_family": 179,
     "mechanic_parent": 10,
     "owner_surface": 62,
     "repo": 1,
     "source_surface": 574,
     "stack_lane": 47,
     "status": 3,
-    "surface_class": 126
+    "surface_class": 127
   },
   "nodes": [
     {
@@ -14238,6 +14338,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-11",
+      "id": "decision:ABYSS-STACK-D-0115",
+      "label": "ABYSS-STACK-D-0115",
+      "path": "docs/decisions/ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md",
+      "posture": "accepted same-role report recovery; no authority widening",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0115 Preserve Writer Role Continuity for Report Repair",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -14315,6 +14425,11 @@
     {
       "id": "guard_family:bootstrap%20handoff",
       "label": "bootstrap handoff",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:bounded%20authority",
+      "label": "bounded authority",
       "type": "guard_family"
     },
     {
@@ -14488,6 +14603,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:evidence%20closure",
+      "label": "evidence closure",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:exact%20admission",
       "label": "exact admission",
       "type": "guard_family"
@@ -14520,6 +14640,11 @@
     {
       "id": "guard_family:exact%20tool%20binding",
       "label": "exact tool binding",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:exact-thread%20resume",
+      "label": "exact-thread resume",
       "type": "guard_family"
     },
     {
@@ -18676,6 +18801,11 @@
     {
       "id": "surface_class:actor%20admission",
       "label": "actor admission",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:actor%20continuity",
+      "label": "actor continuity",
       "type": "surface_class"
     },
     {

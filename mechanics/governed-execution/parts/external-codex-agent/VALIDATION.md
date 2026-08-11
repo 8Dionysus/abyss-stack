@@ -111,7 +111,8 @@ immutable-input evidence identities constrained before structured output,
 idempotent exact duplicate evidence with raw-report preservation and typed
 semantic failure messages,
 digest-bound same-thread recovery from one unchanged read-only reviewer
-identity typo while preserving the failed result,
+identity typo and from one authority-safe bounded writer model-report error,
+while preserving each failed result and refusing any writer path widening,
 canonical non-starting reviewer preparation with controller-owned immutable
 copies and stable forwarded input IDs, reviewer operation after the historical
 source checkout disappears or an historical ancestor is retargeted,

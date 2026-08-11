@@ -626,15 +626,26 @@ caller may bind `previous_result_digest` on any resume; when supplied it must
 match exactly. This prevents a continued result from erasing the checkpoint,
 interruption, or review receipt that justified re-entry.
 
-A failed session is not generally resumable. The sole initial exception is an
-explicit `review_followup` for a read-only `independent_review` incarnation rejected only as
+A failed session is not generally resumable. Two explicit same-thread report
+recovery routes exist; neither retries automatically. A `review_followup` may
+continue a read-only `independent_review` incarnation rejected only as
 `model_report_identity_mismatch`, with no changed paths and an exact matching
-final workspace manifest. The request must also bind the prior `result.json`
-digest, session, thread, and event cursor. Before continuing the same Codex
-thread, the general resume preservation rule retains that failed result and a
-review-specific admission event records its digest. There is no automatic retry,
-and mutation, authority, source-evidence, or other report failures do not enter
-this route.
+final workspace manifest. A `bounded_repair` may continue a
+`bounded_execution`/`repo_mutation` incarnation rejected by model-report
+admission only when the owner source still matches, actor final-manifest and
+delta evidence are present, and every observed changed path remains inside the
+original task's `allowed_paths`. This writer route preserves the same role,
+thread, projection, and authority envelope; it does not convert the actor to
+read-only or grant a new path, effect, source, or external authority.
+
+Both requests must bind the prior `result.json` digest, session, thread, and
+event cursor. Before continuing the same Codex thread, the general resume
+preservation rule verifies and retains that failed result and its evidence
+closure. A route-specific admission event records the digest. Authority,
+source-manifest, projection-closure, or out-of-scope-change failure does not
+enter failed-writer report recovery; an actor in an ordinarily resumable
+`authority_blocked` state remains governed by that separate continuation
+contract.
 
 ## Independent review and A2A return
 

@@ -118,9 +118,13 @@ The controller:
   source aliases are removed from model-facing control views. Workspace
   identity/ancestor coordinates are omitted. A source beneath Codex's built-in minimal-read system roots is
   rejected instead of relying on an allowlist that would expose it;
-- resumes only the exact durable thread and event cursor, with one explicit
-  digest-bound follow-up route for an unchanged read-only review rejected only
-  by an identity-field mismatch, and preserves every prior terminal result plus
+- resumes only the exact durable thread and event cursor, with explicit
+  digest-bound follow-up routes for an unchanged read-only review rejected only
+  by an identity-field mismatch and for an authority-safe bounded writer
+  rejected only during model-report admission. Writer report repair requires
+  unchanged owner source, complete actor manifest/delta evidence, and every
+  observed change inside the original allowed paths; it retains the original
+  role and authority envelope. Every route preserves each prior terminal result plus
   a digest-bound snapshot closure for all referenced evidence in its attempt
   directory before any admitted continuation;
 - emits result v2 with mandatory actor/source provenance for successful returns,

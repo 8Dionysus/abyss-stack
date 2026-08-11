@@ -9,6 +9,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Preserve a bounded repo-mutation actor's exact role and Codex thread when an
+  otherwise authority-safe terminal return fails only model-report admission.
+  The same-role `bounded_repair` route requires the exact prior result digest,
+  unchanged owner source, durable actor final-manifest and delta evidence, and
+  every observed change to remain inside the original allowed paths; it keeps
+  the original authority envelope and preserves the failed result closure.
 - Retry only transient regular-file identity/read and disappearing-directory
   enumeration races while taking an actor manifest, rebuild the whole manifest
   on each bounded attempt, retain

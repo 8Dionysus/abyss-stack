@@ -236,6 +236,10 @@
 
 - [ABYSS-STACK-D-0109 Recover Expired Modern MCP Read Admission](../ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md) (`docs/decisions/ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md`)
 
+## bounded authority
+
+- [ABYSS-STACK-D-0115 Preserve Writer Role Continuity for Report Repair](../ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md) (`docs/decisions/ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md`)
+
 ## bounded context
 
 - [ABYSS-STACK-D-0079 KAG Query Application Port](../ABYSS-STACK-D-0079-kag-query-application-port.md) (`docs/decisions/ABYSS-STACK-D-0079-kag-query-application-port.md`)
@@ -375,6 +379,10 @@
 
 - [ABYSS-STACK-D-0055 Root Routes Validator Module](../ABYSS-STACK-D-0055-root-routes-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0055-root-routes-validator-module.md`)
 
+## evidence closure
+
+- [ABYSS-STACK-D-0115 Preserve Writer Role Continuity for Report Repair](../ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md) (`docs/decisions/ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md`)
+
 ## exact admission
 
 - [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
@@ -408,6 +416,10 @@
 ## exact tool binding
 
 - [ABYSS-STACK-D-0105 Bind Stack MCP Capabilities to Process Contours](../ABYSS-STACK-D-0105-bind-stack-mcp-capabilities-to-process-contours.md) (`docs/decisions/ABYSS-STACK-D-0105-bind-stack-mcp-capabilities-to-process-contours.md`)
+
+## exact-thread resume
+
+- [ABYSS-STACK-D-0115 Preserve Writer Role Continuity for Report Repair](../ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md) (`docs/decisions/ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md`)
 
 ## explicit adapter
 

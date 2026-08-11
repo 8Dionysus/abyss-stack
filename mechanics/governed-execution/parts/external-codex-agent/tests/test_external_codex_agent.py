@@ -819,7 +819,13 @@ if "FAKE_VALID_RUNTIME_FINAL_MANIFEST_EVIDENCE" in task["objective"]:
     report["transition"]["evidence_refs"] = [
         "runtime:workspace-final-manifest#content_entries"
     ]
-if "FAKE_INVALID_RUNTIME_FINAL_MANIFEST_ANCHOR" in task["objective"]:
+if (
+    "FAKE_INVALID_RUNTIME_FINAL_MANIFEST_ANCHOR" in task["objective"]
+    and not (
+        "FAKE_INVALID_RUNTIME_FINAL_MANIFEST_ANCHOR_ON_START" in task["objective"]
+        and resume
+    )
+):
     report["transition"]["evidence_refs"] = [
         "runtime:workspace-final-manifest#absent-final-manifest-key"
     ]
@@ -8191,6 +8197,86 @@ def test_failed_read_only_review_identity_can_resume_exact_thread(
     )
     assert any(
         event["event_type"] == "external_agent.failed_review_resume_admitted"
+        for event in runtime.events(fixture["session_id"], after_sequence=-1)
+    )
+
+
+def test_failed_writer_report_can_resume_exact_thread_without_widening_authority(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker=(
+            "FAKE_WRITE_ALLOWED FAKE_ARTIFACT_PRODUCED "
+            "FAKE_INVALID_RUNTIME_FINAL_MANIFEST_ANCHOR_ON_START"
+        ),
+        identity_suffix="writer-report-followup",
+        workspace_write=True,
+        exact_baseline=True,
+        review_required=True,
+        allowed_paths=("landing-note.md",),
+        source_evidence_paths=("README.md",),
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    failed = _wait_terminal(runtime, fixture["session_id"])
+    first_result = runtime.result(fixture["session_id"])
+
+    assert failed["status"] == "failed"
+    assert first_result is not None
+    assert first_result["failure_code"] == "model_report_runtime_evidence_anchor_invalid"
+    assert first_result["source_manifest_match"] is True
+    assert first_result["changed_paths"] == [
+        {"path": "landing-note.md", "status": "created"}
+    ]
+    first_result_digest = _digest_path(
+        runtime._session_dir(fixture["session_id"]) / "result.json"
+    )
+    resume_path = tmp_path / "writer-report-followup.json"
+    _write_json(
+        resume_path,
+        {
+            "schema_version": "abyss_stack_external_codex_resume_v1",
+            "session_id": fixture["session_id"],
+            "thread_id": failed["thread_id"],
+            "after_event_sequence": failed["last_event_sequence"],
+            "reason": "bounded_repair",
+            "instruction": (
+                "Return the same completed report with an evidence anchor that "
+                "exists literally in the preserved runtime final manifest."
+            ),
+            "previous_result_digest": first_result_digest,
+        },
+    )
+
+    wrong_route_path = tmp_path / "writer-report-wrong-route.json"
+    wrong_route = json.loads(resume_path.read_text(encoding="utf-8"))
+    wrong_route["reason"] = "review_followup"
+    _write_json(wrong_route_path, wrong_route)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.resume(fixture["session_id"], wrong_route_path)
+    assert exc_info.value.code == "failed_writer_report_resume_unbound"
+
+    assert runtime.resume(fixture["session_id"], resume_path)["status"] == "running"
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "review_required"
+    assert result is not None
+    assert result["thread_id"] == failed["thread_id"]
+    assert result["attempt_count"] == 2
+    assert result["failure_code"] is None
+    assert result["source_manifest_match"] is True
+    assert result["changed_paths"] == [
+        {"path": "landing-note.md", "status": "created"}
+    ]
+    preserved_path = (
+        runtime._session_dir(fixture["session_id"]) / "attempts/001/runtime-result.json"
+    )
+    assert _digest_path(preserved_path) == first_result_digest
+    assert any(
+        event["event_type"]
+        == "external_agent.failed_writer_report_resume_admitted"
         for event in runtime.events(fixture["session_id"], after_sequence=-1)
     )
 

@@ -420,6 +420,7 @@ def _close_mcp_credential_proxies(proxies: list[_McpCredentialProxy]) -> None:
 
 RESUMABLE_STATES = {"paused", "interrupted", "review_required", "authority_blocked"}
 REVIEW_REPORT_RECOVERY_FAILURES = {"model_report_identity_mismatch"}
+WRITER_REPORT_RECOVERY_FAILURE_PREFIX = "model_report_"
 SECRET_ENV_RE = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)", re.I)
 SOURCE_LINE_ANCHOR_RE = re.compile(
     r"^L(?P<start>[1-9][0-9]*)(?:-L(?P<end>[1-9][0-9]*))?$"
@@ -10786,8 +10787,8 @@ Runtime session identity: {state["session_id"]}
                     "resume cannot proceed without the original actor projection baseline",
                 )
             self._refresh_interrupted_locked(state)
-            failed_review_followup = state["status"] == "failed"
-            if state["status"] not in RESUMABLE_STATES and not failed_review_followup:
+            failed_terminal_followup = state["status"] == "failed"
+            if state["status"] not in RESUMABLE_STATES and not failed_terminal_followup:
                 raise ExternalCodexRuntimeError(
                     "resume_state_invalid",
                     f"session is not resumable: {state['status']}",
@@ -10807,7 +10808,7 @@ Runtime session identity: {state["session_id"]}
                 )
             task: Mapping[str, Any] | None = None
             if (
-                failed_review_followup
+                failed_terminal_followup
                 or state.get("execution_result_schema_ref") is None
             ):
                 _, _, _, task, _, _ = self._materialized_payloads(state)
@@ -10862,27 +10863,76 @@ Runtime session identity: {state["session_id"]}
                     "resume_previous_result_mismatch",
                     "resume request names another prior runtime result digest",
                 )
-            if failed_review_followup:
-                if (
-                    resume.get("reason") != "review_followup"
-                    or resume.get("previous_result_digest") != result_digest
-                ):
-                    raise ExternalCodexRuntimeError(
-                        "failed_review_resume_unbound",
-                        "failed review resume must bind the exact prior result digest",
+            failed_review_followup = False
+            failed_writer_report_followup = False
+            if failed_terminal_followup:
+                failure_code = previous_result.get("failure_code")
+                changed_paths = previous_result.get("changed_paths")
+                allowed_paths = task.get("allowed_paths") if task is not None else None
+                failed_review_candidate = (
+                    task is not None
+                    and task.get("execution_posture") == "independent_review"
+                    and task.get("allowed_effect_class") == "read_only"
+                )
+                failed_writer_report_candidate = (
+                    task is not None
+                    and task.get("execution_posture") == "bounded_execution"
+                    and task.get("allowed_effect_class") == "repo_mutation"
+                    and isinstance(failure_code, str)
+                    and failure_code.startswith(WRITER_REPORT_RECOVERY_FAILURE_PREFIX)
+                )
+                failed_review_followup = (
+                    failed_review_candidate
+                    and failure_code in REVIEW_REPORT_RECOVERY_FAILURES
+                    and previous_result.get("workspace_manifest_match") is True
+                    and changed_paths == []
+                )
+                failed_writer_report_followup = (
+                    failed_writer_report_candidate
+                    and previous_result.get("source_manifest_match") is True
+                    and isinstance(previous_result.get("actor_final_manifest_ref"), dict)
+                    and isinstance(previous_result.get("actor_delta_ref"), dict)
+                    and isinstance(changed_paths, list)
+                    and isinstance(allowed_paths, list)
+                    and all(
+                        isinstance(change, dict)
+                        and isinstance(change.get("path"), str)
+                        and _relative_path_is_allowed(change["path"], allowed_paths)
+                        for change in changed_paths
                     )
-                if (
-                    task is None
-                    or task.get("execution_posture") != "independent_review"
-                    or task.get("allowed_effect_class") != "read_only"
-                    or previous_result.get("failure_code")
-                    not in REVIEW_REPORT_RECOVERY_FAILURES
-                    or previous_result.get("workspace_manifest_match") is not True
-                    or previous_result.get("changed_paths") != []
-                ):
+                )
+                if failed_review_candidate and not failed_review_followup:
                     raise ExternalCodexRuntimeError(
                         "failed_review_resume_unsupported",
                         "only an unchanged read-only review identity failure is recoverable",
+                    )
+                if failed_writer_report_candidate and not failed_writer_report_followup:
+                    raise ExternalCodexRuntimeError(
+                        "failed_writer_report_resume_unsupported",
+                        "writer report recovery requires intact source, actor evidence, and original path authority",
+                    )
+                if not failed_review_followup and not failed_writer_report_followup:
+                    raise ExternalCodexRuntimeError(
+                        "failed_terminal_resume_unsupported",
+                        "failed session has no authority-safe same-role recovery route",
+                    )
+                expected_reason = (
+                    "review_followup"
+                    if failed_review_followup
+                    else "bounded_repair"
+                )
+                if (
+                    resume.get("reason") != expected_reason
+                    or resume.get("previous_result_digest") != result_digest
+                ):
+                    failure = (
+                        "failed_review_resume_unbound"
+                        if failed_review_followup
+                        else "failed_writer_report_resume_unbound"
+                    )
+                    raise ExternalCodexRuntimeError(
+                        failure,
+                        "failed-session resume must use its recovery reason and bind the exact prior result digest",
                     )
             prior_attempt = state["attempts"][-1]
             attempt_dir = (
@@ -10949,6 +10999,19 @@ Runtime session identity: {state["session_id"]}
                 self._append_event(
                     state,
                     event_type="external_agent.failed_review_resume_admitted",
+                    payload={
+                        "failure_code": previous_result["failure_code"],
+                        "previous_result_ref": preserved_ref,
+                        "reason": resume["reason"],
+                    },
+                    attempt_id=str(prior_attempt["attempt_id"]),
+                    thread_id=str(state["thread_id"]),
+                    significance="review",
+                )
+            if failed_writer_report_followup:
+                self._append_event(
+                    state,
+                    event_type="external_agent.failed_writer_report_resume_admitted",
                     payload={
                         "failure_code": previous_result["failure_code"],
                         "previous_result_ref": preserved_ref,
