@@ -382,6 +382,13 @@ terminated before the attempt can reach terminal finalization.
 pinned `aoa-agents` execution-request plus `aoa-skills` task-local-DAG schemas
 as one immutable content-addressed release below
 `/srv/abyss-machine/runtimes/abyss-stack/external-codex-agent/releases/`.
+When a tool profile names a specialized environment, the same release also
+contains its version-pinned Python package roots and the tracked files of each
+exact owner snapshot. The first landing environment binds pytest plus a clean
+`aoa-stats` source ref. The child receives their release-snapshot coordinates
+as `PYTHONPATH` and `AOA_STATS_ROOT`; it does not inherit the user's Python
+site, mutable owner checkout, or general host paths. These bytes provide tools
+only: `aoa-stats` keeps validator and measurement authority.
 It atomically updates a regular-file `active.json` receipt and three stable
 non-symlink wrappers in `~/.local/bin`:
 
@@ -465,7 +472,9 @@ source `.git/config` after snapshot creation therefore cannot gain
 installer-process execution before status or index inspection.
 Installation requires clean exact
 `abyss-stack`, `aoa-sdk`, `aoa-agents`, and `aoa-skills` source roots unless
-each dirty posture is admitted explicitly.
+each dirty posture is admitted explicitly. A specialized owner snapshot such
+as `aoa-stats` must always be clean and match the source ref pinned by the tool
+profile; it has no dirty-source override.
 
 See [CONTRACT.md](CONTRACT.md), [DIRECTION.md](DIRECTION.md),
 [PROVENANCE.md](PROVENANCE.md), [SUSPENSION.md](SUSPENSION.md), and

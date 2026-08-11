@@ -111,6 +111,7 @@
         "required": ["profile_id", "sandbox_mode", "codex_sandbox", "codex_execution_root", "approval_policy", "allowed_effect_classes", "required_tool_ids", "required_mcp_server_ids", "mcp_server_configs", "network_access", "external_effects"],
         "properties": {
           "profile_id": {"type": "string", "minLength": 1},
+          "specialized_environment": {"$ref": "#/$defs/specializedEnvironment"},
           "sandbox_mode": {"enum": ["read_only", "workspace_write"]},
           "codex_sandbox": {"const": "workspace-write"},
           "codex_execution_root": {"enum": ["attempt-local", "target-workspace"]},
@@ -170,6 +171,56 @@
     }
   },
   "$defs": {
+    "specializedEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment_id", "pythonpath_ref", "python_packages", "owner_roots", "environment_variables"],
+      "properties": {
+        "environment_id": {"type": "string", "minLength": 1},
+        "pythonpath_ref": {"type": "string", "pattern": "^environments/[A-Za-z0-9._/-]+/pythonpath$"},
+        "python_packages": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["distribution", "version", "paths"],
+            "properties": {
+              "distribution": {"type": "string", "minLength": 1},
+              "version": {"type": "string", "minLength": 1},
+              "paths": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"}}
+            }
+          }
+        },
+        "owner_roots": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["owner_repo", "source_ref", "root_ref", "environment_variable", "access"],
+            "properties": {
+              "owner_repo": {"const": "aoa-stats"},
+              "source_ref": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+              "root_ref": {"const": "owners/aoa-stats"},
+              "environment_variable": {"const": "AOA_STATS_ROOT"},
+              "access": {"const": "read_only"}
+            }
+          }
+        },
+        "environment_variables": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["PYTHONDONTWRITEBYTECODE", "PYTHONNOUSERSITE"],
+          "properties": {
+            "PYTHONDONTWRITEBYTECODE": {"const": "1"},
+            "PYTHONNOUSERSITE": {"const": "1"}
+          }
+        }
+      }
+    },
     "ownerContract": {
       "type": "object",
       "additionalProperties": false,

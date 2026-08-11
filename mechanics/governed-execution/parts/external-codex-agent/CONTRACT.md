@@ -306,10 +306,16 @@ The initial model-organ contours expose exact ABI aliases:
 `structured-owner-duty-workspace-write-v1`. Each retains the same bounded
 generic posture for its effect class: the read alias is `read_only` with
 `read_only` effects, while the write aliases are `workspace_write` with
-`repo_mutation` effects. All remain no-MCP, no-network, and
-no-external-effect. The alias must match the realization and incarnation
-binding exactly; it does not choose the task family, selected role chain,
-domain procedure, or model-fit outcome.
+`repo_mutation` effects. Both landing aliases additionally bind the same
+model-neutral `landing-validation-v1` environment. Its pytest distributions
+and clean tracked `aoa-stats` snapshot are files inside the verified
+content-addressed release. The runtime exposes only those read-only roots to
+Codex and supplies `PYTHONPATH`, `AOA_STATS_ROOT`, `PYTHONNOUSERSITE=1`, and
+bytecode suppression. The isolated shell `HOME` remains empty. This is a
+positive tool grant, not owner authority and not an ambient-path exception.
+All aliases remain no-MCP, no-network, and no-external-effect. The alias must
+match the realization and incarnation binding exactly; it does not choose the
+task family, selected role chain, domain procedure, or model-fit outcome.
 
 Codex runs beneath a Linux supervisor that owns a separate process group but
 does not create an outer PID or network namespace. Inference adds only the

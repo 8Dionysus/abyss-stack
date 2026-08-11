@@ -674,6 +674,9 @@ def source_files(
     sdk_root: Path,
     agents_root: Path,
     skills_root: Path,
+    *,
+    stats_root: Path | None = None,
+    validation_python_root: Path | None = None,
 ) -> list[tuple[Path, Path]]:
     part = source_root / "mechanics/governed-execution/parts/external-codex-agent"
     profile_path = require_regular_file(
@@ -732,6 +735,160 @@ def source_files(
         if contract.get("digest") != sha256_file(src):
             raise InstallError(f"{owner} contract differs from runtime profile pin")
         rows.append((src, Path("owners") / owner / relative))
+
+    tool_profiles = profile.get("tool_profiles", [])
+    if not isinstance(tool_profiles, list):
+        raise InstallError("runtime profile tool_profiles are invalid")
+    environments_by_id: dict[str, dict[str, object]] = {}
+    for tool_profile in tool_profiles:
+        if not isinstance(tool_profile, dict):
+            raise InstallError("runtime profile tool profile is invalid")
+        environment = tool_profile.get("specialized_environment")
+        if environment is None:
+            continue
+        if not isinstance(environment, dict):
+            raise InstallError("runtime profile specialized environment is invalid")
+        environment_id = str(environment.get("environment_id") or "")
+        previous = environments_by_id.get(environment_id)
+        if not environment_id or (previous is not None and previous != environment):
+            raise InstallError("runtime profile specialized environment is ambiguous")
+        environments_by_id[environment_id] = environment
+    environments = list(environments_by_id.values())
+    if environments:
+        if stats_root is None or validation_python_root is None:
+            raise InstallError(
+                "runtime profile requires --stats-root and --validation-python-root"
+            )
+        stats_root = require_absolute_directory(stats_root, "aoa-stats source root")
+        validation_python_root = require_absolute_directory(
+            validation_python_root,
+            "specialized validation Python root",
+        )
+    for environment in environments:
+        if not isinstance(environment, dict):
+            raise InstallError("runtime profile specialized environment is invalid")
+        pythonpath_ref = Path(str(environment.get("pythonpath_ref") or ""))
+        if (
+            pythonpath_ref.is_absolute()
+            or ".." in pythonpath_ref.parts
+            or not pythonpath_ref.parts
+            or pythonpath_ref.parts[0] != "environments"
+        ):
+            raise InstallError("specialized environment pythonpath_ref is unsafe")
+        packages = environment.get("python_packages")
+        if not isinstance(packages, list) or not packages:
+            raise InstallError("specialized environment has no Python packages")
+        packaged_paths: set[Path] = set()
+        assert validation_python_root is not None
+        for package in packages:
+            if not isinstance(package, dict):
+                raise InstallError("specialized environment Python package is invalid")
+            package_paths = package.get("paths")
+            if not isinstance(package_paths, list) or not package_paths:
+                raise InstallError("specialized environment Python package has no paths")
+            metadata_roots = [
+                Path(str(value))
+                for value in package_paths
+                if str(value).endswith(".dist-info")
+            ]
+            if len(metadata_roots) != 1:
+                raise InstallError(
+                    "specialized environment Python package must name one dist-info root"
+                )
+            metadata_path = require_regular_file(
+                validation_python_root / metadata_roots[0] / "METADATA",
+                "specialized environment package metadata",
+            )
+            metadata: dict[str, str] = {}
+            for line in metadata_path.read_text(encoding="utf-8").splitlines():
+                if ": " not in line:
+                    continue
+                key, value = line.split(": ", 1)
+                if key in {"Name", "Version"} and key not in metadata:
+                    metadata[key] = value
+            if (
+                metadata.get("Name", "").casefold()
+                != str(package.get("distribution") or "").casefold()
+                or metadata.get("Version") != package.get("version")
+            ):
+                raise InstallError(
+                    "specialized environment Python package differs from profile pin"
+                )
+            for raw_relative in package_paths:
+                relative = Path(str(raw_relative))
+                if relative.is_absolute() or ".." in relative.parts or len(relative.parts) != 1:
+                    raise InstallError("specialized environment package path is unsafe")
+                package_root = validation_python_root / relative
+                if package_root.is_symlink():
+                    raise InstallError(
+                        f"specialized environment contains a symlink: {package_root}"
+                    )
+                if package_root.is_file():
+                    package_sources = (package_root,)
+                else:
+                    require_absolute_directory(
+                        package_root,
+                        f"specialized environment package {relative}",
+                    )
+                    package_sources = tuple(sorted(package_root.rglob("*")))
+                for src in package_sources:
+                    if src.is_dir():
+                        if src.is_symlink():
+                            raise InstallError(
+                                f"specialized environment contains a symlink: {src}"
+                            )
+                        continue
+                    if "__pycache__" in src.parts or src.suffix in {".pyc", ".pyo"}:
+                        continue
+                    require_regular_file(src, f"specialized environment file {src}")
+                    destination = pythonpath_ref / src.relative_to(validation_python_root)
+                    if destination in packaged_paths:
+                        raise InstallError(
+                            f"specialized environment path is duplicated: {destination}"
+                        )
+                    packaged_paths.add(destination)
+                    rows.append((src, destination))
+
+        owner_roots = environment.get("owner_roots")
+        if not isinstance(owner_roots, list) or not owner_roots:
+            raise InstallError("specialized environment has no owner roots")
+        assert stats_root is not None
+        for owner_root in owner_roots:
+            if (
+                not isinstance(owner_root, dict)
+                or owner_root.get("owner_repo") != "aoa-stats"
+            ):
+                raise InstallError("unsupported specialized environment owner root")
+            root_ref = Path(str(owner_root.get("root_ref") or ""))
+            if root_ref != Path("owners/aoa-stats"):
+                raise InstallError("aoa-stats specialized root coordinate is invalid")
+            expected_head = str(owner_root.get("source_ref") or "")
+            if _source_git_coordinate(stats_root, "rev-parse", "HEAD") != expected_head:
+                raise InstallError("aoa-stats source differs from specialized environment pin")
+            tracked = subprocess.run(
+                [INSTALLER_GIT, "ls-files", "-z"],
+                cwd=stats_root,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=_base_installer_git_environment(),
+            )
+            if tracked.returncode != 0:
+                raise InstallError("cannot enumerate tracked aoa-stats source")
+            for raw_relative in tracked.stdout.split(b"\0"):
+                if not raw_relative:
+                    continue
+                relative = Path(os.fsdecode(raw_relative))
+                if relative.is_absolute() or ".." in relative.parts:
+                    raise InstallError("aoa-stats tracked path is unsafe")
+                src = require_regular_file(
+                    stats_root / relative,
+                    f"aoa-stats tracked source {relative}",
+                )
+                rows.append((src, root_ref / relative))
+    destinations = [destination for _, destination in rows]
+    if len(destinations) != len(set(destinations)):
+        raise InstallError("release input destinations must be unique")
     return rows
 
 
@@ -741,6 +898,8 @@ def source_postures(
     sdk_root: Path,
     agents_root: Path,
     skills_root: Path,
+    *,
+    stats_root: Path | None = None,
 ) -> dict[str, dict[str, object]]:
     roots = {
         "source": source_root,
@@ -748,6 +907,8 @@ def source_postures(
         "agents": agents_root,
         "skills": skills_root,
     }
+    if stats_root is not None:
+        roots["stats"] = stats_root
     return {
         label: git_posture(
             root,
@@ -1500,6 +1661,8 @@ def prepare_release(
     runtime_root: Path,
     python_executable: Path,
     *,
+    stats_root: Path | None = None,
+    validation_python_root: Path | None = None,
     allow_dirty_source: bool,
     allow_dirty_sdk: bool,
     allow_dirty_agents: bool,
@@ -1509,24 +1672,40 @@ def prepare_release(
     sdk_root = require_absolute_directory(sdk_root, "aoa-sdk source root")
     agents_root = require_absolute_directory(agents_root, "aoa-agents source root")
     skills_root = require_absolute_directory(skills_root, "aoa-skills source root")
+    if stats_root is not None:
+        stats_root = require_absolute_directory(stats_root, "aoa-stats source root")
+    if validation_python_root is not None:
+        validation_python_root = require_absolute_directory(
+            validation_python_root,
+            "specialized validation Python root",
+        )
     runtime_root = runtime_root.resolve()
     python_executable, python_identity = require_python_executable(
         python_executable
     )
     require_python_executable(WRAPPER_BOOTSTRAP_PYTHON)
     require_snapshot_runtime()
-    files = source_files(source_root, sdk_root, agents_root, skills_root)
+    files = source_files(
+        source_root,
+        sdk_root,
+        agents_root,
+        skills_root,
+        stats_root=stats_root,
+        validation_python_root=validation_python_root,
+    )
     postures = source_postures(
         files,
         source_root,
         sdk_root,
         agents_root,
         skills_root,
+        stats_root=stats_root,
     )
     source_posture = postures["source"]
     sdk_posture = postures["sdk"]
     agents_posture = postures["agents"]
     skills_posture = postures["skills"]
+    stats_posture = postures.get("stats")
     if source_posture["dirty"] and not allow_dirty_source:
         raise InstallError("abyss-stack source is dirty; pass --allow-dirty-source explicitly")
     if sdk_posture["dirty"] and not allow_dirty_sdk:
@@ -1539,16 +1718,26 @@ def prepare_release(
         raise InstallError(
             "aoa-skills source is dirty; pass --allow-dirty-skills explicitly"
         )
+    if isinstance(stats_posture, dict) and stats_posture["dirty"]:
+        raise InstallError("aoa-stats source must be clean for specialized environment packaging")
 
     manifest = release_manifest(files)
     release_root, created = materialize_release(files, manifest, runtime_root / "releases")
-    current_files = source_files(source_root, sdk_root, agents_root, skills_root)
+    current_files = source_files(
+        source_root,
+        sdk_root,
+        agents_root,
+        skills_root,
+        stats_root=stats_root,
+        validation_python_root=validation_python_root,
+    )
     current_postures = source_postures(
         current_files,
         source_root,
         sdk_root,
         agents_root,
         skills_root,
+        stats_root=stats_root,
     )
     if current_postures != postures:
         raise InstallError("source Git posture changed during installation")
@@ -1563,6 +1752,7 @@ def prepare_release(
         "sdk": sdk_posture,
         "agents": agents_posture,
         "skills": skills_posture,
+        "stats": stats_posture,
         "python_executable": python_executable,
         "python_identity": python_identity,
     }
@@ -1576,6 +1766,8 @@ def stage(
     runtime_root: Path,
     python_executable: Path,
     *,
+    stats_root: Path | None = None,
+    validation_python_root: Path | None = None,
     allow_dirty_source: bool,
     allow_dirty_sdk: bool,
     allow_dirty_agents: bool,
@@ -1589,6 +1781,8 @@ def stage(
         skills_root,
         runtime_root,
         python_executable,
+        stats_root=stats_root,
+        validation_python_root=validation_python_root,
         allow_dirty_source=allow_dirty_source,
         allow_dirty_sdk=allow_dirty_sdk,
         allow_dirty_agents=allow_dirty_agents,
@@ -1601,7 +1795,7 @@ def stage(
     now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     dirty = any(
         bool(prepared[name].get("dirty"))
-        for name in ("source", "sdk", "agents", "skills")
+        for name in ("source", "sdk", "agents", "skills", "stats")
         if isinstance(prepared[name], dict)
     )
     staged = {
@@ -1615,6 +1809,7 @@ def stage(
         "sdk": prepared["sdk"],
         "agents": prepared["agents"],
         "skills": prepared["skills"],
+        "stats": prepared["stats"],
         "staged_at": now,
         "nonproduction_dirty_source": dirty,
     }
@@ -1644,6 +1839,8 @@ def install(
     bin_dir: Path,
     python_executable: Path,
     *,
+    stats_root: Path | None = None,
+    validation_python_root: Path | None = None,
     allow_dirty_source: bool,
     allow_dirty_sdk: bool,
     allow_dirty_agents: bool,
@@ -1658,6 +1855,8 @@ def install(
         skills_root,
         runtime_root,
         python_executable,
+        stats_root=stats_root,
+        validation_python_root=validation_python_root,
         allow_dirty_source=allow_dirty_source,
         allow_dirty_sdk=allow_dirty_sdk,
         allow_dirty_agents=allow_dirty_agents,
@@ -1671,6 +1870,7 @@ def install(
     sdk_posture = prepared["sdk"]
     agents_posture = prepared["agents"]
     skills_posture = prepared["skills"]
+    stats_posture = prepared["stats"]
     created = bool(prepared["release_created"])
     if (
         not isinstance(manifest, dict)
@@ -1722,6 +1922,7 @@ def install(
         "sdk": sdk_posture,
         "agents": agents_posture,
         "skills": skills_posture,
+        "stats": stats_posture,
         "installed_at": now,
         "previous_release_id": previous_active.get("release_id") if previous_active else None,
         "nonproduction_dirty_source": bool(
@@ -1729,6 +1930,7 @@ def install(
             or sdk_posture["dirty"]
             or agents_posture["dirty"]
             or skills_posture["dirty"]
+            or (isinstance(stats_posture, dict) and stats_posture["dirty"])
         ),
     }
     atomic_write(
@@ -2034,6 +2236,7 @@ def activate(
         "sdk": staged.get("sdk") if staged else None,
         "agents": staged.get("agents") if staged else None,
         "skills": staged.get("skills") if staged else None,
+        "stats": staged.get("stats") if staged else None,
         "installed_at": now,
         "previous_release_id": previous.get("release_id") if previous else None,
         "nonproduction_dirty_source": (
@@ -2223,6 +2426,8 @@ def parser() -> argparse.ArgumentParser:
     install_parser.add_argument("--sdk-root", type=Path, required=True)
     install_parser.add_argument("--agents-root", type=Path, required=True)
     install_parser.add_argument("--skills-root", type=Path, required=True)
+    install_parser.add_argument("--stats-root", type=Path)
+    install_parser.add_argument("--validation-python-root", type=Path)
     install_parser.add_argument("--runtime-root", type=Path, default=DEFAULT_RUNTIME_ROOT)
     install_parser.add_argument("--bin-dir", type=Path, default=DEFAULT_BIN_DIR)
     install_parser.add_argument("--python", type=Path, default=Path(sys.executable))
@@ -2235,6 +2440,8 @@ def parser() -> argparse.ArgumentParser:
     stage_parser.add_argument("--sdk-root", type=Path, required=True)
     stage_parser.add_argument("--agents-root", type=Path, required=True)
     stage_parser.add_argument("--skills-root", type=Path, required=True)
+    stage_parser.add_argument("--stats-root", type=Path)
+    stage_parser.add_argument("--validation-python-root", type=Path)
     stage_parser.add_argument("--runtime-root", type=Path, default=DEFAULT_RUNTIME_ROOT)
     stage_parser.add_argument("--python", type=Path, default=Path(sys.executable))
     stage_parser.add_argument("--allow-dirty-source", action="store_true")
@@ -2271,6 +2478,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.runtime_root,
                 args.bin_dir,
                 args.python,
+                stats_root=args.stats_root,
+                validation_python_root=args.validation_python_root,
                 allow_dirty_source=args.allow_dirty_source,
                 allow_dirty_sdk=args.allow_dirty_sdk,
                 allow_dirty_agents=args.allow_dirty_agents,
@@ -2284,6 +2493,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.skills_root,
                 args.runtime_root,
                 args.python,
+                stats_root=args.stats_root,
+                validation_python_root=args.validation_python_root,
                 allow_dirty_source=args.allow_dirty_source,
                 allow_dirty_sdk=args.allow_dirty_sdk,
                 allow_dirty_agents=args.allow_dirty_agents,

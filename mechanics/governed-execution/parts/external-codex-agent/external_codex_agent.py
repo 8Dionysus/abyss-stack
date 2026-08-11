@@ -4266,6 +4266,94 @@ def _actor_codex_permission_profile(
     return "{filesystem={" + filesystem + "},network={enabled=false}}"
 
 
+def _specialized_environment(
+    _profile: Mapping[str, Any],
+    tool_entry: Mapping[str, Any],
+) -> tuple[dict[str, str], tuple[Path, ...]]:
+    """Resolve one profile-bound environment inside the verified runtime release."""
+
+    candidate = tool_entry.get("specialized_environment")
+    if candidate is None:
+        return {}, ()
+    if not isinstance(candidate, dict):
+        raise ExternalCodexRuntimeError(
+            "specialized_environment_unavailable",
+            "tool profile specialized environment is invalid",
+        )
+    release_value = os.environ.get("AOA_EXTERNAL_CODEX_VERIFIED_RELEASE_ROOT")
+    if not release_value:
+        raise ExternalCodexRuntimeError(
+            "specialized_environment_unavailable",
+            "specialized environment requires a verified runtime release",
+        )
+    release_root = Path(release_value)
+    try:
+        release_root = release_root.resolve(strict=True)
+    except OSError as exc:
+        raise ExternalCodexRuntimeError(
+            "specialized_environment_unavailable",
+            "verified runtime release root is unavailable",
+        ) from exc
+    if release_root.is_symlink() or not release_root.is_dir():
+        raise ExternalCodexRuntimeError(
+            "specialized_environment_unavailable",
+            "verified runtime release root is not a physical directory",
+        )
+
+    resolved_environment: dict[str, str] = {}
+    readable_paths: list[Path] = []
+
+    def resolve_directory(raw_relative: object, label: str) -> Path:
+        relative = Path(str(raw_relative or ""))
+        if relative.is_absolute() or ".." in relative.parts or not relative.parts:
+            raise ExternalCodexRuntimeError(
+                "specialized_environment_invalid",
+                f"{label} has an unsafe release-relative coordinate",
+            )
+        path = release_root / relative
+        try:
+            resolved = path.resolve(strict=True)
+            resolved.relative_to(release_root)
+        except (OSError, ValueError) as exc:
+            raise ExternalCodexRuntimeError(
+                "specialized_environment_unavailable",
+                f"{label} is unavailable inside the verified release",
+            ) from exc
+        if path.is_symlink() or resolved.is_symlink() or not resolved.is_dir():
+            raise ExternalCodexRuntimeError(
+                "specialized_environment_unavailable",
+                f"{label} is not one physical release directory",
+            )
+        return resolved
+
+    pythonpath = resolve_directory(candidate.get("pythonpath_ref"), "validation Python path")
+    resolved_environment["PYTHONPATH"] = str(pythonpath)
+    readable_paths.append(pythonpath)
+    for owner_root in candidate.get("owner_roots", []):
+        if not isinstance(owner_root, dict):
+            raise ExternalCodexRuntimeError(
+                "specialized_environment_invalid",
+                "specialized environment owner root is invalid",
+            )
+        variable = str(owner_root.get("environment_variable") or "")
+        if re.fullmatch(r"AOA_[A-Z0-9_]+_ROOT", variable) is None:
+            raise ExternalCodexRuntimeError(
+                "specialized_environment_invalid",
+                "specialized environment owner variable is invalid",
+            )
+        root = resolve_directory(owner_root.get("root_ref"), f"owner root {variable}")
+        resolved_environment[variable] = str(root)
+        readable_paths.append(root)
+    for key, value in candidate.get("environment_variables", {}).items():
+        if key not in {"PYTHONDONTWRITEBYTECODE", "PYTHONNOUSERSITE"} or value != "1":
+            raise ExternalCodexRuntimeError(
+                "specialized_environment_invalid",
+                "specialized environment contains an unsupported fixed variable",
+            )
+        resolved_environment[str(key)] = str(value)
+    return resolved_environment, tuple(readable_paths)
+
+
 def _git_head(
     workspace: Path,
     *,
@@ -7674,7 +7762,7 @@ class ExternalCodexRuntime:
         self,
         launch: Mapping[str, Any],
         scratch_root: Path,
-        _tool_entry: Mapping[str, Any],
+        tool_entry: Mapping[str, Any],
         *,
         repository_workspace: Path | None = None,
     ) -> dict[str, str]:
@@ -7719,6 +7807,12 @@ class ExternalCodexRuntime:
         environment.setdefault("LANG", "C.UTF-8")
         environment["TMPDIR"] = str(scratch_root)
         environment["NO_COLOR"] = "1"
+        if tool_entry.get("specialized_environment") is not None:
+            specialized_environment, _ = _specialized_environment(
+                self.profile,
+                tool_entry,
+            )
+            environment.update(specialized_environment)
         return environment
 
     def _materialized_payloads(
@@ -8877,6 +8971,10 @@ Runtime session identity: {state["session_id"]}
                 tool_entry
             )
             credential_proxies.extend(started_credential_proxies)
+            _, specialized_readable_paths = _specialized_environment(
+                self.profile,
+                tool_entry,
+            )
             codex_command = self._codex_command(
                 launch=launch,
                 realization=realization,
@@ -8894,6 +8992,7 @@ Runtime session identity: {state["session_id"]}
                         Path(str(item["path"]))
                         for item in state["materialized_task_inputs"]
                     ),
+                    *specialized_readable_paths,
                 ),
                 writable_paths=(attempt_dir, scratch),
                 denied_paths=(

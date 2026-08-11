@@ -63,6 +63,30 @@
     },
     {
       "profile_id": "abyss-stack:external_codex_agent/landing-readonly-v2",
+      "specialized_environment": {
+        "environment_id": "abyss-stack:external_codex_agent/landing-validation-v1",
+        "pythonpath_ref": "environments/landing-validation-v1/pythonpath",
+        "python_packages": [
+          {"distribution": "pytest", "version": "9.0.3", "paths": ["_pytest", "py.py", "pytest", "pytest-9.0.3.dist-info"]},
+          {"distribution": "pluggy", "version": "1.6.0", "paths": ["pluggy", "pluggy-1.6.0.dist-info"]},
+          {"distribution": "packaging", "version": "25.0", "paths": ["packaging", "packaging-25.0.dist-info"]},
+          {"distribution": "iniconfig", "version": "2.3.0", "paths": ["iniconfig", "iniconfig-2.3.0.dist-info"]},
+          {"distribution": "Pygments", "version": "2.20.0", "paths": ["pygments", "pygments-2.20.0.dist-info"]}
+        ],
+        "owner_roots": [
+          {
+            "owner_repo": "aoa-stats",
+            "source_ref": "ed89112045addb0345306d5a7bb022c6737d095f",
+            "root_ref": "owners/aoa-stats",
+            "environment_variable": "AOA_STATS_ROOT",
+            "access": "read_only"
+          }
+        ],
+        "environment_variables": {
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONNOUSERSITE": "1"
+        }
+      },
       "sandbox_mode": "read_only",
       "codex_sandbox": "workspace-write",
       "codex_execution_root": "attempt-local",
@@ -98,6 +122,30 @@
     },
     {
       "profile_id": "abyss-stack:external_codex_agent/landing-workspace-write-v2",
+      "specialized_environment": {
+        "environment_id": "abyss-stack:external_codex_agent/landing-validation-v1",
+        "pythonpath_ref": "environments/landing-validation-v1/pythonpath",
+        "python_packages": [
+          {"distribution": "pytest", "version": "9.0.3", "paths": ["_pytest", "py.py", "pytest", "pytest-9.0.3.dist-info"]},
+          {"distribution": "pluggy", "version": "1.6.0", "paths": ["pluggy", "pluggy-1.6.0.dist-info"]},
+          {"distribution": "packaging", "version": "25.0", "paths": ["packaging", "packaging-25.0.dist-info"]},
+          {"distribution": "iniconfig", "version": "2.3.0", "paths": ["iniconfig", "iniconfig-2.3.0.dist-info"]},
+          {"distribution": "Pygments", "version": "2.20.0", "paths": ["pygments", "pygments-2.20.0.dist-info"]}
+        ],
+        "owner_roots": [
+          {
+            "owner_repo": "aoa-stats",
+            "source_ref": "ed89112045addb0345306d5a7bb022c6737d095f",
+            "root_ref": "owners/aoa-stats",
+            "environment_variable": "AOA_STATS_ROOT",
+            "access": "read_only"
+          }
+        ],
+        "environment_variables": {
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONNOUSERSITE": "1"
+        }
+      },
       "sandbox_mode": "workspace_write",
       "codex_sandbox": "workspace-write",
       "codex_execution_root": "target-workspace",

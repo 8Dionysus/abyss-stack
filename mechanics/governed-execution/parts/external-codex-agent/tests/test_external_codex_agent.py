@@ -4432,9 +4432,54 @@ def test_runtime_tool_profile_ids_are_model_neutral() -> None:
     assert all("luna" not in item and "sol" not in item for item in profile_ids)
 
 
+def _enable_specialized_test_release(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> Path:
+    release = tmp_path / "verified-release"
+    (release / "environments/landing-validation-v1/pythonpath").mkdir(parents=True)
+    (release / "owners/aoa-stats").mkdir(parents=True)
+    monkeypatch.setenv("AOA_EXTERNAL_CODEX_VERIFIED_RELEASE_ROOT", str(release))
+    return release
+
+
+def test_landing_specialized_environment_is_release_bound(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    release = _enable_specialized_test_release(monkeypatch, tmp_path)
+    profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+    tool_entry = next(
+        item
+        for item in profile["tool_profiles"]
+        if item["profile_id"]
+        == "abyss-stack:external_codex_agent/landing-workspace-write-v2"
+    )
+
+    environment, readable = RUNTIME._specialized_environment(
+        profile,
+        tool_entry,
+    )
+
+    assert environment == {
+        "AOA_STATS_ROOT": str((release / "owners/aoa-stats").resolve()),
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONNOUSERSITE": "1",
+        "PYTHONPATH": str(
+            (release / "environments/landing-validation-v1/pythonpath").resolve()
+        ),
+    }
+    assert set(readable) == {
+        (release / "owners/aoa-stats").resolve(),
+        (release / "environments/landing-validation-v1/pythonpath").resolve(),
+    }
+
+
 def test_model_organ_landing_readonly_profile_admits_exact_runtime_binding(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _enable_specialized_test_release(monkeypatch, tmp_path)
     tool_profile_id = "abyss-stack:external_codex_agent/landing-readonly-v2"
     fixture = _fixture(tmp_path, tool_profile_id=tool_profile_id)
 
@@ -4460,7 +4505,10 @@ def test_model_organ_landing_readonly_profile_admits_exact_runtime_binding(
 def test_model_organ_workspace_write_profiles_admit_exact_runtime_binding(
     tmp_path: Path,
     tool_profile_id: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    if tool_profile_id.endswith("landing-workspace-write-v2"):
+        _enable_specialized_test_release(monkeypatch, tmp_path)
     fixture = _fixture(
         tmp_path,
         workspace_write=True,
@@ -4676,7 +4724,9 @@ def test_reviewer_preparation_uses_historical_coordinate_after_ancestor_retarget
 
 def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _enable_specialized_test_release(monkeypatch, tmp_path)
     fixture = _fixture(
         tmp_path / "writer",
         objective_marker="FAKE_WRITE_ALLOWED FAKE_ARTIFACT_PRODUCED",

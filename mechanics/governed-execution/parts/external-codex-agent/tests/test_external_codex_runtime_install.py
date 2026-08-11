@@ -221,6 +221,193 @@ def test_release_identity_covers_wrapper_bootstrap_material(
     assert changed["release_digest"] != baseline["release_digest"]
 
 
+def make_specialized_environment_sources(
+    tmp_path: Path,
+) -> tuple[Path, Path, Path, Path, Path, Path]:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    stats = tmp_path / "aoa-stats"
+    make_repo(stats)
+    (stats / "validator.py").write_text("OWNER = 'aoa-stats'\n", encoding="utf-8")
+    commit_all(stats)
+    stats_head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=stats,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    validation_python = tmp_path / "validation-pythonpath"
+    package = validation_python / "pytest"
+    metadata = validation_python / "pytest-1.0.dist-info"
+    package.mkdir(parents=True)
+    metadata.mkdir(parents=True)
+    (package / "__init__.py").write_text("VERSION = '1.0'\n", encoding="utf-8")
+    (metadata / "METADATA").write_text(
+        "Metadata-Version: 2.4\nName: pytest\nVersion: 1.0\n",
+        encoding="utf-8",
+    )
+
+    profile_path = (
+        source
+        / "mechanics/governed-execution/parts/external-codex-agent/runtime-profile.v1.json"
+    )
+    profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    profile["tool_profiles"] = [
+        {
+            "profile_id": "test/landing",
+            "specialized_environment": {
+                "environment_id": "test/landing-validation-v1",
+                "pythonpath_ref": "environments/landing-validation-v1/pythonpath",
+                "python_packages": [
+                    {
+                        "distribution": "pytest",
+                        "version": "1.0",
+                        "paths": ["pytest", "pytest-1.0.dist-info"],
+                    }
+                ],
+                "owner_roots": [
+                    {
+                        "owner_repo": "aoa-stats",
+                        "source_ref": stats_head,
+                        "root_ref": "owners/aoa-stats",
+                        "environment_variable": "AOA_STATS_ROOT",
+                        "access": "read_only",
+                    }
+                ],
+                "environment_variables": {
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                    "PYTHONNOUSERSITE": "1",
+                },
+            },
+        }
+    ]
+    profile_path.write_text(json.dumps(profile, sort_keys=True) + "\n", encoding="utf-8")
+    commit_all(source)
+    return source, sdk, agents, skills, stats, validation_python
+
+
+def stage_specialized_environment(
+    source: Path,
+    sdk: Path,
+    agents: Path,
+    skills: Path,
+    stats: Path,
+    validation_python: Path,
+    runtime_root: Path,
+) -> dict[str, object]:
+    return runtime_install.stage(
+        source,
+        sdk,
+        agents,
+        skills,
+        runtime_root,
+        Path(sys.executable),
+        stats_root=stats,
+        validation_python_root=validation_python,
+        allow_dirty_source=False,
+        allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
+    )
+
+
+def test_stage_packages_profile_bound_specialized_environment(tmp_path: Path) -> None:
+    source, sdk, agents, skills, stats, validation_python = (
+        make_specialized_environment_sources(tmp_path)
+    )
+    stats_head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=stats,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    result = stage_specialized_environment(
+        source,
+        sdk,
+        agents,
+        skills,
+        stats,
+        validation_python,
+        tmp_path / "runtime",
+    )
+
+    release = Path(result["staged"]["release_root"])
+    assert (release / "environments/landing-validation-v1/pythonpath/pytest/__init__.py").is_file()
+    assert (release / "owners/aoa-stats/validator.py").is_file()
+    assert result["staged"]["stats"]["head"] == stats_head
+    assert result["staged"]["nonproduction_dirty_source"] is False
+
+
+def test_stage_refuses_missing_specialized_environment_inputs(tmp_path: Path) -> None:
+    source, sdk, agents, skills, _, _ = make_specialized_environment_sources(tmp_path)
+
+    with pytest.raises(
+        runtime_install.InstallError,
+        match="requires --stats-root and --validation-python-root",
+    ):
+        runtime_install.stage(
+            source,
+            sdk,
+            agents,
+            skills,
+            tmp_path / "runtime",
+            Path(sys.executable),
+            allow_dirty_source=False,
+            allow_dirty_sdk=False,
+            allow_dirty_agents=False,
+            allow_dirty_skills=False,
+        )
+
+
+def test_stage_refuses_specialized_python_package_drift(tmp_path: Path) -> None:
+    source, sdk, agents, skills, stats, validation_python = (
+        make_specialized_environment_sources(tmp_path)
+    )
+    metadata = validation_python / "pytest-1.0.dist-info/METADATA"
+    metadata.write_text(
+        "Metadata-Version: 2.4\nName: pytest\nVersion: 2.0\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        runtime_install.InstallError,
+        match="Python package differs from profile pin",
+    ):
+        stage_specialized_environment(
+            source,
+            sdk,
+            agents,
+            skills,
+            stats,
+            validation_python,
+            tmp_path / "runtime",
+        )
+
+
+def test_stage_refuses_dirty_specialized_owner_snapshot(tmp_path: Path) -> None:
+    source, sdk, agents, skills, stats, validation_python = (
+        make_specialized_environment_sources(tmp_path)
+    )
+    (stats / "validator.py").write_text("OWNER = 'dirty'\n", encoding="utf-8")
+
+    with pytest.raises(
+        runtime_install.InstallError,
+        match="aoa-stats source must be clean",
+    ):
+        stage_specialized_environment(
+            source,
+            sdk,
+            agents,
+            skills,
+            stats,
+            validation_python,
+            tmp_path / "runtime",
+        )
+
+
 def write_artifact_gate(path: Path, payload: dict[str, object]) -> None:
     path.write_text(
         "#!/usr/bin/python3\n"
