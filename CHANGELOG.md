@@ -225,7 +225,12 @@ Tracking starts with the community-docs baseline for this repository.
   preparation forwards exact writer evidence into a distinct non-started
   session. Mutation paths, source-evidence paths, and the controller-owned
   post-exit manifest identity are separate. A session-local output schema pins
-  exact task/incarnation IDs, and one explicit prior-result-digest-bound route
+  exact task/incarnation IDs. Same-thread continuation evidence is now carried
+  as exact inline UTF-8 bytes with full provenance, prevalidated as one set,
+  preserved under controller authority, projected through an actor-safe
+  immutable envelope, and admitted into only the session-local evidence schema;
+  the runtime never follows an evidence path supplied by the actor or caller.
+  One explicit prior-result-digest-bound route
   can continue the same unchanged read-only reviewer thread after an identity
   typo while preserving the failed receipt. Every admitted resume now
   preserves its prior terminal receipt, and an interruption before Codex emits

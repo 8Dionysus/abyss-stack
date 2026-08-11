@@ -140,3 +140,11 @@ hardlink, and rename probes remain transport observations; descriptor binding,
 source manifests, and final pathname identity form the current race boundary.
 A new immutable closeout run and independent review remain required before
 comparison or fit work resumes.
+
+The first admitted real-work landing wake exposed a narrower A2A continuation
+gap: a same-thread instruction could name later evidence, but a read-only
+reviewer correctly refused to trust bytes absent from its immutable projection.
+The runtime therefore treats new continuation evidence as data, not prose or a
+new filesystem grant. Exact inline bytes and provenance become a stable
+actor-safe `immutable:` input while the previous result closure and all role,
+workspace, tool, effect, and publication boundaries remain unchanged.

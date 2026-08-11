@@ -105,6 +105,10 @@ partial-usage classification when interruption precedes Codex usage emission,
 immutable preservation of the interrupted receipt and its complete evidence
 closure across ordinary resume, including multiple terminal revisions within
 one recovered attempt,
+digest-bound continuation evidence materialization without arbitrary host-path
+reads, including controller-original and actor-safe copies, session-local
+`immutable:` schema expansion, prompt content withholding, all-entry
+prevalidation, and fail-closed digest mismatch before inference,
 workspace-write continuation from the exact preceding actor final tree while
 retaining the original baseline as the cumulative delta origin,
 runtime-owned actor projection as the Codex target/cwd for both read-only and

@@ -5893,8 +5893,7 @@ class ExternalCodexRuntime:
             obligation.get("schema_version") != "agent-obligation-v1"
             or obligation.get("obligation_id")
             != external["obligation_ref"]["object_id"]
-            or obligation.get("goal_ref", {}).get("object_id")
-            != task["parent_task_id"]
+            or obligation.get("goal_ref", {}).get("object_id") != task["parent_task_id"]
             or obligation.get("domain_owner") != task["target_owner"]
             or obligation.get("current_holder", {}).get("object_id")
             != transfer_holders[0]
@@ -5913,10 +5912,8 @@ class ExternalCodexRuntime:
             or mandate.get("role_binding", {}).get("role_id") != binding.role_id
             or mandate.get("obligation_ref") != external["obligation_ref"]
             or mandate.get("goal_ref") != obligation.get("goal_ref")
-            or mandate.get("role_resolution_ref")
-            != external["role_resolution_ref"]
-            or mandate.get("domain_procedure_refs")
-            != external["domain_procedure_refs"]
+            or mandate.get("role_resolution_ref") != external["role_resolution_ref"]
+            or mandate.get("domain_procedure_refs") != external["domain_procedure_refs"]
             or mandate.get("return_owner") != obligation.get("return_owner")
             or mandate.get("return_owner", {}).get("object_id")
             != owner_request["return_owner"]
@@ -6005,8 +6002,7 @@ class ExternalCodexRuntime:
             )
         projection_ref = external["model_fit_projection_ref"]
         if (
-            binding.model_fit_projection_ref.owner_repo
-            != projection_ref["owner_repo"]
+            binding.model_fit_projection_ref.owner_repo != projection_ref["owner_repo"]
             or binding.model_fit_projection_ref.artifact_ref
             != projection_ref["object_id"]
             or binding.model_fit_projection_ref.schema_version
@@ -6035,8 +6031,7 @@ class ExternalCodexRuntime:
             == binding.model_realization_ref.model_dump(mode="json")
         ]
         if (
-            model_fit_query.get("schema_version")
-            != "aoa_model_fit_query_result_v2"
+            model_fit_query.get("schema_version") != "aoa_model_fit_query_result_v2"
             or model_fit_query.get("query", {}).get("task_family") != fit_family
             or model_fit_query.get("candidate_count")
             != len(model_fit_query.get("candidates", []))
@@ -6091,11 +6086,9 @@ class ExternalCodexRuntime:
         expected_owner_summon["transport_preference"] = "external_cli"
         if (
             sdk_summon.get("transport_preference") not in {"a2a_remote", "either"}
-            or owner_request["quest_passport"]
-            != sdk_request.get("quest_passport")
+            or owner_request["quest_passport"] != sdk_request.get("quest_passport")
             or owner_request["summon_request"] != expected_owner_summon
-            or owner_request["expected_outputs"]
-            != sdk_request.get("expected_outputs")
+            or owner_request["expected_outputs"] != sdk_request.get("expected_outputs")
         ):
             raise ExternalCodexRuntimeError(
                 "owner_sdk_request_content_mismatch",
@@ -6777,9 +6770,7 @@ class ExternalCodexRuntime:
             or not isinstance(passport, dict)
             or not isinstance(expected_outputs, list)
             or not expected_outputs
-            or any(
-                not isinstance(item, str) or not item for item in expected_outputs
-            )
+            or any(not isinstance(item, str) or not item for item in expected_outputs)
             or len(set(expected_outputs)) != len(expected_outputs)
             or nested_request.get("expected_outputs") != expected_outputs
             or passport.get("expected_artifacts") != expected_outputs
@@ -6811,9 +6802,7 @@ class ExternalCodexRuntime:
             not isinstance(request_capabilities, list)
             or not request_capabilities
             or any(
-                not isinstance(item, str)
-                or not item
-                or item not in plan_capabilities
+                not isinstance(item, str) or not item or item not in plan_capabilities
                 for item in request_capabilities
             )
         ):
@@ -8073,8 +8062,7 @@ class ExternalCodexRuntime:
             or nested.get("parent_task_id") != task["parent_task_id"]
             or nested.get("session_ref") != state["session_id"]
             or nested.get("review_required") is not task["review_required"]
-            or nested.get("transport_preference")
-            not in allowed_transport_preferences
+            or nested.get("transport_preference") not in allowed_transport_preferences
             or nested.get("require_progression") is not False
             or nested.get("workspace_root") != state["workspace_path"]
             or request.get("reviewed_artifact_path")
@@ -8174,6 +8162,210 @@ class ExternalCodexRuntime:
             owner="abyss-stack",
         )
         return path
+
+    def _materialize_resume_evidence_locked(
+        self,
+        state: dict[str, Any],
+        resume: Mapping[str, Any],
+        *,
+        attempt_id: str,
+    ) -> tuple[dict[str, Any], ...]:
+        """Bind caller-supplied continuation bytes as immutable actor evidence."""
+
+        supplied = resume.get("evidence_inputs")
+        if supplied is None:
+            return ()
+        if not isinstance(supplied, list) or not supplied:
+            raise ExternalCodexRuntimeError(
+                "resume_evidence_invalid",
+                "resume evidence must be one non-empty schema-validated list",
+            )
+        actor_inputs = list(state["materialized_task_inputs"])
+        controller_inputs = list(
+            state.get("controller_materialized_task_inputs", actor_inputs)
+        )
+        actor_by_id = {str(item["input_id"]): item for item in actor_inputs}
+        controller_by_id = {str(item["input_id"]): item for item in controller_inputs}
+        if set(actor_by_id) != set(controller_by_id):
+            raise ExternalCodexRuntimeError(
+                "resume_evidence_state_invalid",
+                "actor and controller immutable input identities differ",
+            )
+        session_dir = self._session_dir(str(state["session_id"]))
+        inputs_dir = session_dir / "inputs"
+        alias_view = {
+            "launch": {"workspace_path": str(state["workspace_path"])},
+            "workspace": Path(str(state["workspace_path"])),
+            "workspace_manifest_baseline": state["workspace_manifest_baseline"],
+        }
+        aliases = _actor_source_aliases(alias_view)
+        source_roots = frozenset(
+            value
+            for value in (
+                str(state["workspace_path"]),
+                str(state["workspace_manifest_baseline"].get("workspace_path", "")),
+            )
+            if value
+        )
+        prepared: list[dict[str, Any]] = []
+        request_ids: set[str] = set()
+        new_input_count = 0
+        for item in supplied:
+            input_id = str(item["input_id"])
+            if input_id in request_ids:
+                raise ExternalCodexRuntimeError(
+                    "resume_evidence_duplicate",
+                    f"resume evidence input is duplicated: {input_id}",
+                )
+            request_ids.add(input_id)
+            raw = str(item["utf8_content"]).encode("utf-8")
+            provenance = dict(item["provenance"])
+            if sha256_bytes(raw) != provenance["artifact_digest"]:
+                raise ExternalCodexRuntimeError(
+                    "resume_evidence_digest_mismatch",
+                    f"resume evidence differs from its exact digest: {input_id}",
+                )
+            existing_actor = actor_by_id.get(input_id)
+            existing_controller = controller_by_id.get(input_id)
+            if existing_actor is not None or existing_controller is not None:
+                if existing_actor is None or existing_controller is None:
+                    raise ExternalCodexRuntimeError(
+                        "resume_evidence_state_invalid",
+                        f"resume evidence identity is only partly materialized: {input_id}",
+                    )
+                controller_path = Path(str(existing_controller["path"]))
+                if (
+                    existing_controller["provenance"] != provenance
+                    or controller_path.is_symlink()
+                    or not controller_path.is_file()
+                    or sha256_file(controller_path) != provenance["artifact_digest"]
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "resume_evidence_identity_conflict",
+                        f"resume evidence identity is already bound to other bytes: {input_id}",
+                    )
+                prepared.append({"existing_actor": existing_actor})
+                continue
+            new_input_count += 1
+            ordinal = len(actor_inputs) + new_input_count
+            controller_target = (
+                inputs_dir / "controller-immutable" / f"{ordinal:03d}.input"
+            )
+            actor_target = inputs_dir / "immutable" / f"{ordinal:03d}.input"
+            if controller_target.exists() or actor_target.exists():
+                raise ExternalCodexRuntimeError(
+                    "resume_evidence_target_occupied",
+                    "next immutable input coordinate is already occupied",
+                )
+            _, actor_raw = _actor_safe_input_envelope(
+                input_id=input_id,
+                raw=raw,
+                original_provenance=provenance,
+                aliases=aliases,
+                source_roots=source_roots,
+            )
+            prepared.append(
+                {
+                    "input_id": input_id,
+                    "raw": raw,
+                    "provenance": provenance,
+                    "controller_target": controller_target,
+                    "actor_target": actor_target,
+                    "actor_raw": actor_raw,
+                }
+            )
+        materialized: list[dict[str, Any]] = []
+        for candidate in prepared:
+            existing_actor = candidate.get("existing_actor")
+            if isinstance(existing_actor, dict):
+                materialized.append(existing_actor)
+                continue
+            input_id = str(candidate["input_id"])
+            raw = bytes(candidate["raw"])
+            provenance = dict(candidate["provenance"])
+            controller_target = Path(candidate["controller_target"])
+            actor_target = Path(candidate["actor_target"])
+            actor_raw = bytes(candidate["actor_raw"])
+            _atomic_write_bytes(controller_target, raw, mode=0o400)
+            _atomic_write_bytes(actor_target, actor_raw, mode=0o400)
+            controller_item = {
+                "input_id": input_id,
+                "path": str(controller_target),
+                "provenance": provenance,
+            }
+            actor_item = {
+                "input_id": input_id,
+                "path": str(actor_target),
+                "provenance": {
+                    "owner_repo": "abyss-stack",
+                    "artifact_ref": str(actor_target),
+                    "source_ref": (
+                        "actor-safe-derivative-of:" + str(provenance["artifact_digest"])
+                    ),
+                    "artifact_digest": sha256_bytes(actor_raw),
+                    "schema_ref": (
+                        "schemas/external-codex-actor-input-envelope.schema.json"
+                    ),
+                    "schema_version": (
+                        "abyss_stack_external_codex_actor_input_envelope_v1"
+                    ),
+                },
+            }
+            controller_inputs.append(controller_item)
+            actor_inputs.append(actor_item)
+            controller_by_id[input_id] = controller_item
+            actor_by_id[input_id] = actor_item
+            materialized.append(actor_item)
+        state["controller_materialized_task_inputs"] = controller_inputs
+        state["materialized_task_inputs"] = actor_inputs
+        canonical = load_json(
+            Path(str(state["materialized_inputs"]["result_schema"])),
+            label="materialized canonical result schema",
+        )
+        specialized = specialize_report_schema(
+            canonical,
+            task_id=str(state["task_id"]),
+            incarnation_id=str(state["incarnation_id"]),
+            immutable_input_ids=tuple(str(item["input_id"]) for item in actor_inputs),
+        )
+        schema_path = inputs_dir / "execution-result-schema.json"
+        _atomic_write_json(schema_path, specialized, mode=0o400)
+        state["execution_result_schema_ref"] = _artifact_ref(
+            schema_path,
+            owner="abyss-stack",
+        )
+        self._append_event(
+            state,
+            event_type="external_agent.resume_evidence_materialized",
+            payload={
+                "evidence_inputs": [
+                    {
+                        "input_id": str(item["input_id"]),
+                        "source_artifact_digest": str(
+                            controller_by_id[str(item["input_id"])]["provenance"][
+                                "artifact_digest"
+                            ]
+                        ),
+                        "actor_input_ref": {
+                            "artifact_digest": str(
+                                actor_by_id[str(item["input_id"])]["provenance"][
+                                    "artifact_digest"
+                                ]
+                            ),
+                            "artifact_ref": str(
+                                actor_by_id[str(item["input_id"])]["path"]
+                            ),
+                        },
+                    }
+                    for item in supplied
+                ],
+                "resume_reason": str(resume["reason"]),
+            },
+            attempt_id=attempt_id,
+            thread_id=str(state["thread_id"]),
+            significance="review",
+        )
+        return tuple(materialized)
 
     def _preserved_result_refs(self, state: Mapping[str, Any]) -> list[dict[str, Any]]:
         """Return exact prior terminal results retained across explicit resume."""
@@ -8512,8 +8704,26 @@ class ExternalCodexRuntime:
         prompt_validation_commands = [
             project_source_paths(item) for item in task["validation_commands"]
         ]
+        resume_prompt_payload = (
+            json.loads(json.dumps(resume_payload))
+            if resume_payload is not None
+            else None
+        )
+        if isinstance(resume_prompt_payload, dict) and isinstance(
+            resume_prompt_payload.get("evidence_inputs"), list
+        ):
+            resume_prompt_payload["evidence_inputs"] = [
+                {
+                    "input_id": str(item["input_id"]),
+                    "provenance": item["provenance"],
+                    "materialized_as": f"immutable:{item['input_id']}",
+                }
+                for item in resume_prompt_payload["evidence_inputs"]
+            ]
         projected_resume_payload = (
-            project_source_paths(resume_payload) if resume_payload is not None else None
+            project_source_paths(resume_prompt_payload)
+            if resume_prompt_payload is not None
+            else None
         )
         for control_view in (
             role_text,
@@ -9008,9 +9218,11 @@ Runtime session identity: {state["session_id"]}
                 tool_entry
             )
             credential_proxies.extend(started_credential_proxies)
-            specialized_environment, specialized_readable_paths = _specialized_environment(
-                self.profile,
-                tool_entry,
+            specialized_environment, specialized_readable_paths = (
+                _specialized_environment(
+                    self.profile,
+                    tool_entry,
+                )
             )
             codex_command = self._codex_command(
                 launch=launch,
@@ -10020,10 +10232,10 @@ Runtime session identity: {state["session_id"]}
         for item in commands:
             command = str(item.get("command") or "")
             detected.update(_command_effects(command) & RUNTIME_WIDE_FORBIDDEN_EFFECTS)
-            if item.get(
-                "validation_command_id"
-            ) is None and not allow_sandboxed_indirection and (
-                _command_has_unclassified_indirection(command)
+            if (
+                item.get("validation_command_id") is None
+                and not allow_sandboxed_indirection
+                and (_command_has_unclassified_indirection(command))
             ):
                 detected.add("unclassified_indirect_effect")
         return sorted(detected)
@@ -11153,7 +11365,9 @@ Runtime session identity: {state["session_id"]}
                 failed_writer_report_followup = (
                     failed_writer_report_candidate
                     and previous_result.get("source_manifest_match") is True
-                    and isinstance(previous_result.get("actor_final_manifest_ref"), dict)
+                    and isinstance(
+                        previous_result.get("actor_final_manifest_ref"), dict
+                    )
                     and isinstance(previous_result.get("actor_delta_ref"), dict)
                     and isinstance(changed_paths, list)
                     and isinstance(allowed_paths, list)
@@ -11181,9 +11395,7 @@ Runtime session identity: {state["session_id"]}
                         "failed session has no authority-safe same-role recovery route",
                     )
                 expected_reason = (
-                    "review_followup"
-                    if failed_review_followup
-                    else "bounded_repair"
+                    "review_followup" if failed_review_followup else "bounded_repair"
                 )
                 if (
                     resume.get("reason") != expected_reason
@@ -11285,6 +11497,11 @@ Runtime session identity: {state["session_id"]}
                     thread_id=str(state["thread_id"]),
                     significance="review",
                 )
+            self._materialize_resume_evidence_locked(
+                state,
+                resume,
+                attempt_id=str(prior_attempt["attempt_id"]),
+            )
             state["finished_at"] = None
             state["result_path"] = None
             state["result_digest"] = None
@@ -11769,8 +11986,7 @@ Runtime session identity: {state["session_id"]}
                     )
                     and (
                         compatibility_schema_ref is None
-                        or compatibility_schema_ref.source_ref
-                        != writer_result_digest
+                        or compatibility_schema_ref.source_ref != writer_result_digest
                     )
                 )
                 or reviewer_task["parent_task_id"] != writer["task_id"]
@@ -11891,8 +12107,7 @@ Runtime session identity: {state["session_id"]}
                     if (
                         current_compatibility_schema[1]
                         != current_writer_schema_material[1]
-                        or current_compatibility_schema[2].owner_repo
-                        != "abyss-stack"
+                        or current_compatibility_schema[2].owner_repo != "abyss-stack"
                         or current_compatibility_schema[2].source_ref
                         != writer_result_digest
                         or current_compatibility_schema[2].schema_ref

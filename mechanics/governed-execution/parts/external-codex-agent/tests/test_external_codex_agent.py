@@ -83,8 +83,7 @@ OWNER_EXECUTION_REQUEST_SCHEMA_PATH = (
     AGENTS_ROOT / "skills/aoa-summon/references/summon-request-v4.schema.json"
 )
 OWNER_EXECUTION_REQUEST_COMPILER_PATH = (
-    AGENTS_ROOT
-    / "skills/aoa-summon/scripts/compile_external_execution_request.py"
+    AGENTS_ROOT / "skills/aoa-summon/scripts/compile_external_execution_request.py"
 )
 TASK_LOCAL_DAG_SCHEMA_PATH = SKILLS_ROOT / "schemas/task_local_dag_v2.schema.json"
 CONTROLLER_PATH = PART_ROOT / "external_codex_agent.py"
@@ -1011,7 +1010,9 @@ def _fixture(
     omit_historical_reviewer_inputs: bool = False,
 ) -> dict[str, Any]:
     if owner_binding_v1 and not owner_contour:
-        raise AssertionError("owner_binding_v1 is only meaningful for owner-contour tests")
+        raise AssertionError(
+            "owner_binding_v1 is only meaningful for owner-contour tests"
+        )
     if omit_historical_reviewer_inputs and not owner_contour:
         raise AssertionError(
             "historical reviewer-input omission is only meaningful for owner contour"
@@ -1211,9 +1212,7 @@ def _fixture(
             "next_route": "form_actor",
             "obligation_digest": ZERO_DIGEST,
         }
-        obligation["obligation_digest"] = _self_digest(
-            obligation, "obligation_digest"
-        )
+        obligation["obligation_digest"] = _self_digest(obligation, "obligation_digest")
         _write_json(obligation_path, obligation)
         obligation_ref = _provenance(
             "aoa-agents",
@@ -1476,8 +1475,7 @@ def _fixture(
     summon_outputs = (
         ["external_codex_agent_result", "landing_report"]
         if owner_contour
-        else
-        ["independent_landing_review"]
+        else ["independent_landing_review"]
         if task_family == "landing_review"
         else ["external_codex_agent_result", "independent_landing_review"]
     )
@@ -1514,9 +1512,7 @@ def _fixture(
             audit_refs=["fixture:a2a-summon-return"],
             playbook_ref="fixture:a2a-summon-return",
             review_required=review_required,
-            transport_preference=(
-                "a2a_remote" if owner_contour else "codex_local"
-            ),
+            transport_preference=("a2a_remote" if owner_contour else "codex_local"),
             require_progression=False,
             workspace_root=str(workspace),
         ),
@@ -1638,9 +1634,7 @@ def _fixture(
             "projection_ref": model_fit_projection_ref.artifact_ref,
             "realization_provenance": model_ref.model_dump(mode="json"),
             "projection_provenance": model_fit_projection_ref.model_dump(mode="json"),
-            "fit_evidence_refs": [
-                model_fit_projection_ref.model_dump(mode="json")
-            ],
+            "fit_evidence_refs": [model_fit_projection_ref.model_dump(mode="json")],
             "model_slug": "gpt-5.6-luna",
             "reasoning_effort": "max",
             "sandbox_mode": fit_query["sandbox_mode"],
@@ -1946,7 +1940,8 @@ def _fixture(
             network_access="disabled",
         ),
         "tool_profile": IncarnationToolProfile(
-            profile_id=tool_profile_id or (
+            profile_id=tool_profile_id
+            or (
                 {
                     "aoa_evals": "abyss-stack:external_codex_agent/eval-reader-v1",
                     "aoa_stats": "abyss-stack:external_codex_agent/stats-reader-v1",
@@ -2116,32 +2111,28 @@ def _fixture(
         assert model_fit_query_ref is not None
         assert model_fit_projection_ref is not None
         assert SUMMON_COMPILER is not None
-        owner_execution_request = (
-            SUMMON_COMPILER.compile_external_execution_request(
-                request_ref=(
-                    f"task://fixture/{identity_suffix}/owner-execution-request"
-                ),
-                runtime_interface="abyss_stack_external_codex_agent_v1",
-                return_event_object_id=(
-                    "mechanics/governed-execution/parts/external-codex-agent/"
-                    "schemas/external-codex-event.schema.json"
-                ),
-                obligation_path=obligation_path,
-                mandate_path=role_path,
-                role_resolution_path=role_resolution_path,
-                model_fit_query_result_path=model_fit_query_path,
-                model_fit_projection_path=model_fit_projection_path,
-                task_local_dag_path=dag_path,
-                incarnation_binding_path=owner_request_binding_path,
-                sdk_summon_request_path=summon_request_path,
-                sdk_summon_decision_path=summon_decision_path,
-                run_plan_path=plan_path,
-                runtime_launch_path=launch_path,
-                runtime_task_path=task_path,
-                responsibility_transfer_path=transfer_path,
-                domain_procedure_paths=[procedure_path],
-                return_event_schema_path=RUNTIME.EVENT_SCHEMA_PATH,
-            )
+        owner_execution_request = SUMMON_COMPILER.compile_external_execution_request(
+            request_ref=(f"task://fixture/{identity_suffix}/owner-execution-request"),
+            runtime_interface="abyss_stack_external_codex_agent_v1",
+            return_event_object_id=(
+                "mechanics/governed-execution/parts/external-codex-agent/"
+                "schemas/external-codex-event.schema.json"
+            ),
+            obligation_path=obligation_path,
+            mandate_path=role_path,
+            role_resolution_path=role_resolution_path,
+            model_fit_query_result_path=model_fit_query_path,
+            model_fit_projection_path=model_fit_projection_path,
+            task_local_dag_path=dag_path,
+            incarnation_binding_path=owner_request_binding_path,
+            sdk_summon_request_path=summon_request_path,
+            sdk_summon_decision_path=summon_decision_path,
+            run_plan_path=plan_path,
+            runtime_launch_path=launch_path,
+            runtime_task_path=task_path,
+            responsibility_transfer_path=transfer_path,
+            domain_procedure_paths=[procedure_path],
+            return_event_schema_path=RUNTIME.EVENT_SCHEMA_PATH,
         )
         owner_execution_request_path = tmp_path / "owner-execution-request.json"
         _write_json(owner_execution_request_path, owner_execution_request)
@@ -2247,9 +2238,7 @@ def test_actor_manifest_does_not_retry_other_directory_enumeration_error(
 
     def fake_manifest(*args: Any, **kwargs: Any) -> dict[str, Any]:
         calls.append(1)
-        raise RUNTIME.ProjectionError(
-            "actor projection cannot enumerate its tree"
-        )
+        raise RUNTIME.ProjectionError("actor projection cannot enumerate its tree")
 
     monkeypatch.setattr(RUNTIME, "build_actor_manifest_from_descriptor", fake_manifest)
     monkeypatch.setattr(RUNTIME.time, "sleep", sleeps.append)
@@ -4469,7 +4458,11 @@ def test_landing_specialized_environment_is_release_bound(
         "PYTEST_ADDOPTS": "-p no:cacheprovider",
         "PYTHONPATH": os.pathsep.join(
             (
-                str((release / "environments/landing-validation-v1/pythonpath").resolve()),
+                str(
+                    (
+                        release / "environments/landing-validation-v1/pythonpath"
+                    ).resolve()
+                ),
                 str((release / "sdk/src").resolve()),
             )
         ),
@@ -4835,9 +4828,10 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
     assert reviewer_launch["runtime_profile"] == PREPARER._artifact_coordinate(
         PREPARER.PROFILE_PATH
     )
-    assert reviewer_binding["runtime_profile_ref"] == reviewer_plan[
-        "runtime_profile"
-    ]["provenance"]
+    assert (
+        reviewer_binding["runtime_profile_ref"]
+        == reviewer_plan["runtime_profile"]["provenance"]
+    )
     assert reviewer_launch["model_realization"]["path"] == str(
         fixture["reviewer_realization_path"]
     )
@@ -6180,9 +6174,10 @@ def test_sandbox_confined_policy_admits_local_indirection_only_under_exact_postu
     )
     commands = [{"command": command, "status": "completed", "exit_code": 0}]
 
-    assert RUNTIME.ExternalCodexRuntime._forbidden_effects(
-        None, commands, task, binding
-    ) == []
+    assert (
+        RUNTIME.ExternalCodexRuntime._forbidden_effects(None, commands, task, binding)
+        == []
+    )
     assert RUNTIME.ExternalCodexRuntime._forbidden_effects(
         None, commands, {**task, "indirect_command_policy": "fail_closed"}, binding
     ) == ["unclassified_indirect_effect"]
@@ -6204,8 +6199,8 @@ def test_prepared_read_only_reviewer_admits_real_composite_command_shape_only_un
     None
 ):
     command = (
-        "/usr/bin/zsh -lc \"base=/srv/actor-inputs; "
-        "for id in 001 002; do /usr/bin/wc -l < \\\"$base/$id.input\\\"; done\""
+        '/usr/bin/zsh -lc "base=/srv/actor-inputs; '
+        'for id in 001 002; do /usr/bin/wc -l < \\"$base/$id.input\\"; done"'
     )
     task = {
         "allowed_effect_class": "read_only",
@@ -6235,9 +6230,12 @@ def test_prepared_read_only_reviewer_admits_real_composite_command_shape_only_un
     commands = [{"command": command, "status": "completed", "exit_code": 0}]
 
     assert RUNTIME._command_has_unclassified_indirection(command) is True
-    assert RUNTIME.ExternalCodexRuntime._forbidden_effects(
-        None, commands, task, exact_binding
-    ) == []
+    assert (
+        RUNTIME.ExternalCodexRuntime._forbidden_effects(
+            None, commands, task, exact_binding
+        )
+        == []
+    )
     assert RUNTIME.ExternalCodexRuntime._forbidden_effects(
         None, commands, task, widened_binding
     ) == ["unclassified_indirect_effect"]
@@ -8334,9 +8332,10 @@ def test_terminal_validation_suite_may_settle_on_final_workspace_bytes(
         for item in result["executed_commands"]
         if item.get("validation_command_id") is not None
     ]
-    assert [
-        item["validation_command_id"] for item in validation_executions
-    ] == ["git-status-short", "git-status-no-untracked"]
+    assert [item["validation_command_id"] for item in validation_executions] == [
+        "git-status-short",
+        "git-status-no-untracked",
+    ]
     assert (
         validation_executions[0]["workspace_manifest_digest"]
         != validation_executions[1]["workspace_manifest_digest"]
@@ -8560,6 +8559,176 @@ def test_workspace_write_resume_continues_from_exact_prior_actor_tree(
     assert first_delta_ref in preserved_sources
 
 
+def test_resume_materializes_digest_bound_continuation_evidence(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker="FAKE_WRITE_ALLOWED FAKE_ARTIFACT_PRODUCED",
+        role_id="coder",
+        task_family="landing_preparation",
+        workspace_write=True,
+        exact_baseline=True,
+        review_required=True,
+        identity_suffix="resume-evidence",
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    first_terminal = _wait_terminal(runtime, fixture["session_id"])
+    result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    evidence_raw = (
+        "transport audit returned; publication repeat remains held\n"
+        f"owner-source={fixture['workspace']}\n"
+    ).encode("utf-8")
+    evidence_digest = RUNTIME.sha256_bytes(evidence_raw)
+    resume = {
+        "schema_version": "abyss_stack_external_codex_resume_v1",
+        "session_id": fixture["session_id"],
+        "thread_id": first_terminal["thread_id"],
+        "after_event_sequence": first_terminal["last_event_sequence"],
+        "reason": "review_followup",
+        "instruction": "Review the exact continuation evidence before returning.",
+        "previous_result_digest": _digest_path(result_path),
+        "evidence_inputs": [
+            {
+                "input_id": "transport-audit-handoff",
+                "utf8_content": evidence_raw.decode("utf-8"),
+                "provenance": {
+                    "owner_repo": "codex-goal",
+                    "artifact_ref": "task-local:transport-audit-handoff",
+                    "source_ref": "goal:transport-audit-handoff",
+                    "artifact_digest": evidence_digest,
+                    "schema_ref": "task-local/transport-audit-handoff-v1",
+                    "schema_version": "task-local-transport-audit-handoff-v1",
+                },
+            }
+        ],
+    }
+    resume_path = tmp_path / "resume-evidence.json"
+    _write_json(resume_path, resume)
+
+    assert runtime.resume(fixture["session_id"], resume_path)["status"] == "running"
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    state = runtime._load_state(fixture["session_id"])
+
+    assert terminal["status"] == "review_required"
+    actor_input = next(
+        item
+        for item in state["materialized_task_inputs"]
+        if item["input_id"] == "transport-audit-handoff"
+    )
+    controller_input = next(
+        item
+        for item in state["controller_materialized_task_inputs"]
+        if item["input_id"] == "transport-audit-handoff"
+    )
+    assert Path(controller_input["path"]).read_bytes() == evidence_raw
+    envelope = json.loads(Path(actor_input["path"]).read_text(encoding="utf-8"))
+    assert envelope["input_id"] == "transport-audit-handoff"
+    assert envelope["payload"] == (
+        "transport audit returned; publication repeat remains held\n"
+        f"owner-source={ACTOR_EXECUTION_ROOT}\n"
+    )
+    assert envelope["source_artifact_digest"] == evidence_digest
+    assert str(fixture["workspace"]) not in Path(actor_input["path"]).read_text(
+        encoding="utf-8"
+    )
+    prompt = (
+        runtime._session_dir(fixture["session_id"]) / "attempts/002/prompt.txt"
+    ).read_text(encoding="utf-8")
+    assert '"materialized_as": "immutable:transport-audit-handoff"' in prompt
+    assert "utf8_content" not in prompt
+    execution_schema = Path(
+        state["execution_result_schema_ref"]["artifact_ref"]
+    ).read_text(encoding="utf-8")
+    assert "transport\\\\-audit\\\\-handoff" in execution_schema
+    events = runtime.events(fixture["session_id"], after_sequence=-1)
+    materialized_event = next(
+        event
+        for event in events
+        if event["event_type"] == "external_agent.resume_evidence_materialized"
+    )
+    assert materialized_event["payload"]["evidence_inputs"][0]["input_id"] == (
+        "transport-audit-handoff"
+    )
+    assert (
+        materialized_event["payload"]["evidence_inputs"][0]["source_artifact_digest"]
+        == evidence_digest
+    )
+
+
+def test_resume_rejects_continuation_evidence_digest_mismatch(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker="FAKE_WRITE_ALLOWED FAKE_ARTIFACT_PRODUCED",
+        role_id="coder",
+        task_family="landing_preparation",
+        workspace_write=True,
+        exact_baseline=True,
+        review_required=True,
+        identity_suffix="resume-evidence-digest-mismatch",
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    first_terminal = _wait_terminal(runtime, fixture["session_id"])
+    result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    prior_result_digest = _digest_path(result_path)
+    resume_path = tmp_path / "resume-evidence-digest-mismatch.json"
+    _write_json(
+        resume_path,
+        {
+            "schema_version": "abyss_stack_external_codex_resume_v1",
+            "session_id": fixture["session_id"],
+            "thread_id": first_terminal["thread_id"],
+            "after_event_sequence": first_terminal["last_event_sequence"],
+            "reason": "review_followup",
+            "instruction": "This evidence must fail closed before inference.",
+            "previous_result_digest": prior_result_digest,
+            "evidence_inputs": [
+                {
+                    "input_id": "valid-before-invalid",
+                    "utf8_content": "valid bytes\n",
+                    "provenance": {
+                        "owner_repo": "codex-goal",
+                        "artifact_ref": "task-local:valid-before-invalid",
+                        "source_ref": "goal:valid-before-invalid",
+                        "artifact_digest": RUNTIME.sha256_bytes(b"valid bytes\n"),
+                        "schema_ref": "task-local/continuation-evidence-v1",
+                        "schema_version": "task-local-continuation-evidence-v1",
+                    },
+                },
+                {
+                    "input_id": "transport-audit-handoff",
+                    "utf8_content": "different bytes\n",
+                    "provenance": {
+                        "owner_repo": "codex-goal",
+                        "artifact_ref": "task-local:transport-audit-handoff",
+                        "source_ref": "goal:transport-audit-handoff",
+                        "artifact_digest": "sha256:" + "0" * 64,
+                        "schema_ref": "task-local/transport-audit-handoff-v1",
+                        "schema_version": "task-local-transport-audit-handoff-v1",
+                    },
+                },
+            ],
+        },
+    )
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.resume(fixture["session_id"], resume_path)
+
+    assert exc_info.value.code == "resume_evidence_digest_mismatch"
+    state = runtime._load_state(fixture["session_id"])
+    assert state["status"] == "review_required"
+    assert len(state["attempts"]) == 1
+    assert _digest_path(result_path) == prior_result_digest
+    assert all(
+        item["input_id"] not in {"valid-before-invalid", "transport-audit-handoff"}
+        for item in state["materialized_task_inputs"]
+    )
+
+
 def test_parent_can_resume_exact_authority_blocked_continuation(
     tmp_path: Path,
 ) -> None:
@@ -8741,7 +8910,9 @@ def test_failed_writer_report_can_resume_exact_thread_without_widening_authority
 
     assert failed["status"] == "failed"
     assert first_result is not None
-    assert first_result["failure_code"] == "model_report_runtime_evidence_anchor_invalid"
+    assert (
+        first_result["failure_code"] == "model_report_runtime_evidence_anchor_invalid"
+    )
     assert first_result["source_manifest_match"] is True
     assert first_result["changed_paths"] == [
         {"path": "landing-note.md", "status": "created"}
@@ -8784,16 +8955,13 @@ def test_failed_writer_report_can_resume_exact_thread_without_widening_authority
     assert result["attempt_count"] == 2
     assert result["failure_code"] is None
     assert result["source_manifest_match"] is True
-    assert result["changed_paths"] == [
-        {"path": "landing-note.md", "status": "created"}
-    ]
+    assert result["changed_paths"] == [{"path": "landing-note.md", "status": "created"}]
     preserved_path = (
         runtime._session_dir(fixture["session_id"]) / "attempts/001/runtime-result.json"
     )
     assert _digest_path(preserved_path) == first_result_digest
     assert any(
-        event["event_type"]
-        == "external_agent.failed_writer_report_resume_admitted"
+        event["event_type"] == "external_agent.failed_writer_report_resume_admitted"
         for event in runtime.events(fixture["session_id"], after_sequence=-1)
     )
 

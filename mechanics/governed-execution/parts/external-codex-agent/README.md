@@ -127,7 +127,12 @@ The controller:
   observed change inside the original allowed paths; it retains the original
   role and authority envelope. Every route preserves each prior terminal result plus
   a digest-bound snapshot closure for all referenced evidence in its attempt
-  directory before any admitted continuation;
+  directory before any admitted continuation. A continuation can add exact
+  inline UTF-8 evidence with a stable ID and provenance digest: the controller
+  reads no arbitrary host path, validates all entries before writing, preserves
+  controller bytes, gives the actor only a sanitized immutable envelope, and
+  expands only the session-local evidence schema. It does not widen role,
+  workspace, tools, effects, or external authority;
 - emits result v2 with mandatory actor/source provenance for successful returns,
   while continuing to read legacy result v1 and durable state v1/v2 for status and
   terminal-result recovery, while refusing a new inference attempt unless a

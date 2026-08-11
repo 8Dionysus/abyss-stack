@@ -654,6 +654,19 @@ caller may bind `previous_result_digest` on any resume; when supplied it must
 match exactly. This prevents a continued result from erasing the checkpoint,
 interruption, or review receipt that justified re-entry.
 
+A resume may also carry `evidence_inputs`. Each entry supplies a stable input
+ID, exact UTF-8 content, and full provenance whose artifact digest must match
+those bytes before inference. The controller does not follow a caller-supplied
+host path. It retains the original bytes below `controller-immutable`, emits a
+source-coordinate-sanitized actor envelope below `immutable`, expands only the
+session-local report schema with that stable `immutable:<input-id>` identity,
+and records the materialization in the append-only event stream. All entries
+are validated and assigned unoccupied coordinates before any bytes are
+written; a duplicate, conflicting identity, digest mismatch, or occupied
+coordinate fails closed without starting a new attempt. Existing task,
+continuation, role, model, workspace, effect, and external authority remain
+unchanged. The previous terminal result and evidence closure remain immutable.
+
 A failed session is not generally resumable. Two explicit same-thread report
 recovery routes exist; neither retries automatically. A `review_followup` may
 continue a read-only `independent_review` incarnation rejected only as
