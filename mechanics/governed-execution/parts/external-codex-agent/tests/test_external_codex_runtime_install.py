@@ -56,7 +56,10 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         encoding="utf-8",
     )
     (part / "bind_external_actor_launch.py").write_text(
-        "import aoa_sdk\nprint('bind:' + aoa_sdk.MARKER)\n",
+        "import aoa_sdk\n"
+        "with open('/dev/null', 'rb+') as null:\n"
+        "    assert null.write(b'') == 0\n"
+        "print('bind:' + aoa_sdk.MARKER)\n",
         encoding="utf-8",
     )
     (part / "prepare_landing_study.py").write_text(

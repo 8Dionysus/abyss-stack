@@ -1152,6 +1152,8 @@ bwrap_arguments = [
     "--bind",
     "/",
     "/",
+    "--dev",
+    "/dev",
     "--tmpfs",
     str(snapshot_parent),
     "--dir",
