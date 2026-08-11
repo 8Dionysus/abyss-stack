@@ -347,6 +347,23 @@ preparation now binds the policy explicitly in the new reviewer task while
 known forbidden command families and abnormal worker-death closeout remain
 fail-closed; a fresh independent reviewer is still required.
 
+That fresh Luna xhigh reviewer completed on the first attempt as
+`review_required/return_for_repair`, changed no actor-workspace path, matched
+its final manifest, and crossed no authority boundary. It counted 2,814,132
+input tokens, 2,636,032 cached input tokens, and 24,208 output tokens under
+observe-only ChatGPT quota metering. Its blocking findings identified a writer
+report contradiction about produced actor-output files and validation evidence
+that did not support the stated command failures. A2A export then exposed a
+second integration defect: the historical writer plan and derived reviewer
+plan carried no capability refs even though closeout requires plan-bound,
+non-empty SDK summon capabilities. The preserved reviewer result is therefore
+valid return-for-repair evidence, but the v8 pair cannot be exported as a
+reviewed child result. Preflight now rejects that mismatch before inference;
+review preparation binds the exact owner-authored route-drift review capability,
+and runtime final-manifest symbols require exact JSON members rather than
+substring matches. A fresh capability-bound writer/reviewer pair remains
+required; no historical receipt is rewritten.
+
 ## Source surfaces
 
 The first live ambiguity-stop L2 study tested the parent lifecycle itself. Its

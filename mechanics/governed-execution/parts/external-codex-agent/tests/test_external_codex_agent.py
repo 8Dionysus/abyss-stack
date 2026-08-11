@@ -819,6 +819,10 @@ if "FAKE_VALID_RUNTIME_FINAL_MANIFEST_EVIDENCE" in task["objective"]:
     report["transition"]["evidence_refs"] = [
         "runtime:workspace-final-manifest#content_entries"
     ]
+if "FAKE_PARTIAL_RUNTIME_FINAL_MANIFEST_ANCHOR" in task["objective"]:
+    report["transition"]["evidence_refs"] = [
+        "runtime:workspace-final-manifest#git_head"
+    ]
 if (
     "FAKE_INVALID_RUNTIME_FINAL_MANIFEST_ANCHOR" in task["objective"]
     and not (
@@ -1078,7 +1082,13 @@ def _fixture(
     reviewer_realization_path: Path | None = None
     if prepare_mutation_reviewer_sources:
         reviewer_role_path = (
-            tmp_path / "aoa-agents" / "agents/roles/reviewer/profile.json"
+            tmp_path
+            / "aoa-agents"
+            / "agents/roles/reviewer/specializations/route-drift-review/specialization.json"
+        )
+        reviewer_capability_relative = (
+            "agents/operating-model/capabilities/packs/"
+            "route-drift-review.readonly.capability.json"
         )
         _write_json(
             reviewer_role_path,
@@ -1086,11 +1096,26 @@ def _fixture(
                 "schema_version": "fixture-reviewer-role-v1",
                 "role_id": "reviewer",
                 "obligation": "Independently review one bounded writer result.",
+                "capability_pack_ref": reviewer_capability_relative,
+            },
+        )
+        reviewer_capability_path = (
+            tmp_path / "aoa-agents" / reviewer_capability_relative
+        )
+        _write_json(
+            reviewer_capability_path,
+            {
+                "$schema": "https://aoa-agents/schemas/capability-pack.schema.json",
+                "id": "route-drift-review.readonly",
+                "status": "experimental",
             },
         )
         reviewer_role_ref = _provenance(
             "aoa-agents",
-            "agents/roles/reviewer/profile.json",
+            (
+                "agents/roles/reviewer/specializations/route-drift-review/"
+                "specialization.json"
+            ),
             digest=_digest_path(reviewer_role_path),
         )
         extra_role_refs = (("reviewer", reviewer_role_ref),)
@@ -4743,9 +4768,29 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
         for step in reviewer_plan["steps"]
         if reviewer_binding["task_request_ref"] in step["input_refs"]
     ]
+    reviewer_capabilities = reviewer_plan["scenario_binding"]["capability_refs"]
+    selected_reviewer_capability = next(
+        item
+        for item in reviewer_capabilities
+        if item["capability_id"] == "route-drift-review.readonly"
+    )
+    assert selected_reviewer_capability["provenance"]["owner_repo"] == "aoa-agents"
+    review_summon_request = json.loads(
+        Path(
+            next(
+                item["local_path"]
+                for item in reviewer_task["immutable_inputs"]
+                if item["input_id"] == "review-summon-request"
+            )
+        ).read_text(encoding="utf-8")
+    )
+    assert review_summon_request["summon_request"]["capability_refs"] == [
+        "route-drift-review.readonly"
+    ]
     assert active_reviewer_steps
     assert all(
         selected_reviewer in step["agent_refs"]
+        and step["capability_refs"] == [selected_reviewer_capability]
         and step["effect_class"] == "read_only"
         for step in active_reviewer_steps
     )
@@ -5777,6 +5822,10 @@ def test_runtime_final_workspace_manifest_is_admitted_evidence(
         ("FAKE_OPAQUE_EVIDENCE", "schema_validation_failed"),
         (
             "FAKE_INVALID_RUNTIME_FINAL_MANIFEST_ANCHOR",
+            "model_report_runtime_evidence_anchor_invalid",
+        ),
+        (
+            "FAKE_PARTIAL_RUNTIME_FINAL_MANIFEST_ANCHOR",
             "model_report_runtime_evidence_anchor_invalid",
         ),
         (
@@ -8873,6 +8922,22 @@ def test_a2a_summon_request_validation_fails_closed(
                 supplied_path=fixture["summon_request_path"],
             )
     assert exc_info.value.code == failure_code
+
+
+def test_preflight_rejects_summon_capability_absent_from_plan(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        summon_request_mutator=lambda request: request["summon_request"].__setitem__(
+            "capability_refs", ["fixture:unbound-capability"]
+        ),
+    )
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        fixture["runtime"].preflight(fixture["launch_path"])
+
+    assert exc_info.value.code == "incarnation_task_request_capability_unbound"
 
 
 def test_a2a_export_requires_exact_independent_review_result(

@@ -1901,12 +1901,26 @@ def _validate_runtime_evidence_ref(
             "model report final-workspace evidence is unavailable",
         )
     raw = read_bounded(candidate)
-    _validate_evidence_anchor(
-        raw,
-        anchor,
-        label="runtime workspace final manifest",
-        error_code="model_report_runtime_evidence_anchor_invalid",
-    )
+    if SOURCE_LINE_ANCHOR_RE.fullmatch(anchor) is not None:
+        _validate_evidence_anchor(
+            raw,
+            anchor,
+            label="runtime workspace final manifest",
+            error_code="model_report_runtime_evidence_anchor_invalid",
+        )
+        return
+    try:
+        manifest = load_json_bytes(raw, label="runtime workspace final manifest")
+    except ExternalCodexRuntimeError as exc:
+        raise ExternalCodexRuntimeError(
+            "model_report_runtime_evidence_anchor_invalid",
+            "runtime workspace final manifest is not valid JSON",
+        ) from exc
+    if anchor not in manifest:
+        raise ExternalCodexRuntimeError(
+            "model_report_runtime_evidence_anchor_invalid",
+            "model report evidence names no exact top-level final-manifest member",
+        )
 
 
 def _validate_report_evidence_ref(
@@ -6623,6 +6637,29 @@ class ExternalCodexRuntime:
             raise ExternalCodexRuntimeError(
                 "incarnation_task_request_unbound",
                 "incarnation task request is not the exact canonical immutable summon input",
+            )
+        request_payload = load_json_bytes(
+            request_inputs[0]["raw"], label="canonical immutable summon request"
+        )
+        request_capabilities = request_payload.get("summon_request", {}).get(
+            "capability_refs"
+        )
+        plan_capabilities = {
+            item.capability_id for item in plan.scenario_binding.capability_refs
+        }
+        if (
+            not isinstance(request_capabilities, list)
+            or not request_capabilities
+            or any(
+                not isinstance(item, str)
+                or not item
+                or item not in plan_capabilities
+                for item in request_capabilities
+            )
+        ):
+            raise ExternalCodexRuntimeError(
+                "incarnation_task_request_capability_unbound",
+                "summon request capabilities are not bound by the admitted run plan",
             )
 
         owner_admission = None

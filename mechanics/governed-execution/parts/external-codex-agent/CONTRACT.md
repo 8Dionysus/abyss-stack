@@ -568,8 +568,10 @@ before its findings can enter independent review. Stable immutable-input refs
 remain `immutable:<input-id>#<anchor>`. A report may additionally cite only the
 reserved `runtime:workspace-final-manifest#<anchor>` identity for post-exit
 workspace state. The controller creates that manifest before report admission
-and validates the anchor against the exact runtime-owned bytes; arbitrary
-runtime paths or aliases remain inadmissible.
+and validates a line anchor against the exact runtime-owned bytes. A symbolic
+anchor must name one exact top-level JSON member; substring matches such as
+`git_head` inside `source_git_head` are false anchors. Arbitrary runtime paths
+or aliases remain inadmissible.
 
 Evidence-reference arrays are non-empty and every occurrence is independently
 resolved against its exact source, immutable-input, or runtime-owned bytes.
@@ -713,6 +715,15 @@ the writer request remains immutable review evidence. The derived reviewer plan
 and launch bind the current admitted runtime profile required by the new
 incarnation; they never reuse an older writer profile as active authority. The
 historical writer launch, result, and plan remain immutable review evidence.
+The preparer resolves the selected reviewer specialization's exact
+owner-authored `aoa-agents` capability pack, adds it without removing unrelated
+scenario capabilities, assigns it to every reviewer-bound active step, and
+names the same capability ID in the reviewer SDK request. When the writer is
+already the reviewer role, preparation retains only the unique capability
+named by the canonical writer request and present in its admitted scenario;
+missing or multiple matches are not inferred. Every writer and
+reviewer summon request must carry a non-empty capability set contained by its
+admitted plan; this is checked before inference as well as during A2A export.
 The derived reviewer plan
 reassigns only the active writer
 task/request step from the writer role to the exact plan-bound reviewer role as

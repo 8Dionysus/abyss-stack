@@ -228,6 +228,9 @@ The controller:
   `source_evidence_paths`, with a backward-compatible fallback for older task
   packets, and binds claims about post-exit workspace state through the single
   controller-owned `runtime:workspace-final-manifest#...` evidence identity;
+  symbolic anchors on that JSON artifact name an exact top-level member rather
+  than an arbitrary byte substring, while bounded line anchors retain their
+  ordinary meaning;
 - binds every validation claim to an exact observed argv/exit state and the
   workspace-manifest digest observed when that command completed. Every
   receipt normally matches the final manifest; when transient command-sandbox
@@ -250,7 +253,8 @@ The controller:
 - exports an A2A-compatible child result only after a different incarnation
   and different Codex thread reviewed the exact writer runtime result, and
   only when the supplied writer summon request matches the admitted immutable
-  bytes and both writer/reviewer SDK request semantics and outputs; the
+  bytes and both writer/reviewer SDK request semantics, non-empty plan-bound
+  capabilities, and outputs; the
   reviewer state digest must still equal the exact result bytes initially
   admitted by the exporter. `landing_review` is bound at seed admission and
   again across result, task, durable state, and the final locked snapshot. The
@@ -317,6 +321,15 @@ read-only realization; the reviewer never inherits coder permissions. The
 preparer compiles a distinct reviewer task, plan, binding, session, and launch
 with observe-only usage metering, carries the writer's source-evidence scope
 without widening its mutation scope, and starts no process.
+The reviewer specialization's exact `aoa-agents` capability pack is added to
+the scenario, selected on the active review step, and repeated by identity in
+the canonical SDK summon request. If the writer already is the reviewer role,
+the preparer instead retains the single capability named by its exact SDK
+request and admitted scenario; an absent or ambiguous match fails. Existing
+non-review steps and capabilities remain unchanged. Runtime preflight requires
+the writer and reviewer summon
+capability sets to be non-empty subsets of their admitted plans, so a session
+that cannot later produce a valid A2A return never begins inference.
 For an evidence-complete `owner_contour` writer compiled before the baseline
 manifest and SDK request schema became mandatory task inputs, the preparer may
 derive `writer-source-baseline-manifest` from the digest-bound canonical

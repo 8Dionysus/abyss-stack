@@ -295,6 +295,60 @@ def _owner_relative_from_named_root(path: Path, owner_root_name: str) -> str:
     )
 
 
+def _owner_root_from_named_path(path: Path, owner_root_name: str) -> Path:
+    """Return the exact named owner root already present in an admitted path."""
+
+    location = path.resolve()
+    for candidate in (location.parent, *location.parents):
+        if candidate.name == owner_root_name:
+            return candidate
+    raise StudyPreparationError(
+        f"owner path is not beneath a {owner_root_name} root: {location}"
+    )
+
+
+def _reviewer_capability_ref(
+    reviewer_role_path: Path,
+    *,
+    owner_source_ref: str,
+    existing_plan_refs: Sequence[CapabilityRef] = (),
+) -> CapabilityRef:
+    """Bind one reviewer to an owner pack or exact request-bound plan capability."""
+
+    role = load_json(reviewer_role_path, label="reviewer role contract")
+    capability_relative = role.get("capability_pack_ref")
+    if not isinstance(capability_relative, str) or not capability_relative:
+        unique_existing = tuple(dict.fromkeys(existing_plan_refs))
+        if len(unique_existing) == 1:
+            return unique_existing[0]
+        raise StudyPreparationError(
+            "reviewer role names no exact capability pack and its canonical request and scenario do not bind one unique capability"
+        )
+    owner_root = _owner_root_from_named_path(reviewer_role_path, "aoa-agents")
+    capability_path = _resolve_owner_path(owner_root, capability_relative)
+    capability = load_json(capability_path, label="reviewer capability pack")
+    capability_id = capability.get("id")
+    if (
+        capability.get("$schema")
+        != "https://aoa-agents/schemas/capability-pack.schema.json"
+        or not isinstance(capability_id, str)
+        or not capability_id
+    ):
+        raise StudyPreparationError("reviewer capability pack is invalid")
+    return CapabilityRef(
+        capability_id=capability_id,
+        capability_kind="capability_pack",
+        provenance=_file_ref(
+            owner="aoa-agents",
+            artifact_ref=capability_relative,
+            path=capability_path,
+            source_ref=f"{owner_source_ref}@{_file_digest(capability_path)}",
+            schema_ref="schemas/capability-pack.schema.json",
+            schema_version="aoa_agent_capability_pack_v1",
+        ),
+    )
+
+
 def _resolve_owner_path(root: Path, relative: str) -> Path:
     path = (root / relative).resolve()
     _safe_relative(root, path)
@@ -1003,6 +1057,7 @@ def _adapt_plan_for_reviewer(
     base: RunPlan,
     *,
     reviewer_runtime_profile: RuntimeProfile,
+    reviewer_capability_ref: CapabilityRef,
     writer_role_id: str,
     reviewer_role_id: str,
     reviewer_role_ref: ProvenanceRef,
@@ -1051,6 +1106,11 @@ def _adapt_plan_for_reviewer(
 
     scenario = base.scenario_binding.model_copy(
         update={
+            "capability_refs": tuple(
+                dict.fromkeys(
+                    (*base.scenario_binding.capability_refs, reviewer_capability_ref)
+                )
+            ),
             "input_refs": tuple(
                 replace(item) for item in base.scenario_binding.input_refs
             ),
@@ -1083,7 +1143,10 @@ def _adapt_plan_for_reviewer(
                     "agent_refs": tuple(agent_refs),
                     "input_refs": tuple(replace(item) for item in step.input_refs),
                     **(
-                        {"effect_class": "read_only"}
+                        {
+                            "capability_refs": (reviewer_capability_ref,),
+                            "effect_class": "read_only",
+                        }
                         if reviewer_bound_step
                         else {}
                     ),
@@ -1103,6 +1166,7 @@ def _adapt_plan_for_reviewer(
         review_summon_decision_ref,
         summon_request_schema_ref,
         summon_result_schema_ref,
+        reviewer_capability_ref.provenance,
         *additional_input_refs,
     )
     snapshot = base.snapshot.model_copy(
@@ -1131,6 +1195,7 @@ def _adapt_plan_for_reviewer(
                 review_summon_decision_ref,
                 summon_request_schema_ref,
                 summon_result_schema_ref,
+                reviewer_capability_ref.provenance,
                 *additional_input_refs,
             )
         }
@@ -2589,6 +2654,30 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         writer_summon_schema_path,
         label="writer canonical summon request",
     )
+    writer_request_capability_ids = writer_summon_request.get(
+        "summon_request", {}
+    ).get("capability_refs")
+    if (
+        not isinstance(writer_request_capability_ids, list)
+        or not writer_request_capability_ids
+        or any(
+            not isinstance(item, str) or not item
+            for item in writer_request_capability_ids
+        )
+    ):
+        raise StudyPreparationError(
+            "writer canonical summon request has no exact capability identity"
+        )
+    existing_reviewer_capabilities = tuple(
+        item
+        for item in base_plan.scenario_binding.capability_refs
+        if item.capability_id in writer_request_capability_ids
+    )
+    reviewer_capability_ref = _reviewer_capability_ref(
+        reviewer_role_path,
+        owner_source_ref=reviewer_role_ref.source_ref,
+        existing_plan_refs=existing_reviewer_capabilities,
+    )
     writer_summon_decision_ref = _writer_summon_decision_ref(
         plan=base_plan,
         task_request_ref=base_binding.task_request_ref,
@@ -2768,10 +2857,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         route_anchor=writer_result_ref.artifact_digest,
         desired_role="reviewer",
         child_agent_id=incarnation_id,
-        capability_refs=tuple(
-            item.capability_id
-            for item in base_plan.scenario_binding.capability_refs
-        ),
+        capability_refs=(reviewer_capability_ref.capability_id,),
         expected_outputs=("independent_landing_review",),
         parent_task_id=writer_task["task_id"],
         session_ref=session_id,
@@ -2883,6 +2969,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     review_plan = _adapt_plan_for_reviewer(
         base_plan,
         reviewer_runtime_profile=reviewer_runtime_profile,
+        reviewer_capability_ref=reviewer_capability_ref,
         writer_role_id=base_binding.role_id,
         reviewer_role_id="reviewer",
         reviewer_role_ref=reviewer_role_ref,

@@ -9,6 +9,18 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Bind every canonical independent reviewer to its exact capability across the
+  SDK summon request, scenario, and active review step. A selected
+  specialization resolves its owner-authored capability pack; an existing
+  base-role reviewer continuum retains only the unique capability already
+  named by its canonical request and admitted scenario. Preflight now rejects
+  a writer or reviewer whose non-empty summon capabilities are absent from the
+  run plan, instead of allowing a real session that can never pass A2A closeout.
+- Resolve symbolic `runtime:workspace-final-manifest#...` evidence anchors as
+  exact top-level JSON members. A shorter token such as `git_head` can no
+  longer pass by occurring inside the real `source_git_head` member name;
+  bounded line anchors and exact members such as `content_entries` remain
+  valid.
 - Carry the existing `sandbox_confined` indirect-command policy into every
   canonically prepared read-only landing reviewer. Composite local inspection
   commands remain admitted only under the exact read-only, approval-never,
