@@ -1613,6 +1613,8 @@ def _relative_path_is_allowed(path: str, allowed: Sequence[str]) -> bool:
     if path_parts is None:
         return False
     for candidate in allowed:
+        if candidate == ".":
+            return True
         candidate_parts = safe_parts(candidate)
         if candidate_parts is None:
             continue

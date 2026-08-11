@@ -5416,6 +5416,14 @@ def test_source_evidence_scope_is_distinct_from_mutation_scope(
     assert result["changed_paths"] == [{"path": "landing-note.md", "status": "created"}]
 
 
+def test_workspace_root_source_evidence_scope_admits_only_safe_relative_paths() -> None:
+    assert RUNTIME._relative_path_is_allowed("README.md", (".",))
+    assert RUNTIME._relative_path_is_allowed("docs/architecture.md", (".",))
+    assert not RUNTIME._relative_path_is_allowed("../outside.md", (".",))
+    assert not RUNTIME._relative_path_is_allowed("/absolute.md", (".",))
+    assert not RUNTIME._relative_path_is_allowed("docs/../outside.md", (".",))
+
+
 def test_runtime_final_workspace_manifest_is_admitted_evidence(
     tmp_path: Path,
 ) -> None:
