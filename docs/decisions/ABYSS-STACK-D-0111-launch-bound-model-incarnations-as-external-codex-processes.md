@@ -380,6 +380,36 @@ complete role/incarnation/task/session/output/transport/workspace request
 relation before inference, so a fresh semantically bound pair is still
 required and v9 is not rewritten or promoted.
 
+The semantically bound v10 slice then completed the first full obligation-to-
+return contour. One Luna xhigh writer retained the same external CLI thread
+across four attempts, changed only its two named `actor-output` files, matched
+the owner source manifest, and returned `review_required`. Its failed attempts
+exposed two runtime admission defects rather than being rewritten: final-
+manifest evidence did not initially admit exact content-entry paths, and
+digest-bound report recovery did not yet preserve the required exact source
+anchor. The corrected runtime admitted the fourth result. A separate read-only
+Luna xhigh reviewer changed no path and retained its own thread across one
+rejected transition report and one exact digest-bound continuation. The
+reviewed A2A export then completed with `return_for_repair`, binding the exact
+writer/reviewer results, reports, final manifests, deltas, summon request, and
+two distinct threads. Combined observe-only usage was 10,912,871 input tokens,
+9,139,712 cached-input tokens, and 123,963 output tokens, with no execution
+budget.
+
+The return is successful transport and responsibility evidence, not an
+accepted landing. Independent review kept three residuals visible: the
+specialized validation environment lacked `pytest` and an explicit
+`aoa-stats` owner root; the frozen transport audit still forbids publication;
+and the writer wording failed to distinguish unchanged owner source from its
+created actor projection. The owner release gate passes when
+`AOA_STATS_ROOT=/srv/AbyssOS/aoa-stats` is supplied explicitly, establishing a
+concrete environment repair instead of weakening the validator. The final
+`aoa-summon` receipt validates the immutable owner request, exact role/model/
+incarnation refs, runtime-profile-v2, runtime-result-v2, process identity,
+named outputs, and A2A return while correctly leaving every output unaccepted.
+No Luna-fit admission, owner acceptance, landing, publication, or external
+effect authority follows from v10.
+
 ## Source surfaces
 
 The first live ambiguity-stop L2 study tested the parent lifecycle itself. Its
