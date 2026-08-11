@@ -223,8 +223,12 @@ The controller:
   packets, and binds claims about post-exit workspace state through the single
   controller-owned `runtime:workspace-final-manifest#...` evidence identity;
 - binds every validation claim to an exact observed argv/exit state and the
-  workspace-manifest digest observed when that command completed, preserves
-  `review_required` as a real gate, distinguishes a non-review writer's
+  workspace-manifest digest observed when that command completed, keeps full
+  fail-closed projection inventory while retrying only a bounded
+  regular-file read/identity race; a retry rebuilds the entire manifest, and
+  unsupported entries, coordinate drift, Git-body drift, or repeated change
+  still terminate observation; preserves `review_required` as a real gate,
+  distinguishes a non-review writer's
   `submit_for_review` handoff from a reviewer's `return_for_repair` verdict,
   binds each negative review to a separate task-owned outcome status,
   binds model re-entry to the status-selected wake condition, admits only

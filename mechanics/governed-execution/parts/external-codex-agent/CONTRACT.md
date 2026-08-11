@@ -426,7 +426,12 @@ Every workspace symlink must resolve to an existing target inside
 the exact checkout; an absent or outward target fails admission as
 `workspace_symlink_target_unsupported`. The receipt recorded for each exact validation command carries the
 workspace-manifest digest observed at command completion; report admission
-requires the final manifest to retain that digest. An untracked or ignored secret-shaped path blocks admission before
+requires the final manifest to retain that digest. A manifest read that proves
+one regular file changed while its bytes or identity were being inventoried is
+retried only within one short bounded observation window. A stable retry is a
+new complete manifest, not acceptance of the partial read; exhaustion and
+every symlink, special-entry, coordinate, Git-body, or other projection error
+still fail closed immediately. An untracked or ignored secret-shaped path blocks admission before
 its content is hashed. Read-only manifest drift, HEAD drift, an out-of-scope
 write, or a command event whose command text is unavailable fails closed as
 `authority_blocked` evidence. If a failure closeout cannot observe the final

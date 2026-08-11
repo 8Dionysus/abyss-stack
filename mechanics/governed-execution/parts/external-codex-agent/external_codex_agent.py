@@ -799,6 +799,12 @@ TRUSTED_EXECUTABLE_PREFIXES = (
     Path("/usr/local/bin"),
     Path("/usr/local/sbin"),
 )
+ACTOR_MANIFEST_TRANSIENT_ATTEMPTS = 3
+ACTOR_MANIFEST_TRANSIENT_RETRY_SECONDS = 0.02
+ACTOR_MANIFEST_TRANSIENT_ERRORS = (
+    "changed while being read:",
+    "changed while being inventoried:",
+)
 
 
 class ExternalCodexRuntimeError(RuntimeError):
@@ -834,24 +840,33 @@ def _checked_actor_manifest(
 ) -> dict[str, Any]:
     """Translate projection inventory failures into runtime-owned errors."""
 
-    try:
-        if projection_fd is None:
-            return build_actor_manifest(
-                projection_root,
+    for attempt in range(ACTOR_MANIFEST_TRANSIENT_ATTEMPTS):
+        try:
+            if projection_fd is None:
+                return build_actor_manifest(
+                    projection_root,
+                    source_manifest_digest=source_manifest_digest,
+                    source_git_head=source_git_head,
+                )
+            return build_actor_manifest_from_descriptor(
+                projection_fd,
+                workspace_path=projection_root,
                 source_manifest_digest=source_manifest_digest,
                 source_git_head=source_git_head,
             )
-        return build_actor_manifest_from_descriptor(
-            projection_fd,
-            workspace_path=projection_root,
-            source_manifest_digest=source_manifest_digest,
-            source_git_head=source_git_head,
-        )
-    except ProjectionError as exc:
-        raise ExternalCodexRuntimeError(
-            "actor_projection_observation_gap",
-            str(exc),
-        ) from exc
+        except ProjectionError as exc:
+            message = str(exc)
+            transient = any(
+                marker in message for marker in ACTOR_MANIFEST_TRANSIENT_ERRORS
+            )
+            if transient and attempt + 1 < ACTOR_MANIFEST_TRANSIENT_ATTEMPTS:
+                time.sleep(ACTOR_MANIFEST_TRANSIENT_RETRY_SECONDS)
+                continue
+            raise ExternalCodexRuntimeError(
+                "actor_projection_observation_gap",
+                message,
+            ) from exc
+    raise AssertionError("actor manifest retry loop exhausted without a result")
 
 
 def _assert_descriptor_coordinate(projection_fd: int, projection_root: Path) -> None:
@@ -8823,6 +8838,7 @@ Runtime session identity: {state["session_id"]}
         )
         started = utc_now()
         runtime_failure_code: str | None = None
+        runtime_failure_message: str | None = None
         terminate_requested = False
         interrupt_request_path = attempt_dir / "interrupt-request.json"
         with (
@@ -8962,6 +8978,7 @@ Runtime session identity: {state["session_id"]}
                                 )
                             except ExternalCodexRuntimeError as exc:
                                 runtime_failure_code = exc.code
+                                runtime_failure_message = str(exc)
                                 terminate_requested = True
                                 self._terminate_supervised_process(
                                     process,
@@ -9026,6 +9043,7 @@ Runtime session identity: {state["session_id"]}
                 runtime_failure_code = "controlled_interruption"
             except ExternalCodexRuntimeError as exc:
                 runtime_failure_code = exc.code
+                runtime_failure_message = str(exc)
         _close_mcp_credential_proxies(credential_proxies)
         finished = utc_now()
         with self._lock(session_id):
@@ -9041,6 +9059,7 @@ Runtime session identity: {state["session_id"]}
                 raw_events_path=raw_events_path,
                 stderr_path=stderr_path,
                 runtime_failure_code=runtime_failure_code,
+                runtime_failure_message=runtime_failure_message,
                 projection_fd=projection_descriptor,
             )
         os.close(projection_descriptor)
@@ -9781,6 +9800,7 @@ Runtime session identity: {state["session_id"]}
         raw_events_path: Path,
         stderr_path: Path,
         runtime_failure_code: str | None,
+        runtime_failure_message: str | None,
         projection_fd: int | None = None,
     ) -> None:
         launch, _, binding, task, _, _ = self._materialized_payloads(state)
@@ -9892,7 +9912,7 @@ Runtime session identity: {state["session_id"]}
             ]
         state["changed_paths"] = changed_paths
         failure_code: str | None = None
-        failure_message: str | None = None
+        failure_message: str | None = runtime_failure_message
         report: dict[str, Any] | None = None
         controlled_interruption = runtime_failure_code == "controlled_interruption"
         if controlled_interruption:

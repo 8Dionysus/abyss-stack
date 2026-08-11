@@ -2088,6 +2088,69 @@ def _wait_terminal(
     )
 
 
+def test_actor_manifest_retries_one_transient_descriptor_inventory_race(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = {"schema_version": "test-actor-manifest"}
+    calls: list[int] = []
+    sleeps: list[float] = []
+
+    def fake_manifest(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        calls.append(1)
+        if len(calls) == 1:
+            raise RUNTIME.ProjectionError(
+                "actor projection file changed while being inventoried: actor-output/result.json"
+            )
+        return expected
+
+    monkeypatch.setattr(RUNTIME, "build_actor_manifest_from_descriptor", fake_manifest)
+    monkeypatch.setattr(RUNTIME.time, "sleep", sleeps.append)
+
+    observed = RUNTIME._checked_actor_manifest(
+        tmp_path,
+        source_manifest_digest="sha256:" + "0" * 64,
+        source_git_head="a" * 40,
+        projection_fd=7,
+    )
+
+    assert observed == expected
+    assert len(calls) == 2
+    assert sleeps == [RUNTIME.ACTOR_MANIFEST_TRANSIENT_RETRY_SECONDS]
+
+
+def test_actor_manifest_does_not_retry_nontransient_projection_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[int] = []
+    sleeps: list[float] = []
+
+    def fake_manifest(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        calls.append(1)
+        raise RUNTIME.ProjectionError(
+            "actor projection does not admit special entry: unsafe.pipe"
+        )
+
+    monkeypatch.setattr(RUNTIME, "build_actor_manifest_from_descriptor", fake_manifest)
+    monkeypatch.setattr(RUNTIME.time, "sleep", sleeps.append)
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexRuntimeError,
+        match="does not admit special entry",
+    ) as exc_info:
+        RUNTIME._checked_actor_manifest(
+            tmp_path,
+            source_manifest_digest="sha256:" + "0" * 64,
+            source_git_head="a" * 40,
+            projection_fd=7,
+        )
+
+    assert exc_info.value.code == "actor_projection_observation_gap"
+    assert len(calls) == 1
+    assert sleeps == []
+
+
 def test_supervisor_waits_on_signal_notification_without_20hz_procfs_scan(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

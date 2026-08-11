@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Retry only transient regular-file identity/read races while taking an actor
+  manifest, rebuild the whole manifest on each bounded attempt, retain
+  immediate fail-closed handling for every other projection error, and keep
+  the original runtime observation error text in durable failure evidence.
 - Bind the external Codex runtime to the exact model-organ write-profile IDs
   used by landing and structured owner-duty Luna realizations, while keeping
   both aliases model-neutral, projection-isolated, network-disabled,
