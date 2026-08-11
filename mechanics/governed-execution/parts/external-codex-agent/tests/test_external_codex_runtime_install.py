@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import resource
 import shlex
 import shutil
 import subprocess
@@ -21,6 +22,11 @@ SPEC = importlib.util.spec_from_file_location(
 assert SPEC and SPEC.loader
 runtime_install = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runtime_install)
+
+
+def lower_wrapper_descriptor_limit() -> None:
+    _, hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
+    resource.setrlimit(resource.RLIMIT_NOFILE, (16, hard_limit))
 
 
 def git(*args: str, cwd: Path) -> None:
@@ -513,6 +519,7 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
         capture_output=True,
         text=True,
         env=ambient_environment,
+        preexec_fn=lower_wrapper_descriptor_limit,
     )
     assert completed.stdout == "agent:exact-sdk\n"
     assert path_marker.exists() is False

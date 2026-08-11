@@ -986,6 +986,7 @@ import fcntl
 import hashlib
 import json
 import os
+import resource
 import stat
 import sys
 from pathlib import Path
@@ -1193,6 +1194,33 @@ if (
 ):
     os.close(release_descriptor)
     raise SystemExit("external Codex release manifest identity is invalid")
+
+# The verified snapshot keeps one sealed memfd per admitted release file until
+# bwrap has mounted the complete tree.  Raise only this bootstrap process's
+# soft descriptor limit to the exact release-scale need; retain the inherited
+# hard limit and fail closed if the host cannot support the snapshot.
+descriptor_soft_limit, descriptor_hard_limit = resource.getrlimit(
+    resource.RLIMIT_NOFILE
+)
+required_descriptor_limit = len(rows) + 64
+if (
+    descriptor_hard_limit != resource.RLIM_INFINITY
+    and descriptor_hard_limit < required_descriptor_limit
+):
+    os.close(release_descriptor)
+    raise SystemExit("external Codex release exceeds the host descriptor ceiling")
+target_descriptor_limit = max(descriptor_soft_limit, required_descriptor_limit)
+if target_descriptor_limit != descriptor_soft_limit:
+    try:
+        resource.setrlimit(
+            resource.RLIMIT_NOFILE,
+            (target_descriptor_limit, descriptor_hard_limit),
+        )
+    except (OSError, ValueError) as exc:
+        os.close(release_descriptor)
+        raise SystemExit(
+            "external Codex release descriptor admission failed"
+        ) from exc
 
 expected_files = {Path("release-manifest.json")}
 expected_directories = set()
