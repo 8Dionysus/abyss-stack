@@ -78,6 +78,7 @@ from external_codex_agent import (  # noqa: E402
     STATE_SCHEMA_VERSION,
     ExternalCodexRuntime,
     ExternalCodexRuntimeError,
+    _relative_path_is_allowed,
     assert_workspace_manifest,
     build_workspace_manifest,
     load_json,
@@ -2618,10 +2619,8 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     out_of_scope_paths = [
         item["path"]
         for item in observed_changed_paths
-        if not any(
-            item["path"] == allowed
-            or item["path"].startswith(f"{allowed.rstrip('/')}/")
-            for allowed in writer_task["allowed_paths"]
+        if not _relative_path_is_allowed(
+            item["path"], writer_task["allowed_paths"]
         )
     ]
     if out_of_scope_paths:

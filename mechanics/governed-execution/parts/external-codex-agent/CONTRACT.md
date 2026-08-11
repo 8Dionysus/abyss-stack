@@ -289,8 +289,10 @@ as its execution root and receives `TMPDIR` in the sibling attempt-local
 scratch directory. The source checkout is passed to the controller only for
 owner-side manifest checks; it is never the actor cwd or writable root. A
 workspace-write actor may change only task `allowed_paths` inside the projection;
-the controller returns those changes as the canonical actor delta and leaves the
-source checkout unchanged. The invocation receipt records the fixed child
+the `.` sentinel names the workspace root with the same safe-relative-path
+semantics in writer execution and reviewer preparation. The controller returns
+those changes as the canonical actor delta and leaves the source checkout
+unchanged. The invocation receipt records the fixed child
 coordinate while result evidence records the controller-owned host projection.
 The descriptor is the child binding; the final pathname/device/inode comparison
 is the durable closeout binding. The

@@ -4653,6 +4653,7 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
         task_family="landing_preparation",
         workspace_write=True,
         review_required=True,
+        allowed_paths=(".",),
         prepare_mutation_reviewer_sources=True,
         omit_historical_reviewer_inputs=True,
         reviewer_tool_profile_id=(
