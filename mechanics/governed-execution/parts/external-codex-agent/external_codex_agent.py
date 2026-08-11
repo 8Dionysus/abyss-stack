@@ -7815,6 +7815,11 @@ class ExternalCodexRuntime:
         nested = request.get("summon_request")
         passport = request.get("quest_passport")
         top_outputs = request.get("expected_outputs")
+        allowed_transport_preferences = (
+            {"a2a_remote", "either"}
+            if state.get("admission_class") == "owner_contour"
+            else {"codex_local"}
+        )
         if (
             not isinstance(nested, dict)
             or not isinstance(passport, dict)
@@ -7833,7 +7838,8 @@ class ExternalCodexRuntime:
             or nested.get("parent_task_id") != task["parent_task_id"]
             or nested.get("session_ref") != state["session_id"]
             or nested.get("review_required") is not task["review_required"]
-            or nested.get("transport_preference") != "codex_local"
+            or nested.get("transport_preference")
+            not in allowed_transport_preferences
             or nested.get("require_progression") is not False
             or nested.get("workspace_root") != state["workspace_path"]
             or request.get("reviewed_artifact_path")
@@ -11087,13 +11093,17 @@ Runtime session identity: {state["session_id"]}
                 + "\n"
             ).encode("utf-8")
         )
-        if (
-            writer.get("admission_class") != "transport_study_fixture"
-            or reviewer.get("admission_class") != "transport_study_fixture"
-        ):
+        admission_pair = (
+            writer.get("admission_class"),
+            reviewer.get("admission_class"),
+        )
+        if admission_pair not in {
+            ("transport_study_fixture", "transport_study_fixture"),
+            ("owner_contour", "transport_study_fixture"),
+        }:
             raise ExternalCodexRuntimeError(
                 "a2a_admission_class_invalid",
-                "A2A export accepts only one exact transport-study writer/reviewer pair",
+                "A2A export accepts only a transport-study pair or an owner-contour writer with its prepared read-only reviewer",
             )
         if (
             reviewer.get("status") not in {"completed", "review_required"}
@@ -11290,7 +11300,7 @@ Runtime session identity: {state["session_id"]}
             ) = self._materialized_payloads(writer_state)
             writer_result_path = self._session_dir(writer_session_id) / "result.json"
             if (
-                writer_launch["admission_class"] != "transport_study_fixture"
+                writer_launch["admission_class"] != writer.get("admission_class")
                 or writer_state.get("result_path") != str(writer_result_path)
                 or writer_state.get("result_digest") != sha256_file(writer_result_path)
                 or writer_state.get("incarnation_id") != writer_binding.incarnation_id
@@ -11365,6 +11375,7 @@ Runtime session identity: {state["session_id"]}
                     "review task/request is not bound to the exact writer result, report, final workspace manifest, owner, and parent",
                 )
             returned = ["external_codex_agent_result", "independent_landing_review"]
+            returned.extend(str(item) for item in writer_task["expected_artifacts"])
             returned.extend(str(item) for item in writer_report["artifact_paths"])
             unique_returned = list(dict.fromkeys(returned))
             if not set(writer_expected_outputs).issubset(unique_returned) or not set(

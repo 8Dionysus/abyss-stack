@@ -644,12 +644,21 @@ realization with the same provider, runtime, model, and effort. The resulting
 reviewer has a different task, incarnation, and session, uses read-only tools
 and permissions, preserves the writer's `source_evidence_paths` and observe-only
 metering, and has no workspace-write or external-effect authority.
+The writer may be a historical `transport_study_fixture` or an evidence-complete
+`owner_contour`. The prepared reviewer remains `transport_study_fixture`; A2A
+export accepts only the historical fixture pair or the exact
+`owner_contour`-writer/prepared-reviewer pair. The latter does not downgrade the
+writer: its owner request, SDK v4 transport preference, binding v2, durable
+state, report, and terminal actor evidence remain required and digest-bound.
 
 The reviewer receives its own canonical SDK v4 summon request and decision;
 the writer request remains immutable review evidence. A2A export verifies the
 materialized request/schema bytes, typed plan binding, role/incarnation/task
 semantics, requested outputs, and the caller-supplied writer request digest
 before it can emit a child result.
+Symbolic named outputs come from the already admitted runtime task and remain
+separate from model-authored workspace artifact paths; the exporter returns
+both and requires the writer and reviewer summon requests to be satisfied.
 The exporter also serializes the initially loaded reviewer result to its exact
 artifact digest and requires the later locked durable state to retain that
 same digest. Immediately before output publication, it reacquires the reviewer

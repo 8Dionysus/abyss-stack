@@ -287,8 +287,9 @@ role for bounded eval, stats, or memo canaries. Both expose the same isolated
 projection and effect posture; the names preserve model-organ ABI and do not
 select a role, model, procedure, route, or acceptance outcome.
 
-`prepare_landing_study.py prepare-reviewer` remains the canonical non-starting
-transport-study review preparation path. It accepts an exact terminal read-only or bounded
+`prepare_landing_study.py prepare-reviewer` is the canonical non-starting
+review preparation path for both historical transport-study writers and admitted
+owner-contour writers. It accepts an exact terminal read-only or bounded
 repo-mutation writer, verifies the runtime-owned actor final manifest and
 canonical delta, forwards every original immutable input under the same stable
 ID, and adds the exact result, report, source baseline, actor final manifest,
@@ -301,6 +302,10 @@ without widening its mutation scope, and starts no process.
 It also builds a fresh canonical reviewer summon request/decision against the
 same exact SDK v4 schemas while retaining the writer request as immutable
 evidence; it never substitutes either request with the runtime-owner task.
+The prepared reviewer remains a separately addressed read-only fixture whose
+role and realization must match the writer plan; A2A export admits only the
+historical fixture pair or this exact owner-contour-writer/prepared-reviewer
+pair.
 
 The first live L2 fixture proved both branches. One invalid Luna report was
 preserved and filtered with no second Sol turn. A corrected Luna xhigh report

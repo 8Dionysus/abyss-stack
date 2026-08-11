@@ -113,7 +113,8 @@ canonical non-starting reviewer preparation with controller-owned immutable
 copies and stable forwarded input IDs, reviewer operation after the historical
 source checkout disappears or an historical ancestor is retargeted,
 nonterminal/stale/foreign review-seed refusal,
-an explicit workspace-write coder to read-only reviewer transition with a
+an explicit transport-study or owner-contour workspace-write coder to a
+plan-bound read-only reviewer transition with a
 post-write actor manifest/delta and reviewed A2A return, exact review-input-to-
 writer-final-manifest and writer-delta digest binding, exact projection-seed
 envelope ownership and terminal-result binding, mandatory seed presence in

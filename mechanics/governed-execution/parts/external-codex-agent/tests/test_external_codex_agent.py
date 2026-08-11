@@ -4455,9 +4455,15 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
         review_required=True,
         prepare_mutation_reviewer_sources=True,
         source_evidence_paths=("README.md",),
+        owner_contour=True,
     )
     runtime = fixture["runtime"]
-    runtime.start(fixture["launch_path"])
+    owner_request_path = fixture["owner_execution_request_path"]
+    assert owner_request_path is not None
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=owner_request_path,
+    )
     assert _wait_terminal(runtime, fixture["session_id"])["status"] == (
         "review_required"
     )
@@ -4640,7 +4646,7 @@ def test_review_seed_rejects_writer_session_reuse(tmp_path: Path) -> None:
     assert exc_info.value.code == "review_seed_parent_task_mismatch"
 
 
-def test_reviewer_preparation_rejects_non_fixture_writer_admission(
+def test_reviewer_preparation_rejects_malformed_owner_admission(
     tmp_path: Path,
 ) -> None:
     fixture = _fixture(tmp_path / "writer", exact_baseline=True)
@@ -4652,7 +4658,10 @@ def test_reviewer_preparation_rejects_non_fixture_writer_admission(
     launch["admission_class"] = "owner_contour"
     _write_json(fixture["launch_path"], launch)
 
-    with pytest.raises(PREPARER.StudyPreparationError, match="transport_study_fixture"):
+    with pytest.raises(
+        PREPARER.ExternalCodexRuntimeError,
+        match="owner_execution_request_schema",
+    ):
         PREPARER._prepare_reviewer(
             argparse.Namespace(
                 writer_launch=str(fixture["launch_path"]),

@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 112,
-  "edge_count": 2535,
+  "decision_count": 113,
+  "edge_count": 2558,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 953,
-    "DATED": 112,
-    "GUARDED_BY": 343,
-    "HAS_STATUS": 112,
-    "HAS_SURFACE_CLASS": 297,
-    "IN_STACK_LANE": 257,
-    "NEXT_DECISION": 111,
-    "OWNED_BY_SURFACE": 118,
-    "OWNS_DECISION": 112,
+    "CITES_SOURCE_SURFACE": 959,
+    "DATED": 113,
+    "GUARDED_BY": 347,
+    "HAS_STATUS": 113,
+    "HAS_SURFACE_CLASS": 301,
+    "IN_STACK_LANE": 260,
+    "NEXT_DECISION": 112,
+    "OWNED_BY_SURFACE": 119,
+    "OWNS_DECISION": 113,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 118
+    "UNDER_MECHANIC_PARENT": 119
   },
   "edges": [
     {
@@ -12123,11 +12123,121 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0112",
+      "target": "decision:ABYSS-STACK-D-0113",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0112",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0112",
+      "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "date:2026-08-11",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "guard_family:effect%20ceiling",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "guard_family:exact%20binding",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "guard_family:independent%20review",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "guard_family:owner%20provenance",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "surface_class:A2A%20return",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "surface_class:actor%20admission",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "surface_class:independent%20review",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "surface_class:runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "stack_lane:review",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "stack_lane:source",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0113",
       "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -12690,21 +12800,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0112",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0113",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1136,
+  "node_count": 1142,
   "node_type_counts": {
-    "date": 34,
-    "decision": 112,
+    "date": 35,
+    "decision": 113,
     "guard_family": 174,
     "mechanic_parent": 10,
     "owner_surface": 62,
     "repo": 1,
-    "source_surface": 571,
+    "source_surface": 574,
     "stack_lane": 46,
     "status": 3,
-    "surface_class": 123
+    "surface_class": 124
   },
   "nodes": [
     {
@@ -12875,6 +12990,11 @@
     {
       "id": "date:2026-08-10",
       "label": "2026-08-10",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-08-11",
+      "label": "2026-08-11",
       "type": "date"
     },
     {
@@ -13995,6 +14115,16 @@
       "posture": "accepted source-local admission ABI; clean owner landing and live role proof remain open",
       "status": "accepted",
       "title": "ABYSS-STACK-D-0112 Require Evidence-Complete Owner-Contour Incarnations",
+      "type": "decision"
+    },
+    {
+      "date": "2026-08-11",
+      "id": "decision:ABYSS-STACK-D-0113",
+      "label": "ABYSS-STACK-D-0113",
+      "path": "docs/decisions/ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md",
+      "posture": "accepted owner-contour review seam; live role proof remains required",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0113 Carry Owner-Contour Writers Through Independent A2A Review",
       "type": "decision"
     },
     {
@@ -17079,6 +17209,16 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/README.md",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/README.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/bind_external_actor_launch.py",
       "label": "mechanics/governed-execution/parts/external-codex-agent/bind_external_actor_launch.py",
       "type": "source_surface"
@@ -17091,6 +17231,11 @@
     {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py",
       "label": "mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py",
       "type": "source_surface"
     },
     {
@@ -18621,6 +18766,11 @@
     {
       "id": "surface_class:incarnation%20evidence",
       "label": "incarnation evidence",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:independent%20review",
+      "label": "independent review",
       "type": "surface_class"
     },
     {

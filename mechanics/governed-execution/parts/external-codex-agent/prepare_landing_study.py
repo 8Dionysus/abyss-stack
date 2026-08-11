@@ -54,6 +54,7 @@ from aoa_sdk.contracts.control_plane import (  # noqa: E402
 )
 from aoa_sdk.control_plane import (  # noqa: E402
     AgentIncarnationBinding,
+    AgentIncarnationBindingV2,
     ContinuationObligation,
     IncarnationPermissionPosture,
     IncarnationStopCondition,
@@ -2009,9 +2010,13 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         raise StudyPreparationError("writer launch or result is unavailable")
 
     writer_launch = load_json(writer_launch_path, label="writer launch")
-    if writer_launch.get("admission_class") != "transport_study_fixture":
+    writer_admission_class = writer_launch.get("admission_class")
+    if writer_admission_class not in {
+        "transport_study_fixture",
+        "owner_contour",
+    }:
         raise StudyPreparationError(
-            "review preparation accepts only a transport_study_fixture writer"
+            "review preparation accepts only a transport-study or owner-contour writer"
         )
     validate_json(writer_launch, LAUNCH_SCHEMA_PATH, label="writer launch")
     coordinate_paths = {
@@ -2028,9 +2033,9 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     }
     writer_result = load_json(writer_result_path, label="writer runtime result")
     validate_json(writer_result, RESULT_SCHEMA_PATH, label="writer runtime result")
-    if writer_result.get("admission_class") != "transport_study_fixture":
+    if writer_result.get("admission_class") != writer_admission_class:
         raise StudyPreparationError(
-            "review preparation accepts only a transport_study_fixture result"
+            "writer launch and result admission classes differ"
         )
     writer_state_path = writer_result_path.parent / "state.json"
     if (
@@ -2049,7 +2054,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         or writer_state.get("session_id") != writer_result.get("session_id")
         or writer_state.get("launch_id") != writer_launch.get("launch_id")
         or writer_state.get("launch_digest") != _file_digest(writer_launch_path)
-        or writer_state.get("admission_class") != "transport_study_fixture"
+        or writer_state.get("admission_class") != writer_admission_class
         or writer_state.get("status") != writer_result.get("status")
         or writer_state.get("result_path") != str(writer_result_path)
         or writer_state.get("result_digest") != writer_result_digest
@@ -2085,12 +2090,17 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     base_plan = RunPlan.model_validate(
         load_json(coordinate_paths["plan"], label="writer run plan")
     )
-    base_binding = AgentIncarnationBinding.model_validate(
-        load_json(
-            coordinate_paths["incarnation_binding"],
-            label="writer incarnation binding",
-        )
+    base_binding_payload = load_json(
+        coordinate_paths["incarnation_binding"],
+        label="writer incarnation binding",
     )
+    binding_type = (
+        AgentIncarnationBindingV2
+        if base_binding_payload.get("schema_version")
+        == "aoa_agent_incarnation_binding_v2"
+        else AgentIncarnationBinding
+    )
+    base_binding = binding_type.model_validate(base_binding_payload)
     assert_agent_incarnation_binding_matches_plan(base_binding, base_plan)
     writer_task = load_json(coordinate_paths["task"], label="writer task")
     validate_json(writer_task, TASK_SCHEMA_PATH, label="writer task")
