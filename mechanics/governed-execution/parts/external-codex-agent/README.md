@@ -329,7 +329,10 @@ request and admitted scenario; an absent or ambiguous match fails. Existing
 non-review steps and capabilities remain unchanged. Runtime preflight requires
 the writer and reviewer summon
 capability sets to be non-empty subsets of their admitted plans, so a session
-that cannot later produce a valid A2A return never begins inference.
+that cannot later produce a valid A2A return never begins inference. The same
+preflight also binds the request's role, incarnation, parent task, session,
+named outputs, transport, review posture, and workspace to the exact launch and
+runtime task; these semantics are not deferred until A2A export.
 For an evidence-complete `owner_contour` writer compiled before the baseline
 manifest and SDK request schema became mandatory task inputs, the preparer may
 derive `writer-source-baseline-manifest` from the digest-bound canonical

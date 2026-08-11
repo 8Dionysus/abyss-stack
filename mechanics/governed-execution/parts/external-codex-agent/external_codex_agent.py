@@ -6641,9 +6641,46 @@ class ExternalCodexRuntime:
         request_payload = load_json_bytes(
             request_inputs[0]["raw"], label="canonical immutable summon request"
         )
-        request_capabilities = request_payload.get("summon_request", {}).get(
-            "capability_refs"
+        nested_request = request_payload.get("summon_request")
+        passport = request_payload.get("quest_passport")
+        expected_outputs = request_payload.get("expected_outputs")
+        allowed_transport_preferences = (
+            {"a2a_remote", "either"}
+            if launch["admission_class"] == "owner_contour"
+            else {"codex_local"}
         )
+        if (
+            not isinstance(nested_request, dict)
+            or not isinstance(passport, dict)
+            or not isinstance(expected_outputs, list)
+            or not expected_outputs
+            or any(
+                not isinstance(item, str) or not item for item in expected_outputs
+            )
+            or len(set(expected_outputs)) != len(expected_outputs)
+            or nested_request.get("expected_outputs") != expected_outputs
+            or passport.get("expected_artifacts") != expected_outputs
+            or passport.get("control_mode") != "codex_supervised"
+            or passport.get("self_agent") is not False
+            or not isinstance(passport.get("route_anchor"), str)
+            or not passport["route_anchor"]
+            or nested_request.get("desired_role") != binding.role_id
+            or nested_request.get("child_agent_id") != binding.incarnation_id
+            or nested_request.get("parent_task_id") != task["parent_task_id"]
+            or nested_request.get("session_ref") != launch["session_id"]
+            or nested_request.get("review_required") is not task["review_required"]
+            or nested_request.get("transport_preference")
+            not in allowed_transport_preferences
+            or nested_request.get("require_progression") is not False
+            or nested_request.get("workspace_root") != launch["workspace_path"]
+            or request_payload.get("reviewed_artifact_path")
+            != nested_request.get("reviewed_artifact_path")
+        ):
+            raise ExternalCodexRuntimeError(
+                "incarnation_task_request_unbound",
+                "summon request semantics differ from the exact task/incarnation",
+            )
+        request_capabilities = nested_request.get("capability_refs")
         plan_capabilities = {
             item.capability_id for item in plan.scenario_binding.capability_refs
         }

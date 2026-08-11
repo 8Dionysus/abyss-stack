@@ -364,6 +364,20 @@ and runtime final-manifest symbols require exact JSON members rather than
 substring matches. A fresh capability-bound writer/reviewer pair remains
 required; no historical receipt is rewritten.
 
+The capability-bound v9 owner contour then admitted a real Luna xhigh
+workspace-write writer and a distinct Luna xhigh read-only reviewer. The writer
+returned `review_required` in one attempt, created only the two named handoff
+files, and counted 764,236 input, 652,032 cached-input, and 16,735 output tokens.
+The reviewer changed no path, independently returned
+`review_required/return_for_repair`, and counted 2,659,078 input, 2,469,376
+cached-input, and 18,106 output tokens. A2A export crossed the repaired
+capability gate but exposed a later semantic mismatch: the writer SDK request
+still named the parent goal session instead of the exact external incarnation
+session. Both runtime results remain counterevidence. Preflight now checks the
+complete role/incarnation/task/session/output/transport/workspace request
+relation before inference, so a fresh semantically bound pair is still
+required and v9 is not rewritten or promoted.
+
 ## Source surfaces
 
 The first live ambiguity-stop L2 study tested the parent lifecycle itself. Its

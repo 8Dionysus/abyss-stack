@@ -15,7 +15,10 @@ Tracking starts with the community-docs baseline for this repository.
   base-role reviewer continuum retains only the unique capability already
   named by its canonical request and admitted scenario. Preflight now rejects
   a writer or reviewer whose non-empty summon capabilities are absent from the
-  run plan, instead of allowing a real session that can never pass A2A closeout.
+  run plan, or whose summon role, incarnation, parent task, session, outputs,
+  transport, review posture, or workspace semantics differ from the exact
+  launch and task, instead of allowing a real session that can never pass A2A
+  closeout.
 - Resolve symbolic `runtime:workspace-final-manifest#...` evidence anchors as
   exact top-level JSON members. A shorter token such as `git_head` can no
   longer pass by occurring inside the real `source_git_head` member name;

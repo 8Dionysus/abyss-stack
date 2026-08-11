@@ -723,7 +723,10 @@ already the reviewer role, preparation retains only the unique capability
 named by the canonical writer request and present in its admitted scenario;
 missing or multiple matches are not inferred. Every writer and
 reviewer summon request must carry a non-empty capability set contained by its
-admitted plan; this is checked before inference as well as during A2A export.
+admitted plan. Before inference, the request must also match the exact role,
+incarnation, parent task, session, named outputs, transport, review posture,
+and workspace of the admitted task and launch. Both the semantic and
+capability bindings are rechecked during A2A export.
 The derived reviewer plan
 reassigns only the active writer
 task/request step from the writer role to the exact plan-bound reviewer role as

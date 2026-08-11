@@ -8879,27 +8879,24 @@ def test_terminal_result_recovers_when_final_state_save_is_lost(
 
 
 @pytest.mark.parametrize(
-    ("mutator", "validate_request", "failure_code"),
+    ("mutator", "validate_request"),
     (
         (
             lambda request: request.pop("expected_outputs"),
             False,
-            "a2a_summon_request_invalid",
         ),
         (
             lambda request: request["summon_request"].__setitem__(
                 "child_agent_id", "incarnation:fixture:wrong"
             ),
             True,
-            "a2a_summon_request_unbound",
         ),
     ),
 )
-def test_a2a_summon_request_validation_fails_closed(
+def test_summon_request_semantics_fail_closed_before_inference(
     tmp_path: Path,
     mutator: Callable[[dict[str, Any]], None],
     validate_request: bool,
-    failure_code: str,
 ) -> None:
     fixture = _fixture(
         tmp_path,
@@ -8907,21 +8904,9 @@ def test_a2a_summon_request_validation_fails_closed(
         validate_summon_request=validate_request,
     )
     runtime = fixture["runtime"]
-    runtime.start(fixture["launch_path"])
-    _wait_terminal(runtime, fixture["session_id"])
-    with runtime._lock(fixture["session_id"]):
-        state = runtime._load_state(fixture["session_id"])
-        _, plan, binding, task, _, _ = runtime._materialized_payloads(state)
-        with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
-            runtime._validated_a2a_summon_request(
-                state=state,
-                plan=plan,
-                binding=binding,
-                task=task,
-                request_input_id="summon-request",
-                supplied_path=fixture["summon_request_path"],
-            )
-    assert exc_info.value.code == failure_code
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.preflight(fixture["launch_path"])
+    assert exc_info.value.code == "incarnation_task_request_unbound"
 
 
 def test_preflight_rejects_summon_capability_absent_from_plan(
@@ -8938,6 +8923,22 @@ def test_preflight_rejects_summon_capability_absent_from_plan(
         fixture["runtime"].preflight(fixture["launch_path"])
 
     assert exc_info.value.code == "incarnation_task_request_capability_unbound"
+
+
+def test_preflight_rejects_summon_semantics_that_cannot_export_a2a(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        summon_request_mutator=lambda request: request["summon_request"].__setitem__(
+            "session_ref", "session:fixture:foreign"
+        ),
+    )
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        fixture["runtime"].preflight(fixture["launch_path"])
+
+    assert exc_info.value.code == "incarnation_task_request_unbound"
 
 
 def test_a2a_export_requires_exact_independent_review_result(
