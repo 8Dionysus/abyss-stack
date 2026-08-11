@@ -2804,6 +2804,7 @@ def test_preflight_exercises_masked_nested_codex_sandbox(
         and command[index + 1].startswith("permissions.aoa_external_actor=")
     )
     assert f'"{fixture["launch"]["codex_executable"]}"="read"' in permission_override
+    assert '":workspace_roots"="write"' in permission_override
     assert git_directory_present is True
     assert actor_git_mask["masks"]
     assert actor_git_mask["private_directory_views"]
@@ -3125,8 +3126,8 @@ def test_preflight_and_separate_process_return_structured_result(
     )
     assert f'"{sanitized_config}"="read"' in permission_override
     assert f'"{fixture["launch"]["codex_executable"]}"="read"' in permission_override
-    assert f'"{execution_root}"="read"' in permission_override
-    assert f'"{execution_root / ".git"}"="read"' in permission_override
+    assert '":workspace_roots"="read"' in permission_override
+    assert str(execution_root) not in permission_override
     assert '":minimal"="read"' in permission_override
     controller_original_root = (
         runtime._session_dir(fixture["session_id"]) / "inputs" / "controller-immutable"
@@ -5314,8 +5315,8 @@ def test_workspace_write_preparation_stays_inside_allowed_paths(tmp_path: Path) 
     permission_override = next(
         value for value in argv if value.startswith("permissions.aoa_external_actor=")
     )
-    assert f'"{ACTOR_EXECUTION_ROOT}"="write"' in permission_override
-    assert f'"{ACTOR_EXECUTION_ROOT / ".git"}"="read"' in permission_override
+    assert '":workspace_roots"="write"' in permission_override
+    assert str(ACTOR_EXECUTION_ROOT) not in permission_override
     assert not (fixture["workspace"] / "landing-note.md").exists()
     assert result["source_manifest_match"] is True
 

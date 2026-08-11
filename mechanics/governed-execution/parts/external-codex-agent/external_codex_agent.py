@@ -4122,8 +4122,7 @@ def _actor_codex_permission_profile(
         )
     entries: dict[str, str] = {
         ":minimal": "read",
-        str(execution_root): workspace_access,
-        str(execution_root / ".git"): "read",
+        ":workspace_roots": workspace_access,
         str(sanitized_config_path): "read",
     }
     for path in readable_paths:
