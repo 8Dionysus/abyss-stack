@@ -9,6 +9,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Propagate only a profile's validated, verified-release-bound specialized
+  environment into model-issued shell commands through an explicit Codex
+  `shell_environment_policy.set` map. Landing actors can now execute their
+  pinned pytest and `aoa-stats` validation tools while generic profiles retain
+  the core-only, secret-filtered shell environment.
 - Bind every canonical independent reviewer to its exact capability across the
   SDK summon request, scenario, and active review step. A selected
   specialization resolves its owner-authored capability pack; an existing

@@ -205,7 +205,10 @@ schema, explicit model and effort, `approval_policy=never`, an explicit cwd and
 sandbox, `--ignore-user-config`, `--ignore-rules`, `--strict-config`, and
 `--disable multi_agent`. The child inherits only an allowlisted non-secret
 environment; secret-shaped variable names are excluded again from the Codex
-shell environment. No TUI or built-in `spawn_agent` surface participates.
+shell environment. A profile-bound specialized environment is injected through
+an explicit `shell_environment_policy.set` map after validation; the runtime
+does not widen baseline inheritance beyond `core`. No TUI or built-in
+`spawn_agent` surface participates.
 
 Every inference attempt receives a runtime-generated named Codex permission
 profile rather than the undifferentiated `-s workspace-write` shortcut. Before

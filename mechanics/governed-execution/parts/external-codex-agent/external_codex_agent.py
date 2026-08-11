@@ -4266,6 +4266,16 @@ def _actor_codex_permission_profile(
     return "{filesystem={" + filesystem + "},network={enabled=false}}"
 
 
+def _toml_inline_string_map(values: Mapping[str, str]) -> str:
+    """Encode a validated string map for one exact Codex CLI config value."""
+
+    entries = ",".join(
+        f"{json.dumps(key, ensure_ascii=True)}={json.dumps(value, ensure_ascii=True)}"
+        for key, value in sorted(values.items())
+    )
+    return "{" + entries + "}"
+
+
 def _specialized_environment(
     _profile: Mapping[str, Any],
     tool_entry: Mapping[str, Any],
@@ -8646,6 +8656,7 @@ Runtime session identity: {state["session_id"]}
         writable_paths: Sequence[Path] = (),
         denied_paths: Sequence[Path] = (),
         workspace_access: Literal["read", "write"] = "write",
+        shell_environment: Mapping[str, str] | None = None,
     ) -> list[str]:
         executable = str(launch["codex_executable"])
         configuration = realization["configuration"]
@@ -8699,12 +8710,24 @@ Runtime session identity: {state["session_id"]}
             'shell_environment_policy.inherit="core"',
             "-c",
             'shell_environment_policy.exclude=["*KEY*","*TOKEN*","*SECRET*","*PASSWORD*","*CREDENTIAL*"]',
-            "--output-schema",
-            str(output_schema),
-            "--json",
-            "-o",
-            str(output_message),
         ]
+        if shell_environment:
+            common.extend(
+                [
+                    "-c",
+                    "shell_environment_policy.set="
+                    + _toml_inline_string_map(shell_environment),
+                ]
+            )
+        common.extend(
+            [
+                "--output-schema",
+                str(output_schema),
+                "--json",
+                "-o",
+                str(output_message),
+            ]
+        )
         for server in reversed(tool_entry["mcp_server_configs"]):
             server_id = str(server["server_id"])
             endpoint_url = (mcp_endpoint_overrides or {}).get(server_id)
@@ -8971,7 +8994,7 @@ Runtime session identity: {state["session_id"]}
                 tool_entry
             )
             credential_proxies.extend(started_credential_proxies)
-            _, specialized_readable_paths = _specialized_environment(
+            specialized_environment, specialized_readable_paths = _specialized_environment(
                 self.profile,
                 tool_entry,
             )
@@ -9005,6 +9028,7 @@ Runtime session identity: {state["session_id"]}
                     if binding.permission_posture.sandbox_mode == "workspace_write"
                     else "read"
                 ),
+                shell_environment=specialized_environment,
             )
             process_identity_path = attempt_dir / "process-identity.json"
             child_workspace_descriptor = os.dup(projection_descriptor)

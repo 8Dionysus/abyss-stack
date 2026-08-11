@@ -4479,7 +4479,7 @@ def test_model_organ_landing_readonly_profile_admits_exact_runtime_binding(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _enable_specialized_test_release(monkeypatch, tmp_path)
+    release = _enable_specialized_test_release(monkeypatch, tmp_path)
     tool_profile_id = "abyss-stack:external_codex_agent/landing-readonly-v2"
     fixture = _fixture(tmp_path, tool_profile_id=tool_profile_id)
 
@@ -4493,6 +4493,31 @@ def test_model_organ_landing_readonly_profile_admits_exact_runtime_binding(
     assert result is not None
     assert result["status"] == "completed"
     assert result["changed_paths"] == []
+    codex_argv = result["codex_invocations"][0]["argv"]
+    assert (
+        "shell_environment_policy.set="
+        '{"AOA_STATS_ROOT"="'
+        + str((release / "owners/aoa-stats").resolve())
+        + '","PYTHONDONTWRITEBYTECODE"="1","PYTHONNOUSERSITE"="1",'
+        '"PYTHONPATH"="'
+        + str((release / "environments/landing-validation-v1/pythonpath").resolve())
+        + '"}'
+    ) in codex_argv
+
+
+def test_generic_profile_does_not_inject_specialized_shell_environment(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path)
+
+    fixture["runtime"].run_to_terminal(fixture["launch_path"])
+    result = fixture["runtime"].result(fixture["session_id"])
+
+    assert result is not None
+    assert not any(
+        argument.startswith("shell_environment_policy.set=")
+        for argument in result["codex_invocations"][0]["argv"]
+    )
 
 
 @pytest.mark.parametrize(
