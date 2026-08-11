@@ -68,6 +68,9 @@ SHARED_INDEX_MAX_BYTES = 512 * 1024 * 1024
 WRAPPER_BOOTSTRAP_PYTHON = Path("/usr/bin/python3")
 BWRAP_EXECUTABLE = Path("/usr/bin/bwrap")
 WRAPPER_COMPILER = Path("/usr/bin/cc")
+WRAPPER_MATERIAL_ROOT = Path("wrapper-bootstrap-materials")
+WRAPPER_MATERIAL_RUNTIME_ROOT = Path("/__aoa_external_codex_runtime__")
+WRAPPER_MATERIAL_ACTIVE_PATH = WRAPPER_MATERIAL_RUNTIME_ROOT / "active.json"
 
 
 class InstallError(RuntimeError):
@@ -1221,9 +1224,46 @@ def wrapper_paths(bin_dir: Path, name: str) -> tuple[Path, Path]:
     return launcher, companion
 
 
+def wrapper_material_path(release_root: Path, entrypoint_name: str) -> Path:
+    return release_root / WRAPPER_MATERIAL_ROOT / f"{entrypoint_name}.bootstrap.py"
+
+
+def wrapper_material_text(entrypoint_name: str) -> str:
+    return wrapper_bootstrap_text(WRAPPER_MATERIAL_ACTIVE_PATH, entrypoint_name)
+
+
+def wrapper_bootstrap_for_release(
+    release_root: Path,
+    active_path: Path,
+    entrypoint_name: str,
+) -> bytes:
+    material_path = wrapper_material_path(release_root, entrypoint_name)
+    if not material_path.exists():
+        # Historical releases predate content-addressed wrapper materials.
+        # Keep them rollback-callable, but every newly staged release carries
+        # and executes its exact admitted bootstrap material.
+        return wrapper_bootstrap_text(active_path, entrypoint_name).encode("utf-8")
+    material = require_regular_file(
+        material_path,
+        f"wrapper bootstrap material {entrypoint_name}",
+    ).read_text(encoding="utf-8")
+    replacements = {
+        repr(str(WRAPPER_MATERIAL_ACTIVE_PATH)): repr(str(active_path)),
+        repr(str(WRAPPER_MATERIAL_RUNTIME_ROOT)): repr(str(active_path.parent)),
+    }
+    for marker, value in replacements.items():
+        if material.count(marker) != 1:
+            raise InstallError(
+                f"release wrapper material marker is invalid: {entrypoint_name}"
+            )
+        material = material.replace(marker, value)
+    return material.encode("utf-8")
+
+
 def publish_wrappers(
     bin_dir: Path,
     runtime_root: Path,
+    release_root: Path,
     active_path: Path,
     wrappers: dict[str, str],
     static_launcher: bytes,
@@ -1231,7 +1271,9 @@ def publish_wrappers(
     backups: dict[str, str | None] = {}
     for name, entrypoint in wrappers.items():
         launcher, companion = wrapper_paths(bin_dir, name)
-        companion_raw = wrapper_bootstrap_text(active_path, entrypoint).encode("utf-8")
+        companion_raw = wrapper_bootstrap_for_release(
+            release_root, active_path, entrypoint
+        )
         for key, path, expected, mode in (
             (f"{name}.bootstrap.py", companion, companion_raw, 0o444),
             (name, launcher, static_launcher, 0o755),
@@ -1251,6 +1293,7 @@ def publish_wrappers(
 
 def wrapper_status_rows(
     bin_dir: Path,
+    release_root: Path,
     active_path: Path,
     wrappers: dict[str, str],
     static_launcher: bytes,
@@ -1263,8 +1306,8 @@ def wrapper_status_rows(
             companion,
             f"wrapper bootstrap {name}",
         )
-        expected_companion = wrapper_bootstrap_text(active_path, entrypoint).encode(
-            "utf-8"
+        expected_companion = wrapper_bootstrap_for_release(
+            release_root, active_path, entrypoint
         )
         launcher_current = (
             launcher.read_bytes() == static_launcher
@@ -1303,6 +1346,17 @@ def release_manifest(files: Iterable[tuple[Path, Path]]) -> dict[str, object]:
     for path, text in entrypoints.items():
         raw = text.encode("utf-8")
         rows.append({"path": path, "sha256": sha256_bytes(raw), "size": len(raw)})
+    for entrypoint_name in entrypoints:
+        raw = wrapper_material_text(entrypoint_name).encode("utf-8")
+        rows.append(
+            {
+                "path": (
+                    WRAPPER_MATERIAL_ROOT / f"{entrypoint_name}.bootstrap.py"
+                ).as_posix(),
+                "sha256": sha256_bytes(raw),
+                "size": len(raw),
+            }
+        )
     rows.sort(key=lambda row: str(row["path"]))
     identity = {"schema_version": MANIFEST_SCHEMA_VERSION, "files": rows}
     digest = sha256_bytes(canonical_bytes(identity))
@@ -1396,6 +1450,19 @@ def materialize_release(
         ):
             path = staging / name
             path.write_text(entrypoint_text(target), encoding="utf-8", newline="\n")
+            os.chmod(path, 0o444)
+        for entrypoint_name in (
+            "agent-entrypoint.py",
+            "bind-entrypoint.py",
+            "study-entrypoint.py",
+        ):
+            path = staging / WRAPPER_MATERIAL_ROOT / f"{entrypoint_name}.bootstrap.py"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                wrapper_material_text(entrypoint_name),
+                encoding="utf-8",
+                newline="\n",
+            )
             os.chmod(path, 0o444)
         manifest_path = staging / "release-manifest.json"
         manifest_path.write_text(
@@ -1635,6 +1702,7 @@ def install(
     wrapper_backups = publish_wrappers(
         bin_dir,
         runtime_root,
+        release_root,
         active_path,
         wrappers,
         static_wrapper_for_release(release_root),
@@ -1947,6 +2015,7 @@ def activate(
     publish_wrappers(
         bin_dir.resolve(),
         runtime_root,
+        release_root,
         active_path,
         wrappers,
         static_wrapper_for_release(release_root),
@@ -2130,6 +2199,7 @@ def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
     }
     wrapper_status = wrapper_status_rows(
         bin_dir.resolve(),
+        release_root,
         active_path,
         wrappers,
         static_wrapper_for_release(release_root),

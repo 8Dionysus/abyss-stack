@@ -204,6 +204,23 @@ def artifact_gate_payload(
     }
 
 
+def test_release_identity_covers_wrapper_bootstrap_material(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_material = runtime_install.wrapper_material_text
+    baseline = runtime_install.release_manifest([])
+    monkeypatch.setattr(
+        runtime_install,
+        "wrapper_material_text",
+        lambda entrypoint: original_material(entrypoint) + "# material drift\n",
+    )
+
+    changed = runtime_install.release_manifest([])
+
+    assert changed["release_id"] != baseline["release_id"]
+    assert changed["release_digest"] != baseline["release_digest"]
+
+
 def write_artifact_gate(path: Path, payload: dict[str, object]) -> None:
     path.write_text(
         "#!/usr/bin/python3\n"
