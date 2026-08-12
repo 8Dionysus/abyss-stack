@@ -99,6 +99,7 @@ def test_workflow_routes_reusable_commands_through_ci_gate() -> None:
     assert "AOA_SDK_SOURCE_ROOT: ${{ runner.temp }}/aoa-sdk-source" in workflow
     assert "AOA_SKILLS_SOURCE_ROOT: ${{ runner.temp }}/aoa-skills-source" in workflow
     assert "PYTHONPATH: ${{ runner.temp }}/aoa-sdk-source/src" in workflow
+    assert "TMPDIR: ${{ runner.temp }}" in workflow
     assert ".deps/aoa-sdk" not in workflow
     assert shellcheck_commands[0]["command"][0] == "shellcheck"
 

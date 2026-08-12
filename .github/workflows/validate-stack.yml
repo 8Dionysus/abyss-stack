@@ -77,6 +77,7 @@ jobs:
           AOA_SKILLS_SOURCE_ROOT: ${{ runner.temp }}/aoa-skills-source
           AOA_STATS_ROOT: ${{ runner.temp }}/aoa-stats-validator
           PYTHONPATH: ${{ runner.temp }}/aoa-sdk-source/src
+          TMPDIR: ${{ runner.temp }}
         run: python scripts/ci_gate.py --mode release
 
       - name: Shellcheck scripts
