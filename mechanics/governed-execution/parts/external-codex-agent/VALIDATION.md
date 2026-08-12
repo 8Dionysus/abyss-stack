@@ -60,8 +60,9 @@ source-independent private `.git` body with equivalent status/diff, and is
 mounted from its exact open inode at the stable child coordinate. Source
 manifests are checked before and after materialization, source-parent replacement
 cannot expose source config to the actor, a source race fails without an orphan
-projection, and a post-publication target swap cannot become the durable actor
-baseline. Publication is relative to a pinned parent descriptor, its baseline
+projection, projection-local Git packing disables promisor lazy fetches before
+actor containment, and a post-publication target swap cannot become the durable
+actor baseline. Publication is relative to a pinned parent descriptor, its baseline
 comes from the retained staging inode, uses non-replacing rename, and cleans the
 exact committed inode after an injected post-rename failure for both source and
 review-seed projections while refusing a replacement inode. Unicode/JSON-escaped

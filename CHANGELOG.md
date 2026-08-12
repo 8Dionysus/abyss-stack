@@ -9,6 +9,9 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Disable promisor lazy fetches in the projection-local Git environment, so
+  private-Git packing cannot invoke a source checkout's configured remote
+  helper before the actor containment boundary.
 - Remove the last role-scoped MCP bearer from the external runtime's
   exec-time environment: the installed CLI now re-execs through a clean
   environment and carries exact bearer bytes in a bounded sealed descriptor,

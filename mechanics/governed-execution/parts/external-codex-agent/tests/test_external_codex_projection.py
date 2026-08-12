@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -50,6 +51,66 @@ def _source_repo(tmp_path: Path) -> tuple[Path, dict[str, object]]:
         "Authorization: Bearer SOURCE-CONFIG-MARKER",
     )
     return source, build_workspace_manifest(source)
+
+
+def test_projection_packing_disables_promisor_lazy_fetch_helpers(
+    tmp_path: Path,
+) -> None:
+    source, source_identity = _source_repo(tmp_path)
+    blob_oid = _git(source, "rev-parse", "HEAD:tracked.txt")
+    blob_path = source / ".git" / "objects" / blob_oid[:2] / blob_oid[2:]
+    assert blob_path.is_file()
+
+    marker = tmp_path / "projection-promisor-helper-ran"
+    helper = tmp_path / "projection-promisor-helper"
+    helper.write_text(
+        "#!/bin/sh\n"
+        f"/usr/bin/touch {shlex.quote(str(marker))}\n"
+        "exit 1\n",
+        encoding="utf-8",
+    )
+    helper.chmod(0o700)
+    _git(source, "config", "extensions.partialClone", "origin")
+    _git(source, "config", "protocol.ext.allow", "always")
+    _git(source, "config", "remote.origin.url", f"ext::{helper}")
+    _git(source, "config", "remote.origin.promisor", "true")
+    _git(source, "config", "remote.origin.partialclonefilter", "blob:none")
+    blob_path.unlink()
+
+    unsafe_environment = PROJECTION._git_environment()
+    unsafe_environment.pop("GIT_NO_LAZY_FETCH")
+    unsafe = subprocess.run(
+        [
+            "/usr/bin/git",
+            "--no-optional-locks",
+            "-C",
+            str(source),
+            "pack-objects",
+            "--stdout",
+            "--revs",
+        ],
+        input=(str(source_identity["git_head"]) + "\n").encode("ascii"),
+        env=unsafe_environment,
+        check=False,
+        capture_output=True,
+    )
+    assert unsafe.returncode != 0
+    assert marker.is_file()
+    marker.unlink()
+
+    with pytest.raises(
+        ProjectionError,
+        match="private actor Git construction rejected the admitted baseline",
+    ):
+        materialize_actor_projection(
+            source,
+            tmp_path / "runtime" / "actor-workspace",
+            source_manifest=source_identity,
+            source_manifest_digest="sha256:" + "1" * 64,
+        )
+
+    assert PROJECTION._git_environment()["GIT_NO_LAZY_FETCH"] == "1"
+    assert marker.exists() is False
 
 
 def test_inventory_distinguishes_disappearing_directory_from_other_scandir_errors(
