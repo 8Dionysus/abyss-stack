@@ -9,6 +9,14 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Remove the last role-scoped MCP bearer from the external runtime's
+  exec-time environment: the installed CLI now re-execs through a clean
+  environment and carries exact bearer bytes in a bounded sealed descriptor,
+  while actor permissions deny `/proc`. Parent yield/re-entry turns receive an
+  isolated non-writable `HOME` and have tool-bearing features disabled before
+  inference. Prepared non-landing independent reviewers may now consume their
+  exact writer projection under the derived review family, and A2A publication
+  revalidates the canonical writer `result.json` in its final locked snapshot.
 - Propagate only a profile's validated, verified-release-bound specialized
   environment into model-issued shell commands through an explicit Codex
   `shell_environment_policy.set` map. Landing actors can now execute their

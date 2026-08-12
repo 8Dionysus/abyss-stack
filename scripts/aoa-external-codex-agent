@@ -1,9 +1,73 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import fcntl
+import json
+import os
+import re
 import runpy
 import sys
 from pathlib import Path
+
+
+CREDENTIAL_FD_ENV = "AOA_EXTERNAL_CODEX_MCP_CREDENTIALS_FD"
+CREDENTIAL_ENV_RE = re.compile(r"^AOA_[A-Z0-9_]+_MCP_READ_BEARER_TOKEN$")
+
+
+def _reexec_with_brokered_credentials() -> None:
+    if CREDENTIAL_FD_ENV in os.environ:
+        return
+    credentials = {
+        key: value
+        for key, value in os.environ.items()
+        if CREDENTIAL_ENV_RE.fullmatch(key) and value
+    }
+    if not credentials:
+        return
+    descriptor = os.memfd_create(
+        "aoa-external-codex-mcp-credentials",
+        getattr(os, "MFD_ALLOW_SEALING", 0x0002),
+    )
+    raw = json.dumps(
+        credentials,
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    try:
+        remaining = memoryview(raw)
+        while remaining:
+            written = os.write(descriptor, remaining)
+            if written <= 0:
+                raise OSError("credential descriptor write was incomplete")
+            remaining = remaining[written:]
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        fcntl.fcntl(
+            descriptor,
+            fcntl.F_ADD_SEALS,
+            fcntl.F_SEAL_SEAL
+            | fcntl.F_SEAL_SHRINK
+            | fcntl.F_SEAL_GROW
+            | fcntl.F_SEAL_WRITE,
+        )
+        os.set_inheritable(descriptor, True)
+        environment = {
+            key: value
+            for key, value in os.environ.items()
+            if not CREDENTIAL_ENV_RE.fullmatch(key)
+        }
+        environment[CREDENTIAL_FD_ENV] = str(descriptor)
+        script = str(Path(__file__).resolve())
+        os.execve(
+            sys.executable,
+            [sys.executable, "-s", "-B", script, *sys.argv[1:]],
+            environment,
+        )
+    finally:
+        os.close(descriptor)
+
+
+_reexec_with_brokered_credentials()
 
 
 BACKEND = (

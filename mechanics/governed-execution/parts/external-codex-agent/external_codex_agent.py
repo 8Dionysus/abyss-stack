@@ -121,6 +121,7 @@ FOREGROUND_OBSERVATION_INTERVAL_SECONDS = 0.25
 TERMINAL_STATES = {
     "completed",
     "failed",
+    "interrupted",
     "paused",
     "review_required",
     "authority_blocked",
@@ -393,7 +394,9 @@ def _start_mcp_credential_proxies(
     try:
         for server in tool_entry["mcp_server_configs"]:
             token_name = str(server["bearer_token_env_var"])
-            token = os.environ.get(token_name)
+            token = BROKERED_MCP_CREDENTIALS.get(token_name) or os.environ.get(
+                token_name
+            )
             if not token:
                 raise ExternalCodexRuntimeError(
                     "mcp_credential_unavailable",
@@ -416,6 +419,91 @@ def _close_mcp_credential_proxies(proxies: list[_McpCredentialProxy]) -> None:
     for proxy in reversed(proxies):
         proxy.close()
     proxies.clear()
+
+
+def _load_brokered_mcp_credentials() -> dict[str, str]:
+    """Consume credentials carried across the clean launcher re-exec.
+
+    The descriptor number is public coordination metadata. Bearer bytes never
+    re-enter this process's exec-time environment and therefore are not
+    recoverable through ``/proc/<pid>/environ`` by the actor.
+    """
+
+    raw_descriptor = os.environ.pop(
+        "AOA_EXTERNAL_CODEX_MCP_CREDENTIALS_FD",
+        None,
+    )
+    if raw_descriptor is None:
+        return {}
+    try:
+        descriptor = int(raw_descriptor)
+    except ValueError as exc:
+        raise ExternalCodexRuntimeError(
+            "mcp_credential_broker_invalid",
+            "brokered MCP credential descriptor is invalid",
+        ) from exc
+    if descriptor < 3:
+        raise ExternalCodexRuntimeError(
+            "mcp_credential_broker_invalid",
+            "brokered MCP credential descriptor is reserved",
+        )
+    try:
+        observed = os.fstat(descriptor)
+        required_seals = (
+            fcntl.F_SEAL_SEAL
+            | fcntl.F_SEAL_SHRINK
+            | fcntl.F_SEAL_GROW
+            | fcntl.F_SEAL_WRITE
+        )
+        if (
+            not stat.S_ISREG(observed.st_mode)
+            or observed.st_size <= 0
+            or observed.st_size > 256 * 1024
+            or fcntl.fcntl(descriptor, fcntl.F_GET_SEALS) & required_seals
+            != required_seals
+        ):
+            raise ExternalCodexRuntimeError(
+                "mcp_credential_broker_invalid",
+                "brokered MCP credential descriptor is not one bounded sealed file",
+            )
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        raw = os.read(descriptor, observed.st_size + 1)
+        if len(raw) != observed.st_size:
+            raise ExternalCodexRuntimeError(
+                "mcp_credential_broker_invalid",
+                "brokered MCP credential bytes are incomplete",
+            )
+        payload = json.loads(raw)
+    except ExternalCodexRuntimeError:
+        raise
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ExternalCodexRuntimeError(
+            "mcp_credential_broker_invalid",
+            "brokered MCP credential payload is unavailable",
+        ) from exc
+    finally:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+    if (
+        not isinstance(payload, dict)
+        or not payload
+        or any(
+            re.fullmatch(r"AOA_[A-Z0-9_]+_MCP_READ_BEARER_TOKEN", key) is None
+            or not isinstance(value, str)
+            or not value
+            for key, value in payload.items()
+        )
+    ):
+        raise ExternalCodexRuntimeError(
+            "mcp_credential_broker_invalid",
+            "brokered MCP credential payload has an unsupported shape",
+        )
+    return {str(key): str(value) for key, value in payload.items()}
+
+
+BROKERED_MCP_CREDENTIALS = _load_brokered_mcp_credentials()
 
 
 RESUMABLE_STATES = {"paused", "interrupted", "review_required", "authority_blocked"}
@@ -6233,7 +6321,10 @@ class ExternalCodexRuntime:
         mount_launcher_digest = sha256_file(containment_paths["mount_launcher"])
         for server in tool_entry["mcp_server_configs"]:
             token_name = str(server["bearer_token_env_var"])
-            if not os.environ.get(token_name):
+            if not (
+                BROKERED_MCP_CREDENTIALS.get(token_name)
+                or os.environ.get(token_name)
+            ):
                 raise ExternalCodexRuntimeError(
                     "mcp_credential_unavailable",
                     f"required role-scoped MCP credential is unavailable: {token_name}",
@@ -7225,14 +7316,13 @@ class ExternalCodexRuntime:
         binding: IncarnationBinding,
     ) -> dict[str, Any]:
         if (
-            task.get("task_family") != "landing_review"
-            or task.get("execution_posture") != "independent_review"
+            task.get("execution_posture") != "independent_review"
             or task.get("allowed_effect_class") != "read_only"
             or binding.permission_posture.sandbox_mode != "read_only"
         ):
             raise ExternalCodexRuntimeError(
                 "workspace_projection_seed_forbidden",
-                "writer projection seeds are admitted only for a read-only independent landing reviewer",
+                "writer projection seeds are admitted only for a read-only independent reviewer",
             )
         envelope_path = Path(str(seed.get("envelope_path", "")))
         envelope_ref = {
@@ -7261,6 +7351,20 @@ class ExternalCodexRuntime:
             )
         with self._lock(writer_session_id):
             writer_state = self._load_state(writer_session_id)
+            writer_task_family = str(writer_state.get("task_family") or "")
+            expected_reviewer_family = (
+                "landing_review"
+                if writer_task_family.startswith("landing")
+                else f"{writer_task_family}_review"
+            )
+            if (
+                not writer_task_family
+                or task.get("task_family") != expected_reviewer_family
+            ):
+                raise ExternalCodexRuntimeError(
+                    "workspace_projection_seed_forbidden",
+                    "reviewer task family is not derived from the exact seeded writer task family",
+                )
             expected = self._review_seed_envelope_locked(writer_state)
             if envelope != expected:
                 raise ExternalCodexRuntimeError(
@@ -9245,6 +9349,7 @@ Runtime session identity: {state["session_id"]}
                 ),
                 writable_paths=(attempt_dir, scratch),
                 denied_paths=(
+                    Path("/proc"),
                     self._session_dir(str(state["session_id"]))
                     / "inputs"
                     / "controller-immutable",
@@ -12063,6 +12168,13 @@ Runtime session identity: {state["session_id"]}
                     )
                 _verify_a2a_export_snapshot(
                     (
+                        (
+                            "writer result",
+                            {
+                                "artifact_ref": str(writer_result_path),
+                                "artifact_digest": str(writer_state["result_digest"]),
+                            },
+                        ),
                         ("writer report", writer["report_ref"]),
                         ("writer events", writer["events_ref"]),
                         (
@@ -13204,9 +13316,14 @@ class ExternalCodexParentReentry:
     def _codex_environment(
         self, obligation: Mapping[str, Any], scratch: Path
     ) -> dict[str, str]:
+        isolated_home = ExternalCodexRuntime._isolated_empty_directory(
+            scratch / "parent-home",
+            error_code="reentry_parent_home_unavailable",
+            purpose="parent-turn HOME",
+        )
         environment = {
             "CODEX_HOME": str(obligation["codex_home"]),
-            "HOME": os.environ.get("HOME", "/nonexistent"),
+            "HOME": str(isolated_home),
             "PATH": "/usr/local/bin:/usr/bin:/bin",
             "LANG": "C.UTF-8",
             "TMPDIR": str(scratch),
@@ -13230,6 +13347,30 @@ class ExternalCodexParentReentry:
             "--strict-config",
             "--disable",
             "multi_agent",
+            "--disable",
+            "shell_tool",
+            "--disable",
+            "code_mode_host",
+            "--disable",
+            "apps",
+            "--disable",
+            "browser_use",
+            "--disable",
+            "computer_use",
+            "--disable",
+            "image_generation",
+            "--disable",
+            "view_image",
+            "--disable",
+            "goals",
+            "--disable",
+            "memories",
+            "--disable",
+            "plugins",
+            "--disable",
+            "hooks",
+            "--disable",
+            "tool_suggest",
             "-m",
             str(configuration["runtime"]["model_slug"]),
             "-c",

@@ -162,8 +162,11 @@ allowlisting with unadmitted bare-name refusal, direct workspace/non-system
 executable refusal including shell-name impersonation, opaque AWK program-body
 refusal, isolated non-writable shell `HOME` with ambient-profile refusal,
 ripgrep preprocessor/hostname/decompressor dispatch refusal with ordinary
-search preserved and ambient ripgrep configuration disabled,
-attempt-local MCP bearer relay with the upstream credential absent from Codex,
+search preserved and ambient ripgrep configuration disabled, clean CLI re-exec
+with the upstream MCP bearer carried only through a bounded sealed descriptor,
+absence of the bearer name and value from live controller, worker, supervisor,
+and Codex exec-time environments, actor `/proc` denial, attempt-local MCP bearer
+relay with the upstream credential absent from Codex,
 incremental streaming relay and active-connection termination before finalize,
 Codex 0.147 bubblewrap/private-PID selection with legacy fallback disabled,
 live Codex process-environment proof that the upstream bearer name and value
@@ -223,7 +226,8 @@ state save, recovery of the completed semantic turn when its event preceded
 the state save, locked status observation, re-entry recovery after a crash
 before turn materialization, completed-turn recovery without a second
 inference, immutable child-attempt admission independent of later canonical
-child-result changes, rejection of tool events in parent turns, false-event
+child-result changes, pre-inference parent-turn tool disabling and isolated
+non-writable parent `HOME`, rejection of tool events in parent turns, false-event
 filtering with no second parent turn, and exact-thread parent re-entry with a
 distilled return. The fake Codex fixture exercises both filtered and wake branches;
 separate live receipts are required for the installed product surface. The

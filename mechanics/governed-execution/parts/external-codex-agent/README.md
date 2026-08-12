@@ -379,13 +379,14 @@ global-config effects remain disabled in this first admission. A green runtime
 fixture proves the transport and guards; it does not prove Luna's landing fit
 or net benefit.
 
-For MCP-bearing read roles, the worker keeps the real owner bearer outside the
-Codex process and injects it through an attempt-local loopback relay. Codex sees
-only a random, expiring proxy path and no bearer environment variable; its
-model-issued commands run under the Codex 0.147 bubblewrap backend with private
-PID and network namespaces because legacy Landlock fallback is explicitly
-disabled for this bounded filesystem posture. Thus procfs remains usable for
-ordinary process work without exposing the upstream role credential. The
+For MCP-bearing read roles, the installed CLI removes the real owner bearer
+from its exec-time environment during one clean re-exec, carries the exact
+bytes through a bounded sealed descriptor, and injects them only through an
+attempt-local loopback relay. Codex sees only a random, expiring proxy path and
+no bearer environment variable; actor filesystem permissions deny `/proc`,
+while the controller retains host PID coordinates for exact lifecycle and
+cleanup receipts. The model-issued commands still run under the Codex 0.147
+bubblewrap backend with legacy Landlock fallback explicitly disabled. The
 runtime does not claim exhaustive path-alias classification from command events
 that omit effective working directory. Streaming MCP events are forwarded
 incrementally, and active authenticated relay sockets and handlers are

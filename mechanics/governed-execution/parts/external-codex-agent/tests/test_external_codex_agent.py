@@ -90,6 +90,7 @@ CONTROLLER_PATH = PART_ROOT / "external_codex_agent.py"
 BINDER_PATH = PART_ROOT / "bind_external_actor_launch.py"
 PREPARER_PATH = PART_ROOT / "prepare_landing_study.py"
 SUPERVISOR_PATH = PART_ROOT / "external_codex_supervisor.py"
+CLI_PATH = PART_ROOT.parents[3] / "scripts/aoa-external-codex-agent"
 ZERO_DIGEST = "sha256:" + "0" * 64
 
 
@@ -4421,6 +4422,80 @@ def test_live_codex_process_environment_has_no_upstream_mcp_credential(
     assert interrupted["status"] == "interrupted"
 
 
+def test_cli_brokers_mcp_credential_outside_process_environments_and_denies_proc(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        task_family="eval_application",
+        role_mcp="aoa_evals",
+        objective_marker="FAKE_WAIT_FOR_INTERRUPT",
+    )
+    token_name = "AOA_EVALS_MCP_READ_BEARER_TOKEN"
+    token = "upstream-token-not-visible-in-proc"
+    process = subprocess.Popen(
+        [
+            str(CLI_PATH),
+            "run-to-terminal",
+            "--state-root",
+            str(fixture["runtime"].state_root),
+            "--profile",
+            str(PROFILE_PATH),
+            "--launch",
+            str(fixture["launch_path"]),
+        ],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={**os.environ, token_name: token},
+    )
+    runtime = fixture["runtime"]
+    status: dict[str, Any] | None = None
+    deadline = time.monotonic() + 15
+    try:
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                stdout, stderr = process.communicate(timeout=1)
+                pytest.fail(
+                    f"brokered CLI exited before observation: {stdout} {stderr}"
+                )
+            try:
+                status = runtime.status(fixture["session_id"])
+            except RUNTIME.ExternalCodexRuntimeError:
+                time.sleep(0.05)
+                continue
+            if all(
+                isinstance(status.get(key), int)
+                for key in ("worker_pid", "supervisor_pid", "codex_pid")
+            ):
+                break
+            time.sleep(0.05)
+        assert status is not None
+        observed_pids = {
+            process.pid,
+            int(status["worker_pid"]),
+            int(status["supervisor_pid"]),
+            int(status["codex_pid"]),
+        }
+        for pid in observed_pids:
+            environment = Path(f"/proc/{pid}/environ").read_bytes()
+            assert token_name.encode() not in environment
+            assert token.encode() not in environment
+        state = runtime._load_state(fixture["session_id"])
+        rendered = "\n".join(state["attempts"][0]["codex_argv"])
+        assert '"/proc"="deny"' in rendered
+        assert runtime.interrupt(fixture["session_id"])["status"] == "interrupted"
+        stdout, stderr = process.communicate(timeout=15)
+        assert process.returncode == 0, stderr
+        response = json.loads(stdout)
+        assert response["ok"] is True
+        assert response["result"]["status"] == "interrupted"
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            process.wait(timeout=5)
+
+
 def test_runtime_tool_profile_ids_are_model_neutral() -> None:
     profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
     profile_ids = [item["profile_id"] for item in profile["tool_profiles"]]
@@ -4716,6 +4791,41 @@ def test_reviewer_semantics_are_generic_outside_landing() -> None:
         "eval_selection_review",
         "independent_actor_review",
     )
+
+
+def test_non_landing_prepared_reviewer_seed_is_runtime_admitted(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "writer",
+        role_id="reviewer",
+        task_family="eval_selection",
+        exact_baseline=True,
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    writer_result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+
+    response = PREPARER._prepare_reviewer(
+        argparse.Namespace(
+            writer_launch=str(fixture["launch_path"]),
+            writer_result=str(writer_result_path),
+            output_root=str(tmp_path / "review-preparation"),
+            state_root=str(runtime.state_root),
+            aoa_sdk_root=str(SDK_ROOT),
+            review_instance_id="eval-selection-review",
+        )
+    )
+    preparation = json.loads(
+        Path(response["preparation_path"]).read_text(encoding="utf-8")
+    )
+    launch_path = Path(preparation["launch_path"])
+    launch = json.loads(launch_path.read_text(encoding="utf-8"))
+    task = json.loads(Path(launch["task"]["path"]).read_text(encoding="utf-8"))
+
+    assert task["task_family"] == "eval_selection_review"
+    assert runtime.preflight(launch_path)["admitted"] is True
 
 
 def test_reviewer_preparation_uses_historical_coordinate_after_ancestor_retarget(
@@ -9661,6 +9771,7 @@ def test_a2a_export_requires_exact_independent_review_result(
 
     final_publication_refs = (
         Path(str(review_seed_ref["artifact_ref"])),
+        writer_result_path,
         Path(str(writer_result["actor_final_manifest_ref"]["artifact_ref"])),
         Path(str(writer_result["actor_delta_ref"]["artifact_ref"])),
         Path(
@@ -10082,6 +10193,60 @@ def test_parent_inference_yields_and_exact_authority_event_reenters_same_thread(
         "external_parent.reentry_started",
         "external_parent.reentry_completed",
     ]
+
+
+def test_parent_turn_disables_tools_before_inference_and_isolates_home(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_ambiguity_stop",
+        identity_suffix="luna-xhigh-parent-passive",
+    )
+    obligation_path = _parent_reentry_obligation(
+        tmp_path,
+        fixture,
+        reentry_id="reentry:fixture:parent-passive",
+    )
+    obligation = json.loads(obligation_path.read_text(encoding="utf-8"))
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    _, _, realization = bridge._validate_obligation(obligation)
+    scratch = tmp_path / "parent-scratch"
+    scratch.mkdir()
+
+    environment = bridge._codex_environment(obligation, scratch)
+    command = bridge._codex_command(
+        obligation,
+        realization,
+        output_schema=tmp_path / "output.schema.json",
+        output_message=tmp_path / "output.json",
+        thread_id=None,
+    )
+
+    assert Path(environment["HOME"]).parent == scratch
+    assert Path(environment["HOME"]).is_dir()
+    assert Path(environment["HOME"]).stat().st_mode & 0o777 == 0o500
+    disabled = {
+        command[index + 1]
+        for index, value in enumerate(command[:-1])
+        if value == "--disable"
+    }
+    assert {
+        "multi_agent",
+        "shell_tool",
+        "code_mode_host",
+        "apps",
+        "browser_use",
+        "computer_use",
+        "image_generation",
+        "view_image",
+        "goals",
+        "memories",
+        "plugins",
+        "hooks",
+        "tool_suggest",
+    }.issubset(disabled)
 
 
 def test_parent_yield_rejects_any_tool_event(tmp_path: Path) -> None:

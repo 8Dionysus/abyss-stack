@@ -278,11 +278,15 @@ Semantic profiles admit only `read-only` or bounded `workspace-write` target
 authority with model-shell network disabled. A role-scoped read profile may
 configure exactly one loopback AoA MCP (`aoa_evals`, `aoa_stats`, or
 `aoa_memo`) from its own required bearer-token environment variable. The
-worker retains that upstream credential outside Codex and starts an
+installed CLI consumes that variable in a clean re-exec, removes the bearer
+name and value from the runtime's exec-time environment, and carries the exact
+bytes in one bounded sealed descriptor. The runtime retains the recovered
+credential outside Codex and starts an
 attempt-local loopback proxy which injects it only while relaying to the fixed
 owner endpoint. Codex receives a random attempt-scoped proxy path with no
-bearer environment variable; its model shell has network disabled and cannot
-use that path directly. The relay forwards streaming response bytes as they
+bearer environment variable; its model shell has network disabled, its
+filesystem profile denies `/proc`, and it cannot use that path directly. The
+relay forwards streaming response bytes as they
 become available. Before terminal finalization it stops admission, closes all
 active client and upstream sockets, and joins its handler threads, so neither
 the path nor an already-authenticated connection survives the attempt. Ambient
@@ -528,12 +532,13 @@ runtime's general environment-observation policy. Jq program/module sources are
 opaque, while Git-config coordinates supplied through `--rawfile`,
 `--slurpfile`, `--argfile`, or ordinary input-file operands are classified as
 secret access. Ordinary inline jq transforms, including `.env` data fields and
-literal `"env"` keys, remain classifiable. Codex command
-events do not carry their effective working directory, so this runtime does not
-claim exhaustive semantic recognition of procfs path aliases. Credential
-separation is instead enforced structurally by removing the upstream bearer
-from Codex and hiding the credential-bearing worker behind Codex's private PID
-namespace.
+literal `"env"` keys, remain classifiable. Codex command events do not carry
+their effective working directory, so this runtime does not claim exhaustive
+semantic recognition of path aliases. Credential separation is instead
+enforced structurally: the CLI re-execs without the bearer, consumes it from a
+sealed descriptor, never passes it to Codex, and denies `/proc` in the actor
+filesystem profile while retaining one host-PID coordinate system for
+supervisor cleanup and continuation receipts.
 Ordinary ripgrep source search remains classifiable, but `--pre`,
 `--hostname-bin`, and `-z`/`--search-zip` are opaque because they spawn helper
 processes whose commands are absent from the Codex event. The runtime also
@@ -781,7 +786,8 @@ artifact digest and requires the later locked durable state to retain that
 same digest. Immediately before output publication, it reacquires the reviewer
 session lock while retaining the writer lock, revalidates the canonical result,
 review seed, both summon requests and schemas, and every exported writer and
-reviewer report/event/workspace/actor-final/actor-delta artifact, constructs the
+reviewer report/event/workspace/actor-final/actor-delta artifact plus the
+canonical writer runtime result itself, constructs the
 payload from that locked snapshot, and holds both locks through the atomic
 output write. Result, task, durable state, and final locked state must all retain
 task family `landing_review`. A reviewer
@@ -880,9 +886,11 @@ When and only when the admitted event selects `wake_parent`, the controller
 builds a compact return bound to the child-result and observed-event digests,
 then invokes `codex exec resume <exact-parent-thread-id>`. The resumed Sol must
 return a typed parent-reentry report whose identities and authority action
-match that return. Both the initial yield and resumed parent turn admit only
-passive reasoning or agent-message items; any command execution, MCP call, file
-change, or other tool item fails the parent turn instead of broadening its
+match that return. Both the initial yield and resumed parent turn are launched
+with an isolated non-writable `HOME` and all available tool-bearing features
+disabled before inference; their event admission still accepts only passive
+reasoning or agent-message items. Any command execution, MCP call, file change,
+or other tool item fails closed as a second boundary instead of broadening its
 authority. A successful cycle therefore has two completed turns on one
 parent thread with an inference-free durable wait between them. Re-entry
 validation failure is terminal evidence; only a contained controller/process
