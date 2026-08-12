@@ -231,6 +231,7 @@ def test_wrapper_snapshot_avoids_per_file_permission_arguments() -> None:
     bootstrap = runtime_install.wrapper_bootstrap_text(
         Path("/runtime/active.json"),
         "agent-entrypoint.py",
+        "sha256:" + "1" * 64,
     )
 
     assert '"--ro-bind-data"' in bootstrap
@@ -570,10 +571,14 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
     assert preload_marker.exists() is False
     launcher = bin_dir / "aoa-external-codex-agent"
     assert launcher.read_bytes().startswith(b"\x7fELF")
+    assert b".bootstrap.py" not in launcher.read_bytes()
     runtime_install.validate_static_wrapper(launcher.read_bytes())
     companion = Path(str(launcher) + ".bootstrap.py")
-    assert companion.read_text(encoding="utf-8").startswith("#!/bin/false\n")
-    assert companion.stat().st_mode & 0o777 == 0o444
+    assert companion.exists() is False
+    assert status["wrappers"]["aoa-external-codex-agent"]["bootstrap_transport"] == (
+        "embedded_elf_rodata"
+    )
+    assert status["wrappers"]["aoa-external-codex-agent"]["bootstrap_path"] is None
     agent_entrypoint = release_root / "agent-entrypoint.py"
     assert agent_entrypoint.read_text(encoding="utf-8").startswith("#!/bin/false\n")
     assert agent_entrypoint.stat().st_mode & 0o111 == 0
@@ -592,6 +597,38 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
     )
     assert study.stdout == "study:exact-sdk\n"
     assert not list(release_root.rglob("__pycache__"))
+
+    replacement_marker = tmp_path / "replacement-companion-ran"
+    companion.write_text(
+        f"open({str(replacement_marker)!r}, 'w').write('ran')\n",
+        encoding="utf-8",
+    )
+    companion.chmod(0o755)
+    replacement_attempt = subprocess.run(
+        [str(launcher)],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=ambient_environment,
+        preexec_fn=lower_wrapper_descriptor_limit,
+    )
+    assert replacement_attempt.stdout == "agent:exact-sdk\n"
+    assert replacement_marker.exists() is False
+
+    active_path = runtime_root / "active.json"
+    active_raw = active_path.read_bytes()
+    active_path.write_bytes(active_raw + b"\n")
+    drifted_active_attempt = subprocess.run(
+        [str(launcher)],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=ambient_environment,
+        preexec_fn=lower_wrapper_descriptor_limit,
+    )
+    assert drifted_active_attempt.returncode != 0
+    assert "active release identity drift" in drifted_active_attempt.stderr
+    active_path.write_bytes(active_raw)
 
     repeated = runtime_install.install(
         source,

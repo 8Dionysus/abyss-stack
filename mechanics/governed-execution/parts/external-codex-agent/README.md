@@ -430,9 +430,10 @@ inactive.
 
 Each installed wrapper is a minimal static x86_64 Linux ELF with no dynamic
 interpreter. Before its first dynamic exec it removes every ambient `LD_*`
-loader variable, derives its adjacent non-executable read-only Python
-companion through `/proc/self/exe`, and starts that companion with fixed
-`/usr/bin/python3 -I -B`. Installation, activation, and status build and
+loader variable and starts its own embedded Python bootstrap with fixed
+`/usr/bin/python3 -I -B`. The embedded payload binds the exact digest of the
+atomically published `active.json`; it opens no adjacent companion pathname.
+Installation, activation, and status build and
 validate this launcher from the packaged assembly with fixed `/usr/bin/cc`;
 therefore x86_64 Linux, that compiler coordinate, bubblewrap at
 `/usr/bin/bwrap`, and unprivileged user/mount namespaces are host

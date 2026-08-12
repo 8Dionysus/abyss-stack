@@ -240,8 +240,10 @@ release-directory rename and replacement after wrapper verification proves
 that a deferred import still reads the namespace-private verified snapshot.
 The installer also proves that each launcher is a static x86_64 ELF without
 `PT_INTERP`, that an ambient constructor-bearing `LD_PRELOAD` cannot run before
-the wrapper filters loader state, and that the adjacent Python companion is
-non-executable and read-only. Wrapper execution under writable directory modes
+the wrapper filters loader state, that a same-UID replacement at the former
+adjacent companion coordinate is never executed, and that otherwise-valid
+active-record byte drift is rejected by the digest embedded in the launcher.
+Wrapper execution under writable directory modes
 is also proven not to create bytecode inside the immutable release. A
 clean-checkout race between initial posture capture and release
 hashing is proven to fail before wrapper or active-receipt publication. The

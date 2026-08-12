@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Embed each installed wrapper's Python bootstrap and exact `active.json`
+  digest in its already-admitted static ELF, so a same-UID replacement of an
+  adjacent companion or active-record bytes cannot execute host code before
+  release verification and containment.
 - Reject ignored conventional credential files such as `.npmrc` before their
   bytes are hashed into an actor projection, and classify direct model reads of
   those coordinates as secret access.

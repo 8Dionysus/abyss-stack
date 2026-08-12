@@ -39,9 +39,10 @@ profile pins before packaging them.
 The packaged SDK root must therefore satisfy both isolated imports and the
 preparer's exact non-Python contract reads. Each stable wrapper is a minimal
 static x86_64 Linux ELF with no `PT_INTERP`; it filters every `LD_*` variable
-before the first dynamic executable, derives an adjacent non-executable
-read-only companion through `/proc/self/exe`, and executes fixed
-`/usr/bin/python3 -I -B`. Installation, activation, and status compile and
+before the first dynamic executable and executes its own embedded bootstrap
+through fixed `/usr/bin/python3 -I -B`. That payload binds the exact
+`active.json` digest compiled into the already-running ELF and never opens an
+adjacent companion pathname. Installation, activation, and status compile and
 validate that launcher from the packaged assembly through fixed
 `/usr/bin/cc`. The companion consults a regular-file active receipt, verifies
 and seals every manifest file, and materializes those descriptors at the

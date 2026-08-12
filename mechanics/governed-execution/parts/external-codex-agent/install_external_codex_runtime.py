@@ -71,6 +71,8 @@ WRAPPER_COMPILER = Path("/usr/bin/cc")
 WRAPPER_MATERIAL_ROOT = Path("wrapper-bootstrap-materials")
 WRAPPER_MATERIAL_RUNTIME_ROOT = Path("/__aoa_external_codex_runtime__")
 WRAPPER_MATERIAL_ACTIVE_PATH = WRAPPER_MATERIAL_RUNTIME_ROOT / "active.json"
+WRAPPER_MATERIAL_ACTIVE_DIGEST = "sha256:" + "0" * 64
+WRAPPER_EMBEDDED_PAYLOAD_NAME = "external-codex-bootstrap-payload.py"
 
 
 class InstallError(RuntimeError):
@@ -298,7 +300,12 @@ def validate_static_wrapper(raw: bytes) -> None:
             )
 
 
-def build_static_wrapper(source_path: Path | None = None) -> bytes:
+def build_static_wrapper(
+    bootstrap_payload: bytes,
+    source_path: Path | None = None,
+) -> bytes:
+    if not bootstrap_payload or b"\0" in bootstrap_payload:
+        raise InstallError("external Codex bootstrap payload is invalid")
     source = require_regular_file(
         source_path
         if source_path is not None
@@ -312,7 +319,11 @@ def build_static_wrapper(source_path: Path | None = None) -> bytes:
     if not os.access(compiler, os.X_OK):
         raise InstallError(f"external Codex static bootstrap compiler is not executable: {compiler}")
     with tempfile.TemporaryDirectory(prefix="aoa-external-codex-bootstrap-") as temporary:
-        output = Path(temporary) / "bootstrap"
+        temporary_root = Path(temporary)
+        output = temporary_root / "bootstrap"
+        (temporary_root / WRAPPER_EMBEDDED_PAYLOAD_NAME).write_bytes(
+            bootstrap_payload
+        )
         try:
             completed = subprocess.run(
                 [
@@ -331,6 +342,7 @@ def build_static_wrapper(source_path: Path | None = None) -> bytes:
                 stderr=subprocess.PIPE,
                 text=True,
                 timeout=30,
+                cwd=temporary_root,
                 env={
                     "HOME": "/nonexistent",
                     "LANG": "C.UTF-8",
@@ -351,13 +363,41 @@ def build_static_wrapper(source_path: Path | None = None) -> bytes:
     return raw
 
 
-def static_wrapper_for_release(release_root: Path) -> bytes:
+def static_wrapper_for_release(
+    release_root: Path,
+    active_path: Path,
+    entrypoint_name: str,
+    expected_active_digest: str,
+) -> tuple[bytes, bytes]:
     packaged_source = release_root / "runtime/external_codex_static_bootstrap.S"
+    payload = wrapper_bootstrap_for_release(
+        release_root,
+        active_path,
+        entrypoint_name,
+        expected_active_digest,
+    )
     if packaged_source.exists() or packaged_source.is_symlink():
-        return build_static_wrapper(packaged_source)
+        return build_static_wrapper(payload, packaged_source), payload
     # Compatibility rollback for release manifests created before the static
     # launcher source entered the packaged runtime closure.
-    return build_static_wrapper()
+    return build_static_wrapper(payload), payload
+
+
+def compiled_wrapper_artifacts(
+    release_root: Path,
+    active_path: Path,
+    wrappers: dict[str, str],
+    expected_active_digest: str,
+) -> dict[str, tuple[bytes, bytes]]:
+    return {
+        name: static_wrapper_for_release(
+            release_root,
+            active_path,
+            entrypoint_name,
+            expected_active_digest,
+        )
+        for name, entrypoint_name in wrappers.items()
+    }
 
 
 def require_regular_file(path: Path, label: str) -> Path:
@@ -978,11 +1018,13 @@ runpy.run_path(str(TARGET), run_name="__main__")
 def wrapper_bootstrap_text(
     active_path: Path,
     entrypoint_name: str,
+    expected_active_digest: str,
 ) -> str:
-    # The wrapper's isolated bootstrap is stable across runtime-interpreter
-    # changes. It reads the interpreter only from the atomically published
-    # active record, so staged wrapper replacement remains callable before and
-    # after that single publication point.
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", expected_active_digest):
+        raise InstallError("external Codex active-record digest is invalid")
+    # The payload is compiled into the exact static launcher. Its active-record
+    # digest binds the single activation publication point before any release
+    # or interpreter coordinate from that record can influence execution.
     bootstrap = '''from __future__ import annotations
 import fcntl
 import hashlib
@@ -996,6 +1038,7 @@ from pathlib import Path
 ACTIVE = Path(__AOA_ACTIVE_PATH__)
 RUNTIME_ROOT = Path(__AOA_RUNTIME_ROOT__)
 ENTRYPOINT_NAME = __AOA_ENTRYPOINT_NAME__
+EXPECTED_ACTIVE_DIGEST = __AOA_EXPECTED_ACTIVE_DIGEST__
 BWRAP = Path("/usr/bin/bwrap")
 
 FILE_FLAGS = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
@@ -1129,9 +1172,12 @@ try:
     active_metadata = os.fstat(active_descriptor)
     if not stat.S_ISREG(active_metadata.st_mode):
         raise SystemExit(f"external Codex active release is invalid: {ACTIVE}")
-    record = json.loads(read_all(active_descriptor, 1024 * 1024))
+    active_raw = read_all(active_descriptor, 1024 * 1024)
 finally:
     os.close(active_descriptor)
+if digest(active_raw) != EXPECTED_ACTIVE_DIGEST:
+    raise SystemExit("external Codex active release identity drift")
+record = json.loads(active_raw)
 if (
     not isinstance(record, dict)
     or record.get("schema_version")
@@ -1402,6 +1448,7 @@ os.execve(
         "__AOA_ACTIVE_PATH__": repr(str(active_path)),
         "__AOA_RUNTIME_ROOT__": repr(str(active_path.parent)),
         "__AOA_ENTRYPOINT_NAME__": repr(entrypoint_name),
+        "__AOA_EXPECTED_ACTIVE_DIGEST__": repr(expected_active_digest),
     }
     for marker, value in replacements.items():
         if bootstrap.count(marker) != 1:
@@ -1421,20 +1468,29 @@ def wrapper_material_path(release_root: Path, entrypoint_name: str) -> Path:
 
 
 def wrapper_material_text(entrypoint_name: str) -> str:
-    return wrapper_bootstrap_text(WRAPPER_MATERIAL_ACTIVE_PATH, entrypoint_name)
+    return wrapper_bootstrap_text(
+        WRAPPER_MATERIAL_ACTIVE_PATH,
+        entrypoint_name,
+        WRAPPER_MATERIAL_ACTIVE_DIGEST,
+    )
 
 
 def wrapper_bootstrap_for_release(
     release_root: Path,
     active_path: Path,
     entrypoint_name: str,
+    expected_active_digest: str,
 ) -> bytes:
     material_path = wrapper_material_path(release_root, entrypoint_name)
     if not material_path.exists():
         # Historical releases predate content-addressed wrapper materials.
         # Keep them rollback-callable, but every newly staged release carries
         # and executes its exact admitted bootstrap material.
-        return wrapper_bootstrap_text(active_path, entrypoint_name).encode("utf-8")
+        return wrapper_bootstrap_text(
+            active_path,
+            entrypoint_name,
+            expected_active_digest,
+        ).encode("utf-8")
     material = require_regular_file(
         material_path,
         f"wrapper bootstrap material {entrypoint_name}",
@@ -1442,6 +1498,7 @@ def wrapper_bootstrap_for_release(
     replacements = {
         repr(str(WRAPPER_MATERIAL_ACTIVE_PATH)): repr(str(active_path)),
         repr(str(WRAPPER_MATERIAL_RUNTIME_ROOT)): repr(str(active_path.parent)),
+        repr(WRAPPER_MATERIAL_ACTIVE_DIGEST): repr(expected_active_digest),
     }
     for marker, value in replacements.items():
         if material.count(marker) != 1:
@@ -1458,28 +1515,24 @@ def publish_wrappers(
     release_root: Path,
     active_path: Path,
     wrappers: dict[str, str],
-    static_launcher: bytes,
+    wrapper_artifacts: dict[str, tuple[bytes, bytes]],
 ) -> dict[str, str | None]:
     backups: dict[str, str | None] = {}
-    for name, entrypoint in wrappers.items():
-        launcher, companion = wrapper_paths(bin_dir, name)
-        companion_raw = wrapper_bootstrap_for_release(
-            release_root, active_path, entrypoint
-        )
-        for key, path, expected, mode in (
-            (f"{name}.bootstrap.py", companion, companion_raw, 0o444),
-            (name, launcher, static_launcher, 0o755),
+    if set(wrapper_artifacts) != set(wrappers):
+        raise InstallError("compiled wrapper set is incomplete")
+    for name in wrappers:
+        launcher, _legacy_companion = wrapper_paths(bin_dir, name)
+        expected, _embedded_payload = wrapper_artifacts[name]
+        if (
+            launcher.exists()
+            and not launcher.is_symlink()
+            and launcher.read_bytes() == expected
+            and stat.S_IMODE(launcher.stat().st_mode) == 0o755
         ):
-            if (
-                path.exists()
-                and not path.is_symlink()
-                and path.read_bytes() == expected
-                and stat.S_IMODE(path.stat().st_mode) == mode
-            ):
-                backups[key] = None
-                continue
-            backups[key] = backup_existing_wrapper(path, runtime_root)
-            atomic_write(path, expected, mode)
+            backups[name] = None
+            continue
+        backups[name] = backup_existing_wrapper(launcher, runtime_root)
+        atomic_write(launcher, expected, 0o755)
     return backups
 
 
@@ -1488,33 +1541,26 @@ def wrapper_status_rows(
     release_root: Path,
     active_path: Path,
     wrappers: dict[str, str],
-    static_launcher: bytes,
+    wrapper_artifacts: dict[str, tuple[bytes, bytes]],
 ) -> dict[str, dict[str, object]]:
     result: dict[str, dict[str, object]] = {}
-    for name, entrypoint in wrappers.items():
-        launcher, companion = wrapper_paths(bin_dir, name)
+    if set(wrapper_artifacts) != set(wrappers):
+        raise InstallError("compiled wrapper set is incomplete")
+    for name in wrappers:
+        launcher, _legacy_companion = wrapper_paths(bin_dir, name)
         launcher = require_regular_file(launcher, f"wrapper {name}")
-        companion = require_regular_file(
-            companion,
-            f"wrapper bootstrap {name}",
-        )
-        expected_companion = wrapper_bootstrap_for_release(
-            release_root, active_path, entrypoint
-        )
+        expected_launcher, embedded_payload = wrapper_artifacts[name]
         launcher_current = (
-            launcher.read_bytes() == static_launcher
+            launcher.read_bytes() == expected_launcher
             and stat.S_IMODE(launcher.stat().st_mode) == 0o755
-        )
-        companion_current = (
-            companion.read_bytes() == expected_companion
-            and stat.S_IMODE(companion.stat().st_mode) == 0o444
         )
         result[name] = {
             "path": str(launcher),
             "digest": sha256_file(launcher),
-            "bootstrap_path": str(companion),
-            "bootstrap_digest": sha256_file(companion),
-            "current": launcher_current and companion_current,
+            "bootstrap_transport": "embedded_elf_rodata",
+            "bootstrap_path": None,
+            "bootstrap_digest": sha256_bytes(embedded_payload),
+            "current": launcher_current,
         }
         if not result[name]["current"]:
             raise InstallError(f"wrapper drift: {launcher}")
@@ -1930,15 +1976,6 @@ def install(
         "aoa-external-actor-bind": "bind-entrypoint.py",
         "aoa-external-codex-study": "study-entrypoint.py",
     }
-    wrapper_backups = publish_wrappers(
-        bin_dir,
-        runtime_root,
-        release_root,
-        active_path,
-        wrappers,
-        static_wrapper_for_release(release_root),
-    )
-
     verify_release(release_root)
     assert_python_identity_unchanged(python_executable, python_identity)
     now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
@@ -1964,10 +2001,27 @@ def install(
             or (isinstance(stats_posture, dict) and stats_posture["dirty"])
         ),
     }
+    active_raw = (
+        json.dumps(active, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+    ).encode("utf-8")
+    wrapper_artifacts = compiled_wrapper_artifacts(
+        release_root,
+        active_path,
+        wrappers,
+        sha256_bytes(active_raw),
+    )
     atomic_write(
         active_path,
-        (json.dumps(active, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8"),
+        active_raw,
         0o644,
+    )
+    wrapper_backups = publish_wrappers(
+        bin_dir,
+        runtime_root,
+        release_root,
+        active_path,
+        wrappers,
+        wrapper_artifacts,
     )
     receipt = {
         "schema_version": SCHEMA_VERSION,
@@ -1976,9 +2030,7 @@ def install(
         "release_created": created,
         "previous_active": previous_active,
         "wrappers": {name: str(wrapper_paths(bin_dir, name)[0]) for name in wrappers},
-        "wrapper_bootstraps": {
-            name: str(wrapper_paths(bin_dir, name)[1]) for name in wrappers
-        },
+        "wrapper_bootstraps": {name: "embedded_elf_rodata" for name in wrappers},
         "wrapper_backups": wrapper_backups,
         "rollback": {
             "command": (
@@ -2245,14 +2297,6 @@ def activate(
         "aoa-external-actor-bind": "bind-entrypoint.py",
         "aoa-external-codex-study": "study-entrypoint.py",
     }
-    publish_wrappers(
-        bin_dir.resolve(),
-        runtime_root,
-        release_root,
-        active_path,
-        wrappers,
-        static_wrapper_for_release(release_root),
-    )
     verify_release(release_root)
     assert_python_identity_unchanged(python_executable, python_identity)
     now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
@@ -2275,10 +2319,27 @@ def activate(
         ),
         "artifact_admission": artifact_admission,
     }
+    active_raw = (
+        json.dumps(active, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+    ).encode("utf-8")
+    wrapper_artifacts = compiled_wrapper_artifacts(
+        release_root,
+        active_path,
+        wrappers,
+        sha256_bytes(active_raw),
+    )
     atomic_write(
         active_path,
-        (json.dumps(active, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8"),
+        active_raw,
         0o644,
+    )
+    publish_wrappers(
+        bin_dir.resolve(),
+        runtime_root,
+        release_root,
+        active_path,
+        wrappers,
+        wrapper_artifacts,
     )
     return {"schema_version": SCHEMA_VERSION, "operation": "activate", "active": active}
 
@@ -2392,7 +2453,8 @@ def recorded_artifact_admission_status(
 def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
     runtime_root = runtime_root.resolve()
     active_path = require_regular_file(runtime_root / "active.json", "active release record")
-    active = json.loads(active_path.read_text(encoding="utf-8"))
+    active_raw = active_path.read_bytes()
+    active = json.loads(active_raw)
     if active.get("schema_version") != ACTIVE_SCHEMA_VERSION:
         raise InstallError("active release schema mismatch")
     python_value = active.get("python_executable")
@@ -2436,7 +2498,12 @@ def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
         release_root,
         active_path,
         wrappers,
-        static_wrapper_for_release(release_root),
+        compiled_wrapper_artifacts(
+            release_root,
+            active_path,
+            wrappers,
+            sha256_bytes(active_raw),
+        ),
     )
     return {
         "schema_version": SCHEMA_VERSION,
