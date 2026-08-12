@@ -2506,6 +2506,35 @@ def _shell_inline_body(tokens: Sequence[str]) -> str | None:
     return None
 
 
+def _shell_has_startup_dispatch(tokens: Sequence[str]) -> bool:
+    """Detect shell modes that execute startup state before an inline body."""
+
+    if not tokens or Path(tokens[0]).name.lower() not in SHELL_NAMES:
+        return False
+    for token in tokens[1:]:
+        if token == "--":
+            return False
+        if token.startswith("--"):
+            shell_option = token.lower().split("=", 1)[0]
+            if shell_option in {"--login", "--interactive"} or (
+                len(shell_option) >= len("--i")
+                and "--init-file".startswith(shell_option)
+            ) or (
+                len(shell_option) >= len("--rc")
+                and "--rcfile".startswith(shell_option)
+            ):
+                return True
+            continue
+        if token.startswith("-") and token != "-":
+            if any(option in token[1:] for option in "il"):
+                return True
+            continue
+        if token.startswith("+") and token != "+":
+            continue
+        return False
+    return False
+
+
 def _shell_tokenization_analysis(
     command: str,
 ) -> tuple[tuple[tuple[str, ...], ...], bool]:
@@ -3464,7 +3493,9 @@ def _command_has_unclassified_indirection(command: str) -> bool:
             if _executable_path_is_opaque(raw_segment[0]):
                 return True
             if raw_executable in SHELL_NAMES:
-                if _shell_inline_body(raw_segment) is None:
+                if _shell_has_startup_dispatch(raw_segment) or (
+                    _shell_inline_body(raw_segment) is None
+                ):
                     return True
                 continue
             segment = _unwrap_command(raw_segment)

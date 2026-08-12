@@ -9,6 +9,8 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Mark login, interactive, rcfile, and init-file shell modes as opaque startup
+  dispatch while continuing to inspect their inline body for forbidden effects.
 - Parse direct and option-attached argv coordinates before secret-effect
   classification, so `diff`, `grep`, `sed`, `wc`, `sort`, and equivalent
   system-utility forms cannot conceal a credential or private Git-config read.

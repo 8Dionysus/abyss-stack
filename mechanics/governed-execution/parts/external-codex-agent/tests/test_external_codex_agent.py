@@ -6375,7 +6375,7 @@ def test_indirect_interpreter_effect_is_unclassified_but_fixed_validation_is_adm
     assert RUNTIME._command_has_unclassified_indirection(command) is True
     assert (
         RUNTIME._command_has_unclassified_indirection(
-            "/usr/bin/zsh -lc '/usr/bin/rg -n fixture README.md'"
+            "/usr/bin/zsh -c '/usr/bin/rg -n fixture README.md'"
         )
         is False
     )
@@ -6598,13 +6598,38 @@ def test_shell_c_after_script_operand_is_fail_closed(command: str) -> None:
 
 
 def test_shell_c_in_option_position_remains_classifiable() -> None:
-    command = "/usr/bin/bash -O extglob -lc '/usr/bin/true'"
+    command = "/usr/bin/bash -O extglob -c '/usr/bin/true'"
 
     tokenizations, incomplete = RUNTIME._shell_tokenization_analysis(command)
 
     assert tokenizations[-1] == ("/usr/bin/true",)
     assert incomplete is False
     assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/bash -lc '/usr/bin/true'",
+        "/usr/bin/bash --login -c '/usr/bin/true'",
+        "/usr/bin/bash -ic '/usr/bin/true'",
+        "/usr/bin/zsh -lc '/usr/bin/true'",
+        "/usr/bin/sh -ilc '/usr/bin/true'",
+    ),
+)
+def test_shell_login_and_interactive_startup_are_fail_closed(command: str) -> None:
+    tokenizations, incomplete = RUNTIME._shell_tokenization_analysis(command)
+
+    assert tokenizations[-1] == ("/usr/bin/true",)
+    assert incomplete is False
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+def test_login_shell_body_effects_remain_visible() -> None:
+    command = "/usr/bin/bash -lc '/usr/bin/git push; /usr/bin/true'"
+
+    assert "push" in RUNTIME._command_effects(command)
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
 
 
 @pytest.mark.parametrize(
