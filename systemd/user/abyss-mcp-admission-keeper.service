@@ -1,6 +1,8 @@
 [Unit]
 Description=Refresh OS Abyss MCP admission state without issuing owner authority
 Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/README.md
+After=abyss-mcp-modern-admission-refresh.service
+StartLimitIntervalSec=0
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
 ConditionPathExists=/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/deployments/latest.json

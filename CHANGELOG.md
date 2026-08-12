@@ -9,6 +9,14 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Close the modern MCP boot race seen by new Codex sessions. The recovery
+  timer now starts after one second, the source-owned Codex credential launcher
+  synchronously requires all eleven production units and loopback listeners
+  before `exec`, and an incomplete but still-current production fleet is
+  restarted without using bootstrap or resetting claims before its exact
+  process canaries and catalog are renewed. Admission Keeper and preflight
+  sweep now settle finite publication bursts behind that recovery transaction
+  without becoming permanently failed through `unit-start-limit-hit`.
 - Recover the exact modern MCP read fleet after a cold start outlives registry
   or contour currentness. The admission backstop now resets only an expired
   registry to claim-free shadow state, uses the existing manual bootstrap

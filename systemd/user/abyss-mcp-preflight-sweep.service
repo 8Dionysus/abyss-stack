@@ -1,6 +1,8 @@
 [Unit]
 Description=Refresh fail-closed preflight reports for managed MCP contours
 Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/README.md
+After=abyss-mcp-modern-admission-refresh.service abyss-mcp-admission-keeper.service
+StartLimitIntervalSec=0
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/managed-contours.json
 ConditionPathIsDirectory=/srv/AbyssOS/abyss-stack/Logs/mcp/preflight

@@ -66,6 +66,12 @@ MCP_ADMISSION_KEEPER_PATH = (
 MCP_MODERN_ADMISSION_REFRESH_UNIT = (
     REPO_ROOT / "systemd" / "user" / "abyss-mcp-modern-admission-refresh.service"
 )
+MCP_MODERN_ADMISSION_REFRESH_TIMER = (
+    REPO_ROOT / "systemd" / "user" / "abyss-mcp-modern-admission-refresh.timer"
+)
+MCP_PREFLIGHT_SWEEP_UNIT = (
+    REPO_ROOT / "systemd" / "user" / "abyss-mcp-preflight-sweep.service"
+)
 MCP_MODERN_ADMISSION_REFRESH_SCRIPT = (
     REPO_ROOT / "scripts" / "aoa-refresh-modern-mcp-admission"
 )
@@ -2233,6 +2239,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 {
                     "AOA_STACK_ROOT": str(stack_root),
                     "AOA_CODEX_EXECUTABLE": str(fake_codex),
+                    "AOA_MCP_READINESS_SKIP": "1",
                     "CAPTURE_TOKEN": str(capture_token),
                     "CAPTURE_ARGS": str(capture_args),
                 }
@@ -2292,6 +2299,108 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             self.assertIn("conflicts", conflict.stderr)
             self.assertNotIn(MCP_HTTP_AUTH_TOKEN, conflict.stdout + conflict.stderr)
 
+    def test_mcp_http_codex_client_recovers_before_interactive_exec(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            secret_root = stack_root / "Secrets" / "Configs"
+            secret_root.mkdir(parents=True)
+            for index, name in enumerate(CODEX_MCP_READ_CREDENTIAL_NAMES):
+                credential = secret_root / name
+                credential.write_text(
+                    f"readiness-owner-{index}-" + (chr(ord("b") + index) * 48) + "\n",
+                    encoding="utf-8",
+                )
+                credential.chmod(0o600)
+
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            ready_marker = root / "ready"
+            systemctl_log = root / "systemctl.log"
+            fake_systemctl = fake_bin / "systemctl"
+            fake_systemctl.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "if [[ \"$*\" == --user\\ is-active\\ --quiet* ]]; then\n"
+                "  [[ -f \"$READINESS_MARKER\" ]]\n"
+                "  exit\n"
+                "fi\n"
+                "if [[ \"$*\" == \"--user start abyss-mcp-modern-admission-refresh.service\" ]]; then\n"
+                "  printf '%s\\n' \"$*\" >> \"$SYSTEMCTL_LOG\"\n"
+                "  : > \"$READINESS_MARKER\"\n"
+                "  exit 0\n"
+                "fi\n"
+                "exit 2\n",
+                encoding="utf-8",
+            )
+            fake_systemctl.chmod(0o755)
+            fake_ss = fake_bin / "ss"
+            fake_ss.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "[[ -f \"$READINESS_MARKER\" ]]\n"
+                "for port in 5420 5421 5422 5423 5424 5425 5426 5427 5428 5430 5431; do\n"
+                "  printf 'LISTEN 0 128 127.0.0.1:%s 0.0.0.0:*\\n' \"$port\"\n"
+                "done\n",
+                encoding="utf-8",
+            )
+            fake_ss.chmod(0o755)
+            executed = root / "executed"
+            fake_codex = root / "codex"
+            fake_codex.write_text(
+                "#!/usr/bin/env bash\n"
+                ": > \"$CODEX_EXECUTED\"\n",
+                encoding="utf-8",
+            )
+            fake_codex.chmod(0o755)
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CODEX_EXECUTABLE": str(fake_codex),
+                    "CODEX_EXECUTED": str(executed),
+                    "PATH": f"{fake_bin}:{env['PATH']}",
+                    "READINESS_MARKER": str(ready_marker),
+                    "SYSTEMCTL_LOG": str(systemctl_log),
+                }
+            )
+            for environment_name in (
+                *(auth["env"] for auth in ORGAN_MCP_READ_AUTH.values()),
+                "ABYSS_STACK_MCP_READ_BEARER_TOKEN",
+                "AOA_MCP_READINESS_SKIP",
+            ):
+                env.pop(environment_name, None)
+
+            first = subprocess.run(
+                [str(MCP_HTTP_CODEX_CLIENT), "resume", "test-thread"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(first.returncode, 0, first.stderr)
+            self.assertTrue(executed.exists())
+            self.assertEqual(
+                systemctl_log.read_text(encoding="utf-8").splitlines(),
+                ["--user start abyss-mcp-modern-admission-refresh.service"],
+            )
+
+            second = subprocess.run(
+                [str(MCP_HTTP_CODEX_CLIENT), "exec", "health"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertEqual(
+                systemctl_log.read_text(encoding="utf-8").splitlines(),
+                ["--user start abyss-mcp-modern-admission-refresh.service"],
+            )
+
     @unittest.skipIf(
         hasattr(os, "geteuid") and os.geteuid() == 0,
         "MCP HTTP Codex client installs are user-scoped",
@@ -2334,6 +2443,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                     "AOA_CONFIGS_ROOT": str(configs_root),
                     "HOME": str(home),
                     "AOA_CODEX_EXECUTABLE": str(fake_codex),
+                    "AOA_MCP_READINESS_SKIP": "1",
                     "CAPTURE_TOKEN": str(capture_token),
                 }
             )
@@ -2584,6 +2694,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
     ) -> None:
         script = MCP_MODERN_ADMISSION_REFRESH_SCRIPT.read_text(encoding="utf-8")
         unit = MCP_MODERN_ADMISSION_REFRESH_UNIT.read_text(encoding="utf-8")
+        timer = MCP_MODERN_ADMISSION_REFRESH_TIMER.read_text(encoding="utf-8")
+        keeper = MCP_ADMISSION_KEEPER_UNIT.read_text(encoding="utf-8")
+        preflight = MCP_PREFLIGHT_SWEEP_UNIT.read_text(encoding="utf-8")
 
         self.assertIn(
             'REBASE_DECISION_REF="owner://abyss-stack/decision/ABYSS-STACK-D-0109"',
@@ -2609,9 +2722,23 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertIn("  production \\", script)
         self.assertIn("build_preflight production", script)
         self.assertIn("report-production.json", script)
+        self.assertIn('systemctl --user reset-failed "${production_units[@]}"', script)
+        self.assertNotIn(
+            "modern MCP production recovery refused while admission is still current",
+            script,
+        )
         self.assertNotIn("mcp-candidate.service", script)
         self.assertNotIn("mcp-internal-effect.service", script)
         self.assertIn("TimeoutStartSec=10min", unit)
+        self.assertIn("OnBootSec=1s", timer)
+        self.assertIn("After=abyss-mcp-modern-admission-refresh.service", keeper)
+        self.assertIn("StartLimitIntervalSec=0", keeper)
+        self.assertIn(
+            "After=abyss-mcp-modern-admission-refresh.service "
+            "abyss-mcp-admission-keeper.service",
+            preflight,
+        )
+        self.assertIn("StartLimitIntervalSec=0", preflight)
 
         cleanup_start = script.index("cleanup_recovery()")
         cleanup_end = script.index("trap cleanup_recovery EXIT")

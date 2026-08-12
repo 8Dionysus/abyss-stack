@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 8597310,
+  "allowed_tracked_bytes": 31587735,
+  "approved_by": "repository-owner",
+  "base_ref": "1d94233a8da53ae5a4b0290d927f9f2138f4f4b7",
+  "changed_generated_bytes": 8597310,
+  "changed_generated_files": 104,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "2f50660562829651aabd5a14bb930e066bde64e00b2c094af07ba150ff963495",
+  "reason": "Refresh the portable family for the reviewed D-0109 boot readiness barrier and current-admission repair; this receipt admits only the measured generated family for the bounded source diff without raising standing budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 31587735,
+  "tracked_bytes_max": 24117248
+}

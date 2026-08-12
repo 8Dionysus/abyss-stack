@@ -4,6 +4,23 @@ set -euo pipefail
 stack_root="${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}"
 modern_codex_default="/srv/abyss-machine/runtimes/codex-os-abyss-mcp/0.147.0-abyss.2/bin/codex-os-abyss-mcp"
 modern_server_default="abyss_stack,abyss_machine,aoa_decisions,aoa_memo,aoa_session_memory,aoa_evals,aoa_kag,aoa_stats,aoa_4pda_connector,aoa_telegram_connector,aoa_discord_connector"
+readiness_service="abyss-mcp-modern-admission-refresh.service"
+readiness_timeout_seconds=600
+
+readiness_units=(
+  abyss-stack-mcp-read.service
+  aoa-organ-mcp-read@abyss-machine.service
+  aoa-organ-mcp-read@aoa-decisions.service
+  aoa-organ-mcp-read@aoa-memo.service
+  aoa-organ-mcp-read@aoa-session-memory.service
+  aoa-organ-mcp-read@aoa-evals.service
+  aoa-organ-mcp-read@aoa-kag.service
+  aoa-organ-mcp-read@aoa-stats.service
+  aoa-organ-mcp-read@aoa-4pda-connector.service
+  aoa-organ-mcp-read@aoa-telegram-connector.service
+  aoa-organ-mcp-read@aoa-discord-connector.service
+)
+readiness_ports=(5420 5421 5422 5423 5424 5425 5426 5427 5428 5430 5431)
 
 fail() {
   printf 'abyss-stack Codex MCP HTTP client: %s\n' "$1" >&2
@@ -45,6 +62,71 @@ load_credential() {
   printf -v "$environment_name" '%s' "$token"
   # shellcheck disable=SC2163  # environment_name intentionally names the export.
   export "$environment_name"
+}
+
+metadata_only_invocation() {
+  local arg=""
+  local first_positional=""
+
+  for arg in "$@"; do
+    case "$arg" in
+      -h|--help|-V|--version)
+        return 0
+        ;;
+      --)
+        break
+        ;;
+      -*)
+        ;;
+      *)
+        first_positional="$arg"
+        break
+        ;;
+    esac
+  done
+
+  case "$first_positional" in
+    completion|features|help|login|logout|mcp|plugin)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+modern_fleet_ready() {
+  local listeners=""
+  local port=""
+  local unit=""
+
+  command -v systemctl >/dev/null 2>&1 || return 1
+  command -v ss >/dev/null 2>&1 || return 1
+  for unit in "${readiness_units[@]}"; do
+    systemctl --user is-active --quiet "$unit" || return 1
+  done
+  listeners="$(ss -H -ltn 2>/dev/null)" || return 1
+  for port in "${readiness_ports[@]}"; do
+    grep -Eq "(^|[[:space:]])127\\.0\\.0\\.1:${port}([[:space:]]|$)" <<<"$listeners" || return 1
+  done
+}
+
+ensure_modern_fleet_ready() {
+  local skip="${AOA_MCP_READINESS_SKIP:-0}"
+
+  case "${skip,,}" in
+    1|true|yes|on)
+      return 0
+      ;;
+  esac
+  metadata_only_invocation "$@" && return 0
+  modern_fleet_ready && return 0
+
+  command -v timeout >/dev/null 2>&1 || fail "timeout command is required for MCP readiness recovery"
+  if ! timeout --signal=TERM "${readiness_timeout_seconds}s" \
+    systemctl --user start "$readiness_service"; then
+    fail "modern MCP fleet recovery did not complete; inspect ${readiness_service}"
+  fi
+  modern_fleet_ready || \
+    fail "modern MCP fleet is not ready after ${readiness_service} completed"
 }
 
 load_credential \
@@ -111,5 +193,8 @@ if [[ "$codex_real" == "$(readlink -f "$modern_codex_default")" ]]; then
   export CODEX_MCP_2026_SERVERS="${CODEX_MCP_2026_SERVERS:-$modern_server_default}"
 fi
 
+ensure_modern_fleet_ready "$@"
+
 unset AOA_CODEX_EXECUTABLE
+unset AOA_MCP_READINESS_SKIP
 exec "$codex_executable" "$@"
