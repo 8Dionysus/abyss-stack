@@ -173,6 +173,14 @@ class StudyPreparationError(RuntimeError):
     """One study source, workspace, or delivery invariant failed."""
 
 
+def _reviewer_semantics(writer_task_family: str) -> tuple[str, str]:
+    """Preserve landing compatibility while giving other duties honest names."""
+
+    if writer_task_family.startswith("landing"):
+        return "landing_review", "independent_landing_review"
+    return f"{writer_task_family}_review", "independent_actor_review"
+
+
 def _task_route_policy(packet: Mapping[str, Any]) -> dict[str, Any]:
     policy = TASK_ROUTE_POLICIES.get(str(packet.get("task_family")))
     if policy is None:
@@ -2211,6 +2219,10 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     assert_agent_incarnation_binding_matches_plan(base_binding, base_plan)
     writer_task = load_json(coordinate_paths["task"], label="writer task")
     validate_json(writer_task, TASK_SCHEMA_PATH, label="writer task")
+    writer_task_family = str(writer_task["task_family"])
+    reviewer_task_family, reviewer_output_kind = _reviewer_semantics(
+        writer_task_family
+    )
     writer_effect_class = str(writer_task.get("allowed_effect_class"))
     expected_writer_sandbox = {
         "read_only": "read_only",
@@ -2858,7 +2870,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         desired_role="reviewer",
         child_agent_id=incarnation_id,
         capability_refs=(reviewer_capability_ref.capability_id,),
-        expected_outputs=("independent_landing_review",),
+        expected_outputs=(reviewer_output_kind,),
         parent_task_id=writer_task["task_id"],
         session_ref=session_id,
         audit_refs=(
@@ -2900,7 +2912,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         "correlation_id": base_plan.correlation_id,
         "continuation_id": continuation_id,
         "expected_incarnation_id": incarnation_id,
-        "task_family": "landing_review",
+        "task_family": reviewer_task_family,
         "execution_posture": "independent_review",
         "parent_task_id": writer_task["task_id"],
         "objective": (
@@ -2917,7 +2929,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
             "не осталось, верни completed/proceed с review-complete/stop. Только "
             "реальная unresolved owner authority может использовать "
             "authority-needed/wake_parent. artifact_paths оставь пустым; не заявляй "
-            "owner acceptance, model fit, landing completion или внешний effect."
+            "owner acceptance, model fit, task completion или внешний effect."
         ),
         "transition": {
             "from_status": writer_report["transition"]["to_status"],
@@ -2945,7 +2957,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         ],
         "validation_commands": writer_task["validation_commands"],
         "expected_artifacts": [
-            "runtime-owned independent landing review; no workspace artifact"
+            "runtime-owned independent actor review; no workspace artifact"
         ],
         "forbidden_effects": writer_task["forbidden_effects"],
         "ambiguity_policy": "escalate",

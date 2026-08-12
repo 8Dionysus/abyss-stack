@@ -11662,6 +11662,17 @@ Runtime session identity: {state["session_id"]}
             writer.get("admission_class"),
             reviewer.get("admission_class"),
         )
+        if admission_pair == ("owner_contour", "owner_contour"):
+            return self._export_owner_contour_a2a_result(
+                writer_session_id,
+                reviewer_runtime=reviewer_runtime,
+                reviewer_session_id=reviewer_session_id,
+                summon_request_path=summon_request_path,
+                output_path=output_path,
+                writer=writer,
+                reviewer=reviewer,
+                reviewer_receipt_digest=reviewer_receipt_digest,
+            )
         if admission_pair not in {
             ("transport_study_fixture", "transport_study_fixture"),
             ("owner_contour", "transport_study_fixture"),
@@ -12186,6 +12197,456 @@ Runtime session identity: {state["session_id"]}
                             reviewer["actor_delta_ref"]["artifact_digest"]
                         ),
                         "review_seed_envelope": str(review_seed_ref["artifact_digest"]),
+                        "summon_request": current_summon_request_ref.artifact_digest,
+                        "summon_request_schema": current_summon_schema_ref.artifact_digest,
+                        "review_summon_request": current_review_summon_request_ref.artifact_digest,
+                        "review_summon_request_schema": current_review_summon_schema_ref.artifact_digest,
+                    },
+                    "summon_request_ref": current_summon_request_ref.model_dump(
+                        mode="json"
+                    ),
+                    "review_summon_request_ref": current_review_summon_request_ref.model_dump(
+                        mode="json"
+                    ),
+                    "remote_task": {
+                        "task_id": writer["task_id"],
+                        "state": remote_state,
+                        "agent_id": writer_state["incarnation_id"],
+                        "endpoint": f"codex://local/{writer['thread_id']}",
+                        "returned_artifacts": unique_returned,
+                        "context_id": writer["thread_id"],
+                        "parent_task_id": nested["parent_task_id"],
+                        "artifact_refs": [
+                            writer["report_ref"]["artifact_ref"],
+                            reviewer["report_ref"]["artifact_ref"],
+                            writer["events_ref"]["artifact_ref"],
+                            str(writer_result_path),
+                        ],
+                        "message_refs": [reviewer["events_ref"]["artifact_ref"]],
+                    },
+                }
+                encoded = (
+                    json.dumps(payload, ensure_ascii=True, sort_keys=True, indent=2)
+                    + "\n"
+                ).encode("utf-8")
+                if output.exists() and read_bounded(output) != encoded:
+                    raise ExternalCodexRuntimeError(
+                        "a2a_output_conflict",
+                        "A2A output already contains different bytes",
+                    )
+                _atomic_write_bytes(output, encoded)
+            return {
+                "child_task_result": payload,
+                "artifact_ref": _artifact_ref(output),
+                "writer_thread_id": writer["thread_id"],
+                "reviewer_thread_id": reviewer["thread_id"],
+            }
+
+    def _export_owner_contour_a2a_result(
+        self,
+        writer_session_id: str,
+        *,
+        reviewer_runtime: ExternalCodexRuntime,
+        reviewer_session_id: str,
+        summon_request_path: str | Path,
+        output_path: str | Path,
+        writer: Mapping[str, Any],
+        reviewer: Mapping[str, Any],
+        reviewer_receipt_digest: str,
+    ) -> dict[str, Any]:
+        """Export one role-first review bound by exact immutable writer evidence."""
+
+        if (
+            reviewer.get("status") not in {"completed", "review_required"}
+            or reviewer.get("failure_code") is not None
+        ):
+            raise ExternalCodexRuntimeError(
+                "a2a_review_runtime_failed",
+                "failed or authority-blocked reviewer runtime cannot authorize A2A export",
+            )
+        if (
+            writer.get("thread_id") is None
+            or reviewer.get("thread_id") is None
+            or writer["thread_id"] == reviewer["thread_id"]
+            or reviewer.get("execution_posture") != "independent_review"
+        ):
+            raise ExternalCodexRuntimeError(
+                "a2a_review_not_independent",
+                "A2A export requires a separate independent-review thread",
+            )
+
+        reviewer_report = _load_verified_json_ref(
+            reviewer["report_ref"],
+            label="reviewer report",
+            schema_path=REPORT_SCHEMA_PATH,
+        )
+        writer_report = _load_verified_json_ref(
+            writer["report_ref"],
+            label="writer report",
+            schema_path=REPORT_SCHEMA_PATH,
+        )
+        for label, result, report in (
+            ("writer", writer, writer_report),
+            ("reviewer", reviewer, reviewer_report),
+        ):
+            if (
+                report.get("task_id") != result.get("task_id")
+                or report.get("incarnation_id") != result.get("incarnation_id")
+                or report.get("status") != result.get("status")
+            ):
+                raise ExternalCodexRuntimeError(
+                    "a2a_report_identity_mismatch",
+                    f"{label} report identity/status differs from its runtime result",
+                )
+        review_outcome = {
+            ("completed", "proceed"): ("completed", "proceed"),
+            ("review_required", "return_for_repair"): (
+                "failed",
+                "return_for_repair",
+            ),
+        }.get((str(reviewer["status"]), str(reviewer_report["decision"])))
+        if review_outcome is None:
+            raise ExternalCodexRuntimeError(
+                "a2a_review_outcome_invalid",
+                "reviewer runtime status and terminal decision are inconsistent",
+            )
+
+        with reviewer_runtime._lock(reviewer_session_id):
+            reviewer_state = reviewer_runtime._load_state(reviewer_session_id)
+            (
+                reviewer_launch,
+                reviewer_plan,
+                reviewer_binding,
+                reviewer_task,
+                _,
+                _,
+            ) = reviewer_runtime._materialized_payloads(reviewer_state)
+            expected_reviewer_result_path = (
+                reviewer_runtime._session_dir(reviewer_session_id) / "result.json"
+            )
+            if (
+                reviewer_launch["admission_class"] != "owner_contour"
+                or reviewer_state.get("result_path")
+                != str(expected_reviewer_result_path)
+                or reviewer_state.get("result_digest") != reviewer_receipt_digest
+                or sha256_file(expected_reviewer_result_path)
+                != reviewer_receipt_digest
+                or reviewer_state.get("incarnation_id")
+                != reviewer_binding.incarnation_id
+                or reviewer_state.get("task_family")
+                != reviewer_task.get("task_family")
+                or reviewer_state.get("task_family")
+                != reviewer.get("task_family")
+                or reviewer_task.get("execution_posture")
+                != "independent_review"
+                or reviewer_binding.permission_posture.sandbox_mode != "read_only"
+                or reviewer_binding.permission_posture.external_effects
+            ):
+                raise ExternalCodexRuntimeError(
+                    "a2a_review_state_unbound",
+                    "role-first reviewer state is not exact, independent, and read-only",
+                )
+            (
+                reviewer_summon_request,
+                reviewer_summon_request_ref,
+                reviewer_summon_schema_ref,
+                reviewer_expected_outputs,
+            ) = reviewer_runtime._validated_a2a_summon_request(
+                state=reviewer_state,
+                plan=reviewer_plan,
+                binding=reviewer_binding,
+                task=reviewer_task,
+                request_input_id="review-summon-request",
+            )
+            reviewer_schema_material = reviewer_runtime._materialized_task_input(
+                reviewer_state,
+                "summon-request-schema",
+            )
+
+        for label, ref in (
+            ("writer events", writer["events_ref"]),
+            ("reviewer events", reviewer["events_ref"]),
+            ("writer final workspace manifest", writer["workspace_manifest_ref"]),
+            (
+                "reviewer final workspace manifest",
+                reviewer["workspace_manifest_ref"],
+            ),
+            ("writer actor final manifest", writer.get("actor_final_manifest_ref")),
+            ("writer actor delta", writer.get("actor_delta_ref")),
+            ("reviewer actor final manifest", reviewer.get("actor_final_manifest_ref")),
+            ("reviewer actor delta", reviewer.get("actor_delta_ref")),
+        ):
+            if not isinstance(ref, dict):
+                raise ExternalCodexRuntimeError(
+                    "a2a_artifact_ref_invalid",
+                    f"{label} has no exact terminal artifact reference",
+                )
+            _verified_artifact_ref_path(ref, label=label)
+        writer_actor_final = _load_verified_json_ref(
+            writer["actor_final_manifest_ref"],
+            label="writer actor final manifest",
+            schema_path=ACTOR_MANIFEST_SCHEMA_PATH,
+        )
+        reviewer_actor_final = _load_verified_json_ref(
+            reviewer["actor_final_manifest_ref"],
+            label="reviewer actor final manifest",
+            schema_path=ACTOR_MANIFEST_SCHEMA_PATH,
+        )
+        reviewer_actor_delta = _load_verified_json_ref(
+            reviewer["actor_delta_ref"],
+            label="reviewer actor delta",
+            schema_path=ACTOR_DELTA_SCHEMA_PATH,
+        )
+        if (
+            reviewer_actor_delta.get("changes")
+            or reviewer_actor_delta.get("final_manifest_digest")
+            != canonical_digest(reviewer_actor_final)
+        ):
+            raise ExternalCodexRuntimeError(
+                "a2a_projection_not_bound",
+                "role-first reviewer must return a zero-delta read-only projection",
+            )
+
+        writer_output_digests: set[str] = set()
+        entries = {
+            str(item.get("path")): item
+            for item in writer_actor_final.get("content_entries", [])
+            if isinstance(item, dict)
+        }
+        for artifact_path in writer_report["artifact_paths"]:
+            entry = entries.get(str(artifact_path))
+            digest = entry.get("sha256") if isinstance(entry, dict) else None
+            if not isinstance(digest, str) or not digest.startswith("sha256:"):
+                raise ExternalCodexRuntimeError(
+                    "a2a_writer_output_unbound",
+                    "writer report artifact has no exact actor-manifest digest",
+                )
+            writer_output_digests.add(digest)
+
+        with self._lock(writer_session_id):
+            writer_state = self._load_state(writer_session_id)
+            (
+                writer_launch,
+                writer_plan,
+                writer_binding,
+                writer_task,
+                _,
+                _,
+            ) = self._materialized_payloads(writer_state)
+            writer_result_path = self._session_dir(writer_session_id) / "result.json"
+            if (
+                writer_launch["admission_class"] != "owner_contour"
+                or writer_state.get("result_path") != str(writer_result_path)
+                or writer_state.get("result_digest") != sha256_file(writer_result_path)
+                or writer_state.get("incarnation_id")
+                != writer_binding.incarnation_id
+            ):
+                raise ExternalCodexRuntimeError(
+                    "a2a_writer_state_unbound",
+                    "writer durable state is not bound to its exact result/incarnation",
+                )
+            (
+                summon_request,
+                summon_request_ref,
+                summon_schema_ref,
+                writer_expected_outputs,
+            ) = self._validated_a2a_summon_request(
+                state=writer_state,
+                plan=writer_plan,
+                binding=writer_binding,
+                task=writer_task,
+                request_input_id="summon-request",
+                supplied_path=summon_request_path,
+                schema_material=(
+                    None
+                    if any(
+                        item["input_id"] == "summon-request-schema"
+                        for item in writer_task["immutable_inputs"]
+                    )
+                    else reviewer_schema_material
+                ),
+            )
+            nested = summon_request["summon_request"]
+            reviewer_nested = reviewer_summon_request["summon_request"]
+            reviewer_inputs = {
+                str(item["input_id"]): str(
+                    item["provenance"]["artifact_digest"]
+                )
+                for item in reviewer_task["immutable_inputs"]
+            }
+            reviewer_input_digests = set(reviewer_inputs.values())
+            if (
+                reviewer_inputs.get("writer-result")
+                != writer_state["result_digest"]
+                or reviewer_inputs.get("writer-report")
+                != writer["report_ref"]["artifact_digest"]
+                or reviewer_inputs.get("writer-task")
+                != writer_launch["task"]["digest"]
+                or not writer_output_digests.issubset(reviewer_input_digests)
+                or reviewer_task["parent_task_id"] != writer["task_id"]
+                or reviewer_task["target_owner"] != writer_task["target_owner"]
+                or reviewer_state["incarnation_id"]
+                == writer_state["incarnation_id"]
+                or nested["parent_task_id"] != writer_task["parent_task_id"]
+                or reviewer_nested["parent_task_id"] != writer_task["task_id"]
+                or reviewer_nested["reviewed_artifact_path"]
+                != str(writer_result_path)
+            ):
+                raise ExternalCodexRuntimeError(
+                    "a2a_review_not_bound",
+                    "role-first review is not bound to the exact writer task, result, report, outputs, owner, and parent",
+                )
+
+            returned = ["external_codex_agent_result"]
+            returned.extend(str(item) for item in writer_task["expected_artifacts"])
+            returned.extend(str(item) for item in writer_report["artifact_paths"])
+            returned.extend(str(item) for item in reviewer_expected_outputs)
+            unique_returned = list(dict.fromkeys(returned))
+            if not set(writer_expected_outputs).issubset(unique_returned) or not set(
+                reviewer_expected_outputs
+            ).issubset(unique_returned):
+                raise ExternalCodexRuntimeError(
+                    "a2a_return_outputs_incomplete",
+                    "returned artifacts do not satisfy the exact writer/reviewer summon requests",
+                )
+
+            output = Path(output_path)
+            if not output.is_absolute():
+                raise ExternalCodexRuntimeError(
+                    "a2a_output_not_absolute", "A2A output path must be absolute"
+                )
+            if output.is_symlink():
+                raise ExternalCodexRuntimeError(
+                    "a2a_output_conflict", "A2A output must not be a symbolic link"
+                )
+            with reviewer_runtime._lock(reviewer_session_id):
+                current_reviewer_state = reviewer_runtime._load_state(
+                    reviewer_session_id
+                )
+                current_result_path = current_reviewer_state.get("result_path")
+                if (
+                    current_result_path != str(expected_reviewer_result_path)
+                    or expected_reviewer_result_path.is_symlink()
+                    or not expected_reviewer_result_path.is_file()
+                    or current_reviewer_state.get("result_digest")
+                    != reviewer_receipt_digest
+                    or sha256_file(expected_reviewer_result_path)
+                    != reviewer_receipt_digest
+                    or current_reviewer_state.get("incarnation_id")
+                    != reviewer_binding.incarnation_id
+                    or current_reviewer_state.get("task_family")
+                    != reviewer_task.get("task_family")
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "a2a_review_state_unbound",
+                        "role-first reviewer changed before A2A export became durable",
+                    )
+                _verify_a2a_export_snapshot(
+                    (
+                        ("writer report", writer["report_ref"]),
+                        ("writer events", writer["events_ref"]),
+                        (
+                            "writer final workspace manifest",
+                            writer["workspace_manifest_ref"],
+                        ),
+                        (
+                            "writer actor final manifest",
+                            writer["actor_final_manifest_ref"],
+                        ),
+                        ("writer actor delta", writer["actor_delta_ref"]),
+                        ("reviewer report", reviewer["report_ref"]),
+                        ("reviewer events", reviewer["events_ref"]),
+                        (
+                            "reviewer final workspace manifest",
+                            reviewer["workspace_manifest_ref"],
+                        ),
+                        (
+                            "reviewer actor final manifest",
+                            reviewer["actor_final_manifest_ref"],
+                        ),
+                        ("reviewer actor delta", reviewer["actor_delta_ref"]),
+                    )
+                )
+                (
+                    current_summon_request,
+                    current_summon_request_ref,
+                    current_summon_schema_ref,
+                    _,
+                ) = self._validated_a2a_summon_request(
+                    state=writer_state,
+                    plan=writer_plan,
+                    binding=writer_binding,
+                    task=writer_task,
+                    request_input_id="summon-request",
+                    supplied_path=summon_request_path,
+                    schema_material=(
+                        None
+                        if any(
+                            item["input_id"] == "summon-request-schema"
+                            for item in writer_task["immutable_inputs"]
+                        )
+                        else reviewer_runtime._materialized_task_input(
+                            current_reviewer_state,
+                            "summon-request-schema",
+                        )
+                    ),
+                )
+                (
+                    current_review_summon_request,
+                    current_review_summon_request_ref,
+                    current_review_summon_schema_ref,
+                    _,
+                ) = reviewer_runtime._validated_a2a_summon_request(
+                    state=current_reviewer_state,
+                    plan=reviewer_plan,
+                    binding=reviewer_binding,
+                    task=reviewer_task,
+                    request_input_id="review-summon-request",
+                )
+                if (
+                    current_summon_request != summon_request
+                    or current_summon_request_ref != summon_request_ref
+                    or current_summon_schema_ref != summon_schema_ref
+                    or current_review_summon_request != reviewer_summon_request
+                    or current_review_summon_request_ref
+                    != reviewer_summon_request_ref
+                    or current_review_summon_schema_ref
+                    != reviewer_summon_schema_ref
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "a2a_summon_request_unbound",
+                        "summon request bytes changed before A2A publication",
+                    )
+                remote_state, outcome_name = review_outcome
+                payload = {
+                    "reviewed": True,
+                    "review_status": "reviewed",
+                    "review_binding_mode": "owner_contour_immutable_evidence",
+                    "review_outcome": outcome_name,
+                    "reviewer_status": reviewer["status"],
+                    "reviewer_decision": reviewer_report["decision"],
+                    "reviewed_artifact_path": str(writer_result_path),
+                    "evidence_digests": {
+                        "writer_result": str(writer_state["result_digest"]),
+                        "writer_report": str(
+                            writer["report_ref"]["artifact_digest"]
+                        ),
+                        "writer_outputs": sorted(writer_output_digests),
+                        "reviewer_result": str(
+                            current_reviewer_state["result_digest"]
+                        ),
+                        "reviewer_report": str(
+                            reviewer["report_ref"]["artifact_digest"]
+                        ),
+                        "writer_actor_final_manifest": str(
+                            writer["actor_final_manifest_ref"]["artifact_digest"]
+                        ),
+                        "reviewer_actor_final_manifest": str(
+                            reviewer["actor_final_manifest_ref"]["artifact_digest"]
+                        ),
+                        "reviewer_actor_delta": str(
+                            reviewer["actor_delta_ref"]["artifact_digest"]
+                        ),
                         "summon_request": current_summon_request_ref.artifact_digest,
                         "summon_request_schema": current_summon_schema_ref.artifact_digest,
                         "review_summon_request": current_review_summon_request_ref.artifact_digest,

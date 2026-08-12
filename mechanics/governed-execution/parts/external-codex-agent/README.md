@@ -357,6 +357,17 @@ role and realization must match the writer plan; A2A export admits only the
 historical fixture pair or this exact owner-contour-writer/prepared-reviewer
 pair.
 
+The role-first path is stronger and separate from that compatibility preparer.
+When `aoa-agents` supplies a complete independent reviewer obligation and owner
+execution request, both writer and reviewer remain `owner_contour`. The generic
+A2A branch then requires distinct threads and incarnations, an immutable copy
+of the exact writer task/result/report and every report-named output, matching
+owner and parent relations, read-only zero-delta review, and exact SDK v4
+request/schema bytes under the final writer/reviewer locks. Its payload names
+`owner_contour_immutable_evidence`; it returns responsibility without claiming
+domain acceptance or model fit. Non-landing reviewer preparation uses neutral
+review family/output names rather than reusing landing semantics.
+
 The first live L2 fixture proved both branches. One invalid Luna report was
 preserved and filtered with no second Sol turn. A corrected Luna xhigh report
 produced `run.authority_required`, after which the exact yielded Sol thread was

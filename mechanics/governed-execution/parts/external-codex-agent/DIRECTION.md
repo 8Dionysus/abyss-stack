@@ -49,6 +49,17 @@ session or growing a general-purpose host allowlist.
 7. Feed observed usage, rework, handoff quality, and failures to stats/evals;
    keep initiative unconstrained by runtime-authored token budgets.
 
+The first role-first eval-selection slice has now completed the physical loop:
+one external owner-contour writer returned a bounded no-fit selection, a second
+independently formed Luna xhigh owner-contour reviewer confirmed it on a
+different thread with zero workspace delta, and the generic A2A exporter bound
+their exact SDK requests, schema bytes, task, results, reports, and output into
+one reviewed responsibility return. This is evidence for that bounded role and
+transport relation only. It does not admit Luna generally, establish an eval
+verdict, or replace `aoa-evals` owner review. The observed missing global skill
+path is specialized-environment friction to repair through direct owner-skill
+exposure, not by restricting model initiative.
+
 The first live L2 ambiguity-stop pair established transport behavior, not
 admission. Version 1 retained a semantically safe Luna escalation whose invalid
 bare numeric source anchor failed runtime admission; its `result.failed` event

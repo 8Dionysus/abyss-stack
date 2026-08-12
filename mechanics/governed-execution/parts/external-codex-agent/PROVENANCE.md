@@ -67,10 +67,14 @@ The live Codex bundled model catalog and executable digest are currentness
 checks, not replacements for `aoa-models`. Runtime receipts are execution
 evidence, not `aoa-evals` verdicts. The A2A export preserves the existing
 downstream owner review rather than bypassing it.
-The reviewed export is restricted to `landing_review` and revalidates the
-review seed, both summon request/schema pairs, and all exported writer/reviewer
-artifacts while both session locks are held through payload construction and
-publication.
+The compatibility reviewed export remains restricted to `landing_review` and
+revalidates the review seed, both summon request/schema pairs, and all exported
+writer/reviewer artifacts while both session locks are held through payload
+construction and publication. A separately formed role-first owner reviewer
+uses the generic owner-contour branch instead: its own owner request and SDK
+binding remain authoritative, and its immutable inputs must close over the
+exact writer task, result, report, and report-named output bytes before the same
+locked publication boundary can return responsibility.
 
 The session-local output schema is derived only from the admitted canonical
 schema plus the exact task and incarnation identities already present in

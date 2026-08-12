@@ -147,7 +147,10 @@ reviewed A2A export, result-v2 mandatory successful
 projection provenance with legacy-v1 read compatibility,
 reuse on reviewer preparation, reviewer lock retention through durable A2A
 export,
-reviewer-result race refusal, wrapper-delimiter effect observation,
+reviewer-result race refusal, role-first owner-contour writer/reviewer A2A
+admission with distinct threads, exact writer task/result/report/output closure,
+SDK request/schema equality, read-only zero-delta review, and refusal when the
+writer report is absent, wrapper-delimiter effect observation,
 unclassified non-validation interpreter indirection with exact fixed-validation
 exemption, fail-closed `env --split-string` handling, value-aware `timeout`
 wrapper parsing, opaque process-launch-wrapper refusal,

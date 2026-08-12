@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 117,
-  "edge_count": 2640,
+  "decision_count": 118,
+  "edge_count": 2663,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 980,
-    "DATED": 117,
-    "GUARDED_BY": 360,
-    "HAS_STATUS": 117,
-    "HAS_SURFACE_CLASS": 313,
-    "IN_STACK_LANE": 272,
-    "NEXT_DECISION": 116,
-    "OWNED_BY_SURFACE": 123,
-    "OWNS_DECISION": 117,
+    "CITES_SOURCE_SURFACE": 986,
+    "DATED": 118,
+    "GUARDED_BY": 364,
+    "HAS_STATUS": 118,
+    "HAS_SURFACE_CLASS": 317,
+    "IN_STACK_LANE": 275,
+    "NEXT_DECISION": 117,
+    "OWNED_BY_SURFACE": 124,
+    "OWNS_DECISION": 118,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 123
+    "UNDER_MECHANIC_PARENT": 124
   },
   "edges": [
     {
@@ -12623,11 +12623,121 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0117",
+      "target": "decision:ABYSS-STACK-D-0118",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0117",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0117",
+      "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "date:2026-08-12",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "guard_family:exact%20binding",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "guard_family:immutable%20inputs",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "guard_family:independent%20review",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "guard_family:owner%20provenance",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "surface_class:A2A%20return",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "surface_class:actor%20admission",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "surface_class:independent%20review",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "surface_class:runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "stack_lane:review",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "stack_lane:source",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
       "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -13215,13 +13325,18 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0117",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0118",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1158,
+  "node_count": 1160,
   "node_type_counts": {
-    "date": 35,
-    "decision": 117,
+    "date": 36,
+    "decision": 118,
     "guard_family": 181,
     "mechanic_parent": 10,
     "owner_surface": 62,
@@ -13405,6 +13520,11 @@
     {
       "id": "date:2026-08-11",
       "label": "2026-08-11",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-08-12",
+      "label": "2026-08-12",
       "type": "date"
     },
     {
@@ -14575,6 +14695,16 @@
       "posture": "accepted controller-derived review compatibility; no historical rewrite",
       "status": "accepted",
       "title": "ABYSS-STACK-D-0117 Recover Review Inputs Without Rewriting Owner Writers",
+      "type": "decision"
+    },
+    {
+      "date": "2026-08-12",
+      "id": "decision:ABYSS-STACK-D-0118",
+      "label": "ABYSS-STACK-D-0118",
+      "path": "docs/decisions/ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md",
+      "posture": "accepted role-first owner-contour reviewer and responsibility return",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0118 Admit Role-First Owner Reviewers to A2A Return",
       "type": "decision"
     },
     {

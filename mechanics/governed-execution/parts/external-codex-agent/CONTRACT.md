@@ -710,6 +710,19 @@ export accepts only the historical fixture pair or the exact
 writer: its owner request, SDK v4 transport preference, binding v2, durable
 state, report, and terminal actor evidence remain required and digest-bound.
 
+A reviewer formed independently by the role-first `aoa-agents` route instead
+enters as `owner_contour`. The generic owner-contour exporter requires the exact
+writer task, result, report, and all report-named output digests to be immutable
+reviewer inputs; requires a different incarnation and Codex thread, the same
+domain owner, the writer task as reviewer parent, and the exact reviewed result
+path; and requires the reviewer to be `independent_review`, read-only,
+external-effect-free, and zero-delta. Both SDK v4 summon request/schema pairs
+are revalidated while both session locks are held through atomic publication.
+This stronger pair records `owner_contour_immutable_evidence`; it does not
+convert runtime completion into owner acceptance, model fit, eval proof, or
+publication authority. Historical fixture and mixed compatibility pairs keep
+their existing admission path.
+
 An evidence-complete `owner_contour` writer may predate the reviewer input ABI
 without losing its role continuum. If its task lacks the selected workspace
 manifest input, review preparation may create

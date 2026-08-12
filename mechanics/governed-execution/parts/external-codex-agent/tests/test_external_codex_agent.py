@@ -1473,7 +1473,9 @@ def _fixture(
     task_id = f"task:fixture:{identity_suffix}"
     session_id = f"session:fixture:{identity_suffix}"
     summon_outputs = (
-        ["external_codex_agent_result", "landing_report"]
+        ["external_codex_agent_result", "independent_landing_review"]
+        if owner_contour and task_family == "landing_review"
+        else ["external_codex_agent_result", "landing_report"]
         if owner_contour
         else ["independent_landing_review"]
         if task_family == "landing_review"
@@ -1487,7 +1489,7 @@ def _fixture(
         (
             str(path)
             for input_id, path, _ in fixture_extra_inputs
-            if input_id == "writer-runtime-result"
+            if input_id in {"writer-runtime-result", "writer-result"}
         ),
         None,
     )
@@ -1777,7 +1779,11 @@ def _fixture(
                 )
             )
         ],
-        "expected_artifacts": ["landing_report"],
+        "expected_artifacts": [
+            "independent_landing_review"
+            if task_family == "landing_review"
+            else "landing_report"
+        ],
         "forbidden_effects": [
             "commit",
             "push",
@@ -4699,6 +4705,17 @@ def test_reviewer_preparation_forwards_exact_writer_evidence_without_starting(
         output_path=tmp_path / "cross-state-child-task-result.json",
     )
     assert exported["child_task_result"]["review_outcome"] == "proceed"
+
+
+def test_reviewer_semantics_are_generic_outside_landing() -> None:
+    assert PREPARER._reviewer_semantics("landing_preparation") == (
+        "landing_review",
+        "independent_landing_review",
+    )
+    assert PREPARER._reviewer_semantics("eval_selection") == (
+        "eval_selection_review",
+        "independent_actor_review",
+    )
 
 
 def test_reviewer_preparation_uses_historical_coordinate_after_ancestor_retarget(
@@ -9286,6 +9303,135 @@ def test_preflight_rejects_summon_semantics_that_cannot_export_a2a(
         fixture["runtime"].preflight(fixture["launch_path"])
 
     assert exc_info.value.code == "incarnation_task_request_unbound"
+
+
+def test_a2a_export_accepts_role_first_owner_contour_review(
+    tmp_path: Path,
+) -> None:
+    writer = _fixture(
+        tmp_path / "writer",
+        identity_suffix="owner-writer",
+        owner_contour=True,
+        review_required=True,
+    )
+    writer_runtime = writer["runtime"]
+    writer_runtime.start(
+        writer["launch_path"],
+        owner_request_path=writer["owner_execution_request_path"],
+    )
+    assert (
+        _wait_terminal(writer_runtime, writer["session_id"])["status"]
+        == "review_required"
+    )
+    writer_result_path = (
+        writer_runtime._session_dir(writer["session_id"]) / "result.json"
+    )
+    writer_result = writer_runtime.result(writer["session_id"])
+    assert writer_result is not None
+    writer_report_path = Path(str(writer_result["report_ref"]["artifact_ref"]))
+    writer_result_ref = _provenance(
+        "abyss-stack",
+        "runtime-results/owner-writer-result.json",
+        digest=_digest_path(writer_result_path),
+        source_ref=str(writer_result["thread_id"]),
+        schema_ref=(
+            "mechanics/governed-execution/parts/external-codex-agent/schemas/"
+            "external-codex-result.schema.json"
+        ),
+        schema_version=str(writer_result["schema_version"]),
+    )
+    writer_report_ref = _provenance(
+        "abyss-stack",
+        "runtime-results/owner-writer-report.json",
+        digest=_digest_path(writer_report_path),
+        source_ref=str(writer_result["thread_id"]),
+        schema_ref=(
+            "mechanics/governed-execution/parts/external-codex-agent/schemas/"
+            "external-codex-report.schema.json"
+        ),
+        schema_version="abyss_stack_external_codex_report_v1",
+    )
+    writer_task_ref = _provenance(
+        "abyss-stack",
+        "runtime-tasks/owner-writer-task.json",
+        digest=_digest_path(writer["task_path"]),
+        source_ref=str(writer_result["thread_id"]),
+        schema_ref=(
+            "mechanics/governed-execution/parts/external-codex-agent/schemas/"
+            "external-codex-task.schema.json"
+        ),
+        schema_version="abyss_stack_external_codex_task_v1",
+    )
+    reviewer = _fixture(
+        tmp_path / "reviewer",
+        role_id="reviewer",
+        task_family="landing_review",
+        parent_task_id=writer["task_id"],
+        identity_suffix="owner-reviewer",
+        shared_workspace=writer["workspace"],
+        owner_contour=True,
+        extra_immutable_inputs=(
+            ("writer-result", writer_result_path, writer_result_ref),
+            ("writer-report", writer_report_path, writer_report_ref),
+            ("writer-task", writer["task_path"], writer_task_ref),
+        ),
+    )
+    reviewer_runtime = reviewer["runtime"]
+    reviewer_runtime.start(
+        reviewer["launch_path"],
+        owner_request_path=reviewer["owner_execution_request_path"],
+    )
+    assert (
+        _wait_terminal(reviewer_runtime, reviewer["session_id"])["status"]
+        == "completed"
+    )
+
+    exported = writer_runtime.export_a2a_result(
+        writer["session_id"],
+        reviewer_session_id=reviewer["session_id"],
+        reviewer_state_root=reviewer_runtime.state_root,
+        summon_request_path=writer["summon_request_path"],
+        output_path=tmp_path / "owner-contour-a2a.json",
+    )
+
+    assert exported["child_task_result"]["review_outcome"] == "proceed"
+    assert (
+        exported["child_task_result"]["review_binding_mode"]
+        == "owner_contour_immutable_evidence"
+    )
+    assert exported["writer_thread_id"] != exported["reviewer_thread_id"]
+
+    unbound_reviewer = _fixture(
+        tmp_path / "unbound-reviewer",
+        role_id="reviewer",
+        task_family="landing_review",
+        parent_task_id=writer["task_id"],
+        identity_suffix="owner-reviewer-missing-report",
+        shared_workspace=writer["workspace"],
+        owner_contour=True,
+        extra_immutable_inputs=(
+            ("writer-result", writer_result_path, writer_result_ref),
+            ("writer-task", writer["task_path"], writer_task_ref),
+        ),
+    )
+    unbound_runtime = unbound_reviewer["runtime"]
+    unbound_runtime.start(
+        unbound_reviewer["launch_path"],
+        owner_request_path=unbound_reviewer["owner_execution_request_path"],
+    )
+    assert (
+        _wait_terminal(unbound_runtime, unbound_reviewer["session_id"])["status"]
+        == "completed"
+    )
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        writer_runtime.export_a2a_result(
+            writer["session_id"],
+            reviewer_session_id=unbound_reviewer["session_id"],
+            reviewer_state_root=unbound_runtime.state_root,
+            summon_request_path=writer["summon_request_path"],
+            output_path=tmp_path / "unbound-owner-contour-a2a.json",
+        )
+    assert exc_info.value.code == "a2a_review_not_bound"
 
 
 def test_a2a_export_requires_exact_independent_review_result(
