@@ -2492,6 +2492,55 @@ def _direct_reader_secret_file_access(tokens: Sequence[str]) -> bool:
     return any(_secret_shaped_path(value) for value in file_operands)
 
 
+def _find_secret_file_access(tokens: Sequence[str]) -> bool:
+    """Inspect GNU find roots and options that read another file."""
+
+    if not tokens or Path(tokens[0]).name.lower() != "find":
+        return False
+    expression_started = False
+    index = 1
+    while index < len(tokens):
+        token = tokens[index]
+        lowered = token.lower()
+        if lowered == "-files0-from":
+            if index + 1 < len(tokens) and _secret_shaped_path(tokens[index + 1]):
+                return True
+            index += 2
+            continue
+        if lowered.startswith("-files0-from="):
+            if _secret_shaped_path(token.split("=", 1)[1]):
+                return True
+            index += 1
+            continue
+        if lowered in {"-anewer", "-cnewer", "-newer", "-samefile"} or (
+            lowered.startswith("-newer") and len(lowered) == len("-newerxy")
+        ):
+            if index + 1 < len(tokens) and _secret_shaped_path(tokens[index + 1]):
+                return True
+            index += 2
+            continue
+        if not expression_started:
+            if token == "--":
+                index += 1
+                continue
+            if lowered == "-d":
+                index += 2
+                continue
+            if lowered in {"-h", "-l", "-p"} or (
+                lowered.startswith("-o") and len(lowered) > 2
+            ):
+                index += 1
+                continue
+            if token.startswith("-") or token in {"!", "(", ")", ","}:
+                expression_started = True
+                index += 1
+                continue
+            if _secret_shaped_path(token):
+                return True
+        index += 1
+    return False
+
+
 def _reader_secret_file_access(tokens: Sequence[str]) -> bool:
     """Route each reader family through its actual file-coordinate parser."""
 
@@ -2502,6 +2551,8 @@ def _reader_secret_file_access(tokens: Sequence[str]) -> bool:
         return _direct_reader_secret_file_access(tokens)
     if executable == "jq":
         return _jq_file_access(tokens, _secret_shaped_path)
+    if executable == "find":
+        return _find_secret_file_access(tokens)
     if executable in PATTERN_GIT_CONFIG_READERS:
         return _pattern_reader_file_access(tokens, _secret_shaped_path)
     return False

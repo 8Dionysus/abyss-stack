@@ -7410,6 +7410,36 @@ def test_file_list_options_cannot_hide_secret_reads(command: str) -> None:
 @pytest.mark.parametrize(
     "command",
     (
+        "/usr/bin/find -files0-from client_secret.json -maxdepth 0",
+        "/usr/bin/find -files0-from=.npmrc -maxdepth 0",
+        "/usr/bin/find client_secret.json -maxdepth 0",
+        "/usr/bin/find . -newer credentials.json -print",
+        "/usr/bin/find . -newermm token.pem -print",
+    ),
+)
+def test_find_input_coordinates_cannot_hide_secret_reads(command: str) -> None:
+    assert RUNTIME._command_effects(command) == {"secret_access"}
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/find -files0-from input-files.list -maxdepth 0",
+        "/usr/bin/find input -maxdepth 0",
+        "/usr/bin/find . -newer baseline.txt -print",
+        "/usr/bin/find . -fprint client_secret.json",
+    ),
+)
+def test_find_non_secret_or_output_coordinates_remain_classifiable(
+    command: str,
+) -> None:
+    assert RUNTIME._command_effects(command) == set()
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
         "/usr/bin/diff --from-file=.env /dev/null",
         "/usr/bin/diff --to-file=.npmrc /dev/null",
         "/usr/bin/diff --exclude-from=.git/config left right",
