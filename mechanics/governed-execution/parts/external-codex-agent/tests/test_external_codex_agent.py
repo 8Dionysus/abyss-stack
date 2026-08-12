@@ -6414,6 +6414,28 @@ def test_timeout_value_options_cannot_hide_git_push(command: str) -> None:
 @pytest.mark.parametrize(
     "command",
     (
+        "/usr/bin/timeout 5 /usr/bin/env RIPGREP_CONFIG_PATH=./rg.conf "
+        "/usr/bin/rg needle input",
+        "/usr/bin/command /usr/bin/timeout 5 /usr/bin/env "
+        "RIPGREP_CONFIG_PATH=./rg.conf /usr/bin/rg needle input",
+    ),
+)
+def test_wrapped_environment_overrides_are_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+def test_timeout_without_environment_override_remains_classifiable() -> None:
+    assert (
+        RUNTIME._command_has_unclassified_indirection(
+            "/usr/bin/timeout 5 /usr/bin/rg needle input"
+        )
+        is False
+    )
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
         "/usr/bin/nice /usr/bin/cat /home/fixture/.ssh/id_rsa",
         "/usr/bin/nohup /usr/bin/git push",
         "/usr/bin/setsid /usr/bin/systemctl restart fixture.service",
@@ -6469,6 +6491,32 @@ def test_ordinary_sort_remains_classifiable() -> None:
     assert (
         RUNTIME._command_has_unclassified_indirection("/usr/bin/sort -u input") is False
     )
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/sort -o .git/HEAD newhead",
+        "/usr/bin/sort -o.git/HEAD newhead",
+        "/usr/bin/sort --output .git/HEAD newhead",
+        "/usr/bin/sort --output=.git/HEAD newhead",
+        "/usr/bin/sort --out=/tmp/repo/.git/HEAD newhead",
+    ),
+)
+def test_sort_git_metadata_output_is_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/sort -o report.txt input",
+        "/usr/bin/sort -oreport.txt input",
+        "/usr/bin/sort --output=report.txt input",
+    ),
+)
+def test_sort_ordinary_output_remains_classifiable(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
 
 
 @pytest.mark.parametrize(

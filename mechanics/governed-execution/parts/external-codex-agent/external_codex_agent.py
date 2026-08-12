@@ -2747,6 +2747,22 @@ def _unwrap_command(segment: Sequence[str]) -> tuple[str, ...]:
     return tuple(values)
 
 
+def _unwrapped_prefix_has_environment_override(
+    raw_segment: Sequence[str], unwrapped_segment: Sequence[str]
+) -> bool:
+    """Retain environment-bearing authority stripped with launch wrappers."""
+
+    prefix_length = len(raw_segment) - len(unwrapped_segment)
+    if prefix_length < 0 or tuple(raw_segment[prefix_length:]) != tuple(
+        unwrapped_segment
+    ):
+        return True
+    return any(
+        Path(token).name.lower() == "env" or ENV_ASSIGNMENT_RE.match(token)
+        for token in raw_segment[:prefix_length]
+    )
+
+
 def _git_subcommand(tokens: Sequence[str]) -> tuple[str | None, tuple[str, ...]]:
     index = 1
     options_with_value = {
@@ -3113,6 +3129,34 @@ def _sort_has_opaque_dispatch(tokens: Sequence[str]) -> bool:
         option = lowered.split("=", 1)[0]
         if len(option) >= len("--co") and "--compress-program".startswith(option):
             return True
+    return False
+
+
+def _sort_writes_git_metadata(tokens: Sequence[str]) -> bool:
+    """Detect GNU sort output destinations that mutate private Git state."""
+
+    index = 1
+    while index < len(tokens):
+        token = tokens[index]
+        lowered = token.lower()
+        if token == "--":
+            break
+        if lowered == "-o" or (
+            _long_option_prefix(token, "--output") and "=" not in token
+        ):
+            if index + 1 < len(tokens) and _git_admin_metadata_path(
+                tokens[index + 1]
+            ):
+                return True
+            index += 2
+            continue
+        if lowered.startswith("-o") and not lowered.startswith("--"):
+            if _git_admin_metadata_path(token[2:]):
+                return True
+        elif _long_option_prefix(token, "--output") and "=" in token:
+            if _git_admin_metadata_path(token.split("=", 1)[1]):
+                return True
+        index += 1
     return False
 
 
@@ -3517,6 +3561,8 @@ def _command_has_unclassified_indirection(command: str) -> bool:
             segment = _unwrap_command(raw_segment)
             if not segment:
                 return True
+            if _unwrapped_prefix_has_environment_override(raw_segment, segment):
+                return True
             executable = Path(segment[0]).name.lower()
             args = tuple(value.lower() for value in segment[1:])
             if _executable_path_is_opaque(segment[0]):
@@ -3538,6 +3584,8 @@ def _command_has_unclassified_indirection(command: str) -> bool:
             if executable == "jq" and _jq_has_opaque_environment_access(segment):
                 return True
             if executable == "sort" and _sort_has_opaque_dispatch(segment):
+                return True
+            if executable == "sort" and _sort_writes_git_metadata(segment):
                 return True
             if executable == "find" and _find_writes_git_metadata(segment):
                 return True
