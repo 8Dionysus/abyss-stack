@@ -198,6 +198,10 @@ from that root; provisioning neither issues nor copies owner evidence.
 the runtime target catalog explicitly because `systemd.path` does not watch
 nested file replacement recursively; the periodic timer remains the bounded
 backstop for missed or coalesced events.
+The modern admission timer starts one second after the user manager. Keeper
+and preflight services are ordered behind that transaction and allow finite
+publication bursts without becoming permanently failed through
+`unit-start-limit-hit`.
 Enable `abyss-stack-mcp-observation.timer` only as a separate reviewed rollout
 step. Its process has no bearer credential, no network address family, and no
 writable path outside that observation directory.

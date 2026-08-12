@@ -67,6 +67,14 @@ reports. They do not start/restart MCP processes or issue owner proof,
 acceptance, or admission. A failed preflight leaves the target inactive with an
 expected/observed reason instead of entering a restart loop.
 
+The modern admission timer starts one second after the user manager so expired
+cold-start recovery begins before normal interactive work. Admission Keeper
+and preflight sweep are ordered after that transaction and disable service
+start-rate limiting: a finite burst of atomic registry, canary, and catalog
+replacements is allowed to settle instead of leaving their path units in
+`unit-start-limit-hit`. Their own work remains lock-bounded and cannot widen
+the fixed production fleet.
+
 The separately linked `abyss-mcp-protocol-watch.path` reacts to Codex and
 protocol-lab source changes; its hourly timer observes new upstream
 specification, SDK, conformance, and Codex identities and evidence TTL. The
@@ -87,6 +95,13 @@ bearers are inherited only by Codex, the managed Codex binary symlink is
 unchanged, and running shells and sessions are untouched. The ToS bearer is
 staged only; this route does not create its workspace wrapper, start it, or add
 it to the owner bundle.
+The launcher treats modern MCP availability as a pre-exec dependency: it
+checks the exact eleven production units and ports, starts the bounded modern
+admission recovery oneshot when any member is absent, and refuses to exec
+Codex unless the fleet becomes complete within ten minutes. This closes the
+boot race where Codex could start before expired-admission recovery and retain
+failed MCP clients for the whole session. `AOA_MCP_READINESS_SKIP=1` is a
+single-process rollback escape hatch, not a persistent readiness policy.
 The candidate values remain separate named variables for separate Memo/Evals
 candidate registrations; inheriting them does not merge endpoint authority.
 `--remove-mcp-http-codex-client` removes only that managed Zsh block.

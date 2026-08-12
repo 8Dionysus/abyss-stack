@@ -1,9 +1,9 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 109,
-  "edge_count": 2463,
+  "edge_count": 2466,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 936,
+    "CITES_SOURCE_SURFACE": 939,
     "DATED": 109,
     "GUARDED_BY": 327,
     "HAS_STATUS": 109,
@@ -11678,6 +11678,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0109",
+      "target": "source_surface:mcp/services/_shared/codex_http_client.sh",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
       "target": "source_surface:mcp/services/abyss-stack-mcp/DESIGN.md",
       "type": "CITES_SOURCE_SURFACE"
     },
@@ -11693,12 +11698,22 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0109",
+      "target": "source_surface:systemd/user/abyss-mcp-admission-keeper.service",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
       "target": "source_surface:systemd/user/abyss-mcp-modern-admission-refresh.service",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0109",
       "target": "source_surface:systemd/user/abyss-mcp-modern-admission-refresh.timer",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0109",
+      "target": "source_surface:systemd/user/abyss-mcp-preflight-sweep.service",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
@@ -12333,7 +12348,7 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1097,
+  "node_count": 1099,
   "node_type_counts": {
     "date": 34,
     "decision": 109,
@@ -12341,7 +12356,7 @@
     "mechanic_parent": 10,
     "owner_surface": 61,
     "repo": 1,
-    "source_surface": 558,
+    "source_surface": 560,
     "stack_lane": 45,
     "status": 3,
     "surface_class": 114
@@ -17309,6 +17324,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:systemd/user/abyss-mcp-admission-keeper.service",
+      "label": "systemd/user/abyss-mcp-admission-keeper.service",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:systemd/user/abyss-mcp-modern-admission-refresh.service",
       "label": "systemd/user/abyss-mcp-modern-admission-refresh.service",
       "type": "source_surface"
@@ -17316,6 +17336,11 @@
     {
       "id": "source_surface:systemd/user/abyss-mcp-modern-admission-refresh.timer",
       "label": "systemd/user/abyss-mcp-modern-admission-refresh.timer",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:systemd/user/abyss-mcp-preflight-sweep.service",
+      "label": "systemd/user/abyss-mcp-preflight-sweep.service",
       "type": "source_surface"
     },
     {

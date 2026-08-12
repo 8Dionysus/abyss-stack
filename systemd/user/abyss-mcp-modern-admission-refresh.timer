@@ -2,7 +2,7 @@
 Description=Fail-closed modern MCP admission refresh backstop
 
 [Timer]
-OnBootSec=2min
+OnBootSec=1s
 OnUnitActiveSec=30s
 AccuracySec=5s
 Persistent=true
