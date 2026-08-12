@@ -7304,6 +7304,38 @@ def test_direct_secret_file_encoder_is_classified() -> None:
 @pytest.mark.parametrize(
     "command",
     (
+        "/usr/bin/cat client_secret.json",
+        "/usr/bin/grep needle client_secret.json",
+        "/usr/bin/head credentials.json",
+        "/usr/bin/file -m client_secret.json input.txt",
+        "/usr/bin/jq . credentials.json",
+        "/usr/bin/uniq token.txt output.txt",
+    ),
+)
+def test_direct_reader_bare_secret_file_operands_are_classified(command: str) -> None:
+    assert RUNTIME._command_effects(command) == {"secret_access"}
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/echo client_secret.json",
+        "/usr/bin/diff --label client_secret.json left right",
+        "/usr/bin/file -F client_secret.json input.txt",
+        "/usr/bin/grep client_secret.json README.md",
+        "/usr/bin/jq --arg name client_secret.json -n '$name'",
+        "/usr/bin/uniq input.txt client_secret.json",
+    ),
+)
+def test_non_file_and_output_bare_secret_words_do_not_add_secret_access(
+    command: str,
+) -> None:
+    assert "secret_access" not in RUNTIME._command_effects(command)
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
         "/usr/bin/date -f.env",
         "/usr/bin/date -uf.env",
         "/usr/bin/date -f.git/config",

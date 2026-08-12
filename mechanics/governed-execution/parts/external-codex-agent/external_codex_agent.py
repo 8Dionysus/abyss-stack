@@ -31,7 +31,7 @@ import tempfile
 import threading
 import time
 import urllib.parse
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -733,6 +733,75 @@ DIRECT_GIT_CONFIG_READERS = frozenset(
         "wc",
     }
 )
+DIRECT_READER_VALUE_OPTIONS = {
+    "base64": {"-w": ("--wrap", False)},
+    "cat": {},
+    "cmp": {
+        "-i": ("--ignore-initial", False),
+        "-n": ("--bytes", False),
+    },
+    "cut": {
+        "-b": ("--bytes", False),
+        "-c": ("--characters", False),
+        "-d": ("--delimiter", False),
+        "-f": ("--fields", False),
+        "": ("--output-delimiter", False),
+    },
+    "diff": {
+        "-F": ("--show-function-line", False),
+        "-I": ("--ignore-matching-lines", False),
+        "-L": ("--label", False),
+        "-S": ("--starting-file", False),
+        "-W": ("--width", False),
+        "-X": ("--exclude-from", True),
+        "": ("--exclude", False),
+        "from": ("--from-file", True),
+        "horizon": ("--horizon-lines", False),
+        "palette": ("--palette", False),
+        "tabsize": ("--tabsize", False),
+        "to": ("--to-file", True),
+    },
+    "file": {
+        "-e": ("--exclude", False),
+        "-f": ("--files-from", True),
+        "-F": ("--separator", False),
+        "-m": ("--magic-file", True),
+        "-P": ("--parameter", False),
+    },
+    "head": {
+        "-c": ("--bytes", False),
+        "-n": ("--lines", False),
+    },
+    "sort": {
+        "-k": ("--key", False),
+        "-o": ("--output", False),
+        "-S": ("--buffer-size", False),
+        "-T": ("--temporary-directory", False),
+        "-t": ("--field-separator", False),
+        "batch": ("--batch-size", False),
+        "compress": ("--compress-program", False),
+        "": ("--files0-from", True),
+        "parallel": ("--parallel", False),
+        "random": ("--random-source", True),
+    },
+    "stat": {
+        "-c": ("--format", False),
+        "": ("--printf", False),
+    },
+    "tail": {
+        "-c": ("--bytes", False),
+        "-n": ("--lines", False),
+        "-s": ("--sleep-interval", False),
+        "": ("--pid", False),
+        "unchanged": ("--max-unchanged-stats", False),
+    },
+    "uniq": {
+        "-f": ("--skip-fields", False),
+        "-s": ("--skip-chars", False),
+        "-w": ("--check-chars", False),
+    },
+    "wc": {"": ("--files0-from", True)},
+}
 PATTERN_GIT_CONFIG_READERS = frozenset({"grep", "rg", "sed"})
 SAFE_GIT_BOOLEAN_CONFIG_KEYS = (
     "core.filemode",
@@ -2144,7 +2213,9 @@ def _argument_secret_access(executable: str, value: str) -> bool:
     return False
 
 
-def _pattern_reader_git_config_file_access(tokens: Sequence[str]) -> bool:
+def _pattern_reader_file_access(
+    tokens: Sequence[str], path_predicate: Callable[[str], bool]
+) -> bool:
     """Inspect every actual rg, grep, or sed input-file coordinate."""
 
     executable = Path(tokens[0]).name.lower()
@@ -2249,7 +2320,7 @@ def _pattern_reader_git_config_file_access(tokens: Sequence[str]) -> bool:
                 if index + 1 < len(tokens)
                 else ""
             )
-            if _git_config_metadata_path(file_value):
+            if path_predicate(file_value):
                 return True
             explicit_program = True
             index += 1 if "=" in value else 2
@@ -2269,7 +2340,7 @@ def _pattern_reader_git_config_file_access(tokens: Sequence[str]) -> bool:
             lowered.startswith("-f") and lowered != "-f"
         ):
             pattern_file = value[2:]
-            if _git_config_metadata_path(pattern_file):
+            if path_predicate(pattern_file):
                 return True
             explicit_program = True
             index += 1
@@ -2286,7 +2357,7 @@ def _pattern_reader_git_config_file_access(tokens: Sequence[str]) -> bool:
                 if not option_value and index + 1 < len(tokens):
                     option_value = tokens[index + 1]
                     index += 1
-                if option == "f" and _git_config_metadata_path(option_value):
+                if option == "f" and path_predicate(option_value):
                     return True
                 explicit_program = True
                 index += 1
@@ -2296,12 +2367,12 @@ def _pattern_reader_git_config_file_access(tokens: Sequence[str]) -> bool:
             if option in {"e", "f"}:
                 continue
         if executable == "rg" and lowered in {"--ignore-file", "--pre-glob"}:
-            if index + 1 < len(tokens) and _git_config_metadata_path(tokens[index + 1]):
+            if index + 1 < len(tokens) and path_predicate(tokens[index + 1]):
                 return True
             index += 2
             continue
         if executable == "rg" and lowered.startswith(("--ignore-file=", "--pre-glob=")):
-            if _git_config_metadata_path(value.split("=", 1)[1]):
+            if path_predicate(value.split("=", 1)[1]):
                 return True
             index += 1
             continue
@@ -2313,7 +2384,7 @@ def _pattern_reader_git_config_file_access(tokens: Sequence[str]) -> bool:
                 if index + 1 < len(tokens)
                 else ""
             )
-            if _git_config_metadata_path(file_value):
+            if path_predicate(file_value):
                 return True
             index += 1 if "=" in value else 2
             continue
@@ -2336,7 +2407,11 @@ def _pattern_reader_git_config_file_access(tokens: Sequence[str]) -> bool:
         operands.append(value)
         index += 1
     file_operands = operands if explicit_program else operands[1:]
-    return any(_git_config_metadata_path(value) for value in file_operands)
+    return any(path_predicate(value) for value in file_operands)
+
+
+def _pattern_reader_git_config_file_access(tokens: Sequence[str]) -> bool:
+    return _pattern_reader_file_access(tokens, _git_config_metadata_path)
 
 
 def _direct_git_config_file_access(tokens: Sequence[str]) -> bool:
@@ -2354,7 +2429,87 @@ def _direct_git_config_file_access(tokens: Sequence[str]) -> bool:
     return _pattern_reader_git_config_file_access(tokens)
 
 
-def _jq_git_config_file_access(tokens: Sequence[str]) -> bool:
+def _direct_reader_secret_file_access(tokens: Sequence[str]) -> bool:
+    """Inspect actual file coordinates of direct reader utilities."""
+
+    if not tokens:
+        return False
+    executable = Path(tokens[0]).name.lower()
+    options = DIRECT_READER_VALUE_OPTIONS.get(executable)
+    if options is None:
+        return False
+    operands: list[str] = []
+    index = 1
+    while index < len(tokens):
+        token = tokens[index]
+        lowered = token.lower()
+        if token == "--":
+            operands.extend(tokens[index + 1 :])
+            break
+        long_match = next(
+            (
+                (canonical, file_valued)
+                for canonical, file_valued in options.values()
+                if _long_option_prefix(token, canonical)
+            ),
+            None,
+        )
+        if long_match is not None:
+            _, file_valued = long_match
+            if "=" in token:
+                option_value = token.split("=", 1)[1]
+                index += 1
+            else:
+                option_value = tokens[index + 1] if index + 1 < len(tokens) else ""
+                index += 2
+            if file_valued and _secret_shaped_path(option_value):
+                return True
+            continue
+        if token.startswith("-") and not token.startswith("--") and token != "-":
+            short_body = token[1:]
+            consumed_value = False
+            for offset, option in enumerate(short_body):
+                descriptor = options.get("-" + option)
+                if descriptor is None:
+                    continue
+                _, file_valued = descriptor
+                option_value = short_body[offset + 1 :]
+                if not option_value and index + 1 < len(tokens):
+                    option_value = tokens[index + 1]
+                    index += 1
+                if file_valued and _secret_shaped_path(option_value):
+                    return True
+                consumed_value = True
+                break
+            index += 1
+            if consumed_value:
+                continue
+            continue
+        if not lowered.startswith("-"):
+            operands.append(token)
+        index += 1
+    file_operands = operands[:1] if executable == "uniq" else operands
+    return any(_secret_shaped_path(value) for value in file_operands)
+
+
+def _reader_secret_file_access(tokens: Sequence[str]) -> bool:
+    """Route each reader family through its actual file-coordinate parser."""
+
+    if not tokens:
+        return False
+    executable = Path(tokens[0]).name.lower()
+    if executable in DIRECT_READER_VALUE_OPTIONS:
+        return _direct_reader_secret_file_access(tokens)
+    if executable == "jq":
+        return _jq_file_access(tokens, _secret_shaped_path)
+    if executable in PATTERN_GIT_CONFIG_READERS:
+        return _pattern_reader_file_access(tokens, _secret_shaped_path)
+    return False
+
+
+def _jq_file_access(
+    tokens: Sequence[str], path_predicate: Callable[[str], bool]
+) -> bool:
     """Inspect jq input files and explicit file-loading option coordinates."""
 
     program_seen = False
@@ -2368,7 +2523,7 @@ def _jq_git_config_file_access(tokens: Sequence[str]) -> bool:
             index += 1
             continue
         if lowered in {"--rawfile", "--slurpfile", "--argfile"}:
-            if index + 2 < len(tokens) and _git_config_metadata_path(tokens[index + 2]):
+            if index + 2 < len(tokens) and path_predicate(tokens[index + 2]):
                 return True
             index += 3
             continue
@@ -2376,7 +2531,7 @@ def _jq_git_config_file_access(tokens: Sequence[str]) -> bool:
             index += 3
             continue
         if lowered in {"-f", "--from-file"}:
-            if index + 1 < len(tokens) and _git_config_metadata_path(tokens[index + 1]):
+            if index + 1 < len(tokens) and path_predicate(tokens[index + 1]):
                 return True
             program_from_file = True
             program_seen = True
@@ -2384,7 +2539,7 @@ def _jq_git_config_file_access(tokens: Sequence[str]) -> bool:
             continue
         if lowered.startswith(("--from-file=", "-f")) and lowered != "-f":
             source = value.split("=", 1)[1] if "=" in value else value[2:]
-            if _git_config_metadata_path(source):
+            if path_predicate(source):
                 return True
             program_from_file = True
             program_seen = True
@@ -2400,10 +2555,14 @@ def _jq_git_config_file_access(tokens: Sequence[str]) -> bool:
             program_seen = True
             index += 1
             continue
-        if _git_config_metadata_path(value):
+        if path_predicate(value):
             return True
         index += 1
     return False
+
+
+def _jq_git_config_file_access(tokens: Sequence[str]) -> bool:
+    return _jq_file_access(tokens, _git_config_metadata_path)
 
 
 def _generic_mutator_git_metadata_access(tokens: Sequence[str]) -> bool:
@@ -3479,6 +3638,8 @@ def _command_effects(command: str) -> set[str]:
             ):
                 detected.add("secret_access")
             if _direct_git_config_file_access(segment):
+                detected.add("secret_access")
+            if _reader_secret_file_access(segment):
                 detected.add("secret_access")
             if any(
                 _argument_secret_access(executable, value) for value in segment[1:]
