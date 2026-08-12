@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26573737,
+  "allowed_tracked_bytes": 32162654,
+  "approved_by": "repository-owner",
+  "base_ref": "e690b4153e5ecc682d21825d92cc18d482a42f86",
+  "changed_generated_bytes": 26573737,
+  "changed_generated_files": 329,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "8c8262fc58c6b63ba21789842c56cbd042b814372e3014a75edd34f9f186cf14",
+  "reason": "Refresh the exact external-actor reentry, command-observation, workspace-symlink, and release-closure source surface with the CI-pinned aoa-kag generator; count projection growth without constraining actor work.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 32162654,
+  "tracked_bytes_max": 24117248
+}

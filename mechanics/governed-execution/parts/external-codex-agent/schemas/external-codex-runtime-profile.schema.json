@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-runtime-profile.schema.json",
+  "title": "abyss-stack external Codex agent runtime profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "profile_id",
+    "runtime_owner",
+    "adapter_id",
+    "adapter_protocol_version",
+    "transport",
+    "source_ref",
+    "schema_ref",
+    "supported_plan_schema_versions",
+    "supported_event_schema_versions",
+    "supported_effect_classes",
+    "process_containment",
+    "codex_cli",
+    "model_admission",
+    "tool_profiles",
+    "execution_postures",
+    "owner_contracts",
+    "result_schema_ref",
+    "boundaries"
+  ],
+  "properties": {
+    "$schema": {"type": "string", "minLength": 1},
+    "schema_version": {"const": "abyss_stack_external_codex_runtime_profile_v2"},
+    "profile_id": {"const": "runtime-profile:abyss-stack-external-codex-agent-v1"},
+    "runtime_owner": {"const": "abyss-stack"},
+    "adapter_id": {"const": "abyss_stack_external_codex_agent_v1"},
+    "adapter_protocol_version": {"const": "aoa_runtime_adapter_v1"},
+    "transport": {"const": "codex_exec_jsonl_v1"},
+    "source_ref": {"type": "string", "minLength": 1},
+    "schema_ref": {"type": "string", "minLength": 1},
+    "supported_plan_schema_versions": {"type": "array", "minItems": 1, "uniqueItems": true, "contains": {"const": "aoa_control_plane_v1"}, "items": {"type": "string", "minLength": 1}},
+    "supported_event_schema_versions": {"type": "array", "minItems": 1, "uniqueItems": true, "contains": {"const": "aoa_control_plane_v1"}, "items": {"type": "string", "minLength": 1}},
+    "supported_effect_classes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["read_only", "repo_mutation"]}},
+    "process_containment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "supervisor_ref", "parent_death_signal", "term_timeout_seconds", "kill_timeout_seconds", "probe_executable"],
+      "properties": {
+        "strategy": {"const": "linux_subreaper_supervisor_v1"},
+        "supervisor_ref": {"const": "external_codex_supervisor.py"},
+        "parent_death_signal": {"const": "SIGTERM"},
+        "term_timeout_seconds": {"const": 3.0},
+        "kill_timeout_seconds": {"const": 3.0},
+        "probe_executable": {"const": "/usr/bin/true"}
+      }
+    },
+    "codex_cli": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_version", "ignore_user_config", "ignore_exec_rules", "multi_agent_enabled", "structured_events", "structured_final_output", "persistent_sessions"],
+      "properties": {
+        "required_version": {"type": "string", "minLength": 1},
+        "ignore_user_config": {"const": true},
+        "ignore_exec_rules": {"const": true},
+        "multi_agent_enabled": {"const": false},
+        "structured_events": {"const": true},
+        "structured_final_output": {"const": true},
+        "persistent_sessions": {"const": true}
+      }
+    },
+    "model_admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_repo", "schema_version", "runtime_product", "runtime_version", "transport", "auth_regime", "billing_regime", "allowed_lifecycle_states", "requires_live_catalog_match"],
+      "properties": {
+        "owner_repo": {"const": "aoa-models"},
+        "schema_version": {"const": "aoa_model_realization_v1"},
+        "runtime_product": {"const": "codex-cli"},
+        "runtime_version": {"type": "string", "minLength": 1},
+        "transport": {"const": "exec-jsonl"},
+        "auth_regime": {"const": "chatgpt_login"},
+        "billing_regime": {"const": "chatgpt_quota"},
+        "allowed_lifecycle_states": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "requires_live_catalog_match": {"const": true}
+      }
+    },
+    "tool_profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {"sandbox_mode": {"const": "read_only"}},
+              "required": ["sandbox_mode"]
+            },
+            "then": {
+              "properties": {
+                "codex_sandbox": {"const": "workspace-write"},
+                "codex_execution_root": {"const": "attempt-local"}
+              }
+            },
+            "else": {
+              "properties": {
+                "codex_sandbox": {"const": "workspace-write"},
+                "codex_execution_root": {"const": "target-workspace"}
+              }
+            }
+          }
+        ],
+        "required": ["profile_id", "sandbox_mode", "codex_sandbox", "codex_execution_root", "approval_policy", "allowed_effect_classes", "required_tool_ids", "required_mcp_server_ids", "mcp_server_configs", "network_access", "external_effects"],
+        "properties": {
+          "profile_id": {"type": "string", "minLength": 1},
+          "specialized_environment": {"$ref": "#/$defs/specializedEnvironment"},
+          "sandbox_mode": {"enum": ["read_only", "workspace_write"]},
+          "codex_sandbox": {"const": "workspace-write"},
+          "codex_execution_root": {"enum": ["attempt-local", "target-workspace"]},
+          "approval_policy": {"const": "never"},
+          "allowed_effect_classes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["read_only", "repo_mutation"]}},
+          "required_tool_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "required_mcp_server_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "mcp_server_configs": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["server_id", "url", "bearer_token_env_var"],
+              "properties": {
+                "server_id": {"enum": ["aoa_evals", "aoa_stats", "aoa_memo"]},
+                "url": {"type": "string", "pattern": "^http://127\\.0\\.0\\.1:[0-9]+/mcp$"},
+                "bearer_token_env_var": {"enum": ["AOA_EVALS_MCP_READ_BEARER_TOKEN", "AOA_STATS_MCP_READ_BEARER_TOKEN", "AOA_MEMO_MCP_READ_BEARER_TOKEN"]}
+              }
+            }
+          },
+          "network_access": {"const": "disabled"},
+          "external_effects": {"const": false}
+        }
+      }
+    },
+    "execution_postures": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["bounded_execution", "independent_review", "closeout", "ambiguity_stop"]}},
+    "owner_contracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_execution_request_schema", "task_local_dag_schema"],
+      "properties": {
+        "owner_execution_request_schema": {"$ref": "#/$defs/ownerContract"},
+        "task_local_dag_schema": {"$ref": "#/$defs/ownerContract"}
+      }
+    },
+    "result_schema_ref": {"type": "string", "minLength": 1},
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["launches_separate_os_process", "uses_builtin_codex_subagents", "uses_tui_transport", "selects_model_from_binding", "model_fit_authority", "role_authority", "eval_authority", "owner_acceptance_authority", "external_effects_enabled", "commit_effect_enabled", "push_effect_enabled", "merge_effect_enabled", "release_effect_enabled"],
+      "properties": {
+        "launches_separate_os_process": {"const": true},
+        "uses_builtin_codex_subagents": {"const": false},
+        "uses_tui_transport": {"const": false},
+        "selects_model_from_binding": {"const": true},
+        "model_fit_authority": {"const": false},
+        "role_authority": {"const": false},
+        "eval_authority": {"const": false},
+        "owner_acceptance_authority": {"const": false},
+        "external_effects_enabled": {"const": false},
+        "commit_effect_enabled": {"const": false},
+        "push_effect_enabled": {"const": false},
+        "merge_effect_enabled": {"const": false},
+        "release_effect_enabled": {"const": false}
+      }
+    }
+  },
+  "$defs": {
+    "specializedEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment_id", "pythonpath_ref", "sdk_pythonpath_ref", "python_packages", "owner_roots", "environment_variables"],
+      "properties": {
+        "environment_id": {"type": "string", "minLength": 1},
+        "pythonpath_ref": {"type": "string", "pattern": "^environments/[A-Za-z0-9._/-]+/pythonpath$"},
+        "sdk_pythonpath_ref": {"const": "sdk/src"},
+        "python_packages": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["distribution", "version", "paths"],
+            "properties": {
+              "distribution": {"type": "string", "minLength": 1},
+              "version": {"type": "string", "minLength": 1},
+              "paths": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"}}
+            }
+          }
+        },
+        "owner_roots": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["owner_repo", "source_ref", "root_ref", "environment_variable", "access"],
+            "properties": {
+              "owner_repo": {"const": "aoa-stats"},
+              "source_ref": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+              "root_ref": {"const": "owners/aoa-stats"},
+              "environment_variable": {"const": "AOA_STATS_ROOT"},
+              "access": {"const": "read_only"}
+            }
+          }
+        },
+        "environment_variables": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["PYTHONDONTWRITEBYTECODE", "PYTHONNOUSERSITE", "PYTEST_ADDOPTS"],
+          "properties": {
+            "PYTHONDONTWRITEBYTECODE": {"const": "1"},
+            "PYTHONNOUSERSITE": {"const": "1"},
+            "PYTEST_ADDOPTS": {"const": "-p no:cacheprovider"}
+          }
+        }
+      }
+    },
+    "ownerContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_repo", "artifact_ref", "source_ref", "digest", "schema_version"],
+      "properties": {
+        "owner_repo": {"type": "string", "minLength": 1},
+        "artifact_ref": {"type": "string", "minLength": 1},
+        "source_ref": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "schema_version": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

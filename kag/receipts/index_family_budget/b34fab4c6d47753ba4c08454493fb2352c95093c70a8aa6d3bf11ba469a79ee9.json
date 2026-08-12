@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 28372255,
+  "allowed_tracked_bytes": 34452624,
+  "approved_by": "repository-owner",
+  "base_ref": "8a4f396e9b68a230d561f08aee27273ea58aeae6",
+  "changed_generated_bytes": 28372255,
+  "changed_generated_files": 396,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "b34fab4c6d47753ba4c08454493fb2352c95093c70a8aa6d3bf11ba469a79ee9",
+  "reason": "Bind actor test temp-state isolation to the exact pull request base history",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34452624,
+  "tracked_bytes_max": 24117248
+}

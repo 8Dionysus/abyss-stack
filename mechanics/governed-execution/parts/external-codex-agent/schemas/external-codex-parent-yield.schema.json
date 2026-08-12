@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.abyss.local/stack/external-codex-parent-yield.schema.json",
+  "title": "External Codex parent yield report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "reentry_id",
+    "decision",
+    "continuation_id",
+    "child_task_id",
+    "expected_event_kind",
+    "deferred_parent_decisions",
+    "summary"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["abyss_stack_external_codex_parent_yield_v1"]
+    },
+    "reentry_id": {"type": "string"},
+    "decision": {"type": "string", "enum": ["yield"]},
+    "continuation_id": {"type": "string"},
+    "child_task_id": {"type": "string"},
+    "expected_event_kind": {"type": "string"},
+    "deferred_parent_decisions": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "summary": {"type": "string"}
+  }
+}

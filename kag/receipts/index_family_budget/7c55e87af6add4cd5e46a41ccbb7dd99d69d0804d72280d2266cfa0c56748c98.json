@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 28454257,
+  "allowed_tracked_bytes": 34501861,
+  "approved_by": "repository-owner",
+  "base_ref": "37cd71a1604197b01c5a11aa592ef3519cfe108a",
+  "changed_generated_bytes": 28454257,
+  "changed_generated_files": 396,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "7c55e87af6add4cd5e46a41ccbb7dd99d69d0804d72280d2266cfa0c56748c98",
+  "reason": "PR #352 marks login, interactive, rcfile, and init-file shell startup dispatch opaque while preserving inline-body forbidden-effect inspection.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34501861,
+  "tracked_bytes_max": 24117248
+}

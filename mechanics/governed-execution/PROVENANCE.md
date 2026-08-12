@@ -29,6 +29,11 @@ proof verdicts, playbook meaning, and final acceptance.
 - [parts/agent-os-adapter/CONTRACT.md](parts/agent-os-adapter/CONTRACT.md)
   owns the explicit runtime-side binding from `aoa-sdk` lifecycle contracts
   into the governed runner; the SDK remains the plan and protocol owner.
+- [parts/external-codex-agent/PROVENANCE.md](parts/external-codex-agent/PROVENANCE.md)
+  preserves the exact `aoa-sdk` plan/incarnation, `aoa-agents` role,
+  `aoa-models` realization, target-owner task/workspace, and runtime evidence
+  split for a separately launched persistent Codex process. Its result can
+  feed the existing A2A return reviewer but does not replace that owner lane.
 - [parts/return-policy/docs/RECURRENCE_RUNTIME_POLICY.md](parts/return-policy/docs/RECURRENCE_RUNTIME_POLICY.md)
   owns bounded recurrence and return policy.
 - [parts/local-worker-path/docs/CONTEXT_BUDGET_POLICY.md](parts/local-worker-path/docs/CONTEXT_BUDGET_POLICY.md)

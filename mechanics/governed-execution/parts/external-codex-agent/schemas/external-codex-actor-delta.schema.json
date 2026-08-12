@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-actor-delta.schema.json",
+  "title": "Canonical runtime-owned external actor delta",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "projection_kind", "baseline_manifest_digest", "final_manifest_digest", "changes"],
+  "properties": {
+    "$schema": {"const": "schemas/external-codex-actor-delta.schema.json"},
+    "schema_version": {"const": "abyss_stack_external_codex_actor_delta_v1"},
+    "projection_kind": {"const": "runtime_owned_actor_workspace"},
+    "baseline_manifest_digest": {"$ref": "#/$defs/digest"},
+    "final_manifest_digest": {"$ref": "#/$defs/digest"},
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "status", "before", "after"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "status": {"enum": ["created", "deleted", "modified", "mode_changed", "type_changed"]},
+          "before": {"oneOf": [{"$ref": "#/$defs/contentEntry"}, {"type": "null"}]},
+          "after": {"oneOf": [{"$ref": "#/$defs/contentEntry"}, {"type": "null"}]}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": {"pattern": "(^/|(^|/)\\.\\.(/|$))"}
+    },
+    "contentEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "kind", "mode", "size_bytes", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/relativePath"},
+        "kind": {"enum": ["file", "symlink", "directory"]},
+        "mode": {"type": "integer", "minimum": 0},
+        "size_bytes": {"type": "integer", "minimum": 0},
+        "sha256": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]}
+      }
+    }
+  }
+}

@@ -112,15 +112,15 @@ def _sanitize_public_payload(payload: Any) -> Any:
     if isinstance(payload, str):
         if payload == local_root or payload.startswith(local_root + os.sep):
             return _path_ref(Path(payload))
+        home = Path.home().resolve()
+        if payload == str(home) or payload.startswith(str(home) + os.sep):
+            return "host-home-redacted"
         tmp_root = "/srv/abyss-machine/tmp"
         if payload == tmp_root:
             return "host-tmp:abyss-machine"
         if payload.startswith(tmp_root + os.sep):
             suffix = Path(payload).resolve().relative_to(Path(tmp_root)).as_posix()
             return f"host-tmp:abyss-machine/{suffix}"
-        home = Path.home().resolve()
-        if payload == str(home) or payload.startswith(str(home) + os.sep):
-            return "host-home-redacted"
     return payload
 
 

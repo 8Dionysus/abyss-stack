@@ -9,6 +9,140 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Treat zsh inline execution as opaque because it reads the host-global
+  `zshenv`, and reject `find` file-output actions aimed at private Git metadata
+  while preserving ordinary Bash inline work and ordinary find reports.
+- Mark login, interactive, rcfile, and init-file shell modes as opaque startup
+  dispatch while continuing to inspect their inline body for forbidden effects.
+- Parse direct and option-attached argv coordinates before secret-effect
+  classification, so `diff`, `grep`, `sed`, `wc`, `sort`, and equivalent
+  system-utility forms cannot conceal a credential or private Git-config read.
+- Embed each installed wrapper's Python bootstrap and exact `active.json`
+  digest in its already-admitted static ELF, so a same-UID replacement of an
+  adjacent companion or active-record bytes cannot execute host code before
+  release verification and containment.
+- Reject ignored conventional credential files such as `.npmrc` before their
+  bytes are hashed into an actor projection, and classify direct model reads of
+  those coordinates as secret access.
+- Disable promisor lazy fetches in the projection-local Git environment, so
+  private-Git packing cannot invoke a source checkout's configured remote
+  helper before the actor containment boundary.
+- Remove the last role-scoped MCP bearer from the external runtime's
+  exec-time environment: the installed CLI now re-execs through a clean
+  environment and carries exact bearer bytes in a bounded sealed descriptor,
+  while actor permissions deny `/proc`. Parent yield/re-entry turns receive an
+  isolated non-writable `HOME` and have tool-bearing features disabled before
+  inference. Prepared non-landing independent reviewers may now consume their
+  exact writer projection under the derived review family, and A2A publication
+  revalidates the canonical writer `result.json` in its final locked snapshot.
+- Propagate only a profile's validated, verified-release-bound specialized
+  environment into model-issued shell commands through an explicit Codex
+  `shell_environment_policy.set` map. Landing actors can now execute their
+  pinned pytest, packaged `aoa_sdk`, and `aoa-stats` validation tools without
+  leaving pytest cache residue, while generic profiles retain the core-only,
+  secret-filtered shell environment. Public artifact sanitization now gives an
+  isolated home nested below host temp the stricter home-redaction treatment.
+- Bind every canonical independent reviewer to its exact capability across the
+  SDK summon request, scenario, and active review step. A selected
+  specialization resolves its owner-authored capability pack; an existing
+  base-role reviewer continuum retains only the unique capability already
+  named by its canonical request and admitted scenario. Preflight now rejects
+  a writer or reviewer whose non-empty summon capabilities are absent from the
+  run plan, or whose summon role, incarnation, parent task, session, outputs,
+  transport, review posture, or workspace semantics differ from the exact
+  launch and task, instead of allowing a real session that can never pass A2A
+  closeout.
+- Resolve symbolic `runtime:workspace-final-manifest#...` evidence anchors as
+  exact top-level JSON members. A shorter token such as `git_head` can no
+  longer pass by occurring inside the real `source_git_head` member name;
+  bounded line anchors and exact members such as `content_entries` remain
+  valid.
+- Carry the existing `sandbox_confined` indirect-command policy into every
+  canonically prepared read-only landing reviewer. Composite local inspection
+  commands remain admitted only under the exact read-only, approval-never,
+  network-disabled, secret-free, external-effect-free incarnation posture;
+  wider postures, known forbidden command families, and abnormal worker-death
+  closeout still fail closed.
+- Bind a fixed validation return either to one unchanged final actor manifest
+  at every command receipt or to the exact complete terminal validation suffix
+  whose last receipt binds the final manifest. This preserves refusal of later
+  model commands and post-validation workspace drift while tolerating
+  controller-visible transient command-sandbox cleanup between exact
+  owner-fixed validation commands.
+- Preserve a bounded repo-mutation actor's exact role and Codex thread when an
+  otherwise authority-safe terminal return fails only model-report admission.
+  The same-role `bounded_repair` route requires the exact prior result digest,
+  unchanged owner source, durable actor final-manifest and delta evidence, and
+  every observed change to remain inside the original allowed paths; it keeps
+  the original authority envelope and preserves the failed result closure.
+- Retry only transient regular-file identity/read and disappearing-directory
+  enumeration races while taking an actor manifest, rebuild the whole manifest
+  on each bounded attempt, retain
+  immediate fail-closed handling for every other projection error, and keep
+  the original runtime observation error text in durable failure evidence.
+- Bind the external Codex runtime to the exact model-organ write-profile IDs
+  used by landing and structured owner-duty Luna realizations, while keeping
+  both aliases model-neutral, projection-isolated, network-disabled,
+  external-effect-free, and observe-only in usage accounting.
+- Harden the external Codex contour against hidden pre-execution and
+  observation escape seams: opaque `git ls-remote` transport-helper dispatch now fails
+  closed; ripgrep preprocessor, hostname-helper, and decompressor modes are
+  opaque while ordinary searches remain admitted and ambient ripgrep config is
+  disabled; GNU sort compression helpers and hidden Git ref mutations now fail
+  closed while ordinary sorting and ref inspection remain admitted; all
+  model-issued Git config access now fails closed so credential-bearing reads
+  cannot reach the model, and Git remote access is limited to name listing so
+  credential-bearing URLs stay opaque; jq environment reads are classified as
+  secret access; accepted abbreviated Git filter-program options, Bash
+  startup-file options, and Git metadata/object mutations invisible to the
+  workspace manifest now fail closed while
+  read-only metadata inspection remains admitted; each
+  installed launcher is a static x86_64 ELF that removes
+  ambient `LD_*` injection before its first dynamic exec; and verified release
+  bytes are mounted at a namespace-private read-only `/mnt` coordinate rather
+  than overlaying a host-visible release path that could be renamed or
+  replaced. The external actor's Git-config mask now reconstructs affected
+  metadata parents inside namespace-private `tmpfs` views, so reserving absent
+  config and lock coordinates cannot create host files. Jq and GNU-abbreviated
+  pattern and pattern-file operands plus attached generic-mutator destinations
+  can no longer hide Git-config reads or metadata writes. Owner and masked
+  status comparison now fixes rename display explicitly, so harmless local
+  `status.renames` preferences cannot reject a valid repository. The mount gate now uses a
+  bubblewrap-retained socket peer,
+  so supervisor EOF cannot release a rejected launch; abort still kills and
+  reaps the gated wrapper before closing the supervisor endpoint. The exact
+  mount-wrapper digest proven by nested-sandbox preflight is retained through
+  inference launch, so a replacement between those phases fails closed, while
+  older durable v2 states remain readable for observation and result recovery.
+  The actor now materializes a runtime-owned projection through open source
+  descriptors and constructs a source-independent private `.git` body whose
+  status/diff match the admitted baseline. Source manifests are recorded before
+  and after materialization, and source-byte, parent-identity, orphan-staging,
+  publication ABA, or post-open projection-path races fail closed. Projection
+  publication is pinned to a parent descriptor and its baseline to the retained
+  staging inode; non-replacing publication records rename commitment before
+  verification and cleans only that inode after failure. Actor-facing immutable
+  inputs are schema-validated derivatives that structurally remove
+  source/ancestor coordinates from keys and values, reject collisions, and
+  normalize bounded nested Unicode/string escapes—including mixed text,
+  slash/hex-case variants, surrogate pairs, and invalid-UTF-8 binary shadows—
+  across arbitrary text and model-facing control views; controller
+  originals stay denied. Actor baseline/final manifests
+  and a canonical before/after delta are durable;
+  create/modify/delete/binary/mode/symlink changes stay in the projection and
+  the source checkout remains unchanged. Reviewer launches reuse an exact
+  controller-issued writer projection envelope and bind terminal result,
+  actor-manifest/delta, source-manifest, parent task, and reviewer evidence.
+  Reviewer preparation/execution no longer needs the historical source checkout.
+  Reviewed A2A export now binds `landing_review` at admission and final export,
+  and revalidates that exact seed, all exported writer/reviewer artifacts, and
+  both summon request/schema pairs under the writer/reviewer locks. Worker-death
+  closeout promotes observed read-only, source, or out-of-scope drift to
+  `authority_blocked`.
+  Inference mounts the exact open actor inode at a stable child coordinate and
+  finalization rejects pathname/inode replacement. Result v2 requires successful
+  projection provenance while legacy result v1 and state v1/v2 remain readable;
+  old state cannot start inference without a safe v3 projection.
 - Make the Codex MCP cold-start barrier observable instead of presenting a
   blank terminal during the several-minute admission transaction. The launcher
   now reports recovery immediately, prints bounded unit/listener progress every
@@ -108,6 +242,46 @@ Tracking starts with the community-docs baseline for this repository.
   current maintenance release and distinguishes the latest public conformance
   release (`v0.1.16`) from the exact tested `0.2.0-alpha.10` next-wire package;
   migration to `2026-07-28` remains fail-closed.
+
+- A source-local external Codex incarnation runtime now admits a task-family-
+  neutral owner contour: exact `aoa-agents` obligation, mandate, accepted
+  responsibility transfer, domain procedure, and ready `aoa-skills` task-local
+  DAG precede the `aoa-models` realization and `aoa-sdk` post-compile binding.
+  A model-neutral non-starting binder creates the exact separate OS-process
+  launch without using built-in Codex subagents; the semantic execution request
+  remains a separate owner artifact. Eval, stats, memo, and landing can use
+  exact role-scoped profiles, including one named loopback AoA MCP whose token
+  is withheld from the model shell. Transport fixtures remain bounded
+  compatibility evidence. Exact byte manifests include ignored
+  workspace content while refusing secret-shaped ignored inputs, validation
+  claims bind to observed argv/exit states, required review cannot close as
+  completed, produced-artifact and status-selected wake claims fail closed,
+  high-risk command families and path drift remain bounded, and Linux
+  parent-death/subreaper containment covers TERM-resistant `setsid` descendants
+  and unexpected worker death without pre-empting Codex's own sandbox
+  namespaces. A2A return remains gated on a
+  different accepted reviewer runtime and thread;
+  usage is observe-only rather than an execution budget, stable
+  immutable/source/runtime-validation evidence schemes fail closed, admission-
+  time failure closeout survives later input drift, and canonical reviewer
+  preparation forwards exact writer evidence into a distinct non-started
+  session. Mutation paths, source-evidence paths, and the controller-owned
+  post-exit manifest identity are separate. A session-local output schema pins
+  exact task/incarnation IDs. Same-thread continuation evidence is now carried
+  as exact inline UTF-8 bytes with full provenance, prevalidated as one set,
+  preserved under controller authority, projected through an actor-safe
+  immutable envelope, and admitted into only the session-local evidence schema;
+  the runtime never follows an evidence path supplied by the actor or caller.
+  One explicit prior-result-digest-bound route
+  can continue the same unchanged read-only reviewer thread after an identity
+  typo while preserving the failed receipt. Every admitted resume now
+  preserves its prior terminal receipt, and an interruption before Codex emits
+  turn usage is reported as partial observation rather than zero work. A
+  semantically read-only launch now gives Codex a distinct attempt-local
+  execution root and `TMPDIR`; the target checkout stays outside writable
+  roots, the exact execution root is receipted, and network remains disabled;
+  no model-fit, owner-acceptance, landing, commit, publication, or runtime
+  activation claim is implied.
 
 - A separate credential-bearing, content-addressed Wave 1 read-canary contour
   for KAG, stats, and decisions. It observes one exact loopback schema and

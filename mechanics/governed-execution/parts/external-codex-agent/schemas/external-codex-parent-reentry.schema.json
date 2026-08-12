@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.abyss.local/stack/external-codex-parent-reentry.schema.json",
+  "title": "External Codex parent re-entry report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "reentry_id",
+    "continuation_id",
+    "child_task_id",
+    "child_result_digest",
+    "observed_event_digest",
+    "decision",
+    "next_action",
+    "summary"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["abyss_stack_external_codex_parent_reentry_v1"]
+    },
+    "reentry_id": {"type": "string"},
+    "continuation_id": {"type": "string"},
+    "child_task_id": {"type": "string"},
+    "child_result_digest": {"type": "string"},
+    "observed_event_digest": {"type": "string"},
+    "decision": {
+      "type": "string",
+      "enum": ["authority_review_required", "return_to_owner", "stop"]
+    },
+    "next_action": {
+      "type": "string",
+      "enum": ["request_human_authority", "route_to_owner", "stop"]
+    },
+    "summary": {"type": "string"}
+  }
+}

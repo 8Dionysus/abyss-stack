@@ -6,6 +6,8 @@ import re
 import subprocess
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VALIDATION_DIR = REPO_ROOT / "docs" / "validation"
@@ -195,7 +197,13 @@ def test_runtime_config_bundle_validator_sanitizes_public_verify_sidecar(tmp_pat
     assert payload["artifact_subject_resolution"][0]["resolved_path"] == "dist/abyss-stack-runtime-config/substrate.rendered.yml"
 
 
-def test_runtime_config_bundle_validator_sanitizes_host_paths() -> None:
+def test_runtime_config_bundle_validator_sanitizes_host_paths(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "HOME",
+        "/srv/abyss-machine/tmp/external-actor/attempt/scratch-shell-home",
+    )
     validator = load_runtime_config_bundle_validator()
     sanitized = validator._sanitize_public_payload(
         {

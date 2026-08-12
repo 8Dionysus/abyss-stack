@@ -264,6 +264,13 @@
 
 - [ABYSS-STACK-D-0105 Bind Stack MCP Capabilities to Process Contours](../ABYSS-STACK-D-0105-bind-stack-mcp-capabilities-to-process-contours.md) (`docs/decisions/ABYSS-STACK-D-0105-bind-stack-mcp-capabilities-to-process-contours.md`)
 
+## evidence
+
+- [ABYSS-STACK-D-0114 Retry Only Transient Actor-Manifest Observation Races](../ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md) (`docs/decisions/ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md`)
+- [ABYSS-STACK-D-0115 Preserve Writer Role Continuity for Report Repair](../ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md) (`docs/decisions/ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md`)
+- [ABYSS-STACK-D-0116 Bind Terminal Validation Suite After Command-Sandbox Settlement](../ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md) (`docs/decisions/ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md`)
+- [ABYSS-STACK-D-0117 Recover Review Inputs Without Rewriting Owner Writers](../ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md) (`docs/decisions/ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md`)
+
 ## federation seam
 
 - [ABYSS-STACK-D-0076 Repo-Self KAG Runtime Projections](../ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md) (`docs/decisions/ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md`)
@@ -326,11 +333,29 @@
 - [ABYSS-STACK-D-0064 Federation Effective Runtime Inputs](../ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md) (`docs/decisions/ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md`)
 - [ABYSS-STACK-D-0084 Routing Mirror Provenance Readiness](../ABYSS-STACK-D-0084-routing-mirror-provenance-readiness.md) (`docs/decisions/ABYSS-STACK-D-0084-routing-mirror-provenance-readiness.md`)
 
+## review
+
+- [ABYSS-STACK-D-0110 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md`)
+- [ABYSS-STACK-D-0111 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0112 Require Evidence-Complete Owner-Contour Incarnations](../ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md) (`docs/decisions/ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md`)
+- [ABYSS-STACK-D-0113 Carry Owner-Contour Writers Through Independent A2A Review](../ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md) (`docs/decisions/ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md`)
+- [ABYSS-STACK-D-0117 Recover Review Inputs Without Rewriting Owner Writers](../ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md) (`docs/decisions/ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md`)
+- [ABYSS-STACK-D-0118 Admit Role-First Owner Reviewers to A2A Return](../ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md) (`docs/decisions/ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md`)
+
 ## runtime
 
 - [ABYSS-STACK-D-0102 R1 Memory Runtime Is Exact Pull Delivery](../ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md) (`docs/decisions/ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md`)
 - [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
 - [ABYSS-STACK-D-0104 Bind KAG Owner Coverage to the Admitted Bundle](../ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md) (`docs/decisions/ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md`)
+- [ABYSS-STACK-D-0110 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md`)
+- [ABYSS-STACK-D-0111 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0112 Require Evidence-Complete Owner-Contour Incarnations](../ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md) (`docs/decisions/ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md`)
+- [ABYSS-STACK-D-0113 Carry Owner-Contour Writers Through Independent A2A Review](../ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md) (`docs/decisions/ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md`)
+- [ABYSS-STACK-D-0114 Retry Only Transient Actor-Manifest Observation Races](../ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md) (`docs/decisions/ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md`)
+- [ABYSS-STACK-D-0115 Preserve Writer Role Continuity for Report Repair](../ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md) (`docs/decisions/ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md`)
+- [ABYSS-STACK-D-0116 Bind Terminal Validation Suite After Command-Sandbox Settlement](../ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md) (`docs/decisions/ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md`)
+- [ABYSS-STACK-D-0117 Recover Review Inputs Without Rewriting Owner Writers](../ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md) (`docs/decisions/ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md`)
+- [ABYSS-STACK-D-0118 Admit Role-First Owner Reviewers to A2A Return](../ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md) (`docs/decisions/ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md`)
 
 ## runtime access plane
 
@@ -365,6 +390,11 @@
 - [ABYSS-STACK-D-0102 R1 Memory Runtime Is Exact Pull Delivery](../ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md) (`docs/decisions/ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md`)
 - [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
 - [ABYSS-STACK-D-0104 Bind KAG Owner Coverage to the Admitted Bundle](../ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md) (`docs/decisions/ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md`)
+- [ABYSS-STACK-D-0110 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md`)
+- [ABYSS-STACK-D-0111 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0112 Require Evidence-Complete Owner-Contour Incarnations](../ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md) (`docs/decisions/ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md`)
+- [ABYSS-STACK-D-0113 Carry Owner-Contour Writers Through Independent A2A Review](../ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md) (`docs/decisions/ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md`)
+- [ABYSS-STACK-D-0118 Admit Role-First Owner Reviewers to A2A Return](../ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md) (`docs/decisions/ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md`)
 
 ## source validation
 
@@ -379,6 +409,9 @@
 
 - [ABYSS-STACK-D-0096 Fail-Closed MCP Protocol Migration Lab](../ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md) (`docs/decisions/ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md`)
 - [ABYSS-STACK-D-0104 Bind KAG Owner Coverage to the Admitted Bundle](../ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md) (`docs/decisions/ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md`)
+- [ABYSS-STACK-D-0114 Retry Only Transient Actor-Manifest Observation Races](../ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md) (`docs/decisions/ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md`)
+- [ABYSS-STACK-D-0115 Preserve Writer Role Continuity for Report Repair](../ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md) (`docs/decisions/ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md`)
+- [ABYSS-STACK-D-0116 Bind Terminal Validation Suite After Command-Sandbox Settlement](../ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md) (`docs/decisions/ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md`)
 
 ## validation lane
 

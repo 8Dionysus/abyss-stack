@@ -84,6 +84,17 @@ def test_operator_scripts_keep_side_effect_posture_visible() -> None:
     assert operator["validation_lane"] == "source-fast/shellcheck/release"
 
 
+def test_external_codex_operator_wrapper_is_inventory_routed() -> None:
+    operator = next(
+        entry
+        for entry in load_inventory()["script_surfaces"]
+        if entry["family"] == "root-operator-command-surface"
+    )
+
+    assert "scripts/aoa-external-codex-agent" in operator["paths"]
+    assert "scripts/aoa-external-actor-bind" in operator["paths"]
+
+
 def test_focused_validator_modules_are_script_inventory_covered() -> None:
     root_validation = next(
         entry

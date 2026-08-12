@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-study-preparation.schema.json",
+  "title": "Fixed-input external Codex comparison preparation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "model_study_id",
+    "admission_class",
+    "workspace_path",
+    "workspace_head",
+    "workspace_manifest_path",
+    "workspace_manifest_digest",
+    "study_path",
+    "study_digest",
+    "study_packet_path",
+    "study_packet_digest",
+    "task_semantic_digest",
+    "state_root",
+    "aoa_sdk_import_provenance",
+    "arms",
+    "fixed_invariants",
+    "attribution_limits"
+  ],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_external_codex_study_preparation_v1"},
+    "model_study_id": {"type": "string", "pattern": "^model-study:"},
+    "admission_class": {"const": "transport_study_fixture"},
+    "workspace_path": {"$ref": "#/$defs/absolutePath"},
+    "workspace_head": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "workspace_manifest_path": {"$ref": "#/$defs/absolutePath"},
+    "workspace_manifest_digest": {"$ref": "#/$defs/digest"},
+    "study_path": {"$ref": "#/$defs/absolutePath"},
+    "study_digest": {"$ref": "#/$defs/digest"},
+    "study_packet_path": {"$ref": "#/$defs/absolutePath"},
+    "study_packet_digest": {"$ref": "#/$defs/digest"},
+    "task_semantic_digest": {"$ref": "#/$defs/digest"},
+    "state_root": {"$ref": "#/$defs/absolutePath"},
+    "aoa_sdk_import_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_root",
+        "expected_package_root",
+        "capture_point",
+        "coordinates"
+      ],
+      "properties": {
+        "source_root": {"$ref": "#/$defs/absolutePath"},
+        "expected_package_root": {"$ref": "#/$defs/absolutePath"},
+        "capture_point": {
+          "const": "after_all_writer_plan_and_binding_compilation"
+        },
+        "coordinates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["label", "path"],
+            "properties": {
+              "label": {"type": "string", "minLength": 1},
+              "path": {"$ref": "#/$defs/absolutePath"}
+            }
+          }
+        }
+      }
+    },
+    "arms": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "arm_id",
+          "model_realization_ref",
+          "model_slug",
+          "reasoning_effort",
+          "task_id",
+          "incarnation_id",
+          "session_id",
+          "task_path",
+          "summon_request_path",
+          "summon_request_digest",
+          "summon_request_schema_path",
+          "summon_request_schema_digest",
+          "summon_decision_path",
+          "summon_decision_digest",
+          "summon_result_schema_path",
+          "summon_result_schema_digest",
+          "plan_path",
+          "incarnation_binding_path",
+          "launch_path",
+          "launch_digest"
+        ],
+        "properties": {
+          "arm_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          },
+          "model_realization_ref": {"type": "string", "minLength": 1},
+          "model_slug": {"type": "string", "minLength": 1},
+          "reasoning_effort": {"enum": ["xhigh", "max"]},
+          "task_id": {"type": "string", "minLength": 1},
+          "incarnation_id": {"type": "string", "minLength": 1},
+          "session_id": {"type": "string", "minLength": 1},
+          "task_path": {"$ref": "#/$defs/absolutePath"},
+          "summon_request_path": {"$ref": "#/$defs/absolutePath"},
+          "summon_request_digest": {"$ref": "#/$defs/digest"},
+          "summon_request_schema_path": {"$ref": "#/$defs/absolutePath"},
+          "summon_request_schema_digest": {"$ref": "#/$defs/digest"},
+          "summon_decision_path": {"$ref": "#/$defs/absolutePath"},
+          "summon_decision_digest": {"$ref": "#/$defs/digest"},
+          "summon_result_schema_path": {"$ref": "#/$defs/absolutePath"},
+          "summon_result_schema_digest": {"$ref": "#/$defs/digest"},
+          "plan_path": {"$ref": "#/$defs/absolutePath"},
+          "incarnation_binding_path": {"$ref": "#/$defs/absolutePath"},
+          "launch_path": {"$ref": "#/$defs/absolutePath"},
+          "launch_digest": {"$ref": "#/$defs/digest"}
+        }
+      }
+    },
+    "fixed_invariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "attribution_limits": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "absolutePath": {"type": "string", "pattern": "^/"}
+  }
+}

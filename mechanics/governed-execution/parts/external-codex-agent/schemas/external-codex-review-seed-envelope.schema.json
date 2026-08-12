@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-review-seed-envelope.schema.json",
+  "title": "Controller-issued exact writer projection envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "writer_session_id",
+    "writer_incarnation_id",
+    "writer_thread_id",
+    "writer_status",
+    "writer_result_ref",
+    "writer_projection_path",
+    "writer_final_manifest_ref",
+    "writer_delta_ref",
+    "writer_source_manifest_ref"
+  ],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_external_codex_review_seed_envelope_v1"},
+    "writer_session_id": {"type": "string", "minLength": 1},
+    "writer_incarnation_id": {"type": "string", "minLength": 1},
+    "writer_thread_id": {"type": "string", "minLength": 1},
+    "writer_status": {"enum": ["completed", "review_required"]},
+    "writer_result_ref": {"$ref": "#/$defs/evidenceRef"},
+    "writer_projection_path": {"type": "string", "pattern": "^/"},
+    "writer_final_manifest_ref": {"$ref": "#/$defs/evidenceRef"},
+    "writer_delta_ref": {"$ref": "#/$defs/evidenceRef"},
+    "writer_source_manifest_ref": {"$ref": "#/$defs/evidenceRef"}
+  },
+  "$defs": {
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_repo", "artifact_ref", "artifact_digest"],
+      "properties": {
+        "owner_repo": {"type": "string", "minLength": 1},
+        "artifact_ref": {"type": "string", "minLength": 1},
+        "artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

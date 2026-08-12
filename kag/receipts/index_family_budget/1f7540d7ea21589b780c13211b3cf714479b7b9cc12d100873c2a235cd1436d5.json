@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26003452,
+  "allowed_tracked_bytes": 32408867,
+  "approved_by": "repository-owner",
+  "base_ref": "7ab5d1273e1185e495af7b7d12ca0ab717fe1b1a",
+  "changed_generated_bytes": 26003452,
+  "changed_generated_files": 366,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "1f7540d7ea21589b780c13211b3cf714479b7b9cc12d100873c2a235cd1436d5",
+  "reason": "Refresh the merged external-actor runtime family after closing the completed-supervisor identity handoff race.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 32408867,
+  "tracked_bytes_max": 24117248
+}

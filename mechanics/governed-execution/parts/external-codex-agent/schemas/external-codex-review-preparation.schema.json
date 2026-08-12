@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-review-preparation.schema.json",
+  "title": "Separated external Codex reviewer preparation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "writer_session_id",
+    "writer_incarnation_id",
+    "writer_thread_id",
+    "writer_status",
+    "writer_result_path",
+    "writer_result_digest",
+    "writer_runtime_state_path",
+    "writer_runtime_state_digest",
+    "writer_report_path",
+    "writer_report_digest",
+    "writer_effect_class",
+    "writer_workspace_manifest_path",
+    "writer_workspace_manifest_digest",
+    "writer_actor_final_manifest_path",
+    "writer_actor_final_manifest_digest",
+    "writer_actor_delta_path",
+    "writer_actor_delta_digest",
+    "review_seed_envelope_path",
+    "review_seed_envelope_digest",
+    "review_workspace_manifest_path",
+    "review_workspace_manifest_digest",
+    "review_instance_id",
+    "reviewer_session_id",
+    "reviewer_incarnation_id",
+    "reviewer_model_realization_ref",
+    "review_summon_request_path",
+    "review_summon_request_digest",
+    "summon_request_schema_path",
+    "summon_request_schema_digest",
+    "review_summon_decision_path",
+    "review_summon_decision_digest",
+    "summon_result_schema_path",
+    "summon_result_schema_digest",
+    "forwarded_input_ids",
+    "launch_path",
+    "launch_digest",
+    "state_root",
+    "aoa_sdk_import_provenance",
+    "usage_metering",
+    "started",
+    "fixed_invariants"
+  ],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_external_codex_review_preparation_v1"},
+    "writer_session_id": {"type": "string", "minLength": 1},
+    "writer_incarnation_id": {"type": "string", "minLength": 1},
+    "writer_thread_id": {"type": "string", "minLength": 1},
+    "writer_status": {"enum": ["completed", "review_required"]},
+    "writer_result_path": {"$ref": "#/$defs/absolutePath"},
+    "writer_result_digest": {"$ref": "#/$defs/digest"},
+    "writer_runtime_state_path": {"$ref": "#/$defs/absolutePath"},
+    "writer_runtime_state_digest": {"$ref": "#/$defs/digest"},
+    "writer_report_path": {"$ref": "#/$defs/absolutePath"},
+    "writer_report_digest": {"$ref": "#/$defs/digest"},
+    "writer_effect_class": {"enum": ["read_only", "repo_mutation"]},
+    "writer_workspace_manifest_path": {"$ref": "#/$defs/absolutePath"},
+    "writer_workspace_manifest_digest": {"$ref": "#/$defs/digest"},
+    "writer_actor_final_manifest_path": {"$ref": "#/$defs/absolutePath"},
+    "writer_actor_final_manifest_digest": {"$ref": "#/$defs/digest"},
+    "writer_actor_delta_path": {"$ref": "#/$defs/absolutePath"},
+    "writer_actor_delta_digest": {"$ref": "#/$defs/digest"},
+    "review_seed_envelope_path": {"$ref": "#/$defs/absolutePath"},
+    "review_seed_envelope_digest": {"$ref": "#/$defs/digest"},
+    "review_workspace_manifest_path": {"$ref": "#/$defs/absolutePath"},
+    "review_workspace_manifest_digest": {"$ref": "#/$defs/digest"},
+    "review_instance_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "reviewer_session_id": {"type": "string", "minLength": 1},
+    "reviewer_incarnation_id": {"type": "string", "minLength": 1},
+    "reviewer_model_realization_ref": {"type": "string", "minLength": 1},
+    "review_summon_request_path": {"$ref": "#/$defs/absolutePath"},
+    "review_summon_request_digest": {"$ref": "#/$defs/digest"},
+    "summon_request_schema_path": {"$ref": "#/$defs/absolutePath"},
+    "summon_request_schema_digest": {"$ref": "#/$defs/digest"},
+    "review_summon_decision_path": {"$ref": "#/$defs/absolutePath"},
+    "review_summon_decision_digest": {"$ref": "#/$defs/digest"},
+    "summon_result_schema_path": {"$ref": "#/$defs/absolutePath"},
+    "summon_result_schema_digest": {"$ref": "#/$defs/digest"},
+    "forwarded_input_ids": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"}
+    },
+    "launch_path": {"$ref": "#/$defs/absolutePath"},
+    "launch_digest": {"$ref": "#/$defs/digest"},
+    "state_root": {"$ref": "#/$defs/absolutePath"},
+    "aoa_sdk_import_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_root", "expected_package_root", "capture_point", "coordinates"],
+      "properties": {
+        "source_root": {"$ref": "#/$defs/absolutePath"},
+        "expected_package_root": {"$ref": "#/$defs/absolutePath"},
+        "capture_point": {"const": "after_reviewer_plan_and_binding_compilation"},
+        "coordinates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["label", "path"],
+            "properties": {
+              "label": {"type": "string", "minLength": 1},
+              "path": {"$ref": "#/$defs/absolutePath"}
+            }
+          }
+        }
+      }
+    },
+    "usage_metering": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "execution_limit_policy", "metering_regime", "dimensions", "cost_interpretation"],
+      "properties": {
+        "mode": {"const": "observe_only"},
+        "execution_limit_policy": {"const": "none"},
+        "metering_regime": {"type": "string", "minLength": 1},
+        "dimensions": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "cost_interpretation": {"const": "measurement_owner"}
+      }
+    },
+    "started": {"const": false},
+    "fixed_invariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "absolutePath": {"type": "string", "pattern": "^/"}
+  }
+}

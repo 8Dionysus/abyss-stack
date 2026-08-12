@@ -236,9 +236,17 @@
 
 - [ABYSS-STACK-D-0109 Recover Expired Modern MCP Read Admission](../ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md) (`docs/decisions/ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md`)
 
+## bounded authority
+
+- [ABYSS-STACK-D-0115 Preserve Writer Role Continuity for Report Repair](../ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md) (`docs/decisions/ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md`)
+
 ## bounded context
 
 - [ABYSS-STACK-D-0079 KAG Query Application Port](../ABYSS-STACK-D-0079-kag-query-application-port.md) (`docs/decisions/ABYSS-STACK-D-0079-kag-query-application-port.md`)
+
+## bounded retry
+
+- [ABYSS-STACK-D-0114 Retry Only Transient Actor-Manifest Observation Races](../ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md) (`docs/decisions/ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md`)
 
 ## branch policy
 
@@ -345,9 +353,18 @@
 - [ABYSS-STACK-D-0098 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md`)
 - [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
 
+## durable resume
+
+- [ABYSS-STACK-D-0111 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md`)
+
 ## effect boundary
 
 - [ABYSS-STACK-D-0080 Diagnostic Skill Owner Home](../ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md) (`docs/decisions/ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md`)
+
+## effect ceiling
+
+- [ABYSS-STACK-D-0111 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0113 Carry Owner-Contour Writers Through Independent A2A Review](../ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md) (`docs/decisions/ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md`)
 
 ## effect isolation
 
@@ -362,10 +379,23 @@
 
 - [ABYSS-STACK-D-0055 Root Routes Validator Module](../ABYSS-STACK-D-0055-root-routes-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0055-root-routes-validator-module.md`)
 
+## evidence closure
+
+- [ABYSS-STACK-D-0115 Preserve Writer Role Continuity for Report Repair](../ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md) (`docs/decisions/ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md`)
+
 ## exact admission
 
 - [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
 - [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
+
+## exact binding
+
+- [ABYSS-STACK-D-0110 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md`)
+- [ABYSS-STACK-D-0111 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0112 Require Evidence-Complete Owner-Contour Incarnations](../ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md) (`docs/decisions/ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md`)
+- [ABYSS-STACK-D-0113 Carry Owner-Contour Writers Through Independent A2A Review](../ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md) (`docs/decisions/ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md`)
+- [ABYSS-STACK-D-0117 Recover Review Inputs Without Rewriting Owner Writers](../ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md) (`docs/decisions/ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md`)
+- [ABYSS-STACK-D-0118 Admit Role-First Owner Reviewers to A2A Return](../ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md) (`docs/decisions/ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md`)
 
 ## exact delivery
 
@@ -388,6 +418,10 @@
 ## exact tool binding
 
 - [ABYSS-STACK-D-0105 Bind Stack MCP Capabilities to Process Contours](../ABYSS-STACK-D-0105-bind-stack-mcp-capabilities-to-process-contours.md) (`docs/decisions/ABYSS-STACK-D-0105-bind-stack-mcp-capabilities-to-process-contours.md`)
+
+## exact-thread resume
+
+- [ABYSS-STACK-D-0115 Preserve Writer Role Continuity for Report Repair](../ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md) (`docs/decisions/ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md`)
 
 ## explicit adapter
 
@@ -413,6 +447,9 @@
 - [ABYSS-STACK-D-0107 Fail Closed MCP Admission Maintenance](../ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md) (`docs/decisions/ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md`)
 - [ABYSS-STACK-D-0108 Modern-Only MCP Organ Runtime](../ABYSS-STACK-D-0108-modern-only-mcp-organ-runtime.md) (`docs/decisions/ABYSS-STACK-D-0108-modern-only-mcp-organ-runtime.md`)
 - [ABYSS-STACK-D-0109 Recover Expired Modern MCP Read Admission](../ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md) (`docs/decisions/ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md`)
+- [ABYSS-STACK-D-0114 Retry Only Transient Actor-Manifest Observation Races](../ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md) (`docs/decisions/ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md`)
+- [ABYSS-STACK-D-0116 Bind Terminal Validation Suite After Command-Sandbox Settlement](../ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md) (`docs/decisions/ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md`)
+- [ABYSS-STACK-D-0117 Recover Review Inputs Without Rewriting Owner Writers](../ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md) (`docs/decisions/ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md`)
 
 ## fail-closed freshness
 
@@ -434,6 +471,15 @@
 ## filesystem write allowlist
 
 - [ABYSS-STACK-D-0092 Memo and Evals Candidate Contour Isolation](../ABYSS-STACK-D-0092-memo-and-evals-candidate-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0092-memo-and-evals-candidate-contour-isolation.md`)
+
+## fixed validation
+
+- [ABYSS-STACK-D-0116 Bind Terminal Validation Suite After Command-Sandbox Settlement](../ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md) (`docs/decisions/ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md`)
+
+## full manifest
+
+- [ABYSS-STACK-D-0114 Retry Only Transient Actor-Manifest Observation Races](../ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md) (`docs/decisions/ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md`)
+- [ABYSS-STACK-D-0116 Bind Terminal Validation Suite After Command-Sandbox Settlement](../ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md) (`docs/decisions/ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md`)
 
 ## generated index handoff
 
@@ -463,9 +509,20 @@
 
 - [ABYSS-STACK-D-0107 Fail Closed MCP Admission Maintenance](../ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md) (`docs/decisions/ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md`)
 
+## immutable inputs
+
+- [ABYSS-STACK-D-0117 Recover Review Inputs Without Rewriting Owner Writers](../ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md) (`docs/decisions/ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md`)
+- [ABYSS-STACK-D-0118 Admit Role-First Owner Reviewers to A2A Return](../ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md) (`docs/decisions/ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md`)
+
 ## independent reference
 
 - [ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md`)
+
+## independent review
+
+- [ABYSS-STACK-D-0111 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0113 Carry Owner-Contour Writers Through Independent A2A Review](../ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md) (`docs/decisions/ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md`)
+- [ABYSS-STACK-D-0118 Admit Role-First Owner Reviewers to A2A Return](../ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md) (`docs/decisions/ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md`)
 
 ## language competence
 
@@ -511,6 +568,10 @@
 
 - [ABYSS-STACK-D-0041 Source Hygiene Validator Module](../ABYSS-STACK-D-0041-source-hygiene-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0041-source-hygiene-validator-module.md`)
 
+## model-fit evidence
+
+- [ABYSS-STACK-D-0112 Require Evidence-Complete Owner-Contour Incarnations](../ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md) (`docs/decisions/ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md`)
+
 ## mutable control projection
 
 - [ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md`)
@@ -540,6 +601,10 @@
 ## no semantic proxy
 
 - [ABYSS-STACK-D-0095 Cross-Organ Orchestration Host Boundary](../ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md) (`docs/decisions/ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md`)
+
+## observe-only usage
+
+- [ABYSS-STACK-D-0110 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md`)
 
 ## overlay skill install
 
@@ -573,6 +638,15 @@
 
 - [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
 - [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
+
+## owner provenance
+
+- [ABYSS-STACK-D-0110 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md`)
+- [ABYSS-STACK-D-0111 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md`)
+- [ABYSS-STACK-D-0112 Require Evidence-Complete Owner-Contour Incarnations](../ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md) (`docs/decisions/ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md`)
+- [ABYSS-STACK-D-0113 Carry Owner-Contour Writers Through Independent A2A Review](../ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md) (`docs/decisions/ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md`)
+- [ABYSS-STACK-D-0117 Recover Review Inputs Without Rewriting Owner Writers](../ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md) (`docs/decisions/ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md`)
+- [ABYSS-STACK-D-0118 Admit Role-First Owner Reviewers to A2A Return](../ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md) (`docs/decisions/ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md`)
 
 ## owner skill package
 
@@ -614,6 +688,10 @@
 ## post-reveal evidence join
 
 - [ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md`)
+
+## process isolation
+
+- [ABYSS-STACK-D-0111 Launch Bound Model Incarnations as External Codex Processes](../ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md) (`docs/decisions/ABYSS-STACK-D-0111-launch-bound-model-incarnations-as-external-codex-processes.md`)
 
 ## profile topology
 
@@ -664,9 +742,17 @@
 
 - [ABYSS-STACK-D-0083 Tree of Sophia Foundation Laboratory Boundary](../ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md) (`docs/decisions/ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md`)
 
+## responsibility transfer
+
+- [ABYSS-STACK-D-0112 Require Evidence-Complete Owner-Contour Incarnations](../ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md) (`docs/decisions/ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md`)
+
 ## return-policy
 
 - [ABYSS-STACK-D-0053 Return Policy Validator Module](../ABYSS-STACK-D-0053-return-policy-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0053-return-policy-validator-module.md`)
+
+## role-scoped MCP
+
+- [ABYSS-STACK-D-0110 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md`)
 
 ## rollback
 
@@ -742,6 +828,10 @@
 
 - [ABYSS-STACK-D-0063 Root Validator Wrapper Tail Removal](../ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md) (`docs/decisions/ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md`)
 
+## semantic digest
+
+- [ABYSS-STACK-D-0112 Require Evidence-Complete Owner-Contour Incarnations](../ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md) (`docs/decisions/ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md`)
+
 ## service-selection
 
 - [ABYSS-STACK-D-0065 Observability LogQL Loki Alloy](../ABYSS-STACK-D-0065-observability-logql-loki-alloy.md) (`docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md`)
@@ -802,6 +892,10 @@
 ## sync parity
 
 - [ABYSS-STACK-D-0064 Federation Effective Runtime Inputs](../ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md) (`docs/decisions/ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md`)
+
+## task-local DAG
+
+- [ABYSS-STACK-D-0110 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md`)
 
 ## test topology
 

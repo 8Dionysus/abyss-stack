@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26248737,
+  "allowed_tracked_bytes": 32644400,
+  "approved_by": "repository-owner",
+  "base_ref": "8621c72aaa6f54a6e4e548c60327add99e3985fc",
+  "changed_generated_bytes": 26248737,
+  "changed_generated_files": 369,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "26951ec2a37e4c83e44b966666fa0815864ca374dc1866e6b430cafced92efd4",
+  "reason": "Refresh projections for unprivileged bubblewrap CI admission on Ubuntu hosted runners",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 32644400,
+  "tracked_bytes_max": 24117248
+}

@@ -62,6 +62,7 @@ MECHANIC_PACKAGE_PARTS = {
         "runtime-contracts",
         "candidate-exports",
         "local-worker-path",
+        "external-codex-agent",
     ),
     "inference-pilots": (
         "llamacpp-pilot",
@@ -101,6 +102,47 @@ MECHANIC_PACKAGE_PARTS = {
     ),
 }
 MECHANIC_PART_REQUIRED_FILES = {
+    ("governed-execution", "external-codex-agent"): (
+        "AGENTS.md",
+        "CONTRACT.md",
+        "DIRECTION.md",
+        "PROVENANCE.md",
+        "README.md",
+        "SUSPENSION.md",
+        "VALIDATION.md",
+        "external_codex_agent.py",
+        "bind_external_actor_launch.py",
+        "external_codex_supervisor.py",
+        "install_external_codex_runtime.py",
+        "prepare_landing_study.py",
+        "runtime-profile.v1.json",
+        "schemas/external-actor-launch-manifest.schema.json",
+        "schemas/external-codex-actor-delta.schema.json",
+        "schemas/external-codex-actor-input-envelope.schema.json",
+        "schemas/external-codex-actor-workspace-manifest.schema.json",
+        "schemas/external-codex-event.schema.json",
+        "schemas/external-codex-launch.schema.json",
+        "schemas/external-codex-parent-obligation.schema.json",
+        "schemas/external-codex-parent-reentry.schema.json",
+        "schemas/external-codex-parent-yield.schema.json",
+        "schemas/external-codex-reentry-state.schema.json",
+        "schemas/external-codex-report.schema.json",
+        "schemas/external-codex-result.schema.json",
+        "schemas/external-codex-resume.schema.json",
+        "schemas/external-codex-review-preparation.schema.json",
+        "schemas/external-codex-review-seed-envelope.schema.json",
+        "schemas/external-codex-runtime-profile.schema.json",
+        "schemas/external-codex-state.schema.json",
+        "schemas/external-codex-study-preparation.schema.json",
+        "schemas/external-codex-task.schema.json",
+        "schemas/external-codex-workspace-manifest.schema.json",
+        "external_codex_mount_launcher.py",
+        "external_codex_projection.py",
+        "tests/test_external_codex_agent.py",
+        "tests/test_external_codex_mount_launcher.py",
+        "tests/test_external_codex_projection.py",
+        "tests/test_external_codex_runtime_install.py",
+    ),
     ("governed-execution", "agent-os-adapter"): (
         "CONTRACT.md",
         "VALIDATION.md",
@@ -177,7 +219,9 @@ def validate_mechanics_topology(
         root / "docs" / "runtime" / "MECHANICS.md",
     ):
         if not path.is_file():
-            errors.append(f"mechanics topology root is missing {path.relative_to(root)}")
+            errors.append(
+                f"mechanics topology root is missing {path.relative_to(root)}"
+            )
 
     atlas_text = read_text_func(mechanics_root / "README.md") or ""
     for package in MECHANIC_PACKAGES:
@@ -193,7 +237,9 @@ def validate_mechanics_topology(
         parts_readme = read_text_func(package_root / "parts" / "README.md") or ""
         parts_root = package_root / "parts"
         if parts_root.is_dir():
-            for part_dir in sorted(item for item in parts_root.iterdir() if item.is_dir()):
+            for part_dir in sorted(
+                item for item in parts_root.iterdir() if item.is_dir()
+            ):
                 if (
                     part_dir.name in FORBIDDEN_ACTIVE_PART_NAMES
                     or FORBIDDEN_ACTIVE_PART_NAME_FRAGMENT in part_dir.name

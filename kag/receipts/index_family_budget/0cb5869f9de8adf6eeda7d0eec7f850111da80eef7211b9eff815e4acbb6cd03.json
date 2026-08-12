@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 28440267,
+  "allowed_tracked_bytes": 34487778,
+  "approved_by": "repository-owner",
+  "base_ref": "37cd71a1604197b01c5a11aa592ef3519cfe108a",
+  "changed_generated_bytes": 28440267,
+  "changed_generated_files": 396,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "0cb5869f9de8adf6eeda7d0eec7f850111da80eef7211b9eff815e4acbb6cd03",
+  "reason": "PR #352 adds credential-config input refusal and causal no-hash/direct-read proof to the governed external Codex actor runtime source surface.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34487778,
+  "tracked_bytes_max": 24117248
+}

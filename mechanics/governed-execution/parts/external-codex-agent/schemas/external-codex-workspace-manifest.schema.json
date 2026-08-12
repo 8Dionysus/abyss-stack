@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-workspace-manifest.schema.json",
+  "title": "Exact dirty-worktree baseline for one external Codex launch",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "workspace_path",
+    "workspace_identity",
+    "git_head",
+    "git_status_porcelain_sha256",
+    "git_diff_binary_sha256",
+    "status_entries",
+    "content_entries"
+  ],
+  "properties": {
+    "$schema": {"const": "schemas/external-codex-workspace-manifest.schema.json"},
+    "schema_version": {"const": "abyss_stack_external_codex_workspace_manifest_v1"},
+    "workspace_path": {"type": "string", "pattern": "^/"},
+    "workspace_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "ancestors"],
+      "properties": {
+        "root": {"$ref": "#/$defs/identity"},
+        "ancestors": {"type": "array", "items": {"$ref": "#/$defs/identity"}}
+      }
+    },
+    "git_head": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "git_status_porcelain_sha256": {"$ref": "#/$defs/digest"},
+    "git_diff_binary_sha256": {"$ref": "#/$defs/digest"},
+    "status_entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "status"],
+        "properties": {
+          "path": {"$ref": "#/$defs/relativePath"},
+          "status": {"type": "string", "minLength": 2, "maxLength": 2}
+        }
+      }
+    },
+    "content_entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "kind", "size_bytes", "sha256", "index_flags"],
+        "properties": {
+          "path": {"$ref": "#/$defs/relativePath"},
+          "kind": {"enum": ["file", "symlink", "directory", "missing"]},
+          "size_bytes": {"type": "integer", "minimum": 0},
+          "sha256": {
+            "oneOf": [
+              {"$ref": "#/$defs/digest"},
+              {"type": "null"}
+            ]
+          },
+          "mode": {"type": ["integer", "null"], "minimum": 0},
+          "index_flags": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": ["assume_unchanged", "skip_worktree"]
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": {"pattern": "(^/|(^|/)\\.\\.(/|$))"}
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "st_dev", "st_ino", "mode"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^/"},
+        "st_dev": {"type": "integer", "minimum": 0},
+        "st_ino": {"type": "integer", "minimum": 0},
+        "mode": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

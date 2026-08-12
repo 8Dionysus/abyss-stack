@@ -81,6 +81,12 @@ The current direction is:
 - admit `aoa-sdk` Agent OS plans only through an explicit runtime-owned
   compatibility profile, exact snapshot observation, and governed approval
   boundaries
+- keep external Codex incarnations role-first: `aoa-agents` must supply the
+  obligation, mandate, responsibility transfer, domain procedure, and ready
+  task-local DAG before a model-neutral binder may create the exact external
+  process/session launch; retain event-filtered re-entry, independent review,
+  observe-only usage accounting, and disabled external effects until useful
+  owner-local proof exists
 - keep diagnostic spine and antifragility repair posture as evidence and packet
   routes before live mutation or authority promotion
 - keep release history in `CHANGELOG.md`; the current `v0.4.0` contour remains
@@ -225,6 +231,23 @@ The current direction is:
 - Guardrail:
   an SDK plan is not runtime permission, runtime evidence is not an eval
   verdict, and runtime completion is not final reviewed closeout.
+
+## Horizon: External Model Incarnations
+
+- Current posture:
+  a source-local candidate binds exact Luna/Sol realizations to one SDK
+  incarnation and launches a separate persistent Codex process for bounded
+  landing-oriented work. Fake-process fixtures prove transport, drift
+  containment, exact-thread resume, and separately bound review; they do not
+  prove model fit or deployment.
+- Next honest move:
+  run Sol max, Luna max, and Luna xhigh against one fixed owner-pinned landing
+  packet in clean isolated worktrees, preserve comparable receipts, and route
+  them to `aoa-evals` before any center admission.
+- Guardrail:
+  do not substitute built-in Codex spawn or TUI injection for this contract,
+  and do not infer quality, acceptance, landing, or external-effect permission
+  from a green runtime result.
 
 ## Horizon: Diagnostics And Repair
 

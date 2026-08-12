@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26028180,
+  "allowed_tracked_bytes": 32434444,
+  "approved_by": "repository-owner",
+  "base_ref": "7ab5d1273e1185e495af7b7d12ca0ab717fe1b1a",
+  "changed_generated_bytes": 26028180,
+  "changed_generated_files": 366,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "f1aa281a5772bd0df961d8404583bbfe8b45a6856613949112765e9141648184",
+  "reason": "Refresh external actor projections after closing sourced-shell, repository-config, prelaunch-manifest, forbidden-set, secret-reader, and verified-executable gaps.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 32434444,
+  "tracked_bytes_max": 24117248
+}

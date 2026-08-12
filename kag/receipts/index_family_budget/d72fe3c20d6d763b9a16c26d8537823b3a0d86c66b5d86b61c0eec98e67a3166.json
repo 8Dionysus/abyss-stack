@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 28367542,
+  "allowed_tracked_bytes": 34448480,
+  "approved_by": "repository-owner",
+  "base_ref": "8a4f396e9b68a230d561f08aee27273ea58aeae6",
+  "changed_generated_bytes": 28367542,
+  "changed_generated_files": 396,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "d72fe3c20d6d763b9a16c26d8537823b3a0d86c66b5d86b61c0eec98e67a3166",
+  "reason": "Bind the merged external actor contour to the landed role-first SDK owner commit",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34448480,
+  "tracked_bytes_max": 24117248
+}

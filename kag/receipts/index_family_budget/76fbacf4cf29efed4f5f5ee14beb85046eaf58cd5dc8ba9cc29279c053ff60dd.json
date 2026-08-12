@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26570053,
+  "allowed_tracked_bytes": 32130516,
+  "approved_by": "repository-owner",
+  "base_ref": "e690b4153e5ecc682d21825d92cc18d482a42f86",
+  "changed_generated_bytes": 26570053,
+  "changed_generated_files": 330,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "76fbacf4cf29efed4f5f5ee14beb85046eaf58cd5dc8ba9cc29279c053ff60dd",
+  "reason": "Refresh the exact external-actor evidence-closure and embedded-repository admission source surface; count the bounded projection delta without constraining actor work.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 32130516,
+  "tracked_bytes_max": 24117248
+}
