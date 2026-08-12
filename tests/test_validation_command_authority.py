@@ -86,8 +86,18 @@ def test_workflow_routes_reusable_commands_through_ci_gate() -> None:
         "git -C \"$RUNNER_TEMP/aoa-sdk-source\" fetch --depth 1 origin "
         "d364da5c76cdd54e88f68c03ca49964fd3f86313"
     ) in workflow
+    assert (
+        "git -C \"$RUNNER_TEMP/aoa-agents-source\" fetch --depth 1 origin "
+        "6eb9b27709fdab241423bf657dfe39fa85e4b159"
+    ) in workflow
+    assert (
+        "git -C \"$RUNNER_TEMP/aoa-skills-source\" fetch --depth 1 origin "
+        "d9949a4a4e525bceb04210fc4619d5cb57cf7cb7"
+    ) in workflow
     assert 'python -m pip install "$RUNNER_TEMP/aoa-sdk-source"' in workflow
+    assert "AOA_AGENTS_SOURCE_ROOT: ${{ runner.temp }}/aoa-agents-source" in workflow
     assert "AOA_SDK_SOURCE_ROOT: ${{ runner.temp }}/aoa-sdk-source" in workflow
+    assert "AOA_SKILLS_SOURCE_ROOT: ${{ runner.temp }}/aoa-skills-source" in workflow
     assert "PYTHONPATH: ${{ runner.temp }}/aoa-sdk-source/src" in workflow
     assert ".deps/aoa-sdk" not in workflow
     assert shellcheck_commands[0]["command"][0] == "shellcheck"

@@ -26,6 +26,20 @@ jobs:
           git -C "$RUNNER_TEMP/aoa-sdk-source" fetch --depth 1 origin d364da5c76cdd54e88f68c03ca49964fd3f86313
           git -C "$RUNNER_TEMP/aoa-sdk-source" checkout --detach FETCH_HEAD
 
+      - name: Checkout canonical aoa-agents outside the source tree
+        run: |
+          git init "$RUNNER_TEMP/aoa-agents-source"
+          git -C "$RUNNER_TEMP/aoa-agents-source" remote add origin https://github.com/8Dionysus/aoa-agents
+          git -C "$RUNNER_TEMP/aoa-agents-source" fetch --depth 1 origin 6eb9b27709fdab241423bf657dfe39fa85e4b159
+          git -C "$RUNNER_TEMP/aoa-agents-source" checkout --detach FETCH_HEAD
+
+      - name: Checkout canonical aoa-skills outside the source tree
+        run: |
+          git init "$RUNNER_TEMP/aoa-skills-source"
+          git -C "$RUNNER_TEMP/aoa-skills-source" remote add origin https://github.com/8Dionysus/aoa-skills
+          git -C "$RUNNER_TEMP/aoa-skills-source" fetch --depth 1 origin d9949a4a4e525bceb04210fc4619d5cb57cf7cb7
+          git -C "$RUNNER_TEMP/aoa-skills-source" checkout --detach FETCH_HEAD
+
       - name: Clone abyss-machine verifier
         run: git clone --depth 1 https://github.com/8Dionysus/abyss-machine "$RUNNER_TEMP/abyss-machine-verifier"
 
@@ -58,7 +72,9 @@ jobs:
       - name: Run release audit including routing canary contract
         env:
           ABYSS_MACHINE_REPO_ROOT: ${{ runner.temp }}/abyss-machine-verifier
+          AOA_AGENTS_SOURCE_ROOT: ${{ runner.temp }}/aoa-agents-source
           AOA_SDK_SOURCE_ROOT: ${{ runner.temp }}/aoa-sdk-source
+          AOA_SKILLS_SOURCE_ROOT: ${{ runner.temp }}/aoa-skills-source
           AOA_STATS_ROOT: ${{ runner.temp }}/aoa-stats-validator
           PYTHONPATH: ${{ runner.temp }}/aoa-sdk-source/src
         run: python scripts/ci_gate.py --mode release
