@@ -6375,7 +6375,7 @@ def test_indirect_interpreter_effect_is_unclassified_but_fixed_validation_is_adm
     assert RUNTIME._command_has_unclassified_indirection(command) is True
     assert (
         RUNTIME._command_has_unclassified_indirection(
-            "/usr/bin/zsh -c '/usr/bin/rg -n fixture README.md'"
+            "/usr/bin/bash -c '/usr/bin/rg -n fixture README.md'"
         )
         is False
     )
@@ -6629,6 +6629,16 @@ def test_login_shell_body_effects_remain_visible() -> None:
     command = "/usr/bin/bash -lc '/usr/bin/git push; /usr/bin/true'"
 
     assert "push" in RUNTIME._command_effects(command)
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+def test_zsh_unconditional_global_startup_is_fail_closed() -> None:
+    command = "/usr/bin/zsh -c '/usr/bin/true'"
+
+    tokenizations, incomplete = RUNTIME._shell_tokenization_analysis(command)
+
+    assert tokenizations[-1] == ("/usr/bin/true",)
+    assert incomplete is False
     assert RUNTIME._command_has_unclassified_indirection(command) is True
 
 
@@ -7754,6 +7764,31 @@ def test_generic_repository_git_metadata_writers_are_fail_closed(
     command: str,
 ) -> None:
     assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/find . -maxdepth 0 -fprint .git/HEAD",
+        "/usr/bin/find . -maxdepth 0 -fprint0 .git/refs/heads/main",
+        "/usr/bin/find . -maxdepth 0 -fprintf .git/HEAD '%p\\n'",
+        "/usr/bin/find . -maxdepth 0 -fls /tmp/repo/.git/index",
+    ),
+)
+def test_find_output_actions_cannot_mutate_git_metadata(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/find . -maxdepth 1 -print",
+        "/usr/bin/find . -maxdepth 0 -fprint inventory.txt",
+        "/usr/bin/find . -maxdepth 0 -fprintf report.txt '%p\\n'",
+    ),
+)
+def test_ordinary_find_output_remains_classifiable(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
 
 
 def test_ordinary_source_reader_and_writer_remain_classifiable() -> None:

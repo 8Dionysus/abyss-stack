@@ -194,7 +194,8 @@ abbreviated Git cat-file filter/textconv and hash-object path refusal,
 hash-object filter-enabling refusal with exact no-filter hashing preserved,
 signature-backed for-each-ref and revision-walker verifier refusal,
 controller and model Git promisor lazy-fetch helper suppression,
-Bash/Zsh login, interactive, rcfile, and init-file startup execution refusal,
+unconditional zsh startup refusal, Bash login/interactive/rcfile/init-file
+startup execution refusal, find output-action Git-metadata mutation refusal,
 hidden Git symbolic-ref, reflog, ref, and object mutation refusal with
 read-only metadata inspection preserved,
 GNU sed `--sandbox` enforcement, config-driven Git helper refusal,

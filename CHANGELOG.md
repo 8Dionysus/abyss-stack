@@ -9,6 +9,9 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Treat zsh inline execution as opaque because it reads the host-global
+  `zshenv`, and reject `find` file-output actions aimed at private Git metadata
+  while preserving ordinary Bash inline work and ordinary find reports.
 - Mark login, interactive, rcfile, and init-file shell modes as opaque startup
   dispatch while continuing to inspect their inline body for forbidden effects.
 - Parse direct and option-attached argv coordinates before secret-effect

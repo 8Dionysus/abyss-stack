@@ -2511,6 +2511,8 @@ def _shell_has_startup_dispatch(tokens: Sequence[str]) -> bool:
 
     if not tokens or Path(tokens[0]).name.lower() not in SHELL_NAMES:
         return False
+    if Path(tokens[0]).name.lower() == "zsh":
+        return True
     for token in tokens[1:]:
         if token == "--":
             return False
@@ -2532,6 +2534,20 @@ def _shell_has_startup_dispatch(tokens: Sequence[str]) -> bool:
         if token.startswith("+") and token != "+":
             continue
         return False
+    return False
+
+
+def _find_writes_git_metadata(tokens: Sequence[str]) -> bool:
+    """Detect find output actions whose destination mutates private Git state."""
+
+    if not tokens or Path(tokens[0]).name.lower() != "find":
+        return False
+    output_actions = {"-fls", "-fprint", "-fprint0", "-fprintf"}
+    for index, token in enumerate(tokens[1:], start=1):
+        if token.lower() not in output_actions:
+            continue
+        if index + 1 < len(tokens) and _git_admin_metadata_path(tokens[index + 1]):
+            return True
     return False
 
 
@@ -3522,6 +3538,8 @@ def _command_has_unclassified_indirection(command: str) -> bool:
             if executable == "jq" and _jq_has_opaque_environment_access(segment):
                 return True
             if executable == "sort" and _sort_has_opaque_dispatch(segment):
+                return True
+            if executable == "find" and _find_writes_git_metadata(segment):
                 return True
             if _direct_git_config_file_access(segment):
                 return True
