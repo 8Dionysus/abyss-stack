@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 28449717,
+  "allowed_tracked_bytes": 34497321,
+  "approved_by": "repository-owner",
+  "base_ref": "37cd71a1604197b01c5a11aa592ef3519cfe108a",
+  "changed_generated_bytes": 28449717,
+  "changed_generated_files": 396,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "33b8a4fca72d579a73d1f425d027e12df9f50746183f2eee887611bb06894058",
+  "reason": "PR #352 normalizes direct and option-attached argv coordinates before secret-effect classification, closing diff and equivalent system-utility credential reads without blocking ordinary role work.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34497321,
+  "tracked_bytes_max": 24117248
+}
