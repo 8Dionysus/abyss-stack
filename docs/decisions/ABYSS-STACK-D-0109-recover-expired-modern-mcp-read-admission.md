@@ -61,13 +61,19 @@ result contracts, proof, acceptance, rollback, and consumer compatibility
 checks remain mandatory.
 
 The same controller also repairs an incomplete production fleet while registry
-and contour admission remain current. That path does not use bootstrap or
-reset claims: it resets only the fixed production units' failed state, starts
-the literal production set, then replaces the process-bound canary and managed
-catalog family before completing. The Codex credential launcher makes this
-controller a synchronous pre-exec dependency whenever any of the eleven units
-or loopback listeners is absent. A one-second boot timer starts the same
-transaction eagerly; the launcher closes the remaining scheduling race.
+and contour admission remain current. It reuses that admission only when the
+registry deployment identity, all current production canaries, and the managed
+catalog already match the exact current deployment. That fast path does not use
+bootstrap or reset claims: it resets only the fixed production units' failed
+state, starts the literal production set, then replaces the process-bound
+canary and managed catalog family before completing. If time-current admission
+is bound to a predecessor deployment, package, canary family, or catalog, the
+controller instead rebuilds admission through the bounded bootstrap handoff;
+repeated direct production starts would only replay a mandatory fail-closed
+preflight rejection. The Codex credential launcher makes this controller a
+synchronous pre-exec dependency whenever any of the eleven units or loopback
+listeners is absent. A one-second boot timer starts the same transaction
+eagerly; the launcher closes the remaining scheduling race.
 
 ## Rationale
 
@@ -82,9 +88,12 @@ contains the new lifecycle effect to the same read fleet already admitted by
 
 - A host cold start may take several minutes while all owner-shaped canaries
   run; the admission oneshot therefore has a ten-minute timeout.
-- If production is unavailable while admission is still current, recovery
-  restarts only the exact production set and renews its process-bound evidence;
-  bootstrap remains reserved for expired admission.
+- If production is unavailable while admission is still current and reusable
+  for the exact deployment, recovery restarts only the exact production set and
+  renews its process-bound evidence.
+- If production is unavailable and time-current admission is bound to stale
+  deployment or evidence identities, recovery uses the same bounded bootstrap
+  handoff and replaces those identities before production start.
 - Codex no longer starts an MCP-consuming session while the fixed fleet is
   absent. A bounded launcher failure is reported once before Codex execution
   instead of eleven transport failures retained for the whole session.
