@@ -7289,6 +7289,24 @@ def test_direct_secret_file_encoder_is_classified() -> None:
 @pytest.mark.parametrize(
     "command",
     (
+        "/usr/bin/date -f.env",
+        "/usr/bin/date -uf.env",
+        "/usr/bin/date -f.git/config",
+    ),
+)
+def test_date_attached_file_operand_cannot_hide_secret_reads(command: str) -> None:
+    assert RUNTIME._command_effects(command) == {"secret_access"}
+
+
+def test_date_ordinary_attached_file_operand_remains_classifiable() -> None:
+    command = "/usr/bin/date -fdates.txt"
+    assert RUNTIME._command_effects(command) == set()
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
         "/usr/bin/wc --files0-from=.env",
         "/usr/bin/wc --files0-from .npmrc",
         "/usr/bin/wc --files0-f=.pypirc",

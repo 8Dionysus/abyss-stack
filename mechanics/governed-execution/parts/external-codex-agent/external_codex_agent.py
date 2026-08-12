@@ -2114,6 +2114,7 @@ def _long_option_prefix(value: str, canonical: str) -> bool:
 
 ATTACHED_SHORT_FILE_OPTIONS = {
     "awk": frozenset("f"),
+    "date": frozenset("f"),
     "grep": frozenset("f"),
     "jq": frozenset("f"),
     "rg": frozenset("f"),
