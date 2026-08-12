@@ -2,7 +2,13 @@ name: Repo Validation
 
 on:
   push:
+    branches:
+      - main
   pull_request:
+
+concurrency:
+  group: repo-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   release_audit:
