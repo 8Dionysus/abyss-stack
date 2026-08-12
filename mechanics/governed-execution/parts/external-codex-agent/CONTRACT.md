@@ -674,8 +674,8 @@ coordinate fails closed without starting a new attempt. Existing task,
 continuation, role, model, workspace, effect, and external authority remain
 unchanged. The previous terminal result and evidence closure remain immutable.
 
-A failed session is not generally resumable. Two explicit same-thread report
-recovery routes exist; neither retries automatically. A `review_followup` may
+A failed session is not generally resumable. Three explicit same-thread
+recovery routes exist; none retries automatically. A `review_followup` may
 continue a read-only `independent_review` incarnation rejected only as
 `model_report_identity_mismatch` or `model_report_transition_mismatch`, with no
 changed paths and an exact matching final workspace manifest. A
@@ -687,8 +687,21 @@ original task's `allowed_paths`. This writer route preserves the same role,
 thread, projection, and authority envelope; it does not convert the actor to
 read-only or grant a new path, effect, source, or external authority.
 
-Both requests must bind the prior `result.json` digest, session, thread, and
-event cursor. Before continuing the same Codex thread, the general resume
+A `capacity_recovery` may continue the exact role after Codex reports the
+current ChatGPT usage-limit protocol pair before its first completed turn. The
+runtime admits this route only when the per-attempt raw JSONL artifact is
+digest-bound by the prior result and ends with an exact top-level provider
+`error` plus identical `turn.failed` message. The prior result must additionally
+prove zero turns, zero observed tokens, no commands, no changed paths, matching
+source and actor manifests, and complete actor final-manifest/delta evidence.
+The current typed failure is `provider_capacity_unavailable`; a historical
+`codex_process_failed` result may use the same route only when those exact raw
+events independently prove the legacy classification. Stderr, model-authored
+text, substring matching, an arbitrary process failure, or a drifted evidence
+artifact cannot activate the route.
+
+All failed-session recovery requests must bind the prior `result.json` digest,
+session, thread, and event cursor. Before continuing the same Codex thread, the general resume
 preservation rule verifies and retains that failed result and its evidence
 closure. A route-specific admission event records the digest. Authority,
 source-manifest, projection-closure, or out-of-scope-change failure does not

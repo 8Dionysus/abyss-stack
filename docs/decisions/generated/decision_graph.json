@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 118,
-  "edge_count": 2666,
+  "decision_count": 119,
+  "edge_count": 2688,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 989,
-    "DATED": 118,
-    "GUARDED_BY": 364,
-    "HAS_STATUS": 118,
-    "HAS_SURFACE_CLASS": 317,
-    "IN_STACK_LANE": 275,
-    "NEXT_DECISION": 117,
-    "OWNED_BY_SURFACE": 124,
-    "OWNS_DECISION": 118,
+    "CITES_SOURCE_SURFACE": 996,
+    "DATED": 119,
+    "GUARDED_BY": 367,
+    "HAS_STATUS": 119,
+    "HAS_SURFACE_CLASS": 320,
+    "IN_STACK_LANE": 278,
+    "NEXT_DECISION": 118,
+    "OWNED_BY_SURFACE": 125,
+    "OWNS_DECISION": 119,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 124
+    "UNDER_MECHANIC_PARENT": 125
   },
   "edges": [
     {
@@ -12748,11 +12748,116 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0118",
+      "target": "decision:ABYSS-STACK-D-0119",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0118",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0118",
+      "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/SUSPENSION.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-resume.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "date:2026-08-12",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "guard_family:bounded%20authority",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "guard_family:evidence%20closure",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "guard_family:exact-thread%20resume",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "surface_class:actor%20continuity",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "surface_class:provider%20capacity",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "surface_class:runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "stack_lane:evidence",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
       "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -13345,21 +13450,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0118",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0119",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1162,
+  "node_count": 1166,
   "node_type_counts": {
     "date": 36,
-    "decision": 118,
+    "decision": 119,
     "guard_family": 181,
     "mechanic_parent": 10,
     "owner_surface": 62,
     "repo": 1,
-    "source_surface": 576,
+    "source_surface": 578,
     "stack_lane": 47,
     "status": 3,
-    "surface_class": 128
+    "surface_class": 129
   },
   "nodes": [
     {
@@ -14720,6 +14830,16 @@
       "posture": "accepted role-first owner-contour reviewer and responsibility return",
       "status": "accepted",
       "title": "ABYSS-STACK-D-0118 Admit Role-First Owner Reviewers to A2A Return",
+      "type": "decision"
+    },
+    {
+      "date": "2026-08-12",
+      "id": "decision:ABYSS-STACK-D-0119",
+      "label": "ABYSS-STACK-D-0119",
+      "path": "docs/decisions/ABYSS-STACK-D-0119-preserve-actor-continuity-across-provider-capacity-loss.md",
+      "posture": "accepted pre-turn capacity recovery; no generic retry",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0119 Preserve Actor Continuity Across Provider Capacity Loss",
       "type": "decision"
     },
     {
@@ -17844,6 +17964,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/SUSPENSION.md",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/SUSPENSION.md",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md",
       "label": "mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md",
       "type": "source_surface"
@@ -17881,6 +18006,11 @@
     {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-launch.schema.json",
       "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-launch.schema.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-resume.schema.json",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-resume.schema.json",
       "type": "source_surface"
     },
     {
@@ -19561,6 +19691,11 @@
     {
       "id": "surface_class:provenance",
       "label": "provenance",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:provider%20capacity",
+      "label": "provider capacity",
       "type": "surface_class"
     },
     {

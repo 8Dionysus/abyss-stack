@@ -512,6 +512,19 @@ REVIEW_REPORT_RECOVERY_FAILURES = {
     "model_report_transition_mismatch",
 }
 WRITER_REPORT_RECOVERY_FAILURE_PREFIX = "model_report_"
+PROVIDER_CAPACITY_FAILURE_CODES = {
+    "provider_capacity_unavailable",
+    # Releases before ABYSS-STACK-D-0119 collapsed a structured usage-limit
+    # event into this generic process code.  The legacy code is admissible
+    # only when the exact attempt event artifact independently proves the
+    # provider-capacity terminal pair.
+    "codex_process_failed",
+}
+CODEX_CHATGPT_USAGE_LIMIT_RE = re.compile(
+    r"\AYou've hit your usage limit\. Visit "
+    r"https://chatgpt\.com/codex/settings/usage to purchase more credits "
+    r"or try again at [^\r\n]{1,256}\.\Z"
+)
 SECRET_ENV_RE = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)", re.I)
 SOURCE_LINE_ANCHOR_RE = re.compile(
     r"^L(?P<start>[1-9][0-9]*)(?:-L(?P<end>[1-9][0-9]*))?$"
@@ -533,6 +546,79 @@ SECRET_PATH_PARTS = {
     "secret",
     "secrets",
 }
+
+
+def _codex_provider_capacity_failure_message(path: Path) -> str | None:
+    """Return one exact structured ChatGPT usage-limit terminal message.
+
+    Capacity recovery is based on Codex JSONL protocol records, never stderr,
+    model-authored text, or a loose substring.  The admitted shape is the
+    paired top-level ``error`` followed immediately by terminal
+    ``turn.failed`` with the identical bounded provider message.
+    """
+
+    if not path.is_file() or path.is_symlink():
+        return None
+    previous: Mapping[str, Any] | None = None
+    current: Mapping[str, Any] | None = None
+    try:
+        with path.open("rb") as handle:
+            while True:
+                line = handle.readline(MAX_EVENT_LINE_BYTES + 1)
+                if not line:
+                    break
+                if len(line) > MAX_EVENT_LINE_BYTES:
+                    return None
+                payload = json.loads(line)
+                if not isinstance(payload, dict):
+                    return None
+                previous, current = current, payload
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(previous, Mapping) or not isinstance(current, Mapping):
+        return None
+    error_message = previous.get("message")
+    failed_error = current.get("error")
+    failed_message = (
+        failed_error.get("message") if isinstance(failed_error, Mapping) else None
+    )
+    if (
+        previous.get("type") != "error"
+        or current.get("type") != "turn.failed"
+        or not isinstance(error_message, str)
+        or failed_message != error_message
+        or CODEX_CHATGPT_USAGE_LIMIT_RE.fullmatch(error_message) is None
+    ):
+        return None
+    return error_message
+
+
+def _verified_result_attempt_capacity_failure(
+    previous_result: Mapping[str, Any], attempt_dir: Path
+) -> str | None:
+    """Verify that one result binds the exact capacity-failed attempt stream."""
+
+    raw_events_path = attempt_dir / "codex-events.jsonl"
+    references = previous_result.get("evidence_refs")
+    if not isinstance(references, list):
+        return None
+    matching = [
+        item
+        for item in references
+        if isinstance(item, Mapping)
+        and item.get("owner_repo") == "abyss-stack"
+        and item.get("artifact_ref") == str(raw_events_path)
+        and isinstance(item.get("artifact_digest"), str)
+    ]
+    if (
+        len(matching) != 1
+        or not raw_events_path.is_file()
+        or raw_events_path.is_symlink()
+    ):
+        return None
+    if sha256_file(raw_events_path) != matching[0]["artifact_digest"]:
+        return None
+    return _codex_provider_capacity_failure_message(raw_events_path)
 
 
 def _plan_binds_active_summon_request(
@@ -10906,7 +10992,14 @@ Runtime session identity: {state["session_id"]}
         if runtime_failure_code is not None:
             failure_code = runtime_failure_code
         if exit_code != 0 and not controlled_interruption:
-            failure_code = failure_code or "codex_process_failed"
+            capacity_failure_message = _codex_provider_capacity_failure_message(
+                raw_events_path
+            )
+            if failure_code is None and capacity_failure_message is not None:
+                failure_code = "provider_capacity_unavailable"
+                failure_message = capacity_failure_message
+            else:
+                failure_code = failure_code or "codex_process_failed"
         if report_path.is_file():
             try:
                 report = load_json(report_path, label="model report")
@@ -11847,12 +11940,45 @@ Runtime session identity: {state["session_id"]}
                     "resume_previous_result_mismatch",
                     "resume request names another prior runtime result digest",
                 )
+            prior_attempt = state["attempts"][-1]
+            attempt_dir = (
+                self._session_dir(session_id)
+                / "attempts"
+                / f"{int(prior_attempt['attempt_number']):03d}"
+            )
             failed_review_followup = False
             failed_writer_report_followup = False
+            failed_capacity_followup = False
             if failed_terminal_followup:
                 failure_code = previous_result.get("failure_code")
                 changed_paths = previous_result.get("changed_paths")
                 allowed_paths = task.get("allowed_paths") if task is not None else None
+                observed_usage = previous_result.get("usage")
+                failed_capacity_followup = (
+                    failure_code in PROVIDER_CAPACITY_FAILURE_CODES
+                    and previous_result.get("source_manifest_match") is True
+                    and previous_result.get("workspace_manifest_match") is True
+                    and isinstance(
+                        previous_result.get("actor_final_manifest_ref"), dict
+                    )
+                    and isinstance(previous_result.get("actor_delta_ref"), dict)
+                    and changed_paths == []
+                    and previous_result.get("executed_commands") == []
+                    and previous_result.get("turn_count") == 0
+                    and isinstance(observed_usage, dict)
+                    and all(
+                        observed_usage.get(counter) == 0
+                        for counter in (
+                            "input_tokens",
+                            "cached_input_tokens",
+                            "output_tokens",
+                        )
+                    )
+                    and _verified_result_attempt_capacity_failure(
+                        previous_result, attempt_dir
+                    )
+                    is not None
+                )
                 failed_review_candidate = (
                     task is not None
                     and task.get("execution_posture") == "independent_review"
@@ -11887,31 +12013,51 @@ Runtime session identity: {state["session_id"]}
                         for change in changed_paths
                     )
                 )
-                if failed_review_candidate and not failed_review_followup:
+                if (
+                    failed_review_candidate
+                    and not failed_review_followup
+                    and not failed_capacity_followup
+                ):
                     raise ExternalCodexRuntimeError(
                         "failed_review_resume_unsupported",
                         "only an unchanged read-only review identity or transition "
                         "binding failure is recoverable",
                     )
-                if failed_writer_report_candidate and not failed_writer_report_followup:
+                if (
+                    failed_writer_report_candidate
+                    and not failed_writer_report_followup
+                    and not failed_capacity_followup
+                ):
                     raise ExternalCodexRuntimeError(
                         "failed_writer_report_resume_unsupported",
                         "writer report recovery requires intact source, actor evidence, and original path authority",
                     )
-                if not failed_review_followup and not failed_writer_report_followup:
+                if not any(
+                    (
+                        failed_review_followup,
+                        failed_writer_report_followup,
+                        failed_capacity_followup,
+                    )
+                ):
                     raise ExternalCodexRuntimeError(
                         "failed_terminal_resume_unsupported",
                         "failed session has no authority-safe same-role recovery route",
                     )
                 expected_reason = (
-                    "review_followup" if failed_review_followup else "bounded_repair"
+                    "capacity_recovery"
+                    if failed_capacity_followup
+                    else "review_followup"
+                    if failed_review_followup
+                    else "bounded_repair"
                 )
                 if (
                     resume.get("reason") != expected_reason
                     or resume.get("previous_result_digest") != result_digest
                 ):
                     failure = (
-                        "failed_review_resume_unbound"
+                        "failed_capacity_resume_unbound"
+                        if failed_capacity_followup
+                        else "failed_review_resume_unbound"
                         if failed_review_followup
                         else "failed_writer_report_resume_unbound"
                     )
@@ -11919,12 +12065,6 @@ Runtime session identity: {state["session_id"]}
                         failure,
                         "failed-session resume must use its recovery reason and bind the exact prior result digest",
                     )
-            prior_attempt = state["attempts"][-1]
-            attempt_dir = (
-                self._session_dir(session_id)
-                / "attempts"
-                / f"{int(prior_attempt['attempt_number']):03d}"
-            )
             result_candidates = [attempt_dir / "runtime-result.json"]
             result_candidates.extend(
                 sorted(attempt_dir.glob("runtime-result-revision-*.json"))
@@ -12005,6 +12145,24 @@ Runtime session identity: {state["session_id"]}
                     attempt_id=str(prior_attempt["attempt_id"]),
                     thread_id=str(state["thread_id"]),
                     significance="review",
+                )
+            if failed_capacity_followup:
+                self._append_event(
+                    state,
+                    event_type="external_agent.capacity_recovery_admitted",
+                    payload={
+                        "failure_code": previous_result["failure_code"],
+                        "previous_result_ref": preserved_ref,
+                        "reason": resume["reason"],
+                        "capacity_failure_message": (
+                            _verified_result_attempt_capacity_failure(
+                                previous_result, attempt_dir
+                            )
+                        ),
+                    },
+                    attempt_id=str(prior_attempt["attempt_id"]),
+                    thread_id=str(state["thread_id"]),
+                    significance="checkpoint",
                 )
             self._materialize_resume_evidence_locked(
                 state,

@@ -10,7 +10,7 @@
     "session_id": {"type": "string", "minLength": 1},
     "thread_id": {"type": "string", "minLength": 1},
     "after_event_sequence": {"type": "integer", "minimum": 0},
-    "reason": {"enum": ["checkpoint_continue", "process_death_recovery", "bounded_repair", "review_followup"]},
+    "reason": {"enum": ["checkpoint_continue", "process_death_recovery", "capacity_recovery", "bounded_repair", "review_followup"]},
     "instruction": {"type": "string", "minLength": 1},
     "previous_result_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "evidence_inputs": {

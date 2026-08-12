@@ -70,6 +70,15 @@ The parent requested human authority and claimed no acceptance or effect.
 `aoa-evals` review, a target-owner accepted outcome, attributable operator/Sol
 cost, and a reviewed admission decision remain open.
 
+The first role-first stats and memo launches then reached distinct persistent
+Luna xhigh threads but were rejected before their first completed turn by the
+external ChatGPT usage limit. That real pressure exposed a runtime continuity
+gap: the exact provider event was preserved, while terminal classification
+collapsed it to a nonresumable generic process failure. The current source
+adds a narrow, explicit capacity-recovery route that retains the same actor,
+thread, task, projection, model, and authority after capacity returns. It is
+not an automatic retry, a budget, or a general process-failure escape hatch.
+
 The first fixed writer trials and repaired candidate-005 trials are preserved
 as counterevidence. On candidate-005, Sol max crossed the then-fixed token ceiling;
 Luna max returned the first accepted bounded writer result; Luna xhigh was

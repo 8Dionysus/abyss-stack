@@ -9,6 +9,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Preserve an external actor's exact role, Codex thread, task, projection, and
+  authority across a pre-turn ChatGPT usage-limit failure. The explicit
+  `capacity_recovery` route requires the exact prior result digest, a
+  result-bound structured provider error/`turn.failed` pair, zero observed
+  work or effects, and unchanged source/projection evidence; generic process
+  failures remain terminal.
 - Treat zsh inline execution as opaque because it reads the host-global
   `zshenv`, and reject `find` file-output actions aimed at private Git metadata
   while preserving ordinary Bash inline work and ordinary find reports.
