@@ -60,6 +60,21 @@ existing registry CAS, deployment manifest, signer pin, protocol, owner-shaped
 result contracts, proof, acceptance, rollback, and consumer compatibility
 checks remain mandatory.
 
+The same controller also repairs an incomplete production fleet while registry
+and contour admission remain current. It reuses that admission only when the
+registry deployment identity, all current production canaries, and the managed
+catalog already match the exact current deployment. That fast path does not use
+bootstrap or reset claims: it resets only the fixed production units' failed
+state, starts the literal production set, then replaces the process-bound
+canary and managed catalog family before completing. If time-current admission
+is bound to a predecessor deployment, package, canary family, or catalog, the
+controller instead rebuilds admission through the bounded bootstrap handoff;
+repeated direct production starts would only replay a mandatory fail-closed
+preflight rejection. The Codex credential launcher makes this controller a
+synchronous pre-exec dependency whenever any of the eleven units or loopback
+listeners is absent. A one-second boot timer starts the same transaction
+eagerly; the launcher closes the remaining scheduling race.
+
 ## Rationale
 
 Expired evidence must stay unusable, but fail-closed operation does not require
@@ -73,8 +88,18 @@ contains the new lifecycle effect to the same read fleet already admitted by
 
 - A host cold start may take several minutes while all owner-shaped canaries
   run; the admission oneshot therefore has a ten-minute timeout.
-- If production is unavailable while admission is still current, recovery
-  refuses to reset claims and reports the separate runtime failure.
+- If production is unavailable while admission is still current and reusable
+  for the exact deployment, recovery restarts only the exact production set and
+  renews its process-bound evidence.
+- If production is unavailable and time-current admission is bound to stale
+  deployment or evidence identities, recovery uses the same bounded bootstrap
+  handoff and replaces those identities before production start.
+- Codex no longer starts an MCP-consuming session while the fixed fleet is
+  absent. A bounded launcher failure is reported once before Codex execution
+  instead of eleven transport failures retained for the whole session.
+- Keeper and preflight watchers settle finite publication bursts without
+  entering `unit-start-limit-hit`, and remain ordered behind the recovery
+  transaction.
 - An expired registry predecessor is preserved in the private run evidence,
   rebased only through the SDK contract, and replaced only after an unchanged
   predecessor digest check.
@@ -91,6 +116,9 @@ contains the new lifecycle effect to the same read fleet already admitted by
 - `scripts/aoa-refresh-modern-mcp-admission`
 - `systemd/user/abyss-mcp-modern-admission-refresh.service`
 - `systemd/user/abyss-mcp-modern-admission-refresh.timer`
+- `systemd/user/abyss-mcp-admission-keeper.service`
+- `systemd/user/abyss-mcp-preflight-sweep.service`
+- `mcp/services/_shared/codex_http_client.sh`
 - `systemd/user/aoa-organ-mcp-read-bootstrap@.service`
 - `systemd/user/abyss-stack-mcp-read-bootstrap.service`
 - `mcp/services/abyss-stack-mcp/README.md`

@@ -117,6 +117,17 @@ Tracking starts with the community-docs baseline for this repository.
   finalization rejects pathname/inode replacement. Result v2 requires successful
   projection provenance while legacy result v1 and state v1/v2 remain readable;
   old state cannot start inference without a safe v3 projection.
+- Close the modern MCP boot race seen by new Codex sessions. The recovery
+  timer now starts after one second, the source-owned Codex credential launcher
+  synchronously requires all eleven production units and loopback listeners
+  before `exec`, and an incomplete production fleet reuses still-current
+  admission only when its deployment, production canaries, and managed catalog
+  match exactly. A time-current predecessor deployment now takes the bounded
+  bootstrap handoff instead of repeatedly replaying a fail-closed production
+  preflight; reusable admission still restarts production without resetting
+  claims. Admission Keeper and preflight sweep now settle finite publication
+  bursts behind that recovery transaction without becoming permanently failed
+  through `unit-start-limit-hit`.
 - Recover the exact modern MCP read fleet after a cold start outlives registry
   or contour currentness. The admission backstop now resets only an expired
   registry to claim-free shadow state, uses the existing manual bootstrap

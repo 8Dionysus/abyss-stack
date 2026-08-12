@@ -226,14 +226,19 @@ for organ in "${organs[@]}"; do
     ((active_unit_count += 1))
   fi
 done
+production_admission_reusable=0
 if [[ "$admitted_count" -eq 11 \
       && "$production_identity_count" -eq 11 \
       && "$deployment_identity_count" -eq 11 \
       && "$current_canary_count" -eq 11 \
-      && "$active_unit_count" -eq 11 \
       && "$minimum_expiry" -gt "$now_epoch" \
       && "$registry_expiry" -gt "$now_epoch" ]] \
     && catalog_matches_current_canaries; then
+  production_admission_reusable=1
+fi
+
+if [[ "$production_admission_reusable" -eq 1 \
+      && "$active_unit_count" -eq 11 ]]; then
   exit 0
 fi
 
@@ -246,26 +251,26 @@ fi
 
 active_unit_count=$(active_production_count)
 if [[ "$active_unit_count" -ne 11 ]]; then
-  if [[ "$minimum_expiry" -gt "$now_epoch" && "$registry_expiry" -gt "$now_epoch" ]]; then
-    printf 'modern MCP production recovery refused while admission is still current\n' >&2
-    exit 1
+  if [[ "$production_admission_reusable" -eq 1 ]]; then
+    systemctl --user reset-failed "${production_units[@]}"
+  else
+    systemctl --user reset-failed "${bootstrap_units[@]}" "${production_units[@]}"
+    bootstrap_started=1
+    systemctl --user start "${bootstrap_units[@]}"
+    [[ "$(active_production_count)" -eq 0 ]] || {
+      printf 'modern MCP bootstrap recovery did not isolate production units\n' >&2
+      exit 1
+    }
+    capture_canary_family \
+      bootstrap \
+      "$RUN/bootstrap-current" \
+      "$RUN/bootstrap-lkg" \
+      "$RUN/bootstrap-stdout"
+    publish_admission "$RUN/bootstrap-current" "$RUN/bootstrap-lkg" bootstrap
+    build_preflight bootstrap
+    systemctl --user stop "${bootstrap_units[@]}"
+    bootstrap_started=0
   fi
-  systemctl --user reset-failed "${bootstrap_units[@]}" "${production_units[@]}"
-  bootstrap_started=1
-  systemctl --user start "${bootstrap_units[@]}"
-  [[ "$(active_production_count)" -eq 0 ]] || {
-    printf 'modern MCP bootstrap recovery did not isolate production units\n' >&2
-    exit 1
-  }
-  capture_canary_family \
-    bootstrap \
-    "$RUN/bootstrap-current" \
-    "$RUN/bootstrap-lkg" \
-    "$RUN/bootstrap-stdout"
-  publish_admission "$RUN/bootstrap-current" "$RUN/bootstrap-lkg" bootstrap
-  build_preflight bootstrap
-  systemctl --user stop "${bootstrap_units[@]}"
-  bootstrap_started=0
   production_handoff_started=1
   systemctl --user start "${production_units[@]}"
   [[ "$(active_production_count)" -eq 11 ]] || {

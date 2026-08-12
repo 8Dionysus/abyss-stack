@@ -152,8 +152,12 @@ ports and PostgreSQL reservation remain intact.
 
 The client install adds one bounded function to the target user's `.zshrc`.
 For each new interactive `codex` launch, that function delegates to the
-deployed source-owned launcher, which validates the credential and places it
-only in the Codex process environment before `exec`. It does not replace the
+deployed source-owned launcher, which validates the credential, waits for the
+exact eleven-member modern read fleet, and places the credential only in the
+Codex process environment before `exec`. When the fleet is incomplete, the
+launcher synchronously invokes the bounded admission recovery oneshot instead
+of allowing Codex to retain eleven failed startup handshakes for the session.
+Metadata-only Codex commands do not cause recovery. The launcher does not replace the
 Codex installer symlink, export the bearer into the parent shell, or alter
 already running shells and sessions. Remove only this managed route with
 `scripts/aoa-install-systemd --remove-mcp-http-codex-client`.
