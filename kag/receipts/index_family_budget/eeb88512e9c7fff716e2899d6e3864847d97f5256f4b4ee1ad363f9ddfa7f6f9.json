@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 28474883,
+  "allowed_tracked_bytes": 34455402,
+  "approved_by": "repository-owner",
+  "base_ref": "37cd71a1604197b01c5a11aa592ef3519cfe108a",
+  "changed_generated_bytes": 28474883,
+  "changed_generated_files": 400,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "eeb88512e9c7fff716e2899d6e3864847d97f5256f4b4ee1ad363f9ddfa7f6f9",
+  "reason": "Project the committed clean SDK agents and skills owner-root CI contour",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34455402,
+  "tracked_bytes_max": 24117248
+}
