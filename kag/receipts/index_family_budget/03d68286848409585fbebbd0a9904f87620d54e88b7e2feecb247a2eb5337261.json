@@ -1,17 +1,17 @@
 {
-  "allowed_bytes": 28510072,
+  "allowed_bytes": 0,
   "allowed_tracked_bytes": 34541944,
   "approved_by": "repository-owner",
-  "base_ref": "37cd71a1604197b01c5a11aa592ef3519cfe108a",
-  "changed_generated_bytes": 28510072,
-  "changed_generated_files": 400,
+  "base_ref": "878db0d2d91e6eeaa52131345bfba9165073a05b",
+  "changed_generated_bytes": 0,
+  "changed_generated_files": 0,
   "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
   "default_limit_bytes": 1048576,
   "head_family_digest": "03d68286848409585fbebbd0a9904f87620d54e88b7e2feecb247a2eb5337261",
-  "reason": "bind GNU find input-coordinate classification",
+  "reason": "ABYSS-STACK-D-0119 adds one owner decision and the exact external actor provider-capacity recovery contract, schema, tests, and routed documentation.",
   "repo": "abyss-stack",
   "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
-  "scope": "generated_delta_and_tracked_size",
+  "scope": "tracked_size",
   "tracked_bytes": 34541944,
   "tracked_bytes_max": 24117248
 }

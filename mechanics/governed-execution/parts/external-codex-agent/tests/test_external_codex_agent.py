@@ -371,6 +371,20 @@ def emit(value):
 
 emit({"type": "thread.started", "thread_id": thread_id})
 emit({"type": "turn.started"})
+if "FAKE_PROVIDER_CAPACITY_FAILURE" in task["objective"] and not resume:
+    message = (
+        "You've hit your usage limit. Visit "
+        "https://chatgpt.com/codex/settings/usage to purchase more credits or "
+        "try again at Aug 17th, 2026 5:59 PM."
+    )
+    emit({"type": "error", "message": message})
+    emit({"type": "turn.failed", "error": {"message": message}})
+    raise SystemExit(1)
+if "FAKE_OTHER_PROCESS_FAILURE" in task["objective"] and not resume:
+    message = "A non-capacity provider failure occurred."
+    emit({"type": "error", "message": message})
+    emit({"type": "turn.failed", "error": {"message": message}})
+    raise SystemExit(1)
 if "FAKE_INVALID_JSONL" in task["objective"]:
     print("{not-json", flush=True)
     time.sleep(60)
@@ -9413,6 +9427,128 @@ def test_failed_writer_report_can_resume_exact_thread_without_widening_authority
         event["event_type"] == "external_agent.failed_writer_report_resume_admitted"
         for event in runtime.events(fixture["session_id"], after_sequence=-1)
     )
+
+
+@pytest.mark.parametrize("legacy_generic_code", (False, True))
+def test_provider_capacity_failure_can_resume_exact_thread_and_role(
+    tmp_path: Path,
+    legacy_generic_code: bool,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker="FAKE_PROVIDER_CAPACITY_FAILURE",
+        identity_suffix=(
+            "capacity-recovery-legacy"
+            if legacy_generic_code
+            else "capacity-recovery-current"
+        ),
+        workspace_write=True,
+        exact_baseline=True,
+        review_required=True,
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    failed = _wait_terminal(runtime, fixture["session_id"])
+    first_result = runtime.result(fixture["session_id"])
+
+    assert failed["status"] == "failed"
+    assert first_result is not None
+    assert first_result["failure_code"] == "provider_capacity_unavailable"
+    assert first_result["changed_paths"] == []
+    assert first_result["executed_commands"] == []
+    assert first_result["turn_count"] == 0
+    assert first_result["source_manifest_match"] is True
+    assert first_result["workspace_manifest_match"] is True
+
+    session_dir = runtime._session_dir(fixture["session_id"])
+    result_path = session_dir / "result.json"
+    preserved_path = session_dir / "attempts/001/runtime-result.json"
+    if legacy_generic_code:
+        legacy_result = json.loads(result_path.read_text(encoding="utf-8"))
+        legacy_result["failure_code"] = "codex_process_failed"
+        for path in (result_path, preserved_path):
+            path.chmod(0o600)
+            _write_json(path, legacy_result)
+            path.chmod(0o400)
+        closure_path = preserved_path.with_name("runtime-result-evidence-closure.json")
+        closure_path.unlink()
+        state = runtime._load_state(fixture["session_id"])
+        state["result_digest"] = _digest_path(result_path)
+        runtime._save_state(state)
+    first_result_digest = _digest_path(result_path)
+    resume = {
+        "schema_version": "abyss_stack_external_codex_resume_v1",
+        "session_id": fixture["session_id"],
+        "thread_id": failed["thread_id"],
+        "after_event_sequence": failed["last_event_sequence"],
+        "reason": "capacity_recovery",
+        "instruction": (
+            "Continue the same role and obligation now that external provider "
+            "capacity is available; do not widen scope or authority."
+        ),
+        "previous_result_digest": first_result_digest,
+    }
+    resume_path = tmp_path / "capacity-recovery.json"
+    _write_json(resume_path, resume)
+    wrong_route_path = tmp_path / "capacity-recovery-wrong-route.json"
+    wrong_route = dict(resume)
+    wrong_route["reason"] = "bounded_repair"
+    _write_json(wrong_route_path, wrong_route)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.resume(fixture["session_id"], wrong_route_path)
+    assert exc_info.value.code == "failed_capacity_resume_unbound"
+
+    assert runtime.resume(fixture["session_id"], resume_path)["status"] == "running"
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "review_required"
+    assert result is not None
+    assert result["thread_id"] == failed["thread_id"]
+    assert result["attempt_count"] == 2
+    assert result["failure_code"] is None
+    assert result["changed_paths"] == []
+    assert any(
+        event["event_type"] == "external_agent.capacity_recovery_admitted"
+        for event in runtime.events(fixture["session_id"], after_sequence=-1)
+    )
+
+
+def test_non_capacity_process_failure_cannot_use_capacity_recovery(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker="FAKE_OTHER_PROCESS_FAILURE",
+        identity_suffix="non-capacity-recovery-refused",
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    failed = _wait_terminal(runtime, fixture["session_id"])
+    result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+
+    assert failed["status"] == "failed"
+    assert runtime.result(fixture["session_id"])["failure_code"] == (
+        "codex_process_failed"
+    )
+    resume_path = tmp_path / "false-capacity-recovery.json"
+    _write_json(
+        resume_path,
+        {
+            "schema_version": "abyss_stack_external_codex_resume_v1",
+            "session_id": fixture["session_id"],
+            "thread_id": failed["thread_id"],
+            "after_event_sequence": failed["last_event_sequence"],
+            "reason": "capacity_recovery",
+            "instruction": "This non-capacity failure must remain terminal.",
+            "previous_result_digest": _digest_path(result_path),
+        },
+    )
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.resume(fixture["session_id"], resume_path)
+    assert exc_info.value.code == "failed_terminal_resume_unsupported"
 
 
 @pytest.mark.parametrize(

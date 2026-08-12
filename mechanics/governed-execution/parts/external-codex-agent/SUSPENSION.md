@@ -79,6 +79,11 @@ continuation obligation, task authority, immutable inputs, runtime profile,
 and digest-bound follow-up still match. A suspension does not imply permission
 to resume. Provider/catalog drift, target drift, unresolved review findings, or
 withdrawn owner authority requires a new owner decision or a fresh preparation.
+An exact pre-turn ChatGPT usage-limit failure may resume through
+`capacity_recovery` only after capacity is available and only when its prior
+result, raw terminal event pair, empty effect history, manifests, session,
+thread, cursor, and result digest all still verify. Do not probe recovery by
+repeatedly consuming new attempts while the provider limit remains active.
 
 If this source candidate later lands and must be rolled back, the source owner
 reverts the exact landed change through its normal reviewed route and the

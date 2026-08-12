@@ -270,6 +270,7 @@
 - [ABYSS-STACK-D-0115 Preserve Writer Role Continuity for Report Repair](../ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md) (`docs/decisions/ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md`)
 - [ABYSS-STACK-D-0116 Bind Terminal Validation Suite After Command-Sandbox Settlement](../ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md) (`docs/decisions/ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md`)
 - [ABYSS-STACK-D-0117 Recover Review Inputs Without Rewriting Owner Writers](../ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md) (`docs/decisions/ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md`)
+- [ABYSS-STACK-D-0119 Preserve Actor Continuity Across Provider Capacity Loss](../ABYSS-STACK-D-0119-preserve-actor-continuity-across-provider-capacity-loss.md) (`docs/decisions/ABYSS-STACK-D-0119-preserve-actor-continuity-across-provider-capacity-loss.md`)
 
 ## federation seam
 
@@ -356,6 +357,7 @@
 - [ABYSS-STACK-D-0116 Bind Terminal Validation Suite After Command-Sandbox Settlement](../ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md) (`docs/decisions/ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md`)
 - [ABYSS-STACK-D-0117 Recover Review Inputs Without Rewriting Owner Writers](../ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md) (`docs/decisions/ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md`)
 - [ABYSS-STACK-D-0118 Admit Role-First Owner Reviewers to A2A Return](../ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md) (`docs/decisions/ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md`)
+- [ABYSS-STACK-D-0119 Preserve Actor Continuity Across Provider Capacity Loss](../ABYSS-STACK-D-0119-preserve-actor-continuity-across-provider-capacity-loss.md) (`docs/decisions/ABYSS-STACK-D-0119-preserve-actor-continuity-across-provider-capacity-loss.md`)
 
 ## runtime access plane
 
@@ -412,6 +414,7 @@
 - [ABYSS-STACK-D-0114 Retry Only Transient Actor-Manifest Observation Races](../ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md) (`docs/decisions/ABYSS-STACK-D-0114-retry-only-transient-actor-manifest-observation-races.md`)
 - [ABYSS-STACK-D-0115 Preserve Writer Role Continuity for Report Repair](../ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md) (`docs/decisions/ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md`)
 - [ABYSS-STACK-D-0116 Bind Terminal Validation Suite After Command-Sandbox Settlement](../ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md) (`docs/decisions/ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md`)
+- [ABYSS-STACK-D-0119 Preserve Actor Continuity Across Provider Capacity Loss](../ABYSS-STACK-D-0119-preserve-actor-continuity-across-provider-capacity-loss.md) (`docs/decisions/ABYSS-STACK-D-0119-preserve-actor-continuity-across-provider-capacity-loss.md`)
 
 ## validation lane
 

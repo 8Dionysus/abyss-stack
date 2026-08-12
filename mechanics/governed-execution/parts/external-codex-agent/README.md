@@ -121,7 +121,10 @@ The controller:
 - resumes only the exact durable thread and event cursor, with explicit
   digest-bound follow-up routes for an unchanged read-only review rejected only
   by an identity- or task-owned transition-field mismatch and for an
-  authority-safe bounded writer rejected only during model-report admission.
+  authority-safe bounded writer rejected only during model-report admission;
+  an exact pre-turn provider-capacity failure has a third same-role route only
+  when its result-bound raw Codex event stream proves the terminal usage-limit
+  pair, zero observed work/effects, and unchanged source/projection state.
   Writer report repair requires
   unchanged owner source, complete actor manifest/delta evidence, and every
   observed change inside the original allowed paths; it retains the original
