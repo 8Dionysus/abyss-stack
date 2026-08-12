@@ -7220,11 +7220,27 @@ def test_file_list_options_cannot_hide_secret_reads(command: str) -> None:
 @pytest.mark.parametrize(
     "command",
     (
-        "/usr/bin/wc --files0-from=input-files.list",
-        "/usr/bin/sort --files0-from input-files.list",
+        "/usr/bin/diff --from-file=.env /dev/null",
+        "/usr/bin/diff --to-file=.npmrc /dev/null",
+        "/usr/bin/diff --exclude-from=.git/config left right",
+        "/usr/bin/grep -f.env README.md",
+        "/usr/bin/sed -f.git/config README.md",
     ),
 )
-def test_ordinary_file_list_options_remain_classifiable(command: str) -> None:
+def test_attached_options_cannot_hide_secret_coordinates(command: str) -> None:
+    assert RUNTIME._command_effects(command) == {"secret_access"}
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/wc --files0-from=input-files.list",
+        "/usr/bin/sort --files0-from input-files.list",
+        "/usr/bin/diff --from-file=baseline.txt current.txt",
+        "/usr/bin/grep -fpatterns.txt README.md",
+    ),
+)
+def test_ordinary_file_options_remain_classifiable(command: str) -> None:
     assert RUNTIME._command_effects(command) == set()
     assert RUNTIME._command_has_unclassified_indirection(command) is False
 

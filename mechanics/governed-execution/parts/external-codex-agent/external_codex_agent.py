@@ -2112,31 +2112,33 @@ def _long_option_prefix(value: str, canonical: str) -> bool:
     return option.startswith("--") and len(option) >= 3 and canonical.startswith(option)
 
 
-def _file_list_option_secret_access(tokens: Sequence[str]) -> bool:
-    """Inspect file-valued argv options that cause a utility to read paths."""
+ATTACHED_SHORT_FILE_OPTIONS = {
+    "awk": frozenset("f"),
+    "grep": frozenset("f"),
+    "jq": frozenset("f"),
+    "rg": frozenset("f"),
+    "sed": frozenset("f"),
+}
 
-    if not tokens:
-        return False
-    executable = Path(tokens[0]).name.lower()
-    if executable not in {"sort", "wc"}:
-        return False
-    index = 1
-    while index < len(tokens):
-        value = tokens[index]
-        if not _long_option_prefix(value, "--files0-from"):
-            index += 1
-            continue
-        attached = "=" in value
-        file_value = (
-            value.split("=", 1)[1]
-            if attached
-            else tokens[index + 1]
-            if index + 1 < len(tokens)
-            else ""
-        )
-        if _secret_shaped_path(file_value) or _git_config_metadata_path(file_value):
-            return True
-        index += 1 if attached else 2
+
+def _argument_secret_access(executable: str, value: str) -> bool:
+    """Inspect direct and option-attached secret-shaped coordinates."""
+
+    if ("/" in value or value.startswith(".")) and _secret_shaped_path(value):
+        return True
+    if value.startswith("-") and "=" in value:
+        candidate = value.split("=", 1)[1]
+        return _secret_shaped_path(candidate) or _git_config_metadata_path(candidate)
+    if value.startswith("-") and not value.startswith("--"):
+        body = value[1:]
+        file_options = ATTACHED_SHORT_FILE_OPTIONS.get(executable, frozenset())
+        for index, option in enumerate(body):
+            if option not in file_options or index + 1 >= len(body):
+                continue
+            candidate = body[index + 1 :]
+            return _secret_shaped_path(candidate) or _git_config_metadata_path(
+                candidate
+            )
     return False
 
 
@@ -3339,12 +3341,8 @@ def _command_effects(command: str) -> set[str]:
                 detected.add("secret_access")
             if _direct_git_config_file_access(segment):
                 detected.add("secret_access")
-            if _file_list_option_secret_access(segment):
-                detected.add("secret_access")
             if any(
-                _secret_shaped_path(value)
-                for value in segment[1:]
-                if "/" in value or value.startswith(".")
+                _argument_secret_access(executable, value) for value in segment[1:]
             ):
                 detected.add("secret_access")
 

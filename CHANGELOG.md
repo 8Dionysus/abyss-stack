@@ -9,9 +9,9 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
-- Parse attached, separate, and abbreviated `wc`/`sort --files0-from` values
-  before secret-effect classification, so file-list options cannot conceal a
-  credential or private Git-config read.
+- Parse direct and option-attached argv coordinates before secret-effect
+  classification, so `diff`, `grep`, `sed`, `wc`, `sort`, and equivalent
+  system-utility forms cannot conceal a credential or private Git-config read.
 - Embed each installed wrapper's Python bootstrap and exact `active.json`
   digest in its already-admitted static ELF, so a same-UID replacement of an
   adjacent companion or active-record bytes cannot execute host code before
