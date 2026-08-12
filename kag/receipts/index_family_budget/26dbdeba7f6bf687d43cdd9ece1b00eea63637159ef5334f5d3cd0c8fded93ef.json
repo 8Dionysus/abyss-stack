@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 13306732,
+  "allowed_tracked_bytes": 34602011,
+  "approved_by": "repository-owner",
+  "base_ref": "27a0e24bfc354f4ad69942f0ed3e36d961b4780d",
+  "changed_generated_bytes": 13306732,
+  "changed_generated_files": 142,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "26dbdeba7f6bf687d43cdd9ece1b00eea63637159ef5334f5d3cd0c8fded93ef",
+  "reason": "Use the owner-provided compact typing status in abyss-machine-mcp and deduplicate full branch validation while retaining complete PR and postmerge main proof; refresh the deterministic portable KAG family without changing standing generated-delta or tracked-size budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34602011,
+  "tracked_bytes_max": 24117248
+}
