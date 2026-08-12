@@ -2398,6 +2398,15 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertEqual(first.returncode, 0, first.stderr)
             self.assertTrue(executed.exists())
+            self.assertIn(
+                "OS Abyss MCP: read fleet is unavailable; recovery started",
+                first.stderr,
+            )
+            self.assertIn(
+                "OS Abyss MCP: read fleet ready after",
+                first.stderr,
+            )
+            self.assertIn("starting Codex", first.stderr)
             self.assertEqual(
                 systemctl_log.read_text(encoding="utf-8").splitlines(),
                 ["--user start abyss-mcp-modern-admission-refresh.service"],
@@ -2412,6 +2421,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertEqual(second.stderr, "")
             self.assertEqual(
                 systemctl_log.read_text(encoding="utf-8").splitlines(),
                 ["--user start abyss-mcp-modern-admission-refresh.service"],
