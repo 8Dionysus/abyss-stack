@@ -350,7 +350,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'Package-owned mechanics tests',
         'deterministic and public-safe',
         'no live host state',
-        'python -m pytest',
+        'python scripts/ci_gate.py --mode tests',
     ),
     'mechanics/AGENTS.md': (
         'runtime mechanics tree',

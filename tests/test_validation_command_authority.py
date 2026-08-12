@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scripts import ci_gate, release_check, validation_lanes
+from scripts import ci_gate, release_check, run_pytest_lane, validation_lanes
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -112,6 +112,64 @@ def test_release_lane_runs_release_check_entrypoint_for_parity_stabilization() -
 
     assert len(steps) == 1
     assert steps[0].command[-1] == "scripts/release_check.py"
+
+
+def test_full_test_sequences_share_the_bounded_scheduler_entrypoint() -> None:
+    for sequence in ("tests", "release_check"):
+        test_steps = [
+            step
+            for step in validation_lanes.command_sequence(sequence)
+            if step.label == "run tests"
+        ]
+        assert len(test_steps) == 1
+        assert test_steps[0].command[1:] == ("scripts/run_pytest_lane.py",)
+
+
+def test_pytest_scheduler_admits_only_the_exact_worksteal_pin() -> None:
+    admitted = run_pytest_lane.scheduler_plan("auto", xdist_version="3.8.0")
+    missing = run_pytest_lane.scheduler_plan("auto", xdist_version=None)
+    stale = run_pytest_lane.scheduler_plan("auto", xdist_version="3.7.0")
+    explicit_stale = run_pytest_lane.scheduler_plan(
+        "xdist-4-worksteal",
+        xdist_version="3.7.0",
+    )
+
+    assert admitted == {
+        "ok": True,
+        "requested": "auto",
+        "effective": "xdist-4-worksteal",
+        "reason": "measured_bounded_full_suite_scheduler",
+        "pytest_args": ["-n", "4", "--dist", "worksteal"],
+        "selection_changed": False,
+    }
+    assert missing["effective"] == "serial"
+    assert missing["reason"] == "safe_serial_fallback_without_exact_xdist_pin"
+    assert stale["effective"] == "serial"
+    assert explicit_stale["ok"] is False
+    assert explicit_stale["reason"] == "pytest_xdist_pin_unavailable"
+
+
+def test_pytest_scheduler_keeps_an_exact_serial_rollback() -> None:
+    rollback = run_pytest_lane.scheduler_plan("serial", xdist_version="3.8.0")
+    command = run_pytest_lane.pytest_command(
+        scheduler=rollback,
+        extra_args=["tests/test_validation_command_authority.py"],
+    )
+
+    assert rollback["reason"] == "explicit_serial_rollback"
+    assert rollback["selection_changed"] is False
+    assert command[1:] == [
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_validation_command_authority.py",
+    ]
+
+
+def test_release_dependencies_pin_the_admitted_pytest_scheduler() -> None:
+    requirements = (REPO_ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
+
+    assert "pytest-xdist==3.8.0" in requirements.splitlines()
 
 
 def test_decision_graph_lane_refreshes_ignored_cache_before_checking_it() -> None:

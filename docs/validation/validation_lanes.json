@@ -145,7 +145,7 @@
     "tests": [
       {
         "label": "run tests",
-        "command": ["python", "-m", "pytest", "-q"]
+        "command": ["python", "scripts/run_pytest_lane.py"]
       }
     ],
     "mechanics_part_local": [
@@ -385,7 +385,7 @@
       },
       {
         "label": "run tests",
-        "command": ["python", "-m", "pytest", "-q"]
+        "command": ["python", "scripts/run_pytest_lane.py"]
       },
       {
         "label": "validate OS Abyss runtime config artifact bundle",

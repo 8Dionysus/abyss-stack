@@ -10,6 +10,7 @@ parity posture.
 | Layer | Protects | Owner surface | Lane |
 |---|---|---|---|
 | Command authority | validation lane storage and execution routing | `docs/validation/validation_lanes.json` | source-fast, release |
+| Full-suite scheduler | unchanged default pytest selection with pinned bounded work stealing and serial rollback | `scripts/run_pytest_lane.py` | tests, release |
 | Source topology orchestration | route cards, required source surfaces, federation seams, owner-module execution order, and source/runtime guard routing | `scripts/validate_stack.py` | source-fast, release |
 | Source structure | required files, managed unit skeletons, residual root/doc district moves | `scripts/validators/source_structure.py` | source-fast, release |
 | Mechanics topology | mechanic package cards, part route coverage, package/part required files, archive routes, and marker-only artifact posture | `scripts/validators/mechanics_topology.py` | source-fast, release |
@@ -65,6 +66,7 @@ root-level wrapper APIs.
 | Entrypoint | Mode | Failure route |
 |---|---|---|
 | `scripts/ci_gate.py` | lane orchestrator | fix `docs/validation/validation_lanes.json` or the failing lane owner |
+| `scripts/run_pytest_lane.py` | bounded full-suite scheduler | fix the exact xdist pin or use the explicit serial rollback; never remove a failing test from selection |
 | `scripts/release_check.py` | release stabilizer | fix the release lane, then Configs parity if parity fails |
 | `scripts/validate_stack.py` | repo-wide validation orchestrator | fix the named owner module or root orchestration glue |
 | `scripts/validators/script_surface.py` | root script/operator backend validator module | fix script inventory, operator wrapper routes, or owning mechanic backends |

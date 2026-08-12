@@ -1,6 +1,7 @@
 PyYAML
 pydantic
 pytest
+pytest-xdist==3.8.0
 fastapi
 httpx
 jsonschema

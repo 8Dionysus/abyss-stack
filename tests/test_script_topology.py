@@ -123,6 +123,7 @@ def test_focused_validator_modules_are_script_inventory_covered() -> None:
     assert "scripts/validators/source_hygiene.py" in root_validation["paths"]
     assert "scripts/validators/source_structure.py" in root_validation["paths"]
     assert "scripts/validators/sync_parity.py" in root_validation["paths"]
+    assert "scripts/run_pytest_lane.py" in root_validation["paths"]
 
 
 def test_inference_pilot_runners_are_active_package_local_bridges() -> None:
