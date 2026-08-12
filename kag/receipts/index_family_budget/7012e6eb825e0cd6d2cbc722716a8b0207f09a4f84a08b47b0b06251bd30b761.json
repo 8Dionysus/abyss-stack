@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 5537445,
+  "allowed_tracked_bytes": 31595731,
+  "approved_by": "repository-owner",
+  "base_ref": "8a4f396e9b68a230d561f08aee27273ea58aeae6",
+  "changed_generated_bytes": 5537445,
+  "changed_generated_files": 65,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "7012e6eb825e0cd6d2cbc722716a8b0207f09a4f84a08b47b0b06251bd30b761",
+  "reason": "The Codex launcher now makes the existing fail-closed MCP cold-start wait operator-visible; the regenerated portable family preserves exact source identity without raising standing budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 31595731,
+  "tracked_bytes_max": 24117248
+}

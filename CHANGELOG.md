@@ -9,6 +9,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Make the Codex MCP cold-start barrier observable instead of presenting a
+  blank terminal during the several-minute admission transaction. The launcher
+  now reports recovery immediately, prints bounded unit/listener progress every
+  fifteen seconds, and announces the final readiness handoff without weakening
+  the existing 11-of-11 requirement or ten-minute fail-closed timeout.
 - Close the modern MCP boot race seen by new Codex sessions. The recovery
   timer now starts after one second, the source-owned Codex credential launcher
   synchronously requires all eleven production units and loopback listeners
