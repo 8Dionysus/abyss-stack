@@ -98,10 +98,13 @@ it to the owner bundle.
 The launcher treats modern MCP availability as a pre-exec dependency: it
 checks the exact eleven production units and ports, starts the bounded modern
 admission recovery oneshot when any member is absent, and refuses to exec
-Codex unless the fleet becomes complete within ten minutes. This closes the
-boot race where Codex could start before expired-admission recovery and retain
-failed MCP clients for the whole session. `AOA_MCP_READINESS_SKIP=1` is a
-single-process rollback escape hatch, not a persistent readiness policy.
+Codex unless the fleet becomes complete within ten minutes. The wait is
+operator-visible from its first line, reports unit and listener counts every
+fifteen seconds, and prints the final handoff before Codex starts, so a bounded
+cold recovery is not presented as a frozen terminal. This closes the boot race
+where Codex could start before expired-admission recovery and retain failed MCP
+clients for the whole session. `AOA_MCP_READINESS_SKIP=1` is a single-process
+rollback escape hatch, not a persistent readiness policy.
 The candidate values remain separate named variables for separate Memo/Evals
 candidate registrations; inheriting them does not merge endpoint authority.
 `--remove-mcp-http-codex-client` removes only that managed Zsh block.
