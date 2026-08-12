@@ -66,12 +66,27 @@ load_credential() {
 
 metadata_only_invocation() {
   local arg=""
+  local expect_option_value=0
   local first_positional=""
 
   for arg in "$@"; do
     case "$arg" in
       -h|--help|-V|--version)
         return 0
+        ;;
+    esac
+  done
+
+  for arg in "$@"; do
+    if [[ "$expect_option_value" -eq 1 ]]; then
+      expect_option_value=0
+      continue
+    fi
+    case "$arg" in
+      -c|--config|--enable|--disable|--remote|--remote-auth-token-env|\
+      -i|--image|-m|--model|--local-provider|-p|--profile|-s|--sandbox|\
+      -C|--cd|--add-dir|-a|--ask-for-approval)
+        expect_option_value=1
         ;;
       --)
         break

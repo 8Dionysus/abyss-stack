@@ -2372,6 +2372,22 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             ):
                 env.pop(environment_name, None)
 
+            for args in (
+                ("-C", str(root), "mcp", "list"),
+                ("-c", 'model="test"', "--version"),
+            ):
+                metadata = subprocess.run(
+                    [str(MCP_HTTP_CODEX_CLIENT), *args],
+                    cwd=REPO_ROOT,
+                    env=env,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(metadata.returncode, 0, metadata.stderr)
+                self.assertFalse(ready_marker.exists())
+                self.assertFalse(systemctl_log.exists())
+
             first = subprocess.run(
                 [str(MCP_HTTP_CODEX_CLIENT), "resume", "test-thread"],
                 cwd=REPO_ROOT,
