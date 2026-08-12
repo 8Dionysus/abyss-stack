@@ -494,6 +494,13 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Changed
 
+- `Repo Validation` now runs branch candidates through the pull-request event
+  only, retains the full postmerge `main` push proof, and cancels only an
+  obsolete in-progress run for the same PR or ref when a newer head arrives.
+- `abyss-machine-mcp` now requests the bounded owner-provided typing status
+  projection instead of pulling the full detailed packet into every live/full
+  machine brief. An exact missing-flag compatibility fallback keeps older host
+  installs readable without masking any other owner-command failure.
 - Routing federation health is now check-only over the admitted SDK-canonical
   materialization: ordinary sync cannot produce or repair routing bytes,
   governed execution no longer exposes a predecessor mutation target, and the

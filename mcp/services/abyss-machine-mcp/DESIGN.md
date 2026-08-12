@@ -45,6 +45,12 @@ silent.
 The fast brief reads only `stack-bridge latest`. Live/full briefs add safe
 memory, typing, process-latest, and changes-latest surfaces.
 
+The typing surface requests the owner-provided compact status projection so a
+session read does not first materialize and parse the full detailed packet. A
+legacy full-status retry is allowed only for the exact argparse signal that the
+installed owner CLI predates `--compact`; other failures remain failures, and
+the fallback is visible in the returned MCP packet.
+
 `abyss_machine_route()` combines resource plan in no-write mode, memory plan,
 and the existing bridge constraints. It does not invoke the effectful
 `processes game-guard` CLI route; memory plan already computes its owner input

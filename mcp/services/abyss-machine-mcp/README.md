@@ -63,6 +63,10 @@ withdrawn list and fail before command dispatch.
 Important command bindings include:
 
 - `stack-bridge` -> `abyss-machine stack-bridge latest --json`;
+- `typing-status` -> `abyss-machine typing status --compact --json`; an older
+  owner CLI may fall back to the full status route only when argparse reports
+  that the compact flag is unavailable, and the MCP result exposes that
+  compatibility fallback;
 - `resource-plan` -> `abyss-machine resource plan ... --no-write --json`;
 - memory status, pressure, and plan -> owner CLI paths that pass
   `write_latest=False`;

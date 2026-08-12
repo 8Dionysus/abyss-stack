@@ -81,6 +81,9 @@ def test_workflow_routes_reusable_commands_through_ci_gate() -> None:
     assert "python scripts/ci_gate.py --mode release" in workflow
     assert "python scripts/ci_gate.py --mode shellcheck" in workflow
     assert "run: python scripts/release_check.py" not in workflow
+    assert "push:\n    branches:\n      - main\n  pull_request:" in workflow
+    assert "group: repo-validation-${{ github.event.pull_request.number || github.ref }}" in workflow
+    assert "cancel-in-progress: true" in workflow
     assert "https://github.com/8Dionysus/aoa-sdk" in workflow
     assert (
         "git -C \"$RUNNER_TEMP/aoa-sdk-source\" fetch --depth 1 origin "

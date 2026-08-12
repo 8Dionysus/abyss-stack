@@ -114,7 +114,7 @@ READ_SURFACE_META: dict[str, dict[str, str]] = {
     "typing-status": {
         "owner": "abyss-machine",
         "truth_level": "typing_intake_status",
-        "description": "safe typed-text intake status",
+        "description": "bounded typed-text intake status with an explicit legacy-CLI fallback",
     },
     "typing-causal-context": {
         "owner": "abyss-machine",
@@ -374,6 +374,13 @@ def _surface_read_ok(surface: str, payload: Any, returncode: int) -> bool:
     return False
 
 
+def _typing_compact_flag_unavailable(output: CommandOutput) -> bool:
+    return (
+        output.returncode == 2
+        and "unrecognized arguments: --compact" in output.stderr
+    )
+
+
 def _collect_paths(value: Any, *, limit: int = 16) -> list[str]:
     found: list[str] = []
 
@@ -555,7 +562,7 @@ class AbyssMachineMCPState:
         if name == "processes-latest":
             return ["processes", "latest", "--json"]
         if name == "typing-status":
-            return ["typing", "status", "--json"]
+            return ["typing", "status", "--compact", "--json"]
         if name == "typing-causal-context":
             return ["typing", "causal-context", "--json"]
         if name == "maps-paths":
@@ -622,14 +629,27 @@ class AbyssMachineMCPState:
         argv = [self.abyss_machine_bin, *args]
         effective_timeout = float(timeout or SURFACE_TIMEOUT_SECONDS.get(surface, self.timeout_seconds))
         output = self.command_runner(argv, effective_timeout)
+        preferred_argv: list[str] | None = None
+        compatibility_fallback: str | None = None
+        elapsed_ms = output.elapsed_ms
+        if surface == "typing-status" and _typing_compact_flag_unavailable(output):
+            preferred_argv = argv
+            argv = [self.abyss_machine_bin, "typing", "status", "--json"]
+            remaining_timeout = max(1.0, effective_timeout - (output.elapsed_ms / 1000.0))
+            fallback_output = self.command_runner(argv, remaining_timeout)
+            elapsed_ms = round(output.elapsed_ms + fallback_output.elapsed_ms, 1)
+            output = fallback_output
+            compatibility_fallback = "typing_status_compact_flag_unavailable"
         payload = _read_json(output.stdout)
         return {
             "surface": surface,
             "argv": argv,
+            "preferred_argv": preferred_argv,
+            "compatibility_fallback": compatibility_fallback,
             "timeout_seconds": effective_timeout,
             "returncode": output.returncode,
             "stderr": output.stderr.strip(),
-            "elapsed_ms": output.elapsed_ms,
+            "elapsed_ms": elapsed_ms,
             "payload": payload,
             "payload_parse_ok": payload is not None,
             "ok": _surface_read_ok(surface, payload, output.returncode),
@@ -663,6 +683,11 @@ class AbyssMachineMCPState:
         }
         if include_payload:
             result["payload_compact"] = _compact(payload, max_depth=5, max_items=12)
+        if run.get("compatibility_fallback"):
+            result["compatibility_fallback"] = {
+                "reason": run["compatibility_fallback"],
+                "preferred_command": run["preferred_argv"],
+            }
         return result
 
     def surface(
