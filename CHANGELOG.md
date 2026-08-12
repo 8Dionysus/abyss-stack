@@ -494,6 +494,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Changed
 
+- `abyss-machine-mcp` now requests the bounded owner-provided typing status
+  projection instead of pulling the full detailed packet into every live/full
+  machine brief. An exact missing-flag compatibility fallback keeps older host
+  installs readable without masking any other owner-command failure.
 - Routing federation health is now check-only over the admitted SDK-canonical
   materialization: ordinary sync cannot produce or repair routing bytes,
   governed execution no longer exposes a predecessor mutation target, and the

@@ -84,6 +84,13 @@ PAYLOADS: dict[tuple[str, ...], dict[str, Any]] = {
         "generated_at": "2026-05-25T00:00:01Z",
         "summary": {"class": "ok", "swap_used_percent": 2.0},
     },
+    ("typing", "status", "--compact", "--json"): {
+        "schema": "abyss_machine_typing_status_compact_v1",
+        "source_schema": "abyss_machine_typing_status_v1",
+        "ok": True,
+        "generated_at": "2026-05-25T00:00:02Z",
+        "summary": {"sources": 3, "status": "ready"},
+    },
     ("typing", "status", "--json"): {
         "schema": "abyss_machine_typing_status_v1",
         "ok": True,
@@ -413,6 +420,38 @@ class NonJsonRunner(FakeRunner):
         return super().__call__(argv, timeout)
 
 
+class LegacyTypingRunner(FakeRunner):
+    def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+        key = tuple(argv[1:])
+        if key == ("typing", "status", "--compact", "--json"):
+            self.calls.append(key)
+            self.timeouts.append((key, timeout))
+            return CommandOutput(
+                argv=argv,
+                returncode=2,
+                stdout="",
+                stderr="abyss-machine: error: unrecognized arguments: --compact",
+                elapsed_ms=1.0,
+            )
+        return super().__call__(argv, timeout)
+
+
+class BrokenCompactTypingRunner(FakeRunner):
+    def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+        key = tuple(argv[1:])
+        if key == ("typing", "status", "--compact", "--json"):
+            self.calls.append(key)
+            self.timeouts.append((key, timeout))
+            return CommandOutput(
+                argv=argv,
+                returncode=1,
+                stdout=json.dumps({"schema": "abyss_machine_typing_status_compact_v1", "ok": False}),
+                stderr="typing status failed",
+                elapsed_ms=1.0,
+            )
+        return super().__call__(argv, timeout)
+
+
 class MemoryPressureWatchRunner(FakeRunner):
     def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
         key = tuple(argv[1:])
@@ -544,6 +583,51 @@ def test_surface_allowlist_rejects_arbitrary_command() -> None:
 
     with pytest.raises(ValueError):
         state.surface("artifacts")
+
+
+def test_typing_status_uses_bounded_compact_owner_route() -> None:
+    runner = FakeRunner()
+    state = state_with_fake(runner)
+
+    result = state.surface("typing-status")
+
+    assert result["ok"] is True
+    assert result["payload_schema"] == "abyss_machine_typing_status_compact_v1"
+    assert result["payload_compact"]["source_schema"] == "abyss_machine_typing_status_v1"
+    assert result["command"] == ["abyss-machine", "typing", "status", "--compact", "--json"]
+    assert "compatibility_fallback" not in result
+    assert runner.calls == [("typing", "status", "--compact", "--json")]
+
+
+def test_typing_status_falls_back_only_when_compact_flag_is_unavailable() -> None:
+    runner = LegacyTypingRunner()
+    state = state_with_fake(runner)
+
+    result = state.surface("typing-status")
+
+    assert result["ok"] is True
+    assert result["payload_schema"] == "abyss_machine_typing_status_v1"
+    assert result["command"] == ["abyss-machine", "typing", "status", "--json"]
+    assert result["compatibility_fallback"] == {
+        "reason": "typing_status_compact_flag_unavailable",
+        "preferred_command": ["abyss-machine", "typing", "status", "--compact", "--json"],
+    }
+    assert runner.calls == [
+        ("typing", "status", "--compact", "--json"),
+        ("typing", "status", "--json"),
+    ]
+
+
+def test_typing_status_does_not_hide_other_compact_route_failures() -> None:
+    runner = BrokenCompactTypingRunner()
+    state = state_with_fake(runner)
+
+    result = state.surface("typing-status")
+
+    assert result["ok"] is False
+    assert result["command"] == ["abyss-machine", "typing", "status", "--compact", "--json"]
+    assert "compatibility_fallback" not in result
+    assert runner.calls == [("typing", "status", "--compact", "--json")]
 
 
 def test_route_is_preflight_only_and_uses_allowlisted_surfaces() -> None:
