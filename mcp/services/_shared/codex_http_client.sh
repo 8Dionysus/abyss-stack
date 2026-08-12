@@ -71,6 +71,9 @@ metadata_only_invocation() {
 
   for arg in "$@"; do
     case "$arg" in
+      --)
+        break
+        ;;
       -h|--help|-V|--version)
         return 0
         ;;

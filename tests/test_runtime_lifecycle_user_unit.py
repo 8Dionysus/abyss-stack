@@ -2389,7 +2389,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 self.assertFalse(systemctl_log.exists())
 
             first = subprocess.run(
-                [str(MCP_HTTP_CODEX_CLIENT), "resume", "test-thread"],
+                [str(MCP_HTTP_CODEX_CLIENT), "exec", "--", "--help"],
                 cwd=REPO_ROOT,
                 env=env,
                 check=False,
