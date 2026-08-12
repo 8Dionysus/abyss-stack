@@ -199,7 +199,8 @@ hidden Git symbolic-ref, reflog, ref, and object mutation refusal with
 read-only metadata inspection preserved,
 GNU sed `--sandbox` enforcement, config-driven Git helper refusal,
 sourced-shell refusal, Git alias/config-write/external-subcommand refusal, ambient
-environment-assignment refusal, Git-invisible FIFO and Unix-socket refusal,
+environment-assignment refusal, file-valued `wc` and `sort --files0-from`
+secret-coordinate classification, Git-invisible FIFO and Unix-socket refusal,
 post-preflight full-manifest drift refusal, source-race refusal before
 inference, final actor-manifest/delta tamper refusal,
 provenance checks for all loaded `aoa_sdk` modules in the study preparer plus a

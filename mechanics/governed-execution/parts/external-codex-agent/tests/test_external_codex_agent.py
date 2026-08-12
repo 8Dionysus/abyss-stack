@@ -7203,6 +7203,32 @@ def test_direct_secret_file_encoder_is_classified() -> None:
     }
 
 
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/wc --files0-from=.env",
+        "/usr/bin/wc --files0-from .npmrc",
+        "/usr/bin/wc --files0-f=.pypirc",
+        "/usr/bin/sort --files0-from=.yarnrc.yml",
+        "/usr/bin/sort --files0-from .git/config",
+    ),
+)
+def test_file_list_options_cannot_hide_secret_reads(command: str) -> None:
+    assert RUNTIME._command_effects(command) == {"secret_access"}
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/wc --files0-from=input-files.list",
+        "/usr/bin/sort --files0-from input-files.list",
+    ),
+)
+def test_ordinary_file_list_options_remain_classifiable(command: str) -> None:
+    assert RUNTIME._command_effects(command) == set()
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
 def test_direct_repository_git_config_reader_is_fail_closed() -> None:
     command = "/usr/bin/cat .git/config"
 

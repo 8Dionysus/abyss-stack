@@ -2112,6 +2112,34 @@ def _long_option_prefix(value: str, canonical: str) -> bool:
     return option.startswith("--") and len(option) >= 3 and canonical.startswith(option)
 
 
+def _file_list_option_secret_access(tokens: Sequence[str]) -> bool:
+    """Inspect file-valued argv options that cause a utility to read paths."""
+
+    if not tokens:
+        return False
+    executable = Path(tokens[0]).name.lower()
+    if executable not in {"sort", "wc"}:
+        return False
+    index = 1
+    while index < len(tokens):
+        value = tokens[index]
+        if not _long_option_prefix(value, "--files0-from"):
+            index += 1
+            continue
+        attached = "=" in value
+        file_value = (
+            value.split("=", 1)[1]
+            if attached
+            else tokens[index + 1]
+            if index + 1 < len(tokens)
+            else ""
+        )
+        if _secret_shaped_path(file_value) or _git_config_metadata_path(file_value):
+            return True
+        index += 1 if attached else 2
+    return False
+
+
 def _pattern_reader_git_config_file_access(tokens: Sequence[str]) -> bool:
     """Inspect every actual rg, grep, or sed input-file coordinate."""
 
@@ -3310,6 +3338,8 @@ def _command_effects(command: str) -> set[str]:
             ):
                 detected.add("secret_access")
             if _direct_git_config_file_access(segment):
+                detected.add("secret_access")
+            if _file_list_option_secret_access(segment):
                 detected.add("secret_access")
             if any(
                 _secret_shaped_path(value)
