@@ -48,8 +48,8 @@ structured events and output, no built-in multi-agent flag, byte-aware
 read-only drift containment including every tracked byte,
 assume-unchanged/skip-worktree mutations, and ignored bytes,
 tracked-submodule, untracked-embedded-repository, and outward-symlink refusal, a foreground `run-to-terminal` lifecycle for transient cgroup launchers without execution
-ceilings, secret-shaped ignored
-input refusal, complete runtime-wide forbidden-set admission plus subset-resistant
+ceilings, secret-shaped ignored input refusal including conventional
+credential-config dotfiles before hashing or direct reads, complete runtime-wide forbidden-set admission plus subset-resistant
 terminal classification, direct secret-path encoder classification, exact-open-inode
 Codex preflight and inference execution across a pathname replacement plus
 pre-exec digest-drift refusal, and a real historical outer-bubblewrap plus inner

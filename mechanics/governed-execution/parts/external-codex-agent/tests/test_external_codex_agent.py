@@ -7943,6 +7943,36 @@ def test_secret_shaped_ignored_path_blocks_manifest_without_hashing(
     assert exc_info.value.code == "workspace_secret_path_present"
 
 
+def test_ignored_npmrc_blocks_manifest_and_direct_read_before_hashing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / ".gitignore").write_text(".npmrc\n", encoding="utf-8")
+    _git(workspace, "add", ".gitignore")
+    _git(workspace, "commit", "-m", "fixture")
+    npmrc = workspace / ".npmrc"
+    npmrc.write_text("//registry.example/:_authToken=must-not-leak\n", encoding="utf-8")
+    original_sha256_file = RUNTIME.sha256_file
+
+    def guarded_sha256_file(path: Path) -> str:
+        if path == npmrc:
+            pytest.fail("credential-bearing ignored file was hashed")
+        return original_sha256_file(path)
+
+    monkeypatch.setattr(RUNTIME, "sha256_file", guarded_sha256_file)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.build_workspace_manifest(workspace)
+
+    assert exc_info.value.code == "workspace_secret_path_present"
+    assert RUNTIME._command_effects("/usr/bin/cat .npmrc") == {"secret_access"}
+
+
 def test_workspace_manifest_disables_repository_diff_and_filter_programs(
     tmp_path: Path,
 ) -> None:
@@ -8195,6 +8225,11 @@ def test_workspace_manifest_rejects_git_invisible_special_entries(
         "provider-token.txt",
         "config/secrets.toml",
         "private/service.credentials.json",
+        ".npmrc",
+        ".pypirc",
+        ".yarnrc.yml",
+        ".docker/config.json",
+        ".kube/config",
     ),
 )
 def test_secret_shaped_name_recognition_covers_provider_files(

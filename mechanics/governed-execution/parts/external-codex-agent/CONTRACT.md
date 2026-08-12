@@ -458,7 +458,8 @@ or a queued directory disappeared before `scandir`, is retried only within one
 short bounded observation window. A stable retry is a new complete manifest,
 not acceptance of the partial read; exhaustion and every symlink,
 special-entry, coordinate, Git-body, or other projection error still fail
-closed immediately. An untracked or ignored secret-shaped path blocks admission before
+closed immediately. An untracked or ignored secret-shaped path, including
+conventional credential-config names such as `.npmrc`, blocks admission before
 its content is hashed. Read-only manifest drift, HEAD drift, an out-of-scope
 write, or a command event whose command text is unavailable fails closed as
 `authority_blocked` evidence. If a failure closeout cannot observe the final

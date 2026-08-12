@@ -9,6 +9,9 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Reject ignored conventional credential files such as `.npmrc` before their
+  bytes are hashed into an actor projection, and classify direct model reads of
+  those coordinates as secret access.
 - Disable promisor lazy fetches in the projection-local Git environment, so
   private-Git packing cannot invoke a source checkout's configured remote
   helper before the actor containment boundary.

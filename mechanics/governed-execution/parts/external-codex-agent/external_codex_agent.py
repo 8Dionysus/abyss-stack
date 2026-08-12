@@ -524,7 +524,9 @@ PARENT_PASSIVE_ITEM_TYPES = {"agent_message", "reasoning"}
 ENV_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=.*$", re.S)
 SECRET_PATH_PARTS = {
     ".aws",
+    ".docker",
     ".gnupg",
+    ".kube",
     ".ssh",
     "credential",
     "credentials",
@@ -551,7 +553,14 @@ def _plan_binds_active_summon_request(
 
 SECRET_FILE_NAMES = {
     ".env",
+    ".envrc",
+    ".git-credentials",
+    ".gitcookies",
     ".netrc",
+    ".npmrc",
+    ".pypirc",
+    ".yarnrc",
+    ".yarnrc.yml",
     "auth.json",
     "credentials.json",
     "id_dsa",
