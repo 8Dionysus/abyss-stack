@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 28431315,
+  "allowed_tracked_bytes": 34478824,
+  "approved_by": "repository-owner",
+  "base_ref": "37cd71a1604197b01c5a11aa592ef3519cfe108a",
+  "changed_generated_bytes": 28431315,
+  "changed_generated_files": 396,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "8ff9f0f770a5aa8409a32489bfeecdcdc3380abcd4a1a2e4d0e8cf72b09ce2fd",
+  "reason": "PR #352 adds the governed external Codex actor runtime, isolation and lifecycle contracts, deterministic proof suite, and owner-facing documentation as one intentionally large new source surface.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34478824,
+  "tracked_bytes_max": 24117248
+}
