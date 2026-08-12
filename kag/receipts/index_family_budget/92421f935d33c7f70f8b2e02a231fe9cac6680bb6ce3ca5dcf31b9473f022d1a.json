@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 8601569,
+  "allowed_tracked_bytes": 34598651,
+  "approved_by": "repository-owner",
+  "base_ref": "27a0e24bfc354f4ad69942f0ed3e36d961b4780d",
+  "changed_generated_bytes": 8601569,
+  "changed_generated_files": 92,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "92421f935d33c7f70f8b2e02a231fe9cac6680bb6ce3ca5dcf31b9473f022d1a",
+  "reason": "abyss-machine-mcp consumes the owner-provided compact typing status with an exact legacy-CLI fallback; refresh the deterministic portable KAG family while leaving the standing generated-delta and tracked-size budgets unchanged.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34598651,
+  "tracked_bytes_max": 24117248
+}
