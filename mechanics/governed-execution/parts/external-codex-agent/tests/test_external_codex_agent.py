@@ -6433,6 +6433,21 @@ def test_timeout_without_environment_override_remains_classifiable() -> None:
     )
 
 
+def test_timeout_wrapped_shell_body_is_recursively_classified() -> None:
+    command = "/usr/bin/timeout 5 /usr/bin/bash -c '/usr/bin/python -c pass'"
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+def test_timeout_wrapped_shell_body_preserves_forbidden_effects() -> None:
+    command = "/usr/bin/timeout 5 /usr/bin/bash -c '/usr/bin/git push'"
+    assert "push" in RUNTIME._command_effects(command)
+
+
+def test_timeout_wrapped_safe_shell_body_remains_classifiable() -> None:
+    command = "/usr/bin/timeout 5 /usr/bin/bash -c '/usr/bin/rg needle input'"
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
 @pytest.mark.parametrize(
     "command",
     (
@@ -7301,6 +7316,48 @@ def test_date_attached_file_operand_cannot_hide_secret_reads(command: str) -> No
 def test_date_ordinary_attached_file_operand_remains_classifiable() -> None:
     command = "/usr/bin/date -fdates.txt"
     assert RUNTIME._command_effects(command) == set()
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/file -f.env",
+        "/usr/bin/file -0f.env",
+        "/usr/bin/file -f.git/config",
+    ),
+)
+def test_file_attached_namefile_cannot_hide_secret_reads(command: str) -> None:
+    assert RUNTIME._command_effects(command) == {"secret_access"}
+
+
+def test_file_ordinary_attached_namefile_remains_classifiable() -> None:
+    command = "/usr/bin/file -fnames.txt"
+    assert RUNTIME._command_effects(command) == set()
+    assert RUNTIME._command_has_unclassified_indirection(command) is False
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/uniq newhead .git/HEAD",
+        "/usr/bin/uniq -f 1 newhead /tmp/repo/.git/HEAD",
+        "/usr/bin/uniq --skip-fields=1 -- newhead .git/HEAD",
+    ),
+)
+def test_uniq_git_metadata_output_is_fail_closed(command: str) -> None:
+    assert RUNTIME._command_has_unclassified_indirection(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "/usr/bin/uniq input output.txt",
+        "/usr/bin/uniq -f1 input output.txt",
+        "/usr/bin/uniq --skip-fields 1 input output.txt",
+    ),
+)
+def test_uniq_ordinary_output_remains_classifiable(command: str) -> None:
     assert RUNTIME._command_has_unclassified_indirection(command) is False
 
 

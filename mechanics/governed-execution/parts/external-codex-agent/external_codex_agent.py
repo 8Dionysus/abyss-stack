@@ -2115,6 +2115,7 @@ def _long_option_prefix(value: str, canonical: str) -> bool:
 ATTACHED_SHORT_FILE_OPTIONS = {
     "awk": frozenset("f"),
     "date": frozenset("f"),
+    "file": frozenset("f"),
     "grep": frozenset("f"),
     "jq": frozenset("f"),
     "rg": frozenset("f"),
@@ -2552,6 +2553,52 @@ def _find_writes_git_metadata(tokens: Sequence[str]) -> bool:
     return False
 
 
+def _uniq_writes_git_metadata(tokens: Sequence[str]) -> bool:
+    """Detect uniq's optional positional output beneath private Git state."""
+
+    if not tokens or Path(tokens[0]).name.lower() != "uniq":
+        return False
+    value_options = {
+        "-f": "--skip-fields",
+        "-s": "--skip-chars",
+        "-w": "--check-chars",
+    }
+    operands: list[str] = []
+    index = 1
+    while index < len(tokens):
+        token = tokens[index]
+        lowered = token.lower()
+        if token == "--":
+            operands.extend(tokens[index + 1 :])
+            break
+        matched_long = next(
+            (
+                canonical
+                for canonical in value_options.values()
+                if _long_option_prefix(token, canonical)
+            ),
+            None,
+        )
+        if lowered in value_options or (matched_long is not None and "=" not in token):
+            index += 2
+            continue
+        if matched_long is not None and "=" in token:
+            index += 1
+            continue
+        if any(
+            lowered.startswith(option) and lowered != option
+            for option in value_options
+        ):
+            index += 1
+            continue
+        if token.startswith("-") and token != "-":
+            index += 1
+            continue
+        operands.append(token)
+        index += 1
+    return len(operands) >= 2 and _git_admin_metadata_path(operands[1])
+
+
 def _shell_tokenization_analysis(
     command: str,
 ) -> tuple[tuple[tuple[str, ...], ...], bool]:
@@ -2581,9 +2628,11 @@ def _shell_tokenization_analysis(
         if not tokens:
             continue
         tokenizations.append(tokens)
-        executable = Path(tokens[0]).name
-        if executable in SHELL_NAMES:
-            inline_body = _shell_inline_body(tokens)
+        for raw_segment in _command_segments(tokens):
+            segment = _unwrap_command(raw_segment)
+            if not segment or Path(segment[0]).name.lower() not in SHELL_NAMES:
+                continue
+            inline_body = _shell_inline_body(segment)
             if inline_body is not None:
                 pending.append(inline_body)
     incomplete = incomplete or any(raw not in seen for raw in pending)
@@ -3568,6 +3617,12 @@ def _command_has_unclassified_indirection(command: str) -> bool:
             args = tuple(value.lower() for value in segment[1:])
             if _executable_path_is_opaque(segment[0]):
                 return True
+            if executable in SHELL_NAMES:
+                if _shell_has_startup_dispatch(segment) or (
+                    _shell_inline_body(segment) is None
+                ):
+                    return True
+                continue
             if segment[0] == "." or executable == "source":
                 return True
             if executable in (
@@ -3589,6 +3644,8 @@ def _command_has_unclassified_indirection(command: str) -> bool:
             if executable == "sort" and _sort_writes_git_metadata(segment):
                 return True
             if executable == "find" and _find_writes_git_metadata(segment):
+                return True
+            if executable == "uniq" and _uniq_writes_git_metadata(segment):
                 return True
             if _direct_git_config_file_access(segment):
                 return True
