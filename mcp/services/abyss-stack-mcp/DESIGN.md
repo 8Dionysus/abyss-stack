@@ -165,11 +165,13 @@ admission require their own issuers. Expiry immediately remains fail-closed.
 The ordinary Keeper pipeline never mutates the services it observes, so
 protocol cutover and Tasks adapters retain independent admission and rollback
 boundaries. The separate D-0109 cold-start controller is the only exception:
-after registry-source or read-currentness expiry prevents the exact production
-fleet from starting, it may transiently start the already-defined manual read
-bootstrap units, reset an expired registry to claim-free shadow state, rebuild
-an eligible catalog, hand off to the exact production units, and replace every
-bootstrap process identity with a production receipt. It cannot select units,
+when registry-source or read-currentness expiry prevents the exact production
+fleet from starting, or when still-current admission is not reusable for the
+exact deployment and production evidence identities, it may transiently start
+the already-defined manual read bootstrap units, reset an expired registry to
+claim-free shadow state when required, rebuild an eligible catalog, hand off to
+the exact production units, and replace every bootstrap process identity with
+a production receipt. It cannot select units,
 organs, contours, tools, credentials, endpoints, candidate planes, or effect
 planes at runtime. Completion also requires the managed catalog to match every
 final production receipt. Any incomplete handoff stops bootstrap and any

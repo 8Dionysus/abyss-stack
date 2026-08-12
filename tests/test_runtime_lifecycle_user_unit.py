@@ -2733,6 +2733,24 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertIn("catalog_matches_current_canaries", script)
         self.assertIn(".canary_receipt_id == $receipt_id", script)
         self.assertIn(".canary_observed_at == $observed_at", script)
+        self.assertIn("production_admission_reusable=0", script)
+        self.assertIn(
+            'if [[ "$production_admission_reusable" -eq 1 \\\n'
+            '      && "$active_unit_count" -eq 11 ]]; then',
+            script,
+        )
+        self.assertIn(
+            'if [[ "$production_admission_reusable" -eq 1 ]]; then\n'
+            '    systemctl --user reset-failed "${production_units[@]}"\n'
+            "  else\n"
+            '    systemctl --user reset-failed "${bootstrap_units[@]}"',
+            script,
+        )
+        self.assertNotIn(
+            'if [[ "$minimum_expiry" -gt "$now_epoch" '
+            '&& "$registry_expiry" -gt "$now_epoch" ]]; then',
+            script,
+        )
         self.assertIn("systemctl --user stop \"${bootstrap_units[@]}\"", script)
         self.assertIn("systemctl --user start \"${production_units[@]}\"", script)
         self.assertIn("  production \\", script)
