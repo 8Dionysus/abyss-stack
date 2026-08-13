@@ -79,8 +79,12 @@ The controller:
   wrapper before closing the still-unreleased supervisor endpoint;
   preflight executes the same historical outer mask plus Codex's own inner
   named bubblewrap/private-PID sandbox instead of merely checking their
-  binaries, and records the exact mount-wrapper and mount-launcher digests for
-  defense-in-depth drift checks;
+  binaries. Independent preflight probes overlap only as separate
+  start-new-session supervisor process groups: admission waits for every exact
+  result, retains each probe's deadline and failure class, and terminates and
+  reaps every outstanding group if one cannot complete. The controller still
+  repeats the complete preflight in the worker and records the exact
+  mount-wrapper and mount-launcher digests for defense-in-depth drift checks;
 - materializes every admitted Git baseline into a fresh runtime-owned actor
   projection before inference, rejecting unsupported special entries or unsafe
   symlinks and constructing a private source-independent `.git` body whose

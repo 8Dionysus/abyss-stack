@@ -21,10 +21,11 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
+from types import MethodType, ModuleType, SimpleNamespace
 from typing import Any
 
 import pytest
+from jsonschema.exceptions import SchemaError
 
 from aoa_sdk.a2a.rebase import (
     QuestPassport,
@@ -911,6 +912,50 @@ else:
     path.chmod(0o755)
 
 
+def _fixture_codex_preflight(
+    _runtime: Any,
+    launch: Mapping[str, Any],
+    model_slug: str,
+    reasoning_effort: str,
+    _tool_entry: Mapping[str, Any],
+    *,
+    repository_workspace: Path | None = None,
+) -> dict[str, Any]:
+    """Return the exact successful preflight shape for non-preflight tests.
+
+    The production implementation and its process-isolation behavior stay under
+    direct unit and end-to-end coverage.  Semantic runtime tests use this fork-
+    inherited double so report, lifecycle, and authority assertions do not each
+    repeat five external transport probes.
+    """
+
+    assert repository_workspace is not None
+    executable = Path(str(launch["codex_executable"]))
+    if (
+        not executable.is_absolute()
+        or not executable.is_file()
+        or executable.resolve() != executable
+    ):
+        raise RUNTIME.ExternalCodexRuntimeError(
+            "codex_unavailable",
+            "fixture Codex executable is not an exact absolute file",
+        )
+    executable_digest = _digest_path(executable)
+    if executable_digest != launch["codex_executable_digest"]:
+        raise RUNTIME.ExternalCodexRuntimeError(
+            "codex_executable_drift", "fixture Codex executable digest changed"
+        )
+    return {
+        "version": "codex-cli 0.147.0",
+        "auth_regime": "chatgpt_login",
+        "model_slug": model_slug,
+        "reasoning_effort": reasoning_effort,
+        "executable_digest": executable_digest,
+        "mount_wrapper_digest": _digest_path(RUNTIME.MOUNT_WRAPPER_PATH),
+        "mount_launcher_digest": _digest_path(RUNTIME.MOUNT_LAUNCHER_PATH),
+    }
+
+
 def _adapt_plan(
     *,
     task_ref: ProvenanceRef,
@@ -1061,6 +1106,7 @@ def _fixture(
     responsibility_transfer_mutator: Callable[[dict[str, Any]], None] | None = None,
     validation_commands: tuple[Mapping[str, Any], ...] | None = None,
     omit_historical_reviewer_inputs: bool = False,
+    exact_preflight: bool = False,
 ) -> dict[str, Any]:
     if owner_binding_v1 and not owner_contour:
         raise AssertionError(
@@ -2195,8 +2241,14 @@ def _fixture(
         )
         owner_execution_request_path = tmp_path / "owner-execution-request.json"
         _write_json(owner_execution_request_path, owner_execution_request)
+    runtime = RUNTIME.ExternalCodexRuntime(state_root or (tmp_path / "state"))
+    if not exact_preflight:
+        runtime._codex_preflight = MethodType(  # type: ignore[method-assign]
+            _fixture_codex_preflight,
+            runtime,
+        )
     return {
-        "runtime": RUNTIME.ExternalCodexRuntime(state_root or (tmp_path / "state")),
+        "runtime": runtime,
         "launch_path": launch_path,
         "launch": launch,
         "binding_path": binding_path,
@@ -2228,6 +2280,62 @@ def _wait_terminal(
     raise AssertionError(
         f"external Codex fixture did not stop: {state}"
     )
+
+
+def test_schema_meta_validation_cache_is_exact_and_fail_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    schema_path = tmp_path / "fixture.schema.json"
+    original = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": False,
+    }
+    RUNTIME._check_schema_bytes_cached.cache_clear()
+    try:
+        _write_json(schema_path, original)
+        original_raw = schema_path.read_bytes()
+        first_loaded = RUNTIME.load_schema(schema_path)
+        assert first_loaded == original
+        first_loaded["type"] = "array"
+        assert RUNTIME.load_schema(schema_path) == original
+        first = RUNTIME._check_schema_bytes_cached.cache_info()
+        assert first.maxsize == 64
+        assert (first.hits, first.misses, first.currsize) == (1, 1, 1)
+
+        changed = dict(original, type="integer")
+        _write_json(schema_path, changed)
+        assert RUNTIME.load_schema(schema_path) == changed
+        second = RUNTIME._check_schema_bytes_cached.cache_info()
+        assert (second.hits, second.misses, second.currsize) == (1, 2, 2)
+
+        invalid = dict(original, type="not-a-json-schema-type")
+        _write_json(schema_path, invalid)
+        with pytest.raises(SchemaError):
+            RUNTIME.load_schema(schema_path)
+        with pytest.raises(SchemaError):
+            RUNTIME.load_schema(schema_path)
+        rejected = RUNTIME._check_schema_bytes_cached.cache_info()
+        assert (rejected.hits, rejected.misses, rejected.currsize) == (1, 4, 2)
+
+        schema_path.write_bytes(original_raw)
+        assert RUNTIME.load_schema(schema_path) == original
+        restored = RUNTIME._check_schema_bytes_cached.cache_info()
+        assert (restored.hits, restored.misses, restored.currsize) == (2, 4, 2)
+
+        RUNTIME._check_schema_bytes_cached.cache_clear()
+        monkeypatch.setattr(
+            RUNTIME,
+            "MAX_CACHED_SCHEMA_BYTES",
+            len(original_raw) - 1,
+        )
+        assert RUNTIME.load_schema(schema_path) == original
+        assert RUNTIME.load_schema(schema_path) == original
+        bounded = RUNTIME._check_schema_bytes_cached.cache_info()
+        assert (bounded.hits, bounded.misses, bounded.currsize) == (0, 0, 0)
+    finally:
+        RUNTIME._check_schema_bytes_cached.cache_clear()
 
 
 def test_wait_terminal_accepts_transition_at_timeout_boundary(
@@ -3001,7 +3109,7 @@ def test_preflight_rejects_path_replacement_after_controller_digest(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fixture = _fixture(tmp_path)
+    fixture = _fixture(tmp_path, exact_preflight=True)
     runtime = fixture["runtime"]
     original_containment_command = runtime._containment_command
     replaced = [False]
@@ -3038,11 +3146,174 @@ def test_preflight_rejects_path_replacement_after_controller_digest(
     assert exc_info.value.code == "codex_preflight_failed"
 
 
+def test_preflight_probe_group_overlaps_independent_processes(
+    tmp_path: Path,
+) -> None:
+    first_ready = tmp_path / "first.ready"
+    second_ready = tmp_path / "second.ready"
+    barrier_probe = """
+import sys
+import time
+from pathlib import Path
+
+mine = Path(sys.argv[1])
+other = Path(sys.argv[2])
+mine.write_text("ready\\n", encoding="utf-8")
+deadline = time.monotonic() + 2
+while not other.is_file():
+    if time.monotonic() >= deadline:
+        raise SystemExit(9)
+    time.sleep(0.01)
+print(mine.name)
+"""
+
+    results = RUNTIME._run_preflight_probe_group(
+        [
+            (
+                "first",
+                [
+                    sys.executable,
+                    "-c",
+                    barrier_probe,
+                    str(first_ready),
+                    str(second_ready),
+                ],
+                5,
+            ),
+            (
+                "second",
+                [
+                    sys.executable,
+                    "-c",
+                    barrier_probe,
+                    str(second_ready),
+                    str(first_ready),
+                ],
+                5,
+            ),
+        ],
+        env=os.environ.copy(),
+        failure_code="fixture_probe_failed",
+        failure_messages={
+            "first": "first fixture probe failed",
+            "second": "second fixture probe failed",
+        },
+    )
+
+    assert results["first"].returncode == 0
+    assert results["second"].returncode == 0
+    assert results["first"].stdout.strip() == first_ready.name
+    assert results["second"].stdout.strip() == second_ready.name
+
+
+def test_preflight_probe_group_timeout_cleans_exact_process_group(
+    tmp_path: Path,
+) -> None:
+    identity_path = tmp_path / "probe-identity.json"
+    blocking_probe = """
+import json
+import os
+import time
+from pathlib import Path
+
+raw = Path(f"/proc/{os.getpid()}/stat").read_text(encoding="utf-8")
+fields = raw[raw.rfind(")") + 2:].split()
+Path(os.environ["FIXTURE_IDENTITY_PATH"]).write_text(
+    json.dumps({"pid": os.getpid(), "start_ticks": int(fields[19])}) + "\\n",
+    encoding="utf-8",
+)
+time.sleep(60)
+"""
+    environment = os.environ.copy()
+    environment["FIXTURE_IDENTITY_PATH"] = str(identity_path)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME._run_preflight_probe_group(
+            [("blocking", [sys.executable, "-c", blocking_probe], 0.5)],
+            env=environment,
+            failure_code="fixture_probe_failed",
+            failure_messages={"blocking": "blocking fixture probe failed"},
+        )
+
+    assert exc_info.value.code == "fixture_probe_failed"
+    identity = json.loads(identity_path.read_text(encoding="utf-8"))
+    assert not RUNTIME._pid_matches(identity["pid"], identity["start_ticks"])
+
+
+def test_preflight_probe_group_failure_cleans_completed_sibling_descendants(
+    tmp_path: Path,
+) -> None:
+    child_identity_path = tmp_path / "completed-sibling-child.json"
+    child_probe = """
+import json
+import os
+import time
+from pathlib import Path
+
+raw = Path(f"/proc/{os.getpid()}/stat").read_text(encoding="utf-8")
+fields = raw[raw.rfind(")") + 2:].split()
+Path(os.environ["FIXTURE_CHILD_IDENTITY_PATH"]).write_text(
+    json.dumps({"pid": os.getpid(), "start_ticks": int(fields[19])}) + "\\n",
+    encoding="utf-8",
+)
+time.sleep(60)
+"""
+    completed_parent_probe = f"""
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+identity_path = Path({str(child_identity_path)!r})
+subprocess.Popen(
+    [sys.executable, "-c", {child_probe!r}],
+    stdin=subprocess.DEVNULL,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+deadline = time.monotonic() + 5
+while not identity_path.is_file():
+    if time.monotonic() >= deadline:
+        raise SystemExit(8)
+    time.sleep(0.01)
+"""
+    environment = os.environ.copy()
+    environment["FIXTURE_CHILD_IDENTITY_PATH"] = str(child_identity_path)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME._run_preflight_probe_group(
+            [
+                (
+                    "completed_parent",
+                    [sys.executable, "-c", completed_parent_probe],
+                    5,
+                ),
+                (
+                    "blocking_sibling",
+                    [sys.executable, "-c", "import time; time.sleep(60)"],
+                    0.75,
+                ),
+            ],
+            env=environment,
+            failure_code="fixture_probe_failed",
+            failure_messages={
+                "completed_parent": "completed parent fixture probe failed",
+                "blocking_sibling": "blocking sibling fixture probe failed",
+            },
+        )
+
+    assert exc_info.value.code == "fixture_probe_failed"
+    child_identity = json.loads(child_identity_path.read_text(encoding="utf-8"))
+    assert not RUNTIME._pid_matches(
+        child_identity["pid"], child_identity["start_ticks"]
+    )
+
+
 def test_preflight_exercises_masked_nested_codex_sandbox(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fixture = _fixture(tmp_path)
+    fixture = _fixture(tmp_path, exact_preflight=True)
     runtime = fixture["runtime"]
     original_containment_command = runtime._containment_command
     observed: list[tuple[list[str], Mapping[str, Any], tuple[str, ...]]] = []
@@ -3320,7 +3591,7 @@ def test_live_supervisor_rejects_mismatched_child_identity_receipt(
 def test_preflight_and_separate_process_return_structured_result(
     tmp_path: Path,
 ) -> None:
-    fixture = _fixture(tmp_path)
+    fixture = _fixture(tmp_path, exact_preflight=True)
     runtime = fixture["runtime"]
     _git(
         fixture["workspace"],
@@ -3333,6 +3604,17 @@ def test_preflight_and_separate_process_return_structured_result(
     assert preflight["admitted"] is True
     assert preflight["model_slug"] == "gpt-5.6-luna"
     assert preflight["reasoning_effort"] == "max"
+    assert preflight["preflight"]["version"] == "codex-cli 0.147.0"
+    assert preflight["preflight"]["auth_regime"] == "chatgpt_login"
+    assert preflight["preflight"]["executable_digest"] == (
+        fixture["launch"]["codex_executable_digest"]
+    )
+    assert preflight["preflight"]["mount_wrapper_digest"] == _digest_path(
+        RUNTIME.MOUNT_WRAPPER_PATH
+    )
+    assert preflight["preflight"]["mount_launcher_digest"] == _digest_path(
+        RUNTIME.MOUNT_LAUNCHER_PATH
+    )
     started = runtime.start(fixture["launch_path"])
     assert started["status"] == "running"
     assert started["worker_pid"] != os.getpid()
@@ -3966,6 +4248,7 @@ def test_role_scoped_mcp_requires_only_its_exact_credential(
         tmp_path,
         task_family="eval_application",
         role_mcp="aoa_evals",
+        exact_preflight=True,
     )
     monkeypatch.delenv("AOA_EVALS_MCP_READ_BEARER_TOKEN", raising=False)
     monkeypatch.setenv("AOA_STATS_MCP_READ_BEARER_TOKEN", "wrong-role-token")
@@ -10413,7 +10696,7 @@ def test_unexpected_worker_death_cleans_codex_group_and_returns_failure(
     codex_pid = running["codex_pid"]
 
     os.kill(worker_pid, signal.SIGKILL)
-    terminal = runtime.status(fixture["session_id"])
+    terminal = _wait_terminal(runtime, fixture["session_id"])
     result = runtime.result(fixture["session_id"])
 
     assert terminal["status"] == "failed"
@@ -10450,7 +10733,7 @@ def test_worker_death_promotes_projection_authority_drift(
     )
 
     os.kill(running["worker_pid"], signal.SIGKILL)
-    terminal = runtime.status(fixture["session_id"])
+    terminal = _wait_terminal(runtime, fixture["session_id"])
     result = runtime.result(fixture["session_id"])
 
     assert terminal["status"] == "authority_blocked"
@@ -10481,7 +10764,7 @@ def test_worker_death_promotes_owner_source_drift(tmp_path: Path) -> None:
     )
 
     os.kill(running["worker_pid"], signal.SIGKILL)
-    terminal = runtime.status(fixture["session_id"])
+    terminal = _wait_terminal(runtime, fixture["session_id"])
     result = runtime.result(fixture["session_id"])
 
     assert terminal["status"] == "authority_blocked"

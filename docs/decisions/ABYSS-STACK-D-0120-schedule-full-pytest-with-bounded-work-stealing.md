@@ -59,6 +59,112 @@ that resolved a virtual-environment interpreter symlink before starting a
 bubblewrap child, thereby discarding that environment's dependencies. Passing
 the exact `sys.executable` preserves the admitted interpreter environment.
 
+A later postmerge profile showed why duration-aware reassignment alone had no
+material headroom left. The 32 observed shard durations totalled 1,558.56
+seconds, so the four-worker lower bound was 389.64 seconds; the actual queue
+makespan was already about 391 seconds. Shards 1 through 9 all came from
+`test_external_codex_agent.py` and accounted for about 87 percent of total
+shard time. One representative end-to-end test executed 103 programs because
+the exact five-probe Codex preflight runs once at admission and again in the
+worker, as the runtime contract requires.
+
+The next comparison therefore kept the scheduler, selection, and repeated
+preflight unchanged and overlapped only independent probes inside each
+preflight. On one fixed old-baseline wave of the first four slow shards, all
+282 assigned tests and the exact observed union stayed green. Wall time fell
+from 132.58 to 111.00 seconds (16.3 percent), cgroup CPU time fell from 398.81
+to 365.63 seconds (8.3 percent), and memory peak rose from 636.6 to 701.1 MiB.
+The result rejects a duration-hint-only change for this bottleneck and admits
+the process-isolated preflight-overlap candidate to complete-suite and public
+runner validation; it does not weaken or cache any runtime probe.
+
+The subsequent complete local proof used the exact CI owner pins, an installed
+`aoa-sdk` (so isolated `python -I` subprocesses exercised the packaged route),
+and the unchanged 4-by-32 scheduler. Its exact union selected 2,220 tests and
+closed green; after adding an explicit completed-sibling orphan-cleanup proof,
+the final exact union selected 2,221 tests and closed with 2,217 passed, four
+skipped, and 230 passed subtests in 318.99 seconds, with a 757.4 MiB cgroup
+memory peak and no swap.
+
+The independent public comparison rejected unconditional nested overlap as a
+complete-suite optimization on the four-CPU runner. Two exact baseline runs
+completed their pytest queues in 390.99 and 382.79 seconds. The overlap
+candidate remained correctness-green but needed 411.10 seconds; its four-worker
+queue was already within one second of the 410.32-second lower bound. The
+regression is consistent with four outer pytest processes each creating up to
+three inner probe processes. A local speedup on a larger host therefore does
+not admit the same scheduling policy under a smaller outer CPU budget.
+
+The next comparison separated transport proof from runtime-semantic proof
+without changing production code, full-suite membership, or the repeated
+worker preflight contract. Four explicit fixture cases retain the real
+`_codex_preflight` path: executable pathname replacement, nested Codex sandbox,
+missing role-scoped MCP credential, and the complete preflight/start/worker
+lifecycle. The probe-group tests independently retain concurrent completion,
+timeout cleanup, and completed-sibling descendant cleanup. Other lifecycle,
+report, authority, and evidence tests install a successful contract-shaped
+preflight double only on their fixture runtime. The runtime forks its worker,
+so that double is inherited across the same admission and worker call sites;
+tests that alter the second return still prove that worker revalidation occurs.
+It does not add a runtime flag or a production bypass.
+
+On the same fixed four-shard, 282-test local wave, the stratified candidate
+passed the exact union in 96.08 seconds. That is 13.4 percent faster than the
+111.00-second overlap-only candidate and 27.5 percent faster than the
+132.58-second serial-preflight baseline. This admits stratification to the full
+local and public gates; public-runner evidence remains required before landing.
+
+Full-suite profiling then exposed two independent deterministic tests that
+silently called the deployed `langchain-api /run/federated` advisory endpoint.
+One Agent OS adapter chain spent about six seconds blocked in one socket receive
+per successful governed closeout. Its 28-test file fell from 78.23 to 17.48
+seconds after the test backend supplied a local contract-shaped review trace;
+25 tests still passed and the same three explicitly live-compiler cases stayed
+skipped. A governed-runner skipped-reasons test fell from 20.36 seconds to 0.03
+seconds after receiving the same explicit test input. Neither test asserts live
+advisory quality, and the default test contract already forbids dependence on
+deployed runtime state. Dedicated live receipts remain the evidence for that
+external surface.
+
+Two complete post-change local runs selected the identical 2,221-node digest
+and remained exact and green. The first completed in 281.28 seconds with
+1,005.20 aggregate shard-seconds; the second completed in 316.63 seconds with
+1,170.14 aggregate shard-seconds under materially different host contention.
+The earlier overlap-only local proof was 318.99 seconds and 1,120.39
+shard-seconds. The isolated causal comparisons are therefore accepted, but no
+single local full-suite wall time is treated as a stable effect estimate; the
+fresh public runner remains the landing comparison.
+
+Two public runs of the same stratified exact head then selected the same 2,221
+tests and closed green. Their pytest queues took 390.10 and 308.00 seconds,
+with 1,557.17 and 1,227.44 aggregate shard-seconds. The earlier baseline pair
+took 390.99 and 382.79 seconds. The candidate pair therefore supplied one
+baseline-equivalent sample and one materially faster sample, but the runner
+variance remained too large to attribute the entire spread to stratification.
+It did establish that the deterministic boundary changes were portable and did
+not introduce a public-runner regression.
+
+Test-level profiling then found a runtime operation, rather than another
+scheduler imbalance. One A2A negative-matrix test invoked value validation more
+than 2,200 times. Its profile spent 40.32 seconds in 2,216 schema loads and
+41.15 seconds in 2,264 Draft 2020-12 meta-schema checks, even though most calls
+read the same immutable schema bytes. Caching compiled validators would also
+share mutable application state and couple value-validation behavior to cache
+lifetime. Caching by pathname or metadata would fail to bind the proof to the
+bytes actually used.
+
+The bounded candidate instead memoizes only a successful schema
+meta-validation keyed by the complete raw bytes. Each call still rereads and
+parses its file into a fresh mapping, and every value is still validated.
+Changed bytes miss, invalid schemas are never cached, schemas over 512 KiB use
+the uncached path, and the 64-entry bound caps retained raw keys. The focused
+A2A test fell from 22.87 to 6.91 seconds outside the profiler; under profiling,
+function calls fell from 118.68 million in 63.28 seconds to 19.65 million in
+22.66 seconds. The complete exact local lane then selected 2,222 tests, closed
+with 2,217 passed, five skipped, and 230 passed subtests, and took 151.75
+seconds with 574.47 aggregate shard-seconds. Its four-worker lower bound was
+143.62 seconds, so only 8.13 seconds remained above the observed work bound.
+
 ## Options considered
 
 - Retain the serial gate and optimize only individual tests.
@@ -67,6 +173,16 @@ the exact `sys.executable` preserves the admitted interpreter environment.
 - Use xdist `worksteal` with four bounded workers.
 - Run one serial fork-sensitive lane beside xdist for the remaining tests.
 - Run bounded, process-isolated shards with exact union proof.
+- Overlap every independent preflight probe inside each outer shard.
+- Keep production preflight exact while stratifying transport sentinels from
+  semantic runtime tests through a fork-inherited fixture double.
+- Let deterministic tests reach deployed advisory services and fall back after
+  a network timeout.
+- Supply contract-shaped advisory inputs inside tests whose claim is local
+  review-packet or runtime semantics, retaining live service proof elsewhere.
+- Repeat Draft 2020-12 schema meta-validation on every value-validation call.
+- Cache schema proof by path or file metadata, or share compiled validators.
+- Memoize only successful meta-validation keyed by exact bounded schema bytes.
 - Use an unbounded worker count derived from every visible logical CPU.
 
 ## Decision
@@ -92,6 +208,28 @@ explicit process scheduler refuses targeted arguments rather than inventing a
 second partition contract. `ABYSS_STACK_TEST_SCHEDULER=serial` remains the exact
 full-selection rollback and independent sequential oracle.
 
+The external Codex production runtime still executes every admitted probe and
+repeats the complete preflight in the worker. Its independent probes may
+overlap only as separate process groups with their existing timeout, cleanup,
+and fail-closed results. Test fixtures separate that transport proof from
+unrelated semantic assertions: named exact cases execute production preflight,
+while the remaining cases replace only the fixture instance's successful
+`_codex_preflight` result. No environment switch, launch field, runtime profile,
+or installed surface can select the test double.
+
+Default deterministic tests must likewise provide their advisory trace when
+their assertion is about local runtime or review-packet semantics. They may not
+probe a deployed service incidentally and then accept a timeout fallback as
+test setup. Live advisory integration remains a separate explicit evidence
+lane.
+
+Schema loading may memoize only successful Draft 2020-12 meta-validation for
+the complete raw bytes of schemas no larger than 512 KiB, with at most 64 keys.
+Every load rereads the file and returns a freshly parsed mapping; every value
+validation still executes. Changed bytes, invalid schemas, and larger schemas
+take the fail-closed uncached path. The runtime does not cache by pathname or
+metadata and does not share compiled validator instances.
+
 ## Rationale
 
 The chosen scheduler matches the four-CPU runner while avoiding xdist's
@@ -105,6 +243,23 @@ large-file tail, and duration hints close the remaining scheduling imbalance.
 Because baseline, assignment, observation, and aggregate proof are independent
 of the hints, future timing drift can only reduce speed; it cannot hide tests.
 A bounded count also prevents accidental fan-out on high-core developer hosts.
+Once that queue is within one percent of its duration lower bound, further
+scheduler tuning is not treated as the default answer: the owning slow test or
+runtime operation must be profiled and changed under its own contract.
+
+Inner concurrency is not free capacity. The public counterexample shows that a
+locally faster nested fan-out can slow an already saturated four-worker queue.
+Transport stratification removes repeated setup only where the test's claim is
+about lifecycle or authority semantics, while explicit exact sentinels retain
+the real containment and credential claims. This moves the test boundary
+instead of weakening the runtime boundary.
+
+Schema validity is a property of exact bytes, while application validity is a
+property of each value. Separating those claims removes repeated meta-schema
+work from both tests and real external-Codex session transitions without
+reusing a parsed mutable mapping or suppressing any value check. Exact-byte
+keys also make content drift self-invalidating without trusting filesystem
+timestamps.
 
 ## Consequences
 
@@ -118,12 +273,25 @@ A bounded count also prevents accidental fan-out on high-core developer hosts.
   races visible; both remain blocking failures until repaired and re-proved.
 - Positive: an early failed shard remains diagnosable from the final bounded
   log tail, avoiding a second full run merely to recover its traceback.
+- Positive: semantic external-agent tests retain admission/worker call topology
+  without paying for five real transport probes at every unrelated assertion.
+- Positive: exact preflight, nested sandbox, credential, timeout, cleanup, and
+  full-lifecycle claims remain tied to real-process tests.
+- Positive: deterministic Agent OS and review-packet tests no longer vary with
+  deployed advisory health or wait through its network timeout.
+- Positive: repeated runtime state, result, event, continuation, review, and A2A
+  validations reuse only an exact-byte schema-validity proof while every value
+  remains checked.
 - Positive: no extra scheduler dependency is installed, and exact serial
   execution remains one environment switch away.
 - Tradeoff: each shard is a fresh pytest process, so import cost is higher than
   persistent workers; file-aware units bound that cost.
 - Tradeoff: timing hints need occasional refresh as slow-test topology changes,
   but stale hints affect performance only.
+- Tradeoff: a new test whose claim depends on live preflight must opt into the
+  exact fixture path; reviews must reject a semantic double for that claim.
+- Tradeoff: each runtime process can retain at most 64 schema byte strings of up
+  to 512 KiB; larger schemas deliberately receive no cache benefit.
 - Follow-up: require green exact-head PR and postmerge runs on the public runner,
   compare repeat distributions, and use the serial oracle before classifying a
   scheduler-specific failure.
@@ -135,12 +303,18 @@ A bounded count also prevents accidental fan-out on high-core developer hosts.
 - `docs/validation/COMMAND_AUTHORITY.md`
 - `docs/testing/TEST_TOPOLOGY.md`
 - `.github/workflows/validate-stack.yml`
+- `mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py`
+- `mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md`
 - `mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py`
 - `mechanics/runtime-lifecycle/parts/logs-status/tests/test_optimization_audit_status.py`
 
 ## Follow-up route
 
-The next validation pass should use GitHub timings and shard receipts to refresh
-duration hints or decompose remaining long subprocess tests. A future multi-job
-DAG must still prove the same complete selection and final sufficiency; it must
-not replace the serial oracle or hide failed owner evidence.
+Landing requires a green exact-head public proof of the bounded schema cache,
+followed by a postmerge run and real-session observation. The current local
+queue is already within 5.7 percent of its observed four-worker work bound, so
+the next speed investigation should profile the remaining 70-second shard and
+real session transitions instead of refreshing duration hints without measured
+queue imbalance. A future multi-job DAG must still prove the same complete
+selection and final sufficiency; it must not replace the serial oracle or hide
+failed owner evidence.

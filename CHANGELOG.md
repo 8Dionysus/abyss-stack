@@ -9,6 +9,16 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Shorten external Codex admission without caching or dropping proof: the
+  independent version, login, model-catalog, subreaper, and nested-sandbox
+  probes now overlap in bounded process-isolated groups with exact timeout and
+  descendant cleanup. The deterministic suite keeps real transport,
+  credential, containment, and full-lifecycle sentinels while unrelated
+  lifecycle/authority cases use a fork-inherited fixture-only successful
+  preflight double, preserving production admission and worker revalidation.
+  Agent OS and governed review-packet semantic tests now inject their bounded
+  advisory trace instead of silently calling a deployed endpoint and waiting
+  through its timeout fallback; explicit live evidence remains separate.
 - Admit a created or deleted structural parent directory in an external
   actor's final workspace delta only when the same exact delta contains a
   strict descendant whose own change is already authorized. Normal closeout,
@@ -511,6 +521,11 @@ Tracking starts with the community-docs baseline for this repository.
   selection, and final-verdict proofs. Duration hints affect order only; the
   explicit serial oracle remains available, and no xdist control thread enters
   fork-sensitive tests.
+- External Codex runtime validation now memoizes only successful Draft 2020-12
+  meta-validation keyed by exact bounded schema bytes. Files are still reread
+  and freshly parsed, changed or invalid bytes fail closed, and every runtime
+  value remains validated; repeated session and A2A transitions avoid the
+  previous redundant meta-schema traversal.
 - `Repo Validation` now runs branch candidates through the pull-request event
   only, retains the full postmerge `main` push proof, and cancels only an
   obsolete in-progress run for the same PR or ref when a newer head arrives.

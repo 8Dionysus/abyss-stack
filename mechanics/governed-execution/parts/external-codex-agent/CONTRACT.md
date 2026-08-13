@@ -358,7 +358,15 @@ route. Preflight also performs one network-disabled `codex sandbox -P` command
 through the outer read-only bind contour, so nested bubblewrap
 compatibility is exercised rather than inferred from installed files. Its exact
 mount-wrapper and mount-launcher digests are retained and rechecked before
-supervisor launch. Inference additionally binds the exact open actor workspace
+supervisor launch. The three independent Codex metadata probes run
+concurrently as distinct start-new-session supervisor process groups; after
+their outputs are admitted, the independent subreaper and masked nested-sandbox
+probes do the same. Every probe retains its own timeout, verified executable
+route, stdout/stderr result, and deterministic failure class. Admission waits
+for the complete group, and any incomplete group is terminated and reaped by
+exact process-group identity before the error can return. This changes only
+latency: no probe, worker repetition, digest check, or fail-closed result is
+removed. Inference additionally binds the exact open actor workspace
 descriptor and never re-resolves the host pathname in the child. The retained
 controller descriptor plus final pathname identity check turns a same-UID
 replacement into typed authority-blocked evidence.

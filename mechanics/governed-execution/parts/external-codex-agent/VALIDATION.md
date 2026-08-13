@@ -35,6 +35,30 @@ python scripts/generate_decision_indexes.py --check
 python scripts/validate_nested_agents.py
 ```
 
+The deterministic suite separates transport sentinels from unrelated semantic
+cases without exposing a runtime bypass. Fixtures selecting
+`exact_preflight=True` execute the production path for executable pathname
+replacement, nested Codex sandbox, missing role-scoped MCP credentials, and the
+complete preflight/start/worker lifecycle. Probe-group tests directly exercise
+overlap, timeout cleanup, and completed-sibling descendant cleanup. Other
+lifecycle, report, evidence, and authority cases bind a successful
+contract-shaped `_codex_preflight` double to the test runtime instance only.
+Because the worker is forked, the double traverses the same admission and worker
+revalidation call sites; second-return drift tests still prove the repetition.
+No launch field, profile, environment variable, installed wrapper, or
+production source path can select this test-only double. Any test whose verdict
+depends on live preflight must use the exact fixture path.
+
+Runtime schema loading retains a separate fail-closed optimization. Every load
+still reads the named file, parses its current bytes into a fresh mapping, and
+runs the requested value validation. Only a successful Draft 2020-12
+meta-validation is memoized, keyed by the complete schema bytes, for at most 64
+schemas no larger than 512 KiB. Changed bytes are a cache miss, invalid schemas
+are rejected again because exceptions are not cached, and larger schemas always
+take the uncached meta-validation path. The focused cache regression proves all
+of those boundaries, including that callers never receive a shared mutable
+schema object.
+
 The focused suite uses disposable Git repositories and a fake Codex-compatible
 binary. It proves exact fixture admission plus separate owner-contour semantic
 admission against pinned `aoa-agents` and `aoa-skills` schemas, a neutral
@@ -53,7 +77,9 @@ ceilings, secret-shaped ignored input refusal including conventional
 credential-config dotfiles before hashing or direct reads, complete runtime-wide forbidden-set admission plus subset-resistant
 terminal classification, direct secret-path encoder classification, exact-open-inode
 Codex preflight and inference execution across a pathname replacement plus
-pre-exec digest-drift refusal, and a real historical outer-bubblewrap plus inner
+pre-exec digest-drift refusal, bounded process-isolated overlap of independent
+preflight probes with exact timeout cleanup and no shared controller thread,
+and a real historical outer-bubblewrap plus inner
 named Codex-sandbox preflight command. The mount-wrapper and mount-launcher
 checks also prove the descriptor-bound inference contour. The projection slice
 proves an admitted Git baseline is copied through open descriptors, receives a

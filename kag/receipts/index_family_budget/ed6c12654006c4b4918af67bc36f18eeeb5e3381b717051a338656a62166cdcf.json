@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 23934535,
+  "allowed_tracked_bytes": 34889870,
+  "approved_by": "repository-owner",
+  "base_ref": "754990eb4ffbfd6c6c328b6311ebbeb5bd634d88",
+  "changed_generated_bytes": 23934535,
+  "changed_generated_files": 256,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "ed6c12654006c4b4918af67bc36f18eeeb5e3381b717051a338656a62166cdcf",
+  "reason": "Refresh the exact CI-pinned portable family after overlapping independent external Codex preflight probes with exact process-group cleanup, without raising standing budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34889870,
+  "tracked_bytes_max": 24117248
+}

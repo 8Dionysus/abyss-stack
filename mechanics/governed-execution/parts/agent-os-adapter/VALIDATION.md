@@ -14,8 +14,10 @@ python scripts/validate_nested_agents.py
 
 The focused suite uses a disposable Git repository, the real governed runner,
 typed A2A and owner degradation artifacts, injected safe
-gate/advisory/proposal providers, and subprocess restores over the public
-bridge executable. The subprocess proof supplies a deliberately spoofed
+gate/advisory/proposal and review-packet-trace providers, and subprocess
+restores over the public bridge executable. The deterministic suite never calls
+the live advisory endpoint; dedicated live receipts remain separate evidence.
+The subprocess proof supplies a deliberately spoofed
 `PYTHONPATH`; the explicit interpreter and `-I` must still select the packaged
 SDK. Each golden success path starts with the installed public compiler v3
 chain and reaches the bridge without post-compilation plan mutation. A release
