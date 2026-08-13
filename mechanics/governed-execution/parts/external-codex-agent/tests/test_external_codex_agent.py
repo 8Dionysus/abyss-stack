@@ -818,6 +818,14 @@ if "FAKE_OUT_OF_SCOPE_SOURCE_EVIDENCE" in task["objective"]:
     }]
 if "FAKE_VALID_IMMUTABLE_EVIDENCE" in task["objective"]:
     report["transition"]["evidence_refs"] = ["immutable:fixture-readme#L1"]
+if "FAKE_MIXED_NESTED_EVIDENCE" in task["objective"]:
+    report["transition"]["evidence_refs"] = ["immutable:fixture-readme#L1"]
+    report["findings"] = [{
+        "category": "mixed-nested-evidence",
+        "evidence_refs": ["source:README.md#L1"],
+        "severity": "info",
+        "summary": "The fixture binds both immutable and source evidence.",
+    }]
 if "FAKE_DUPLICATE_EVIDENCE_REFS" in task["objective"]:
     report["transition"]["evidence_refs"] = [
         "source:README.md#L1",
@@ -843,6 +851,10 @@ if "FAKE_OPAQUE_EVIDENCE" in task["objective"]:
 if "FAKE_VALID_RUNTIME_FINAL_MANIFEST_EVIDENCE" in task["objective"]:
     report["transition"]["evidence_refs"] = [
         "runtime:workspace-final-manifest#content_entries"
+    ]
+if "FAKE_VALID_RUNTIME_FINAL_MANIFEST_LINE_EVIDENCE" in task["objective"]:
+    report["transition"]["evidence_refs"] = [
+        "runtime:workspace-final-manifest#L1"
     ]
 if "FAKE_VALID_RUNTIME_FINAL_MANIFEST_PATH_EVIDENCE" in task["objective"]:
     report["transition"]["evidence_refs"] = [
@@ -6371,6 +6383,403 @@ def test_stable_immutable_input_evidence_is_admitted(tmp_path: Path) -> None:
 
     assert terminal["status"] == "completed"
     assert result is not None and result["failure_code"] is None
+
+
+def test_nested_evidence_namespace_closes_exact_producer_graph(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker="FAKE_MIXED_NESTED_EVIDENCE",
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "completed"
+    assert result is not None and result["failure_code"] is None
+    session = runtime._session_dir(fixture["session_id"])
+    state = json.loads((session / "state.json").read_text(encoding="utf-8"))
+
+    def review_input(input_id: str, path: Path) -> dict[str, Any]:
+        raw = path.read_bytes()
+        return {
+            "input_id": input_id,
+            "raw": raw,
+            "provenance": {
+                "owner_repo": "fixture",
+                "artifact_ref": input_id,
+                "source_ref": fixture["session_id"],
+                "artifact_digest": RUNTIME.sha256_bytes(raw),
+                "schema_ref": "task-local/nested-evidence-test-v1",
+                "schema_version": "task-local-nested-evidence-test-v1",
+            },
+        }
+
+    upstream_readme = next(
+        item
+        for item in state["materialized_task_inputs"]
+        if item["input_id"] == "fixture-readme"
+    )
+    collision_path = tmp_path / "reviewer-fixture-readme.json"
+    collision_path.write_text('{"reviewer":"different-bytes"}\n', encoding="utf-8")
+    inputs = [
+        review_input("writer-task", session / "inputs/task.json"),
+        review_input("writer-result", session / "result.json"),
+        review_input(
+            "writer-report",
+            Path(str(result["report_ref"]["artifact_ref"])),
+        ),
+        review_input("writer-delta", session / "actor-delta.json"),
+        review_input(
+            "writer-fixture-readme",
+            Path(str(upstream_readme["path"])),
+        ),
+        review_input("fixture-readme", collision_path),
+    ]
+    review_task_digest = "sha256:" + "1" * 64
+    assert (
+        RUNTIME.build_nested_evidence_namespace(
+            review_task_id="task:nested-evidence-partial-review",
+            review_task_digest=review_task_digest,
+            immutable_inputs=tuple(
+                item for item in inputs if item["input_id"] != "writer-delta"
+            ),
+        )
+        is None
+    )
+    namespace = RUNTIME.build_nested_evidence_namespace(
+        review_task_id="task:nested-evidence-review",
+        review_task_digest=review_task_digest,
+        immutable_inputs=inputs,
+    )
+
+    assert namespace is not None
+    assert namespace["status"] == "closed"
+    assert namespace["review_task_digest"] == review_task_digest
+    assert namespace["summary"]["unresolved"] == 0
+    assert namespace["summary"]["immutable_exact"] >= 1
+    assert namespace["summary"]["source_exact"] >= 1
+    assert namespace["summary"]["same_name_digest_collisions"] >= 1
+    assert namespace["namespace_digest"] == (
+        RUNTIME.nested_evidence_namespace_digest(namespace)
+    )
+    RUNTIME.validate_json(
+        namespace,
+        RUNTIME.NESTED_EVIDENCE_NAMESPACE_SCHEMA_PATH,
+        label="test nested evidence namespace",
+    )
+    entries = [
+        entry
+        for producer in namespace["producers"]
+        for entry in producer["entries"]
+    ]
+    immutable_entry = next(
+        entry
+        for entry in entries
+        if entry["original_ref"].startswith("immutable:fixture-readme#")
+    )
+    assert immutable_entry["resolution"]["target_input_id"] == (
+        "writer-fixture-readme"
+    )
+    assert immutable_entry["same_name_digest_collision"] is True
+    assert immutable_entry["resolution"]["anchored_excerpt"]
+    assert re.fullmatch(
+        r"sha256:[0-9a-f]{64}",
+        immutable_entry["resolution"]["anchored_excerpt_digest"],
+    )
+
+    namespace_path = tmp_path / "nested-evidence-namespace.json"
+    _write_json(namespace_path, namespace)
+    runtime_ref = (
+        "runtime:nested-evidence-namespace#" + immutable_entry["entry_id"]
+    )
+    RUNTIME._validate_runtime_evidence_ref(
+        runtime_ref,
+        {"nested-evidence-namespace": namespace_path},
+    )
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME._validate_runtime_evidence_ref(
+            "runtime:nested-evidence-namespace#nested-evidence-000000000000000000000000",
+            {"nested-evidence-namespace": namespace_path},
+        )
+    assert exc_info.value.code == "model_report_runtime_evidence_anchor_invalid"
+
+    duplicate_upstream = dict(
+        next(
+            item
+            for item in inputs
+            if item["input_id"] == "writer-fixture-readme"
+        )
+    )
+    duplicate_upstream["input_id"] = "duplicate-writer-fixture-readme"
+    with pytest.raises(RUNTIME.NestedEvidenceNamespaceError, match="2 exact"):
+        RUNTIME.build_nested_evidence_namespace(
+            review_task_id="task:nested-evidence-review",
+            review_task_digest=review_task_digest,
+            immutable_inputs=(*inputs, duplicate_upstream),
+        )
+
+    producer_readme = Path(str(result["actor_projection_path"])) / "README.md"
+    producer_readme.write_text("drift after producer result\n", encoding="utf-8")
+    with pytest.raises(
+        RUNTIME.NestedEvidenceNamespaceError,
+        match="producer source bytes drifted",
+    ):
+        RUNTIME.build_nested_evidence_namespace(
+            review_task_id="task:nested-evidence-review",
+            review_task_digest=review_task_digest,
+            immutable_inputs=inputs,
+        )
+
+
+@pytest.mark.parametrize(
+    ("marker", "workspace_write", "expected_kind"),
+    (
+        (
+            "FAKE_VALID_RUNTIME_FINAL_MANIFEST_EVIDENCE",
+            False,
+            "producer-final-workspace-manifest-exact",
+        ),
+        (
+            "FAKE_VALID_RUNTIME_FINAL_MANIFEST_LINE_EVIDENCE",
+            False,
+            "producer-final-workspace-manifest-exact",
+        ),
+        (
+            "FAKE_WRITE_ALLOWED FAKE_ARTIFACT_PRODUCED "
+            "FAKE_VALID_RUNTIME_FINAL_MANIFEST_PATH_EVIDENCE",
+            True,
+            "producer-final-workspace-output-exact",
+        ),
+    ),
+)
+def test_nested_evidence_namespace_preserves_all_runtime_manifest_anchors(
+    tmp_path: Path,
+    marker: str,
+    workspace_write: bool,
+    expected_kind: str,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker=marker,
+        role_id="coder" if workspace_write else "architect",
+        task_family="landing_preparation" if workspace_write else "capability_eval",
+        workspace_write=workspace_write,
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "completed"
+    assert result is not None and result["failure_code"] is None
+    session = runtime._session_dir(fixture["session_id"])
+
+    def review_input(input_id: str, path: Path) -> dict[str, Any]:
+        raw = path.read_bytes()
+        return {
+            "input_id": input_id,
+            "raw": raw,
+            "provenance": {
+                "owner_repo": "fixture",
+                "artifact_ref": input_id,
+                "source_ref": fixture["session_id"],
+                "artifact_digest": RUNTIME.sha256_bytes(raw),
+                "schema_ref": "task-local/nested-manifest-test-v1",
+                "schema_version": "task-local-nested-manifest-test-v1",
+            },
+        }
+
+    inputs = [
+        review_input("writer-task", session / "inputs/task.json"),
+        review_input("writer-result", session / "result.json"),
+        review_input(
+            "writer-report",
+            Path(str(result["report_ref"]["artifact_ref"])),
+        ),
+        review_input("writer-delta", session / "actor-delta.json"),
+    ]
+    if workspace_write:
+        inputs.append(
+            review_input(
+                "writer-output",
+                Path(str(result["actor_projection_path"])) / "landing-note.md",
+            )
+        )
+    namespace = RUNTIME.build_nested_evidence_namespace(
+        review_task_id="task:nested-runtime-manifest-review",
+        review_task_digest="sha256:" + "2" * 64,
+        immutable_inputs=inputs,
+    )
+
+    assert namespace is not None
+    runtime_entries = [
+        entry
+        for producer in namespace["producers"]
+        for entry in producer["entries"]
+        if entry["original_ref"].startswith(
+            "runtime:workspace-final-manifest#"
+        )
+    ]
+    assert len(runtime_entries) == 1
+    assert runtime_entries[0]["resolution"]["kind"] == expected_kind
+    assert namespace["summary"]["runtime_exact"] == 1
+
+
+def test_independent_review_materializes_nested_evidence_before_inference(
+    tmp_path: Path,
+) -> None:
+    writer = _fixture(
+        tmp_path / "writer",
+        identity_suffix="nested-evidence-writer",
+        objective_marker="FAKE_MIXED_NESTED_EVIDENCE",
+    )
+    writer_runtime = writer["runtime"]
+    writer_runtime.start(writer["launch_path"])
+    writer_terminal = _wait_terminal(writer_runtime, writer["session_id"])
+    writer_result = writer_runtime.result(writer["session_id"])
+
+    assert writer_terminal["status"] == "completed"
+    assert writer_result is not None and writer_result["failure_code"] is None
+    writer_session = writer_runtime._session_dir(writer["session_id"])
+    writer_state = json.loads(
+        (writer_session / "state.json").read_text(encoding="utf-8")
+    )
+    writer_readme = next(
+        item
+        for item in writer_state["materialized_task_inputs"]
+        if item["input_id"] == "fixture-readme"
+    )
+
+    def forwarded(
+        input_id: str,
+        path: Path,
+        schema_version: str,
+    ) -> tuple[str, Path, ProvenanceRef]:
+        return (
+            input_id,
+            path,
+            _provenance(
+                "abyss-stack",
+                f"nested-evidence/{input_id}",
+                digest=_digest_path(path),
+                schema_ref=f"task-local/{schema_version}",
+                schema_version=schema_version,
+            ),
+        )
+
+    reviewer = _fixture(
+        tmp_path / "reviewer",
+        identity_suffix="nested-evidence-reviewer",
+        task_family="landing_review",
+        parent_task_id=writer["task_id"],
+        shared_workspace=writer["workspace"],
+        extra_immutable_inputs=(
+            forwarded(
+                "writer-task",
+                writer_session / "inputs/task.json",
+                "abyss_stack_external_codex_task_v1",
+            ),
+            forwarded(
+                "writer-result",
+                writer_session / "result.json",
+                "abyss_stack_external_codex_result_v2",
+            ),
+            forwarded(
+                "writer-report",
+                Path(str(writer_result["report_ref"]["artifact_ref"])),
+                "abyss_stack_external_codex_report_v1",
+            ),
+            forwarded(
+                "writer-delta",
+                writer_session / "actor-delta.json",
+                "abyss_stack_external_codex_actor_delta_v1",
+            ),
+            forwarded(
+                "writer-fixture-readme",
+                Path(str(writer_readme["path"])),
+                "abyss_stack_external_codex_actor_input_envelope_v1",
+            ),
+        ),
+    )
+    reviewer_runtime = reviewer["runtime"]
+    reviewer_runtime.start(reviewer["launch_path"])
+    reviewer_terminal = _wait_terminal(
+        reviewer_runtime,
+        reviewer["session_id"],
+    )
+    reviewer_result = reviewer_runtime.result(reviewer["session_id"])
+
+    assert reviewer_terminal["status"] == "completed"
+    assert reviewer_result is not None and reviewer_result["failure_code"] is None
+    reviewer_session = reviewer_runtime._session_dir(reviewer["session_id"])
+    reviewer_state = json.loads(
+        (reviewer_session / "state.json").read_text(encoding="utf-8")
+    )
+    namespace_ref = reviewer_state["nested_evidence_namespace_ref"]
+    namespace_path = Path(str(namespace_ref["artifact_ref"]))
+    namespace = json.loads(namespace_path.read_text(encoding="utf-8"))
+    assert namespace_ref["artifact_digest"] == _digest_path(namespace_path)
+    assert namespace["summary"]["unresolved"] == 0
+    assert namespace["summary"]["immutable_exact"] >= 1
+    assert namespace["summary"]["source_exact"] >= 1
+    assert namespace["summary"]["validation_exact"] >= 1
+    assert namespace["summary"]["same_name_digest_collisions"] >= 1
+    prompt = (
+        reviewer_session / "attempts/001/prompt.txt"
+    ).read_text(encoding="utf-8")
+    assert "<nested_evidence_namespace>" in prompt
+    assert namespace["namespace_digest"] in prompt
+    assert "same-name digest collision" in prompt
+    execution_schema = json.loads(
+        Path(
+            str(reviewer_state["execution_result_schema_ref"]["artifact_ref"])
+        ).read_text(encoding="utf-8")
+    )
+    evidence_pattern = execution_schema["properties"]["transition"][
+        "properties"
+    ]["evidence_refs"]["items"]["pattern"]
+    entry_id = namespace["producers"][0]["entries"][0]["entry_id"]
+    assert re.fullmatch(
+        evidence_pattern,
+        f"runtime:nested-evidence-namespace#{entry_id}",
+    )
+
+
+def test_nested_evidence_model_only_fallback_is_exact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(RUNTIME.NESTED_EVIDENCE_ENV, "off")
+
+    def refuse_namespace(**_kwargs: Any) -> dict[str, Any]:
+        raise AssertionError("namespace builder must be bypassed in rollback mode")
+
+    monkeypatch.setattr(
+        RUNTIME,
+        "build_nested_evidence_namespace",
+        refuse_namespace,
+    )
+    fixture = _fixture(
+        tmp_path,
+        identity_suffix="nested-evidence-model-only-fallback",
+        task_family="landing_review",
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "completed"
+    assert result is not None and result["failure_code"] is None
+    state = json.loads(
+        (
+            runtime._session_dir(fixture["session_id"]) / "state.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert state["nested_evidence_namespace_ref"] is None
 
 
 def test_exact_duplicate_evidence_refs_are_idempotent_and_preserved(

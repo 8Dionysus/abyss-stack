@@ -61,6 +61,10 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         "import aoa_sdk\nprint('agent:' + aoa_sdk.MARKER)\n",
         encoding="utf-8",
     )
+    (part / "external_codex_nested_evidence.py").write_text(
+        "SCHEMA_VERSION = 'fixture'\n",
+        encoding="utf-8",
+    )
     (part / "bind_external_actor_launch.py").write_text(
         "import aoa_sdk\n"
         "with open('/dev/null', 'rb+') as null:\n"

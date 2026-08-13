@@ -98,6 +98,9 @@
     "review_seed_envelope_ref": {
       "oneOf": [{"type": "null"}, {"$ref": "#/$defs/artifactRef"}]
     },
+    "nested_evidence_namespace_ref": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/artifactRef"}]
+    },
     "materialized_inputs": {
       "type": "object",
       "additionalProperties": false,

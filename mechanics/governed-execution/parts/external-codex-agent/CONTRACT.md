@@ -603,6 +603,23 @@ anchor must name either one exact top-level JSON member or one exact
 `source_git_head`, and partial path matches, are false anchors. Arbitrary
 runtime paths or aliases remain inadmissible.
 
+An independent reviewer may also receive one controller-generated
+`nested-evidence-namespace` derivative when its immutable packet contains a
+complete earlier producer graph. Each entry binds the producer task/result/
+report/delta digests, the exact artifact occurrence, and either an exact
+upstream actor-envelope digest, a final-manifest source digest plus anchored
+excerpt, an exact final-manifest line/member/content-entry value, a delta-bound
+output, or a recorded validation observation. Matching
+an alias by name is forbidden: the producer's original source digest must lead
+to one and only one current envelope. A packet without the complete producer
+task/result/report/delta/output envelope stays on the prior model-only route;
+it never receives a partial namespace. Once a complete graph is admitted, any
+missing, ambiguous, drifted, or out-of-scope nested edge rejects the review
+before inference. A model may cite a
+closed entry as `runtime:nested-evidence-namespace#<entry-id>`, but must still
+judge the semantic claim independently; the derivative neither rewrites prior
+artifacts nor creates owner truth.
+
 Evidence-reference arrays are non-empty and every occurrence is independently
 resolved against its exact source, immutable-input, or runtime-owned bytes.
 Because the admitted Structured Outputs subset cannot express `uniqueItems`, an

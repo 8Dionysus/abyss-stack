@@ -100,6 +100,16 @@ The controller resolves that identity only to the manifest it writes during
 the same attempt's finalization. This makes post-exit state citable without
 turning an arbitrary runtime path into evidence.
 
+Nested-review evidence keeps the same asymmetry. The original producer task,
+result, report, output, actor delta, final manifest, upstream actor envelope,
+and source bytes remain stronger than the controller-generated namespace. The
+namespace is a content-addressed navigation and validation receipt over those
+exact objects; it carries anchored excerpts so a reviewer need not substitute
+newer workspace bytes for historical source. It grants no alias-rewrite,
+source-rewrite, acceptance, proof, or domain authority.
+Incomplete historical producer envelopes do not create partial namespace
+authority: the controller preserves the existing model-only reviewer route.
+
 `prepare_landing_study.py` verifies that the imported `aoa_sdk` package,
 `compile_run_plan`, and every loaded `aoa_sdk` module or package path live
 beneath the exact `--aoa-sdk-root/src/aoa_sdk` named by the caller. Hashing one

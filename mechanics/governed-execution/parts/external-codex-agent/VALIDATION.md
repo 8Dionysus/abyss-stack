@@ -17,6 +17,7 @@ python -m py_compile \
   scripts/aoa-external-actor-bind \
   mechanics/governed-execution/parts/external-codex-agent/bind_external_actor_launch.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py \
+  mechanics/governed-execution/parts/external-codex-agent/external_codex_nested_evidence.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_mount_launcher.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py \
   mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py \
@@ -211,7 +212,12 @@ provenance checks for all loaded `aoa_sdk` modules in the study preparer plus a
 post-compilation persisted
 path inventory, produced-artifact admission, source-evidence file/line
 validation including a source scope wider than mutation scope, reserved
-runtime final-manifest evidence with false-anchor refusal, signal-notified
+runtime final-manifest evidence with false-anchor refusal, pre-inference
+digest-bound nested evidence closure across producer task/result/report/delta,
+same-name digest-collision disambiguation, historical source excerpts,
+validation observations, line/member/content-entry/output manifest anchors,
+partial-producer model-only fallback, ambiguity/drift refusal, and
+runtime namespace-entry citation, signal-notified
 steady-state supervisor waiting, status-selected
 wake binding, failed-reviewer A2A refusal, absence of an outer namespace that
 would conflict with Codex sandboxing (the filesystem boundary uses rootless

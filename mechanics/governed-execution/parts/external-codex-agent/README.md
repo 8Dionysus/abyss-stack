@@ -240,6 +240,17 @@ The controller:
   symbolic anchors on that JSON artifact name either an exact top-level member
   or an exact `content_entries[].path`, never an arbitrary byte substring,
   while bounded line anchors retain their ordinary meaning;
+- before an independent reviewer starts, closes any nested writer evidence
+  graph through the exact admitted producer task, result, report, actor delta,
+  final manifest, upstream actor envelopes, validation observations, and
+  anchored historical source bytes. Exact historical final-manifest line,
+  member, content-entry, and delta-bound output anchors remain admissible. An
+  incomplete producer envelope retains the unchanged model-only route instead
+  of exposing a partial namespace. The controller exposes the resulting
+  read-only derivative as `runtime:nested-evidence-namespace#<entry-id>`;
+  digest collisions, ambiguity, drift, or an invalid anchor fail before model
+  inference. The namespace never rewrites the signed/content-addressed writer
+  artifact and never replaces source or owner authority;
 - binds every validation claim to an exact observed argv/exit state and the
   workspace-manifest digest observed when that command completed. Every
   receipt normally matches the final manifest; when transient command-sandbox
