@@ -1873,8 +1873,14 @@ def _session_token(session_id: str) -> str:
 
 
 def _relative_path_is_allowed(path: str, allowed: Sequence[str]) -> bool:
-    def safe_parts(value: str) -> tuple[str, ...] | None:
-        if not value or value.startswith("/") or "\\" in value or "\0" in value:
+    def safe_parts(value: Any) -> tuple[str, ...] | None:
+        if (
+            not isinstance(value, str)
+            or not value
+            or value.startswith("/")
+            or "\\" in value
+            or "\0" in value
+        ):
             return None
         parts = tuple(value.split("/"))
         if any(part in {"", ".", ".."} for part in parts):
@@ -1893,6 +1899,85 @@ def _relative_path_is_allowed(path: str, allowed: Sequence[str]) -> bool:
         if path_parts[: len(candidate_parts)] == candidate_parts:
             return True
     return False
+
+
+def _actor_delta_change_is_allowed(
+    change: Mapping[str, Any],
+    allowed: Sequence[str],
+    *,
+    peer_changes: Sequence[Mapping[str, Any]] = (),
+) -> bool:
+    """Admit one actor-delta entry under the exact path authority relation.
+
+    ``allowed_paths`` names the actor's semantic mutation surface.  Creating
+    ``actor-output/result.json`` necessarily creates ``actor-output`` when the
+    source tree does not already contain it.  The manifest records both
+    entries, so treating the directory entry as a separate scope expansion
+    makes the explicitly admitted file impossible to produce.
+
+    Only created or deleted *directories* may use this structural-ancestor
+    rule, and only when ``peer_changes`` contains an actually changed,
+    ordinarily allowed descendant.  Files, symlinks, type changes, mode
+    changes, and sibling paths must still match the ordinary descendant rule
+    exactly.  A caller that has only one compact path must not infer that it is
+    a structural ancestor.
+    """
+
+    path = change.get("path")
+    if not isinstance(path, str):
+        return False
+    if _relative_path_is_allowed(path, allowed):
+        return True
+
+    status = change.get("status")
+    if status == "created":
+        entry = change.get("after")
+    elif status == "deleted":
+        entry = change.get("before")
+    else:
+        return False
+    if not isinstance(entry, Mapping) or entry.get("kind") != "directory":
+        return False
+
+    path_parts = tuple(path.split("/"))
+    if (
+        not path
+        or path.startswith("/")
+        or "\\" in path
+        or "\0" in path
+        or any(part in {"", ".", ".."} for part in path_parts)
+    ):
+        return False
+    for peer in peer_changes:
+        peer_path = peer.get("path")
+        if not isinstance(peer_path, str):
+            continue
+        peer_parts = tuple(peer_path.split("/"))
+        if (
+            len(peer_parts) <= len(path_parts)
+            or peer_parts[: len(path_parts)] != path_parts
+        ):
+            continue
+        if _relative_path_is_allowed(peer_path, allowed):
+            return True
+    return False
+
+
+def _actor_delta_changes_out_of_scope(
+    changes: Sequence[Mapping[str, Any]], allowed: Sequence[str]
+) -> list[str]:
+    """Classify a complete exact actor delta without compact-path inference."""
+
+    peer_changes = tuple(changes)
+    return [
+        str(change.get("path", "<invalid>"))
+        for change in peer_changes
+        if not _actor_delta_change_is_allowed(
+            change,
+            allowed,
+            peer_changes=peer_changes,
+        )
+    ]
 
 
 def _workspace_artifact_path(workspace: str | Path, value: str) -> Path:
@@ -10908,6 +10993,7 @@ Runtime session identity: {state["session_id"]}
         actor_final_manifest_ref: dict[str, Any] | None = None
         source_manifest_match: bool | None = None
         source_manifest_final_ref: dict[str, Any] | None = None
+        actor_delta_changes: list[dict[str, Any]] = []
         manifest_observation_gap = False
         manifest_observation_failure_code: str | None = None
         head_drift = False
@@ -10943,6 +11029,7 @@ Runtime session identity: {state["session_id"]}
                 current_digest=final_workspace_manifest_digest,
             )
             validate_json(delta, ACTOR_DELTA_SCHEMA_PATH, label="actor delta")
+            actor_delta_changes = list(delta["changes"])
             delta_path = (
                 self._session_dir(str(state["session_id"])) / "actor-delta.json"
             )
@@ -11031,11 +11118,10 @@ Runtime session identity: {state["session_id"]}
             item.get("command") == "<unavailable>"
             for item in state["executed_commands"]
         )
-        out_of_scope_paths = [
-            item["path"]
-            for item in changed_paths
-            if not _relative_path_is_allowed(item["path"], task["allowed_paths"])
-        ]
+        out_of_scope_paths = _actor_delta_changes_out_of_scope(
+            actor_delta_changes,
+            task["allowed_paths"],
+        )
         read_only_drift = task["allowed_effect_class"] == "read_only" and (
             actor_manifest_match is False
             or (actor_manifest_match is None and bool(changed_paths))
@@ -11323,6 +11409,7 @@ Runtime session identity: {state["session_id"]}
         actor_baseline_ref = state.get("actor_baseline_manifest_ref")
         actor_final_ref: dict[str, Any] | None = None
         source_final_ref: dict[str, Any] | None = None
+        actor_delta_changes: list[dict[str, Any]] = []
         changed_paths: list[dict[str, str]] = []
         try:
             if isinstance(actor_baseline_ref, dict):
@@ -11351,12 +11438,13 @@ Runtime session identity: {state["session_id"]}
                     current_digest=canonical_digest(current_manifest),
                 )
                 validate_json(delta, ACTOR_DELTA_SCHEMA_PATH, label="actor delta")
+                actor_delta_changes = list(delta["changes"])
                 delta_path = session_dir / "actor-delta.json"
                 _atomic_write_json(delta_path, delta)
                 actor_delta_ref = _artifact_ref(delta_path)
                 changed_paths = [
                     {"path": str(item["path"]), "status": str(item["status"])}
-                    for item in delta["changes"]
+                    for item in actor_delta_changes
                 ]
                 state["actor_final_manifest_ref"] = actor_final_ref
                 state["actor_delta_ref"] = actor_delta_ref
@@ -11390,7 +11478,15 @@ Runtime session identity: {state["session_id"]}
                 f"original failure {code}: {message}; workspace manifest "
                 f"observation failed: {observation_code}: {exc}"
             )
-            code = "workspace_manifest_observation_gap"
+            code = (
+                observation_code
+                if observation_code
+                in {
+                    "actor_projection_coordinate_drift",
+                    "actor_projection_observation_gap",
+                }
+                else "workspace_manifest_observation_gap"
+            )
             state["status"] = status
             for attempt in state["attempts"]:
                 if attempt["attempt_id"] == attempt_id:
@@ -11402,11 +11498,14 @@ Runtime session identity: {state["session_id"]}
                 attempt_id=attempt_id,
                 significance="authority",
             )
-        out_of_scope_paths = [
-            item["path"]
-            for item in changed_paths
-            if not _relative_path_is_allowed(item["path"], task["allowed_paths"])
-        ]
+        out_of_scope_paths = (
+            _actor_delta_changes_out_of_scope(
+                actor_delta_changes,
+                task["allowed_paths"],
+            )
+            if actor_delta_ref is not None
+            else [str(item["path"]) for item in changed_paths]
+        )
         read_only_drift = (
             task["allowed_effect_class"] == "read_only"
             and workspace_manifest_match is False
@@ -11946,6 +12045,15 @@ Runtime session identity: {state["session_id"]}
                 / "attempts"
                 / f"{int(prior_attempt['attempt_number']):03d}"
             )
+            actor_delta: dict[str, Any] | None = None
+            if failed_terminal_followup and isinstance(
+                previous_result.get("actor_delta_ref"), dict
+            ):
+                actor_delta = _load_verified_json_ref(
+                    previous_result["actor_delta_ref"],
+                    label="prior actor delta",
+                    schema_path=ACTOR_DELTA_SCHEMA_PATH,
+                )
             failed_review_followup = False
             failed_writer_report_followup = False
             failed_capacity_followup = False
@@ -11961,7 +12069,8 @@ Runtime session identity: {state["session_id"]}
                     and isinstance(
                         previous_result.get("actor_final_manifest_ref"), dict
                     )
-                    and isinstance(previous_result.get("actor_delta_ref"), dict)
+                    and actor_delta is not None
+                    and actor_delta.get("changes") == []
                     and changed_paths == []
                     and previous_result.get("executed_commands") == []
                     and previous_result.get("turn_count") == 0
@@ -12003,14 +12112,12 @@ Runtime session identity: {state["session_id"]}
                     and isinstance(
                         previous_result.get("actor_final_manifest_ref"), dict
                     )
-                    and isinstance(previous_result.get("actor_delta_ref"), dict)
-                    and isinstance(changed_paths, list)
+                    and actor_delta is not None
+                    and isinstance(actor_delta.get("changes"), list)
                     and isinstance(allowed_paths, list)
-                    and all(
-                        isinstance(change, dict)
-                        and isinstance(change.get("path"), str)
-                        and _relative_path_is_allowed(change["path"], allowed_paths)
-                        for change in changed_paths
+                    and not _actor_delta_changes_out_of_scope(
+                        actor_delta["changes"],
+                        allowed_paths,
                     )
                 )
                 if (
