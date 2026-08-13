@@ -47,7 +47,7 @@ cleanup_canary_workers() {
   local pid
 
   for pid in "${canary_worker_pids[@]}"; do
-    kill -TERM "$pid" >/dev/null 2>&1 || true
+    kill -TERM -- "-${pid}" >/dev/null 2>&1 || true
   done
   for pid in "${canary_worker_pids[@]}"; do
     wait "$pid" >/dev/null 2>&1 || true
@@ -136,7 +136,8 @@ capture_canary_family() {
   chmod 0700 "$current_root" "$lkg_root" "$stdout_root"
   canary_worker_pids=()
   for organ in "${organs[@]}"; do
-    capture_canary_pair \
+    VENV="$VENV" setsid --wait bash -c "$(declare -f capture_canary_pair)
+capture_canary_pair \"\$@\"" _ \
       "$process_unit" "$current_root" "$lkg_root" "$stdout_root" "$organ" &
     canary_worker_pids+=("$!")
     if ((${#canary_worker_pids[@]} >= CANARY_WORKERS)); then
