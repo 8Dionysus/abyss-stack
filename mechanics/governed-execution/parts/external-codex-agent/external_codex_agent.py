@@ -1908,6 +1908,134 @@ def _terminate_owned_process_group(
         )
 
 
+def _cleanup_preflight_probe_processes(
+    processes: Sequence[tuple[subprocess.Popen[str], int | None]],
+) -> None:
+    """Stop and reap every outstanding process-isolated preflight probe."""
+
+    cleanup_error: ExternalCodexRuntimeError | None = None
+    for process, start_ticks in processes:
+        try:
+            if start_ticks is not None:
+                _terminate_owned_process_group(process.pid, start_ticks)
+            elif process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=7)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=3)
+        except (OSError, subprocess.TimeoutExpired, ExternalCodexRuntimeError) as exc:
+            if cleanup_error is None:
+                cleanup_error = ExternalCodexRuntimeError(
+                    "codex_process_cleanup_incomplete",
+                    "a preflight probe process group could not be cleaned",
+                )
+                cleanup_error.__cause__ = exc
+    for process, _start_ticks in processes:
+        try:
+            process.communicate(timeout=1)
+        except subprocess.TimeoutExpired as exc:
+            if cleanup_error is None:
+                cleanup_error = ExternalCodexRuntimeError(
+                    "codex_process_cleanup_incomplete",
+                    "a preflight probe supervisor did not become waitable",
+                )
+                cleanup_error.__cause__ = exc
+    if cleanup_error is not None:
+        raise cleanup_error
+
+
+def _run_preflight_probe_group(
+    probes: Sequence[tuple[str, Sequence[str], float]],
+    *,
+    env: Mapping[str, str],
+    failure_code: str,
+    failure_messages: Mapping[str, str],
+) -> dict[str, subprocess.CompletedProcess[str]]:
+    """Overlap independent exact probes without threads or shared workers."""
+
+    running: list[
+        tuple[
+            str,
+            list[str],
+            float,
+            subprocess.Popen[str],
+            int | None,
+        ]
+    ] = []
+    for label, raw_command, timeout_seconds in probes:
+        command = list(raw_command)
+        try:
+            process = subprocess.Popen(
+                command,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+                start_new_session=True,
+            )
+        except OSError as exc:
+            try:
+                _cleanup_preflight_probe_processes(
+                    [(item[3], item[4]) for item in running]
+                )
+            except ExternalCodexRuntimeError as cleanup_exc:
+                raise cleanup_exc from exc
+            raise ExternalCodexRuntimeError(
+                failure_code,
+                failure_messages[label],
+            ) from exc
+        started = time.monotonic()
+        start_ticks = _process_start_ticks(process.pid)
+        if start_ticks is None and process.poll() is None:
+            try:
+                _cleanup_preflight_probe_processes(
+                    [
+                        *[(item[3], item[4]) for item in running],
+                        (process, None),
+                    ]
+                )
+            except ExternalCodexRuntimeError as cleanup_exc:
+                raise cleanup_exc
+            raise ExternalCodexRuntimeError(
+                failure_code,
+                failure_messages[label],
+            )
+        running.append(
+            (label, command, started + timeout_seconds, process, start_ticks)
+        )
+
+    results: dict[str, subprocess.CompletedProcess[str]] = {}
+    for label, command, deadline, process, _start_ticks in running:
+        try:
+            if process.poll() is not None:
+                stdout, stderr = process.communicate()
+            else:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(command, 0)
+                stdout, stderr = process.communicate(timeout=remaining)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            try:
+                _cleanup_preflight_probe_processes(
+                    [(item[3], item[4]) for item in running]
+                )
+            except ExternalCodexRuntimeError as cleanup_exc:
+                raise cleanup_exc from exc
+            raise ExternalCodexRuntimeError(
+                failure_code,
+                failure_messages[label],
+            ) from exc
+        results[label] = subprocess.CompletedProcess(
+            args=command,
+            returncode=process.returncode,
+            stdout=stdout,
+            stderr=stderr,
+        )
+    return results
+
+
 def _pid_matches(pid: Any, start_ticks: Any) -> bool:
     if not isinstance(pid, int) or pid <= 1 or not isinstance(start_ticks, int):
         return False
@@ -7109,29 +7237,30 @@ class ExternalCodexRuntime:
             ("login", [str(executable), "login", "status"]),
             ("models", [str(executable), "debug", "models", "--bundled"]),
         ]
-        results: dict[str, subprocess.CompletedProcess[str]] = {}
-        for label, command in probes:
-            try:
-                completed = subprocess.run(
+        results = _run_preflight_probe_group(
+            [
+                (
+                    label,
                     self._containment_command(
                         command,
                         executable_digest=executable_digest,
                     ),
-                    text=True,
-                    capture_output=True,
-                    check=False,
-                    timeout=30,
-                    env=env,
+                    30,
                 )
-            except (OSError, subprocess.TimeoutExpired) as exc:
-                raise ExternalCodexRuntimeError(
-                    "codex_preflight_failed", f"Codex {label} probe failed"
-                ) from exc
+                for label, command in probes
+            ],
+            env=env,
+            failure_code="codex_preflight_failed",
+            failure_messages={
+                label: f"Codex {label} probe failed" for label, _command in probes
+            },
+        )
+        for label, _command in probes:
+            completed = results[label]
             if completed.returncode != 0:
                 raise ExternalCodexRuntimeError(
                     "codex_preflight_failed", f"Codex {label} probe was rejected"
                 )
-            results[label] = completed
         version = results["version"].stdout.strip()
         expected_version = (
             "codex-cli " + self.profile["model_admission"]["runtime_version"]
@@ -7170,25 +7299,6 @@ class ExternalCodexRuntime:
             [str(containment_paths["probe_executable"])],
             executable_digest=sha256_file(containment_paths["probe_executable"]),
         )
-        try:
-            contained = subprocess.run(
-                containment_probe,
-                text=True,
-                capture_output=True,
-                check=False,
-                timeout=10,
-                env=env,
-            )
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            raise ExternalCodexRuntimeError(
-                "process_containment_unavailable",
-                "Linux subreaper-supervisor containment probe failed",
-            ) from exc
-        if contained.returncode != 0:
-            raise ExternalCodexRuntimeError(
-                "process_containment_unavailable",
-                "Linux subreaper-supervisor containment probe was rejected",
-            )
         with tempfile.TemporaryDirectory(
             prefix=".external-codex-preflight-",
             dir=self.state_root,
@@ -7241,26 +7351,37 @@ class ExternalCodexRuntime:
                 "--",
                 str(containment_paths["probe_executable"]),
             ]
-            try:
-                nested = subprocess.run(
-                    self._containment_command(
-                        nested_sandbox_probe,
-                        executable_digest=executable_digest,
-                        actor_git_mask=actor_git_mask,
-                        mount_wrapper_digest=mount_wrapper_digest,
-                        mount_launcher_digest=mount_launcher_digest,
+            containment_results = _run_preflight_probe_group(
+                [
+                    ("supervisor", containment_probe, 10),
+                    (
+                        "nested_sandbox",
+                        self._containment_command(
+                            nested_sandbox_probe,
+                            executable_digest=executable_digest,
+                            actor_git_mask=actor_git_mask,
+                            mount_wrapper_digest=mount_wrapper_digest,
+                            mount_launcher_digest=mount_launcher_digest,
+                        ),
+                        30,
                     ),
-                    text=True,
-                    capture_output=True,
-                    check=False,
-                    timeout=30,
-                    env=env,
-                )
-            except (OSError, subprocess.TimeoutExpired) as exc:
+                ],
+                env=env,
+                failure_code="process_containment_unavailable",
+                failure_messages={
+                    "supervisor": (
+                        "Linux subreaper-supervisor containment probe failed"
+                    ),
+                    "nested_sandbox": "masked nested Codex sandbox preflight failed",
+                },
+            )
+            contained = containment_results["supervisor"]
+            nested = containment_results["nested_sandbox"]
+            if contained.returncode != 0:
                 raise ExternalCodexRuntimeError(
                     "process_containment_unavailable",
-                    "masked nested Codex sandbox preflight failed",
-                ) from exc
+                    "Linux subreaper-supervisor containment probe was rejected",
+                )
             if nested.returncode != 0:
                 raise ExternalCodexRuntimeError(
                     "process_containment_unavailable",

@@ -59,6 +59,35 @@ that resolved a virtual-environment interpreter symlink before starting a
 bubblewrap child, thereby discarding that environment's dependencies. Passing
 the exact `sys.executable` preserves the admitted interpreter environment.
 
+A later postmerge profile showed why duration-aware reassignment alone had no
+material headroom left. The 32 observed shard durations totalled 1,558.56
+seconds, so the four-worker lower bound was 389.64 seconds; the actual queue
+makespan was already about 391 seconds. Shards 1 through 9 all came from
+`test_external_codex_agent.py` and accounted for about 87 percent of total
+shard time. One representative end-to-end test executed 103 programs because
+the exact five-probe Codex preflight runs once at admission and again in the
+worker, as the runtime contract requires.
+
+The next comparison therefore kept the scheduler, selection, and repeated
+preflight unchanged and overlapped only independent probes inside each
+preflight. On one fixed old-baseline wave of the first four slow shards, all
+282 assigned tests and the exact observed union stayed green. Wall time fell
+from 132.58 to 111.00 seconds (16.3 percent), cgroup CPU time fell from 398.81
+to 365.63 seconds (8.3 percent), and memory peak rose from 636.6 to 701.1 MiB.
+The result rejects a duration-hint-only change for this bottleneck and admits
+the process-isolated preflight-overlap candidate to complete-suite and public
+runner validation; it does not weaken or cache any runtime probe.
+
+The subsequent complete local proof used the exact CI owner pins, an installed
+`aoa-sdk` (so isolated `python -I` subprocesses exercised the packaged route),
+and the unchanged 4-by-32 scheduler. Its exact union selected 2,220 tests and
+closed green; after adding an explicit completed-sibling orphan-cleanup proof,
+the final exact union selected 2,221 tests and closed with 2,217 passed, four
+skipped, and 230 passed subtests in 318.99 seconds, with a 757.4 MiB cgroup
+memory peak and no swap. This admits the
+candidate to public-runner comparison; the controlled fixed-wave A/B remains
+the causal latency evidence until that independent runner result exists.
+
 ## Options considered
 
 - Retain the serial gate and optimize only individual tests.
@@ -105,6 +134,9 @@ large-file tail, and duration hints close the remaining scheduling imbalance.
 Because baseline, assignment, observation, and aggregate proof are independent
 of the hints, future timing drift can only reduce speed; it cannot hide tests.
 A bounded count also prevents accidental fan-out on high-core developer hosts.
+Once that queue is within one percent of its duration lower bound, further
+scheduler tuning is not treated as the default answer: the owning slow test or
+runtime operation must be profiled and changed under its own contract.
 
 ## Consequences
 
@@ -140,7 +172,8 @@ A bounded count also prevents accidental fan-out on high-core developer hosts.
 
 ## Follow-up route
 
-The next validation pass should use GitHub timings and shard receipts to refresh
-duration hints or decompose remaining long subprocess tests. A future multi-job
+The next validation pass should prove the preflight-overlap candidate on the
+public runner, then continue decomposing long subprocess tests instead of
+refreshing duration hints without measured queue imbalance. A future multi-job
 DAG must still prove the same complete selection and final sufficiency; it must
 not replace the serial oracle or hide failed owner evidence.

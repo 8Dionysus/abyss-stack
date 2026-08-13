@@ -86,6 +86,14 @@ mutation and produced-artifact authority remains separately bounded by
 preparation receipt records the complete SDK module-path inventory again after
 all plan and binding compilation.
 
+Independent probes within each preflight may overlap as separate
+start-new-session supervisor process groups. The controller still performs all
+five probes at admission and repeats all five in the worker; each keeps its
+verified-fd execution, timeout, result, and failure classification. It waits
+for the complete group and identity-cleans every outstanding process group on
+failure. This is a latency optimization inside the accepted process boundary,
+not a preflight cache, skipped check, shared worker, or new authority.
+
 An earlier source candidate placed Codex inside an outer user/PID namespace.
 The first live post-repair Luna run showed that this prevents Codex's own
 `codex-linux-sandbox`/bubblewrap probe from completing. The runtime therefore

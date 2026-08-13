@@ -3038,6 +3038,169 @@ def test_preflight_rejects_path_replacement_after_controller_digest(
     assert exc_info.value.code == "codex_preflight_failed"
 
 
+def test_preflight_probe_group_overlaps_independent_processes(
+    tmp_path: Path,
+) -> None:
+    first_ready = tmp_path / "first.ready"
+    second_ready = tmp_path / "second.ready"
+    barrier_probe = """
+import sys
+import time
+from pathlib import Path
+
+mine = Path(sys.argv[1])
+other = Path(sys.argv[2])
+mine.write_text("ready\\n", encoding="utf-8")
+deadline = time.monotonic() + 2
+while not other.is_file():
+    if time.monotonic() >= deadline:
+        raise SystemExit(9)
+    time.sleep(0.01)
+print(mine.name)
+"""
+
+    results = RUNTIME._run_preflight_probe_group(
+        [
+            (
+                "first",
+                [
+                    sys.executable,
+                    "-c",
+                    barrier_probe,
+                    str(first_ready),
+                    str(second_ready),
+                ],
+                5,
+            ),
+            (
+                "second",
+                [
+                    sys.executable,
+                    "-c",
+                    barrier_probe,
+                    str(second_ready),
+                    str(first_ready),
+                ],
+                5,
+            ),
+        ],
+        env=os.environ.copy(),
+        failure_code="fixture_probe_failed",
+        failure_messages={
+            "first": "first fixture probe failed",
+            "second": "second fixture probe failed",
+        },
+    )
+
+    assert results["first"].returncode == 0
+    assert results["second"].returncode == 0
+    assert results["first"].stdout.strip() == first_ready.name
+    assert results["second"].stdout.strip() == second_ready.name
+
+
+def test_preflight_probe_group_timeout_cleans_exact_process_group(
+    tmp_path: Path,
+) -> None:
+    identity_path = tmp_path / "probe-identity.json"
+    blocking_probe = """
+import json
+import os
+import time
+from pathlib import Path
+
+raw = Path(f"/proc/{os.getpid()}/stat").read_text(encoding="utf-8")
+fields = raw[raw.rfind(")") + 2:].split()
+Path(os.environ["FIXTURE_IDENTITY_PATH"]).write_text(
+    json.dumps({"pid": os.getpid(), "start_ticks": int(fields[19])}) + "\\n",
+    encoding="utf-8",
+)
+time.sleep(60)
+"""
+    environment = os.environ.copy()
+    environment["FIXTURE_IDENTITY_PATH"] = str(identity_path)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME._run_preflight_probe_group(
+            [("blocking", [sys.executable, "-c", blocking_probe], 0.5)],
+            env=environment,
+            failure_code="fixture_probe_failed",
+            failure_messages={"blocking": "blocking fixture probe failed"},
+        )
+
+    assert exc_info.value.code == "fixture_probe_failed"
+    identity = json.loads(identity_path.read_text(encoding="utf-8"))
+    assert not RUNTIME._pid_matches(identity["pid"], identity["start_ticks"])
+
+
+def test_preflight_probe_group_failure_cleans_completed_sibling_descendants(
+    tmp_path: Path,
+) -> None:
+    child_identity_path = tmp_path / "completed-sibling-child.json"
+    child_probe = """
+import json
+import os
+import time
+from pathlib import Path
+
+raw = Path(f"/proc/{os.getpid()}/stat").read_text(encoding="utf-8")
+fields = raw[raw.rfind(")") + 2:].split()
+Path(os.environ["FIXTURE_CHILD_IDENTITY_PATH"]).write_text(
+    json.dumps({"pid": os.getpid(), "start_ticks": int(fields[19])}) + "\\n",
+    encoding="utf-8",
+)
+time.sleep(60)
+"""
+    completed_parent_probe = f"""
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+identity_path = Path({str(child_identity_path)!r})
+subprocess.Popen(
+    [sys.executable, "-c", {child_probe!r}],
+    stdin=subprocess.DEVNULL,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+deadline = time.monotonic() + 5
+while not identity_path.is_file():
+    if time.monotonic() >= deadline:
+        raise SystemExit(8)
+    time.sleep(0.01)
+"""
+    environment = os.environ.copy()
+    environment["FIXTURE_CHILD_IDENTITY_PATH"] = str(child_identity_path)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME._run_preflight_probe_group(
+            [
+                (
+                    "completed_parent",
+                    [sys.executable, "-c", completed_parent_probe],
+                    5,
+                ),
+                (
+                    "blocking_sibling",
+                    [sys.executable, "-c", "import time; time.sleep(60)"],
+                    0.75,
+                ),
+            ],
+            env=environment,
+            failure_code="fixture_probe_failed",
+            failure_messages={
+                "completed_parent": "completed parent fixture probe failed",
+                "blocking_sibling": "blocking sibling fixture probe failed",
+            },
+        )
+
+    assert exc_info.value.code == "fixture_probe_failed"
+    child_identity = json.loads(child_identity_path.read_text(encoding="utf-8"))
+    assert not RUNTIME._pid_matches(
+        child_identity["pid"], child_identity["start_ticks"]
+    )
+
+
 def test_preflight_exercises_masked_nested_codex_sandbox(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

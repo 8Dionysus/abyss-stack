@@ -53,7 +53,9 @@ ceilings, secret-shaped ignored input refusal including conventional
 credential-config dotfiles before hashing or direct reads, complete runtime-wide forbidden-set admission plus subset-resistant
 terminal classification, direct secret-path encoder classification, exact-open-inode
 Codex preflight and inference execution across a pathname replacement plus
-pre-exec digest-drift refusal, and a real historical outer-bubblewrap plus inner
+pre-exec digest-drift refusal, bounded process-isolated overlap of independent
+preflight probes with exact timeout cleanup and no shared controller thread,
+and a real historical outer-bubblewrap plus inner
 named Codex-sandbox preflight command. The mount-wrapper and mount-launcher
 checks also prove the descriptor-bound inference contour. The projection slice
 proves an admitted Git baseline is copied through open descriptors, receives a
