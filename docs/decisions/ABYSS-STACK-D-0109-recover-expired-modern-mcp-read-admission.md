@@ -60,6 +60,14 @@ existing registry CAS, deployment manifest, signer pin, protocol, owner-shaped
 result contracts, proof, acceptance, rollback, and consumer compatibility
 checks remain mandatory.
 
+Canary collection may use a bounded worker pool across independent organs.
+The last-known-good/current pair for one organ remains ordered, each worker
+writes only that organ's addressed receipt paths, and publication remains a
+barrier after the complete family succeeds. The default worker count is three,
+one is exact sequential rollback, and the controller rejects counts outside
+the literal eleven-organ fleet. This changes scheduling only; it does not
+remove or weaken either bootstrap or production evidence family.
+
 The same controller also repairs an incomplete production fleet while registry
 and contour admission remain current. It reuses that admission only when the
 registry deployment identity, all current production canaries, and the managed
@@ -86,8 +94,9 @@ contains the new lifecycle effect to the same read fleet already admitted by
 
 ## Consequences
 
-- A host cold start may take several minutes while all owner-shaped canaries
-  run; the admission oneshot therefore has a ten-minute timeout.
+- A host cold start still runs every owner-shaped canary, but independent organ
+  pairs are collected concurrently behind a bounded join; the admission
+  oneshot retains its ten-minute fail-closed timeout.
 - If production is unavailable while admission is still current and reusable
   for the exact deployment, recovery restarts only the exact production set and
   renews its process-bound evidence.

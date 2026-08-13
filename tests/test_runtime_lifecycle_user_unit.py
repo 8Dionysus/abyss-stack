@@ -2733,6 +2733,17 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertIn("predecessor_digest=$(sha256sum", script)
         self.assertIn("live_digest=$(sha256sum", script)
         self.assertIn("trap cleanup_recovery EXIT", script)
+        self.assertIn(
+            'CANARY_WORKERS="${ABYSS_MCP_CANARY_WORKERS:-3}"', script
+        )
+        self.assertIn("CANARY_WORKERS < 1", script)
+        self.assertIn("CANARY_WORKERS > ${#organs[@]}", script)
+        self.assertIn("capture_canary_pair", script)
+        self.assertIn("setsid --wait bash -euo pipefail -c", script)
+        self.assertIn('kill -TERM -- "-${pid}"', script)
+        self.assertIn("canary_worker_pids+=(\"$!\")", script)
+        self.assertIn("wait -n -p completed_pid", script)
+        self.assertIn("cleanup_canary_workers", script)
         self.assertIn("--process-unit \"$process_unit\"", script)
         self.assertIn("capture_canary_family", script)
         self.assertIn("    bootstrap \\", script)
