@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -52,7 +53,7 @@ class OptimizationAuditStatusTests(unittest.TestCase):
         )
 
     def test_require_complete_returns_nonzero_when_blocked(self) -> None:
-        with unittest.mock.patch.object(
+        with mock.patch.object(
             optimization_audit_status,
             "build_audit",
             return_value={

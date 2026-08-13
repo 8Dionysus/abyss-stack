@@ -72,6 +72,8 @@ still synced into deployed `Configs/` with the wrappers.
   mode uses at most four process-isolated workers over 32 file-aware shards,
   proves their exact disjoint union against one baseline collection, and
   supports exact serial rollback through `ABYSS_STACK_TEST_SCHEDULER=serial`.
+  Failed shard logs are replayed at aggregate closeout for bounded-log
+  diagnostics; tests are not retried.
 - Keep `validate_local_stats_port.py` as a thin delegation to the `aoa-stats`
   contract owner; do not copy the central schemas or validator into this repo.
 - Put mechanic-specific implementation logic under the owning

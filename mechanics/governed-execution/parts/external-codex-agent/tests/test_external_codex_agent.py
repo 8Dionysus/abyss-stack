@@ -2184,9 +2184,31 @@ def _wait_terminal(
         if state["status"] != "running":
             return state
         time.sleep(0.05)
+    state = runtime.status(session_id)
+    if state["status"] != "running":
+        return state
     raise AssertionError(
-        f"external Codex fixture did not stop: {runtime.status(session_id)}"
+        f"external Codex fixture did not stop: {state}"
     )
+
+
+def test_wait_terminal_accepts_transition_at_timeout_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ticks = iter((0.0, 0.0, 1.0))
+    states = iter(({"status": "running"}, {"status": "authority_blocked"}))
+
+    class BoundaryRuntime:
+        def status(self, session_id: str) -> dict[str, str]:
+            assert session_id == "session:boundary"
+            return next(states)
+
+    monkeypatch.setattr(time, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(time, "sleep", lambda _seconds: None)
+
+    terminal = _wait_terminal(BoundaryRuntime(), "session:boundary", timeout=1)
+
+    assert terminal["status"] == "authority_blocked"
 
 
 def test_actor_manifest_retries_one_transient_descriptor_inventory_race(
@@ -7888,7 +7910,7 @@ def test_current_mount_aliases_cover_bind_mounted_repository_alias(
             str(repository),
             str(alias),
             "--",
-            str(Path(sys.executable).resolve()),
+            sys.executable,
             "-c",
             script,
         ],

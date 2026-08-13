@@ -1,9 +1,9 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 120,
-  "edge_count": 2707,
+  "edge_count": 2709,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1001,
+    "CITES_SOURCE_SURFACE": 1003,
     "DATED": 120,
     "GUARDED_BY": 370,
     "HAS_STATUS": 120,
@@ -12888,6 +12888,16 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0120",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "source_surface:mechanics/runtime-lifecycle/parts/logs-status/tests/test_optimization_audit_status.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
       "target": "source_surface:scripts/run_pytest_lane.py",
       "type": "CITES_SOURCE_SURFACE"
     },
@@ -13553,7 +13563,7 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1179,
+  "node_count": 1180,
   "node_type_counts": {
     "date": 36,
     "decision": 120,
@@ -13561,7 +13571,7 @@
     "mechanic_parent": 10,
     "owner_surface": 63,
     "repo": 1,
-    "source_surface": 581,
+    "source_surface": 582,
     "stack_lane": 49,
     "status": 3,
     "surface_class": 132
@@ -18421,6 +18431,11 @@
     {
       "id": "source_surface:mechanics/runtime-lifecycle/parts/layout-install/aoa_install_layout.sh",
       "label": "mechanics/runtime-lifecycle/parts/layout-install/aoa_install_layout.sh",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/runtime-lifecycle/parts/logs-status/tests/test_optimization_audit_status.py",
+      "label": "mechanics/runtime-lifecycle/parts/logs-status/tests/test_optimization_audit_status.py",
       "type": "source_surface"
     },
     {

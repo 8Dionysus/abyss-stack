@@ -46,6 +46,19 @@ multithreaded-fork warning. The hybrid split was stopped after 403 seconds when
 its serial fork-sensitive lane was still incomplete and could no longer beat
 the already green process-DAG result.
 
+The first exact-head process-scheduler CI run proved an exact 2,205-test union
+and exposed two test-harness defects previously masked by serial timing and
+import order. One isolated test referenced `unittest.mock` without importing
+that submodule. One terminal-state polling helper discarded a valid
+`authority_blocked` transition that occurred at its deadline: its diagnostic
+read saw the completed state, but it raised unconditionally. The repair imports
+`mock` explicitly and performs one final authoritative state observation at
+the polling boundary without extending the timeout or weakening the expected
+authority result. A local isolated-environment run also exposed one fixture
+that resolved a virtual-environment interpreter symlink before starting a
+bubblewrap child, thereby discarding that environment's dependencies. Passing
+the exact `sys.executable` preserves the admitted interpreter environment.
+
 ## Options considered
 
 - Retain the serial gate and optimize only individual tests.
@@ -70,7 +83,9 @@ count, and digest. The scheduler proves that all assignments are disjoint and
 their union equals that baseline. Every child receives explicit nodeids, writes
 its observed-selection manifest and exit receipt, and must match its assignment
 exactly. The aggregate is green only when every child is green and every
-selection proof is exact.
+selection proof is exact. Failed shard logs are replayed after the aggregate so
+bounded CI and resource-launch log tails retain the actionable traceback even
+when an early shard fails and later shards continue to completion.
 
 Targeted pytest arguments use the unchanged serial path automatically. An
 explicit process scheduler refuses targeted arguments rather than inventing a
@@ -99,6 +114,10 @@ A bounded count also prevents accidental fan-out on high-core developer hosts.
   disjoint shard evidence, observed-selection receipts, and one atomic verdict.
 - Positive: fork-sensitive tests run in process-isolated pytest children and no
   longer inherit an xdist control thread.
+- Positive: process isolation makes order-dependent imports and polling-boundary
+  races visible; both remain blocking failures until repaired and re-proved.
+- Positive: an early failed shard remains diagnosable from the final bounded
+  log tail, avoiding a second full run merely to recover its traceback.
 - Positive: no extra scheduler dependency is installed, and exact serial
   execution remains one environment switch away.
 - Tradeoff: each shard is a fresh pytest process, so import cost is higher than
@@ -116,6 +135,8 @@ A bounded count also prevents accidental fan-out on high-core developer hosts.
 - `docs/validation/COMMAND_AUTHORITY.md`
 - `docs/testing/TEST_TOPOLOGY.md`
 - `.github/workflows/validate-stack.yml`
+- `mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py`
+- `mechanics/runtime-lifecycle/parts/logs-status/tests/test_optimization_audit_status.py`
 
 ## Follow-up route
 

@@ -40,7 +40,8 @@ stabilizer, but it reads the release command sequence from the lane manifest.
   four process-isolated workers over an exact file-aware partition. Baseline,
   disjoint union, observed selection, and child exit receipts must all verify;
   `ABYSS_STACK_TEST_SCHEDULER=serial` is the explicit rollback. Timing hints may
-  change order, never selection or failure semantics.
+  change order, never selection or failure semantics. Failed shard logs repeat
+  after the aggregate so bounded log tails retain the actionable traceback.
 
 ## Active Lanes
 

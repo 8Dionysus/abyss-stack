@@ -34,6 +34,7 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 - `scripts/run_pytest_lane.py` schedules the complete default pytest selection.
   It bounds file-aware work stealing to four process-isolated workers and proves
   baseline/assignment/observed-selection parity; it does not own test selection.
+  It replays failed shard logs at aggregate closeout without retrying tests.
 - `scripts/validate_local_stats_port.py` delegates the local port contract to
   the `aoa-stats` validator and does not own shared measurement semantics.
 - `scripts/release_check.py` remains the release entrypoint and Configs parity

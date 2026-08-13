@@ -297,6 +297,33 @@ def _read_result(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _replay_failed_shards(
+    records: dict[int, dict[str, Any]],
+    failed_shards: list[int],
+    *,
+    shard_count: int,
+) -> None:
+    for shard_index in failed_shards:
+        record = records[shard_index]
+        print(
+            f"[pytest-failed-shard {shard_index + 1}/{shard_count}]",
+            file=sys.stderr,
+        )
+        print(
+            record["log"].read_text(encoding="utf-8"),
+            end="",
+            file=sys.stderr,
+        )
+        print(
+            "[pytest-failed-shard-result] "
+            f"index={shard_index + 1} selected={record['selected']} "
+            f"returncode={record['returncode']} "
+            f"selection_proof={record['selection_proof']}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
 def run_process_worksteal(*, extra_args: list[str]) -> int:
     parent = os.environ.get("TMPDIR")
     temporary_parent = parent if parent and Path(parent).is_dir() else None
@@ -409,6 +436,7 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
             raise
 
         failed = False
+        failed_shards: list[int] = []
         totals: Counter[str] = Counter()
         for shard_index in range(len(assignments)):
             record = records[shard_index]
@@ -431,6 +459,10 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                 failed = True
             if int(record["returncode"]) != 0:
                 failed = True
+            record["selected"] = len(assignments[shard_index])
+            record["selection_proof"] = proof
+            if proof != "exact" or int(record["returncode"]) != 0:
+                failed_shards.append(shard_index)
             print(
                 "[pytest-shard-result] "
                 f"index={shard_index + 1} selected={len(assignments[shard_index])} "
@@ -444,6 +476,11 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
             f"verdict={'failed' if failed else 'passed'} selected={len(baseline)} "
             f"shards={len(assignments)} outcomes={json.dumps(dict(sorted(totals.items())), sort_keys=True)}",
             flush=True,
+        )
+        _replay_failed_shards(
+            records,
+            failed_shards,
+            shard_count=len(assignments),
         )
         return 1 if failed else 0
 

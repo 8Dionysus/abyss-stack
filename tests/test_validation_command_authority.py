@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts import ci_gate, release_check, run_pytest_lane, validation_lanes
 
 
@@ -204,6 +206,30 @@ def test_pytest_scheduler_keeps_an_exact_serial_rollback() -> None:
         "-q",
         "tests/test_validation_command_authority.py",
     ]
+
+
+def test_pytest_scheduler_replays_failed_shard_log_at_closeout(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    log_path = tmp_path / "shard-2.log"
+    log_path.write_text("FAILED tests/test_example.py::test_failure\n", encoding="utf-8")
+    records = {
+        1: {
+            "log": log_path,
+            "selected": 7,
+            "returncode": 1,
+            "selection_proof": "exact",
+        }
+    }
+
+    run_pytest_lane._replay_failed_shards(records, [1], shard_count=4)
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "[pytest-failed-shard 2/4]" in captured.err
+    assert "FAILED tests/test_example.py::test_failure" in captured.err
+    assert "selected=7 returncode=1 selection_proof=exact" in captured.err
 
 
 def test_release_dependencies_do_not_add_a_threaded_pytest_scheduler() -> None:

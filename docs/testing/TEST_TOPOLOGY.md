@@ -46,4 +46,5 @@ ABYSS_STACK_TEST_SCHEDULER=serial python scripts/ci_gate.py --mode tests
 
 as the exact rollback and independent sequential oracle. The scheduler may
 change execution order only. Duration hints cannot change membership. It does
-not skip, lose, retry, or reinterpret failures.
+not skip, lose, retry, or reinterpret failures. It replays failed shard logs
+after the aggregate so an early traceback remains visible in bounded log tails.
