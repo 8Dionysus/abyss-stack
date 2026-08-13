@@ -1895,6 +1895,67 @@ def _relative_path_is_allowed(path: str, allowed: Sequence[str]) -> bool:
     return False
 
 
+def _actor_delta_change_is_allowed(
+    change: Mapping[str, Any], allowed: Sequence[str]
+) -> bool:
+    """Admit a changed path or a necessary directory ancestor of one.
+
+    ``allowed_paths`` names the actor's semantic mutation surface.  Creating
+    ``actor-output/result.json`` necessarily creates ``actor-output`` when the
+    source tree does not already contain it.  The manifest records both
+    entries, so treating the directory entry as a separate scope expansion
+    makes the explicitly admitted file impossible to produce.
+
+    Only created or deleted *directories* may use this structural-ancestor
+    rule.  Files, symlinks, type changes, mode changes, and sibling paths must
+    still match the ordinary descendant rule exactly.
+    """
+
+    path = change.get("path")
+    if not isinstance(path, str):
+        return False
+    if _relative_path_is_allowed(path, allowed):
+        return True
+
+    status = change.get("status")
+    if status == "created":
+        entry = change.get("after")
+    elif status == "deleted":
+        entry = change.get("before")
+    else:
+        return False
+    if not isinstance(entry, Mapping) or entry.get("kind") != "directory":
+        return False
+
+    path_parts = tuple(path.split("/"))
+    if (
+        not path
+        or path.startswith("/")
+        or "\\" in path
+        or "\0" in path
+        or any(part in {"", ".", ".."} for part in path_parts)
+    ):
+        return False
+    for candidate in allowed:
+        if not isinstance(candidate, str) or candidate == ".":
+            continue
+        candidate_parts = tuple(candidate.split("/"))
+        if (
+            not candidate
+            or candidate.startswith("/")
+            or "\\" in candidate
+            or "\0" in candidate
+            or any(part in {"", ".", ".."} for part in candidate_parts)
+        ):
+            continue
+        if (
+            len(candidate_parts) > len(path_parts)
+            and candidate_parts[: len(path_parts)] == path_parts
+        ):
+            return True
+    return False
+
+
 def _workspace_artifact_path(workspace: str | Path, value: str) -> Path:
     """Resolve one produced regular file without following workspace symlinks."""
 
@@ -10908,6 +10969,7 @@ Runtime session identity: {state["session_id"]}
         actor_final_manifest_ref: dict[str, Any] | None = None
         source_manifest_match: bool | None = None
         source_manifest_final_ref: dict[str, Any] | None = None
+        actor_delta_changes: list[dict[str, Any]] = []
         manifest_observation_gap = False
         manifest_observation_failure_code: str | None = None
         head_drift = False
@@ -10943,6 +11005,7 @@ Runtime session identity: {state["session_id"]}
                 current_digest=final_workspace_manifest_digest,
             )
             validate_json(delta, ACTOR_DELTA_SCHEMA_PATH, label="actor delta")
+            actor_delta_changes = list(delta["changes"])
             delta_path = (
                 self._session_dir(str(state["session_id"])) / "actor-delta.json"
             )
@@ -11032,9 +11095,9 @@ Runtime session identity: {state["session_id"]}
             for item in state["executed_commands"]
         )
         out_of_scope_paths = [
-            item["path"]
-            for item in changed_paths
-            if not _relative_path_is_allowed(item["path"], task["allowed_paths"])
+            str(item["path"])
+            for item in actor_delta_changes
+            if not _actor_delta_change_is_allowed(item, task["allowed_paths"])
         ]
         read_only_drift = task["allowed_effect_class"] == "read_only" and (
             actor_manifest_match is False

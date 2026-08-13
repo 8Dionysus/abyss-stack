@@ -420,6 +420,11 @@ if "FAKE_CREATE_FIFO_OUT_OF_SCOPE" in task["objective"]:
     os.mkfifo(workspace / "unexpected.pipe")
 if "FAKE_WRITE_ALLOWED" in task["objective"]:
     (workspace / "landing-note.md").write_text("bounded preparation\n", encoding="utf-8")
+if "FAKE_WRITE_NESTED_ALLOWED" in task["objective"]:
+    (workspace / "actor-output").mkdir()
+    (workspace / "actor-output" / "result.json").write_text(
+        '{"status":"ready"}\n', encoding="utf-8"
+    )
 if "FAKE_SAME_STATUS_MUTATION" in task["objective"]:
     (workspace / "dirty-note.txt").write_text("same status, changed bytes\n", encoding="utf-8")
 if "FAKE_WRITE_IGNORED" in task["objective"]:
@@ -786,6 +791,8 @@ if "FAKE_ARTIFACT_PREEXISTING" in task["objective"]:
     report["artifact_paths"] = ["README.md"]
 if "FAKE_ARTIFACT_PRODUCED" in task["objective"]:
     report["artifact_paths"] = ["landing-note.md"]
+if "FAKE_NESTED_ARTIFACT_PRODUCED" in task["objective"]:
+    report["artifact_paths"] = ["actor-output/result.json"]
 if "FAKE_INVALID_SOURCE_EVIDENCE" in task["objective"]:
     report["findings"] = [{
         "severity": "blocking",
@@ -5912,6 +5919,68 @@ def test_workspace_write_preparation_stays_inside_allowed_paths(tmp_path: Path) 
     assert str(ACTOR_EXECUTION_ROOT) not in permission_override
     assert not (fixture["workspace"] / "landing-note.md").exists()
     assert result["source_manifest_match"] is True
+
+
+def test_workspace_write_admits_only_required_parent_directories(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker=(
+            "FAKE_WRITE_NESTED_ALLOWED FAKE_NESTED_ARTIFACT_PRODUCED"
+        ),
+        role_id="coder",
+        task_family="landing_preparation",
+        identity_suffix="luna-nested-output",
+        workspace_write=True,
+        allowed_paths=("actor-output/result.json",),
+        source_evidence_paths=("README.md",),
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "completed"
+    assert result is not None and result["status"] == "completed"
+    assert result["changed_paths"] == [
+        {"path": "actor-output", "status": "created"},
+        {"path": "actor-output/result.json", "status": "created"},
+    ]
+    report = json.loads(Path(result["report_ref"]["artifact_ref"]).read_text())
+    assert report["artifact_paths"] == ["actor-output/result.json"]
+
+
+def test_structural_parent_rule_does_not_admit_sibling_or_non_directory() -> None:
+    allowed = ("actor-output/result.json",)
+    assert RUNTIME._actor_delta_change_is_allowed(
+        {
+            "path": "actor-output",
+            "status": "created",
+            "before": None,
+            "after": {"kind": "directory"},
+        },
+        allowed,
+    )
+    assert not RUNTIME._actor_delta_change_is_allowed(
+        {
+            "path": "actor-output/other.json",
+            "status": "created",
+            "before": None,
+            "after": {"kind": "file"},
+        },
+        allowed,
+    )
+    assert not RUNTIME._actor_delta_change_is_allowed(
+        {
+            "path": "actor-output",
+            "status": "type_changed",
+            "before": {"kind": "directory"},
+            "after": {"kind": "symlink"},
+        },
+        allowed,
+    )
 
 
 @pytest.mark.parametrize(
