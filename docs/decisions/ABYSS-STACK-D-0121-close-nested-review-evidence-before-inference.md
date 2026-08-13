@@ -51,9 +51,12 @@ nevertheless changed the substantive judgment from evidence-closure repair to
 semantic blocker remained. The runtime then correctly failed the attempt
 because the canonical post-inference report schema, unlike its specialized
 session-local derivative, had not yet admitted the new runtime reference.
-That shadow-found integration gap is closed by admitting
-`runtime:nested-evidence-namespace#<entry-id>` in both canonical evidence-ref
-arrays and asserting the canonical patterns in the namespace regression test.
+The first correction widened that canonical schema, but a preserved-packet
+preflight then proved that doing so breaks the exact result-schema and
+incarnation bindings of existing owner packets. The compatible correction
+keeps the canonical owner ABI byte-stable and uses the already persisted,
+identity-bound session-local derivative consistently for structured decoding,
+post-inference admission, and later A2A export.
 
 ## Options considered
 
@@ -150,7 +153,7 @@ runtime can already prove incomplete.
   semantic review, but the first real shadow increased input-token volume and
   did not reduce wall time because the reviewer still inspected owner sources
   and underlying immutable envelopes.
-- Follow-up: rerun the admitted real reviewer after the canonical-schema fix;
+- Follow-up: rerun the admitted real reviewer after the session-local-schema fix;
   then compare end-to-end avoided retries as well as duration, input tokens,
   verdict equivalence, and unresolved-edge rates. Optimize namespace prompt
   weight separately rather than treating transport closure as a demonstrated

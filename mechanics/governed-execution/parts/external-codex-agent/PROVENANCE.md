@@ -79,9 +79,10 @@ locked publication boundary can return responsibility.
 The session-local output schema is derived only from the admitted canonical
 schema plus the exact task and incarnation identities already present in
 runtime state. Its path and digest are persisted and checked before inference;
-the canonical schema is still used for source admission and final report
-validation. Before every admitted continuation, the exact prior terminal
-runtime result is copied into its attempt directory and retained as an
+the same exact derivative validates the model report after inference and every
+later A2A export, while the unchanged canonical schema remains the owner ABI
+for source admission. Before every admitted continuation, the exact prior
+terminal runtime result is copied into its attempt directory and retained as an
 evidence ref rather than overwritten by the later terminal result. The narrow
 failed-review route adds stricter failure/status/digest checks on top of this
 general preservation rule.

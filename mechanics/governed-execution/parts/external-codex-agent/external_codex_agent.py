@@ -8986,6 +8986,25 @@ class ExternalCodexRuntime:
             )
         return candidate
 
+    def _load_verified_session_report(
+        self,
+        session_id: str,
+        report_ref: Mapping[str, Any],
+        *,
+        label: str,
+    ) -> dict[str, Any]:
+        """Load a terminal report under its exact session-local schema."""
+
+        with self._lock(session_id):
+            state = self._load_state(session_id)
+            report = _load_verified_json_ref(report_ref, label=label)
+            validate_json(
+                report,
+                self._execution_result_schema_path(state),
+                label=label,
+            )
+        return report
+
     def _ensure_execution_result_schema_locked(self, state: dict[str, Any]) -> Path:
         """Materialize exact identity constraints for a legacy resumable session."""
 
@@ -11326,7 +11345,11 @@ Runtime session identity: {state["session_id"]}
         if report_path.is_file():
             try:
                 report = load_json(report_path, label="model report")
-                validate_json(report, REPORT_SCHEMA_PATH, label="model report")
+                validate_json(
+                    report,
+                    self._execution_result_schema_path(state),
+                    label="model report",
+                )
                 runtime_evidence_paths: dict[str, Path] = {}
                 if workspace_manifest_ref is not None:
                     runtime_evidence_paths["workspace-final-manifest"] = (
@@ -12720,15 +12743,15 @@ Runtime session identity: {state["session_id"]}
                 "a2a_review_not_independent",
                 "A2A export requires a separate landing-review thread",
             )
-        reviewer_report = _load_verified_json_ref(
+        reviewer_report = reviewer_runtime._load_verified_session_report(
+            reviewer_session_id,
             reviewer["report_ref"],
             label="reviewer report",
-            schema_path=REPORT_SCHEMA_PATH,
         )
-        writer_report = _load_verified_json_ref(
+        writer_report = self._load_verified_session_report(
+            writer_session_id,
             writer["report_ref"],
             label="writer report",
-            schema_path=REPORT_SCHEMA_PATH,
         )
         for label, result, report in (
             ("writer", writer, writer_report),
@@ -13302,15 +13325,15 @@ Runtime session identity: {state["session_id"]}
                 "A2A export requires a separate independent-review thread",
             )
 
-        reviewer_report = _load_verified_json_ref(
+        reviewer_report = reviewer_runtime._load_verified_session_report(
+            reviewer_session_id,
             reviewer["report_ref"],
             label="reviewer report",
-            schema_path=REPORT_SCHEMA_PATH,
         )
-        writer_report = _load_verified_json_ref(
+        writer_report = self._load_verified_session_report(
+            writer_session_id,
             writer["report_ref"],
             label="writer report",
-            schema_path=REPORT_SCHEMA_PATH,
         )
         for label, result, report in (
             ("writer", writer, writer_report),

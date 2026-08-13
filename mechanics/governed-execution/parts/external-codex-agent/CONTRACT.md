@@ -194,10 +194,11 @@ constraints are exact `const` values for the task and incarnation IDs plus an
 exact allowlist of the materialized immutable-input identities in finding and
 transition evidence references. Source and controller-owned runtime evidence
 retain their canonical reference shapes. The derivative's path and digest are
-persisted in runtime state and revalidated before every inference; drift fails
-closed. This prevents a known runtime identity or forwarded immutable input
-from being mistyped or plausibly aliased in an otherwise substantive report
-without weakening the post-output semantic identity and byte checks.
+persisted in runtime state and revalidated before inference, after inference,
+and during A2A export; drift fails closed. This prevents a known runtime
+identity or forwarded immutable input from being mistyped or plausibly aliased
+in an otherwise substantive report without weakening the post-output semantic
+identity and byte checks.
 
 ## Process and tool boundary
 

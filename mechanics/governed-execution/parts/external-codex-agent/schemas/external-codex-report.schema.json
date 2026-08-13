@@ -55,7 +55,7 @@
           "minItems": 1,
           "items": {
             "type": "string",
-            "pattern": "^(?:source:[^#]+|immutable:[a-z0-9]+(?:-[a-z0-9]+)*|runtime:(?:workspace-final-manifest|nested-evidence-namespace))#[^#]+$"
+            "pattern": "^(?:source:[^#]+|immutable:[a-z0-9]+(?:-[a-z0-9]+)*|runtime:workspace-final-manifest)#[^#]+$"
           }
         },
         "approval_posture": {"type": "string"},
@@ -81,7 +81,7 @@
             "minItems": 1,
             "items": {
               "type": "string",
-              "pattern": "^(?:source:[^#]+|immutable:[a-z0-9]+(?:-[a-z0-9]+)*|runtime:(?:workspace-final-manifest|nested-evidence-namespace))#[^#]+$"
+              "pattern": "^(?:source:[^#]+|immutable:[a-z0-9]+(?:-[a-z0-9]+)*|runtime:workspace-final-manifest)#[^#]+$"
             }
           }
         }

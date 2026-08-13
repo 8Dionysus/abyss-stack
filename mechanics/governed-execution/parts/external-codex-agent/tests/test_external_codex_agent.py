@@ -826,6 +826,23 @@ if "FAKE_MIXED_NESTED_EVIDENCE" in task["objective"]:
         "severity": "info",
         "summary": "The fixture binds both immutable and source evidence.",
     }]
+if "FAKE_VALID_NESTED_NAMESPACE_EVIDENCE" in task["objective"]:
+    namespace_summary_match = re.search(
+        r"<nested_evidence_namespace_summary>\n(.*?)\n"
+        r"</nested_evidence_namespace_summary>",
+        prompt,
+        re.S,
+    )
+    if namespace_summary_match is None:
+        raise SystemExit(15)
+    namespace_summary = json.loads(namespace_summary_match.group(1))
+    namespace = json.loads(
+        Path(namespace_summary["materialized_path"]).read_text(encoding="utf-8")
+    )
+    namespace_entry_id = namespace["producers"][0]["entries"][0]["entry_id"]
+    report["transition"]["evidence_refs"] = [
+        "runtime:nested-evidence-namespace#" + namespace_entry_id
+    ]
 if "FAKE_DUPLICATE_EVIDENCE_REFS" in task["objective"]:
     report["transition"]["evidence_refs"] = [
         "source:README.md#L1",
@@ -6507,7 +6524,7 @@ def test_nested_evidence_namespace_closes_exact_producer_graph(
         ]["items"]["pattern"],
     )
     for evidence_pattern in canonical_evidence_patterns:
-        assert re.fullmatch(evidence_pattern, runtime_ref)
+        assert re.fullmatch(evidence_pattern, runtime_ref) is None
     RUNTIME._validate_runtime_evidence_ref(
         runtime_ref,
         {"nested-evidence-namespace": namespace_path},
@@ -6686,6 +6703,7 @@ def test_independent_review_materializes_nested_evidence_before_inference(
     reviewer = _fixture(
         tmp_path / "reviewer",
         identity_suffix="nested-evidence-reviewer",
+        objective_marker="FAKE_VALID_NESTED_NAMESPACE_EVIDENCE",
         task_family="landing_review",
         parent_task_id=writer["task_id"],
         shared_workspace=writer["workspace"],
@@ -6727,6 +6745,20 @@ def test_independent_review_materializes_nested_evidence_before_inference(
 
     assert reviewer_terminal["status"] == "completed"
     assert reviewer_result is not None and reviewer_result["failure_code"] is None
+    assert reviewer_result["report_ref"] is not None
+    reviewer_report = json.loads(
+        Path(str(reviewer_result["report_ref"]["artifact_ref"])).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert reviewer_report["transition"]["evidence_refs"][0].startswith(
+        "runtime:nested-evidence-namespace#"
+    )
+    assert reviewer_runtime._load_verified_session_report(
+        reviewer["session_id"],
+        reviewer_result["report_ref"],
+        label="test reviewer report",
+    ) == reviewer_report
     reviewer_session = reviewer_runtime._session_dir(reviewer["session_id"])
     reviewer_state = json.loads(
         (reviewer_session / "state.json").read_text(encoding="utf-8")
