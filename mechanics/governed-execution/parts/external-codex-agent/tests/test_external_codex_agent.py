@@ -86,6 +86,11 @@ OWNER_EXECUTION_REQUEST_SCHEMA_PATH = (
 OWNER_EXECUTION_REQUEST_COMPILER_PATH = (
     AGENTS_ROOT / "skills/aoa-summon/scripts/compile_external_execution_request.py"
 )
+INCARNATION_BINDING_V2_SCHEMA_PATH = (
+    SDK_ROOT
+    / "mechanics/boundary-bridge/parts/agent-incarnation-binding/schemas/"
+    "agent-incarnation-binding-v2.schema.json"
+)
 TASK_LOCAL_DAG_SCHEMA_PATH = SKILLS_ROOT / "schemas/task_local_dag_v2.schema.json"
 CONTROLLER_PATH = PART_ROOT / "external_codex_agent.py"
 BINDER_PATH = PART_ROOT / "bind_external_actor_launch.py"
@@ -1598,7 +1603,7 @@ def _fixture(
             risk="r1_repo_local" if workspace_write else "r0_readonly",
             control_mode="codex_supervised",
             delegate_tier="executor" if role_id == "coder" else "verifier",
-            route_anchor="fixture:a2a-summon-return",
+            route_anchor=parent_task_id,
             expected_artifacts=summon_outputs,
             self_agent=False,
         ),
@@ -1647,7 +1652,9 @@ def _fixture(
             {
                 "schema_version": "urn:aoa-sdk:a2a:summon-result:v4",
                 "allowed": True,
-                "execution_surface": "external_cli",
+                "capability_execution_claimed": False,
+                "execution_surface": "a2a_remote",
+                "cohort_pattern": "solo",
                 "request_artifact_digest": summon_request_ref.artifact_digest,
             },
         )
@@ -1997,7 +2004,11 @@ def _fixture(
         continuation_id=continuation_id,
         parent_objective_ref=workspace_ref,
         established_decision_refs=(),
-        delegated_obligation="Inspect one exact landing transition and return evidence.",
+        delegated_obligation=(
+            obligation["duty"]
+            if owner_contour
+            else "Inspect one exact landing transition and return evidence."
+        ),
         delegation_reason="The bounded landing check is repeatable and independently reviewable.",
         exact_child_identity=incarnation_id,
         owner_scope=(
@@ -2216,6 +2227,8 @@ def _fixture(
         assert model_fit_query_ref is not None
         assert model_fit_projection_ref is not None
         assert SUMMON_COMPILER is not None
+        run_plan_schema_path = tmp_path / "sdk-run-plan.schema.json"
+        _write_json(run_plan_schema_path, RunPlan.model_json_schema())
         owner_execution_request = SUMMON_COMPILER.compile_external_execution_request(
             request_ref=(f"task://fixture/{identity_suffix}/owner-execution-request"),
             runtime_interface="abyss_stack_external_codex_agent_v1",
@@ -2230,9 +2243,11 @@ def _fixture(
             model_fit_projection_path=model_fit_projection_path,
             task_local_dag_path=dag_path,
             incarnation_binding_path=owner_request_binding_path,
+            incarnation_binding_schema_path=INCARNATION_BINDING_V2_SCHEMA_PATH,
             sdk_summon_request_path=summon_request_path,
             sdk_summon_decision_path=summon_decision_path,
             run_plan_path=plan_path,
+            run_plan_schema_path=run_plan_schema_path,
             runtime_launch_path=launch_path,
             runtime_task_path=task_path,
             responsibility_transfer_path=transfer_path,
