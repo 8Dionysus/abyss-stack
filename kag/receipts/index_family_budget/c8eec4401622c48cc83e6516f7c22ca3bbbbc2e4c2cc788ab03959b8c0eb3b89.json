@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 6792449,
+  "allowed_tracked_bytes": 34698314,
+  "approved_by": "repository-owner",
+  "base_ref": "6c6662a583b23987edcd7a18cb3566fc8fea02c2",
+  "changed_generated_bytes": 6792449,
+  "changed_generated_files": 71,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "c8eec4401622c48cc83e6516f7c22ca3bbbbc2e4c2cc788ab03959b8c0eb3b89",
+  "reason": "The isolated MCP canary worker shell now preserves fail-fast execution while retaining bounded process-group cleanup.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34698314,
+  "tracked_bytes_max": 24117248
+}
