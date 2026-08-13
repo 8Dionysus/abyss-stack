@@ -12,6 +12,7 @@ RUN="$ROOT/runs/$(date -u +%Y%m%dT%H%M%SZ)"
 LOCK="$ROOT/.refresh.lock"
 REBASE_DECISION_REF="owner://abyss-stack/decision/ABYSS-STACK-D-0109"
 REBASE_TTL_SECONDS=86400
+CANARY_WORKERS="${ABYSS_MCP_CANARY_WORKERS:-3}"
 
 organs=(
   abyss-stack abyss-machine aoa-decisions aoa-memo aoa-session-memory
@@ -29,8 +30,33 @@ done
 bootstrap_started=0
 production_handoff_started=0
 rebase_staging=""
+canary_worker_pids=()
+
+case "$CANARY_WORKERS" in
+  ''|*[!0-9]*)
+    printf 'modern MCP canary worker count must be an integer from 1 to 11\n' >&2
+    exit 1
+    ;;
+esac
+if ((CANARY_WORKERS < 1 || CANARY_WORKERS > ${#organs[@]})); then
+  printf 'modern MCP canary worker count must be an integer from 1 to 11\n' >&2
+  exit 1
+fi
+
+cleanup_canary_workers() {
+  local pid
+
+  for pid in "${canary_worker_pids[@]}"; do
+    kill -TERM "$pid" >/dev/null 2>&1 || true
+  done
+  for pid in "${canary_worker_pids[@]}"; do
+    wait "$pid" >/dev/null 2>&1 || true
+  done
+  canary_worker_pids=()
+}
 
 cleanup_recovery() {
+  cleanup_canary_workers
   if [[ "$production_handoff_started" -eq 1 ]]; then
     systemctl --user stop "${production_units[@]}" >/dev/null 2>&1 || true
   fi
@@ -55,31 +81,76 @@ active_production_count() {
   printf '%s\n' "$count"
 }
 
+capture_canary_pair() {
+  local process_unit=$1
+  local current_root=$2
+  local lkg_root=$3
+  local stdout_root=$4
+  local organ=$5
+  local lkg_record
+  local current_record
+
+  "$VENV/abyss-stack-mcp-canary" \
+    --organ "$organ" \
+    --process-unit "$process_unit" \
+    --purpose last-known-good \
+    --ttl-seconds 3600 > "$stdout_root/${organ}-lkg.json"
+  "$VENV/abyss-stack-mcp-canary" \
+    --organ "$organ" \
+    --process-unit "$process_unit" \
+    --ttl-seconds 3600 > "$stdout_root/${organ}-current.json"
+  lkg_record=$(jq -er .record_path "$stdout_root/${organ}-lkg.json")
+  current_record=$(jq -er .record_path "$stdout_root/${organ}-current.json")
+  install -m 0600 "$lkg_record" "$lkg_root/${organ}.read.json"
+  install -m 0600 "$current_record" "$current_root/${organ}.read.json"
+}
+
+wait_for_canary_worker() {
+  local completed_pid=""
+  local pid
+  local status=0
+  local remaining_pids=()
+
+  if wait -n -p completed_pid "${canary_worker_pids[@]}"; then
+    status=0
+  else
+    status=$?
+  fi
+  for pid in "${canary_worker_pids[@]}"; do
+    if [[ "$pid" != "$completed_pid" ]]; then
+      remaining_pids+=("$pid")
+    fi
+  done
+  canary_worker_pids=("${remaining_pids[@]}")
+  return "$status"
+}
+
 capture_canary_family() {
   local process_unit=$1
   local current_root=$2
   local lkg_root=$3
   local stdout_root=$4
   local organ
-  local lkg_record
-  local current_record
 
   mkdir -p "$current_root" "$lkg_root" "$stdout_root"
   chmod 0700 "$current_root" "$lkg_root" "$stdout_root"
+  canary_worker_pids=()
   for organ in "${organs[@]}"; do
-    "$VENV/abyss-stack-mcp-canary" \
-      --organ "$organ" \
-      --process-unit "$process_unit" \
-      --purpose last-known-good \
-      --ttl-seconds 3600 > "$stdout_root/${organ}-lkg.json"
-    "$VENV/abyss-stack-mcp-canary" \
-      --organ "$organ" \
-      --process-unit "$process_unit" \
-      --ttl-seconds 3600 > "$stdout_root/${organ}-current.json"
-    lkg_record=$(jq -er .record_path "$stdout_root/${organ}-lkg.json")
-    current_record=$(jq -er .record_path "$stdout_root/${organ}-current.json")
-    install -m 0600 "$lkg_record" "$lkg_root/${organ}.read.json"
-    install -m 0600 "$current_record" "$current_root/${organ}.read.json"
+    capture_canary_pair \
+      "$process_unit" "$current_root" "$lkg_root" "$stdout_root" "$organ" &
+    canary_worker_pids+=("$!")
+    if ((${#canary_worker_pids[@]} >= CANARY_WORKERS)); then
+      if ! wait_for_canary_worker; then
+        cleanup_canary_workers
+        return 1
+      fi
+    fi
+  done
+  while ((${#canary_worker_pids[@]})); do
+    if ! wait_for_canary_worker; then
+      cleanup_canary_workers
+      return 1
+    fi
   done
 }
 

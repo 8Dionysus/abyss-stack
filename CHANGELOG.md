@@ -9,6 +9,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Shorten the modern MCP cold-start admission transaction by collecting
+  independent organ canary pairs through a bounded three-worker pool. Each
+  organ still records last-known-good before current, both full 11-organ waves
+  still join before publication, invalid worker counts fail closed, and one
+  worker restores exact sequential scheduling.
 - Preserve an external actor's exact role, Codex thread, task, projection, and
   authority across a pre-turn ChatGPT usage-limit failure. The explicit
   `capacity_recovery` route requires the exact prior result digest, a

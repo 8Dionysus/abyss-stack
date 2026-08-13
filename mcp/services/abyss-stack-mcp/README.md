@@ -471,6 +471,15 @@ completion. Any partial bootstrap step stops bootstrap; any incomplete
 production handoff stops the production fleet that the controller started and
 remains fail-closed.
 
+Within each bootstrap and production phase, canary pairs for independent
+organs run through a bounded dynamic worker pool. Each organ still captures
+its last-known-good receipt before its current receipt, and admission
+publication waits for every pair to finish successfully. The default is three
+workers; `ABYSS_MCP_CANARY_WORKERS=1` restores exact sequential behavior, and
+values outside `1..11` fail closed. Parallelism therefore shortens evidence
+collection without changing the fixed fleet, receipt order within an organ,
+or either 11-of-11 barrier.
+
 For example:
 
 ```bash

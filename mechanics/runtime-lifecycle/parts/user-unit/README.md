@@ -74,6 +74,10 @@ start-rate limiting: a finite burst of atomic registry, canary, and catalog
 replacements is allowed to settle instead of leaving their path units in
 `unit-start-limit-hit`. Their own work remains lock-bounded and cannot widen
 the fixed production fleet.
+Independent organ canary pairs use three workers by default during each
+bootstrap or production evidence wave. The last-known-good/current order stays
+serial within one organ, the complete wave joins before publication, and
+`ABYSS_MCP_CANARY_WORKERS=1` is the exact sequential rollback setting.
 
 The separately linked `abyss-mcp-protocol-watch.path` reacts to Codex and
 protocol-lab source changes; its hourly timer observes new upstream
