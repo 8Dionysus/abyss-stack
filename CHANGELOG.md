@@ -9,6 +9,16 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Shorten external Codex admission without caching or dropping proof: the
+  independent version, login, model-catalog, subreaper, and nested-sandbox
+  probes now overlap in bounded process-isolated groups with exact timeout and
+  descendant cleanup. The deterministic suite keeps real transport,
+  credential, containment, and full-lifecycle sentinels while unrelated
+  lifecycle/authority cases use a fork-inherited fixture-only successful
+  preflight double, preserving production admission and worker revalidation.
+  Agent OS and governed review-packet semantic tests now inject their bounded
+  advisory trace instead of silently calling a deployed endpoint and waiting
+  through its timeout fallback; explicit live evidence remains separate.
 - Admit a created or deleted structural parent directory in an external
   actor's final workspace delta only when the same exact delta contains a
   strict descendant whose own change is already authorized. Normal closeout,

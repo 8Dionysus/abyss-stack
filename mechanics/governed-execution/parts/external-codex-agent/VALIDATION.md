@@ -35,6 +35,20 @@ python scripts/generate_decision_indexes.py --check
 python scripts/validate_nested_agents.py
 ```
 
+The deterministic suite separates transport sentinels from unrelated semantic
+cases without exposing a runtime bypass. Fixtures selecting
+`exact_preflight=True` execute the production path for executable pathname
+replacement, nested Codex sandbox, missing role-scoped MCP credentials, and the
+complete preflight/start/worker lifecycle. Probe-group tests directly exercise
+overlap, timeout cleanup, and completed-sibling descendant cleanup. Other
+lifecycle, report, evidence, and authority cases bind a successful
+contract-shaped `_codex_preflight` double to the test runtime instance only.
+Because the worker is forked, the double traverses the same admission and worker
+revalidation call sites; second-return drift tests still prove the repetition.
+No launch field, profile, environment variable, installed wrapper, or
+production source path can select this test-only double. Any test whose verdict
+depends on live preflight must use the exact fixture path.
+
 The focused suite uses disposable Git repositories and a fake Codex-compatible
 binary. It proves exact fixture admission plus separate owner-contour semantic
 admission against pinned `aoa-agents` and `aoa-skills` schemas, a neutral

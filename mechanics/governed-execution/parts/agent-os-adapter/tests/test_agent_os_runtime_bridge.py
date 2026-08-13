@@ -1162,8 +1162,21 @@ def _build_read_only_harness(
     )
 
 
+def _fixture_review_packet_trace(request: dict[str, Any]) -> dict[str, Any]:
+    """Keep deterministic adapter tests off the live advisory endpoint."""
+
+    return {
+        "selectors": {
+            "playbook_id": request.get("playbook_id"),
+            "profile_class": request.get("profile_class"),
+        },
+        "trace_source": "agent-os-adapter-fixture",
+    }
+
+
 class CountingBackend:
     def __init__(self, backend: ModuleType) -> None:
+        backend.default_review_packet_trace_provider = _fixture_review_packet_trace
         self.backend = backend
         self.prepare_calls = 0
         self.resume_calls = 0

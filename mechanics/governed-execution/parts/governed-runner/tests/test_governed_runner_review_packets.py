@@ -119,12 +119,23 @@ class GovernedRunnerReviewPacketTests(GovernedRunnerTestCase):
             "changed_files": ["docs/target.md"],
         }
 
-        status = self.module.materialize_review_packets(
-            run_dir,
-            request=request,
-            state=state,
-            advisory_context={"playbook_id": "AOA-P-0011"},
-        )
+        with patch.object(
+            self.module,
+            "default_review_packet_trace_provider",
+            return_value={
+                "selectors": {
+                    "playbook_id": "AOA-P-0011",
+                    "profile_class": "workhorse",
+                },
+                "trace_source": "governed-runner-fixture",
+            },
+        ):
+            status = self.module.materialize_review_packets(
+                run_dir,
+                request=request,
+                state=state,
+                advisory_context={"playbook_id": "AOA-P-0011"},
+            )
 
         self.assertTrue(status["ready"])
         self.assertEqual(status["emitted_candidate_artifact_count"], 0)

@@ -21,7 +21,7 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
+from types import MethodType, ModuleType, SimpleNamespace
 from typing import Any
 
 import pytest
@@ -911,6 +911,50 @@ else:
     path.chmod(0o755)
 
 
+def _fixture_codex_preflight(
+    _runtime: Any,
+    launch: Mapping[str, Any],
+    model_slug: str,
+    reasoning_effort: str,
+    _tool_entry: Mapping[str, Any],
+    *,
+    repository_workspace: Path | None = None,
+) -> dict[str, Any]:
+    """Return the exact successful preflight shape for non-preflight tests.
+
+    The production implementation and its process-isolation behavior stay under
+    direct unit and end-to-end coverage.  Semantic runtime tests use this fork-
+    inherited double so report, lifecycle, and authority assertions do not each
+    repeat five external transport probes.
+    """
+
+    assert repository_workspace is not None
+    executable = Path(str(launch["codex_executable"]))
+    if (
+        not executable.is_absolute()
+        or not executable.is_file()
+        or executable.resolve() != executable
+    ):
+        raise RUNTIME.ExternalCodexRuntimeError(
+            "codex_unavailable",
+            "fixture Codex executable is not an exact absolute file",
+        )
+    executable_digest = _digest_path(executable)
+    if executable_digest != launch["codex_executable_digest"]:
+        raise RUNTIME.ExternalCodexRuntimeError(
+            "codex_executable_drift", "fixture Codex executable digest changed"
+        )
+    return {
+        "version": "codex-cli 0.147.0",
+        "auth_regime": "chatgpt_login",
+        "model_slug": model_slug,
+        "reasoning_effort": reasoning_effort,
+        "executable_digest": executable_digest,
+        "mount_wrapper_digest": _digest_path(RUNTIME.MOUNT_WRAPPER_PATH),
+        "mount_launcher_digest": _digest_path(RUNTIME.MOUNT_LAUNCHER_PATH),
+    }
+
+
 def _adapt_plan(
     *,
     task_ref: ProvenanceRef,
@@ -1061,6 +1105,7 @@ def _fixture(
     responsibility_transfer_mutator: Callable[[dict[str, Any]], None] | None = None,
     validation_commands: tuple[Mapping[str, Any], ...] | None = None,
     omit_historical_reviewer_inputs: bool = False,
+    exact_preflight: bool = False,
 ) -> dict[str, Any]:
     if owner_binding_v1 and not owner_contour:
         raise AssertionError(
@@ -2195,8 +2240,14 @@ def _fixture(
         )
         owner_execution_request_path = tmp_path / "owner-execution-request.json"
         _write_json(owner_execution_request_path, owner_execution_request)
+    runtime = RUNTIME.ExternalCodexRuntime(state_root or (tmp_path / "state"))
+    if not exact_preflight:
+        runtime._codex_preflight = MethodType(  # type: ignore[method-assign]
+            _fixture_codex_preflight,
+            runtime,
+        )
     return {
-        "runtime": RUNTIME.ExternalCodexRuntime(state_root or (tmp_path / "state")),
+        "runtime": runtime,
         "launch_path": launch_path,
         "launch": launch,
         "binding_path": binding_path,
@@ -3001,7 +3052,7 @@ def test_preflight_rejects_path_replacement_after_controller_digest(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fixture = _fixture(tmp_path)
+    fixture = _fixture(tmp_path, exact_preflight=True)
     runtime = fixture["runtime"]
     original_containment_command = runtime._containment_command
     replaced = [False]
@@ -3205,7 +3256,7 @@ def test_preflight_exercises_masked_nested_codex_sandbox(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fixture = _fixture(tmp_path)
+    fixture = _fixture(tmp_path, exact_preflight=True)
     runtime = fixture["runtime"]
     original_containment_command = runtime._containment_command
     observed: list[tuple[list[str], Mapping[str, Any], tuple[str, ...]]] = []
@@ -3483,7 +3534,7 @@ def test_live_supervisor_rejects_mismatched_child_identity_receipt(
 def test_preflight_and_separate_process_return_structured_result(
     tmp_path: Path,
 ) -> None:
-    fixture = _fixture(tmp_path)
+    fixture = _fixture(tmp_path, exact_preflight=True)
     runtime = fixture["runtime"]
     _git(
         fixture["workspace"],
@@ -3496,6 +3547,17 @@ def test_preflight_and_separate_process_return_structured_result(
     assert preflight["admitted"] is True
     assert preflight["model_slug"] == "gpt-5.6-luna"
     assert preflight["reasoning_effort"] == "max"
+    assert preflight["preflight"]["version"] == "codex-cli 0.147.0"
+    assert preflight["preflight"]["auth_regime"] == "chatgpt_login"
+    assert preflight["preflight"]["executable_digest"] == (
+        fixture["launch"]["codex_executable_digest"]
+    )
+    assert preflight["preflight"]["mount_wrapper_digest"] == _digest_path(
+        RUNTIME.MOUNT_WRAPPER_PATH
+    )
+    assert preflight["preflight"]["mount_launcher_digest"] == _digest_path(
+        RUNTIME.MOUNT_LAUNCHER_PATH
+    )
     started = runtime.start(fixture["launch_path"])
     assert started["status"] == "running"
     assert started["worker_pid"] != os.getpid()
@@ -4129,6 +4191,7 @@ def test_role_scoped_mcp_requires_only_its_exact_credential(
         tmp_path,
         task_family="eval_application",
         role_mcp="aoa_evals",
+        exact_preflight=True,
     )
     monkeypatch.delenv("AOA_EVALS_MCP_READ_BEARER_TOKEN", raising=False)
     monkeypatch.setenv("AOA_STATS_MCP_READ_BEARER_TOKEN", "wrong-role-token")
