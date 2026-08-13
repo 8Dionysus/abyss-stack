@@ -1265,19 +1265,31 @@ def load_schema(path: Path) -> dict[str, Any]:
     return schema
 
 
-def validate_json(value: Any, schema_path: Path, *, label: str) -> None:
-    validator = Draft202012Validator(
-        load_schema(schema_path),
-        format_checker=FormatChecker(),
-    )
+def _validate_json_against_schema(
+    value: Any,
+    schema: Mapping[str, Any],
+    *,
+    label: str,
+    schema_label: str,
+) -> None:
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
     errors = sorted(validator.iter_errors(value), key=lambda item: list(item.path))
     if errors:
         first = errors[0]
         location = "/".join(str(item) for item in first.path) or "<root>"
         raise ExternalCodexRuntimeError(
             "schema_validation_failed",
-            f"{label} violates {schema_path.name} at {location}: {first.message}",
+            f"{label} violates {schema_label} at {location}: {first.message}",
         )
+
+
+def validate_json(value: Any, schema_path: Path, *, label: str) -> None:
+    _validate_json_against_schema(
+        value,
+        load_schema(schema_path),
+        label=label,
+        schema_label=schema_path.name,
+    )
 
 
 def validate_structured_output_schema(schema: Mapping[str, Any]) -> None:
@@ -1435,6 +1447,68 @@ def specialize_report_schema(
     Draft202012Validator.check_schema(specialized)
     validate_structured_output_schema(specialized)
     return specialized
+
+
+def report_semantic_validation_schema(
+    schema: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Admit known evidence syntax before exact semantic and identity checks.
+
+    The canonical report schema intentionally keeps its historical digest and
+    ABI.  A session-local Structured Outputs schema additionally constrains
+    exact task, incarnation, and immutable-input identities.  During runtime
+    admission, semantic validation must see syntactically valid but unavailable
+    identities so it can reject them with the precise fail-closed owner code.
+    Successful reports still pass the exact session-local schema afterwards.
+    """
+
+    semantic = json.loads(json.dumps(schema))
+    properties = semantic.get("properties")
+    findings = properties.get("findings") if isinstance(properties, dict) else None
+    transition = (
+        properties.get("transition") if isinstance(properties, dict) else None
+    )
+    finding_items = findings.get("items") if isinstance(findings, dict) else None
+    finding_properties = (
+        finding_items.get("properties") if isinstance(finding_items, dict) else None
+    )
+    transition_properties = (
+        transition.get("properties") if isinstance(transition, dict) else None
+    )
+    evidence_arrays = (
+        finding_properties.get("evidence_refs")
+        if isinstance(finding_properties, dict)
+        else None,
+        transition_properties.get("evidence_refs")
+        if isinstance(transition_properties, dict)
+        else None,
+    )
+    for evidence_array in evidence_arrays:
+        if (
+            not isinstance(evidence_array, dict)
+            or not isinstance(evidence_array.get("items"), dict)
+            or evidence_array["items"].get("type") != "string"
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_profile_invalid",
+                "canonical report schema cannot expose semantic evidence refs",
+            )
+        evidence_pattern = evidence_array["items"].get("pattern")
+        runtime_token = "runtime:workspace-final-manifest)"
+        if (
+            not isinstance(evidence_pattern, str)
+            or evidence_pattern.count(runtime_token) != 1
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_profile_invalid",
+                "canonical report schema cannot extend semantic runtime evidence",
+            )
+        evidence_array["items"]["pattern"] = evidence_pattern.replace(
+            runtime_token,
+            "runtime:(?:workspace-final-manifest|nested-evidence-namespace))",
+        )
+    Draft202012Validator.check_schema(semantic)
+    return semantic
 
 
 def _atomic_write_bytes(path: Path, payload: bytes, *, mode: int = 0o600) -> None:
@@ -11345,10 +11419,15 @@ Runtime session identity: {state["session_id"]}
         if report_path.is_file():
             try:
                 report = load_json(report_path, label="model report")
-                validate_json(
+                exact_report_schema_path = self._execution_result_schema_path(state)
+                canonical_report_schema = load_schema(
+                    Path(str(state["materialized_inputs"]["result_schema"]))
+                )
+                _validate_json_against_schema(
                     report,
-                    self._execution_result_schema_path(state),
+                    report_semantic_validation_schema(canonical_report_schema),
                     label="model report",
+                    schema_label="semantic external-codex-report schema",
                 )
                 runtime_evidence_paths: dict[str, Path] = {}
                 if workspace_manifest_ref is not None:
@@ -11372,6 +11451,11 @@ Runtime session identity: {state["session_id"]}
                     runtime_evidence_paths=runtime_evidence_paths,
                     final_workspace_manifest_digest=final_workspace_manifest_digest,
                     projection_fd=projection_fd,
+                )
+                validate_json(
+                    report,
+                    exact_report_schema_path,
+                    label="model report",
                 )
             except ExternalCodexRuntimeError as exc:
                 failure_code = exc.code
