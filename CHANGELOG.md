@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Pin both external Codex specialized-environment profiles to the landed
+  `aoa-stats` actor-responsibility receipt revision, so a release built from
+  the current validation dependency can package and verify that same owner
+  source instead of retaining the pre-admission snapshot.
 - Shorten external Codex admission without caching or dropping proof: the
   independent version, login, model-catalog, subreaper, and nested-sandbox
   probes now overlap in bounded process-isolated groups with exact timeout and
