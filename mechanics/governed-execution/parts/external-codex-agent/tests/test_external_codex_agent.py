@@ -6495,6 +6495,19 @@ def test_nested_evidence_namespace_closes_exact_producer_graph(
     runtime_ref = (
         "runtime:nested-evidence-namespace#" + immutable_entry["entry_id"]
     )
+    canonical_report_schema = json.loads(
+        REPORT_SCHEMA_PATH.read_text(encoding="utf-8")
+    )
+    canonical_evidence_patterns = (
+        canonical_report_schema["properties"]["findings"]["items"][
+            "properties"
+        ]["evidence_refs"]["items"]["pattern"],
+        canonical_report_schema["properties"]["transition"]["properties"][
+            "evidence_refs"
+        ]["items"]["pattern"],
+    )
+    for evidence_pattern in canonical_evidence_patterns:
+        assert re.fullmatch(evidence_pattern, runtime_ref)
     RUNTIME._validate_runtime_evidence_ref(
         runtime_ref,
         {"nested-evidence-namespace": namespace_path},

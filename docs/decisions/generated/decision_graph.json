@@ -1,9 +1,9 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 121,
-  "edge_count": 2734,
+  "edge_count": 2735,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1011,
+    "CITES_SOURCE_SURFACE": 1012,
     "DATED": 121,
     "GUARDED_BY": 374,
     "HAS_STATUS": 121,
@@ -12998,6 +12998,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0121",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-report.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0121",
       "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-state.schema.json",
       "type": "CITES_SOURCE_SURFACE"
     },
@@ -13688,7 +13693,7 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1192,
+  "node_count": 1193,
   "node_type_counts": {
     "date": 37,
     "decision": 121,
@@ -13696,7 +13701,7 @@
     "mechanic_parent": 10,
     "owner_surface": 64,
     "repo": 1,
-    "source_surface": 586,
+    "source_surface": 587,
     "stack_lane": 49,
     "status": 3,
     "surface_class": 135
@@ -18321,6 +18326,11 @@
     {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-nested-evidence-namespace.schema.json",
       "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-nested-evidence-namespace.schema.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-report.schema.json",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-report.schema.json",
       "type": "source_surface"
     },
     {

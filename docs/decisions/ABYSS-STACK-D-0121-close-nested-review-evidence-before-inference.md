@@ -40,6 +40,21 @@ same-name digest collisions and left zero unresolved refs. Repeated runs were
 deterministic and completed below one second. This is a durable transport and
 review-cost boundary, not a domain-proof or acceptance decision.
 
+The first admitted real-session shadow showed that deterministic closure is a
+correctness and restart-avoidance improvement, not yet a per-inference latency
+improvement. It ran in 401.36 seconds versus the preserved 401.52-second
+model-only run. The reviewer consumed 2,747,506 input tokens, of which
+2,552,064 were cached, and 17,920 output tokens, versus 1,986,045 input,
+1,832,192 cached, and 18,559 output tokens in the model-only run. The reviewer
+nevertheless changed the substantive judgment from evidence-closure repair to
+`completed`/`proceed`: both prior closure blockers were resolved and no
+semantic blocker remained. The runtime then correctly failed the attempt
+because the canonical post-inference report schema, unlike its specialized
+session-local derivative, had not yet admitted the new runtime reference.
+That shadow-found integration gap is closed by admitting
+`runtime:nested-evidence-namespace#<entry-id>` in both canonical evidence-ref
+arrays and asserting the canonical patterns in the namespace regression test.
+
 ## Options considered
 
 - Leave all transitive evidence reconstruction to the model. This preserves no
@@ -104,9 +119,10 @@ closure; rollback does not admit name-only mapping or rewrite prior artifacts.
 The controller already owns immutable materialization, exact digests, actor
 manifests, deltas, and runtime validation observations. Joining those exact
 transport identities is therefore runtime work, while deciding whether the
-evidence proves the domain claim remains reviewer work. This split removes a
-large deterministic reconstruction burden without weakening the independent
-semantic gate.
+evidence proves the domain claim remains reviewer work. This split removes
+transport ambiguity and false repair loops without weakening the independent
+semantic gate; the first real shadow does not support a claim that it reduces
+the model's own inspection time or input-token volume.
 
 Digest binding prevents silent same-name collisions. Producer-final source
 binding prevents temporal substitution by a newer reviewer checkout. Keeping
@@ -117,8 +133,9 @@ runtime can already prove incomplete.
 
 ## Consequences
 
-- Positive: exact byte and anchor closure moves from a 401-second model review
-  into a sub-second deterministic preflight for the measured real packet.
+- Positive: exact byte and anchor closure itself is a sub-second deterministic
+  preflight and changed the measured real review from a false evidence repair
+  to no remaining semantic blocker, avoiding a needless repair/review cycle.
 - Positive: historical report/output bytes remain unchanged and independently
   inspectable.
 - Positive: same-name collisions, source drift, missing historical paths,
@@ -129,18 +146,22 @@ runtime can already prove incomplete.
 - Tradeoff: reviewer packets that want deterministic transitive closure must
   carry the complete producer task/result/report/delta/output envelope;
   incomplete legacy packets remain on the more expensive model-only route.
-- Tradeoff: bounded anchored excerpts add a small amount of prompt material,
-  but replace broad repeated file discovery and keep exact historical bytes
-  visible to semantic review.
-- Follow-up: shadow the admitted namespace against fresh real reviewers,
-  compare duration, input tokens, verdict equivalence, and unresolved-edge
-  rates, then retain the default only while exact closure remains green.
+- Tradeoff: bounded anchored excerpts keep exact historical bytes visible to
+  semantic review, but the first real shadow increased input-token volume and
+  did not reduce wall time because the reviewer still inspected owner sources
+  and underlying immutable envelopes.
+- Follow-up: rerun the admitted real reviewer after the canonical-schema fix;
+  then compare end-to-end avoided retries as well as duration, input tokens,
+  verdict equivalence, and unresolved-edge rates. Optimize namespace prompt
+  weight separately rather than treating transport closure as a demonstrated
+  inference-speed win.
 
 ## Source surfaces
 
 - `mechanics/governed-execution/parts/external-codex-agent/external_codex_nested_evidence.py`
 - `mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py`
 - `mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-nested-evidence-namespace.schema.json`
+- `mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-report.schema.json`
 - `mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-state.schema.json`
 - `mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md`
 - `mechanics/governed-execution/parts/external-codex-agent/PROVENANCE.md`
