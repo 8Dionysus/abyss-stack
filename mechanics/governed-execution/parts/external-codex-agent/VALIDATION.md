@@ -49,6 +49,16 @@ No launch field, profile, environment variable, installed wrapper, or
 production source path can select this test-only double. Any test whose verdict
 depends on live preflight must use the exact fixture path.
 
+Runtime schema loading retains a separate fail-closed optimization. Every load
+still reads the named file, parses its current bytes into a fresh mapping, and
+runs the requested value validation. Only a successful Draft 2020-12
+meta-validation is memoized, keyed by the complete schema bytes, for at most 64
+schemas no larger than 512 KiB. Changed bytes are a cache miss, invalid schemas
+are rejected again because exceptions are not cached, and larger schemas always
+take the uncached meta-validation path. The focused cache regression proves all
+of those boundaries, including that callers never receive a shared mutable
+schema object.
+
 The focused suite uses disposable Git repositories and a fake Codex-compatible
 binary. It proves exact fixture admission plus separate owner-contour semantic
 admission against pinned `aoa-agents` and `aoa-skills` schemas, a neutral

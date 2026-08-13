@@ -25,6 +25,7 @@ from types import MethodType, ModuleType, SimpleNamespace
 from typing import Any
 
 import pytest
+from jsonschema.exceptions import SchemaError
 
 from aoa_sdk.a2a.rebase import (
     QuestPassport,
@@ -2279,6 +2280,62 @@ def _wait_terminal(
     raise AssertionError(
         f"external Codex fixture did not stop: {state}"
     )
+
+
+def test_schema_meta_validation_cache_is_exact_and_fail_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    schema_path = tmp_path / "fixture.schema.json"
+    original = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": False,
+    }
+    RUNTIME._check_schema_bytes_cached.cache_clear()
+    try:
+        _write_json(schema_path, original)
+        original_raw = schema_path.read_bytes()
+        first_loaded = RUNTIME.load_schema(schema_path)
+        assert first_loaded == original
+        first_loaded["type"] = "array"
+        assert RUNTIME.load_schema(schema_path) == original
+        first = RUNTIME._check_schema_bytes_cached.cache_info()
+        assert first.maxsize == 64
+        assert (first.hits, first.misses, first.currsize) == (1, 1, 1)
+
+        changed = dict(original, type="integer")
+        _write_json(schema_path, changed)
+        assert RUNTIME.load_schema(schema_path) == changed
+        second = RUNTIME._check_schema_bytes_cached.cache_info()
+        assert (second.hits, second.misses, second.currsize) == (1, 2, 2)
+
+        invalid = dict(original, type="not-a-json-schema-type")
+        _write_json(schema_path, invalid)
+        with pytest.raises(SchemaError):
+            RUNTIME.load_schema(schema_path)
+        with pytest.raises(SchemaError):
+            RUNTIME.load_schema(schema_path)
+        rejected = RUNTIME._check_schema_bytes_cached.cache_info()
+        assert (rejected.hits, rejected.misses, rejected.currsize) == (1, 4, 2)
+
+        schema_path.write_bytes(original_raw)
+        assert RUNTIME.load_schema(schema_path) == original
+        restored = RUNTIME._check_schema_bytes_cached.cache_info()
+        assert (restored.hits, restored.misses, restored.currsize) == (2, 4, 2)
+
+        RUNTIME._check_schema_bytes_cached.cache_clear()
+        monkeypatch.setattr(
+            RUNTIME,
+            "MAX_CACHED_SCHEMA_BYTES",
+            len(original_raw) - 1,
+        )
+        assert RUNTIME.load_schema(schema_path) == original
+        assert RUNTIME.load_schema(schema_path) == original
+        bounded = RUNTIME._check_schema_bytes_cached.cache_info()
+        assert (bounded.hits, bounded.misses, bounded.currsize) == (0, 0, 0)
+    finally:
+        RUNTIME._check_schema_bytes_cached.cache_clear()
 
 
 def test_wait_terminal_accepts_transition_at_timeout_boundary(
@@ -10639,7 +10696,7 @@ def test_unexpected_worker_death_cleans_codex_group_and_returns_failure(
     codex_pid = running["codex_pid"]
 
     os.kill(worker_pid, signal.SIGKILL)
-    terminal = runtime.status(fixture["session_id"])
+    terminal = _wait_terminal(runtime, fixture["session_id"])
     result = runtime.result(fixture["session_id"])
 
     assert terminal["status"] == "failed"
@@ -10676,7 +10733,7 @@ def test_worker_death_promotes_projection_authority_drift(
     )
 
     os.kill(running["worker_pid"], signal.SIGKILL)
-    terminal = runtime.status(fixture["session_id"])
+    terminal = _wait_terminal(runtime, fixture["session_id"])
     result = runtime.result(fixture["session_id"])
 
     assert terminal["status"] == "authority_blocked"
@@ -10707,7 +10764,7 @@ def test_worker_death_promotes_owner_source_drift(tmp_path: Path) -> None:
     )
 
     os.kill(running["worker_pid"], signal.SIGKILL)
-    terminal = runtime.status(fixture["session_id"])
+    terminal = _wait_terminal(runtime, fixture["session_id"])
     result = runtime.result(fixture["session_id"])
 
     assert terminal["status"] == "authority_blocked"

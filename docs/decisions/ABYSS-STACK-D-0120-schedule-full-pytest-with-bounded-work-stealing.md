@@ -135,6 +135,36 @@ shard-seconds. The isolated causal comparisons are therefore accepted, but no
 single local full-suite wall time is treated as a stable effect estimate; the
 fresh public runner remains the landing comparison.
 
+Two public runs of the same stratified exact head then selected the same 2,221
+tests and closed green. Their pytest queues took 390.10 and 308.00 seconds,
+with 1,557.17 and 1,227.44 aggregate shard-seconds. The earlier baseline pair
+took 390.99 and 382.79 seconds. The candidate pair therefore supplied one
+baseline-equivalent sample and one materially faster sample, but the runner
+variance remained too large to attribute the entire spread to stratification.
+It did establish that the deterministic boundary changes were portable and did
+not introduce a public-runner regression.
+
+Test-level profiling then found a runtime operation, rather than another
+scheduler imbalance. One A2A negative-matrix test invoked value validation more
+than 2,200 times. Its profile spent 40.32 seconds in 2,216 schema loads and
+41.15 seconds in 2,264 Draft 2020-12 meta-schema checks, even though most calls
+read the same immutable schema bytes. Caching compiled validators would also
+share mutable application state and couple value-validation behavior to cache
+lifetime. Caching by pathname or metadata would fail to bind the proof to the
+bytes actually used.
+
+The bounded candidate instead memoizes only a successful schema
+meta-validation keyed by the complete raw bytes. Each call still rereads and
+parses its file into a fresh mapping, and every value is still validated.
+Changed bytes miss, invalid schemas are never cached, schemas over 512 KiB use
+the uncached path, and the 64-entry bound caps retained raw keys. The focused
+A2A test fell from 22.87 to 6.91 seconds outside the profiler; under profiling,
+function calls fell from 118.68 million in 63.28 seconds to 19.65 million in
+22.66 seconds. The complete exact local lane then selected 2,222 tests, closed
+with 2,217 passed, five skipped, and 230 passed subtests, and took 151.75
+seconds with 574.47 aggregate shard-seconds. Its four-worker lower bound was
+143.62 seconds, so only 8.13 seconds remained above the observed work bound.
+
 ## Options considered
 
 - Retain the serial gate and optimize only individual tests.
@@ -150,6 +180,9 @@ fresh public runner remains the landing comparison.
   a network timeout.
 - Supply contract-shaped advisory inputs inside tests whose claim is local
   review-packet or runtime semantics, retaining live service proof elsewhere.
+- Repeat Draft 2020-12 schema meta-validation on every value-validation call.
+- Cache schema proof by path or file metadata, or share compiled validators.
+- Memoize only successful meta-validation keyed by exact bounded schema bytes.
 - Use an unbounded worker count derived from every visible logical CPU.
 
 ## Decision
@@ -190,6 +223,13 @@ probe a deployed service incidentally and then accept a timeout fallback as
 test setup. Live advisory integration remains a separate explicit evidence
 lane.
 
+Schema loading may memoize only successful Draft 2020-12 meta-validation for
+the complete raw bytes of schemas no larger than 512 KiB, with at most 64 keys.
+Every load rereads the file and returns a freshly parsed mapping; every value
+validation still executes. Changed bytes, invalid schemas, and larger schemas
+take the fail-closed uncached path. The runtime does not cache by pathname or
+metadata and does not share compiled validator instances.
+
 ## Rationale
 
 The chosen scheduler matches the four-CPU runner while avoiding xdist's
@@ -214,6 +254,13 @@ about lifecycle or authority semantics, while explicit exact sentinels retain
 the real containment and credential claims. This moves the test boundary
 instead of weakening the runtime boundary.
 
+Schema validity is a property of exact bytes, while application validity is a
+property of each value. Separating those claims removes repeated meta-schema
+work from both tests and real external-Codex session transitions without
+reusing a parsed mutable mapping or suppressing any value check. Exact-byte
+keys also make content drift self-invalidating without trusting filesystem
+timestamps.
+
 ## Consequences
 
 - Positive: the entire assertion surface remains blocking while the dominant
@@ -232,6 +279,9 @@ instead of weakening the runtime boundary.
   full-lifecycle claims remain tied to real-process tests.
 - Positive: deterministic Agent OS and review-packet tests no longer vary with
   deployed advisory health or wait through its network timeout.
+- Positive: repeated runtime state, result, event, continuation, review, and A2A
+  validations reuse only an exact-byte schema-validity proof while every value
+  remains checked.
 - Positive: no extra scheduler dependency is installed, and exact serial
   execution remains one environment switch away.
 - Tradeoff: each shard is a fresh pytest process, so import cost is higher than
@@ -240,6 +290,8 @@ instead of weakening the runtime boundary.
   but stale hints affect performance only.
 - Tradeoff: a new test whose claim depends on live preflight must opt into the
   exact fixture path; reviews must reject a semantic double for that claim.
+- Tradeoff: each runtime process can retain at most 64 schema byte strings of up
+  to 512 KiB; larger schemas deliberately receive no cache benefit.
 - Follow-up: require green exact-head PR and postmerge runs on the public runner,
   compare repeat distributions, and use the serial oracle before classifying a
   scheduler-specific failure.
@@ -251,17 +303,18 @@ instead of weakening the runtime boundary.
 - `docs/validation/COMMAND_AUTHORITY.md`
 - `docs/testing/TEST_TOPOLOGY.md`
 - `.github/workflows/validate-stack.yml`
+- `mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py`
 - `mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md`
 - `mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py`
 - `mechanics/runtime-lifecycle/parts/logs-status/tests/test_optimization_audit_status.py`
 
 ## Follow-up route
 
-The next validation pass should prove the stratified candidate on the public
-runner and compare its exact queue against both baseline runs. If nested
-oversubscription remains visible in the small exact layer, compare an explicit
-outer-to-inner process budget before changing the default production overlap.
-Then continue decomposing long subprocess tests instead of refreshing duration
-hints without measured queue imbalance. A future multi-job DAG must still prove
-the same complete selection and final sufficiency; it must not replace the
-serial oracle or hide failed owner evidence.
+Landing requires a green exact-head public proof of the bounded schema cache,
+followed by a postmerge run and real-session observation. The current local
+queue is already within 5.7 percent of its observed four-worker work bound, so
+the next speed investigation should profile the remaining 70-second shard and
+real session transitions instead of refreshing duration hints without measured
+queue imbalance. A future multi-job DAG must still prove the same complete
+selection and final sufficiency; it must not replace the serial oracle or hide
+failed owner evidence.

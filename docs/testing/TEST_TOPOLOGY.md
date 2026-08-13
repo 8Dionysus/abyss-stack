@@ -63,3 +63,10 @@ Tests of local Agent OS and governed review-packet semantics provide an
 explicit deterministic advisory trace. They must not call a deployed advisory
 endpoint and pass through its timeout fallback; live service integration is a
 separate opt-in evidence lane.
+
+Repeated value validation may reuse only an exact-byte proof that the schema
+itself is a valid Draft 2020-12 schema. The external Codex runtime rereads and
+parses the current schema into a fresh mapping on every call, rechecks changed,
+invalid, or over-budget schema bytes, and always performs the actual value
+validation. Tests must prove those fail-closed cache boundaries rather than
+substituting a path, timestamp, or shared mutable validator cache.

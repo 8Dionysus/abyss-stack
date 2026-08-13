@@ -34,6 +34,7 @@ import urllib.parse
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
@@ -122,6 +123,7 @@ MAX_CONTROL_BYTES = 16 * 1024 * 1024
 MAX_ROLE_BYTES = 2 * 1024 * 1024
 MAX_EVENT_LINE_BYTES = 8 * 1024 * 1024
 MAX_MCP_PROXY_REQUEST_BYTES = 16 * 1024 * 1024
+MAX_CACHED_SCHEMA_BYTES = 512 * 1024
 MAX_JSON_ESCAPE_LAYERS = 32
 MCP_PROXY_CONNECT_TIMEOUT_SECONDS = 15
 SHELL_NESTING_INSPECTION_LIMIT = 4
@@ -1259,9 +1261,21 @@ def load_json(path: Path, *, label: str) -> dict[str, Any]:
     return load_json_bytes(read_bounded(path), label=label)
 
 
-def load_schema(path: Path) -> dict[str, Any]:
-    schema = load_json(path, label=f"schema {path.name}")
+@lru_cache(maxsize=64)
+def _check_schema_bytes_cached(raw: bytes) -> None:
+    """Memoize successful meta-validation of one exact bounded byte sequence."""
+
+    schema = load_json_bytes(raw, label="cached JSON schema")
     Draft202012Validator.check_schema(schema)
+
+
+def load_schema(path: Path) -> dict[str, Any]:
+    raw = read_bounded(path)
+    schema = load_json_bytes(raw, label=f"schema {path.name}")
+    if len(raw) <= MAX_CACHED_SCHEMA_BYTES:
+        _check_schema_bytes_cached(raw)
+    else:
+        Draft202012Validator.check_schema(schema)
     return schema
 
 
