@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 24213479,
+  "allowed_tracked_bytes": 34717464,
+  "approved_by": "repository-owner",
+  "base_ref": "b7b68735ab2480e3c693232f6708c93af1710fda",
+  "changed_generated_bytes": 24213479,
+  "changed_generated_files": 259,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "f2d1005f833605ec6495ecb1ad65e97afb01f7e94cf783e61a8e05b840c45fb0",
+  "reason": "The required Unreleased changelog entry changes one owner source and deterministically rebinds the content-addressed portable family; the repository already carries an accepted larger-family posture, and the actual newly tracked source content is only this bounded documentation addition.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34717464,
+  "tracked_bytes_max": 24117248
+}
