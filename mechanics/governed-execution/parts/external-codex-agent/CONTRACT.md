@@ -849,7 +849,10 @@ review seed, both summon requests and schemas, and every exported writer and
 reviewer report/event/workspace/actor-final/actor-delta artifact plus the
 canonical writer runtime result itself, constructs the
 payload from that locked snapshot, and holds both locks through the atomic
-output write. Result, task, durable state, and final locked state must all retain
+output write. The published child payload self-identifies as
+`abyss_stack_external_codex_a2a_return_v1`; downstream closeout never has to
+infer the runtime-owned schema from a filename or caller assertion. Result,
+task, durable state, and final locked state must all retain
 task family `landing_review`. A reviewer
 continuation racing the export therefore either precedes a failed revalidation
 or follows a durable export; it cannot mix a stale verdict with newer bytes.

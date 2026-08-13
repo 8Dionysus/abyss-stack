@@ -5134,6 +5134,10 @@ def test_reviewer_preparation_forwards_exact_writer_evidence_without_starting(
         summon_request_path=summon_path,
         output_path=tmp_path / "cross-state-child-task-result.json",
     )
+    assert (
+        exported["child_task_result"]["schema_version"]
+        == "abyss_stack_external_codex_a2a_return_v1"
+    )
     assert exported["child_task_result"]["review_outcome"] == "proceed"
 
 
@@ -11221,6 +11225,10 @@ def test_a2a_export_requires_exact_independent_review_result(
     )
 
     assert exported["writer_thread_id"] != exported["reviewer_thread_id"]
+    assert (
+        exported["child_task_result"]["schema_version"]
+        == "abyss_stack_external_codex_a2a_return_v1"
+    )
     assert exported["child_task_result"]["reviewed"] is True
     assert exported["child_task_result"]["review_outcome"] == "proceed"
     assert exported["child_task_result"]["remote_task"]["state"] == "completed"

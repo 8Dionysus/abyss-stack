@@ -13454,6 +13454,7 @@ Runtime session identity: {state["session_id"]}
                         "summon request bytes changed before A2A publication",
                     )
                 payload = {
+                    "schema_version": "abyss_stack_external_codex_a2a_return_v1",
                     "reviewed": True,
                     "review_status": "reviewed",
                     "review_outcome": outcome_name,
@@ -13889,6 +13890,7 @@ Runtime session identity: {state["session_id"]}
                     )
                 remote_state, outcome_name = review_outcome
                 payload = {
+                    "schema_version": "abyss_stack_external_codex_a2a_return_v1",
                     "reviewed": True,
                     "review_status": "reviewed",
                     "review_binding_mode": "owner_contour_immutable_evidence",
