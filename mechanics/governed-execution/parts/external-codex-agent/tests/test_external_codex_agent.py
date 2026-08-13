@@ -2172,7 +2172,7 @@ def _fixture(
                     "digest": _digest_path(OWNER_EXECUTION_REQUEST_SCHEMA_PATH),
                     "owner_repo": "aoa-agents",
                     "artifact_ref": "skills/aoa-summon/references/summon-request-v4.schema.json",
-                    "source_ref": "4a8dbd922737aaff876ca16a0098ab26cb9cf22e",
+                    "source_ref": "34a9b091ae836f5c97a079d516ca7c3c74f5952b",
                     "schema_version": "summon-request-v4",
                 },
                 "task_local_dag_schema": {

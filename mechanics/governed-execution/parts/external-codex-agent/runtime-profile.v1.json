@@ -270,7 +270,7 @@
     "owner_execution_request_schema": {
       "owner_repo": "aoa-agents",
       "artifact_ref": "skills/aoa-summon/references/summon-request-v4.schema.json",
-      "source_ref": "4a8dbd922737aaff876ca16a0098ab26cb9cf22e",
+      "source_ref": "34a9b091ae836f5c97a079d516ca7c3c74f5952b",
       "digest": "sha256:c47afa1654827ca1f8f05a31b9e450c5960b536114374936858d5a1a723d3e37",
       "schema_version": "summon-request-v4"
     },
