@@ -19,6 +19,10 @@ Tracking starts with the community-docs baseline for this repository.
   Agent OS and governed review-packet semantic tests now inject their bounded
   advisory trace instead of silently calling a deployed endpoint and waiting
   through its timeout fallback; explicit live evidence remains separate.
+- Require every external owner-contour request to repeat the exact SDK run-plan
+  and model-realization identities from its evidence-complete incarnation
+  binding. Preflight now rejects a caller that substitutes either explicit ref
+  and recomputes only the request digest.
 - Admit a created or deleted structural parent directory in an external
   actor's final workspace delta only when the same exact delta contains a
   strict descendant whose own change is already authorized. Normal closeout,

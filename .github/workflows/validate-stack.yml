@@ -36,14 +36,14 @@ jobs:
         run: |
           git init "$RUNNER_TEMP/aoa-agents-source"
           git -C "$RUNNER_TEMP/aoa-agents-source" remote add origin https://github.com/8Dionysus/aoa-agents
-          git -C "$RUNNER_TEMP/aoa-agents-source" fetch --depth 1 origin 6eb9b27709fdab241423bf657dfe39fa85e4b159
+          git -C "$RUNNER_TEMP/aoa-agents-source" fetch --depth 1 origin f6656abf1780d9b27133ed39d03a2c9ff11dfd5e
           git -C "$RUNNER_TEMP/aoa-agents-source" checkout --detach FETCH_HEAD
 
       - name: Checkout canonical aoa-skills outside the source tree
         run: |
           git init "$RUNNER_TEMP/aoa-skills-source"
           git -C "$RUNNER_TEMP/aoa-skills-source" remote add origin https://github.com/8Dionysus/aoa-skills
-          git -C "$RUNNER_TEMP/aoa-skills-source" fetch --depth 1 origin d9949a4a4e525bceb04210fc4619d5cb57cf7cb7
+          git -C "$RUNNER_TEMP/aoa-skills-source" fetch --depth 1 origin 909e59f9d168077d9dc3656bb5afbeb66bfa9c6b
           git -C "$RUNNER_TEMP/aoa-skills-source" checkout --detach FETCH_HEAD
 
       - name: Clone abyss-machine verifier
@@ -53,7 +53,7 @@ jobs:
         run: |
           git init "$RUNNER_TEMP/aoa-stats-validator"
           git -C "$RUNNER_TEMP/aoa-stats-validator" remote add origin https://github.com/8Dionysus/aoa-stats
-          git -C "$RUNNER_TEMP/aoa-stats-validator" fetch --depth 1 origin 740c57d6ab2fe78d6a8440c19c2637431e039c6b
+          git -C "$RUNNER_TEMP/aoa-stats-validator" fetch --depth 1 origin 85a686a8d6bbcb1b28e8f26ab3d92f946bf8152f
           git -C "$RUNNER_TEMP/aoa-stats-validator" checkout --detach FETCH_HEAD
 
       - name: Set up Python

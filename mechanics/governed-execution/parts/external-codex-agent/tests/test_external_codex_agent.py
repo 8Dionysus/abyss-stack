@@ -86,6 +86,11 @@ OWNER_EXECUTION_REQUEST_SCHEMA_PATH = (
 OWNER_EXECUTION_REQUEST_COMPILER_PATH = (
     AGENTS_ROOT / "skills/aoa-summon/scripts/compile_external_execution_request.py"
 )
+INCARNATION_BINDING_V2_SCHEMA_PATH = (
+    SDK_ROOT
+    / "mechanics/boundary-bridge/parts/agent-incarnation-binding/schemas/"
+    "agent-incarnation-binding-v2.schema.json"
+)
 TASK_LOCAL_DAG_SCHEMA_PATH = SKILLS_ROOT / "schemas/task_local_dag_v2.schema.json"
 CONTROLLER_PATH = PART_ROOT / "external_codex_agent.py"
 BINDER_PATH = PART_ROOT / "bind_external_actor_launch.py"
@@ -1598,7 +1603,7 @@ def _fixture(
             risk="r1_repo_local" if workspace_write else "r0_readonly",
             control_mode="codex_supervised",
             delegate_tier="executor" if role_id == "coder" else "verifier",
-            route_anchor="fixture:a2a-summon-return",
+            route_anchor=parent_task_id,
             expected_artifacts=summon_outputs,
             self_agent=False,
         ),
@@ -1647,7 +1652,9 @@ def _fixture(
             {
                 "schema_version": "urn:aoa-sdk:a2a:summon-result:v4",
                 "allowed": True,
-                "execution_surface": "external_cli",
+                "capability_execution_claimed": False,
+                "execution_surface": "a2a_remote",
+                "cohort_pattern": "solo",
                 "request_artifact_digest": summon_request_ref.artifact_digest,
             },
         )
@@ -1997,7 +2004,11 @@ def _fixture(
         continuation_id=continuation_id,
         parent_objective_ref=workspace_ref,
         established_decision_refs=(),
-        delegated_obligation="Inspect one exact landing transition and return evidence.",
+        delegated_obligation=(
+            obligation["duty"]
+            if owner_contour
+            else "Inspect one exact landing transition and return evidence."
+        ),
         delegation_reason="The bounded landing check is repeatable and independently reviewable.",
         exact_child_identity=incarnation_id,
         owner_scope=(
@@ -2172,7 +2183,7 @@ def _fixture(
                     "digest": _digest_path(OWNER_EXECUTION_REQUEST_SCHEMA_PATH),
                     "owner_repo": "aoa-agents",
                     "artifact_ref": "skills/aoa-summon/references/summon-request-v4.schema.json",
-                    "source_ref": "1458393baa90178aae63f1841e3bd58139c13232",
+                    "source_ref": "f6656abf1780d9b27133ed39d03a2c9ff11dfd5e",
                     "schema_version": "summon-request-v4",
                 },
                 "task_local_dag_schema": {
@@ -2216,6 +2227,8 @@ def _fixture(
         assert model_fit_query_ref is not None
         assert model_fit_projection_ref is not None
         assert SUMMON_COMPILER is not None
+        run_plan_schema_path = tmp_path / "sdk-run-plan.schema.json"
+        _write_json(run_plan_schema_path, RunPlan.model_json_schema())
         owner_execution_request = SUMMON_COMPILER.compile_external_execution_request(
             request_ref=(f"task://fixture/{identity_suffix}/owner-execution-request"),
             runtime_interface="abyss_stack_external_codex_agent_v1",
@@ -2230,9 +2243,11 @@ def _fixture(
             model_fit_projection_path=model_fit_projection_path,
             task_local_dag_path=dag_path,
             incarnation_binding_path=owner_request_binding_path,
+            incarnation_binding_schema_path=INCARNATION_BINDING_V2_SCHEMA_PATH,
             sdk_summon_request_path=summon_request_path,
             sdk_summon_decision_path=summon_decision_path,
             run_plan_path=plan_path,
+            run_plan_schema_path=run_plan_schema_path,
             runtime_launch_path=launch_path,
             runtime_task_path=task_path,
             responsibility_transfer_path=transfer_path,
@@ -2277,9 +2292,7 @@ def _wait_terminal(
     state = runtime.status(session_id)
     if state["status"] != "running":
         return state
-    raise AssertionError(
-        f"external Codex fixture did not stop: {state}"
-    )
+    raise AssertionError(f"external Codex fixture did not stop: {state}")
 
 
 def test_schema_meta_validation_cache_is_exact_and_fail_closed(
@@ -5136,6 +5149,10 @@ def test_reviewer_preparation_forwards_exact_writer_evidence_without_starting(
         summon_request_path=summon_path,
         output_path=tmp_path / "cross-state-child-task-result.json",
     )
+    assert (
+        exported["child_task_result"]["schema_version"]
+        == "abyss_stack_external_codex_a2a_return_v1"
+    )
     assert exported["child_task_result"]["review_outcome"] == "proceed"
 
 
@@ -5765,6 +5782,59 @@ def test_owner_contour_rejects_request_that_changes_responsibility_holders(
     or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file(),
     reason="paired owner-contour proof requires aoa-agents and aoa-skills source roots",
 )
+@pytest.mark.parametrize(
+    ("field", "replacement", "expected_code"),
+    (
+        (
+            "run_plan_ref",
+            {
+                "object_id": "run-plan:fixture:substituted",
+                "owner_repo": "aoa-sdk",
+                "schema_version": "aoa_control_plane_v1",
+                "digest": "sha256:" + "7" * 64,
+            },
+            "owner_run_plan_mismatch",
+        ),
+        (
+            "model_realization_ref",
+            {
+                "object_id": "source/model-realizations/substituted.json",
+                "owner_repo": "aoa-models",
+                "schema_version": "aoa_model_realization_v1",
+                "digest": "sha256:" + "8" * 64,
+            },
+            "owner_model_realization_mismatch",
+        ),
+    ),
+)
+def test_owner_contour_rejects_substituted_explicit_incarnation_ref(
+    tmp_path: Path,
+    field: str,
+    replacement: dict[str, str],
+    expected_code: str,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True)
+    owner_request_path = fixture["owner_execution_request_path"]
+    assert owner_request_path is not None
+    request = json.loads(owner_request_path.read_text(encoding="utf-8"))
+    request["external_incarnation"][field] = replacement
+    _refresh_request_digest(request)
+    _write_json(owner_request_path, request)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        fixture["runtime"].preflight(
+            fixture["launch_path"],
+            owner_request_path=owner_request_path,
+        )
+
+    assert exc_info.value.code == expected_code
+
+
+@pytest.mark.skipif(
+    not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
+    or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file(),
+    reason="paired owner-contour proof requires aoa-agents and aoa-skills source roots",
+)
 def test_owner_request_compiler_rejects_internally_inconsistent_transfer(
     tmp_path: Path,
 ) -> None:
@@ -6240,9 +6310,7 @@ def test_workspace_write_admits_only_required_parent_directories(
 ) -> None:
     fixture = _fixture(
         tmp_path,
-        objective_marker=(
-            "FAKE_WRITE_NESTED_ALLOWED FAKE_NESTED_ARTIFACT_PRODUCED"
-        ),
+        objective_marker=("FAKE_WRITE_NESTED_ALLOWED FAKE_NESTED_ARTIFACT_PRODUCED"),
         role_id="coder",
         task_family="landing_preparation",
         identity_suffix="luna-nested-output",
@@ -6286,9 +6354,7 @@ def test_workspace_write_rejects_empty_structural_parent(tmp_path: Path) -> None
     assert terminal["status"] == "authority_blocked"
     assert result is not None
     assert result["failure_code"] == "authority_boundary_crossed"
-    assert result["changed_paths"] == [
-        {"path": "actor-output", "status": "created"}
-    ]
+    assert result["changed_paths"] == [{"path": "actor-output", "status": "created"}]
 
 
 def test_structural_parent_rule_requires_an_exact_allowed_peer_delta() -> None:
@@ -6324,12 +6390,18 @@ def test_structural_parent_rule_requires_an_exact_allowed_peer_delta() -> None:
         allowed,
         peer_changes=(created_parent, created_child),
     )
-    assert RUNTIME._actor_delta_changes_out_of_scope(
-        (created_parent, created_child), allowed
-    ) == []
-    assert RUNTIME._actor_delta_changes_out_of_scope(
-        (deleted_parent, deleted_child), allowed
-    ) == []
+    assert (
+        RUNTIME._actor_delta_changes_out_of_scope(
+            (created_parent, created_child), allowed
+        )
+        == []
+    )
+    assert (
+        RUNTIME._actor_delta_changes_out_of_scope(
+            (deleted_parent, deleted_child), allowed
+        )
+        == []
+    )
     assert RUNTIME._actor_delta_changes_out_of_scope((created_parent,), allowed) == [
         "actor-output"
     ]
@@ -11168,6 +11240,10 @@ def test_a2a_export_requires_exact_independent_review_result(
     )
 
     assert exported["writer_thread_id"] != exported["reviewer_thread_id"]
+    assert (
+        exported["child_task_result"]["schema_version"]
+        == "abyss_stack_external_codex_a2a_return_v1"
+    )
     assert exported["child_task_result"]["reviewed"] is True
     assert exported["child_task_result"]["review_outcome"] == "proceed"
     assert exported["child_task_result"]["remote_task"]["state"] == "completed"

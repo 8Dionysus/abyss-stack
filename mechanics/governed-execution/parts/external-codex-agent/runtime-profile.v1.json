@@ -270,8 +270,8 @@
     "owner_execution_request_schema": {
       "owner_repo": "aoa-agents",
       "artifact_ref": "skills/aoa-summon/references/summon-request-v4.schema.json",
-      "source_ref": "1458393baa90178aae63f1841e3bd58139c13232",
-      "digest": "sha256:f1111ef14ac541a4354421370234cb20041983c2beb5a57fc582a9288cb06841",
+      "source_ref": "f6656abf1780d9b27133ed39d03a2c9ff11dfd5e",
+      "digest": "sha256:c47afa1654827ca1f8f05a31b9e450c5960b536114374936858d5a1a723d3e37",
       "schema_version": "summon-request-v4"
     },
     "task_local_dag_schema": {

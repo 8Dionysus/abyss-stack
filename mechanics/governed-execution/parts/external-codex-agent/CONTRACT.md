@@ -164,8 +164,9 @@ Before launch the controller verifies:
     `summon-request-v4`, validated against its runtime-profile-pinned owner
     bytes, plus SDK incarnation binding v2. Their obligation, mandate, exact
     role resolution, informational model-fit query and chosen projection,
-    ready task-local DAG, accepted responsibility transfer, domain procedure
-    refs, child scope, external-process/session posture, and observe-only usage
+    exact model realization and SDK run plan, ready task-local DAG, accepted
+    responsibility transfer, domain procedure refs, child scope,
+    external-process/session posture, and observe-only usage
     semantics must match the launch and continuation exactly. Owner semantic
     self-digests and immutable transport-byte digests remain distinct and both
     are verified.
@@ -848,7 +849,10 @@ review seed, both summon requests and schemas, and every exported writer and
 reviewer report/event/workspace/actor-final/actor-delta artifact plus the
 canonical writer runtime result itself, constructs the
 payload from that locked snapshot, and holds both locks through the atomic
-output write. Result, task, durable state, and final locked state must all retain
+output write. The published child payload self-identifies as
+`abyss_stack_external_codex_a2a_return_v1`; downstream closeout never has to
+infer the runtime-owned schema from a filename or caller assertion. Result,
+task, durable state, and final locked state must all retain
 task family `landing_review`. A reviewer
 continuation racing the export therefore either precedes a failed revalidation
 or follows a durable export; it cannot mix a stale verdict with newer bytes.

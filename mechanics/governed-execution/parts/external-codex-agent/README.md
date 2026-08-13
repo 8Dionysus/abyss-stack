@@ -275,8 +275,8 @@ The controller:
   binds model re-entry to the status-selected wake condition, admits only
   genuinely produced workspace artifacts, and admits `owner_contour` only with
   a separate exact `aoa-agents` execution request, ready task-local DAG,
-  accepted responsibility transfer, domain procedure refs, and pinned owner
-  schemas;
+  accepted responsibility transfer, domain procedure refs, exact SDK run-plan
+  and model-realization refs, and pinned owner schemas;
 - exports an A2A-compatible child result only after a different incarnation
   and different Codex thread reviewed the exact writer runtime result, and
   only when the supplied writer summon request matches the admitted immutable
