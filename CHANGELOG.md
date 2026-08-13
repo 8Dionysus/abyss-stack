@@ -9,6 +9,13 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Admit a created or deleted structural parent directory in an external
+  actor's final workspace delta only when the same exact delta contains a
+  strict descendant whose own change is already authorized. Normal closeout,
+  failure closeout, and failed-writer recovery now share this complete-delta
+  rule, while empty parents, siblings, symlinks, type changes, invalid paths,
+  and unrelated descendants remain authority-blocked with their precise
+  observation codes preserved.
 - Shorten the modern MCP cold-start admission transaction by collecting
   independent organ canary pairs through a bounded three-worker pool. Each
   organ still records last-known-good before current, both full 11-organ waves
