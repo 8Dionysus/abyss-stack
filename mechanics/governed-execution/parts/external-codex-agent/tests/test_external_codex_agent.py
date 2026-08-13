@@ -421,10 +421,12 @@ if "FAKE_CREATE_FIFO_OUT_OF_SCOPE" in task["objective"]:
 if "FAKE_WRITE_ALLOWED" in task["objective"]:
     (workspace / "landing-note.md").write_text("bounded preparation\n", encoding="utf-8")
 if "FAKE_WRITE_NESTED_ALLOWED" in task["objective"]:
-    (workspace / "actor-output").mkdir()
+    (workspace / "actor-output").mkdir(exist_ok=True)
     (workspace / "actor-output" / "result.json").write_text(
         '{"status":"ready"}\n', encoding="utf-8"
     )
+if "FAKE_WRITE_EMPTY_ALLOWED_PARENT" in task["objective"]:
+    (workspace / "actor-output").mkdir(exist_ok=True)
 if "FAKE_SAME_STATUS_MUTATION" in task["objective"]:
     (workspace / "dirty-note.txt").write_text("same status, changed bytes\n", encoding="utf-8")
 if "FAKE_WRITE_IGNORED" in task["objective"]:
@@ -5952,17 +5954,73 @@ def test_workspace_write_admits_only_required_parent_directories(
     assert report["artifact_paths"] == ["actor-output/result.json"]
 
 
-def test_structural_parent_rule_does_not_admit_sibling_or_non_directory() -> None:
-    allowed = ("actor-output/result.json",)
-    assert RUNTIME._actor_delta_change_is_allowed(
-        {
-            "path": "actor-output",
-            "status": "created",
-            "before": None,
-            "after": {"kind": "directory"},
-        },
-        allowed,
+def test_workspace_write_rejects_empty_structural_parent(tmp_path: Path) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker="FAKE_WRITE_EMPTY_ALLOWED_PARENT",
+        role_id="coder",
+        task_family="landing_preparation",
+        identity_suffix="luna-empty-parent",
+        workspace_write=True,
+        allowed_paths=("actor-output/result.json",),
+        source_evidence_paths=("README.md",),
     )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "authority_blocked"
+    assert result is not None
+    assert result["failure_code"] == "authority_boundary_crossed"
+    assert result["changed_paths"] == [
+        {"path": "actor-output", "status": "created"}
+    ]
+
+
+def test_structural_parent_rule_requires_an_exact_allowed_peer_delta() -> None:
+    allowed = ("actor-output/result.json",)
+    created_parent = {
+        "path": "actor-output",
+        "status": "created",
+        "before": None,
+        "after": {"kind": "directory"},
+    }
+    created_child = {
+        "path": "actor-output/result.json",
+        "status": "created",
+        "before": None,
+        "after": {"kind": "file"},
+    }
+    deleted_parent = {
+        "path": "actor-output",
+        "status": "deleted",
+        "before": {"kind": "directory"},
+        "after": None,
+    }
+    deleted_child = {
+        "path": "actor-output/result.json",
+        "status": "deleted",
+        "before": {"kind": "file"},
+        "after": None,
+    }
+
+    assert not RUNTIME._actor_delta_change_is_allowed(created_parent, allowed)
+    assert RUNTIME._actor_delta_change_is_allowed(
+        created_parent,
+        allowed,
+        peer_changes=(created_parent, created_child),
+    )
+    assert RUNTIME._actor_delta_changes_out_of_scope(
+        (created_parent, created_child), allowed
+    ) == []
+    assert RUNTIME._actor_delta_changes_out_of_scope(
+        (deleted_parent, deleted_child), allowed
+    ) == []
+    assert RUNTIME._actor_delta_changes_out_of_scope((created_parent,), allowed) == [
+        "actor-output"
+    ]
     assert not RUNTIME._actor_delta_change_is_allowed(
         {
             "path": "actor-output/other.json",
@@ -5981,6 +6039,101 @@ def test_structural_parent_rule_does_not_admit_sibling_or_non_directory() -> Non
         },
         allowed,
     )
+    assert not RUNTIME._actor_delta_change_is_allowed(
+        {
+            "path": "actor-output",
+            "status": "created",
+            "before": None,
+            "after": {"kind": "symlink"},
+        },
+        allowed,
+    )
+    assert not RUNTIME._actor_delta_change_is_allowed(
+        {
+            "path": "actor-output/../outside",
+            "status": "created",
+            "before": None,
+            "after": {"kind": "directory"},
+        },
+        allowed,
+    )
+
+
+def test_failure_closeout_uses_the_exact_actor_delta_parent_relation(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker="FAKE_WRITE_NESTED_ALLOWED FAKE_NESTED_ARTIFACT_PRODUCED",
+        role_id="coder",
+        task_family="landing_preparation",
+        identity_suffix="luna-nested-failure-closeout",
+        workspace_write=True,
+        allowed_paths=("actor-output/result.json",),
+        source_evidence_paths=("README.md",),
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+
+    with runtime._lock(fixture["session_id"]):
+        state = runtime._load_state(fixture["session_id"])
+        attempt_id = state["attempts"][-1]["attempt_id"]
+        state["status"] = "failed"
+        state["finished_at"] = RUNTIME.iso_now()
+        runtime._write_failure_result_locked(
+            state,
+            attempt_id=attempt_id,
+            code="unexpected_worker_failure",
+            message="worker failed after writing a nested allowed output",
+        )
+        runtime._save_state(state)
+
+    result = runtime.result(fixture["session_id"])
+
+    assert runtime.status(fixture["session_id"])["status"] == "failed"
+    assert result is not None
+    assert result["failure_code"] == "unexpected_worker_failure"
+    assert result["changed_paths"] == [
+        {"path": "actor-output", "status": "created"},
+        {"path": "actor-output/result.json", "status": "created"},
+    ]
+
+
+def test_failure_closeout_preserves_actor_projection_observation_code(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(tmp_path)
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+
+    def fail_actor_manifest(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        raise RUNTIME.ExternalCodexRuntimeError(
+            "actor_projection_observation_gap",
+            "actor projection inventory is unavailable",
+        )
+
+    monkeypatch.setattr(RUNTIME, "_checked_actor_manifest", fail_actor_manifest)
+    with runtime._lock(fixture["session_id"]):
+        state = runtime._load_state(fixture["session_id"])
+        attempt_id = state["attempts"][-1]["attempt_id"]
+        state["status"] = "failed"
+        state["finished_at"] = RUNTIME.iso_now()
+        runtime._write_failure_result_locked(
+            state,
+            attempt_id=attempt_id,
+            code="unexpected_worker_failure",
+            message="worker failed before actor projection closeout",
+        )
+        runtime._save_state(state)
+
+    result = runtime.result(fixture["session_id"])
+
+    assert runtime.status(fixture["session_id"])["status"] == "authority_blocked"
+    assert result is not None
+    assert result["failure_code"] == "actor_projection_observation_gap"
 
 
 @pytest.mark.parametrize(
@@ -9447,14 +9600,14 @@ def test_failed_writer_report_can_resume_exact_thread_without_widening_authority
     fixture = _fixture(
         tmp_path,
         objective_marker=(
-            "FAKE_WRITE_ALLOWED FAKE_ARTIFACT_PRODUCED "
+            "FAKE_WRITE_NESTED_ALLOWED FAKE_NESTED_ARTIFACT_PRODUCED "
             "FAKE_INVALID_RUNTIME_FINAL_MANIFEST_ANCHOR_ON_START"
         ),
         identity_suffix="writer-report-followup",
         workspace_write=True,
         exact_baseline=True,
         review_required=True,
-        allowed_paths=("landing-note.md",),
+        allowed_paths=("actor-output/result.json",),
         source_evidence_paths=("README.md",),
     )
     runtime = fixture["runtime"]
@@ -9469,7 +9622,8 @@ def test_failed_writer_report_can_resume_exact_thread_without_widening_authority
     )
     assert first_result["source_manifest_match"] is True
     assert first_result["changed_paths"] == [
-        {"path": "landing-note.md", "status": "created"}
+        {"path": "actor-output", "status": "created"},
+        {"path": "actor-output/result.json", "status": "created"},
     ]
     first_result_digest = _digest_path(
         runtime._session_dir(fixture["session_id"]) / "result.json"
@@ -9509,7 +9663,10 @@ def test_failed_writer_report_can_resume_exact_thread_without_widening_authority
     assert result["attempt_count"] == 2
     assert result["failure_code"] is None
     assert result["source_manifest_match"] is True
-    assert result["changed_paths"] == [{"path": "landing-note.md", "status": "created"}]
+    assert result["changed_paths"] == [
+        {"path": "actor-output", "status": "created"},
+        {"path": "actor-output/result.json", "status": "created"},
+    ]
     preserved_path = (
         runtime._session_dir(fixture["session_id"]) / "attempts/001/runtime-result.json"
     )

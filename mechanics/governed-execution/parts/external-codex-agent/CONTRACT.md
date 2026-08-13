@@ -304,6 +304,13 @@ unchanged. The invocation receipt records the fixed child
 coordinate while result evidence records the controller-owned host projection.
 The descriptor is the child binding; the final pathname/device/inode comparison
 is the durable closeout binding. The
+actor-delta authority check admits an ordinary changed path only when its
+safe-relative path is inside `allowed_paths`. A created or deleted directory
+that is a strict ancestor of an allowed path is admitted only when the same
+exact actor delta also contains an actually changed descendant that passes that
+ordinary check; a compact `changed_paths` receipt cannot establish structural
+parent authority. Symlinks, type changes, mode changes, siblings, malformed
+paths, and empty structural ancestors remain out of scope.
 optional `source_evidence_paths` field governs anchored workspace citations and
 falls back to `allowed_paths` only for older v1 tasks. Neither field authorizes
 commit, push, PR, merge, tag, release, publication, service mutation, secret
@@ -380,7 +387,12 @@ death closes as `authority_blocked` instead of erasing the authority breach
 behind an ordinary process failure. Failure closeout also evaluates the final
 actor delta and source manifest before choosing the wake route: read-only drift,
 an out-of-scope writer path, or source drift promotes the result to
-`authority_blocked` even when the original process failure was ordinary.
+`authority_blocked` even when the original process failure was ordinary. It
+uses the same exact actor-delta relation as normal finalization, including the
+peer-descendant proof for structural parents; if actor projection observation
+or coordinate binding fails, its typed
+`actor_projection_observation_gap` or `actor_projection_coordinate_drift`
+code is preserved rather than replaced by a generic manifest code.
 
 While Codex is live, signal handlers notify a nonblocking self-pipe for child
 state and termination events. The supervisor therefore sleeps in `select`
@@ -682,10 +694,12 @@ changed paths and an exact matching final workspace manifest. A
 `bounded_repair` may continue a
 `bounded_execution`/`repo_mutation` incarnation rejected by model-report
 admission only when the owner source still matches, actor final-manifest and
-delta evidence are present, and every observed changed path remains inside the
-original task's `allowed_paths`. This writer route preserves the same role,
-thread, projection, and authority envelope; it does not convert the actor to
-read-only or grant a new path, effect, source, or external authority.
+delta evidence are present, and every exact actor-delta entry passes the same
+original task's `allowed_paths` relation. Structural parent entries therefore
+require their exact allowed descendant peer; recovery never infers directory
+authority from compact `changed_paths`. This writer route preserves the same
+role, thread, projection, and authority envelope; it does not convert the actor
+to read-only or grant a new path, effect, source, or external authority.
 
 A `capacity_recovery` may continue the exact role after Codex reports the
 current ChatGPT usage-limit protocol pair before its first completed turn. The
