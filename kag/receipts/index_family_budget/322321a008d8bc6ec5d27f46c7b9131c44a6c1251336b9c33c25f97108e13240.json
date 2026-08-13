@@ -1,17 +1,17 @@
 {
-  "allowed_bytes": 0,
+  "allowed_bytes": 24774618,
   "allowed_tracked_bytes": 34911475,
   "approved_by": "repository-owner",
-  "base_ref": "8c50a5a63ec35e9071cc5e43287649395b16d91a",
-  "changed_generated_bytes": 0,
-  "changed_generated_files": 0,
+  "base_ref": "371df08d02e36ba5f8efb1953210110c31dbd563",
+  "changed_generated_bytes": 24774618,
+  "changed_generated_files": 265,
   "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
   "default_limit_bytes": 1048576,
   "head_family_digest": "322321a008d8bc6ec5d27f46c7b9131c44a6c1251336b9c33c25f97108e13240",
-  "reason": "Content-addressed reindex after aligning both external Codex specialized environments with the landed aoa-stats responsibility-receipt revision and documenting that runtime pin correction.",
+  "reason": "Refresh the exact CI-pinned portable owner family after binding command-authority tests to the landed sibling owner commits.",
   "repo": "abyss-stack",
   "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
-  "scope": "tracked_size",
+  "scope": "generated_delta_and_tracked_size",
   "tracked_bytes": 34911475,
   "tracked_bytes_max": 24117248
 }
