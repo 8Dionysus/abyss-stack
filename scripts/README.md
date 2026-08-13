@@ -24,7 +24,7 @@ still synced into deployed `Configs/` with the wrappers.
 | Governed execution | `aoa-governed-run`, `aoa-agent-os-runtime`, `aoa-external-actor-bind`, `aoa-external-codex-agent`, `aoa-export-memo-candidate`, `aoa-export-runtime-evidence-selection`, `aoa-export-artifact-hook-candidate`, `aoa-run-memo-contradiction-integrity` | [governed execution](../mechanics/governed-execution/README.md); command backends under governed-execution and runtime-repair parts |
 | Federation, KAG, and RPG seams | `aoa-federated-check`, `aoa-sync-federation-surfaces`, `aoa-routing-canary`, `aoa-routing-cutover`, `aoa-kag-runtime-family`, `aoa-kag-runtime-projection`, `aoa-kag-runtime-eval`, `tos-up`, `aoa-tos-graph`, `aoa-rpg-runtime-projection` | [federation seams](../mechanics/federation-seams/README.md); command backends under `mechanics/federation-seams/parts/` |
 | Repair adapters | `aoa-a2a-return-closeout-dry-run` | [runtime repair](../mechanics/runtime-repair/README.md); command backend under `mechanics/runtime-repair/parts/` |
-| Repository validation | `ci_gate.py`, `validation_lanes.py`, `validate_stack.py`, `validate_nested_agents.py`, `validate_local_stats_port.py`, `validate_decision_records.py`, `generate_decision_indexes.py`, `build_workspace_decision_graph.py`, `validate_workspace_decision_graph.py`, `release_check.py` | root `AGENTS.md`, [validation command authority](../docs/validation/COMMAND_AUTHORITY.md), [local stats port](../stats/README.md), [mechanics artifact topology](../mechanics/ARTIFACT_TOPOLOGY.md), [decision records](../docs/decisions/README.md) |
+| Repository validation | `ci_gate.py`, `validation_lanes.py`, `run_pytest_lane.py`, `validate_stack.py`, `validate_nested_agents.py`, `validate_local_stats_port.py`, `validate_decision_records.py`, `generate_decision_indexes.py`, `build_workspace_decision_graph.py`, `validate_workspace_decision_graph.py`, `release_check.py` | root `AGENTS.md`, [validation command authority](../docs/validation/COMMAND_AUTHORITY.md), [local stats port](../stats/README.md), [mechanics artifact topology](../mechanics/ARTIFACT_TOPOLOGY.md), [decision records](../docs/decisions/README.md) |
 | Windows bridge | `aoa.ps1`, `aoa-doctor-win.ps1`, `aoa-bootstrap-wsl.ps1` | [machine-fit windows bridge](../mechanics/machine-fit/parts/windows-bridge/README.md) |
 
 ## Contract
@@ -68,6 +68,12 @@ still synced into deployed `Configs/` with the wrappers.
 - Keep lane command sequences in
   `docs/validation/validation_lanes.json`; `ci_gate.py` and `release_check.py`
   read that manifest instead of owning duplicate command lists.
+- Keep the complete pytest selection behind `run_pytest_lane.py`: automatic
+  mode uses at most four process-isolated workers over 32 file-aware shards,
+  proves their exact disjoint union against one baseline collection, and
+  supports exact serial rollback through `ABYSS_STACK_TEST_SCHEDULER=serial`.
+  Failed shard logs are replayed at aggregate closeout for bounded-log
+  diagnostics; tests are not retried.
 - Keep `validate_local_stats_port.py` as a thin delegation to the `aoa-stats`
   contract owner; do not copy the central schemas or validator into this repo.
 - Put mechanic-specific implementation logic under the owning

@@ -1,17 +1,17 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 119,
-  "edge_count": 2688,
+  "decision_count": 120,
+  "edge_count": 2709,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 996,
-    "DATED": 119,
-    "GUARDED_BY": 367,
-    "HAS_STATUS": 119,
-    "HAS_SURFACE_CLASS": 320,
-    "IN_STACK_LANE": 278,
-    "NEXT_DECISION": 118,
-    "OWNED_BY_SURFACE": 125,
-    "OWNS_DECISION": 119,
+    "CITES_SOURCE_SURFACE": 1003,
+    "DATED": 120,
+    "GUARDED_BY": 370,
+    "HAS_STATUS": 120,
+    "HAS_SURFACE_CLASS": 323,
+    "IN_STACK_LANE": 281,
+    "NEXT_DECISION": 119,
+    "OWNED_BY_SURFACE": 126,
+    "OWNS_DECISION": 120,
     "SUPERSEDED_BY": 2,
     "UNDER_MECHANIC_PARENT": 125
   },
@@ -12853,6 +12853,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0119",
+      "target": "decision:ABYSS-STACK-D-0120",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0119",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
       "type": "OWNED_BY_SURFACE"
     },
@@ -12860,6 +12865,101 @@
       "source": "decision:ABYSS-STACK-D-0119",
       "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "source_surface:.github/workflows/validate-stack.yml",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "source_surface:docs/testing/TEST_TOPOLOGY.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "source_surface:docs/validation/COMMAND_AUTHORITY.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "source_surface:docs/validation/validation_lanes.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "source_surface:mechanics/runtime-lifecycle/parts/logs-status/tests/test_optimization_audit_status.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "source_surface:scripts/run_pytest_lane.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "date:2026-08-12",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "guard_family:complete%20selection",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "guard_family:exact%20partition%20proof",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "guard_family:serial%20rollback",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "surface_class:landing%20latency",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "surface_class:test%20scheduler",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "surface_class:validation%20workflow",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "stack_lane:release",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "stack_lane:tests",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0120",
+      "target": "owner_surface:docs/validation/validation_lanes.json",
+      "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "repo:abyss-stack",
@@ -13455,21 +13555,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0119",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0120",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1166,
+  "node_count": 1180,
   "node_type_counts": {
     "date": 36,
-    "decision": 119,
-    "guard_family": 181,
+    "decision": 120,
+    "guard_family": 184,
     "mechanic_parent": 10,
-    "owner_surface": 62,
+    "owner_surface": 63,
     "repo": 1,
-    "source_surface": 578,
-    "stack_lane": 47,
+    "source_surface": 582,
+    "stack_lane": 49,
     "status": 3,
-    "surface_class": 129
+    "surface_class": 132
   },
   "nodes": [
     {
@@ -14843,6 +14948,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-12",
+      "id": "decision:ABYSS-STACK-D-0120",
+      "label": "ABYSS-STACK-D-0120",
+      "path": "docs/decisions/ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md",
+      "posture": "accepted bounded parallel scheduling; no coverage reduction",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0120 Schedule Full Pytest With Bounded Work Stealing",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -14975,6 +15090,11 @@
     {
       "id": "guard_family:compatibility%20gate%20language",
       "label": "compatibility gate language",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:complete%20selection",
+      "label": "complete selection",
       "type": "guard_family"
     },
     {
@@ -15120,6 +15240,11 @@
     {
       "id": "guard_family:exact%20identity",
       "label": "exact identity",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:exact%20partition%20proof",
+      "label": "exact partition proof",
       "type": "guard_family"
     },
     {
@@ -15643,6 +15768,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:serial%20rollback",
+      "label": "serial rollback",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:service%20selection",
       "label": "service selection",
       "type": "guard_family"
@@ -15825,6 +15955,11 @@
     {
       "id": "owner_surface:docs/validation/",
       "label": "docs/validation/",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:docs/validation/validation_lanes.json",
+      "label": "docs/validation/validation_lanes.json",
       "type": "owner_surface"
     },
     {
@@ -16869,6 +17004,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:docs/testing/TEST_TOPOLOGY.md",
+      "label": "docs/testing/TEST_TOPOLOGY.md",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:docs/testing/test_inventory.json",
       "label": "docs/testing/test_inventory.json",
       "type": "source_surface"
@@ -16876,6 +17016,11 @@
     {
       "id": "source_surface:docs/validation/",
       "label": "docs/validation/",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:docs/validation/COMMAND_AUTHORITY.md",
+      "label": "docs/validation/COMMAND_AUTHORITY.md",
       "type": "source_surface"
     },
     {
@@ -18289,6 +18434,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/runtime-lifecycle/parts/logs-status/tests/test_optimization_audit_status.py",
+      "label": "mechanics/runtime-lifecycle/parts/logs-status/tests/test_optimization_audit_status.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/runtime-lifecycle/parts/start-stop/",
       "label": "mechanics/runtime-lifecycle/parts/start-stop/",
       "type": "source_surface"
@@ -18526,6 +18676,11 @@
     {
       "id": "source_surface:scripts/release_check.py",
       "label": "scripts/release_check.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:scripts/run_pytest_lane.py",
+      "label": "scripts/run_pytest_lane.py",
       "type": "source_surface"
     },
     {
@@ -19144,6 +19299,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:release",
+      "label": "release",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:release/tooling",
       "label": "release/tooling",
       "type": "stack_lane"
@@ -19221,6 +19381,11 @@
     {
       "id": "stack_lane:systemd%20units",
       "label": "systemd units",
+      "type": "stack_lane"
+    },
+    {
+      "id": "stack_lane:tests",
+      "label": "tests",
       "type": "stack_lane"
     },
     {
@@ -19579,6 +19744,11 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:landing%20latency",
+      "label": "landing latency",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:legacy/provenance",
       "label": "legacy/provenance",
       "type": "surface_class"
@@ -19874,6 +20044,11 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:test%20scheduler",
+      "label": "test scheduler",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:validation",
       "label": "validation",
       "type": "surface_class"
@@ -19891,6 +20066,11 @@
     {
       "id": "surface_class:validation%20topology",
       "label": "validation topology",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:validation%20workflow",
+      "label": "validation workflow",
       "type": "surface_class"
     },
     {

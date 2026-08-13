@@ -187,6 +187,7 @@
         "scripts/decision_indexes.py",
         "scripts/generate_decision_indexes.py",
         "scripts/release_check.py",
+        "scripts/run_pytest_lane.py",
         "scripts/validate_decision_records.py",
         "scripts/validate_local_stats_port.py",
         "scripts/validate_workspace_decision_graph.py",

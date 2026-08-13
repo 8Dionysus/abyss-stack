@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26309726,
+  "allowed_tracked_bytes": 34687043,
+  "approved_by": "repository-owner",
+  "base_ref": "22bd7018f63ac8e6e881406a32560762c446f71d",
+  "changed_generated_bytes": 26309726,
+  "changed_generated_files": 294,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "abf1cb1cd8d85c6217a011fdb17affba0eaccb26ab8d9586b94aa8a9cb4e0305",
+  "reason": "Regenerate the complete portable family for the process-isolated pytest Claim/Evidence DAG and revised source decision; standing budgets remain unchanged.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34687043,
+  "tracked_bytes_max": 24117248
+}

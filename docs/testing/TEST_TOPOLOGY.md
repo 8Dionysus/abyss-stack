@@ -31,3 +31,20 @@ deterministic, public-safe, and explicit about which owner surface failed.
 - Legacy test paths must stay out of default discovery and default inventory.
 - Broad release behavior should be tested through lane-composition assertions,
   not by replaying the full release gate inside an ordinary unit test.
+
+## Full-Suite Scheduler
+
+The `tests` and `release` lanes keep the complete default pytest selection and
+route only its scheduling through `scripts/run_pytest_lane.py`. Automatic mode
+uses at most four process-isolated workers over 32 deterministic file-aware
+shards. One baseline collection and each child's observed manifest prove an
+exact disjoint union before the aggregate can pass. Use:
+
+```bash
+ABYSS_STACK_TEST_SCHEDULER=serial python scripts/ci_gate.py --mode tests
+```
+
+as the exact rollback and independent sequential oracle. The scheduler may
+change execution order only. Duration hints cannot change membership. It does
+not skip, lose, retry, or reinterpret failures. It replays failed shard logs
+after the aggregate so an early traceback remains visible in bounded log tails.

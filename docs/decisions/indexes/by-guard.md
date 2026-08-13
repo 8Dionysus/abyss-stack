@@ -282,6 +282,10 @@
 
 - [ABYSS-STACK-D-0060 Inference Pilot Compatibility Validator Module](../ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md`)
 
+## complete selection
+
+- [ABYSS-STACK-D-0120 Schedule Full Pytest With Bounded Work Stealing](../ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md) (`docs/decisions/ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md`)
+
 ## composition-first runtime shape
 
 - [ABYSS-STACK-D-0058 Profile Topology Validator Module](../ABYSS-STACK-D-0058-profile-topology-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0058-profile-topology-validator-module.md`)
@@ -408,6 +412,10 @@
 - [ABYSS-STACK-D-0107 Fail Closed MCP Admission Maintenance](../ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md) (`docs/decisions/ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md`)
 - [ABYSS-STACK-D-0108 Modern-Only MCP Organ Runtime](../ABYSS-STACK-D-0108-modern-only-mcp-organ-runtime.md) (`docs/decisions/ABYSS-STACK-D-0108-modern-only-mcp-organ-runtime.md`)
 - [ABYSS-STACK-D-0109 Recover Expired Modern MCP Read Admission](../ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md) (`docs/decisions/ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md`)
+
+## exact partition proof
+
+- [ABYSS-STACK-D-0120 Schedule Full Pytest With Bounded Work Stealing](../ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md) (`docs/decisions/ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md`)
 
 ## exact pin
 
@@ -834,6 +842,10 @@
 ## semantic digest
 
 - [ABYSS-STACK-D-0112 Require Evidence-Complete Owner-Contour Incarnations](../ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md) (`docs/decisions/ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md`)
+
+## serial rollback
+
+- [ABYSS-STACK-D-0120 Schedule Full Pytest With Bounded Work Stealing](../ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md) (`docs/decisions/ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md`)
 
 ## service-selection
 

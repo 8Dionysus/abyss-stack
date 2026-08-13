@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scripts import ci_gate, release_check, validation_lanes
+import pytest
+
+from scripts import ci_gate, release_check, run_pytest_lane, validation_lanes
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -112,6 +114,131 @@ def test_release_lane_runs_release_check_entrypoint_for_parity_stabilization() -
 
     assert len(steps) == 1
     assert steps[0].command[-1] == "scripts/release_check.py"
+
+
+def test_full_test_sequences_share_the_bounded_scheduler_entrypoint() -> None:
+    for sequence in ("tests", "release_check"):
+        test_steps = [
+            step
+            for step in validation_lanes.command_sequence(sequence)
+            if step.label == "run tests"
+        ]
+        assert len(test_steps) == 1
+        assert test_steps[0].command[1:] == ("scripts/run_pytest_lane.py",)
+
+
+def test_pytest_scheduler_uses_process_isolated_workstealing() -> None:
+    admitted = run_pytest_lane.scheduler_plan("auto")
+
+    assert admitted == {
+        "ok": True,
+        "requested": "auto",
+        "effective": "process-4x32-file-aware",
+        "reason": "isolated_process_workstealing",
+        "worker_limit": 4,
+        "shard_count": 32,
+        "ordering": "file_aware_duration_hints",
+        "selection_proof": "baseline_manifest_exact_union",
+        "selection_changed": False,
+    }
+
+
+def test_pytest_process_partitions_are_disjoint_and_complete() -> None:
+    nodeids = [f"tests/test_example.py::test_{index}" for index in range(19)]
+    partitions = run_pytest_lane.partition_nodeids(nodeids, shard_count=8)
+    flattened = [nodeid for partition in partitions for nodeid in partition]
+
+    assert len(partitions) == 8
+    assert max(map(len, partitions)) - min(map(len, partitions)) <= 1
+    assert len(flattened) == len(set(flattened)) == len(nodeids)
+    assert set(flattened) == set(nodeids)
+
+
+def test_pytest_process_partitions_keep_small_files_as_import_units() -> None:
+    nodeids = [
+        *[f"tests/test_small_a.py::test_{index}" for index in range(3)],
+        *[f"tests/test_small_b.py::test_{index}" for index in range(3)],
+        *[f"tests/test_large.py::test_{index}" for index in range(20)],
+    ]
+    partitions = run_pytest_lane.partition_nodeids(nodeids, shard_count=4)
+
+    for path in ("tests/test_small_a.py", "tests/test_small_b.py"):
+        owners = [
+            index
+            for index, partition in enumerate(partitions)
+            if any(nodeid.startswith(f"{path}::") for nodeid in partition)
+        ]
+        assert len(owners) == 1
+    large_owners = [
+        partition
+        for partition in partitions
+        if any(nodeid.startswith("tests/test_large.py::") for nodeid in partition)
+    ]
+    assert len(large_owners) == 3
+
+
+def test_pytest_process_partitions_queue_measured_slow_units_first() -> None:
+    slow_path = (
+        "mechanics/governed-execution/parts/external-codex-agent/"
+        "tests/test_external_codex_agent.py"
+    )
+    nodeids = [
+        *[f"tests/test_fast.py::test_{index}" for index in range(4)],
+        *[f"{slow_path}::test_{index}" for index in range(4)],
+    ]
+
+    partitions = run_pytest_lane.partition_nodeids(nodeids, shard_count=2)
+
+    assert all(nodeid.startswith(f"{slow_path}::") for nodeid in partitions[0])
+
+
+def test_pytest_scheduler_keeps_an_exact_serial_rollback() -> None:
+    rollback = run_pytest_lane.scheduler_plan("serial")
+    command = run_pytest_lane.build_pytest_command(
+        extra_args=["tests/test_validation_command_authority.py"],
+    )
+
+    assert rollback["reason"] == "explicit_serial_rollback"
+    assert rollback["selection_changed"] is False
+    assert command[1:] == [
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_validation_command_authority.py",
+    ]
+
+
+def test_pytest_scheduler_replays_failed_shard_log_at_closeout(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    log_path = tmp_path / "shard-2.log"
+    log_path.write_text("FAILED tests/test_example.py::test_failure\n", encoding="utf-8")
+    records = {
+        1: {
+            "log": log_path,
+            "selected": 7,
+            "returncode": 1,
+            "selection_proof": "exact",
+        }
+    }
+
+    run_pytest_lane._replay_failed_shards(records, [1], shard_count=4)
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "[pytest-failed-shard 2/4]" in captured.err
+    assert "FAILED tests/test_example.py::test_failure" in captured.err
+    assert "selected=7 returncode=1 selection_proof=exact" in captured.err
+
+
+def test_release_dependencies_do_not_add_a_threaded_pytest_scheduler() -> None:
+    requirements = (REPO_ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
+
+    assert not any(
+        requirement.startswith("pytest-xdist")
+        for requirement in requirements.splitlines()
+    )
 
 
 def test_decision_graph_lane_refreshes_ignored_cache_before_checking_it() -> None:

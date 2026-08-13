@@ -18,6 +18,7 @@ stabilizer, but it reads the release command sequence from the lane manifest.
 | `docs/validation/validation_lanes.json` | executable lane command sequences |
 | `scripts/validation_lanes.py` | stdlib loader/API and manifest validation |
 | `scripts/ci_gate.py` | local and CI lane executor |
+| `scripts/run_pytest_lane.py` | bounded scheduler for the unchanged complete pytest selection |
 | `scripts/release_check.py` | release entrypoint plus synthetic/live Configs parity selection |
 | `.github/workflows/validate-stack.yml` | GitHub platform runner that calls lane entrypoints and owns platform-only rehearsal steps |
 | `AGENTS.md` and local route cards | focused validation guidance and lane IDs |
@@ -35,6 +36,12 @@ stabilizer, but it reads the release command sequence from the lane manifest.
 - Keep live parity opt-in through `scripts/release_check.py --parity-mode live`.
 - Keep OS Abyss artifact bundle checks in the release lane when they validate
   generated deployable outputs rather than source topology alone.
+- Keep full-suite scheduling bounded and reversible. Automatic mode may use
+  four process-isolated workers over an exact file-aware partition. Baseline,
+  disjoint union, observed selection, and child exit receipts must all verify;
+  `ABYSS_STACK_TEST_SCHEDULER=serial` is the explicit rollback. Timing hints may
+  change order, never selection or failure semantics. Failed shard logs repeat
+  after the aggregate so bounded log tails retain the actionable traceback.
 
 ## Active Lanes
 
@@ -42,7 +49,7 @@ stabilizer, but it reads the release command sequence from the lane manifest.
 |---|---|
 | `source-fast` | growth-safe route, decision, nested AGENTS, stack topology, and local stats contract checks |
 | `generated` | generated decision, diagnostic read-model, and vendored MCP HTTP auth helper freshness |
-| `tests` | default pytest collection for current source checkout contracts |
+| `tests` | default pytest collection for current source checkout contracts, scheduled through the bounded full-suite runner |
 | `mechanics-part-local` | mechanic part-local pytest homes, including currently active provenance tests |
 | `mcp-services` | MCP service validators and service-local tests |
 | `shellcheck` | shell wrapper/backend syntax hygiene where shellcheck is available |

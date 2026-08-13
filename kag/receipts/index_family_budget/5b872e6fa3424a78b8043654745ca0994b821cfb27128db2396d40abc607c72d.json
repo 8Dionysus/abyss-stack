@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26305881,
+  "allowed_tracked_bytes": 34648768,
+  "approved_by": "repository-owner",
+  "base_ref": "22bd7018f63ac8e6e881406a32560762c446f71d",
+  "changed_generated_bytes": 26305881,
+  "changed_generated_files": 294,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "5b872e6fa3424a78b8043654745ca0994b821cfb27128db2396d40abc607c72d",
+  "reason": "Regenerate the complete portable family for the bounded pytest scheduler and its source decision; standing budgets remain unchanged.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34648768,
+  "tracked_bytes_max": 24117248
+}
