@@ -107,6 +107,10 @@ namespace is a content-addressed navigation and validation receipt over those
 exact objects; it carries anchored excerpts so a reviewer need not substitute
 newer workspace bytes for historical source. It grants no alias-rewrite,
 source-rewrite, acceptance, proof, or domain authority.
+The model-facing prompt receives a compact locator bound to the namespace's
+canonical digest and artifact digest. The complete derivative remains an exact
+read-only runtime artifact and is queried only for entries relevant to the
+claim, so repeated model turns do not duplicate every historical excerpt.
 Incomplete historical producer envelopes do not create partial namespace
 authority: the controller preserves the existing model-only reviewer route.
 

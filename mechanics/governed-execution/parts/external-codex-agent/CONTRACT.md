@@ -618,7 +618,11 @@ missing, ambiguous, drifted, or out-of-scope nested edge rejects the review
 before inference. A model may cite a
 closed entry as `runtime:nested-evidence-namespace#<entry-id>`, but must still
 judge the semantic claim independently; the derivative neither rewrites prior
-artifacts nor creates owner truth.
+artifacts nor creates owner truth. The model prompt contains only a compact
+summary bound to both the namespace's canonical digest and the exact artifact
+digest. Its `materialized_path` is admitted read-only in the attempt-local
+Codex permission profile; the reviewer must select only needed entries rather
+than copy the complete namespace into the transcript.
 
 Evidence-reference arrays are non-empty and every occurrence is independently
 resolved against its exact source, immutable-input, or runtime-owned bytes.

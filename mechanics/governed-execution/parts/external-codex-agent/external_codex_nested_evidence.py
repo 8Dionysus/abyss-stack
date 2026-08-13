@@ -910,5 +910,7 @@ def build_nested_evidence_namespace(
     }
     namespace["namespace_digest"] = nested_evidence_namespace_digest(namespace)
     if len(_canonical_bytes(namespace)) > MAX_NAMESPACE_BYTES:
-        raise NestedEvidenceNamespaceError("nested evidence namespace exceeds its prompt bound")
+        raise NestedEvidenceNamespaceError(
+            "nested evidence namespace exceeds its bounded artifact limit"
+        )
     return namespace

@@ -6743,9 +6743,32 @@ def test_independent_review_materializes_nested_evidence_before_inference(
     prompt = (
         reviewer_session / "attempts/001/prompt.txt"
     ).read_text(encoding="utf-8")
-    assert "<nested_evidence_namespace>" in prompt
+    assert "<nested_evidence_namespace_summary>" in prompt
+    assert "<nested_evidence_namespace>" not in prompt
     assert namespace["namespace_digest"] in prompt
+    assert namespace_ref["artifact_digest"] in prompt
+    assert str(namespace_path) in prompt
     assert "same-name digest collision" in prompt
+    assert '"anchored_excerpt"' not in prompt
+    entry_ids = {
+        entry["entry_id"]
+        for producer in namespace["producers"]
+        for entry in producer["entries"]
+    }
+    assert entry_ids
+    assert all(entry_id not in prompt for entry_id in entry_ids)
+    argv = reviewer_result["codex_invocations"][0]["argv"]
+    config_overrides = [
+        argv[index + 1]
+        for index, value in enumerate(argv[:-1])
+        if value == "-c"
+    ]
+    permission_override = next(
+        value
+        for value in config_overrides
+        if value.startswith("permissions.aoa_external_actor=")
+    )
+    assert f'"{namespace_path}"="read"' in permission_override
     execution_schema = json.loads(
         Path(
             str(reviewer_state["execution_result_schema_ref"]["artifact_ref"])

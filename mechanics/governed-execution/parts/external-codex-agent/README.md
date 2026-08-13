@@ -247,7 +247,10 @@ The controller:
   member, content-entry, and delta-bound output anchors remain admissible. An
   incomplete producer envelope retains the unchanged model-only route instead
   of exposing a partial namespace. The controller exposes the resulting
-  read-only derivative as `runtime:nested-evidence-namespace#<entry-id>`;
+  read-only derivative as `runtime:nested-evidence-namespace#<entry-id>`. The
+  prompt carries only a compact digest-bound summary and exact read-only
+  materialized path; the reviewer selects needed entries from the full JSON
+  with bounded queries instead of repeating every excerpt on every tool turn;
   digest collisions, ambiguity, drift, or an invalid anchor fail before model
   inference. The namespace never rewrites the signed/content-addressed writer
   artifact and never replaces source or owner authority;

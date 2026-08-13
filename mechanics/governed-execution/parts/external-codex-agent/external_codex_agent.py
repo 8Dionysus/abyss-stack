@@ -1668,6 +1668,51 @@ def _load_nested_evidence_namespace(
     return namespace
 
 
+def _nested_evidence_prompt_summary(
+    state: Mapping[str, Any],
+    namespace: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Expose a compact, digest-bound locator instead of duplicating all entries."""
+
+    namespace_ref = state.get("nested_evidence_namespace_ref")
+    if not isinstance(namespace_ref, dict):
+        raise ExternalCodexRuntimeError(
+            "nested_evidence_namespace_drift",
+            "nested evidence namespace state is malformed",
+        )
+    namespace_path = _verified_artifact_ref_path(
+        namespace_ref,
+        label="nested evidence namespace",
+    )
+    return {
+        "schema_version": (
+            "abyss_stack_external_codex_nested_evidence_prompt_summary_v1"
+        ),
+        "status": namespace["status"],
+        "namespace_digest": namespace["namespace_digest"],
+        "artifact_digest": namespace_ref["artifact_digest"],
+        "materialized_path": str(namespace_path),
+        "review_task_id": namespace["review_task_id"],
+        "review_task_digest": namespace["review_task_digest"],
+        "summary": namespace["summary"],
+        "producers": [
+            {
+                "producer_task_id": producer["producer_task_id"],
+                "task_input_id": producer["task_input_id"],
+                "task_digest": producer["task_digest"],
+                "result_input_id": producer["result_input_id"],
+                "result_digest": producer["result_digest"],
+                "report_input_id": producer["report_input_id"],
+                "report_digest": producer["report_digest"],
+                "delta_input_id": producer["delta_input_id"],
+                "delta_digest": producer["delta_digest"],
+                "entry_count": len(producer["entries"]),
+            }
+            for producer in namespace["producers"]
+        ],
+    }
+
+
 def _process_start_ticks(pid: int) -> int | None:
     try:
         raw = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
@@ -9496,6 +9541,11 @@ class ExternalCodexRuntime:
         )
         immutable_inputs = state["materialized_task_inputs"]
         nested_evidence_namespace = _load_nested_evidence_namespace(state)
+        nested_evidence_prompt_summary = (
+            _nested_evidence_prompt_summary(state, nested_evidence_namespace)
+            if nested_evidence_namespace is not None
+            else None
+        )
         # The owner task remains durable and exact on disk, but its source-side
         # local_path hints are not actor coordinates.  Give the model a
         # projection-safe task view whose immutable inputs point only at the
@@ -9538,9 +9588,29 @@ class ExternalCodexRuntime:
             continuation,
             prompt_validation_commands,
             projected_resume_payload,
-            nested_evidence_namespace,
         ):
             assert_control_view_is_source_free(control_view)
+        if nested_evidence_prompt_summary is not None:
+            # Runtime materializations, like immutable input paths, may share a
+            # harmless filesystem ancestor with a source checkout in tests.
+            # Keep every semantic field free of all source aliases, while the
+            # exact locator itself must exclude every source workspace root.
+            assert_control_view_is_source_free(
+                {
+                    key: value
+                    for key, value in nested_evidence_prompt_summary.items()
+                    if key != "materialized_path"
+                }
+            )
+            materialized_path = nested_evidence_prompt_summary["materialized_path"]
+            if any(
+                _contains_source_path(materialized_path, candidate)
+                for candidate in source_roots
+            ):
+                raise ExternalCodexRuntimeError(
+                    "actor_source_path_exposed",
+                    "nested evidence locator retained a source workspace root",
+                )
         validation_execution_protocol = [
             {
                 "command_id": item["command_id"],
@@ -9567,16 +9637,16 @@ class ExternalCodexRuntime:
             else ""
         )
         nested_evidence_block = (
-            "\nRuntime-owned nested evidence namespace (a subordinate exact "
-            "transport derivative, never owner truth):\n"
-            "<nested_evidence_namespace>\n"
+            "\nCompact locator for the runtime-owned nested evidence namespace "
+            "(a subordinate exact transport derivative, never owner truth):\n"
+            "<nested_evidence_namespace_summary>\n"
             + json.dumps(
-                nested_evidence_namespace,
+                nested_evidence_prompt_summary,
                 ensure_ascii=False,
                 indent=2,
             )
-            + "\n</nested_evidence_namespace>\n"
-            if nested_evidence_namespace is not None
+            + "\n</nested_evidence_namespace_summary>\n"
+            if nested_evidence_prompt_summary is not None
             else ""
         )
         workspace_projection = {
@@ -9654,7 +9724,11 @@ Hard stop-lines:
   the source. Use the reserved runtime ref for claims about final workspace state; the
   controller binds it after the model exits. Emit each exact evidence ref only
   once per transition or finding; exact repetitions are semantically redundant.
-- When nested_evidence_namespace is present, it proves only the transport
+- When nested_evidence_namespace_summary is present, its artifact_digest binds
+  the exact read-only JSON at materialized_path and namespace_digest binds its
+  canonical content. Inspect only entries needed for the claim with bounded jq
+  selection by original_ref, entry_id, or producer_task_id; do not dump the
+  complete namespace into the transcript. The namespace proves only transport
   closure of historical refs through exact producer task/result/report/delta,
   digests, manifests, and anchored excerpts. Independently judge the claim.
   Do not report a mapped alias or source-coordinate change as an evidence defect;
@@ -10054,6 +10128,16 @@ Runtime session identity: {state["session_id"]}
                     tool_entry,
                 )
             )
+            nested_evidence_readable_paths = (
+                (
+                    _verified_artifact_ref_path(
+                        state["nested_evidence_namespace_ref"],
+                        label="nested evidence namespace",
+                    ),
+                )
+                if isinstance(state.get("nested_evidence_namespace_ref"), dict)
+                else ()
+            )
             codex_command = self._codex_command(
                 launch=launch,
                 realization=realization,
@@ -10071,6 +10155,7 @@ Runtime session identity: {state["session_id"]}
                         Path(str(item["path"]))
                         for item in state["materialized_task_inputs"]
                     ),
+                    *nested_evidence_readable_paths,
                     *specialized_readable_paths,
                 ),
                 writable_paths=(attempt_dir, scratch),
