@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 27269928,
+  "allowed_tracked_bytes": 34875912,
+  "approved_by": "repository-owner",
+  "base_ref": "56a64aa4d84db27f655f2982e4b0068db8903479",
+  "changed_generated_bytes": 27269928,
+  "changed_generated_files": 323,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "046b8a8e8f4a2801591cfd127524d831c98daa3e2bb592e7be79bd1dc5fb6240",
+  "reason": "Refresh the exact CI-pinned portable family after restoring precise fail-closed report semantics and registering the nested evidence schema without raising the standing budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34875912,
+  "tracked_bytes_max": 24117248
+}
