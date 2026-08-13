@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 24672284,
+  "allowed_tracked_bytes": 34910862,
+  "approved_by": "repository-owner",
+  "base_ref": "371df08d02e36ba5f8efb1953210110c31dbd563",
+  "changed_generated_bytes": 24672284,
+  "changed_generated_files": 262,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "8dd5307be4bdc19e301ee6b24ca08276bb81b77a6cb56ed3bc620859c404620c",
+  "reason": "Refresh the exact CI-pinned portable owner family for the landed summon v4 runtime binding and owner ABI without changing source authority.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34910862,
+  "tracked_bytes_max": 24117248
+}
