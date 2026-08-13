@@ -2172,7 +2172,7 @@ def _fixture(
                     "digest": _digest_path(OWNER_EXECUTION_REQUEST_SCHEMA_PATH),
                     "owner_repo": "aoa-agents",
                     "artifact_ref": "skills/aoa-summon/references/summon-request-v4.schema.json",
-                    "source_ref": "1458393baa90178aae63f1841e3bd58139c13232",
+                    "source_ref": "4a8dbd922737aaff876ca16a0098ab26cb9cf22e",
                     "schema_version": "summon-request-v4",
                 },
                 "task_local_dag_schema": {
@@ -2277,9 +2277,7 @@ def _wait_terminal(
     state = runtime.status(session_id)
     if state["status"] != "running":
         return state
-    raise AssertionError(
-        f"external Codex fixture did not stop: {state}"
-    )
+    raise AssertionError(f"external Codex fixture did not stop: {state}")
 
 
 def test_schema_meta_validation_cache_is_exact_and_fail_closed(
@@ -5765,6 +5763,59 @@ def test_owner_contour_rejects_request_that_changes_responsibility_holders(
     or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file(),
     reason="paired owner-contour proof requires aoa-agents and aoa-skills source roots",
 )
+@pytest.mark.parametrize(
+    ("field", "replacement", "expected_code"),
+    (
+        (
+            "run_plan_ref",
+            {
+                "object_id": "run-plan:fixture:substituted",
+                "owner_repo": "aoa-sdk",
+                "schema_version": "aoa_control_plane_v1",
+                "digest": "sha256:" + "7" * 64,
+            },
+            "owner_run_plan_mismatch",
+        ),
+        (
+            "model_realization_ref",
+            {
+                "object_id": "source/model-realizations/substituted.json",
+                "owner_repo": "aoa-models",
+                "schema_version": "aoa_model_realization_v1",
+                "digest": "sha256:" + "8" * 64,
+            },
+            "owner_model_realization_mismatch",
+        ),
+    ),
+)
+def test_owner_contour_rejects_substituted_explicit_incarnation_ref(
+    tmp_path: Path,
+    field: str,
+    replacement: dict[str, str],
+    expected_code: str,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True)
+    owner_request_path = fixture["owner_execution_request_path"]
+    assert owner_request_path is not None
+    request = json.loads(owner_request_path.read_text(encoding="utf-8"))
+    request["external_incarnation"][field] = replacement
+    _refresh_request_digest(request)
+    _write_json(owner_request_path, request)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        fixture["runtime"].preflight(
+            fixture["launch_path"],
+            owner_request_path=owner_request_path,
+        )
+
+    assert exc_info.value.code == expected_code
+
+
+@pytest.mark.skipif(
+    not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
+    or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file(),
+    reason="paired owner-contour proof requires aoa-agents and aoa-skills source roots",
+)
 def test_owner_request_compiler_rejects_internally_inconsistent_transfer(
     tmp_path: Path,
 ) -> None:
@@ -6240,9 +6291,7 @@ def test_workspace_write_admits_only_required_parent_directories(
 ) -> None:
     fixture = _fixture(
         tmp_path,
-        objective_marker=(
-            "FAKE_WRITE_NESTED_ALLOWED FAKE_NESTED_ARTIFACT_PRODUCED"
-        ),
+        objective_marker=("FAKE_WRITE_NESTED_ALLOWED FAKE_NESTED_ARTIFACT_PRODUCED"),
         role_id="coder",
         task_family="landing_preparation",
         identity_suffix="luna-nested-output",
@@ -6286,9 +6335,7 @@ def test_workspace_write_rejects_empty_structural_parent(tmp_path: Path) -> None
     assert terminal["status"] == "authority_blocked"
     assert result is not None
     assert result["failure_code"] == "authority_boundary_crossed"
-    assert result["changed_paths"] == [
-        {"path": "actor-output", "status": "created"}
-    ]
+    assert result["changed_paths"] == [{"path": "actor-output", "status": "created"}]
 
 
 def test_structural_parent_rule_requires_an_exact_allowed_peer_delta() -> None:
@@ -6324,12 +6371,18 @@ def test_structural_parent_rule_requires_an_exact_allowed_peer_delta() -> None:
         allowed,
         peer_changes=(created_parent, created_child),
     )
-    assert RUNTIME._actor_delta_changes_out_of_scope(
-        (created_parent, created_child), allowed
-    ) == []
-    assert RUNTIME._actor_delta_changes_out_of_scope(
-        (deleted_parent, deleted_child), allowed
-    ) == []
+    assert (
+        RUNTIME._actor_delta_changes_out_of_scope(
+            (created_parent, created_child), allowed
+        )
+        == []
+    )
+    assert (
+        RUNTIME._actor_delta_changes_out_of_scope(
+            (deleted_parent, deleted_child), allowed
+        )
+        == []
+    )
     assert RUNTIME._actor_delta_changes_out_of_scope((created_parent,), allowed) == [
         "actor-output"
     ]

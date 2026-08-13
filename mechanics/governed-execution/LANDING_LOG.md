@@ -128,3 +128,12 @@ The source now records this attempt-local execution root, keeps the target
 checkout outside writable roots, rejects path overlap, and leaves network
 disabled. These probes establish a transport candidate only; a fresh immutable
 closeout and independent review are still required.
+
+## 2026-08-13 - Exact owner run-plan and realization admission
+
+The external-Codex owner contour now consumes the `aoa-agents` v4 request that
+explicitly repeats the SDK run-plan and selected model-realization refs. Runtime
+preflight compares both with the already validated incarnation binding and
+fails closed on a recomputed-request substitution. This is a runtime admission
+repair; it does not move role, model-fit, plan, or owner-acceptance authority
+into `abyss-stack`.

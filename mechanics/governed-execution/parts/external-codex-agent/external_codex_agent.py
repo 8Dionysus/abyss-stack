@@ -3237,12 +3237,16 @@ def _shell_has_startup_dispatch(tokens: Sequence[str]) -> bool:
             return False
         if token.startswith("--"):
             shell_option = token.lower().split("=", 1)[0]
-            if shell_option in {"--login", "--interactive"} or (
-                len(shell_option) >= len("--i")
-                and "--init-file".startswith(shell_option)
-            ) or (
-                len(shell_option) >= len("--rc")
-                and "--rcfile".startswith(shell_option)
+            if (
+                shell_option in {"--login", "--interactive"}
+                or (
+                    len(shell_option) >= len("--i")
+                    and "--init-file".startswith(shell_option)
+                )
+                or (
+                    len(shell_option) >= len("--rc")
+                    and "--rcfile".startswith(shell_option)
+                )
             ):
                 return True
             continue
@@ -3303,8 +3307,7 @@ def _uniq_writes_git_metadata(tokens: Sequence[str]) -> bool:
             index += 1
             continue
         if any(
-            lowered.startswith(option) and lowered != option
-            for option in value_options
+            lowered.startswith(option) and lowered != option for option in value_options
         ):
             index += 1
             continue
@@ -3911,9 +3914,7 @@ def _sort_writes_git_metadata(tokens: Sequence[str]) -> bool:
         if lowered == "-o" or (
             _long_option_prefix(token, "--output") and "=" not in token
         ):
-            if index + 1 < len(tokens) and _git_admin_metadata_path(
-                tokens[index + 1]
-            ):
+            if index + 1 < len(tokens) and _git_admin_metadata_path(tokens[index + 1]):
                 return True
             index += 2
             continue
@@ -4199,9 +4200,7 @@ def _command_effects(command: str) -> set[str]:
                 detected.add("secret_access")
             if _reader_secret_file_access(segment):
                 detected.add("secret_access")
-            if any(
-                _argument_secret_access(executable, value) for value in segment[1:]
-            ):
+            if any(_argument_secret_access(executable, value) for value in segment[1:]):
                 detected.add("secret_access")
 
             writes_system_path = any(
@@ -6999,6 +6998,24 @@ class ExternalCodexRuntime:
                 "owner_incarnation_evidence_mismatch",
                 "SDK incarnation names different obligation, mandate, role, or fit evidence",
             )
+        run_plan_ref = external["run_plan_ref"]
+        if binding.run_plan_ref.model_dump(mode="json") != run_plan_ref:
+            raise ExternalCodexRuntimeError(
+                "owner_run_plan_mismatch",
+                "owner request names another SDK run plan",
+            )
+        model_realization_ref = external["model_realization_ref"]
+        expected_model_realization_ref = {
+            "object_id": binding.model_realization_ref.artifact_ref,
+            "owner_repo": binding.model_realization_ref.owner_repo,
+            "schema_version": binding.model_realization_ref.schema_version,
+            "digest": binding.model_realization_ref.artifact_digest,
+        }
+        if model_realization_ref != expected_model_realization_ref:
+            raise ExternalCodexRuntimeError(
+                "owner_model_realization_mismatch",
+                "owner request names another model realization",
+            )
         projection_ref = external["model_fit_projection_ref"]
         if (
             binding.model_fit_projection_ref.owner_repo != projection_ref["owner_repo"]
@@ -7233,8 +7250,7 @@ class ExternalCodexRuntime:
         for server in tool_entry["mcp_server_configs"]:
             token_name = str(server["bearer_token_env_var"])
             if not (
-                BROKERED_MCP_CREDENTIALS.get(token_name)
-                or os.environ.get(token_name)
+                BROKERED_MCP_CREDENTIALS.get(token_name) or os.environ.get(token_name)
             ):
                 raise ExternalCodexRuntimeError(
                     "mcp_credential_unavailable",
@@ -13598,16 +13614,12 @@ Runtime session identity: {state["session_id"]}
                 or reviewer_state.get("result_path")
                 != str(expected_reviewer_result_path)
                 or reviewer_state.get("result_digest") != reviewer_receipt_digest
-                or sha256_file(expected_reviewer_result_path)
-                != reviewer_receipt_digest
+                or sha256_file(expected_reviewer_result_path) != reviewer_receipt_digest
                 or reviewer_state.get("incarnation_id")
                 != reviewer_binding.incarnation_id
-                or reviewer_state.get("task_family")
-                != reviewer_task.get("task_family")
-                or reviewer_state.get("task_family")
-                != reviewer.get("task_family")
-                or reviewer_task.get("execution_posture")
-                != "independent_review"
+                or reviewer_state.get("task_family") != reviewer_task.get("task_family")
+                or reviewer_state.get("task_family") != reviewer.get("task_family")
+                or reviewer_task.get("execution_posture") != "independent_review"
                 or reviewer_binding.permission_posture.sandbox_mode != "read_only"
                 or reviewer_binding.permission_posture.external_effects
             ):
@@ -13666,11 +13678,9 @@ Runtime session identity: {state["session_id"]}
             label="reviewer actor delta",
             schema_path=ACTOR_DELTA_SCHEMA_PATH,
         )
-        if (
-            reviewer_actor_delta.get("changes")
-            or reviewer_actor_delta.get("final_manifest_digest")
-            != canonical_digest(reviewer_actor_final)
-        ):
+        if reviewer_actor_delta.get("changes") or reviewer_actor_delta.get(
+            "final_manifest_digest"
+        ) != canonical_digest(reviewer_actor_final):
             raise ExternalCodexRuntimeError(
                 "a2a_projection_not_bound",
                 "role-first reviewer must return a zero-delta read-only projection",
@@ -13707,8 +13717,7 @@ Runtime session identity: {state["session_id"]}
                 writer_launch["admission_class"] != "owner_contour"
                 or writer_state.get("result_path") != str(writer_result_path)
                 or writer_state.get("result_digest") != sha256_file(writer_result_path)
-                or writer_state.get("incarnation_id")
-                != writer_binding.incarnation_id
+                or writer_state.get("incarnation_id") != writer_binding.incarnation_id
             ):
                 raise ExternalCodexRuntimeError(
                     "a2a_writer_state_unbound",
@@ -13738,28 +13747,22 @@ Runtime session identity: {state["session_id"]}
             nested = summon_request["summon_request"]
             reviewer_nested = reviewer_summon_request["summon_request"]
             reviewer_inputs = {
-                str(item["input_id"]): str(
-                    item["provenance"]["artifact_digest"]
-                )
+                str(item["input_id"]): str(item["provenance"]["artifact_digest"])
                 for item in reviewer_task["immutable_inputs"]
             }
             reviewer_input_digests = set(reviewer_inputs.values())
             if (
-                reviewer_inputs.get("writer-result")
-                != writer_state["result_digest"]
+                reviewer_inputs.get("writer-result") != writer_state["result_digest"]
                 or reviewer_inputs.get("writer-report")
                 != writer["report_ref"]["artifact_digest"]
-                or reviewer_inputs.get("writer-task")
-                != writer_launch["task"]["digest"]
+                or reviewer_inputs.get("writer-task") != writer_launch["task"]["digest"]
                 or not writer_output_digests.issubset(reviewer_input_digests)
                 or reviewer_task["parent_task_id"] != writer["task_id"]
                 or reviewer_task["target_owner"] != writer_task["target_owner"]
-                or reviewer_state["incarnation_id"]
-                == writer_state["incarnation_id"]
+                or reviewer_state["incarnation_id"] == writer_state["incarnation_id"]
                 or nested["parent_task_id"] != writer_task["parent_task_id"]
                 or reviewer_nested["parent_task_id"] != writer_task["task_id"]
-                or reviewer_nested["reviewed_artifact_path"]
-                != str(writer_result_path)
+                or reviewer_nested["reviewed_artifact_path"] != str(writer_result_path)
             ):
                 raise ExternalCodexRuntimeError(
                     "a2a_review_not_bound",
@@ -13877,10 +13880,8 @@ Runtime session identity: {state["session_id"]}
                     or current_summon_request_ref != summon_request_ref
                     or current_summon_schema_ref != summon_schema_ref
                     or current_review_summon_request != reviewer_summon_request
-                    or current_review_summon_request_ref
-                    != reviewer_summon_request_ref
-                    or current_review_summon_schema_ref
-                    != reviewer_summon_schema_ref
+                    or current_review_summon_request_ref != reviewer_summon_request_ref
+                    or current_review_summon_schema_ref != reviewer_summon_schema_ref
                 ):
                     raise ExternalCodexRuntimeError(
                         "a2a_summon_request_unbound",
@@ -13897,13 +13898,9 @@ Runtime session identity: {state["session_id"]}
                     "reviewed_artifact_path": str(writer_result_path),
                     "evidence_digests": {
                         "writer_result": str(writer_state["result_digest"]),
-                        "writer_report": str(
-                            writer["report_ref"]["artifact_digest"]
-                        ),
+                        "writer_report": str(writer["report_ref"]["artifact_digest"]),
                         "writer_outputs": sorted(writer_output_digests),
-                        "reviewer_result": str(
-                            current_reviewer_state["result_digest"]
-                        ),
+                        "reviewer_result": str(current_reviewer_state["result_digest"]),
                         "reviewer_report": str(
                             reviewer["report_ref"]["artifact_digest"]
                         ),

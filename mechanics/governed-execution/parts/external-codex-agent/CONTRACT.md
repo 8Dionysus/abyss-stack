@@ -164,8 +164,9 @@ Before launch the controller verifies:
     `summon-request-v4`, validated against its runtime-profile-pinned owner
     bytes, plus SDK incarnation binding v2. Their obligation, mandate, exact
     role resolution, informational model-fit query and chosen projection,
-    ready task-local DAG, accepted responsibility transfer, domain procedure
-    refs, child scope, external-process/session posture, and observe-only usage
+    exact model realization and SDK run plan, ready task-local DAG, accepted
+    responsibility transfer, domain procedure refs, child scope,
+    external-process/session posture, and observe-only usage
     semantics must match the launch and continuation exactly. Owner semantic
     self-digests and immutable transport-byte digests remain distinct and both
     are verified.

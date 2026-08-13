@@ -47,7 +47,8 @@ Every new `owner_contour` execution requires the exact runtime-profile-pinned
 `aoa-agents` `summon-request-v4` and an
 `aoa_agent_incarnation_binding_v2`. The request and binding must name the same
 agent obligation, actor mandate, exact role resolution, model-fit query
-result, selected model-fit projection, SDK summon request and decision,
+result, selected model-fit projection, model realization, SDK run plan, SDK
+summon request and decision,
 runtime launch, task-local DAG, responsibility transfer, domain procedures,
 continuity, and return-event schema.
 
@@ -58,6 +59,12 @@ profile, and named outputs. It also verifies one exact informational
 task-family relation through query result and projection to the already bound
 model realization. This verification does not choose a role or model and does
 not grant `aoa-models` routing, activation, proof, or acceptance authority.
+
+The owner request repeats the binding's exact `run_plan_ref` and a normalized
+content reference to its exact `model_realization_ref`. Runtime admission
+compares both explicitly with the already validated SDK binding. A caller
+cannot therefore replace either authority-bearing identity and recompute only
+the owner-request digest while leaving the physical launch and binding intact.
 
 Immutable input transport continues to require raw byte SHA-256 through its
 `ProvenanceRef`. `agent-obligation-v1`, `actor-mandate-v1`,
@@ -98,7 +105,8 @@ fixtures to masquerade as evidence-complete responsibility transfer.
 ## Consequences
 
 - Positive: every admitted owner-contour process has an inspectable chain from
-  obligation and role through current fit evidence to the exact realization.
+  obligation and role through current fit evidence to the exact realization
+  and SDK run plan.
 - Positive: changing Luna, effort, or a later model does not mutate the stable
   role or public invocation semantics.
 - Positive: old transport receipts remain usable for their original evidence
