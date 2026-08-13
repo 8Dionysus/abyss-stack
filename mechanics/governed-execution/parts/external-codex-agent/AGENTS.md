@@ -44,6 +44,7 @@ Run:
 AOA_SDK_SOURCE_ROOT=/absolute/path/to/aoa-sdk \
 AOA_AGENTS_SOURCE_ROOT=/absolute/path/to/aoa-agents \
 AOA_SKILLS_SOURCE_ROOT=/absolute/path/to/aoa-skills \
+PYTHONPATH=/absolute/path/to/aoa-sdk/src \
 python -m pytest -q \
   mechanics/governed-execution/parts/external-codex-agent/tests
 python -m py_compile \
@@ -51,6 +52,7 @@ python -m py_compile \
   scripts/aoa-external-actor-bind \
   mechanics/governed-execution/parts/external-codex-agent/bind_external_actor_launch.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py \
+  mechanics/governed-execution/parts/external-codex-agent/external_codex_nested_evidence.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_projection.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_mount_launcher.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py \

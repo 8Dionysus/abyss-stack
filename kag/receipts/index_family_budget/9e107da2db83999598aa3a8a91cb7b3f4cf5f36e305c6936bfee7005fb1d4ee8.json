@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 27233774,
+  "allowed_tracked_bytes": 34869180,
+  "approved_by": "repository-owner",
+  "base_ref": "56a64aa4d84db27f655f2982e4b0068db8903479",
+  "changed_generated_bytes": 27233774,
+  "changed_generated_files": 322,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "9e107da2db83999598aa3a8a91cb7b3f4cf5f36e305c6936bfee7005fb1d4ee8",
+  "reason": "Refresh the exact CI-pinned portable family for the nested reviewer evidence namespace and compact source-return route without raising the standing budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34869180,
+  "tracked_bytes_max": 24117248
+}

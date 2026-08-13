@@ -60,6 +60,11 @@ from external_codex_projection import (  # noqa: E402
     materialize_actor_projection_from_seed,
     remove_actor_projection,
 )
+from external_codex_nested_evidence import (  # noqa: E402
+    NestedEvidenceNamespaceError,
+    build_nested_evidence_namespace,
+    nested_evidence_namespace_digest,
+)
 
 PROFILE_PATH = PART_ROOT / "runtime-profile.v1.json"
 SUPERVISOR_PATH = PART_ROOT / "external_codex_supervisor.py"
@@ -96,6 +101,9 @@ REVIEW_SEED_ENVELOPE_SCHEMA_PATH = (
 ACTOR_INPUT_ENVELOPE_SCHEMA_PATH = (
     SCHEMA_ROOT / "external-codex-actor-input-envelope.schema.json"
 )
+NESTED_EVIDENCE_NAMESPACE_SCHEMA_PATH = (
+    SCHEMA_ROOT / "external-codex-nested-evidence-namespace.schema.json"
+)
 SDK_SUMMON_REQUEST_SCHEMA_REF = (
     "mechanics/checkpoint/parts/child-task-reentry/schemas/"
     "summon-request-v4.schema.json"
@@ -118,6 +126,7 @@ MAX_JSON_ESCAPE_LAYERS = 32
 MCP_PROXY_CONNECT_TIMEOUT_SECONDS = 15
 SHELL_NESTING_INSPECTION_LIMIT = 4
 FOREGROUND_OBSERVATION_INTERVAL_SECONDS = 0.25
+NESTED_EVIDENCE_ENV = "AOA_EXTERNAL_CODEX_NESTED_EVIDENCE"
 TERMINAL_STATES = {
     "completed",
     "failed",
@@ -1256,19 +1265,31 @@ def load_schema(path: Path) -> dict[str, Any]:
     return schema
 
 
-def validate_json(value: Any, schema_path: Path, *, label: str) -> None:
-    validator = Draft202012Validator(
-        load_schema(schema_path),
-        format_checker=FormatChecker(),
-    )
+def _validate_json_against_schema(
+    value: Any,
+    schema: Mapping[str, Any],
+    *,
+    label: str,
+    schema_label: str,
+) -> None:
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
     errors = sorted(validator.iter_errors(value), key=lambda item: list(item.path))
     if errors:
         first = errors[0]
         location = "/".join(str(item) for item in first.path) or "<root>"
         raise ExternalCodexRuntimeError(
             "schema_validation_failed",
-            f"{label} violates {schema_path.name} at {location}: {first.message}",
+            f"{label} violates {schema_label} at {location}: {first.message}",
         )
+
+
+def validate_json(value: Any, schema_path: Path, *, label: str) -> None:
+    _validate_json_against_schema(
+        value,
+        load_schema(schema_path),
+        label=label,
+        schema_label=schema_path.name,
+    )
 
 
 def validate_structured_output_schema(schema: Mapping[str, Any]) -> None:
@@ -1387,7 +1408,7 @@ def specialize_report_schema(
     evidence_pattern = (
         "^(?:source:[^#]+|immutable:(?:"
         f"{immutable_alternation}"
-        ")|runtime:workspace-final-manifest)#[^#]+$"
+        ")|runtime:(?:workspace-final-manifest|nested-evidence-namespace))#[^#]+$"
     )
     findings = properties.get("findings")
     transition = properties.get("transition")
@@ -1426,6 +1447,68 @@ def specialize_report_schema(
     Draft202012Validator.check_schema(specialized)
     validate_structured_output_schema(specialized)
     return specialized
+
+
+def report_semantic_validation_schema(
+    schema: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Admit known evidence syntax before exact semantic and identity checks.
+
+    The canonical report schema intentionally keeps its historical digest and
+    ABI.  A session-local Structured Outputs schema additionally constrains
+    exact task, incarnation, and immutable-input identities.  During runtime
+    admission, semantic validation must see syntactically valid but unavailable
+    identities so it can reject them with the precise fail-closed owner code.
+    Successful reports still pass the exact session-local schema afterwards.
+    """
+
+    semantic = json.loads(json.dumps(schema))
+    properties = semantic.get("properties")
+    findings = properties.get("findings") if isinstance(properties, dict) else None
+    transition = (
+        properties.get("transition") if isinstance(properties, dict) else None
+    )
+    finding_items = findings.get("items") if isinstance(findings, dict) else None
+    finding_properties = (
+        finding_items.get("properties") if isinstance(finding_items, dict) else None
+    )
+    transition_properties = (
+        transition.get("properties") if isinstance(transition, dict) else None
+    )
+    evidence_arrays = (
+        finding_properties.get("evidence_refs")
+        if isinstance(finding_properties, dict)
+        else None,
+        transition_properties.get("evidence_refs")
+        if isinstance(transition_properties, dict)
+        else None,
+    )
+    for evidence_array in evidence_arrays:
+        if (
+            not isinstance(evidence_array, dict)
+            or not isinstance(evidence_array.get("items"), dict)
+            or evidence_array["items"].get("type") != "string"
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_profile_invalid",
+                "canonical report schema cannot expose semantic evidence refs",
+            )
+        evidence_pattern = evidence_array["items"].get("pattern")
+        runtime_token = "runtime:workspace-final-manifest)"
+        if (
+            not isinstance(evidence_pattern, str)
+            or evidence_pattern.count(runtime_token) != 1
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_profile_invalid",
+                "canonical report schema cannot extend semantic runtime evidence",
+            )
+        evidence_array["items"]["pattern"] = evidence_pattern.replace(
+            runtime_token,
+            "runtime:(?:workspace-final-manifest|nested-evidence-namespace))",
+        )
+    Draft202012Validator.check_schema(semantic)
+    return semantic
 
 
 def _atomic_write_bytes(path: Path, payload: bytes, *, mode: int = 0o600) -> None:
@@ -1623,6 +1706,85 @@ def _load_verified_json_ref(
     if schema_path is not None:
         validate_json(value, schema_path, label=label)
     return value
+
+
+def _load_nested_evidence_namespace(
+    state: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    """Reload and rebind one controller-generated nested evidence derivative."""
+
+    namespace_ref = state.get("nested_evidence_namespace_ref")
+    if namespace_ref is None:
+        return None
+    if not isinstance(namespace_ref, dict):
+        raise ExternalCodexRuntimeError(
+            "nested_evidence_namespace_drift",
+            "nested evidence namespace state is malformed",
+        )
+    namespace = _load_verified_json_ref(
+        namespace_ref,
+        label="nested evidence namespace",
+        schema_path=NESTED_EVIDENCE_NAMESPACE_SCHEMA_PATH,
+    )
+    task_path = Path(str(state["materialized_inputs"]["task"]))
+    if (
+        namespace.get("namespace_digest")
+        != nested_evidence_namespace_digest(namespace)
+        or namespace.get("review_task_id") != state.get("task_id")
+        or namespace.get("review_task_digest") != sha256_file(task_path)
+        or namespace.get("status") != "closed"
+        or namespace.get("summary", {}).get("unresolved") != 0
+    ):
+        raise ExternalCodexRuntimeError(
+            "nested_evidence_namespace_drift",
+            "nested evidence namespace no longer binds the exact review task",
+        )
+    return namespace
+
+
+def _nested_evidence_prompt_summary(
+    state: Mapping[str, Any],
+    namespace: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Expose a compact, digest-bound locator instead of duplicating all entries."""
+
+    namespace_ref = state.get("nested_evidence_namespace_ref")
+    if not isinstance(namespace_ref, dict):
+        raise ExternalCodexRuntimeError(
+            "nested_evidence_namespace_drift",
+            "nested evidence namespace state is malformed",
+        )
+    namespace_path = _verified_artifact_ref_path(
+        namespace_ref,
+        label="nested evidence namespace",
+    )
+    return {
+        "schema_version": (
+            "abyss_stack_external_codex_nested_evidence_prompt_summary_v1"
+        ),
+        "status": namespace["status"],
+        "namespace_digest": namespace["namespace_digest"],
+        "artifact_digest": namespace_ref["artifact_digest"],
+        "materialized_path": str(namespace_path),
+        "review_task_id": namespace["review_task_id"],
+        "review_task_digest": namespace["review_task_digest"],
+        "summary": namespace["summary"],
+        "producers": [
+            {
+                "producer_task_id": producer["producer_task_id"],
+                "task_input_id": producer["task_input_id"],
+                "task_digest": producer["task_digest"],
+                "result_input_id": producer["result_input_id"],
+                "result_digest": producer["result_digest"],
+                "report_input_id": producer["report_input_id"],
+                "report_digest": producer["report_digest"],
+                "delta_input_id": producer["delta_input_id"],
+                "delta_digest": producer["delta_digest"],
+                "entry_count": len(producer["entries"]),
+            }
+            for producer in namespace["producers"]
+        ],
+    }
 
 
 def _process_start_ticks(pid: int) -> int | None:
@@ -2220,7 +2382,8 @@ def _validate_runtime_evidence_ref(
     body = value.removeprefix("runtime:")
     evidence_id, separator, anchor = body.partition("#")
     if (
-        evidence_id != "workspace-final-manifest"
+        evidence_id
+        not in {"workspace-final-manifest", "nested-evidence-namespace"}
         or not separator
         or not anchor
         or "#" in anchor
@@ -2238,9 +2401,40 @@ def _validate_runtime_evidence_ref(
     ):
         raise ExternalCodexRuntimeError(
             "model_report_runtime_evidence_unavailable",
-            "model report final-workspace evidence is unavailable",
+            "model report runtime-owned evidence is unavailable",
         )
     raw = read_bounded(candidate)
+    if evidence_id == "nested-evidence-namespace":
+        if re.fullmatch(r"nested-evidence-[0-9a-f]{24}", anchor) is None:
+            raise ExternalCodexRuntimeError(
+                "model_report_runtime_evidence_anchor_invalid",
+                "nested evidence namespace requires one exact entry identity",
+            )
+        namespace = load_json_bytes(raw, label="nested evidence namespace")
+        validate_json(
+            namespace,
+            NESTED_EVIDENCE_NAMESPACE_SCHEMA_PATH,
+            label="nested evidence namespace",
+        )
+        if namespace.get("namespace_digest") != nested_evidence_namespace_digest(
+            namespace
+        ):
+            raise ExternalCodexRuntimeError(
+                "model_report_runtime_evidence_anchor_invalid",
+                "nested evidence namespace digest is invalid",
+            )
+        entries = [
+            entry
+            for producer in namespace.get("producers", [])
+            for entry in producer.get("entries", [])
+            if entry.get("entry_id") == anchor
+        ]
+        if len(entries) != 1:
+            raise ExternalCodexRuntimeError(
+                "model_report_runtime_evidence_anchor_invalid",
+                "nested evidence namespace entry is absent or ambiguous",
+            )
+        return
     if SOURCE_LINE_ANCHOR_RE.fullmatch(anchor) is not None:
         _validate_evidence_anchor(
             raw,
@@ -2298,7 +2492,7 @@ def _validate_report_evidence_ref(
     raise ExternalCodexRuntimeError(
         "model_report_evidence_scheme_unsupported",
         "model report evidence must use anchored source:, immutable:<input_id>, "
-        "or runtime:workspace-final-manifest refs",
+        "runtime:workspace-final-manifest, or runtime:nested-evidence-namespace refs",
     )
 
 
@@ -8142,6 +8336,53 @@ class ExternalCodexRuntime:
                         },
                     }
                 )
+            nested_evidence_namespace_ref: dict[str, Any] | None = None
+            nested_evidence_namespace: dict[str, Any] | None = None
+            nested_evidence_mode = os.environ.get(
+                NESTED_EVIDENCE_ENV,
+                "on",
+            ).strip().lower()
+            if nested_evidence_mode not in {"on", "off"}:
+                raise ExternalCodexRuntimeError(
+                    "nested_evidence_configuration_invalid",
+                    f"{NESTED_EVIDENCE_ENV} must be exactly on or off",
+                )
+            if (
+                validated["task"]["execution_posture"] == "independent_review"
+                and nested_evidence_mode == "on"
+            ):
+                try:
+                    nested_evidence_namespace = build_nested_evidence_namespace(
+                        review_task_id=str(validated["task"]["task_id"]),
+                        review_task_digest=sha256_bytes(
+                            validated["coordinates"]["task"][1]
+                        ),
+                        immutable_inputs=validated["immutable_inputs"],
+                    )
+                except NestedEvidenceNamespaceError as exc:
+                    raise ExternalCodexRuntimeError(
+                        "nested_evidence_namespace_unresolved",
+                        "independent-review nested evidence did not close exactly: "
+                        + str(exc),
+                    ) from exc
+                if nested_evidence_namespace is not None:
+                    validate_json(
+                        nested_evidence_namespace,
+                        NESTED_EVIDENCE_NAMESPACE_SCHEMA_PATH,
+                        label="nested evidence namespace",
+                    )
+                    nested_evidence_namespace_path = (
+                        inputs_dir / "nested-evidence-namespace.json"
+                    )
+                    _atomic_write_json(
+                        nested_evidence_namespace_path,
+                        nested_evidence_namespace,
+                        mode=0o400,
+                    )
+                    nested_evidence_namespace_ref = _artifact_ref(
+                        nested_evidence_namespace_path,
+                        owner="abyss-stack",
+                    )
             projection = self._prepare_actor_projection(
                 validated=validated,
                 session_dir=session_dir,
@@ -8197,6 +8438,7 @@ class ExternalCodexRuntime:
                     if validated["review_seed"] is not None
                     else None
                 ),
+                "nested_evidence_namespace_ref": nested_evidence_namespace_ref,
                 "materialized_inputs": materialized,
                 "execution_result_schema_ref": _artifact_ref(
                     execution_result_schema_path,
@@ -8242,6 +8484,11 @@ class ExternalCodexRuntime:
                 payload={
                     "launch_digest": validated["launch_digest"],
                     "incarnation_id": validated["binding"].incarnation_id,
+                    "nested_evidence_namespace_digest": (
+                        nested_evidence_namespace_ref["artifact_digest"]
+                        if nested_evidence_namespace_ref is not None
+                        else None
+                    ),
                 },
                 significance="progress",
             )
@@ -8813,6 +9060,25 @@ class ExternalCodexRuntime:
             )
         return candidate
 
+    def _load_verified_session_report(
+        self,
+        session_id: str,
+        report_ref: Mapping[str, Any],
+        *,
+        label: str,
+    ) -> dict[str, Any]:
+        """Load a terminal report under its exact session-local schema."""
+
+        with self._lock(session_id):
+            state = self._load_state(session_id)
+            report = _load_verified_json_ref(report_ref, label=label)
+            validate_json(
+                report,
+                self._execution_result_schema_path(state),
+                label=label,
+            )
+        return report
+
     def _ensure_execution_result_schema_locked(self, state: dict[str, Any]) -> Path:
         """Materialize exact identity constraints for a legacy resumable session."""
 
@@ -9367,6 +9633,12 @@ class ExternalCodexRuntime:
             binding.continuation.model_dump(mode="json")
         )
         immutable_inputs = state["materialized_task_inputs"]
+        nested_evidence_namespace = _load_nested_evidence_namespace(state)
+        nested_evidence_prompt_summary = (
+            _nested_evidence_prompt_summary(state, nested_evidence_namespace)
+            if nested_evidence_namespace is not None
+            else None
+        )
         # The owner task remains durable and exact on disk, but its source-side
         # local_path hints are not actor coordinates.  Give the model a
         # projection-safe task view whose immutable inputs point only at the
@@ -9411,6 +9683,27 @@ class ExternalCodexRuntime:
             projected_resume_payload,
         ):
             assert_control_view_is_source_free(control_view)
+        if nested_evidence_prompt_summary is not None:
+            # Runtime materializations, like immutable input paths, may share a
+            # harmless filesystem ancestor with a source checkout in tests.
+            # Keep every semantic field free of all source aliases, while the
+            # exact locator itself must exclude every source workspace root.
+            assert_control_view_is_source_free(
+                {
+                    key: value
+                    for key, value in nested_evidence_prompt_summary.items()
+                    if key != "materialized_path"
+                }
+            )
+            materialized_path = nested_evidence_prompt_summary["materialized_path"]
+            if any(
+                _contains_source_path(materialized_path, candidate)
+                for candidate in source_roots
+            ):
+                raise ExternalCodexRuntimeError(
+                    "actor_source_path_exposed",
+                    "nested evidence locator retained a source workspace root",
+                )
         validation_execution_protocol = [
             {
                 "command_id": item["command_id"],
@@ -9434,6 +9727,19 @@ class ExternalCodexRuntime:
                 indent=2,
             )
             if resume_payload is not None
+            else ""
+        )
+        nested_evidence_block = (
+            "\nCompact locator for the runtime-owned nested evidence namespace "
+            "(a subordinate exact transport derivative, never owner truth):\n"
+            "<nested_evidence_namespace_summary>\n"
+            + json.dumps(
+                nested_evidence_prompt_summary,
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n</nested_evidence_namespace_summary>\n"
+            if nested_evidence_prompt_summary is not None
             else ""
         )
         workspace_projection = {
@@ -9469,6 +9775,7 @@ Runtime-materialized immutable inputs (read these paths, not mutable aliases):
 <immutable_inputs>
 {json.dumps(immutable_inputs, ensure_ascii=False, indent=2)}
 </immutable_inputs>
+{nested_evidence_block}
 
 Runtime-owned actor workspace projection (the only mutable repository view):
 <workspace_projection>
@@ -9500,8 +9807,9 @@ Hard stop-lines:
   runtime:validation:<command_id>; the runtime binds it to observed argv/status.
 - Every transition or finding evidence ref must be an anchored
   source:<workspace-relative-path>#<line-or-symbol>, an anchored
-  immutable:<input_id>#<line-or-symbol>, or the reserved post-exit
-  runtime:workspace-final-manifest#<line-or-symbol> ref. Use the stable input_id
+  immutable:<input_id>#<line-or-symbol>, the reserved post-exit
+  runtime:workspace-final-manifest#<line-or-symbol> ref, or an exact
+  runtime:nested-evidence-namespace#<entry-id> ref. Use the stable input_id
   shown in immutable_inputs, never its ordinal materialized filename or absolute
   path. A line anchor is spelled exactly L<number> or L<number>-L<number>
   (for example #L35 or #L35-L38). A bare numeric anchor such as #35 is treated
@@ -9509,6 +9817,16 @@ Hard stop-lines:
   the source. Use the reserved runtime ref for claims about final workspace state; the
   controller binds it after the model exits. Emit each exact evidence ref only
   once per transition or finding; exact repetitions are semantically redundant.
+- When nested_evidence_namespace_summary is present, its artifact_digest binds
+  the exact read-only JSON at materialized_path and namespace_digest binds its
+  canonical content. Inspect only entries needed for the claim with bounded jq
+  selection by original_ref, entry_id, or producer_task_id; do not dump the
+  complete namespace into the transcript. The namespace proves only transport
+  closure of historical refs through exact producer task/result/report/delta,
+  digests, manifests, and anchored excerpts. Independently judge the claim.
+  Do not report a mapped alias or source-coordinate change as an evidence defect;
+  cite the exact namespace entry for that closure. A same-name digest collision
+  is a warning against name-only resolution, not evidence for the wrong input.
 - artifact_paths must be empty for read-only work. For repo-mutation work they
   may contain only regular, non-symlink files inside allowed_paths that this
   attempt actually changed relative to the immutable baseline.
@@ -9903,6 +10221,16 @@ Runtime session identity: {state["session_id"]}
                     tool_entry,
                 )
             )
+            nested_evidence_readable_paths = (
+                (
+                    _verified_artifact_ref_path(
+                        state["nested_evidence_namespace_ref"],
+                        label="nested evidence namespace",
+                    ),
+                )
+                if isinstance(state.get("nested_evidence_namespace_ref"), dict)
+                else ()
+            )
             codex_command = self._codex_command(
                 launch=launch,
                 realization=realization,
@@ -9920,6 +10248,7 @@ Runtime session identity: {state["session_id"]}
                         Path(str(item["path"]))
                         for item in state["materialized_task_inputs"]
                     ),
+                    *nested_evidence_readable_paths,
                     *specialized_readable_paths,
                 ),
                 writable_paths=(attempt_dir, scratch),
@@ -11090,19 +11419,43 @@ Runtime session identity: {state["session_id"]}
         if report_path.is_file():
             try:
                 report = load_json(report_path, label="model report")
-                validate_json(report, REPORT_SCHEMA_PATH, label="model report")
+                exact_report_schema_path = self._execution_result_schema_path(state)
+                canonical_report_schema = load_schema(
+                    Path(str(state["materialized_inputs"]["result_schema"]))
+                )
+                _validate_json_against_schema(
+                    report,
+                    report_semantic_validation_schema(canonical_report_schema),
+                    label="model report",
+                    schema_label="semantic external-codex-report schema",
+                )
+                runtime_evidence_paths: dict[str, Path] = {}
+                if workspace_manifest_ref is not None:
+                    runtime_evidence_paths["workspace-final-manifest"] = (
+                        final_manifest_path
+                    )
+                nested_namespace = _load_nested_evidence_namespace(state)
+                nested_namespace_ref = state.get("nested_evidence_namespace_ref")
+                if (
+                    nested_namespace is not None
+                    and isinstance(nested_namespace_ref, dict)
+                ):
+                    runtime_evidence_paths["nested-evidence-namespace"] = Path(
+                        str(nested_namespace_ref["artifact_ref"])
+                    )
                 self._validate_report_against_task(
                     report,
                     state=state,
                     task=task,
                     binding=binding,
-                    runtime_evidence_paths=(
-                        {"workspace-final-manifest": final_manifest_path}
-                        if workspace_manifest_ref is not None
-                        else {}
-                    ),
+                    runtime_evidence_paths=runtime_evidence_paths,
                     final_workspace_manifest_digest=final_workspace_manifest_digest,
                     projection_fd=projection_fd,
+                )
+                validate_json(
+                    report,
+                    exact_report_schema_path,
+                    label="model report",
                 )
             except ExternalCodexRuntimeError as exc:
                 failure_code = exc.code
@@ -12474,15 +12827,15 @@ Runtime session identity: {state["session_id"]}
                 "a2a_review_not_independent",
                 "A2A export requires a separate landing-review thread",
             )
-        reviewer_report = _load_verified_json_ref(
+        reviewer_report = reviewer_runtime._load_verified_session_report(
+            reviewer_session_id,
             reviewer["report_ref"],
             label="reviewer report",
-            schema_path=REPORT_SCHEMA_PATH,
         )
-        writer_report = _load_verified_json_ref(
+        writer_report = self._load_verified_session_report(
+            writer_session_id,
             writer["report_ref"],
             label="writer report",
-            schema_path=REPORT_SCHEMA_PATH,
         )
         for label, result, report in (
             ("writer", writer, writer_report),
@@ -13056,15 +13409,15 @@ Runtime session identity: {state["session_id"]}
                 "A2A export requires a separate independent-review thread",
             )
 
-        reviewer_report = _load_verified_json_ref(
+        reviewer_report = reviewer_runtime._load_verified_session_report(
+            reviewer_session_id,
             reviewer["report_ref"],
             label="reviewer report",
-            schema_path=REPORT_SCHEMA_PATH,
         )
-        writer_report = _load_verified_json_ref(
+        writer_report = self._load_verified_session_report(
+            writer_session_id,
             writer["report_ref"],
             label="writer report",
-            schema_path=REPORT_SCHEMA_PATH,
         )
         for label, result, report in (
             ("writer", writer, writer_report),

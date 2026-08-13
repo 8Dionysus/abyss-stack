@@ -79,9 +79,10 @@ locked publication boundary can return responsibility.
 The session-local output schema is derived only from the admitted canonical
 schema plus the exact task and incarnation identities already present in
 runtime state. Its path and digest are persisted and checked before inference;
-the canonical schema is still used for source admission and final report
-validation. Before every admitted continuation, the exact prior terminal
-runtime result is copied into its attempt directory and retained as an
+the same exact derivative validates the model report after inference and every
+later A2A export, while the unchanged canonical schema remains the owner ABI
+for source admission. Before every admitted continuation, the exact prior
+terminal runtime result is copied into its attempt directory and retained as an
 evidence ref rather than overwritten by the later terminal result. The narrow
 failed-review route adds stricter failure/status/digest checks on top of this
 general preservation rule.
@@ -99,6 +100,20 @@ address it through the reserved `runtime:workspace-final-manifest` identity.
 The controller resolves that identity only to the manifest it writes during
 the same attempt's finalization. This makes post-exit state citable without
 turning an arbitrary runtime path into evidence.
+
+Nested-review evidence keeps the same asymmetry. The original producer task,
+result, report, output, actor delta, final manifest, upstream actor envelope,
+and source bytes remain stronger than the controller-generated namespace. The
+namespace is a content-addressed navigation and validation receipt over those
+exact objects; it carries anchored excerpts so a reviewer need not substitute
+newer workspace bytes for historical source. It grants no alias-rewrite,
+source-rewrite, acceptance, proof, or domain authority.
+The model-facing prompt receives a compact locator bound to the namespace's
+canonical digest and artifact digest. The complete derivative remains an exact
+read-only runtime artifact and is queried only for entries relevant to the
+claim, so repeated model turns do not duplicate every historical excerpt.
+Incomplete historical producer envelopes do not create partial namespace
+authority: the controller preserves the existing model-only reviewer route.
 
 `prepare_landing_study.py` verifies that the imported `aoa_sdk` package,
 `compile_run_plan`, and every loaded `aoa_sdk` module or package path live

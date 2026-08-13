@@ -194,10 +194,11 @@ constraints are exact `const` values for the task and incarnation IDs plus an
 exact allowlist of the materialized immutable-input identities in finding and
 transition evidence references. Source and controller-owned runtime evidence
 retain their canonical reference shapes. The derivative's path and digest are
-persisted in runtime state and revalidated before every inference; drift fails
-closed. This prevents a known runtime identity or forwarded immutable input
-from being mistyped or plausibly aliased in an otherwise substantive report
-without weakening the post-output semantic identity and byte checks.
+persisted in runtime state and revalidated before inference, after inference,
+and during A2A export; drift fails closed. This prevents a known runtime
+identity or forwarded immutable input from being mistyped or plausibly aliased
+in an otherwise substantive report without weakening the post-output semantic
+identity and byte checks.
 
 ## Process and tool boundary
 
@@ -602,6 +603,27 @@ anchor must name either one exact top-level JSON member or one exact
 `content_entries[].path`; substring matches such as `git_head` inside
 `source_git_head`, and partial path matches, are false anchors. Arbitrary
 runtime paths or aliases remain inadmissible.
+
+An independent reviewer may also receive one controller-generated
+`nested-evidence-namespace` derivative when its immutable packet contains a
+complete earlier producer graph. Each entry binds the producer task/result/
+report/delta digests, the exact artifact occurrence, and either an exact
+upstream actor-envelope digest, a final-manifest source digest plus anchored
+excerpt, an exact final-manifest line/member/content-entry value, a delta-bound
+output, or a recorded validation observation. Matching
+an alias by name is forbidden: the producer's original source digest must lead
+to one and only one current envelope. A packet without the complete producer
+task/result/report/delta/output envelope stays on the prior model-only route;
+it never receives a partial namespace. Once a complete graph is admitted, any
+missing, ambiguous, drifted, or out-of-scope nested edge rejects the review
+before inference. A model may cite a
+closed entry as `runtime:nested-evidence-namespace#<entry-id>`, but must still
+judge the semantic claim independently; the derivative neither rewrites prior
+artifacts nor creates owner truth. The model prompt contains only a compact
+summary bound to both the namespace's canonical digest and the exact artifact
+digest. Its `materialized_path` is admitted read-only in the attempt-local
+Codex permission profile; the reviewer must select only needed entries rather
+than copy the complete namespace into the transcript.
 
 Evidence-reference arrays are non-empty and every occurrence is independently
 resolved against its exact source, immutable-input, or runtime-owned bytes.

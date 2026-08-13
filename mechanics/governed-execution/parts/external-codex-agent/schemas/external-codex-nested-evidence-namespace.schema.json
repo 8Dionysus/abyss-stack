@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/external-codex-nested-evidence-namespace.schema.json",
+  "title": "External Codex Nested Evidence Namespace",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "review_task_id",
+    "review_task_digest",
+    "status",
+    "summary",
+    "producers",
+    "namespace_digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "abyss_stack_external_codex_nested_evidence_namespace_v1"
+    },
+    "review_task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "review_task_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "status": {
+      "const": "closed"
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "producers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/producer"
+      }
+    },
+    "namespace_digest": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "inputId": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "producer_count",
+        "artifact_count",
+        "reference_occurrences",
+        "immutable_exact",
+        "source_exact",
+        "runtime_exact",
+        "validation_exact",
+        "same_name_digest_collisions",
+        "unresolved"
+      ],
+      "properties": {
+        "producer_count": {"type": "integer", "minimum": 1},
+        "artifact_count": {"type": "integer", "minimum": 1},
+        "reference_occurrences": {"type": "integer", "minimum": 1},
+        "immutable_exact": {"type": "integer", "minimum": 0},
+        "source_exact": {"type": "integer", "minimum": 0},
+        "runtime_exact": {"type": "integer", "minimum": 0},
+        "validation_exact": {"type": "integer", "minimum": 0},
+        "same_name_digest_collisions": {"type": "integer", "minimum": 0},
+        "unresolved": {"const": 0}
+      }
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "producer_task_id",
+        "task_input_id",
+        "task_digest",
+        "result_input_id",
+        "result_digest",
+        "report_input_id",
+        "report_digest",
+        "delta_input_id",
+        "delta_digest",
+        "entries"
+      ],
+      "properties": {
+        "producer_task_id": {"type": "string", "minLength": 1},
+        "task_input_id": {"$ref": "#/$defs/inputId"},
+        "task_digest": {"$ref": "#/$defs/digest"},
+        "result_input_id": {"$ref": "#/$defs/inputId"},
+        "result_digest": {"$ref": "#/$defs/digest"},
+        "report_input_id": {"$ref": "#/$defs/inputId"},
+        "report_digest": {"$ref": "#/$defs/digest"},
+        "delta_input_id": {"$ref": "#/$defs/inputId"},
+        "delta_digest": {"$ref": "#/$defs/digest"},
+        "entries": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/entry"}
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry_id",
+        "artifact_input_id",
+        "artifact_digest",
+        "json_pointer",
+        "original_ref",
+        "same_name_digest_collision",
+        "resolution"
+      ],
+      "properties": {
+        "entry_id": {
+          "type": "string",
+          "pattern": "^nested-evidence-[0-9a-f]{24}$"
+        },
+        "artifact_input_id": {"$ref": "#/$defs/inputId"},
+        "artifact_digest": {"$ref": "#/$defs/digest"},
+        "json_pointer": {"type": "string", "pattern": "^/"},
+        "original_ref": {"type": "string", "minLength": 1},
+        "same_name_digest_collision": {"type": "boolean"},
+        "resolution": {"$ref": "#/$defs/resolution"}
+      }
+    },
+    "anchoredExcerpt": {
+      "type": "object",
+      "required": ["validated_anchor", "anchored_excerpt", "anchored_excerpt_digest"],
+      "properties": {
+        "validated_anchor": {"type": "string", "minLength": 1},
+        "anchored_excerpt": {"type": "string"},
+        "anchored_excerpt_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "resolution": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "producer_input_id",
+            "producer_source_artifact_digest",
+            "target_input_id",
+            "target_envelope_digest",
+            "validated_anchor",
+            "anchored_excerpt",
+            "anchored_excerpt_digest"
+          ],
+          "properties": {
+            "kind": {"const": "upstream-actor-envelope-exact"},
+            "producer_input_id": {"$ref": "#/$defs/inputId"},
+            "producer_source_artifact_digest": {"$ref": "#/$defs/digest"},
+            "target_input_id": {"$ref": "#/$defs/inputId"},
+            "target_envelope_digest": {"$ref": "#/$defs/digest"},
+            "validated_anchor": {"type": "string", "minLength": 1},
+            "anchored_excerpt": {"type": "string"},
+            "anchored_excerpt_digest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "source_path",
+            "source_artifact_digest",
+            "producer_final_manifest_digest",
+            "validated_anchor",
+            "anchored_excerpt",
+            "anchored_excerpt_digest"
+          ],
+          "properties": {
+            "kind": {"const": "producer-final-workspace-source-exact"},
+            "source_path": {"type": "string", "minLength": 1},
+            "source_artifact_digest": {"$ref": "#/$defs/digest"},
+            "producer_final_manifest_digest": {"$ref": "#/$defs/digest"},
+            "validated_anchor": {"type": "string", "minLength": 1},
+            "anchored_excerpt": {"type": "string"},
+            "anchored_excerpt_digest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "output_path",
+            "output_artifact_digest",
+            "target_input_id",
+            "producer_delta_input_id",
+            "producer_final_manifest_digest",
+            "validated_anchor"
+          ],
+          "properties": {
+            "kind": {"const": "producer-final-workspace-output-exact"},
+            "output_path": {"type": "string", "minLength": 1},
+            "output_artifact_digest": {"$ref": "#/$defs/digest"},
+            "target_input_id": {"$ref": "#/$defs/inputId"},
+            "producer_delta_input_id": {"$ref": "#/$defs/inputId"},
+            "producer_final_manifest_digest": {"$ref": "#/$defs/digest"},
+            "validated_anchor": {"type": "string", "minLength": 1}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "manifest_anchor",
+            "producer_final_manifest_digest",
+            "manifest_value_digest",
+            "anchored_excerpt"
+          ],
+          "properties": {
+            "kind": {"const": "producer-final-workspace-manifest-exact"},
+            "manifest_anchor": {"type": "string", "minLength": 1},
+            "producer_final_manifest_digest": {"$ref": "#/$defs/digest"},
+            "manifest_value_digest": {"$ref": "#/$defs/digest"},
+            "anchored_excerpt": {"type": "string"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "validation_command_id",
+            "producer_result_input_id",
+            "observed_status"
+          ],
+          "properties": {
+            "kind": {"const": "producer-validation-observation-exact"},
+            "validation_command_id": {"type": "string", "minLength": 1},
+            "producer_result_input_id": {"$ref": "#/$defs/inputId"},
+            "observed_status": {"const": "passed"}
+          }
+        }
+      ]
+    }
+  }
+}
