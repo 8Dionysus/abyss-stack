@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 4068732,
+  "allowed_tracked_bytes": 34912727,
+  "approved_by": "repository-owner",
+  "base_ref": "8c50a5a63ec35e9071cc5e43287649395b16d91a",
+  "changed_generated_bytes": 4068732,
+  "changed_generated_files": 40,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "d0a17e823904a176a8d3e3b00503ccff0268859ef0aa2c76d47528bd9a1d2ddd",
+  "reason": "Content-addressed reindex after aligning both external Codex specialized environments with the landed aoa-stats responsibility-receipt revision and documenting that runtime pin correction.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34912727,
+  "tracked_bytes_max": 24117248
+}

@@ -77,7 +77,7 @@
         "owner_roots": [
           {
             "owner_repo": "aoa-stats",
-            "source_ref": "ed89112045addb0345306d5a7bb022c6737d095f",
+            "source_ref": "85a686a8d6bbcb1b28e8f26ab3d92f946bf8152f",
             "root_ref": "owners/aoa-stats",
             "environment_variable": "AOA_STATS_ROOT",
             "access": "read_only"
@@ -138,7 +138,7 @@
         "owner_roots": [
           {
             "owner_repo": "aoa-stats",
-            "source_ref": "ed89112045addb0345306d5a7bb022c6737d095f",
+            "source_ref": "85a686a8d6bbcb1b28e8f26ab3d92f946bf8152f",
             "root_ref": "owners/aoa-stats",
             "environment_variable": "AOA_STATS_ROOT",
             "access": "read_only"
