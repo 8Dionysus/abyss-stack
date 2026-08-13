@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 6792011,
+  "allowed_tracked_bytes": 34697876,
+  "approved_by": "repository-owner",
+  "base_ref": "6c6662a583b23987edcd7a18cb3566fc8fea02c2",
+  "changed_generated_bytes": 6792011,
+  "changed_generated_files": 71,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "744daca3448688dac059836bf4dc7a4657d8f460ff4667af7a1ac239d758a9ed",
+  "reason": "The modern MCP cold-start controller now schedules independent organ canary pairs through a bounded three-worker pool while preserving per-organ ordering and both complete 11-organ publication barriers.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34697876,
+  "tracked_bytes_max": 24117248
+}
