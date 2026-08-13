@@ -93,16 +93,21 @@ def test_workflow_routes_reusable_commands_through_ci_gate() -> None:
     ) in workflow
     assert (
         "git -C \"$RUNNER_TEMP/aoa-agents-source\" fetch --depth 1 origin "
-        "6eb9b27709fdab241423bf657dfe39fa85e4b159"
+        "f6656abf1780d9b27133ed39d03a2c9ff11dfd5e"
     ) in workflow
     assert (
         "git -C \"$RUNNER_TEMP/aoa-skills-source\" fetch --depth 1 origin "
-        "d9949a4a4e525bceb04210fc4619d5cb57cf7cb7"
+        "909e59f9d168077d9dc3656bb5afbeb66bfa9c6b"
+    ) in workflow
+    assert (
+        "git -C \"$RUNNER_TEMP/aoa-stats-validator\" fetch --depth 1 origin "
+        "85a686a8d6bbcb1b28e8f26ab3d92f946bf8152f"
     ) in workflow
     assert 'python -m pip install "$RUNNER_TEMP/aoa-sdk-source"' in workflow
     assert "AOA_AGENTS_SOURCE_ROOT: ${{ runner.temp }}/aoa-agents-source" in workflow
     assert "AOA_SDK_SOURCE_ROOT: ${{ runner.temp }}/aoa-sdk-source" in workflow
     assert "AOA_SKILLS_SOURCE_ROOT: ${{ runner.temp }}/aoa-skills-source" in workflow
+    assert "AOA_STATS_ROOT: ${{ runner.temp }}/aoa-stats-validator" in workflow
     assert "PYTHONPATH: ${{ runner.temp }}/aoa-sdk-source/src" in workflow
     assert "TMPDIR: ${{ runner.temp }}" in workflow
     assert ".deps/aoa-sdk" not in workflow
