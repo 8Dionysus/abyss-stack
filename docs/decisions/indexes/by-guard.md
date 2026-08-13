@@ -407,15 +407,15 @@
 
 - [ABYSS-STACK-D-0102 R1 Memory Runtime Is Exact Pull Delivery](../ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md) (`docs/decisions/ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md`)
 
-## exact dependency pin
-
-- [ABYSS-STACK-D-0120 Schedule Full Pytest With Bounded Work Stealing](../ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md) (`docs/decisions/ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md`)
-
 ## exact identity
 
 - [ABYSS-STACK-D-0107 Fail Closed MCP Admission Maintenance](../ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md) (`docs/decisions/ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md`)
 - [ABYSS-STACK-D-0108 Modern-Only MCP Organ Runtime](../ABYSS-STACK-D-0108-modern-only-mcp-organ-runtime.md) (`docs/decisions/ABYSS-STACK-D-0108-modern-only-mcp-organ-runtime.md`)
 - [ABYSS-STACK-D-0109 Recover Expired Modern MCP Read Admission](../ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md) (`docs/decisions/ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md`)
+
+## exact partition proof
+
+- [ABYSS-STACK-D-0120 Schedule Full Pytest With Bounded Work Stealing](../ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md) (`docs/decisions/ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md`)
 
 ## exact pin
 

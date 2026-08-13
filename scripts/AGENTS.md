@@ -32,8 +32,8 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
   command list.
 - `scripts/ci_gate.py` executes named validation lanes from the manifest.
 - `scripts/run_pytest_lane.py` schedules the complete default pytest selection.
-  It admits four-worker work stealing only with the exact pinned xdist version
-  and otherwise keeps a serial fallback; it does not own test selection.
+  It bounds file-aware work stealing to four process-isolated workers and proves
+  baseline/assignment/observed-selection parity; it does not own test selection.
 - `scripts/validate_local_stats_port.py` delegates the local port contract to
   the `aoa-stats` validator and does not own shared measurement semantics.
 - `scripts/release_check.py` remains the release entrypoint and Configs parity

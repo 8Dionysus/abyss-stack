@@ -125,34 +125,74 @@ def test_full_test_sequences_share_the_bounded_scheduler_entrypoint() -> None:
         assert test_steps[0].command[1:] == ("scripts/run_pytest_lane.py",)
 
 
-def test_pytest_scheduler_admits_only_the_exact_worksteal_pin() -> None:
-    admitted = run_pytest_lane.scheduler_plan("auto", xdist_version="3.8.0")
-    missing = run_pytest_lane.scheduler_plan("auto", xdist_version=None)
-    stale = run_pytest_lane.scheduler_plan("auto", xdist_version="3.7.0")
-    explicit_stale = run_pytest_lane.scheduler_plan(
-        "xdist-4-worksteal",
-        xdist_version="3.7.0",
-    )
+def test_pytest_scheduler_uses_process_isolated_workstealing() -> None:
+    admitted = run_pytest_lane.scheduler_plan("auto")
 
     assert admitted == {
         "ok": True,
         "requested": "auto",
-        "effective": "xdist-4-worksteal",
-        "reason": "measured_bounded_full_suite_scheduler",
-        "pytest_args": ["-n", "4", "--dist", "worksteal"],
+        "effective": "process-4x32-file-aware",
+        "reason": "isolated_process_workstealing",
+        "worker_limit": 4,
+        "shard_count": 32,
+        "ordering": "file_aware_duration_hints",
+        "selection_proof": "baseline_manifest_exact_union",
         "selection_changed": False,
     }
-    assert missing["effective"] == "serial"
-    assert missing["reason"] == "safe_serial_fallback_without_exact_xdist_pin"
-    assert stale["effective"] == "serial"
-    assert explicit_stale["ok"] is False
-    assert explicit_stale["reason"] == "pytest_xdist_pin_unavailable"
+
+
+def test_pytest_process_partitions_are_disjoint_and_complete() -> None:
+    nodeids = [f"tests/test_example.py::test_{index}" for index in range(19)]
+    partitions = run_pytest_lane.partition_nodeids(nodeids, shard_count=8)
+    flattened = [nodeid for partition in partitions for nodeid in partition]
+
+    assert len(partitions) == 8
+    assert max(map(len, partitions)) - min(map(len, partitions)) <= 1
+    assert len(flattened) == len(set(flattened)) == len(nodeids)
+    assert set(flattened) == set(nodeids)
+
+
+def test_pytest_process_partitions_keep_small_files_as_import_units() -> None:
+    nodeids = [
+        *[f"tests/test_small_a.py::test_{index}" for index in range(3)],
+        *[f"tests/test_small_b.py::test_{index}" for index in range(3)],
+        *[f"tests/test_large.py::test_{index}" for index in range(20)],
+    ]
+    partitions = run_pytest_lane.partition_nodeids(nodeids, shard_count=4)
+
+    for path in ("tests/test_small_a.py", "tests/test_small_b.py"):
+        owners = [
+            index
+            for index, partition in enumerate(partitions)
+            if any(nodeid.startswith(f"{path}::") for nodeid in partition)
+        ]
+        assert len(owners) == 1
+    large_owners = [
+        partition
+        for partition in partitions
+        if any(nodeid.startswith("tests/test_large.py::") for nodeid in partition)
+    ]
+    assert len(large_owners) == 3
+
+
+def test_pytest_process_partitions_queue_measured_slow_units_first() -> None:
+    slow_path = (
+        "mechanics/governed-execution/parts/external-codex-agent/"
+        "tests/test_external_codex_agent.py"
+    )
+    nodeids = [
+        *[f"tests/test_fast.py::test_{index}" for index in range(4)],
+        *[f"{slow_path}::test_{index}" for index in range(4)],
+    ]
+
+    partitions = run_pytest_lane.partition_nodeids(nodeids, shard_count=2)
+
+    assert all(nodeid.startswith(f"{slow_path}::") for nodeid in partitions[0])
 
 
 def test_pytest_scheduler_keeps_an_exact_serial_rollback() -> None:
-    rollback = run_pytest_lane.scheduler_plan("serial", xdist_version="3.8.0")
-    command = run_pytest_lane.pytest_command(
-        scheduler=rollback,
+    rollback = run_pytest_lane.scheduler_plan("serial")
+    command = run_pytest_lane.build_pytest_command(
         extra_args=["tests/test_validation_command_authority.py"],
     )
 
@@ -166,10 +206,13 @@ def test_pytest_scheduler_keeps_an_exact_serial_rollback() -> None:
     ]
 
 
-def test_release_dependencies_pin_the_admitted_pytest_scheduler() -> None:
+def test_release_dependencies_do_not_add_a_threaded_pytest_scheduler() -> None:
     requirements = (REPO_ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
 
-    assert "pytest-xdist==3.8.0" in requirements.splitlines()
+    assert not any(
+        requirement.startswith("pytest-xdist")
+        for requirement in requirements.splitlines()
+    )
 
 
 def test_decision_graph_lane_refreshes_ignored_cache_before_checking_it() -> None:

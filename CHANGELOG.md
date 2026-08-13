@@ -494,10 +494,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Changed
 
-- The complete `tests` and `release` pytest selection now uses an exact-pinned,
-  four-worker work-stealing scheduler when available. Two repeated full-suite
-  trials passed without deselection; missing or drifted scheduler dependencies
-  fall back to serial, and an explicit serial oracle remains available.
+- The complete `tests` and `release` pytest selection now uses a four-process,
+  file-aware work-stealing DAG with exact baseline, disjoint-union, observed
+  selection, and final-verdict proofs. Duration hints affect order only; the
+  explicit serial oracle remains available, and no xdist control thread enters
+  fork-sensitive tests.
 - `Repo Validation` now runs branch candidates through the pull-request event
   only, retains the full postmerge `main` push proof, and cancels only an
   obsolete in-progress run for the same PR or ref when a newer head arrives.

@@ -37,9 +37,9 @@ stabilizer, but it reads the release command sequence from the lane manifest.
 - Keep OS Abyss artifact bundle checks in the release lane when they validate
   generated deployable outputs rather than source topology alone.
 - Keep full-suite scheduling bounded and reversible. Automatic mode may use
-  four-worker work stealing only with exact `pytest-xdist==3.8.0`; a missing or
-  different pin falls back to serial, and
-  `ABYSS_STACK_TEST_SCHEDULER=serial` is the explicit rollback. Scheduling may
+  four process-isolated workers over an exact file-aware partition. Baseline,
+  disjoint union, observed selection, and child exit receipts must all verify;
+  `ABYSS_STACK_TEST_SCHEDULER=serial` is the explicit rollback. Timing hints may
   change order, never selection or failure semantics.
 
 ## Active Lanes

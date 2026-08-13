@@ -69,9 +69,9 @@ still synced into deployed `Configs/` with the wrappers.
   `docs/validation/validation_lanes.json`; `ci_gate.py` and `release_check.py`
   read that manifest instead of owning duplicate command lists.
 - Keep the complete pytest selection behind `run_pytest_lane.py`: automatic
-  mode uses exact `pytest-xdist==3.8.0` with four bounded work-stealing workers,
-  falls back safely to serial when that pin is unavailable, and supports exact
-  serial rollback through `ABYSS_STACK_TEST_SCHEDULER=serial`.
+  mode uses at most four process-isolated workers over 32 file-aware shards,
+  proves their exact disjoint union against one baseline collection, and
+  supports exact serial rollback through `ABYSS_STACK_TEST_SCHEDULER=serial`.
 - Keep `validate_local_stats_port.py` as a thin delegation to the `aoa-stats`
   contract owner; do not copy the central schemas or validator into this repo.
 - Put mechanic-specific implementation logic under the owning

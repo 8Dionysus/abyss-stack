@@ -1,9 +1,9 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 120,
-  "edge_count": 2708,
+  "edge_count": 2707,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1002,
+    "CITES_SOURCE_SURFACE": 1001,
     "DATED": 120,
     "GUARDED_BY": 370,
     "HAS_STATUS": 120,
@@ -12888,11 +12888,6 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0120",
-      "target": "source_surface:requirements-dev.txt",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0120",
       "target": "source_surface:scripts/run_pytest_lane.py",
       "type": "CITES_SOURCE_SURFACE"
     },
@@ -12908,7 +12903,7 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0120",
-      "target": "guard_family:exact%20dependency%20pin",
+      "target": "guard_family:exact%20partition%20proof",
       "type": "GUARDED_BY"
     },
     {
@@ -13558,7 +13553,7 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1180,
+  "node_count": 1179,
   "node_type_counts": {
     "date": 36,
     "decision": 120,
@@ -13566,7 +13561,7 @@
     "mechanic_parent": 10,
     "owner_surface": 63,
     "repo": 1,
-    "source_surface": 582,
+    "source_surface": 581,
     "stack_lane": 49,
     "status": 3,
     "surface_class": 132
@@ -15233,13 +15228,13 @@
       "type": "guard_family"
     },
     {
-      "id": "guard_family:exact%20dependency%20pin",
-      "label": "exact dependency pin",
+      "id": "guard_family:exact%20identity",
+      "label": "exact identity",
       "type": "guard_family"
     },
     {
-      "id": "guard_family:exact%20identity",
-      "label": "exact identity",
+      "id": "guard_family:exact%20partition%20proof",
+      "label": "exact partition proof",
       "type": "guard_family"
     },
     {
@@ -18541,11 +18536,6 @@
     {
       "id": "source_surface:repo%3Aaoa-sdk/src/aoa_sdk/runtime_adapters/abyss_stack.py",
       "label": "repo:aoa-sdk/src/aoa_sdk/runtime_adapters/abyss_stack.py",
-      "type": "source_surface"
-    },
-    {
-      "id": "source_surface:requirements-dev.txt",
-      "label": "requirements-dev.txt",
       "type": "source_surface"
     },
     {

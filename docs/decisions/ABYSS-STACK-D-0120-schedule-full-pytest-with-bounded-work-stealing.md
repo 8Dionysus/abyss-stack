@@ -11,31 +11,40 @@
 - Surface classes: validation workflow, test scheduler, landing latency
 - Stack lanes: validation, tests, release
 - Mechanic parents: none
-- Guard families: complete selection, exact dependency pin, serial rollback
+- Guard families: complete selection, exact partition proof, serial rollback
 - Posture: accepted bounded parallel scheduling; no coverage reduction
 
 ## Context
 
-The complete repository gate collected 2,194 tests, four skips, and 230
-subtests. On the landed `main` postmerge run, pytest alone took 899.36 seconds;
-the source validators before it took only a few seconds. The workflow therefore
-spent almost its entire critical path inside one serial pytest process even
-though the public GitHub runner provides four CPUs.
+The complete repository gate initially collected 2,194 tests, four skips, and
+230 subtests. On landed `main`, pytest alone took 899.36 seconds while the
+source validators before it took only a few seconds. The public GitHub runner
+provides four CPUs, so one serial pytest process dominated the landing path.
 
-The suite is not a uniform unit-test corpus. It contains many real subprocess
-and governed-execution scenarios, while one source file alone contributes more
-than 600 tests. Scheduling by whole file or scope would leave a large serial
-tail, and splitting the suite into several GitHub jobs would duplicate setup
-and weaken the simplicity of one complete selection unless a separate
-sufficiency graph were introduced.
+The corpus is not uniform. It contains real subprocess and governed-execution
+scenarios, and one source file contributes more than 600 tests. Whole-file
+sharding leaves a serial tail. Independent GitHub jobs duplicate setup and
+would need a separate sufficiency graph before they could replace one atomic
+suite verdict.
 
-Controlled full-selection trials compared xdist `load` with two, three, and
-four workers, then four-worker `worksteal`. All candidates passed the same
-2,194 tests, four skips, and 230 subtests. The measured pytest wall times were
-480.49 seconds, 382.10 seconds, 356.93 seconds, and 278.44 seconds
-respectively. A second four-worker work-stealing run passed in 269.82 seconds.
-Observed unit memory peaks rose from about 846 MiB at two workers to about
-1.15-1.22 GiB at four workers.
+Controlled full-selection comparisons included xdist `load` with two, three,
+and four workers; xdist `worksteal`; eight and 32 isolated-process shards; a
+hybrid serial/xdist split; file-aware process shards; and duration-aware queue
+ordering. The best xdist local trial passed in 269.82 seconds, and the public
+runner passed the exact PR head in 351.94 seconds. That runner also emitted 157
+warnings because the governed external-agent tests call `os.fork()` inside
+multithreaded xdist workers. The forked child continues Python execution, so
+the warning represented a real deadlock boundary rather than harmless output.
+
+The isolated-process comparisons retained one pytest process per active shard.
+Eight coarse shards were green but needed about 471 seconds; 32 hash-distributed
+shards needed 382.54 seconds. Keeping small files as import units and splitting
+only large files reduced that to 321.14 seconds. Starting measured slow units
+first then completed the current 2,200-test candidate, four skips, and 230
+subtests in 269.61 seconds, with a 517.7 MiB cgroup memory peak and no swap or
+multithreaded-fork warning. The hybrid split was stopped after 403 seconds when
+its serial fork-sensitive lane was still incomplete and could no longer beat
+the already green process-DAG result.
 
 ## Options considered
 
@@ -43,55 +52,65 @@ Observed unit memory peaks rose from about 846 MiB at two workers to about
 - Split files or scopes statically across processes or GitHub jobs.
 - Use xdist `load` with two, three, or four workers.
 - Use xdist `worksteal` with four bounded workers.
+- Run one serial fork-sensitive lane beside xdist for the remaining tests.
+- Run bounded, process-isolated shards with exact union proof.
 - Use an unbounded worker count derived from every visible logical CPU.
 
 ## Decision
 
-The complete `tests` and `release` selections run through
-`scripts/run_pytest_lane.py`. Automatic mode admits four-worker xdist
-`worksteal` only when installed `pytest-xdist` is exactly `3.8.0`. A missing or
-different pin falls back to the unchanged serial selection. Explicitly asking
-for the parallel scheduler with a missing or different pin fails closed.
+The complete default `tests` and `release` selections run through
+`scripts/run_pytest_lane.py`. Automatic mode uses at most four independent
+pytest processes and a queue of 32 deterministic file-aware shards. Small test
+files stay in one import unit; only files larger than the target shard size are
+split. Conservative duration hints start known slow units first. Hints affect
+queue order only and cannot alter membership or verdict.
 
-`ABYSS_STACK_TEST_SCHEDULER=serial` selects the exact serial rollback and
-independent sequential oracle. Scheduling changes order only: it does not
-change collection roots, markers, skips, retries, assertions, exit status, or
-failure interpretation.
+Before execution, one collect-only process writes the ordered baseline nodeids,
+count, and digest. The scheduler proves that all assignments are disjoint and
+their union equals that baseline. Every child receives explicit nodeids, writes
+its observed-selection manifest and exit receipt, and must match its assignment
+exactly. The aggregate is green only when every child is green and every
+selection proof is exact.
+
+Targeted pytest arguments use the unchanged serial path automatically. An
+explicit process scheduler refuses targeted arguments rather than inventing a
+second partition contract. `ABYSS_STACK_TEST_SCHEDULER=serial` remains the exact
+full-selection rollback and independent sequential oracle.
 
 ## Rationale
 
-Four-worker work stealing matched the public runner's bounded CPU shape and
-removed the long tail better than xdist's ordinary load scheduler. Repeated
-full-suite success provides stronger evidence than a targeted smoke, while the
-exact dependency pin prevents a silently changed scheduler implementation from
-entering the owner gate.
+The chosen scheduler matches the four-CPU runner while avoiding xdist's
+controller thread inside test processes. It therefore preserves the real
+`os.fork()` scenarios without accepting a scheduler-created deadlock risk. Its
+measured 269.61-second local result matches the fastest xdist trial while using
+only stdlib orchestration plus pytest already required by the suite.
 
-The serial fallback preserves availability for minimal local environments and
-keeps rollback immediate. A bounded count avoids turning a high-core developer
-host into an accidental unbounded subprocess fan-out. Static file and scope
-sharding remain valid future methods if the large-file topology is first
-decomposed or a source-owned sufficiency graph can prove complete selection.
+File-aware shards remove most repeated imports. Dynamic queueing avoids the
+large-file tail, and duration hints close the remaining scheduling imbalance.
+Because baseline, assignment, observation, and aggregate proof are independent
+of the hints, future timing drift can only reduce speed; it cannot hide tests.
+A bounded count also prevents accidental fan-out on high-core developer hosts.
 
 ## Consequences
 
 - Positive: the entire assertion surface remains blocking while the dominant
-  local and CI critical path can execute concurrently.
-- Positive: exact serial execution remains one environment switch away and is
-  also the safe automatic fallback when the scheduler pin is unavailable.
-- Positive: selection stays centralized in pytest instead of being copied into
-  workflow job shards.
-- Tradeoff: the release environment installs one exact scheduler dependency
-  and uses roughly 1.2 GiB at the measured four-worker peak.
-- Tradeoff: test order is intentionally nondeterministic across workers, so a
-  test that depends on shared mutable state should fail and be repaired rather
-  than silently forced green.
-- Follow-up: require green PR and postmerge runs on the public four-CPU runner,
-  monitor later runs for scheduler-specific flakes, and use the serial oracle
-  before classifying any such failure.
+  local and CI critical path executes concurrently.
+- Positive: the scheduler has an explicit Claim/Evidence DAG: baseline claim,
+  disjoint shard evidence, observed-selection receipts, and one atomic verdict.
+- Positive: fork-sensitive tests run in process-isolated pytest children and no
+  longer inherit an xdist control thread.
+- Positive: no extra scheduler dependency is installed, and exact serial
+  execution remains one environment switch away.
+- Tradeoff: each shard is a fresh pytest process, so import cost is higher than
+  persistent workers; file-aware units bound that cost.
+- Tradeoff: timing hints need occasional refresh as slow-test topology changes,
+  but stale hints affect performance only.
+- Follow-up: require green exact-head PR and postmerge runs on the public runner,
+  compare repeat distributions, and use the serial oracle before classifying a
+  scheduler-specific failure.
 
 ## Source surfaces
 
-- `requirements-dev.txt`
 - `scripts/run_pytest_lane.py`
 - `docs/validation/validation_lanes.json`
 - `docs/validation/COMMAND_AUTHORITY.md`
@@ -100,7 +119,7 @@ decomposed or a source-owned sufficiency graph can prove complete selection.
 
 ## Follow-up route
 
-The next validation pass should compare repeat run distributions on GitHub and
-inspect the remaining long subprocess tests. Static/DAG decomposition should
-be reconsidered only with an explicit complete-selection and final-sufficiency
-contract; it must not replace the serial oracle or hide failed owner evidence.
+The next validation pass should use GitHub timings and shard receipts to refresh
+duration hints or decompose remaining long subprocess tests. A future multi-job
+DAG must still prove the same complete selection and final sufficiency; it must
+not replace the serial oracle or hide failed owner evidence.

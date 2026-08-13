@@ -9,9 +9,9 @@ parity, questbook shape, route cards, public-safe templates, and release-facing
 roadmap checks.
 
 The complete default lane runs through `python scripts/ci_gate.py --mode tests`.
-With exact `pytest-xdist==3.8.0` it uses four bounded work-stealing workers;
-without that exact pin it falls back to the same serial selection. Set
-`ABYSS_STACK_TEST_SCHEDULER=serial` for the explicit sequential oracle.
+It uses at most four process-isolated workers over an exact, file-aware shard
+union. Set `ABYSS_STACK_TEST_SCHEDULER=serial` for the explicit sequential
+oracle.
 
 ## Current Test Surface
 
