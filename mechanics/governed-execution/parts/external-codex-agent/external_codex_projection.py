@@ -26,6 +26,15 @@ PROJECTION_MANIFEST_SCHEMA_VERSION = (
 )
 PROJECTION_DELTA_SCHEMA_VERSION = "abyss_stack_external_codex_actor_delta_v1"
 MAX_GIT_OUTPUT_BYTES = 256 * 1024 * 1024
+PRIVATE_GIT_CONFIG_BYTES = (
+    "[core]\n"
+    "\trepositoryFormatVersion = 0\n"
+    "\tfileMode = true\n"
+    "\tbare = false\n"
+    "\tlogAllRefUpdates = false\n"
+    "\texcludesFile = /dev/null\n"
+    "[gc]\n\tauto = 0\n"
+).encode("utf-8")
 
 
 class ProjectionError(RuntimeError):
@@ -481,6 +490,21 @@ def build_private_git_admission_manifest(
             raise ProjectionError(
                 "actor private Git bytes differ before semantic inspection"
             )
+        config_entries = [
+            entry for entry in private_entries if entry.get("path") == "config"
+        ]
+        if len(config_entries) != 1 or any(
+            config_entries[0].get(key) != value
+            for key, value in {
+                "path": "config",
+                "kind": "file",
+                "size_bytes": len(PRIVATE_GIT_CONFIG_BYTES),
+                "sha256": sha256_bytes(PRIVATE_GIT_CONFIG_BYTES),
+            }.items()
+        ):
+            raise ProjectionError(
+                "actor private Git configuration is not the runtime-authored posture"
+            )
         index_raw, _ = _read_regular_path(
             descriptor_root / ".git" / "index",
             label=".git/index",
@@ -750,16 +774,7 @@ def _construct_private_git(
         "\n".join(exclude_lines) + ("\n" if exclude_lines else ""),
         encoding="utf-8",
     )
-    (staging / ".git" / "config").write_text(
-        "[core]\n"
-        "\trepositoryFormatVersion = 0\n"
-        "\tfileMode = true\n"
-        "\tbare = false\n"
-        "\tlogAllRefUpdates = false\n"
-        "\texcludesFile = /dev/null\n"
-        "[gc]\n\tauto = 0\n",
-        encoding="utf-8",
-    )
+    (staging / ".git" / "config").write_bytes(PRIVATE_GIT_CONFIG_BYTES)
     for forbidden in ("objects/info/alternates", "FETCH_HEAD", "logs"):
         candidate = staging / ".git" / forbidden
         if candidate.is_file() or candidate.is_symlink():
@@ -962,6 +977,7 @@ def materialize_actor_projection(
     *,
     source_manifest: Mapping[str, Any],
     source_manifest_digest: str,
+    private_git_admission: MutableMapping[str, Any] | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     """Copy one admitted source tree into a fresh runtime-owned Git workspace."""
 
@@ -1023,6 +1039,11 @@ def materialize_actor_projection(
                 raise ProjectionError(
                     "actor projection baseline differs from the admitted source manifest"
                 )
+            captured_private_git = (
+                build_private_git_admission_manifest(staging)
+                if private_git_admission is not None
+                else None
+            )
             _publish_staging(
                 parent_fd=parent_fd,
                 parent_identity=parent_identity,
@@ -1031,6 +1052,9 @@ def materialize_actor_projection(
                 target=target,
                 publication_state=publication_state,
             )
+            if private_git_admission is not None:
+                private_git_admission.clear()
+                private_git_admission.update(captured_private_git or {})
         except BaseException:
             cleanup_name = (
                 target.name if publication_state["committed"] else staging_name
@@ -1059,6 +1083,7 @@ def materialize_actor_projection_from_seed(
     projection_path: str | Path,
     *,
     expected_manifest: Mapping[str, Any],
+    private_git_admission: MutableMapping[str, Any] | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     """Clone one exact terminal writer tree for an independent reviewer."""
 
@@ -1108,6 +1133,11 @@ def materialize_actor_projection_from_seed(
                 raise ProjectionError(
                     "actor projection seed changed before reviewer materialization"
                 )
+            captured_private_git = (
+                build_private_git_admission_manifest(staging)
+                if private_git_admission is not None
+                else None
+            )
             _publish_staging(
                 parent_fd=parent_fd,
                 parent_identity=parent_identity,
@@ -1116,6 +1146,9 @@ def materialize_actor_projection_from_seed(
                 target=target,
                 publication_state=publication_state,
             )
+            if private_git_admission is not None:
+                private_git_admission.clear()
+                private_git_admission.update(captured_private_git or {})
         except BaseException:
             cleanup_name = (
                 target.name if publication_state["committed"] else staging_name

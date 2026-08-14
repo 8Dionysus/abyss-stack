@@ -144,6 +144,49 @@ def test_inventory_distinguishes_disappearing_directory_from_other_scandir_error
         PROJECTION._inventory(root)
 
 
+def test_recovery_authority_rejects_private_git_poison_before_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, source_manifest = _source_repo(tmp_path)
+    target = tmp_path / "runtime" / "actor-workspace"
+    original_construct = PROJECTION._construct_private_git
+
+    def construct_then_poison(
+        source_root: Path,
+        staging: Path,
+        *,
+        source_manifest: dict[str, object],
+    ) -> None:
+        original_construct(
+            source_root,
+            staging,
+            source_manifest=source_manifest,
+        )
+        with (staging / ".git" / "config").open(
+            "a", encoding="utf-8"
+        ) as handle:
+            handle.write("[core]\n\tfsmonitor = /tmp/attacker-helper\n")
+
+    monkeypatch.setattr(PROJECTION, "_construct_private_git", construct_then_poison)
+    private_git_admission: dict[str, object] = {}
+
+    with pytest.raises(
+        ProjectionError,
+        match="runtime-authored posture",
+    ):
+        materialize_actor_projection(
+            source,
+            target,
+            source_manifest=source_manifest,
+            source_manifest_digest="sha256:" + "1" * 64,
+            private_git_admission=private_git_admission,
+        )
+
+    assert target.exists() is False
+    assert private_git_admission == {}
+
+
 def test_projection_owns_private_git_and_survives_source_parent_replacement(
     tmp_path: Path,
 ) -> None:

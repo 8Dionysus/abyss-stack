@@ -552,11 +552,13 @@ This external digest binding is generation-anchor v2; v1 remains readable and
 an exact attempt-free v1 admission can recover through the independent witness
 without replacing or relabeling its anchor. Recovery never runs Git against the
 mutable projection. All non-index private-Git bytes are compared with the safe
-witness, the recovered index is read through a pinned descriptor and sealed in
-a memfd, and only its stage/flag meaning is interpreted against the fresh
-witness with hooks and fsmonitor disabled. The mutable projection is then
-inventoried again, so a concurrent config, attribute, or worktree rewrite can
-fail closed without gaining controller-process execution. If the prepared event was
+witness authority captured in memory before the staging inode receives its
+public session pathname. Later mutation of that published witness cannot change
+the comparison value. The recovered index is read through a pinned descriptor
+and sealed in a memfd, and only its stage/flag meaning is interpreted against
+the fresh witness with hooks and fsmonitor disabled. The mutable projection is
+then inventoried again, so a concurrent config, attribute, or worktree rewrite
+can fail closed without gaining controller-process execution. If the prepared event was
 already appended, its complete event object, including the anchor-derived
 timestamp, becomes the initial durable prefix rather than being duplicated. A
 different identity, changed projection, or additional event is rejected.

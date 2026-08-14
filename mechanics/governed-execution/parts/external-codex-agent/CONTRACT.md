@@ -228,12 +228,14 @@ Before launch the controller verifies:
     v1 admission may use the independent witness path without pretending to be
     v2 or replacing its anchor. No Git command runs against the mutable
     recovered projection. All non-index Git bytes must match the safe witness,
-    the recovered index is copied from a pinned descriptor into a sealed memfd,
-    and only its stage/flag meaning is interpreted against the fresh witness
-    with hooks and fsmonitor disabled. The recovered content and private Git
-    body are inventoried again after that inspection. Any mismatch fails closed
-    without executing a concurrently introduced repository config, attribute,
-    hook, fsmonitor, or filter.
+    whose private-Git authority is captured in memory before its staging inode
+    receives a public session pathname; later mutation of the published witness
+    cannot alter that comparison value. The recovered index is copied from a
+    pinned descriptor into a sealed memfd, and only its stage/flag meaning is
+    interpreted against the fresh witness with hooks and fsmonitor disabled.
+    The recovered content and private Git body are inventoried again after that
+    inspection. Any mismatch fails closed without executing a concurrently
+    introduced repository config, attribute, hook, fsmonitor, or filter.
     The same binding is checked after first-state publication: every durable
     v2 state must retain the anchor-bound baseline reference and bytes. If the
     state is still `prepared` with no attempt, the independent source/seed

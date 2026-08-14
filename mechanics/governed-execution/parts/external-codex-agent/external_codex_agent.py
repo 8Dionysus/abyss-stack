@@ -6657,6 +6657,7 @@ class ExternalCodexRuntime:
                 ".actor-recovery-witness-" + os.urandom(16).hex()
             )
             witness_identity: Mapping[str, Any] | None = None
+            witness_private_git: dict[str, Any] = {}
             try:
                 if review_seed is None:
                     _, witness_baseline = materialize_actor_projection(
@@ -6666,6 +6667,7 @@ class ExternalCodexRuntime:
                         source_manifest_digest=str(
                             source_before_ref["artifact_digest"]
                         ),
+                        private_git_admission=witness_private_git,
                     )
                 else:
                     seed_path = Path(str(review_seed["writer_projection_path"]))
@@ -6691,12 +6693,10 @@ class ExternalCodexRuntime:
                                 seed_path,
                                 witness_path,
                                 expected_manifest=seed_manifest,
+                                private_git_admission=witness_private_git,
                             )
                         )
                 witness_identity = witness_baseline["workspace_identity"]
-                witness_private_git = build_private_git_admission_manifest(
-                    witness_path
-                )
                 observed_private_git = build_private_git_admission_manifest(
                     projection_path,
                     expected_private_git_entries=witness_private_git[

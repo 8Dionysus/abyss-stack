@@ -6364,6 +6364,90 @@ def test_owner_admission_retry_rejects_projection_and_baseline_coordinated_rewri
     assert fsmonitor_marker.exists() is False
 
 
+def test_owner_admission_retry_rejects_matching_published_witness_poison(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="matching-published-witness-poison",
+    )
+    runtime = fixture["runtime"]
+    monkeypatch.setattr(
+        runtime,
+        "_save_state",
+        lambda state: (_ for _ in ()).throw(
+            RUNTIME.ExternalCodexRuntimeError(
+                "fixture_controller_crash",
+                "controller stopped after generation and event publication",
+            )
+        ),
+    )
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert exc_info.value.code == "fixture_controller_crash"
+
+    session_dir = runtime._session_dir(fixture["session_id"])
+    projection = session_dir / "actor-workspace"
+    baseline_path = session_dir / "actor-baseline-manifest.json"
+    original_baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    fsmonitor_marker = tmp_path / "matching-witness-fsmonitor-ran"
+    fsmonitor_helper = tmp_path / "matching-witness-fsmonitor"
+    fsmonitor_helper.write_text(
+        "#!/bin/sh\n/usr/bin/touch "
+        + shlex.quote(str(fsmonitor_marker))
+        + "\n",
+        encoding="utf-8",
+    )
+    fsmonitor_helper.chmod(0o700)
+    malicious_config = f"[core]\n\tfsmonitor = {fsmonitor_helper}\n"
+    with (projection / ".git" / "config").open("a", encoding="utf-8") as handle:
+        handle.write(malicious_config)
+    rewritten_baseline = RUNTIME._checked_actor_manifest(
+        projection,
+        source_manifest_digest=original_baseline["source_manifest_digest"],
+        source_git_head=original_baseline["source_git_head"],
+    )
+    baseline_path.chmod(0o600)
+    _write_json(baseline_path, rewritten_baseline)
+    generation_path = runtime._owner_admission_generation_path(
+        fixture["session_id"]
+    )
+    generation = json.loads(generation_path.read_text(encoding="utf-8"))
+    generation_path.unlink()
+    generation["actor_baseline_manifest_digest"] = _digest_path(baseline_path)
+    _write_json(generation_path, generation)
+    generation_path.chmod(0o400)
+
+    original_materialize = RUNTIME.materialize_actor_projection
+
+    def materialize_then_poison(*args: Any, **kwargs: Any) -> Any:
+        witness, manifest = original_materialize(*args, **kwargs)
+        with (witness / ".git" / "config").open(
+            "a", encoding="utf-8"
+        ) as handle:
+            handle.write(malicious_config)
+        return witness, manifest
+
+    monkeypatch.setattr(
+        RUNTIME,
+        "materialize_actor_projection",
+        materialize_then_poison,
+    )
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as retry_exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert retry_exc_info.value.code == "workspace_projection_retry_invalid"
+    assert fsmonitor_marker.exists() is False
+
+
 def test_owner_admission_retry_never_executes_racing_recovered_git_filter(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
