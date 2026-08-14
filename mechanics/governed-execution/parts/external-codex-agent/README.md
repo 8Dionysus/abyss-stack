@@ -403,7 +403,10 @@ or net benefit.
 For MCP-bearing read roles, the installed CLI removes the real owner bearer
 from its exec-time environment during one clean re-exec, carries the exact
 bytes through a bounded sealed descriptor, and injects them only through an
-attempt-local loopback relay. Codex sees only a random, expiring proxy path and
+attempt-local loopback relay. The relay also binds the upstream request to the
+owner-supported modern MCP protocol version `2026-07-28`, replacing any
+client-supplied version rather than weakening the owner endpoint. Codex sees
+only a random, expiring proxy path and
 no bearer environment variable; actor filesystem permissions deny `/proc`,
 while the controller retains host PID coordinates for exact lifecycle and
 cleanup receipts. The model-issued commands still run under the Codex 0.147

@@ -148,6 +148,7 @@ MAX_MCP_PROXY_REQUEST_BYTES = 16 * 1024 * 1024
 MAX_CACHED_SCHEMA_BYTES = 512 * 1024
 MAX_JSON_ESCAPE_LAYERS = 32
 MCP_PROXY_CONNECT_TIMEOUT_SECONDS = 15
+MCP_PROXY_PROTOCOL_VERSION = "2026-07-28"
 SHELL_NESTING_INSPECTION_LIMIT = 4
 FOREGROUND_OBSERVATION_INTERVAL_SECONDS = 0.25
 NESTED_EVIDENCE_ENV = "AOA_EXTERNAL_CODEX_NESTED_EVIDENCE"
@@ -269,6 +270,7 @@ class _McpCredentialProxy:
                         "connection",
                         "content-length",
                         "host",
+                        "mcp-protocol-version",
                         "proxy-authorization",
                         "transfer-encoding",
                     }
@@ -295,6 +297,7 @@ class _McpCredentialProxy:
                     if bearer_token is None:
                         raise OSError("attempt-local MCP credential proxy is closing")
                     headers["Authorization"] = f"Bearer {bearer_token}"
+                    headers["MCP-Protocol-Version"] = MCP_PROXY_PROTOCOL_VERSION
                     upstream.request(
                         self.command,
                         proxy._upstream_path,

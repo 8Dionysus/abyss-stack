@@ -4507,7 +4507,10 @@ def test_attempt_environment_excludes_upstream_mcp_credential(
     assert "upstream-token" not in environment.values()
 
 
-def test_attempt_local_mcp_proxy_injects_upstream_credential_only_at_relay() -> None:
+@pytest.mark.parametrize("client_protocol_version", [None, "stale-client-version"])
+def test_attempt_local_mcp_proxy_injects_upstream_credential_only_at_relay(
+    client_protocol_version: str | None,
+) -> None:
     observed: dict[str, Any] = {}
 
     class UpstreamHandler(http.server.BaseHTTPRequestHandler):
@@ -4517,6 +4520,9 @@ def test_attempt_local_mcp_proxy_injects_upstream_credential_only_at_relay() -> 
         def do_POST(self) -> None:
             length = int(self.headers.get("Content-Length", "0"))
             observed["authorization"] = self.headers.get("Authorization")
+            observed["mcp_protocol_version"] = self.headers.get(
+                "MCP-Protocol-Version"
+            )
             observed["path"] = self.path
             observed["body"] = self.rfile.read(length)
             payload = b'{"jsonrpc":"2.0","id":1,"result":{}}'
@@ -4536,10 +4542,13 @@ def test_attempt_local_mcp_proxy_injects_upstream_credential_only_at_relay() -> 
     )
     proxy.start()
     try:
+        request_headers = {"Content-Type": "application/json"}
+        if client_protocol_version is not None:
+            request_headers["MCP-Protocol-Version"] = client_protocol_version
         request = urllib.request.Request(
             proxy.endpoint_url,
             data=b'{"jsonrpc":"2.0","id":1,"method":"initialize"}',
-            headers={"Content-Type": "application/json"},
+            headers=request_headers,
             method="POST",
         )
         with urllib.request.urlopen(request, timeout=5) as response:
@@ -4557,6 +4566,7 @@ def test_attempt_local_mcp_proxy_injects_upstream_credential_only_at_relay() -> 
 
     assert observed == {
         "authorization": "Bearer upstream-token",
+        "mcp_protocol_version": "2026-07-28",
         "path": "/mcp",
         "body": b'{"jsonrpc":"2.0","id":1,"method":"initialize"}',
     }
