@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 27516548,
+  "allowed_tracked_bytes": 35260114,
+  "approved_by": "repository-owner",
+  "base_ref": "58d14aa8e061e4b33102d040dc05bfc4830c535b",
+  "changed_generated_bytes": 27516548,
+  "changed_generated_files": 321,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "52c0807bade64008d9c5fcf49d88fee1f815514a494b538d0b85f549cf197077",
+  "reason": "Refresh the exact CI-pinned portable family after bounding external Codex attempt-local Python hygiene and preserving unrelated escaped evidence bytes; the receipt admits only the measured candidate family and does not raise standing budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35260114,
+  "tracked_bytes_max": 24117248
+}
