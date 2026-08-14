@@ -6328,6 +6328,17 @@ def test_owner_admission_retry_rejects_projection_and_baseline_coordinated_rewri
         "coordinated same-uid replacement\n",
         encoding="utf-8",
     )
+    fsmonitor_marker = tmp_path / "forged-fsmonitor-ran"
+    fsmonitor_helper = tmp_path / "forged-fsmonitor"
+    fsmonitor_helper.write_text(
+        "#!/bin/sh\n/usr/bin/touch "
+        + shlex.quote(str(fsmonitor_marker))
+        + "\n",
+        encoding="utf-8",
+    )
+    fsmonitor_helper.chmod(0o700)
+    with (projection / ".git" / "config").open("a", encoding="utf-8") as handle:
+        handle.write(f"[core]\n\tfsmonitor = {fsmonitor_helper}\n")
     rewritten_baseline = RUNTIME._checked_actor_manifest(
         projection,
         source_manifest_digest=original_baseline["source_manifest_digest"],
@@ -6350,6 +6361,7 @@ def test_owner_admission_retry_rejects_projection_and_baseline_coordinated_rewri
             owner_request_path=fixture["owner_execution_request_path"],
         )
     assert retry_exc_info.value.code == "workspace_projection_retry_invalid"
+    assert fsmonitor_marker.exists() is False
 
 
 def test_owner_admission_retry_rejects_rewritten_prepared_event_timestamp(
@@ -6445,7 +6457,7 @@ def test_previous_v1_owner_generation_remains_readable_for_durable_state(
     assert result["status"] == "completed"
 
 
-def test_previous_v1_owner_generation_cannot_resume_before_first_state(
+def test_previous_v1_owner_generation_revalidates_before_first_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -6496,14 +6508,16 @@ def test_previous_v1_owner_generation_cannot_resume_before_first_state(
         current_generation,
     )
     monkeypatch.setattr(runtime, "_publish_owner_admission_generation", current_publish)
-    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as retry_exc_info:
-        runtime.start(
-            fixture["launch_path"],
-            owner_request_path=fixture["owner_execution_request_path"],
-        )
-    assert (
-        retry_exc_info.value.code
-        == "owner_admission_generation_upgrade_required"
+    monkeypatch.setattr(runtime, "_spawn_worker", lambda *args, **kwargs: None)
+    retried = runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+
+    generation = runtime._load_owner_admission_generation(fixture["session_id"])
+    assert retried["status"] == "prepared"
+    assert generation["schema_version"] == (
+        RUNTIME.PREVIOUS_OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
     )
 
 
@@ -6896,6 +6910,66 @@ def test_owner_prepared_session_revalidates_before_retrying_spawn(
 
     assert retried["status"] == "prepared"
     assert calls == 2
+
+
+def test_previous_v1_owner_prepared_state_revalidates_before_retrying_spawn(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="previous-v1-owner-prepared-spawn-retry",
+    )
+    runtime = fixture["runtime"]
+    current_generation = runtime._owner_admission_generation_from_validated
+    calls = 0
+
+    def previous_generation(
+        validated: Mapping[str, Any],
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        generation = current_generation(validated, **kwargs)
+        generation["schema_version"] = (
+            RUNTIME.PREVIOUS_OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
+        )
+        generation.pop("actor_baseline_manifest_digest", None)
+        return generation
+
+    def fail_once_then_hold(*args: Any, **kwargs: Any) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("fixture previous-v1 owner fork failure")
+
+    monkeypatch.setattr(
+        runtime,
+        "_owner_admission_generation_from_validated",
+        previous_generation,
+    )
+    monkeypatch.setattr(runtime, "_spawn_worker", fail_once_then_hold)
+    with pytest.raises(OSError, match="fixture previous-v1 owner fork failure"):
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    monkeypatch.setattr(
+        runtime,
+        "_owner_admission_generation_from_validated",
+        current_generation,
+    )
+
+    retried = runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    generation = runtime._load_owner_admission_generation(fixture["session_id"])
+
+    assert retried["status"] == "prepared"
+    assert calls == 2
+    assert generation["schema_version"] == (
+        RUNTIME.PREVIOUS_OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
+    )
 
 
 def test_owner_prepared_session_rejects_forged_durable_projection_closure(

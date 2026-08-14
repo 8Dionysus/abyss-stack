@@ -548,9 +548,11 @@ be adopted merely by changing session files. The retry additionally builds a
 fresh, inode-pinned witness from the independently admitted source or exact
 review seed and requires the recovered content and private Git body to match;
 recreating the UID-owned anchor therefore cannot select substituted bytes.
-This binding is generation-anchor v2; v1 remains readable for
-already durable sessions but cannot recover an admission interrupted before
-its first state without an explicit migration. If the prepared event was
+This external digest binding is generation-anchor v2; v1 remains readable and
+an exact attempt-free v1 admission can recover through the independent witness
+without replacing or relabeling its anchor. Recovered local Git config is
+byte-compared with the safe witness before any Git command, and hooks plus
+fsmonitor are explicitly disabled. If the prepared event was
 already appended, its complete event object, including the anchor-derived
 timestamp, becomes the initial durable prefix rather than being duplicated. A
 different identity, changed projection, or additional event is rejected.

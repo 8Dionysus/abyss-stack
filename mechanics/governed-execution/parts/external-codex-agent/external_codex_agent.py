@@ -6611,8 +6611,11 @@ class ExternalCodexRuntime:
             generation = self._load_owner_admission_generation(
                 str(validated["launch"]["session_id"])
             )
-            if generation.get("actor_baseline_manifest_digest") != sha256_bytes(
-                baseline_raw
+            if (
+                generation.get("schema_version")
+                == OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
+                and generation.get("actor_baseline_manifest_digest")
+                != sha256_bytes(baseline_raw)
             ):
                 raise ExternalCodexRuntimeError(
                     "workspace_projection_retry_invalid",
@@ -6655,9 +6658,6 @@ class ExternalCodexRuntime:
             )
             witness_identity: Mapping[str, Any] | None = None
             try:
-                observed_private_git = build_private_git_admission_manifest(
-                    projection_path
-                )
                 if review_seed is None:
                     _, witness_baseline = materialize_actor_projection(
                         source,
@@ -6696,6 +6696,12 @@ class ExternalCodexRuntime:
                 witness_identity = witness_baseline["workspace_identity"]
                 witness_private_git = build_private_git_admission_manifest(
                     witness_path
+                )
+                observed_private_git = build_private_git_admission_manifest(
+                    projection_path,
+                    expected_private_git_entries=witness_private_git[
+                        "private_git_entries"
+                    ],
                 )
                 if any(
                     observed_baseline[key] != witness_baseline[key]
@@ -8659,14 +8665,6 @@ class ExternalCodexRuntime:
                         "owner_admission_generation_conflict",
                         "session has an external owner generation for another launch",
                     )
-                if (
-                    anchor.get("schema_version")
-                    != OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
-                ):
-                    raise ExternalCodexRuntimeError(
-                        "owner_admission_generation_upgrade_required",
-                        "an interrupted pre-v2 owner admission cannot be resumed without explicit migration",
-                    )
             return
         if state.get("launch_digest") != validated["launch_digest"]:
             raise ExternalCodexRuntimeError(
@@ -8757,11 +8755,6 @@ class ExternalCodexRuntime:
         if not anchor_path.exists():
             return iso_now(), False
         anchor = self._load_owner_admission_generation(session_id)
-        if anchor.get("schema_version") != OWNER_ADMISSION_GENERATION_SCHEMA_VERSION:
-            raise ExternalCodexRuntimeError(
-                "owner_admission_generation_upgrade_required",
-                "an interrupted pre-v2 owner admission cannot be resumed without explicit migration",
-            )
         recorded_at = anchor.get("recorded_at")
         if not isinstance(recorded_at, str):
             raise ExternalCodexRuntimeError(
@@ -8773,7 +8766,6 @@ class ExternalCodexRuntime:
             recorded_at=recorded_at,
         )
         identity_keys = (
-            "schema_version",
             "session_id",
             "launch_id",
             "identity_mode",
@@ -9227,17 +9219,6 @@ class ExternalCodexRuntime:
                         state.get("schema_version") == STATE_SCHEMA_VERSION
                         and state.get("admission_class") == "owner_contour"
                     ):
-                        generation = self._load_owner_admission_generation(
-                            session_id
-                        )
-                        if (
-                            generation.get("schema_version")
-                            != OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
-                        ):
-                            raise ExternalCodexRuntimeError(
-                                "owner_admission_generation_upgrade_required",
-                                "an attempt-free pre-v2 owner admission cannot be resumed without explicit migration",
-                            )
                         recovered_projection = self._prepare_actor_projection(
                             validated=validated,
                             session_dir=session_dir,
@@ -9497,7 +9478,10 @@ class ExternalCodexRuntime:
                 "result_digest": None,
                 "wake_evaluation": None,
             }
-            if launch["admission_class"] == "owner_contour":
+            if (
+                launch["admission_class"] == "owner_contour"
+                and not recover_published_admission
+            ):
                 self._publish_owner_admission_generation(
                     self._owner_admission_generation_from_validated(
                         validated,

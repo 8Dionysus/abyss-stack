@@ -224,15 +224,16 @@ Before launch the controller verifies:
     projection must also match a fresh one-time witness materialized directly
     from the admitted source or exact review seed; the witness is removed by
     its pinned inode before recovery continues. New admissions therefore
-    publish a v2 anchor. A
-    durable session created with the preceding v1 anchor remains readable, but
-    a v1 crash before first state cannot enter this recovery path without an
-    explicit migration. Any mismatch fails closed.
+    publish a v2 anchor. A v1 anchor remains readable and an exact attempt-free
+    v1 admission may use the independent witness path without pretending to be
+    v2 or replacing its anchor. Before any recovered private-Git command runs,
+    all non-index Git bytes must match the safe witness; hooks and fsmonitor are
+    also explicitly disabled. Any mismatch fails closed.
     The same binding is checked after first-state publication: every durable
     v2 state must retain the anchor-bound baseline reference and bytes. If the
     state is still `prepared` with no attempt, the independent source/seed
-    witness is rebuilt before the first worker is retried. A v1 attempt-free
-    state requires explicit migration rather than inheriting the v2 path.
+    witness is rebuilt before the first worker is retried. The same witness
+    safely admits an exact v1 attempt-free state despite its older anchor form.
 
 The two request-shaped objects are intentionally not collapsed. The
 `AgentIncarnationBinding.task_request_ref` is the canonical schema-valid SDK

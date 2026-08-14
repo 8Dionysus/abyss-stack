@@ -369,6 +369,8 @@ def build_actor_manifest_from_descriptor(
 
 def build_private_git_admission_manifest(
     projection_root: str | Path,
+    *,
+    expected_private_git_entries: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Observe stable private-Git meaning while excluding index stat cache bytes."""
 
@@ -394,17 +396,43 @@ def build_private_git_admission_manifest(
             )
             if entry["path"] != "index"
         ]
+        if (
+            expected_private_git_entries is not None
+            and private_entries != expected_private_git_entries
+        ):
+            raise ProjectionError(
+                "actor private Git bytes differ before semantic inspection"
+            )
+        safe_git_config = (
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "core.hooksPath=/dev/null",
+        )
         manifest = {
             "private_git_entries": private_entries,
             "index_stage_sha256": sha256_bytes(
-                _git(descriptor_root, "ls-files", "--stage", "-z")
+                _git(
+                    descriptor_root,
+                    *safe_git_config,
+                    "ls-files",
+                    "--stage",
+                    "-z",
+                )
             ),
             "index_flags_sha256": sha256_bytes(
-                _git(descriptor_root, "ls-files", "-v", "-z")
+                _git(
+                    descriptor_root,
+                    *safe_git_config,
+                    "ls-files",
+                    "-v",
+                    "-z",
+                )
             ),
             "status_sha256": sha256_bytes(
                 _git(
                     descriptor_root,
+                    *safe_git_config,
                     "status",
                     "--porcelain=v1",
                     "-z",
@@ -414,6 +442,7 @@ def build_private_git_admission_manifest(
             "diff_sha256": sha256_bytes(
                 _git(
                     descriptor_root,
+                    *safe_git_config,
                     "diff",
                     "--no-ext-diff",
                     "--no-textconv",
