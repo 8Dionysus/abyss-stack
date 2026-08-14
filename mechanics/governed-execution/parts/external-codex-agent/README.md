@@ -539,6 +539,10 @@ admission requires the current mode, and ordinary reads never create a
 migration. A cataloged markerless v3 session may publish its anchor only when
 the operator-supplied expected digests and all durable bytes agree. The same
 anchor then preserves the crash-before-first-attempt `prepared` recovery path.
+For a new current-generation admission, a crash after anchor publication but
+before `state.json` is idempotent: the exact retry reuses the recorded anchor
+timestamp and resets only the verified unpublished actor projection before
+rebuilding it. A different identity or changed projection is rejected.
 
 See [CONTRACT.md](CONTRACT.md), [DIRECTION.md](DIRECTION.md),
 [PROVENANCE.md](PROVENANCE.md), [SUSPENSION.md](SUSPENSION.md), and

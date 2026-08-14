@@ -6170,6 +6170,65 @@ def test_v4_owner_receipt_cannot_downgrade_by_rewriting_full_session_closure(
     assert exc_info.value.code == "runtime_state_owner_identity_invalid"
 
 
+def test_owner_admission_retry_reuses_generation_published_before_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="generation-before-state-retry",
+    )
+    runtime = fixture["runtime"]
+    original_publish = runtime._publish_owner_admission_generation
+    published_generation: dict[str, Any] = {}
+
+    def publish_then_crash(generation: Mapping[str, Any]) -> dict[str, Any]:
+        published = original_publish(generation)
+        published_generation.update(published)
+        raise RUNTIME.ExternalCodexRuntimeError(
+            "fixture_controller_crash",
+            "controller stopped after generation publication",
+        )
+
+    monkeypatch.setattr(
+        runtime,
+        "_publish_owner_admission_generation",
+        publish_then_crash,
+    )
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert exc_info.value.code == "fixture_controller_crash"
+    assert runtime._state_path(fixture["session_id"]).exists() is False
+
+    monkeypatch.setattr(
+        runtime,
+        "_publish_owner_admission_generation",
+        original_publish,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_spawn_worker",
+        MethodType(
+            lambda self, state, *, mode, resume_payload: None,
+            runtime,
+        ),
+    )
+    retried = runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    state = runtime._load_state(fixture["session_id"])
+    anchor = runtime._load_owner_admission_generation(fixture["session_id"])
+
+    assert retried["status"] == "prepared"
+    assert anchor == published_generation
+    assert state["created_at"] == anchor["recorded_at"]
+
+
 def test_unanchored_legacy_v3_requires_explicit_generation_migration(
     tmp_path: Path,
 ) -> None:

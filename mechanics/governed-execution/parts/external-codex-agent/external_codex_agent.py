@@ -6513,6 +6513,7 @@ class ExternalCodexRuntime:
         *,
         validated: Mapping[str, Any],
         session_dir: Path,
+        recover_published_admission: bool = False,
     ) -> dict[str, Any]:
         """Materialize one source-checked actor tree before any worker fork."""
 
@@ -6535,6 +6536,52 @@ class ExternalCodexRuntime:
         source_before_ref = _artifact_ref(source_before_path)
         projection_path = session_dir / "actor-workspace"
         projection_identity: Mapping[str, Any] | None = None
+
+        if projection_path.exists() and recover_published_admission:
+            baseline_path = session_dir / "actor-baseline-manifest.json"
+            baseline_raw = read_bounded(baseline_path)
+            prior_baseline = load_json_bytes(
+                baseline_raw,
+                label="unpublished actor baseline manifest",
+            )
+            validate_json(
+                prior_baseline,
+                ACTOR_MANIFEST_SCHEMA_PATH,
+                label="unpublished actor baseline manifest",
+            )
+            if (
+                prior_baseline.get("workspace_path") != str(projection_path)
+                or prior_baseline.get("source_manifest_digest")
+                != source_before_ref["artifact_digest"]
+                or prior_baseline.get("source_git_head")
+                != validated["launch"]["workspace_expected_head"]
+            ):
+                raise ExternalCodexRuntimeError(
+                    "workspace_projection_retry_invalid",
+                    "unpublished actor projection differs from the admitted retry",
+                )
+            observed_baseline = _checked_actor_manifest(
+                projection_path,
+                source_manifest_digest=str(
+                    prior_baseline["source_manifest_digest"]
+                ),
+                source_git_head=str(prior_baseline["source_git_head"]),
+            )
+            if observed_baseline != prior_baseline:
+                raise ExternalCodexRuntimeError(
+                    "workspace_projection_retry_invalid",
+                    "unpublished actor projection changed after generation publication",
+                )
+            try:
+                remove_actor_projection(
+                    projection_path,
+                    expected_identity=prior_baseline["workspace_identity"],
+                )
+            except (OSError, ProjectionError) as exc:
+                raise ExternalCodexRuntimeError(
+                    "workspace_projection_cleanup_incomplete",
+                    "verified unpublished actor projection could not be reset",
+                ) from exc
 
         def cleanup_projection() -> None:
             try:
@@ -8454,6 +8501,37 @@ class ExternalCodexRuntime:
             "recorded_at": recorded_at or iso_now(),
         }
 
+    def _new_session_admission_epoch(
+        self,
+        validated: Mapping[str, Any],
+    ) -> tuple[str, bool]:
+        """Reuse an already-published current generation across admission retry."""
+
+        launch = validated["launch"]
+        if launch.get("admission_class") != "owner_contour":
+            return iso_now(), False
+        session_id = str(launch["session_id"])
+        anchor_path = self._owner_admission_generation_path(session_id)
+        if not anchor_path.exists():
+            return iso_now(), False
+        anchor = self._load_owner_admission_generation(session_id)
+        recorded_at = anchor.get("recorded_at")
+        if not isinstance(recorded_at, str):
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_invalid",
+                "owner admission generation anchor has no recorded timestamp",
+            )
+        expected = self._owner_admission_generation_from_validated(
+            validated,
+            recorded_at=recorded_at,
+        )
+        if anchor != expected:
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_conflict",
+                "session has an external owner generation for another admission",
+            )
+        return recorded_at, True
+
     def migrate_legacy_owner_admission_generation(
         self,
         session_id: str,
@@ -8890,6 +8968,10 @@ class ExternalCodexRuntime:
                     self._spawn_worker(state, mode="start", resume_payload=None)
                 return self._public_state(state)
             self._validate_owner_launch_identity_generation(validated, None)
+            (
+                new_session_created_at,
+                recover_published_admission,
+            ) = self._new_session_admission_epoch(validated)
             inputs_dir = session_dir / "inputs"
             materialized: dict[str, str] = {}
             for key, (_, raw, _) in validated["coordinates"].items():
@@ -9030,6 +9112,7 @@ class ExternalCodexRuntime:
             projection = self._prepare_actor_projection(
                 validated=validated,
                 session_dir=session_dir,
+                recover_published_admission=recover_published_admission,
             )
             failure_closeout = self._failure_closeout_context(
                 binding=validated["binding"],
@@ -9094,7 +9177,7 @@ class ExternalCodexRuntime:
                 "materialized_task_inputs": materialized_task_inputs,
                 "failure_closeout": failure_closeout,
                 "preflight": validated["preflight"],
-                "created_at": iso_now(),
+                "created_at": new_session_created_at,
                 "started_at": None,
                 "finished_at": None,
                 "thread_id": None,

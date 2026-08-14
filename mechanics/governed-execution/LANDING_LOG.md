@@ -44,6 +44,12 @@ complete content-addressed release before publishing its active record and
 wrappers, so the runtime UID cannot turn attacker-selected catalog bytes into
 an admitted migration authority.
 
+The new-admission contour is also idempotent across its narrow publication
+window. If the controller stops after the current generation anchor is durable
+but before `state.json`, an exact retry reuses that anchor's `recorded_at` and
+resets only an actor projection whose full baseline and inode identity still
+match the anchored admission. Drift fails closed.
+
 The complete external-Codex deterministic suite passed. This is an ABI repair,
 not new role, model-fit, owner-acceptance, publication, or external-effect
 authority.
