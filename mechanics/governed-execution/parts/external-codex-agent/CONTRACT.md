@@ -190,11 +190,18 @@ Before launch the controller verifies:
     `owner-admission-generations/` ledger. It binds session, launch, exact
     launch bytes, exact owner-request bytes, stable request identity, identity
     mode, and provenance outside the rewriteable session directory. Every
-    later owner-result read must agree with that write-once anchor.
+    later owner-result read must agree with that anchor. Its same-UID pathname
+    is not treated as immutable: absence always fails closed. The only route
+    that may recreate a missing legacy anchor is additionally authorized by an
+    exact pre-upgrade inventory sealed into the verified content-addressed
+    release. The launcher verifies that catalog and mounts it from a sealed
+    memfd in the read-only runtime snapshot; a session created after the
+    inventory cannot add itself to the migration set.
     A legacy v3 receipt is accepted only when its materialized launch lacks
     that mode and the request's semantic self-digest plus `runtime_launch_ref`
-    still bind the same launch and an explicit operator migration has published
-    a legacy-generation anchor with the expected launch and request digests.
+    still bind the same launch and an explicit operator migration has matched
+    its session, launch, request, and stable request identity against that
+    release-bound catalog before publishing a legacy-generation anchor.
     Unanchored v3 state fails closed; ordinary reads never infer or create a
     migration record. The marker is mandatory for a new owner-contour
     admission. An anchored markerless launch may pass preflight or start only

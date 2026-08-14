@@ -86,6 +86,12 @@ STATE_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-state.schema.json"
 OWNER_ADMISSION_GENERATION_SCHEMA_PATH = (
     SCHEMA_ROOT / "external-codex-owner-admission-generation.schema.json"
 )
+LEGACY_OWNER_MIGRATION_CATALOG_PATH = (
+    PART_ROOT / "legacy-owner-admission-migrations.v1.json"
+)
+LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_PATH = (
+    SCHEMA_ROOT / "external-codex-legacy-owner-migration-catalog.schema.json"
+)
 PARENT_OBLIGATION_SCHEMA_PATH = (
     SCHEMA_ROOT / "external-codex-parent-obligation.schema.json"
 )
@@ -124,6 +130,9 @@ STABLE_OWNER_ADMISSION_IDENTITY_MODE = "stable_request_ref_v1"
 LEGACY_OWNER_ADMISSION_IDENTITY_MODE = "legacy_materialized_path_v1"
 OWNER_ADMISSION_GENERATION_SCHEMA_VERSION = (
     "abyss_stack_external_codex_owner_admission_generation_v1"
+)
+LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_legacy_owner_migration_catalog_v1"
 )
 PROJECTION_STATE_SCHEMA_VERSIONS = frozenset(
     {LEGACY_STATE_V3_SCHEMA_VERSION, STATE_SCHEMA_VERSION}
@@ -6261,6 +6270,38 @@ class ExternalCodexRuntime:
                 "runtime_profile_invalid", "runtime profile result schema ref drifted"
             )
         validate_structured_output_schema(load_schema(REPORT_SCHEMA_PATH))
+        self.legacy_owner_migration_catalog_raw = read_bounded(
+            LEGACY_OWNER_MIGRATION_CATALOG_PATH
+        )
+        self.legacy_owner_migration_catalog = load_json_bytes(
+            self.legacy_owner_migration_catalog_raw,
+            label="legacy owner migration catalog",
+        )
+        validate_json(
+            self.legacy_owner_migration_catalog,
+            LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_PATH,
+            label="legacy owner migration catalog",
+        )
+        if (
+            self.legacy_owner_migration_catalog.get("schema_version")
+            != LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION
+        ):
+            raise ExternalCodexRuntimeError(
+                "legacy_owner_migration_catalog_invalid",
+                "legacy owner migration catalog version is unsupported",
+            )
+        entries = self.legacy_owner_migration_catalog["entries"]
+        self.legacy_owner_migration_entries = {
+            str(entry["session_id"]): entry for entry in entries
+        }
+        if len(self.legacy_owner_migration_entries) != len(entries):
+            raise ExternalCodexRuntimeError(
+                "legacy_owner_migration_catalog_invalid",
+                "legacy owner migration catalog session identities must be unique",
+            )
+        self.legacy_owner_migration_catalog_digest = sha256_bytes(
+            self.legacy_owner_migration_catalog_raw
+        )
 
     def _session_dir(self, session_id: str) -> Path:
         return self.state_root / "sessions" / _session_token(session_id)
@@ -6313,7 +6354,7 @@ class ExternalCodexRuntime:
             ):
                 raise ExternalCodexRuntimeError(
                     "owner_admission_generation_anchor_invalid",
-                    "owner admission generation anchor is not a private immutable regular file",
+                    "owner admission generation anchor is not a private read-only regular file",
                 )
             chunks: list[bytes] = []
             total = 0
@@ -6357,13 +6398,35 @@ class ExternalCodexRuntime:
                 "owner_admission_generation_anchor_invalid",
                 "owner admission generation anchor names another session",
             )
+        if generation.get("identity_mode") == LEGACY_OWNER_ADMISSION_IDENTITY_MODE:
+            catalog_entry = self.legacy_owner_migration_entries.get(session_id)
+            catalog_keys = (
+                "session_id",
+                "launch_id",
+                "launch_digest",
+                "owner_admission_digest",
+                "owner_request_ref",
+            )
+            if (
+                generation.get("migration_catalog_digest")
+                != self.legacy_owner_migration_catalog_digest
+                or catalog_entry is None
+                or any(
+                    generation.get(key) != catalog_entry.get(key)
+                    for key in catalog_keys
+                )
+            ):
+                raise ExternalCodexRuntimeError(
+                    "owner_admission_generation_anchor_invalid",
+                    "legacy owner generation is not authorized by this release catalog",
+                )
         return generation
 
     def _publish_owner_admission_generation(
         self,
         generation: Mapping[str, Any],
     ) -> dict[str, Any]:
-        """Publish one write-once generation anchor without replacing a prior one."""
+        """Publish one generation anchor without replacing a prior one."""
 
         session_id = str(generation["session_id"])
         path = self._owner_admission_generation_path(session_id)
@@ -8405,7 +8468,22 @@ class ExternalCodexRuntime:
             if anchor_path.exists():
                 raise ExternalCodexRuntimeError(
                     "owner_admission_generation_already_anchored",
-                    "owner admission generation already has a write-once anchor",
+                    "owner admission generation already has a non-replacing anchor",
+                )
+            catalog_entry = self.legacy_owner_migration_entries.get(session_id)
+            if catalog_entry is None:
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_not_cataloged",
+                    "session is not an admitted pre-upgrade legacy generation in this release",
+                )
+            if (
+                catalog_entry.get("launch_digest") != expected_launch_digest
+                or catalog_entry.get("owner_admission_digest")
+                != expected_owner_admission_digest
+            ):
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_migration_mismatch",
+                    "legacy migration expectations differ from the release-bound catalog",
                 )
             state = self._load_state(session_id)
             if (
@@ -8437,6 +8515,7 @@ class ExternalCodexRuntime:
             if (
                 launch.get("session_id") != session_id
                 or launch.get("launch_id") != state.get("launch_id")
+                or launch.get("launch_id") != catalog_entry.get("launch_id")
                 or launch.get("admission_class") != "owner_contour"
                 or launch.get("owner_admission_identity_mode") is not None
             ):
@@ -8475,6 +8554,7 @@ class ExternalCodexRuntime:
             if (
                 not isinstance(request_ref, str)
                 or not request_ref
+                or request_ref != catalog_entry.get("owner_request_ref")
                 or not isinstance(runtime_launch_ref, dict)
                 or runtime_launch_ref.get("object_id") != launch.get("launch_id")
                 or runtime_launch_ref.get("digest") != expected_launch_digest
@@ -8491,6 +8571,7 @@ class ExternalCodexRuntime:
                 "launch_digest": expected_launch_digest,
                 "owner_admission_digest": expected_owner_admission_digest,
                 "owner_request_ref": request_ref,
+                "migration_catalog_digest": self.legacy_owner_migration_catalog_digest,
                 "provenance": "explicit_legacy_migration",
                 "recorded_at": iso_now(),
             }
@@ -10110,7 +10191,7 @@ class ExternalCodexRuntime:
         state: Mapping[str, Any],
         owner_request_raw: bytes,
     ) -> str:
-        """Resolve owner-result identity from an external write-once anchor."""
+        """Resolve owner-result identity from an external generation anchor."""
 
         session_id = state.get("session_id")
         if not isinstance(session_id, str) or not session_id:

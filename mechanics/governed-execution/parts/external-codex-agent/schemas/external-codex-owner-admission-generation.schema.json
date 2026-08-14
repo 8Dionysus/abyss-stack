@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-owner-admission-generation.schema.json",
-  "title": "Write-once external owner admission generation anchor",
+  "title": "Non-replacing external owner admission generation anchor",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -27,6 +27,7 @@
     "launch_digest": {"$ref": "#/$defs/digest"},
     "owner_admission_digest": {"$ref": "#/$defs/digest"},
     "owner_request_ref": {"type": "string", "minLength": 1},
+    "migration_catalog_digest": {"$ref": "#/$defs/digest"},
     "provenance": {"enum": ["new_admission", "explicit_legacy_migration"]},
     "recorded_at": {"type": "string", "format": "date-time"}
   },
@@ -38,7 +39,8 @@
       },
       "then": {"properties": {"provenance": {"const": "new_admission"}}},
       "else": {
-        "properties": {"provenance": {"const": "explicit_legacy_migration"}}
+        "properties": {"provenance": {"const": "explicit_legacy_migration"}},
+        "required": ["migration_catalog_digest"]
       }
     }
   ],

@@ -85,6 +85,21 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
     (part / "external_codex_projection.py").write_text(
         "PASS = True\n", encoding="utf-8"
     )
+    (part / runtime_install.LEGACY_OWNER_MIGRATION_CATALOG_NAME).write_text(
+        json.dumps(
+            {
+                "schema_version": (
+                    runtime_install.LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION
+                ),
+                "catalog_id": "fixture-empty-default",
+                "captured_at": "2026-08-13T00:00:00Z",
+                "entries": [],
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     shutil.copyfile(
         PART_ROOT / "external_codex_static_bootstrap.S",
         part / "external_codex_static_bootstrap.S",
@@ -229,6 +244,94 @@ def test_release_identity_covers_wrapper_bootstrap_material(
 
     assert changed["release_id"] != baseline["release_id"]
     assert changed["release_digest"] != baseline["release_digest"]
+
+
+def test_stage_seals_operator_legacy_migration_catalog_into_release(
+    tmp_path: Path,
+) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    catalog = tmp_path / "operator-legacy-catalog.json"
+    value = {
+        "schema_version": runtime_install.LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION,
+        "catalog_id": "host-pre-upgrade-inventory",
+        "captured_at": "2026-08-13T12:00:00Z",
+        "entries": [
+            {
+                "session_id": "legacy-session",
+                "launch_id": "launch:legacy-session",
+                "launch_digest": "sha256:" + "1" * 64,
+                "owner_admission_digest": "sha256:" + "2" * 64,
+                "owner_request_ref": "task://legacy/owner-request",
+            }
+        ],
+    }
+    catalog.write_text(json.dumps(value, sort_keys=True) + "\n", encoding="utf-8")
+
+    result = runtime_install.stage(
+        source,
+        sdk,
+        agents,
+        skills,
+        tmp_path / "runtime",
+        Path(sys.executable),
+        legacy_owner_migration_catalog=catalog,
+        allow_dirty_source=False,
+        allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
+    )
+
+    release = Path(result["staged"]["release_root"])
+    sealed = release / "runtime" / runtime_install.LEGACY_OWNER_MIGRATION_CATALOG_NAME
+    assert sealed.read_bytes() == catalog.read_bytes()
+    assert runtime_install.verify_release(release)["release_id"] == result["staged"][
+        "release_id"
+    ]
+
+
+def test_stage_rejects_ambiguous_legacy_migration_catalog(tmp_path: Path) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    entry = {
+        "session_id": "legacy-session",
+        "launch_id": "launch:legacy-session",
+        "launch_digest": "sha256:" + "1" * 64,
+        "owner_admission_digest": "sha256:" + "2" * 64,
+        "owner_request_ref": "task://legacy/owner-request",
+    }
+    catalog = tmp_path / "ambiguous-catalog.json"
+    catalog.write_text(
+        json.dumps(
+            {
+                "schema_version": (
+                    runtime_install.LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION
+                ),
+                "catalog_id": "ambiguous",
+                "captured_at": "2026-08-13T12:00:00Z",
+                "entries": [entry, entry],
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        runtime_install.InstallError,
+        match="session identities must be unique",
+    ):
+        runtime_install.stage(
+            source,
+            sdk,
+            agents,
+            skills,
+            tmp_path / "runtime",
+            Path(sys.executable),
+            legacy_owner_migration_catalog=catalog,
+            allow_dirty_source=False,
+            allow_dirty_sdk=False,
+            allow_dirty_agents=False,
+            allow_dirty_skills=False,
+        )
 
 
 def test_wrapper_snapshot_avoids_per_file_permission_arguments() -> None:

@@ -2345,12 +2345,60 @@ def _rewrite_owner_state_as_legacy_v3(
     if migrate_generation:
         generation_path = runtime._owner_admission_generation_path(session_id)
         generation_path.unlink()
+        _admit_legacy_generation_for_test(
+            runtime,
+            state,
+            owner_request_path=owner_request_path,
+        )
         runtime.migrate_legacy_owner_admission_generation(
             session_id,
             expected_launch_digest=launch_digest,
             expected_owner_admission_digest=owner_evidence_ref["artifact_digest"],
         )
     return state, owner_request_path, owner_evidence_ref
+
+
+def _admit_legacy_generation_for_test(
+    runtime: Any,
+    state: Mapping[str, Any],
+    *,
+    owner_request_path: Path,
+) -> None:
+    """Model an exact pre-upgrade inventory sealed into the tested release."""
+
+    owner_request = json.loads(owner_request_path.read_text(encoding="utf-8"))
+    entry = {
+        "session_id": state["session_id"],
+        "launch_id": state["launch_id"],
+        "launch_digest": state["launch_digest"],
+        "owner_admission_digest": state["owner_admission_digest"],
+        "owner_request_ref": owner_request["request_ref"],
+    }
+    catalog = {
+        "schema_version": RUNTIME.LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION,
+        "catalog_id": "test-pre-upgrade-inventory",
+        "captured_at": "2026-08-13T00:00:00Z",
+        "entries": [entry],
+    }
+    raw = json.dumps(
+        catalog,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    catalog_path = runtime.state_root / "test-verified-release-legacy-catalog.json"
+    catalog_path.write_bytes(raw)
+    for runtime_class in (
+        RUNTIME.ExternalCodexRuntime,
+        PREPARER.ExternalCodexRuntime,
+    ):
+        runtime_class.__init__.__globals__[  # type: ignore[attr-defined]
+            "LEGACY_OWNER_MIGRATION_CATALOG_PATH"
+        ] = catalog_path
+    runtime.legacy_owner_migration_catalog_raw = raw
+    runtime.legacy_owner_migration_catalog = catalog
+    runtime.legacy_owner_migration_entries = {str(state["session_id"]): entry}
+    runtime.legacy_owner_migration_catalog_digest = RUNTIME.sha256_bytes(raw)
 
 
 def _rewrite_owner_receipt_as_legacy_v3(
@@ -6152,6 +6200,11 @@ def test_unanchored_legacy_v3_requires_explicit_generation_migration(
         )
     assert exc_info.value.code == "owner_admission_generation_anchor_required"
 
+    _admit_legacy_generation_for_test(
+        runtime,
+        state,
+        owner_request_path=_owner_path,
+    )
     migrated = runtime.migrate_legacy_owner_admission_generation(
         fixture["session_id"],
         expected_launch_digest=state["launch_digest"],
@@ -6163,6 +6216,64 @@ def test_unanchored_legacy_v3_requires_explicit_generation_migration(
         fixture["launch_path"],
         owner_request_path=fixture["owner_execution_request_path"],
     )["admitted"] is True
+
+
+def test_deleted_v4_anchor_cannot_reopen_legacy_migration(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="deleted-v4-anchor",
+    )
+    runtime = fixture["runtime"]
+    runtime._spawn_worker = MethodType(  # type: ignore[method-assign]
+        lambda self, state, *, mode, resume_payload: None,
+        runtime,
+    )
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    state, _owner_path, _owner_ref = _rewrite_owner_state_as_legacy_v3(
+        runtime,
+        fixture["session_id"],
+        source_launch_path=fixture["launch_path"],
+        source_owner_request_path=fixture["owner_execution_request_path"],
+        migrate_generation=False,
+    )
+    runtime._owner_admission_generation_path(fixture["session_id"]).unlink()
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.migrate_legacy_owner_admission_generation(
+            fixture["session_id"],
+            expected_launch_digest=state["launch_digest"],
+            expected_owner_admission_digest=state["owner_admission_digest"],
+        )
+    assert exc_info.value.code == "legacy_owner_admission_not_cataloged"
+
+    owner_request = json.loads(_owner_path.read_text(encoding="utf-8"))
+    forged = {
+        "schema_version": RUNTIME.OWNER_ADMISSION_GENERATION_SCHEMA_VERSION,
+        "session_id": state["session_id"],
+        "launch_id": state["launch_id"],
+        "identity_mode": RUNTIME.LEGACY_OWNER_ADMISSION_IDENTITY_MODE,
+        "launch_digest": state["launch_digest"],
+        "owner_admission_digest": state["owner_admission_digest"],
+        "owner_request_ref": owner_request["request_ref"],
+        "migration_catalog_digest": runtime.legacy_owner_migration_catalog_digest,
+        "provenance": "explicit_legacy_migration",
+        "recorded_at": "2026-08-13T00:00:00Z",
+    }
+    generation_path = runtime._owner_admission_generation_path(fixture["session_id"])
+    _write_json(generation_path, forged)
+    generation_path.chmod(0o400)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.preflight(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert exc_info.value.code == "owner_admission_generation_anchor_invalid"
 
 
 def test_markerless_owner_launch_cannot_create_a_new_legacy_session(

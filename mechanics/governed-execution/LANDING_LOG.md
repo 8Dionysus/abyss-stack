@@ -22,15 +22,20 @@ downgrade to the legacy path form. That distinction is not inferred from the
 mutable state version alone: every new owner-contour launch carries
 `owner_admission_identity_mode=stable_request_ref_v1`, and the admitted owner
 request binds the exact launch digest. A genuine legacy v3 launch has no such
-mode. The runtime now publishes a separate write-once generation anchor outside
+mode. The runtime now publishes a separate non-replacing generation anchor outside
 the session tree before first state publication. Result reads therefore require
 that external anchor, state version, materialized launch bytes, owner request
 semantic self-digest, and runtime-launch ref to agree. Rewriting the entire
-session-local closure cannot change the anchor. Prior v3 sessions remain usable
-only after the explicit migration operation records their operator-observed
-expected launch and request digests; ordinary reads fail closed and never
-invent that provenance. The anchored legacy path also preserves a pre-upgrade
-session that crashed after `prepared` but before its first worker attempt.
+session-local closure cannot substitute the anchor. Its same-UID pathname is
+not claimed immutable: deletion makes the session fail closed. It cannot turn
+a rewritten v4 session into legacy state because migration additionally
+requires the exact session, launch, request, and stable request ref in an
+operator inventory sealed into the verified release snapshot. Prior v3
+sessions remain usable only after that catalog match and the explicit migration
+operation confirms their operator-observed expected launch and request digests;
+ordinary reads fail closed and never invent that provenance. The anchored
+legacy path also preserves a pre-upgrade session that crashed after `prepared`
+but before its first worker attempt.
 
 The complete external-Codex deterministic suite passed. This is an ABI repair,
 not new role, model-fit, owner-acceptance, publication, or external-effect
