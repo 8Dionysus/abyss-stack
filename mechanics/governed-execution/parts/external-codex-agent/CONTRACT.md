@@ -174,6 +174,12 @@ Before launch the controller verifies:
     bytes, rather than by the runtime-private materialization path. That
     materialized immutable snapshot remains a separate path-addressable
     `evidence_refs` member for runtime recovery and continuation closure.
+    Runtime state v4 owns this representation. A pre-upgrade v3 state instead
+    requires the exact historical path-shaped `owner_admission_ref`, including
+    the same admitted byte digest and evidence membership. Result reads,
+    recovery, resume, reviewer preparation, review-seed issuance, and initial
+    parent re-entry accept that legacy form only when the durable state is v3;
+    v4 cannot downgrade and v3 cannot claim the stable v4 form.
 
 The two request-shaped objects are intentionally not collapsed. The
 `AgentIncarnationBinding.task_request_ref` is the canonical schema-valid SDK
@@ -377,9 +383,10 @@ controller descriptor plus final pathname identity check turns a same-UID
 replacement into typed authority-blocked evidence.
 
 Durable v1/v2 states remain readable for status, event, and terminal-result
-recovery. They cannot start another attempt without a safe v3 runtime-owned
-projection and baseline; the attempt fails closed instead of inventing or
-backfilling historical projection proof.
+recovery. They cannot start another attempt without a safe v3-or-newer
+runtime-owned projection and baseline; the attempt fails closed instead of
+inventing or backfilling historical projection proof. Durable v3 projections
+remain resumable after v4 introduces the stable owner-request identity form.
 
 The runtime emits result v2. Every v2 receipt carries the actor projection,
 baseline, source-before, and source-after references; completed,

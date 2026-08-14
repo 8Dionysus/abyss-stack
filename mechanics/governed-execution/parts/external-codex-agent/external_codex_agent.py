@@ -115,7 +115,11 @@ IncarnationBinding = AgentIncarnationBinding | AgentIncarnationBindingV2
 
 LEGACY_STATE_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v1"
 LEGACY_STATE_V2_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v2"
-STATE_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v3"
+LEGACY_STATE_V3_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v3"
+STATE_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v4"
+PROJECTION_STATE_SCHEMA_VERSIONS = frozenset(
+    {LEGACY_STATE_V3_SCHEMA_VERSION, STATE_SCHEMA_VERSION}
+)
 RESPONSE_SCHEMA_VERSION = "abyss_stack_external_codex_response_v1"
 LEGACY_REENTRY_STATE_SCHEMA_VERSION = "abyss_stack_external_codex_reentry_state_v1"
 REENTRY_STATE_SCHEMA_VERSION = "abyss_stack_external_codex_reentry_state_v2"
@@ -6476,6 +6480,7 @@ class ExternalCodexRuntime:
             not in {
                 LEGACY_STATE_SCHEMA_VERSION,
                 LEGACY_STATE_V2_SCHEMA_VERSION,
+                LEGACY_STATE_V3_SCHEMA_VERSION,
                 STATE_SCHEMA_VERSION,
             }
             or state.get("session_id") != session_id
@@ -8394,7 +8399,7 @@ class ExternalCodexRuntime:
                 ):
                     if state.get(
                         "schema_version"
-                    ) != STATE_SCHEMA_VERSION or not isinstance(
+                    ) not in PROJECTION_STATE_SCHEMA_VERSIONS or not isinstance(
                         state.get("actor_projection_path"), str
                     ):
                         raise ExternalCodexRuntimeError(
@@ -9676,6 +9681,8 @@ class ExternalCodexRuntime:
                 "materialized_input_drift",
                 "durable owner execution request changed after admission",
             )
+        if state.get("schema_version") != STATE_SCHEMA_VERSION:
+            return self._owner_admission_evidence_ref(state)
         request = load_json_bytes(raw, label="durable owner execution request")
         request_ref = request.get("request_ref")
         if not isinstance(request_ref, str) or not request_ref:
@@ -12527,10 +12534,10 @@ Runtime session identity: {state["session_id"]}
         validate_json(resume, RESUME_SCHEMA_PATH, label="resume request")
         with self._lock(session_id):
             state = self._load_state(session_id)
-            if state["schema_version"] != STATE_SCHEMA_VERSION:
+            if state["schema_version"] not in PROJECTION_STATE_SCHEMA_VERSIONS:
                 raise ExternalCodexRuntimeError(
                     "legacy_session_resume_unsupported",
-                    "legacy session has no v3 runtime-owned actor projection",
+                    "legacy session has no runtime-owned actor projection",
                 )
             projection_path = self._projection_path_from_state(state)
             if not isinstance(state.get("actor_baseline_manifest_ref"), dict):
@@ -15197,7 +15204,7 @@ class ExternalCodexParentReentry:
         expected_events_path = session_dir / "events.jsonl"
         events_ref = child_result["events_ref"]
         if (
-            child_state.get("schema_version") != STATE_SCHEMA_VERSION
+            child_state.get("schema_version") not in PROJECTION_STATE_SCHEMA_VERSIONS
             or child_state.get("session_id") != session_id
             or child_state.get("status") != child_result["status"]
             or child_state.get("status") not in {*TERMINAL_STATES, "interrupted"}

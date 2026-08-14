@@ -75,8 +75,8 @@ from aoa_sdk.runtime_adapters import (  # noqa: E402
     load_abyss_stack_external_codex_runtime_profile,
 )
 from external_codex_agent import (  # noqa: E402
+    PROJECTION_STATE_SCHEMA_VERSIONS,
     STATE_SCHEMA_PATH,
-    STATE_SCHEMA_VERSION,
     ExternalCodexRuntime,
     ExternalCodexRuntimeError,
     _relative_path_is_allowed,
@@ -2165,7 +2165,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     validate_json(writer_state, STATE_SCHEMA_PATH, label="writer runtime state")
     writer_result_digest = _file_digest(writer_result_path)
     if (
-        writer_state.get("schema_version") != STATE_SCHEMA_VERSION
+        writer_state.get("schema_version") not in PROJECTION_STATE_SCHEMA_VERSIONS
         or writer_state.get("session_id") != writer_result.get("session_id")
         or writer_state.get("launch_id") != writer_launch.get("launch_id")
         or writer_state.get("launch_digest") != _file_digest(writer_launch_path)

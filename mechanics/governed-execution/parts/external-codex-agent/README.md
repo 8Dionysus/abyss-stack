@@ -143,7 +143,7 @@ The controller:
 - emits result v2 with mandatory actor/source provenance for successful returns,
   while continuing to read legacy result v1 and durable state v1/v2 for status and
   terminal-result recovery, while refusing a new inference attempt unless a
-  safe v3 runtime-owned projection and its baseline are available;
+  safe v3-or-newer runtime-owned projection and its baseline are available;
 - turns read-only drift, out-of-scope paths, forbidden effects, identity drift,
   or report-contract drift into typed failure or authority-blocked evidence;
   non-owner-fixed interpreter, script, process-launch wrapper, `find -exec`,

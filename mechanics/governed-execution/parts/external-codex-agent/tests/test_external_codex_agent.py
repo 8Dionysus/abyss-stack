@@ -2295,6 +2295,39 @@ def _wait_terminal(
     raise AssertionError(f"external Codex fixture did not stop: {state}")
 
 
+def _rewrite_owner_receipt_as_legacy_v3(
+    runtime: Any, session_id: str
+) -> dict[str, Any]:
+    """Reproduce the exact owner-ref representation emitted by runtime state v3."""
+
+    state = runtime._load_state(session_id)
+    result_path = runtime._session_dir(session_id) / "result.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result["owner_admission_ref"] = runtime._owner_admission_evidence_ref(state)
+    _write_json(result_path, result)
+    attempt_dir = (
+        runtime._session_dir(session_id)
+        / "attempts"
+        / f"{int(result['attempt_count']):03d}"
+    )
+    preserved_path = attempt_dir / "runtime-result.json"
+    if preserved_path.is_file():
+        preserved_path.chmod(0o600)
+        _write_json(preserved_path, result)
+        preserved_path.chmod(0o400)
+        closure_path = attempt_dir / "runtime-result-evidence-closure.json"
+        if closure_path.is_file():
+            closure = json.loads(closure_path.read_text(encoding="utf-8"))
+            closure["source_result_ref"] = RUNTIME._artifact_ref(preserved_path)
+            closure_path.chmod(0o600)
+            _write_json(closure_path, closure)
+            closure_path.chmod(0o400)
+    state["schema_version"] = RUNTIME.LEGACY_STATE_V3_SCHEMA_VERSION
+    state["result_digest"] = _digest_path(result_path)
+    runtime._save_state(state)
+    return result
+
+
 def test_schema_meta_validation_cache_is_exact_and_fail_closed(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -5507,6 +5540,40 @@ def test_reviewer_preparation_rejects_substituted_owner_request_identity(
         )
 
 
+def test_legacy_v3_owner_receipt_remains_readable_and_reviewable_after_upgrade(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "writer",
+        role_id="reviewer",
+        owner_contour=True,
+        omit_historical_reviewer_inputs=True,
+    )
+    runtime = fixture["runtime"]
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    legacy_result = _rewrite_owner_receipt_as_legacy_v3(
+        runtime, fixture["session_id"]
+    )
+
+    assert runtime.result(fixture["session_id"]) == legacy_result
+    preparation = PREPARER._prepare_reviewer(
+        argparse.Namespace(
+            writer_launch=str(fixture["launch_path"]),
+            writer_result=str(
+                runtime._session_dir(fixture["session_id"]) / "result.json"
+            ),
+            output_root=str(tmp_path / "review-preparation"),
+            state_root=str(runtime.state_root),
+            aoa_sdk_root=str(SDK_ROOT),
+        )
+    )
+    assert preparation["prepared"] is True
+
+
 def test_review_seed_rejects_live_writer_and_stale_terminal_result(
     tmp_path: Path,
 ) -> None:
@@ -5783,6 +5850,7 @@ def test_owner_result_binding_rejects_stable_request_identity_substitution(
     )
     owner_digest = _digest_path(owner_request_path)
     state = {
+        "schema_version": RUNTIME.STATE_SCHEMA_VERSION,
         "materialized_inputs": {
             "owner_execution_request": str(owner_request_path),
         },
@@ -5813,6 +5881,49 @@ def test_owner_result_binding_rejects_stable_request_identity_substitution(
             result,
             failure_code="fixture_owner_binding_mismatch",
             label="fixture result",
+        )
+    assert exc_info.value.code == "fixture_owner_binding_mismatch"
+
+
+def test_owner_result_binding_accepts_exact_legacy_v3_path_receipt(
+    tmp_path: Path,
+) -> None:
+    runtime = RUNTIME.ExternalCodexRuntime(tmp_path / "state")
+    owner_request_path = tmp_path / "durable-owner-execution-request.json"
+    _write_json(
+        owner_request_path,
+        {"request_ref": "external-execution-request:fixture:legacy"},
+    )
+    evidence_ref = RUNTIME._artifact_ref(owner_request_path, owner="aoa-agents")
+    state = {
+        "schema_version": RUNTIME.LEGACY_STATE_V3_SCHEMA_VERSION,
+        "materialized_inputs": {
+            "owner_execution_request": str(owner_request_path),
+        },
+        "owner_admission_digest": evidence_ref["artifact_digest"],
+    }
+    result = {
+        "owner_admission_ref": evidence_ref,
+        "evidence_refs": [evidence_ref],
+    }
+
+    runtime._validate_owner_admission_result_binding_locked(
+        state,
+        result,
+        failure_code="fixture_owner_binding_mismatch",
+        label="legacy fixture result",
+    )
+
+    result["owner_admission_ref"] = {
+        **evidence_ref,
+        "artifact_ref": "external-execution-request:fixture:legacy",
+    }
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime._validate_owner_admission_result_binding_locked(
+            state,
+            result,
+            failure_code="fixture_owner_binding_mismatch",
+            label="legacy fixture result",
         )
     assert exc_info.value.code == "fixture_owner_binding_mismatch"
 
@@ -10152,6 +10263,55 @@ def test_interrupted_process_resumes_exact_thread(tmp_path: Path) -> None:
     )
 
 
+def test_legacy_v3_owner_receipt_resumes_after_upgrade(tmp_path: Path) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker="FAKE_WAIT_FOR_INTERRUPT",
+        owner_contour=True,
+    )
+    runtime = fixture["runtime"]
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    deadline = time.monotonic() + 10
+    running: dict[str, Any] | None = None
+    while time.monotonic() < deadline:
+        running = runtime.status(fixture["session_id"])
+        if running["thread_id"] and running["codex_pid"]:
+            break
+        time.sleep(0.05)
+    assert running is not None and running["thread_id"]
+    interrupted = runtime.interrupt(fixture["session_id"])
+    legacy_result = _rewrite_owner_receipt_as_legacy_v3(
+        runtime, fixture["session_id"]
+    )
+    result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    resume_path = tmp_path / "legacy-v3-resume.json"
+    _write_json(
+        resume_path,
+        {
+            "schema_version": "abyss_stack_external_codex_resume_v1",
+            "session_id": fixture["session_id"],
+            "thread_id": interrupted["thread_id"],
+            "after_event_sequence": interrupted["last_event_sequence"],
+            "reason": "process_death_recovery",
+            "instruction": "Resume the exact bounded fixture.",
+            "previous_result_digest": _digest_path(result_path),
+        },
+    )
+
+    resumed = runtime.resume(fixture["session_id"], resume_path)
+    assert resumed["status"] == "running"
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    result = runtime.result(fixture["session_id"])
+    assert result is not None
+    assert result["thread_id"] == legacy_result["thread_id"]
+    assert result["owner_admission_ref"]["artifact_ref"].endswith(
+        "/inputs/owner-execution-request.json"
+    )
+
+
 def test_workspace_write_resume_continues_from_exact_prior_actor_tree(
     tmp_path: Path,
 ) -> None:
@@ -11914,6 +12074,40 @@ def test_parent_inference_yields_and_exact_authority_event_reenters_same_thread(
         "external_parent.reentry_started",
         "external_parent.reentry_completed",
     ]
+
+
+def test_parent_reentry_accepts_exact_legacy_v3_owner_receipt_after_upgrade(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_ambiguity_stop",
+        identity_suffix="legacy-v3-owner-reentry",
+        owner_contour=True,
+    )
+    reentry_id = "reentry:fixture:legacy-v3-owner-reentry"
+    obligation_path = _parent_reentry_obligation(
+        tmp_path,
+        fixture,
+        reentry_id=reentry_id,
+    )
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge.yield_parent(obligation_path)
+    assert fixture["runtime"].run_to_terminal(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )["status"] == "authority_blocked"
+    _rewrite_owner_receipt_as_legacy_v3(
+        fixture["runtime"], fixture["session_id"]
+    )
+    result_path = (
+        fixture["runtime"]._session_dir(fixture["session_id"]) / "result.json"
+    )
+
+    reentered = bridge.reenter_parent(reentry_id, result_path)["state"]
+    assert reentered["status"] == "reentered"
+    assert reentered["wake_evaluation"]["wake_parent"] is True
 
 
 def test_parent_reentry_rejects_substituted_child_owner_request_identity(

@@ -8,7 +8,7 @@
     {
       "if": {
         "properties": {
-          "schema_version": {"enum": ["abyss_stack_external_codex_runtime_state_v2", "abyss_stack_external_codex_runtime_state_v3"]}
+          "schema_version": {"enum": ["abyss_stack_external_codex_runtime_state_v2", "abyss_stack_external_codex_runtime_state_v3", "abyss_stack_external_codex_runtime_state_v4"]}
         },
         "required": ["schema_version"]
       },
@@ -17,7 +17,7 @@
     {
       "if": {
         "properties": {
-          "schema_version": {"const": "abyss_stack_external_codex_runtime_state_v3"}
+          "schema_version": {"enum": ["abyss_stack_external_codex_runtime_state_v3", "abyss_stack_external_codex_runtime_state_v4"]}
         },
         "required": ["schema_version"]
       },
@@ -58,7 +58,7 @@
     "wake_evaluation"
   ],
   "properties": {
-    "schema_version": {"enum": ["abyss_stack_external_codex_runtime_state_v1", "abyss_stack_external_codex_runtime_state_v2", "abyss_stack_external_codex_runtime_state_v3"]},
+    "schema_version": {"enum": ["abyss_stack_external_codex_runtime_state_v1", "abyss_stack_external_codex_runtime_state_v2", "abyss_stack_external_codex_runtime_state_v3", "abyss_stack_external_codex_runtime_state_v4"]},
     "session_id": {"type": "string", "minLength": 1},
     "launch_id": {"type": "string", "minLength": 1},
     "launch_digest": {"$ref": "#/$defs/digest"},

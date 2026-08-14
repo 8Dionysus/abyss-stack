@@ -18,6 +18,10 @@ Tracking starts with the community-docs baseline for this repository.
   a schema-valid semantic substitution cannot ride an intact evidence snapshot.
   Review-seed issuance, reviewer preparation, and initial parent re-entry child
   admission enforce the same binding before consuming a terminal result.
+  New receipts use runtime state v4 for this representation. Existing v3
+  receipts remain readable, reviewable, resumable, and re-enterable only with
+  their exact historical path-shaped owner reference and immutable digest;
+  the two representations cannot be interchanged within one state version.
 - Pin both external Codex specialized-environment profiles to the landed
   `aoa-stats` actor-responsibility receipt revision, so a release built from
   the current validation dependency can package and verify that same owner
