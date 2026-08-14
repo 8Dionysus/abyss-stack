@@ -5775,8 +5775,7 @@ def test_owner_contour_admits_exact_role_first_request_and_runs_separate_process
 def test_owner_result_binding_rejects_stable_request_identity_substitution(
     tmp_path: Path,
 ) -> None:
-    fixture = _fixture(tmp_path)
-    runtime = fixture["runtime"]
+    runtime = RUNTIME.ExternalCodexRuntime(tmp_path / "state")
     owner_request_path = tmp_path / "durable-owner-execution-request.json"
     _write_json(
         owner_request_path,
