@@ -17,10 +17,7 @@
   ],
   "properties": {
     "schema_version": {
-      "enum": [
-        "abyss_stack_external_codex_owner_admission_generation_v1",
-        "abyss_stack_external_codex_owner_admission_generation_v2"
-      ]
+      "const": "abyss_stack_external_codex_owner_admission_generation_v2"
     },
     "session_id": {"type": "string", "minLength": 1},
     "launch_id": {"type": "string", "minLength": 1},

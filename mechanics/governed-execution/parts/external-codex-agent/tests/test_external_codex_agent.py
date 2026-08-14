@@ -6588,117 +6588,36 @@ def test_owner_admission_retry_rejects_rewritten_prepared_event_timestamp(
     assert retry_exc_info.value.code == "runtime_event_state_drift"
 
 
-def test_previous_v1_owner_generation_remains_readable_for_durable_state(
+def test_current_owner_generation_rejects_same_uid_v2_to_v1_downgrade(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fixture = _fixture(
         tmp_path,
         owner_contour=True,
-        identity_suffix="previous-v1-generation-durable-state",
+        identity_suffix="v2-to-v1-generation-downgrade",
     )
     runtime = fixture["runtime"]
-    current_generation = runtime._owner_admission_generation_from_validated
-
-    def previous_generation(
-        validated: Mapping[str, Any],
-        **kwargs: Any,
-    ) -> dict[str, Any]:
-        generation = current_generation(validated, **kwargs)
-        generation["schema_version"] = (
-            RUNTIME.PREVIOUS_OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
-        )
-        generation.pop("actor_baseline_manifest_digest", None)
-        return generation
-
-    monkeypatch.setattr(
-        runtime,
-        "_owner_admission_generation_from_validated",
-        previous_generation,
-    )
     runtime.start(
         fixture["launch_path"],
         owner_request_path=fixture["owner_execution_request_path"],
     )
-    monkeypatch.setattr(
-        runtime,
-        "_owner_admission_generation_from_validated",
-        current_generation,
-    )
-
     assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
-    generation = runtime._load_owner_admission_generation(fixture["session_id"])
-    result = runtime.result(fixture["session_id"])
-
-    assert generation["schema_version"] == (
-        RUNTIME.PREVIOUS_OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
+    generation_path = runtime._owner_admission_generation_path(
+        fixture["session_id"]
     )
-    assert "actor_baseline_manifest_digest" not in generation
-    assert result["status"] == "completed"
-
-
-def test_previous_v1_owner_generation_revalidates_before_first_state(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fixture = _fixture(
-        tmp_path,
-        owner_contour=True,
-        identity_suffix="previous-v1-generation-before-state",
+    generation = json.loads(generation_path.read_text(encoding="utf-8"))
+    generation["schema_version"] = (
+        "abyss_stack_external_codex_owner_admission_generation_v1"
     )
-    runtime = fixture["runtime"]
-    current_generation = runtime._owner_admission_generation_from_validated
-    current_publish = runtime._publish_owner_admission_generation
+    generation.pop("actor_baseline_manifest_digest")
+    generation_path.chmod(0o600)
+    generation_path.unlink()
+    _write_json(generation_path, generation)
+    generation_path.chmod(0o400)
 
-    def previous_generation(
-        validated: Mapping[str, Any],
-        **kwargs: Any,
-    ) -> dict[str, Any]:
-        generation = current_generation(validated, **kwargs)
-        generation["schema_version"] = (
-            RUNTIME.PREVIOUS_OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
-        )
-        generation.pop("actor_baseline_manifest_digest", None)
-        return generation
-
-    def publish_then_crash(generation: Mapping[str, Any]) -> dict[str, Any]:
-        current_publish(generation)
-        raise RUNTIME.ExternalCodexRuntimeError(
-            "fixture_controller_crash",
-            "controller stopped after previous generation publication",
-        )
-
-    monkeypatch.setattr(
-        runtime,
-        "_owner_admission_generation_from_validated",
-        previous_generation,
-    )
-    monkeypatch.setattr(runtime, "_publish_owner_admission_generation", publish_then_crash)
     with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
-        runtime.start(
-            fixture["launch_path"],
-            owner_request_path=fixture["owner_execution_request_path"],
-        )
-    assert exc_info.value.code == "fixture_controller_crash"
-    assert runtime._state_path(fixture["session_id"]).exists() is False
-
-    monkeypatch.setattr(
-        runtime,
-        "_owner_admission_generation_from_validated",
-        current_generation,
-    )
-    monkeypatch.setattr(runtime, "_publish_owner_admission_generation", current_publish)
-    monkeypatch.setattr(runtime, "_spawn_worker", lambda *args, **kwargs: None)
-    retried = runtime.start(
-        fixture["launch_path"],
-        owner_request_path=fixture["owner_execution_request_path"],
-    )
-
-    generation = runtime._load_owner_admission_generation(fixture["session_id"])
-    assert retried["status"] == "prepared"
-    assert generation["schema_version"] == (
-        RUNTIME.PREVIOUS_OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
-    )
+        runtime.result(fixture["session_id"])
+    assert exc_info.value.code == "schema_validation_failed"
 
 
 def test_unanchored_legacy_v3_requires_explicit_generation_migration(
@@ -7090,66 +7009,6 @@ def test_owner_prepared_session_revalidates_before_retrying_spawn(
 
     assert retried["status"] == "prepared"
     assert calls == 2
-
-
-def test_previous_v1_owner_prepared_state_revalidates_before_retrying_spawn(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fixture = _fixture(
-        tmp_path,
-        owner_contour=True,
-        identity_suffix="previous-v1-owner-prepared-spawn-retry",
-    )
-    runtime = fixture["runtime"]
-    current_generation = runtime._owner_admission_generation_from_validated
-    calls = 0
-
-    def previous_generation(
-        validated: Mapping[str, Any],
-        **kwargs: Any,
-    ) -> dict[str, Any]:
-        generation = current_generation(validated, **kwargs)
-        generation["schema_version"] = (
-            RUNTIME.PREVIOUS_OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
-        )
-        generation.pop("actor_baseline_manifest_digest", None)
-        return generation
-
-    def fail_once_then_hold(*args: Any, **kwargs: Any) -> None:
-        nonlocal calls
-        calls += 1
-        if calls == 1:
-            raise OSError("fixture previous-v1 owner fork failure")
-
-    monkeypatch.setattr(
-        runtime,
-        "_owner_admission_generation_from_validated",
-        previous_generation,
-    )
-    monkeypatch.setattr(runtime, "_spawn_worker", fail_once_then_hold)
-    with pytest.raises(OSError, match="fixture previous-v1 owner fork failure"):
-        runtime.start(
-            fixture["launch_path"],
-            owner_request_path=fixture["owner_execution_request_path"],
-        )
-    monkeypatch.setattr(
-        runtime,
-        "_owner_admission_generation_from_validated",
-        current_generation,
-    )
-
-    retried = runtime.start(
-        fixture["launch_path"],
-        owner_request_path=fixture["owner_execution_request_path"],
-    )
-    generation = runtime._load_owner_admission_generation(fixture["session_id"])
-
-    assert retried["status"] == "prepared"
-    assert calls == 2
-    assert generation["schema_version"] == (
-        RUNTIME.PREVIOUS_OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
-    )
 
 
 def test_owner_prepared_session_rejects_forged_durable_projection_closure(

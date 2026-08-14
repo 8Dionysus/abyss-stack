@@ -15,6 +15,7 @@ import ctypes
 import errno
 import fcntl
 import os
+import re
 import stat
 import subprocess
 from pathlib import Path, PurePosixPath
@@ -33,8 +34,13 @@ PRIVATE_GIT_CONFIG_BYTES = (
     "\tbare = false\n"
     "\tlogAllRefUpdates = false\n"
     "\texcludesFile = /dev/null\n"
+    "\tfsmonitor = false\n"
+    "\thooksPath = /dev/null\n"
     "[gc]\n\tauto = 0\n"
 ).encode("utf-8")
+PRIVATE_GIT_PACK_FILE_PATTERN = re.compile(
+    r"objects/pack/pack-[0-9a-f]{40}\.(?:idx|pack|rev)"
+)
 
 
 class ProjectionError(RuntimeError):
@@ -459,6 +465,7 @@ def build_private_git_admission_manifest(
     expected_private_git_entries: list[dict[str, Any]] | None = None,
     expected_source_git_head: str | None = None,
     expected_object_ids: set[str] | frozenset[str] | None = None,
+    expected_info_exclude: bytes | None = None,
     semantic_workspace_root: str | Path | None = None,
 ) -> dict[str, Any]:
     """Observe stable private-Git meaning without executing recovered bytes."""
@@ -492,6 +499,39 @@ def build_private_git_admission_manifest(
         ):
             raise ProjectionError(
                 "actor private Git bytes differ before semantic inspection"
+            )
+        private_files = {
+            str(entry.get("path")): entry
+            for entry in full_private_entries
+            if entry.get("kind") != "directory"
+        }
+        required_private_files = {
+            "HEAD",
+            "config",
+            "index",
+            "info/exclude",
+            "refs/heads/actor-baseline",
+        }
+        unexpected_private_files = set(private_files) - required_private_files
+        pack_files = {
+            path
+            for path in unexpected_private_files
+            if PRIVATE_GIT_PACK_FILE_PATTERN.fullmatch(path)
+        }
+        if (
+            not required_private_files.issubset(private_files)
+            or unexpected_private_files != pack_files
+            or len([path for path in pack_files if path.endswith(".pack")]) != 1
+            or len([path for path in pack_files if path.endswith(".idx")]) != 1
+            or len([path for path in pack_files if path.endswith(".rev")]) > 1
+            or {
+                path.rsplit(".", 1)[0]
+                for path in pack_files
+            }
+            != {next(iter(pack_files)).rsplit(".", 1)[0]}
+        ):
+            raise ProjectionError(
+                "actor private Git topology contains unadmitted metadata"
             )
         config_entries = [
             entry for entry in private_entries if entry.get("path") == "config"
@@ -566,6 +606,17 @@ def build_private_git_admission_manifest(
                 "--no-dangling",
                 environment_overrides={"GIT_NO_REPLACE_OBJECTS": "1"},
             )
+        if expected_info_exclude is not None:
+            exclude_entry = private_files["info/exclude"]
+            if (
+                exclude_entry.get("kind") != "file"
+                or exclude_entry.get("size_bytes") != len(expected_info_exclude)
+                or exclude_entry.get("sha256")
+                != sha256_bytes(expected_info_exclude)
+            ):
+                raise ProjectionError(
+                    "actor private Git excludes differ from the admitted source"
+                )
         index_raw, _ = _read_regular_path(
             descriptor_root / ".git" / "index",
             label=".git/index",
@@ -764,7 +815,7 @@ def _construct_private_git(
     staging: Path,
     *,
     source_manifest: Mapping[str, Any],
-) -> frozenset[str]:
+) -> tuple[frozenset[str], bytes]:
     source_head = str(source_manifest["git_head"])
     index_entries = _git(source, "ls-files", "--stage", "-z")
     object_ids = {source_head}
@@ -845,12 +896,19 @@ def _construct_private_git(
     ]
     info = staging / ".git" / "info"
     info.mkdir(mode=0o700, parents=True, exist_ok=True)
-    (info / "exclude").write_text(
-        "\n".join(exclude_lines) + ("\n" if exclude_lines else ""),
-        encoding="utf-8",
-    )
+    exclude_bytes = (
+        "\n".join(exclude_lines) + ("\n" if exclude_lines else "")
+    ).encode("utf-8")
+    (info / "exclude").write_bytes(exclude_bytes)
     (staging / ".git" / "config").write_bytes(PRIVATE_GIT_CONFIG_BYTES)
-    for forbidden in ("objects/info/alternates", "FETCH_HEAD", "logs"):
+    for forbidden in (
+        "branches",
+        "description",
+        "hooks",
+        "objects/info/alternates",
+        "FETCH_HEAD",
+        "logs",
+    ):
         candidate = staging / ".git" / forbidden
         if candidate.is_file() or candidate.is_symlink():
             candidate.unlink()
@@ -886,7 +944,7 @@ def _construct_private_git(
         raw, _ = _read_regular_path(candidate, label=f".git/{entry['path']}")
         if source_bytes and source_bytes in raw:
             raise ProjectionError("private actor Git body retained a source coordinate")
-    return frozenset(object_ids)
+    return frozenset(object_ids), exclude_bytes
 
 
 def _remove_tree(root: Path) -> None:
@@ -1102,7 +1160,7 @@ def materialize_actor_projection(
                 raise ProjectionError(
                     "actor projection bytes differ from the admitted source manifest"
                 )
-            expected_object_ids = _construct_private_git(
+            expected_object_ids, expected_info_exclude = _construct_private_git(
                 source,
                 staging,
                 source_manifest=source_manifest,
@@ -1123,6 +1181,7 @@ def materialize_actor_projection(
                 staging,
                 expected_source_git_head=source_head,
                 expected_object_ids=expected_object_ids,
+                expected_info_exclude=expected_info_exclude,
             )
             if captured_private_git.get("private_git_digest") != manifest.get(
                 "private_git_digest"

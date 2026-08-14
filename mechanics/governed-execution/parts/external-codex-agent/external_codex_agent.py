@@ -129,9 +129,6 @@ LEGACY_STATE_V3_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v3"
 STATE_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v4"
 STABLE_OWNER_ADMISSION_IDENTITY_MODE = "stable_request_ref_v1"
 LEGACY_OWNER_ADMISSION_IDENTITY_MODE = "legacy_materialized_path_v1"
-PREVIOUS_OWNER_ADMISSION_GENERATION_SCHEMA_VERSION = (
-    "abyss_stack_external_codex_owner_admission_generation_v1"
-)
 OWNER_ADMISSION_GENERATION_SCHEMA_VERSION = (
     "abyss_stack_external_codex_owner_admission_generation_v2"
 )
