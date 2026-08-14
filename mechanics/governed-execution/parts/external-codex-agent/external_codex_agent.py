@@ -9663,7 +9663,33 @@ class ExternalCodexRuntime:
         if path_value is None:
             return None
         path = Path(str(path_value))
-        reference = _artifact_ref(path, owner="aoa-agents")
+        raw = read_bounded(path)
+        artifact_digest = sha256_bytes(raw)
+        if artifact_digest != state.get("owner_admission_digest"):
+            raise ExternalCodexRuntimeError(
+                "materialized_input_drift",
+                "durable owner execution request changed after admission",
+            )
+        request = load_json_bytes(raw, label="durable owner execution request")
+        request_ref = request.get("request_ref")
+        if not isinstance(request_ref, str) or not request_ref:
+            raise ExternalCodexRuntimeError(
+                "materialized_input_drift",
+                "durable owner execution request lost its stable request identity",
+            )
+        return {
+            "owner_repo": "aoa-agents",
+            "artifact_ref": request_ref,
+            "artifact_digest": artifact_digest,
+        }
+
+    def _owner_admission_evidence_ref(
+        self, state: Mapping[str, Any]
+    ) -> dict[str, Any] | None:
+        path_value = state["materialized_inputs"].get("owner_execution_request")
+        if path_value is None:
+            return None
+        reference = _artifact_ref(Path(str(path_value)), owner="aoa-agents")
         if reference["artifact_digest"] != state.get("owner_admission_digest"):
             raise ExternalCodexRuntimeError(
                 "materialized_input_drift",
@@ -11747,8 +11773,9 @@ Runtime session identity: {state["session_id"]}
             if isinstance(ref, dict):
                 evidence_refs.append(ref)
         owner_admission_ref = self._owner_admission_ref(state)
-        if owner_admission_ref is not None:
-            evidence_refs.append(owner_admission_ref)
+        owner_admission_evidence_ref = self._owner_admission_evidence_ref(state)
+        if owner_admission_evidence_ref is not None:
+            evidence_refs.append(owner_admission_evidence_ref)
         evidence_refs.extend(self._preserved_result_refs(state))
         result = {
             "schema_version": "abyss_stack_external_codex_result_v2",
@@ -12087,8 +12114,9 @@ Runtime session identity: {state["session_id"]}
             if isinstance(ref, dict):
                 evidence_refs.append(ref)
         owner_admission_ref = self._owner_admission_ref(state)
-        if owner_admission_ref is not None:
-            evidence_refs.append(owner_admission_ref)
+        owner_admission_evidence_ref = self._owner_admission_evidence_ref(state)
+        if owner_admission_evidence_ref is not None:
+            evidence_refs.append(owner_admission_evidence_ref)
         evidence_refs.extend(self._preserved_result_refs(state))
         result = {
             "schema_version": "abyss_stack_external_codex_result_v2",

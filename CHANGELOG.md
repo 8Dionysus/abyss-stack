@@ -9,6 +9,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Return an admitted external actor's stable `aoa-agents` owner-request
+  identity in `owner_admission_ref` while retaining the runtime-private
+  immutable request snapshot as separate path-addressable evidence. This lets
+  downstream summon closeout match the exact selected request without
+  weakening byte-drift detection, terminal recovery, or continuation closure.
 - Pin both external Codex specialized-environment profiles to the landed
   `aoa-stats` actor-responsibility receipt revision, so a release built from
   the current validation dependency can package and verify that same owner

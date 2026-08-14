@@ -169,7 +169,11 @@ Before launch the controller verifies:
     external-process/session posture, and observe-only usage
     semantics must match the launch and continuation exactly. Owner semantic
     self-digests and immutable transport-byte digests remain distinct and both
-    are verified.
+    are verified. The terminal runtime result identifies the admitted owner
+    request by its stable `request_ref` and the digest of the exact admitted
+    bytes, rather than by the runtime-private materialization path. That
+    materialized immutable snapshot remains a separate path-addressable
+    `evidence_refs` member for runtime recovery and continuation closure.
 
 The two request-shaped objects are intentionally not collapsed. The
 `AgentIncarnationBinding.task_request_ref` is the canonical schema-valid SDK

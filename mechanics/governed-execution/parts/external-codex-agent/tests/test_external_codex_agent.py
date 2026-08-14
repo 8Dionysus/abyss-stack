@@ -5698,6 +5698,21 @@ def test_owner_contour_admits_exact_role_first_request_and_runs_separate_process
     assert terminal["status"] == "completed"
     result = fixture["runtime"].result(started["session_id"])
     assert result["admission_class"] == "owner_contour"
+    request = json.loads(owner_request_path.read_text(encoding="utf-8"))
+    assert result["owner_admission_ref"] == {
+        "owner_repo": "aoa-agents",
+        "artifact_ref": request["request_ref"],
+        "artifact_digest": _digest_path(owner_request_path),
+    }
+    assert {
+        "owner_repo": "aoa-agents",
+        "artifact_ref": str(
+            fixture["runtime"]._session_dir(started["session_id"])
+            / "inputs"
+            / "owner-execution-request.json"
+        ),
+        "artifact_digest": _digest_path(owner_request_path),
+    } in result["evidence_refs"]
     assert result["owner_admission_ref"]["artifact_digest"] == _digest_path(
         owner_request_path
     )

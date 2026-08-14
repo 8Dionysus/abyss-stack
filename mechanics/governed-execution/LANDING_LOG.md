@@ -1,5 +1,17 @@
 # Governed Execution Landing Log
 
+## 2026-08-13 - Stable external owner-request result identity
+
+Separated the cross-owner identity of an admitted `aoa-agents` execution
+request from the runtime-private path of its immutable materialized copy. The
+terminal result now returns the stable `request_ref` plus exact admitted byte
+digest in `owner_admission_ref`, while `evidence_refs` retains the verified
+local snapshot needed for recovery and continuation closure.
+
+The complete external-Codex deterministic suite passed. This is an ABI repair,
+not new role, model-fit, owner-acceptance, publication, or external-effect
+authority.
+
 ## 2026-05-07 - Initial package landing
 
 Created the governed-execution package as the route home for governed local
