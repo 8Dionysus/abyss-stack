@@ -233,3 +233,7 @@
 ## 2026-08-13
 
 - [ABYSS-STACK-D-0121 Close Nested Review Evidence Before Inference](../ABYSS-STACK-D-0121-close-nested-review-evidence-before-inference.md) (`docs/decisions/ABYSS-STACK-D-0121-close-nested-review-evidence-before-inference.md`)
+
+## 2026-08-14
+
+- [ABYSS-STACK-D-0122 Attempt-Local Python Cache Routing](../ABYSS-STACK-D-0122-attempt-local-python-cache-routing.md) (`docs/decisions/ABYSS-STACK-D-0122-attempt-local-python-cache-routing.md`)

@@ -23,9 +23,10 @@ leaving role selection and domain meaning upstream; it does not fork the
 runtime into task-owned launchers. Landing now supplies its first actual
 specialized validation environment from the same verified release: exact
 pytest and `aoa_sdk` bytes, cache-free validation, and a pinned read-only
-`aoa-stats` owner snapshot. This repairs a
-missing capability exposed by real work, rather than weakening the isolated
-session or growing a general-purpose host allowlist.
+`aoa-stats` owner snapshot. The runtime also applies attempt-local Python cache
+routing to every admitted profile, including structured owner-duty writers;
+this repairs explicit-compile and generic-profile residue without weakening
+the isolated session or growing a general-purpose host allowlist.
 
 ## Proof sequence
 

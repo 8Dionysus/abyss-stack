@@ -5306,6 +5306,50 @@ def _toml_inline_string_map(values: Mapping[str, str]) -> str:
     return "{" + entries + "}"
 
 
+def _attempt_local_python_environment(scratch_root: str | Path) -> dict[str, str]:
+    """Return runtime-owned Python hygiene for one exact attempt scratch root.
+
+    ``PYTHONDONTWRITEBYTECODE`` does not constrain explicit ``py_compile``.
+    The prefix therefore remains necessary, and it must be derived from the
+    runtime-created attempt coordinate rather than from model or task input.
+    """
+
+    scratch = Path(scratch_root)
+    if not scratch.is_absolute() or scratch.is_symlink() or not scratch.is_dir():
+        raise ExternalCodexRuntimeError(
+            "attempt_scratch_unavailable",
+            "attempt-local Python hygiene requires a physical scratch directory",
+        )
+    prefix = scratch / "python-pycache"
+    try:
+        if prefix.is_symlink() or (prefix.exists() and not prefix.is_dir()):
+            raise OSError("attempt-local Python cache prefix is not a directory")
+        prefix.mkdir(mode=0o700, exist_ok=True)
+        prefix.chmod(0o700)
+    except OSError as exc:
+        raise ExternalCodexRuntimeError(
+            "attempt_python_cache_unavailable",
+            "cannot establish the attempt-local Python cache prefix",
+        ) from exc
+    return {
+        "PYTHONPYCACHEPREFIX": str(prefix),
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONNOUSERSITE": "1",
+        "PYTEST_ADDOPTS": "-p no:cacheprovider",
+    }
+
+
+def _attempt_shell_environment(
+    scratch_root: str | Path,
+    specialized_environment: Mapping[str, str],
+) -> dict[str, str]:
+    """Merge verified profile inputs with runtime-owned attempt hygiene."""
+
+    environment = dict(specialized_environment)
+    environment.update(_attempt_local_python_environment(scratch_root))
+    return environment
+
+
 def _specialized_environment(
     _profile: Mapping[str, Any],
     tool_entry: Mapping[str, Any],
@@ -9794,6 +9838,7 @@ class ExternalCodexRuntime:
                 tool_entry,
             )
             environment.update(specialized_environment)
+        environment.update(_attempt_local_python_environment(scratch_root))
         return environment
 
     def _materialized_payloads(
@@ -11459,7 +11504,10 @@ Runtime session identity: {state["session_id"]}
                     if binding.permission_posture.sandbox_mode == "workspace_write"
                     else "read"
                 ),
-                shell_environment=specialized_environment,
+                shell_environment=_attempt_shell_environment(
+                    scratch,
+                    specialized_environment,
+                ),
             )
             process_identity_path = attempt_dir / "process-identity.json"
             child_workspace_descriptor = os.dup(projection_descriptor)
@@ -15557,6 +15605,7 @@ class ExternalCodexParentReentry:
             "TMPDIR": str(scratch),
             "NO_COLOR": "1",
         }
+        environment.update(_attempt_local_python_environment(scratch))
         return environment
 
     def _codex_command(

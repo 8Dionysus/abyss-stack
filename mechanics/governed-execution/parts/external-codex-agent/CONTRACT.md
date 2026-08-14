@@ -403,11 +403,16 @@ generic posture for its effect class: the read alias is `read_only` with
 `repo_mutation` effects. Both landing aliases additionally bind the same
 model-neutral `landing-validation-v1` environment. Its pytest distributions,
 packaged `aoa_sdk`, and clean tracked `aoa-stats` snapshot are files inside the
-verified content-addressed release. The runtime exposes only those read-only
-roots to Codex and supplies their composed `PYTHONPATH`, `AOA_STATS_ROOT`,
+verified content-addressed release. Every admitted external Codex attempt,
+including generic structured owner-duty writers, receives a runtime-generated
+`PYTHONPYCACHEPREFIX` beneath its distinct attempt-local scratch directory,
+outside the actor projection. The same runtime-owned shell map supplies
 `PYTHONNOUSERSITE=1`, bytecode suppression, and pytest cache-provider
-suppression. The isolated shell `HOME` remains empty. This is a
-positive tool grant, not owner authority and not an ambient-path exception.
+suppression without changing the owner-signed validation argv. A resumed
+attempt receives a new scratch coordinate and therefore a new prefix. Landing
+profiles additionally receive their verified-release `PYTHONPATH` and
+`AOA_STATS_ROOT`; the isolated shell `HOME` remains empty. This is a positive
+tool grant, not owner authority and not an ambient-path exception.
 All aliases remain no-MCP, no-network, and no-external-effect. The alias must
 match the realization and incarnation binding exactly; it does not choose the
 task family, selected role chain, domain procedure, or model-fit outcome.
