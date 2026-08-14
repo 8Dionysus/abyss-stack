@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 18449935,
+  "allowed_tracked_bytes": 35278318,
+  "approved_by": "repository-owner",
+  "base_ref": "7db3e4cd4643a293437ad4d54152688481e8c559",
+  "changed_generated_bytes": 18449935,
+  "changed_generated_files": 184,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "2f6b06a4bb4ac313cc22ad15d6cb3e6d9129484fa7ded3c114b2ee543d181869",
+  "reason": "Regenerate the canonical repo-local KAG portable family after the accepted PR #379 nested-test inventory repair; the generated family delta is deterministic and exceeds the standing budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35278318,
+  "tracked_bytes_max": 24117248
+}
