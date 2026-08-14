@@ -180,18 +180,29 @@ Before launch the controller verifies:
     recovery, resume, reviewer preparation, review-seed issuance, and initial
     parent re-entry accept that legacy form only when the durable state is v3;
     v4 cannot downgrade and v3 cannot claim the stable v4 form. The
-    discriminator is not the mutable state version by itself. Every newly
+    discriminator is not the mutable state version or any closure of
+    session-local files. Every newly
     admitted owner-contour launch contains
     `owner_admission_identity_mode=stable_request_ref_v1`, and the owner
     request binds the digest and object identity of those exact launch bytes.
+    Before first state publication the controller also publishes one
+    non-replacing, mode-0400 generation anchor under the state-root-level
+    `owner-admission-generations/` ledger. It binds session, launch, exact
+    launch bytes, exact owner-request bytes, stable request identity, identity
+    mode, and provenance outside the rewriteable session directory. Every
+    later owner-result read must agree with that write-once anchor.
     A legacy v3 receipt is accepted only when its materialized launch lacks
     that mode and the request's semantic self-digest plus `runtime_launch_ref`
-    still bind the same launch. Any mixed state/launch generation fails closed.
-    The marker is mandatory for a new owner-contour admission. A markerless
-    launch may pass preflight or start only when an existing durable v3 session
-    has the same launch digest, owner-admission digest, materialized request,
-    and legacy generation. This permits recovery from a crash after durable
-    `prepared` state but before attempt one without reopening legacy admission.
+    still bind the same launch and an explicit operator migration has published
+    a legacy-generation anchor with the expected launch and request digests.
+    Unanchored v3 state fails closed; ordinary reads never infer or create a
+    migration record. The marker is mandatory for a new owner-contour
+    admission. An anchored markerless launch may pass preflight or start only
+    when an existing durable v3 session has the same launch digest,
+    owner-admission digest, materialized request, and legacy generation. This
+    permits reviewed recovery from a crash after durable `prepared` state but
+    before attempt one without reopening legacy admission or allowing a v4
+    session to manufacture its own downgrade.
 
 The two request-shaped objects are intentionally not collapsed. The
 `AgentIncarnationBinding.task_request_ref` is the canonical schema-valid SDK

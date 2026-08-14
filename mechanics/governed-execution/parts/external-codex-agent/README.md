@@ -521,11 +521,15 @@ Owner-contour launch binding also carries an owner-request-bound receipt
 identity mode. New sessions use `stable_request_ref_v1`; pre-upgrade v3
 receipts are recognized only by an exact legacy launch without that mode.
 Runtime reads verify the materialized launch digest, the owner request semantic
-self-digest, and its `runtime_launch_ref` before selecting either result form,
-so editing `state.json.schema_version` cannot downgrade a v4 receipt. New
-admission requires the current mode. A markerless launch is accepted only for
-an exact already-durable v3 session, including the crash-before-first-attempt
-`prepared` recovery path.
+self-digest, its `runtime_launch_ref`, and a separate write-once generation
+anchor under `owner-admission-generations/` before selecting either result
+form. The anchor is published outside the session directory with non-replacing
+semantics and is retained as evidence by new results, so rewriting the complete
+session-local closure cannot downgrade v4. New admission requires the current
+mode. A markerless v3 launch is accepted only after the explicit
+`migrate-legacy-owner-admission` operation anchors its exact expected launch and
+owner-request digests; ordinary reads never create that migration. The same
+anchor then preserves the crash-before-first-attempt `prepared` recovery path.
 
 See [CONTRACT.md](CONTRACT.md), [DIRECTION.md](DIRECTION.md),
 [PROVENANCE.md](PROVENANCE.md), [SUSPENSION.md](SUSPENSION.md), and

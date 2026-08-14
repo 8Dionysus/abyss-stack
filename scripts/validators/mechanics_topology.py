@@ -122,6 +122,7 @@ MECHANIC_PART_REQUIRED_FILES = {
         "schemas/external-codex-actor-workspace-manifest.schema.json",
         "schemas/external-codex-event.schema.json",
         "schemas/external-codex-launch.schema.json",
+        "schemas/external-codex-owner-admission-generation.schema.json",
         "schemas/external-codex-parent-obligation.schema.json",
         "schemas/external-codex-parent-reentry.schema.json",
         "schemas/external-codex-parent-yield.schema.json",

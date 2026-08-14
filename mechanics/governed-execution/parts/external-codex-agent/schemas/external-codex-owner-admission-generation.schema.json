@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-owner-admission-generation.schema.json",
+  "title": "Write-once external owner admission generation anchor",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_id",
+    "launch_id",
+    "identity_mode",
+    "launch_digest",
+    "owner_admission_digest",
+    "owner_request_ref",
+    "provenance",
+    "recorded_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "abyss_stack_external_codex_owner_admission_generation_v1"
+    },
+    "session_id": {"type": "string", "minLength": 1},
+    "launch_id": {"type": "string", "minLength": 1},
+    "identity_mode": {
+      "enum": ["stable_request_ref_v1", "legacy_materialized_path_v1"]
+    },
+    "launch_digest": {"$ref": "#/$defs/digest"},
+    "owner_admission_digest": {"$ref": "#/$defs/digest"},
+    "owner_request_ref": {"type": "string", "minLength": 1},
+    "provenance": {"enum": ["new_admission", "explicit_legacy_migration"]},
+    "recorded_at": {"type": "string", "format": "date-time"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"identity_mode": {"const": "stable_request_ref_v1"}},
+        "required": ["identity_mode"]
+      },
+      "then": {"properties": {"provenance": {"const": "new_admission"}}},
+      "else": {
+        "properties": {"provenance": {"const": "explicit_legacy_migration"}}
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

@@ -83,6 +83,9 @@ RESULT_EVIDENCE_CLOSURE_SCHEMA_PATH = (
 )
 RESUME_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-resume.schema.json"
 STATE_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-state.schema.json"
+OWNER_ADMISSION_GENERATION_SCHEMA_PATH = (
+    SCHEMA_ROOT / "external-codex-owner-admission-generation.schema.json"
+)
 PARENT_OBLIGATION_SCHEMA_PATH = (
     SCHEMA_ROOT / "external-codex-parent-obligation.schema.json"
 )
@@ -118,6 +121,10 @@ LEGACY_STATE_V2_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v2"
 LEGACY_STATE_V3_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v3"
 STATE_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v4"
 STABLE_OWNER_ADMISSION_IDENTITY_MODE = "stable_request_ref_v1"
+LEGACY_OWNER_ADMISSION_IDENTITY_MODE = "legacy_materialized_path_v1"
+OWNER_ADMISSION_GENERATION_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_owner_admission_generation_v1"
+)
 PROJECTION_STATE_SCHEMA_VERSIONS = frozenset(
     {LEGACY_STATE_V3_SCHEMA_VERSION, STATE_SCHEMA_VERSION}
 )
@@ -6258,6 +6265,170 @@ class ExternalCodexRuntime:
     def _session_dir(self, session_id: str) -> Path:
         return self.state_root / "sessions" / _session_token(session_id)
 
+    def _owner_admission_generation_path(self, session_id: str) -> Path:
+        return (
+            self.state_root
+            / "owner-admission-generations"
+            / f"{_session_token(session_id)}.json"
+        )
+
+    def _owner_admission_generation_ref(
+        self, state: Mapping[str, Any]
+    ) -> dict[str, str] | None:
+        if state.get("admission_class") != "owner_contour":
+            return None
+        self._load_owner_admission_generation(str(state["session_id"]))
+        return _artifact_ref(
+            self._owner_admission_generation_path(str(state["session_id"])),
+            owner="abyss-stack",
+        )
+
+    def _load_owner_admission_generation(self, session_id: str) -> dict[str, Any]:
+        """Load the controller-owned generation anchor outside session files."""
+
+        path = self._owner_admission_generation_path(session_id)
+        try:
+            descriptor = os.open(
+                path,
+                os.O_RDONLY | os.O_CLOEXEC | getattr(os, "O_NOFOLLOW", 0),
+            )
+        except FileNotFoundError as exc:
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_required",
+                "owner-contour session requires an external generation anchor; "
+                "pre-upgrade v3 state must be migrated explicitly",
+            ) from exc
+        except OSError as exc:
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_invalid",
+                "owner admission generation anchor cannot be opened without following links",
+            ) from exc
+        try:
+            observed = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(observed.st_mode)
+                or observed.st_nlink != 1
+                or observed.st_uid != os.geteuid()
+                or stat.S_IMODE(observed.st_mode) != 0o400
+            ):
+                raise ExternalCodexRuntimeError(
+                    "owner_admission_generation_anchor_invalid",
+                    "owner admission generation anchor is not a private immutable regular file",
+                )
+            chunks: list[bytes] = []
+            total = 0
+            while True:
+                chunk = os.read(descriptor, min(65536, MAX_CONTROL_BYTES + 1 - total))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                total += len(chunk)
+                if total > MAX_CONTROL_BYTES:
+                    raise ExternalCodexRuntimeError(
+                        "owner_admission_generation_anchor_invalid",
+                        "owner admission generation anchor exceeds the control limit",
+                    )
+            coordinate = path.lstat()
+            if (
+                coordinate.st_dev != observed.st_dev
+                or coordinate.st_ino != observed.st_ino
+            ):
+                raise ExternalCodexRuntimeError(
+                    "owner_admission_generation_anchor_invalid",
+                    "owner admission generation anchor coordinate changed while read",
+                )
+        except FileNotFoundError as exc:
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_invalid",
+                "owner admission generation anchor disappeared while read",
+            ) from exc
+        finally:
+            os.close(descriptor)
+        generation = load_json_bytes(
+            b"".join(chunks), label="owner admission generation anchor"
+        )
+        validate_json(
+            generation,
+            OWNER_ADMISSION_GENERATION_SCHEMA_PATH,
+            label="owner admission generation anchor",
+        )
+        if generation.get("session_id") != session_id:
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_invalid",
+                "owner admission generation anchor names another session",
+            )
+        return generation
+
+    def _publish_owner_admission_generation(
+        self,
+        generation: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Publish one write-once generation anchor without replacing a prior one."""
+
+        session_id = str(generation["session_id"])
+        path = self._owner_admission_generation_path(session_id)
+        directory = path.parent
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        try:
+            directory_stat = directory.lstat()
+        except OSError as exc:
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_invalid",
+                "owner admission generation directory is unavailable",
+            ) from exc
+        if (
+            not stat.S_ISDIR(directory_stat.st_mode)
+            or directory.is_symlink()
+            or directory_stat.st_uid != os.geteuid()
+            or stat.S_IMODE(directory_stat.st_mode) != 0o700
+        ):
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_invalid",
+                "owner admission generation directory must be a real directory",
+            )
+        value = dict(generation)
+        validate_json(
+            value,
+            OWNER_ADMISSION_GENERATION_SCHEMA_PATH,
+            label="owner admission generation anchor",
+        )
+        payload = (
+            json.dumps(value, ensure_ascii=True, sort_keys=True, indent=2) + "\n"
+        ).encode("utf-8")
+        descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=directory)
+        temp_path = Path(temporary)
+        published = False
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(temp_path, 0o400)
+            try:
+                os.link(temp_path, path, follow_symlinks=False)
+                published = True
+            except FileExistsError:
+                existing = self._load_owner_admission_generation(session_id)
+                if existing != value:
+                    raise ExternalCodexRuntimeError(
+                        "owner_admission_generation_conflict",
+                        "session already has another external owner admission generation",
+                    )
+                return existing
+            directory_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        finally:
+            temp_path.unlink(missing_ok=True)
+        if not published:
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_invalid",
+                "owner admission generation anchor was not published",
+            )
+        return self._load_owner_admission_generation(session_id)
+
     @staticmethod
     def _projection_path_from_state(state: Mapping[str, Any]) -> Path:
         value = state.get("actor_projection_path")
@@ -8129,6 +8300,28 @@ class ExternalCodexRuntime:
                     "owner_admission_identity_mode_required",
                     "new owner-contour launches require stable request identity binding",
                 )
+            anchor_path = self._owner_admission_generation_path(
+                str(launch["session_id"])
+            )
+            if anchor_path.exists():
+                anchor = self._load_owner_admission_generation(
+                    str(launch["session_id"])
+                )
+                expected = self._owner_admission_generation_from_validated(validated)
+                identity_keys = (
+                    "schema_version",
+                    "session_id",
+                    "launch_id",
+                    "identity_mode",
+                    "launch_digest",
+                    "owner_admission_digest",
+                    "owner_request_ref",
+                )
+                if any(anchor.get(key) != expected.get(key) for key in identity_keys):
+                    raise ExternalCodexRuntimeError(
+                        "owner_admission_generation_conflict",
+                        "session has an external owner generation for another launch",
+                    )
             return
         if state.get("launch_digest") != validated["launch_digest"]:
             raise ExternalCodexRuntimeError(
@@ -8167,6 +8360,146 @@ class ExternalCodexRuntime:
                 "runtime_state_owner_identity_invalid",
                 "incoming launch generation differs from durable owner admission",
             )
+
+    def _owner_admission_generation_from_validated(
+        self,
+        validated: Mapping[str, Any],
+        *,
+        identity_mode: str = STABLE_OWNER_ADMISSION_IDENTITY_MODE,
+        provenance: str = "new_admission",
+        recorded_at: str | None = None,
+    ) -> dict[str, Any]:
+        launch = validated["launch"]
+        owner_admission = validated.get("owner_admission")
+        if launch.get("admission_class") != "owner_contour" or not isinstance(
+            owner_admission, Mapping
+        ):
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_invalid",
+                "generation anchor requires an admitted owner-contour request",
+            )
+        request = owner_admission["request"]
+        return {
+            "schema_version": OWNER_ADMISSION_GENERATION_SCHEMA_VERSION,
+            "session_id": str(launch["session_id"]),
+            "launch_id": str(launch["launch_id"]),
+            "identity_mode": identity_mode,
+            "launch_digest": str(validated["launch_digest"]),
+            "owner_admission_digest": str(owner_admission["request_digest"]),
+            "owner_request_ref": str(request["request_ref"]),
+            "provenance": provenance,
+            "recorded_at": recorded_at or iso_now(),
+        }
+
+    def migrate_legacy_owner_admission_generation(
+        self,
+        session_id: str,
+        *,
+        expected_launch_digest: str,
+        expected_owner_admission_digest: str,
+    ) -> dict[str, Any]:
+        """Explicitly anchor one verified pre-upgrade v3 owner session."""
+
+        with self._lock(session_id):
+            anchor_path = self._owner_admission_generation_path(session_id)
+            if anchor_path.exists():
+                raise ExternalCodexRuntimeError(
+                    "owner_admission_generation_already_anchored",
+                    "owner admission generation already has a write-once anchor",
+                )
+            state = self._load_state(session_id)
+            if (
+                state.get("schema_version") != LEGACY_STATE_V3_SCHEMA_VERSION
+                or state.get("admission_class") != "owner_contour"
+                or state.get("launch_digest") != expected_launch_digest
+                or state.get("owner_admission_digest")
+                != expected_owner_admission_digest
+            ):
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_migration_mismatch",
+                    "legacy migration expectations do not match exact durable v3 state",
+                )
+            launch_path = self._session_dir(session_id) / "inputs" / "launch.json"
+            launch_raw = read_bounded(launch_path)
+            if sha256_bytes(launch_raw) != expected_launch_digest:
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_migration_mismatch",
+                    "legacy materialized launch differs from the expected digest",
+                )
+            launch = load_json_bytes(
+                launch_raw, label="legacy materialized external Codex launch"
+            )
+            validate_json(
+                launch,
+                LAUNCH_SCHEMA_PATH,
+                label="legacy materialized external Codex launch",
+            )
+            if (
+                launch.get("session_id") != session_id
+                or launch.get("launch_id") != state.get("launch_id")
+                or launch.get("admission_class") != "owner_contour"
+                or launch.get("owner_admission_identity_mode") is not None
+            ):
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_migration_mismatch",
+                    "legacy launch does not describe the exact markerless v3 generation",
+                )
+            owner_request_path = state.get("materialized_inputs", {}).get(
+                "owner_execution_request"
+            )
+            if not isinstance(owner_request_path, str):
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_migration_mismatch",
+                    "legacy state has no materialized owner request",
+                )
+            owner_request_raw = read_bounded(Path(owner_request_path))
+            if sha256_bytes(owner_request_raw) != expected_owner_admission_digest:
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_migration_mismatch",
+                    "legacy owner request differs from the expected digest",
+                )
+            owner_request = load_json_bytes(
+                owner_request_raw, label="legacy durable owner execution request"
+            )
+            if owner_request.get("request_digest") != owner_request_digest(
+                owner_request
+            ):
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_migration_mismatch",
+                    "legacy owner request lost its semantic self-digest",
+                )
+            runtime_launch_ref = owner_request.get("external_incarnation", {}).get(
+                "runtime_launch_ref"
+            )
+            request_ref = owner_request.get("request_ref")
+            if (
+                not isinstance(request_ref, str)
+                or not request_ref
+                or not isinstance(runtime_launch_ref, dict)
+                or runtime_launch_ref.get("object_id") != launch.get("launch_id")
+                or runtime_launch_ref.get("digest") != expected_launch_digest
+            ):
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_migration_mismatch",
+                    "legacy owner request does not bind the exact launch generation",
+                )
+            generation = {
+                "schema_version": OWNER_ADMISSION_GENERATION_SCHEMA_VERSION,
+                "session_id": session_id,
+                "launch_id": str(launch["launch_id"]),
+                "identity_mode": LEGACY_OWNER_ADMISSION_IDENTITY_MODE,
+                "launch_digest": expected_launch_digest,
+                "owner_admission_digest": expected_owner_admission_digest,
+                "owner_request_ref": request_ref,
+                "provenance": "explicit_legacy_migration",
+                "recorded_at": iso_now(),
+            }
+            anchored = self._publish_owner_admission_generation(generation)
+            return {
+                "migrated": True,
+                "generation": anchored,
+                "generation_ref": _artifact_ref(anchor_path, owner="abyss-stack"),
+            }
 
     def _review_seed_envelope_locked(
         self,
@@ -8708,6 +9041,13 @@ class ExternalCodexRuntime:
                 "result_digest": None,
                 "wake_evaluation": None,
             }
+            if launch["admission_class"] == "owner_contour":
+                self._publish_owner_admission_generation(
+                    self._owner_admission_generation_from_validated(
+                        validated,
+                        recorded_at=str(state["created_at"]),
+                    )
+                )
             self._append_event(
                 state,
                 event_type="external_agent.prepared",
@@ -9770,7 +10110,7 @@ class ExternalCodexRuntime:
         state: Mapping[str, Any],
         owner_request_raw: bytes,
     ) -> str:
-        """Resolve owner-result identity from the admitted launch, not mutable state."""
+        """Resolve owner-result identity from an external write-once anchor."""
 
         session_id = state.get("session_id")
         if not isinstance(session_id, str) or not session_id:
@@ -9819,13 +10159,35 @@ class ExternalCodexRuntime:
             )
         launch_mode = launch.get("owner_admission_identity_mode")
         state_version = state.get("schema_version")
+        generation = self._load_owner_admission_generation(session_id)
+        request_ref = owner_request.get("request_ref")
+        if (
+            generation.get("launch_id") != launch.get("launch_id")
+            or generation.get("launch_digest") != sha256_bytes(launch_raw)
+            or generation.get("owner_admission_digest")
+            != sha256_bytes(owner_request_raw)
+            or generation.get("owner_request_ref") != request_ref
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "session-local owner bytes differ from the external generation anchor",
+            )
         if (
             state_version == STATE_SCHEMA_VERSION
             and launch_mode == STABLE_OWNER_ADMISSION_IDENTITY_MODE
+            and generation.get("identity_mode")
+            == STABLE_OWNER_ADMISSION_IDENTITY_MODE
+            and generation.get("provenance") == "new_admission"
         ):
             return STABLE_OWNER_ADMISSION_IDENTITY_MODE
-        if state_version == LEGACY_STATE_V3_SCHEMA_VERSION and launch_mode is None:
-            return "legacy_materialized_path_v1"
+        if (
+            state_version == LEGACY_STATE_V3_SCHEMA_VERSION
+            and launch_mode is None
+            and generation.get("identity_mode")
+            == LEGACY_OWNER_ADMISSION_IDENTITY_MODE
+            and generation.get("provenance") == "explicit_legacy_migration"
+        ):
+            return LEGACY_OWNER_ADMISSION_IDENTITY_MODE
         raise ExternalCodexRuntimeError(
             "runtime_state_owner_identity_invalid",
             "runtime state version and owner-bound launch identity mode disagree",
@@ -9869,6 +10231,16 @@ class ExternalCodexRuntime:
                 failure_code,
                 f"{label} does not retain the admitted owner request snapshot",
             )
+        if state.get("admission_class") != "owner_contour":
+            return
+        generation = self._load_owner_admission_generation(str(state["session_id"]))
+        if generation["identity_mode"] == STABLE_OWNER_ADMISSION_IDENTITY_MODE:
+            expected_generation_ref = self._owner_admission_generation_ref(state)
+            if expected_generation_ref not in result.get("evidence_refs", []):
+                raise ExternalCodexRuntimeError(
+                    failure_code,
+                    f"{label} does not retain the external owner generation anchor",
+                )
 
     def _attempt_has_completed_usage_event(
         self,
@@ -11949,6 +12321,9 @@ Runtime session identity: {state["session_id"]}
         owner_admission_evidence_ref = self._owner_admission_evidence_ref(state)
         if owner_admission_evidence_ref is not None:
             evidence_refs.append(owner_admission_evidence_ref)
+        owner_generation_ref = self._owner_admission_generation_ref(state)
+        if owner_generation_ref is not None:
+            evidence_refs.append(owner_generation_ref)
         evidence_refs.extend(self._preserved_result_refs(state))
         result = {
             "schema_version": "abyss_stack_external_codex_result_v2",
@@ -12290,6 +12665,9 @@ Runtime session identity: {state["session_id"]}
         owner_admission_evidence_ref = self._owner_admission_evidence_ref(state)
         if owner_admission_evidence_ref is not None:
             evidence_refs.append(owner_admission_evidence_ref)
+        owner_generation_ref = self._owner_admission_generation_ref(state)
+        if owner_generation_ref is not None:
+            evidence_refs.append(owner_generation_ref)
         evidence_refs.extend(self._preserved_result_refs(state))
         result = {
             "schema_version": "abyss_stack_external_codex_result_v2",
@@ -15880,6 +16258,7 @@ def build_parser() -> argparse.ArgumentParser:
             "result",
             "resume",
             "interrupt",
+            "migrate-legacy-owner-admission",
             "export-a2a-result",
             "yield-parent",
             "reenter-parent",
@@ -15891,6 +16270,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--launch")
     parser.add_argument("--owner-execution-request")
     parser.add_argument("--session-id")
+    parser.add_argument("--expected-launch-digest")
+    parser.add_argument("--expected-owner-admission-digest")
     parser.add_argument("--after-sequence", type=int, default=-1)
     parser.add_argument("--resume-request")
     parser.add_argument("--reviewer-session-id")
@@ -15977,6 +16358,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             elif args.operation == "interrupt":
                 result = runtime.interrupt(_require(args.session_id, "--session-id"))
+            elif args.operation == "migrate-legacy-owner-admission":
+                result = runtime.migrate_legacy_owner_admission_generation(
+                    _require(args.session_id, "--session-id"),
+                    expected_launch_digest=_require(
+                        args.expected_launch_digest, "--expected-launch-digest"
+                    ),
+                    expected_owner_admission_digest=_require(
+                        args.expected_owner_admission_digest,
+                        "--expected-owner-admission-digest",
+                    ),
+                )
             else:
                 result = runtime.export_a2a_result(
                     _require(args.session_id, "--session-id"),

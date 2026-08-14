@@ -2306,6 +2306,7 @@ def _rewrite_owner_state_as_legacy_v3(
     *,
     source_launch_path: Path,
     source_owner_request_path: Path,
+    migrate_generation: bool = True,
 ) -> tuple[dict[str, Any], Path, dict[str, str]]:
     """Reproduce the launch/request generation of a durable runtime state v3."""
 
@@ -2338,6 +2339,17 @@ def _rewrite_owner_state_as_legacy_v3(
     state["launch_digest"] = launch_digest
     state["owner_admission_digest"] = owner_evidence_ref["artifact_digest"]
     runtime._save_state(state)
+    # Emulate a state created before generation anchors existed, then perform
+    # the explicit one-time migration required by the upgraded runtime.  A
+    # normal v4 session can never replace its already-published stable anchor.
+    if migrate_generation:
+        generation_path = runtime._owner_admission_generation_path(session_id)
+        generation_path.unlink()
+        runtime.migrate_legacy_owner_admission_generation(
+            session_id,
+            expected_launch_digest=launch_digest,
+            expected_owner_admission_digest=owner_evidence_ref["artifact_digest"],
+        )
     return state, owner_request_path, owner_evidence_ref
 
 
@@ -2368,6 +2380,8 @@ def _rewrite_owner_receipt_as_legacy_v3(
         and item.get("artifact_ref") == str(owner_request_path)
         else item
         for item in result["evidence_refs"]
+        if item.get("artifact_ref")
+        != str(runtime._owner_admission_generation_path(session_id))
     ]
     _write_json(result_path, result)
     attempt_dir = (
@@ -2384,6 +2398,12 @@ def _rewrite_owner_receipt_as_legacy_v3(
         if closure_path.is_file():
             closure = json.loads(closure_path.read_text(encoding="utf-8"))
             closure["source_result_ref"] = RUNTIME._artifact_ref(preserved_path)
+            closure["preserved_evidence"] = [
+                item
+                for item in closure["preserved_evidence"]
+                if item["source_ref"].get("artifact_ref")
+                != str(runtime._owner_admission_generation_path(session_id))
+            ]
             for item in closure["preserved_evidence"]:
                 if (
                     item["source_ref"].get("owner_repo") == "aoa-agents"
@@ -6064,6 +6084,85 @@ def test_v4_owner_receipt_cannot_downgrade_to_legacy_path_identity(
     with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
         runtime.result(fixture["session_id"])
     assert exc_info.value.code == "runtime_state_owner_identity_invalid"
+
+
+def test_v4_owner_receipt_cannot_downgrade_by_rewriting_full_session_closure(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True)
+    runtime = fixture["runtime"]
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    state, owner_request_path, owner_evidence_ref = _rewrite_owner_state_as_legacy_v3(
+        runtime,
+        fixture["session_id"],
+        source_launch_path=fixture["launch_path"],
+        source_owner_request_path=fixture["owner_execution_request_path"],
+        migrate_generation=False,
+    )
+    result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result["owner_admission_ref"] = owner_evidence_ref
+    result["evidence_refs"] = [
+        owner_evidence_ref
+        if item.get("owner_repo") == "aoa-agents"
+        and item.get("artifact_ref") == str(owner_request_path)
+        else item
+        for item in result["evidence_refs"]
+    ]
+    _write_json(result_path, result)
+    state["result_digest"] = _digest_path(result_path)
+    runtime._save_state(state)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.result(fixture["session_id"])
+    assert exc_info.value.code == "runtime_state_owner_identity_invalid"
+
+
+def test_unanchored_legacy_v3_requires_explicit_generation_migration(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True)
+    runtime = fixture["runtime"]
+    original_spawn = runtime._spawn_worker
+    runtime._spawn_worker = MethodType(  # type: ignore[method-assign]
+        lambda self, state, *, mode, resume_payload: None,
+        runtime,
+    )
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    state, _owner_path, _owner_ref = _rewrite_owner_state_as_legacy_v3(
+        runtime,
+        fixture["session_id"],
+        source_launch_path=fixture["launch_path"],
+        source_owner_request_path=fixture["owner_execution_request_path"],
+        migrate_generation=False,
+    )
+    generation_path = runtime._owner_admission_generation_path(fixture["session_id"])
+    generation_path.unlink()
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.preflight(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert exc_info.value.code == "owner_admission_generation_anchor_required"
+
+    migrated = runtime.migrate_legacy_owner_admission_generation(
+        fixture["session_id"],
+        expected_launch_digest=state["launch_digest"],
+        expected_owner_admission_digest=state["owner_admission_digest"],
+    )
+    assert migrated["migrated"] is True
+    runtime._spawn_worker = original_spawn  # type: ignore[method-assign]
+    assert runtime.preflight(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )["admitted"] is True
 
 
 def test_markerless_owner_launch_cannot_create_a_new_legacy_session(

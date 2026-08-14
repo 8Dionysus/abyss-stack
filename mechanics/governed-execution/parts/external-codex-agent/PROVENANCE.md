@@ -58,6 +58,15 @@ and reaped.
 Historical v2 state without these newer digests remains evidence-readable; it is
 not silently upgraded into authority for another inference attempt.
 
+Owner-result identity has one additional controller provenance layer. New
+owner-contour admissions publish a write-once generation anchor in a
+state-root-level ledger before durable session state appears. It binds the
+stable request identity and exact launch/request digests independently of the
+mutable session tree. Pre-upgrade v3 state receives equivalent legacy
+provenance only through an explicit migration command supplied with the
+operator-observed expected digests; normal result, recovery, continuation, and
+review routes never synthesize that provenance.
+
 The neutral binder consumes already selected coordinates and writes only the
 runtime launch. Its response explicitly returns to `aoa-agents` to form the
 separate owner execution request; it cannot choose the obligation, role,

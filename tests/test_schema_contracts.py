@@ -183,6 +183,9 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-nested-evidence-namespace.schema.json"
     ),
     Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-owner-admission-generation.schema.json"
+    ),
+    Path(
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-parent-obligation.schema.json"
     ),
     Path(

@@ -22,6 +22,10 @@ Tracking starts with the community-docs baseline for this repository.
   receipts remain readable, reviewable, resumable, and re-enterable only with
   their exact historical path-shaped owner reference and immutable digest;
   the two representations cannot be interchanged within one state version.
+  A non-replacing owner-generation anchor now binds this distinction outside
+  the rewriteable session directory, closing a coordinated full-session v4 to
+  v3 downgrade. Legacy v3 sessions require an explicit digest-pinned migration
+  record before use; normal reads cannot create one.
 - Pin both external Codex specialized-environment profiles to the landed
   `aoa-stats` actor-responsibility receipt revision, so a release built from
   the current validation dependency can package and verify that same owner

@@ -398,6 +398,7 @@ REQUIRED_FILE_PATHS = tuple(
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-actor-workspace-manifest.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-event.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-launch.schema.json",
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-owner-admission-generation.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-parent-obligation.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-parent-reentry.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-parent-yield.schema.json",
