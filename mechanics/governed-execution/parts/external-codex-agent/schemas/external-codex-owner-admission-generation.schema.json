@@ -17,7 +17,10 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "abyss_stack_external_codex_owner_admission_generation_v1"
+      "enum": [
+        "abyss_stack_external_codex_owner_admission_generation_v1",
+        "abyss_stack_external_codex_owner_admission_generation_v2"
+      ]
     },
     "session_id": {"type": "string", "minLength": 1},
     "launch_id": {"type": "string", "minLength": 1},
@@ -38,14 +41,23 @@
         "properties": {"identity_mode": {"const": "stable_request_ref_v1"}},
         "required": ["identity_mode"]
       },
-      "then": {
-        "properties": {"provenance": {"const": "new_admission"}},
-        "required": ["actor_baseline_manifest_digest"]
-      },
+      "then": {"properties": {"provenance": {"const": "new_admission"}}},
       "else": {
         "properties": {"provenance": {"const": "explicit_legacy_migration"}},
         "required": ["migration_catalog_digest"]
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "abyss_stack_external_codex_owner_admission_generation_v2"
+          },
+          "identity_mode": {"const": "stable_request_ref_v1"}
+        },
+        "required": ["schema_version", "identity_mode"]
+      },
+      "then": {"required": ["actor_baseline_manifest_digest"]}
     }
   ],
   "$defs": {

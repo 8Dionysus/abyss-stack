@@ -221,7 +221,10 @@ Before launch the controller verifies:
     still match the digest held by that external anchor may be reused, and at
     most one exact prepared event with the anchored timestamp may be reconciled
     into first state. The projection itself must still match that anchored
-    baseline byte-for-byte. Any mismatch fails closed.
+    baseline byte-for-byte. New admissions therefore publish a v2 anchor. A
+    durable session created with the preceding v1 anchor remains readable, but
+    a v1 crash before first state cannot enter this recovery path without an
+    explicit migration. Any mismatch fails closed.
 
 The two request-shaped objects are intentionally not collapsed. The
 `AgentIncarnationBinding.task_request_ref` is the canonical schema-valid SDK

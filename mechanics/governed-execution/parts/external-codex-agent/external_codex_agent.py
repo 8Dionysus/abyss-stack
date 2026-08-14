@@ -128,8 +128,11 @@ LEGACY_STATE_V3_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v3"
 STATE_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v4"
 STABLE_OWNER_ADMISSION_IDENTITY_MODE = "stable_request_ref_v1"
 LEGACY_OWNER_ADMISSION_IDENTITY_MODE = "legacy_materialized_path_v1"
-OWNER_ADMISSION_GENERATION_SCHEMA_VERSION = (
+PREVIOUS_OWNER_ADMISSION_GENERATION_SCHEMA_VERSION = (
     "abyss_stack_external_codex_owner_admission_generation_v1"
+)
+OWNER_ADMISSION_GENERATION_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_owner_admission_generation_v2"
 )
 LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION = (
     "abyss_stack_external_codex_legacy_owner_migration_catalog_v1"
@@ -8504,7 +8507,6 @@ class ExternalCodexRuntime:
                 )
                 expected = self._owner_admission_generation_from_validated(validated)
                 identity_keys = (
-                    "schema_version",
                     "session_id",
                     "launch_id",
                     "identity_mode",
@@ -8516,6 +8518,14 @@ class ExternalCodexRuntime:
                     raise ExternalCodexRuntimeError(
                         "owner_admission_generation_conflict",
                         "session has an external owner generation for another launch",
+                    )
+                if (
+                    anchor.get("schema_version")
+                    != OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "owner_admission_generation_upgrade_required",
+                        "an interrupted pre-v2 owner admission cannot be resumed without explicit migration",
                     )
             return
         if state.get("launch_digest") != validated["launch_digest"]:
@@ -8606,6 +8616,11 @@ class ExternalCodexRuntime:
         if not anchor_path.exists():
             return iso_now(), False
         anchor = self._load_owner_admission_generation(session_id)
+        if anchor.get("schema_version") != OWNER_ADMISSION_GENERATION_SCHEMA_VERSION:
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_upgrade_required",
+                "an interrupted pre-v2 owner admission cannot be resumed without explicit migration",
+            )
         recorded_at = anchor.get("recorded_at")
         if not isinstance(recorded_at, str):
             raise ExternalCodexRuntimeError(

@@ -6388,6 +6388,117 @@ def test_owner_admission_retry_rejects_rewritten_prepared_event_timestamp(
     assert retry_exc_info.value.code == "runtime_event_state_drift"
 
 
+def test_previous_v1_owner_generation_remains_readable_for_durable_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="previous-v1-generation-durable-state",
+    )
+    runtime = fixture["runtime"]
+    current_generation = runtime._owner_admission_generation_from_validated
+
+    def previous_generation(
+        validated: Mapping[str, Any],
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        generation = current_generation(validated, **kwargs)
+        generation["schema_version"] = (
+            RUNTIME.PREVIOUS_OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
+        )
+        generation.pop("actor_baseline_manifest_digest", None)
+        return generation
+
+    monkeypatch.setattr(
+        runtime,
+        "_owner_admission_generation_from_validated",
+        previous_generation,
+    )
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_owner_admission_generation_from_validated",
+        current_generation,
+    )
+
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    generation = runtime._load_owner_admission_generation(fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert generation["schema_version"] == (
+        RUNTIME.PREVIOUS_OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
+    )
+    assert "actor_baseline_manifest_digest" not in generation
+    assert result["status"] == "completed"
+
+
+def test_previous_v1_owner_generation_cannot_resume_before_first_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="previous-v1-generation-before-state",
+    )
+    runtime = fixture["runtime"]
+    current_generation = runtime._owner_admission_generation_from_validated
+    current_publish = runtime._publish_owner_admission_generation
+
+    def previous_generation(
+        validated: Mapping[str, Any],
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        generation = current_generation(validated, **kwargs)
+        generation["schema_version"] = (
+            RUNTIME.PREVIOUS_OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
+        )
+        generation.pop("actor_baseline_manifest_digest", None)
+        return generation
+
+    def publish_then_crash(generation: Mapping[str, Any]) -> dict[str, Any]:
+        current_publish(generation)
+        raise RUNTIME.ExternalCodexRuntimeError(
+            "fixture_controller_crash",
+            "controller stopped after previous generation publication",
+        )
+
+    monkeypatch.setattr(
+        runtime,
+        "_owner_admission_generation_from_validated",
+        previous_generation,
+    )
+    monkeypatch.setattr(runtime, "_publish_owner_admission_generation", publish_then_crash)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert exc_info.value.code == "fixture_controller_crash"
+    assert runtime._state_path(fixture["session_id"]).exists() is False
+
+    monkeypatch.setattr(
+        runtime,
+        "_owner_admission_generation_from_validated",
+        current_generation,
+    )
+    monkeypatch.setattr(runtime, "_publish_owner_admission_generation", current_publish)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as retry_exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert (
+        retry_exc_info.value.code
+        == "owner_admission_generation_upgrade_required"
+    )
+
+
 def test_unanchored_legacy_v3_requires_explicit_generation_migration(
     tmp_path: Path,
 ) -> None:

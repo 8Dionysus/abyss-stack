@@ -544,10 +544,12 @@ before `state.json` is idempotent: the exact retry reuses the recorded anchor
 timestamp and the verified unpublished actor projection without deleting it.
 The external anchor also binds the actor-baseline manifest digest, so a
 same-UID rewrite of both the projection and its session-local manifest cannot
-be adopted. If the prepared event was already appended, its complete event
-object, including the anchor-derived timestamp, becomes the initial durable
-prefix rather than being duplicated. A different identity, changed projection,
-or additional event is rejected.
+be adopted. This binding is generation-anchor v2; v1 remains readable for
+already durable sessions but cannot recover an admission interrupted before
+its first state without an explicit migration. If the prepared event was
+already appended, its complete event object, including the anchor-derived
+timestamp, becomes the initial durable prefix rather than being duplicated. A
+different identity, changed projection, or additional event is rejected.
 
 See [CONTRACT.md](CONTRACT.md), [DIRECTION.md](DIRECTION.md),
 [PROVENANCE.md](PROVENANCE.md), [SUSPENSION.md](SUSPENSION.md), and
