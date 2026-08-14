@@ -6702,6 +6702,14 @@ class ExternalCodexRuntime:
                     expected_private_git_entries=witness_private_git[
                         "private_git_entries"
                     ],
+                    semantic_workspace_root=witness_path,
+                )
+                observed_baseline_after = _checked_actor_manifest(
+                    projection_path,
+                    source_manifest_digest=str(
+                        prior_baseline["source_manifest_digest"]
+                    ),
+                    source_git_head=str(prior_baseline["source_git_head"]),
                 )
                 if any(
                     observed_baseline[key] != witness_baseline[key]
@@ -6709,7 +6717,10 @@ class ExternalCodexRuntime:
                         "content_entries",
                         "source_git_head",
                     )
-                ) or observed_private_git != witness_private_git:
+                ) or (
+                    observed_baseline_after != observed_baseline
+                    or observed_private_git != witness_private_git
+                ):
                     raise ExternalCodexRuntimeError(
                         "workspace_projection_retry_invalid",
                         "unpublished actor projection differs from independently admitted bytes",

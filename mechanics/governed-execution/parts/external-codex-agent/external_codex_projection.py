@@ -13,6 +13,7 @@ import hashlib
 import json
 import ctypes
 import errno
+import fcntl
 import os
 import stat
 import subprocess
@@ -96,12 +97,14 @@ def _git(
     *arguments: str,
     input_bytes: bytes | None = None,
     timeout: int = 120,
+    environment_overrides: Mapping[str, str] | None = None,
+    extra_pass_fds: tuple[int, ...] = (),
 ) -> bytes:
-    pass_fds: tuple[int, ...] = ()
+    pass_fds = extra_pass_fds
     workspace_parts = workspace.parts
     if len(workspace_parts) >= 5 and workspace_parts[:4] == ("/", "proc", "self", "fd"):
         try:
-            pass_fds = (int(workspace_parts[4]),)
+            pass_fds = tuple(sorted({*pass_fds, int(workspace_parts[4])}))
         except ValueError:
             pass
     try:
@@ -111,7 +114,7 @@ def _git(
             capture_output=True,
             check=False,
             timeout=timeout,
-            env=_git_environment(),
+            env=_git_environment() | dict(environment_overrides or {}),
             pass_fds=pass_fds,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -123,6 +126,80 @@ def _git(
     if len(completed.stdout) > MAX_GIT_OUTPUT_BYTES:
         raise ProjectionError("private actor Git output exceeds its runtime bound")
     return completed.stdout
+
+
+def _sealed_memfd(name: str, raw: bytes) -> int:
+    if not hasattr(os, "memfd_create") or not hasattr(os, "MFD_ALLOW_SEALING"):
+        raise ProjectionError("sealed private Git inspection is unavailable")
+    descriptor = os.memfd_create(
+        name,
+        os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING,
+    )
+    try:
+        offset = 0
+        while offset < len(raw):
+            written = os.write(descriptor, raw[offset:])
+            if written <= 0:
+                raise ProjectionError(
+                    "private Git index snapshot could not be written"
+                )
+            offset += written
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        fcntl.fcntl(
+            descriptor,
+            fcntl.F_ADD_SEALS,
+            fcntl.F_SEAL_SEAL
+            | fcntl.F_SEAL_SHRINK
+            | fcntl.F_SEAL_GROW
+            | fcntl.F_SEAL_WRITE,
+        )
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _private_git_index_semantics(
+    workspace: Path,
+    index_raw: bytes,
+) -> dict[str, str]:
+    """Interpret pinned index bytes without consulting the recovered tree."""
+
+    descriptor = _sealed_memfd("aoa-external-actor-recovery-index", index_raw)
+    try:
+        environment = {"GIT_INDEX_FILE": f"/proc/self/fd/{descriptor}"}
+        safe_git_config = (
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "core.hooksPath=/dev/null",
+        )
+        return {
+            "index_stage_sha256": sha256_bytes(
+                _git(
+                    workspace,
+                    *safe_git_config,
+                    "ls-files",
+                    "--stage",
+                    "-z",
+                    environment_overrides=environment,
+                    extra_pass_fds=(descriptor,),
+                )
+            ),
+            "index_flags_sha256": sha256_bytes(
+                _git(
+                    workspace,
+                    *safe_git_config,
+                    "ls-files",
+                    "-v",
+                    "-z",
+                    environment_overrides=environment,
+                    extra_pass_fds=(descriptor,),
+                )
+            ),
+        }
+    finally:
+        os.close(descriptor)
 
 
 def _read_regular_at(
@@ -371,8 +448,9 @@ def build_private_git_admission_manifest(
     projection_root: str | Path,
     *,
     expected_private_git_entries: list[dict[str, Any]] | None = None,
+    semantic_workspace_root: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Observe stable private-Git meaning while excluding index stat cache bytes."""
+    """Observe stable private-Git meaning without executing recovered bytes."""
 
     root = Path(projection_root)
     if not root.is_absolute() or root.is_symlink() or not root.is_dir():
@@ -403,55 +481,39 @@ def build_private_git_admission_manifest(
             raise ProjectionError(
                 "actor private Git bytes differ before semantic inspection"
             )
-        safe_git_config = (
-            "-c",
-            "core.fsmonitor=false",
-            "-c",
-            "core.hooksPath=/dev/null",
+        index_raw, _ = _read_regular_path(
+            descriptor_root / ".git" / "index",
+            label=".git/index",
         )
+        semantic_root_is_descriptor = semantic_workspace_root is None
+        semantic_root = (
+            descriptor_root
+            if semantic_root_is_descriptor
+            else Path(semantic_workspace_root)
+        )
+        if (
+            not semantic_root.is_absolute()
+            or (not semantic_root_is_descriptor and semantic_root.is_symlink())
+            or not semantic_root.is_dir()
+        ):
+            raise ProjectionError("private Git semantic workspace is unavailable")
         manifest = {
             "private_git_entries": private_entries,
-            "index_stage_sha256": sha256_bytes(
-                _git(
-                    descriptor_root,
-                    *safe_git_config,
-                    "ls-files",
-                    "--stage",
-                    "-z",
-                )
-            ),
-            "index_flags_sha256": sha256_bytes(
-                _git(
-                    descriptor_root,
-                    *safe_git_config,
-                    "ls-files",
-                    "-v",
-                    "-z",
-                )
-            ),
-            "status_sha256": sha256_bytes(
-                _git(
-                    descriptor_root,
-                    *safe_git_config,
-                    "status",
-                    "--porcelain=v1",
-                    "-z",
-                    "--untracked-files=all",
-                )
-            ),
-            "diff_sha256": sha256_bytes(
-                _git(
-                    descriptor_root,
-                    *safe_git_config,
-                    "diff",
-                    "--no-ext-diff",
-                    "--no-textconv",
-                    "--binary",
-                    "HEAD",
-                    "--",
-                )
-            ),
+            **_private_git_index_semantics(semantic_root, index_raw),
         }
+        private_entries_after = [
+            entry
+            for entry in _inventory(
+                descriptor_root / ".git",
+                include_git=True,
+                descriptor_root=True,
+            )
+            if entry["path"] != "index"
+        ]
+        if private_entries_after != private_entries:
+            raise ProjectionError(
+                "actor private Git bytes changed during semantic inspection"
+            )
         after = root.stat(follow_symlinks=False)
         if not _same_inode(observed, after):
             raise ProjectionError("actor projection coordinate changed")

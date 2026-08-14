@@ -6364,6 +6364,102 @@ def test_owner_admission_retry_rejects_projection_and_baseline_coordinated_rewri
     assert fsmonitor_marker.exists() is False
 
 
+def test_owner_admission_retry_never_executes_racing_recovered_git_filter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="racing-recovered-git-filter",
+    )
+    runtime = fixture["runtime"]
+    monkeypatch.setattr(
+        runtime,
+        "_save_state",
+        lambda state: (_ for _ in ()).throw(
+            RUNTIME.ExternalCodexRuntimeError(
+                "fixture_controller_crash",
+                "controller stopped after generation and event publication",
+            )
+        ),
+    )
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert exc_info.value.code == "fixture_controller_crash"
+
+    monkeypatch.undo()
+    projection = runtime._session_dir(fixture["session_id"]) / "actor-workspace"
+    filter_marker = tmp_path / "racing-clean-filter-ran"
+    filter_helper = tmp_path / "racing-clean-filter"
+    filter_helper.write_text(
+        "#!/bin/sh\n/usr/bin/touch "
+        + shlex.quote(str(filter_marker))
+        + "\n/bin/cat\n",
+        encoding="utf-8",
+    )
+    filter_helper.chmod(0o700)
+
+    projection_module = sys.modules[
+        RUNTIME.build_private_git_admission_manifest.__module__
+    ]
+    original_inventory = projection_module._inventory
+    original_private_git_manifest = RUNTIME.build_private_git_admission_manifest
+    race_armed = False
+    race_completed = False
+
+    def racing_inventory(root: Path, **kwargs: Any) -> list[dict[str, Any]]:
+        nonlocal race_completed
+        entries = original_inventory(root, **kwargs)
+        try:
+            observed_root = Path(root).resolve()
+        except OSError:
+            return entries
+        if (
+            race_armed
+            and not race_completed
+            and observed_root == (projection / ".git").resolve()
+        ):
+            race_completed = True
+            with (projection / ".git" / "config").open(
+                "a", encoding="utf-8"
+            ) as handle:
+                handle.write(
+                    "[filter \"race\"]\n"
+                    f"\tclean = {filter_helper}\n"
+                    "\trequired = true\n"
+                )
+            (projection / ".gitattributes").write_text(
+                "README.md filter=race\n",
+                encoding="utf-8",
+            )
+        return entries
+
+    def arm_race(
+        projection_root: str | Path,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        nonlocal race_armed
+        if Path(projection_root) == projection:
+            race_armed = True
+        return original_private_git_manifest(projection_root, **kwargs)
+
+    monkeypatch.setattr(projection_module, "_inventory", racing_inventory)
+    monkeypatch.setattr(RUNTIME, "build_private_git_admission_manifest", arm_race)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as retry_exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert retry_exc_info.value.code == "workspace_projection_retry_invalid"
+    assert race_completed is True
+    assert filter_marker.exists() is False
+
+
 def test_owner_admission_retry_rejects_rewritten_prepared_event_timestamp(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

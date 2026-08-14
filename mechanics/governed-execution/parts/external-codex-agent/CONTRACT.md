@@ -226,9 +226,14 @@ Before launch the controller verifies:
     its pinned inode before recovery continues. New admissions therefore
     publish a v2 anchor. A v1 anchor remains readable and an exact attempt-free
     v1 admission may use the independent witness path without pretending to be
-    v2 or replacing its anchor. Before any recovered private-Git command runs,
-    all non-index Git bytes must match the safe witness; hooks and fsmonitor are
-    also explicitly disabled. Any mismatch fails closed.
+    v2 or replacing its anchor. No Git command runs against the mutable
+    recovered projection. All non-index Git bytes must match the safe witness,
+    the recovered index is copied from a pinned descriptor into a sealed memfd,
+    and only its stage/flag meaning is interpreted against the fresh witness
+    with hooks and fsmonitor disabled. The recovered content and private Git
+    body are inventoried again after that inspection. Any mismatch fails closed
+    without executing a concurrently introduced repository config, attribute,
+    hook, fsmonitor, or filter.
     The same binding is checked after first-state publication: every durable
     v2 state must retain the anchor-bound baseline reference and bytes. If the
     state is still `prepared` with no attempt, the independent source/seed
