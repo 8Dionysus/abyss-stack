@@ -689,7 +689,10 @@ If the worker exits after atomically replacing the canonical terminal
 `result.json` but before the final state rewrite, worker-death observation first
 attempts a locked semantic recovery. Recovery requires the current attempt
 count, session/model/task/thread identities, terminal status, complete event
-digest, invocation identities, and every evidence digest to remain exact. A
+digest, invocation identities, and every evidence digest to remain exact. For
+an owner-contour session it also recomputes the stable owner-request reference
+from the admitted request bytes and requires the separate path-addressable
+snapshot to remain in result evidence. A
 prior result deliberately left at the canonical path during resume has a lower
 attempt count and is not mistaken for the current terminal commit. Only when no
 current recoverable result exists does unexpected worker death produce its own
@@ -698,8 +701,9 @@ typed failure receipt.
 Every terminal closeout copies the exact `result.json` bytes into its attempt
 directory and snapshots every unique artifact named by that result before any
 later resume can change a session-wide evidence surface. Before admitting a
-resume, the controller validates the current terminal result and this preserved
-closure. A schema-validated closure receipt binds each
+resume, the controller rebinds its stable owner-request identity and immutable
+snapshot to durable admission state, then validates the current terminal result
+and this preserved closure. A schema-validated closure receipt binds each
 original coordinate and digest to its immutable snapshot; later event appends
 or final-manifest replacement therefore cannot make the prior result
 unverifiable. Both the exact result and closure receipt enter the

@@ -5719,6 +5719,52 @@ def test_owner_contour_admits_exact_role_first_request_and_runs_separate_process
     assert result["usage"]["input_tokens"] == 120
 
 
+def test_owner_result_binding_rejects_stable_request_identity_substitution(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path)
+    runtime = fixture["runtime"]
+    owner_request_path = tmp_path / "durable-owner-execution-request.json"
+    _write_json(
+        owner_request_path,
+        {"request_ref": "external-execution-request:fixture:original"},
+    )
+    owner_digest = _digest_path(owner_request_path)
+    state = {
+        "materialized_inputs": {
+            "owner_execution_request": str(owner_request_path),
+        },
+        "owner_admission_digest": owner_digest,
+    }
+    evidence_ref = RUNTIME._artifact_ref(owner_request_path, owner="aoa-agents")
+    result = {
+        "owner_admission_ref": {
+            "owner_repo": "aoa-agents",
+            "artifact_ref": "external-execution-request:fixture:original",
+            "artifact_digest": owner_digest,
+        },
+        "evidence_refs": [evidence_ref],
+    }
+    runtime._validate_owner_admission_result_binding_locked(
+        state,
+        result,
+        failure_code="fixture_owner_binding_mismatch",
+        label="fixture result",
+    )
+
+    result["owner_admission_ref"]["artifact_ref"] = (
+        "external-execution-request:fixture:substituted"
+    )
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime._validate_owner_admission_result_binding_locked(
+            state,
+            result,
+            failure_code="fixture_owner_binding_mismatch",
+            label="fixture result",
+        )
+    assert exc_info.value.code == "fixture_owner_binding_mismatch"
+
+
 @pytest.mark.skipif(
     not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
     or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file(),
@@ -10903,6 +10949,72 @@ def test_terminal_result_recovers_when_final_state_save_is_lost(
     assert persisted["result_digest"] == _digest_path(
         runtime._session_dir(fixture["session_id"]) / "result.json"
     )
+
+
+def test_terminal_result_recovery_rejects_owner_identity_substitution(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path)
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    _wait_terminal(runtime, fixture["session_id"])
+
+    state = runtime._load_state(fixture["session_id"])
+    result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result["owner_admission_ref"] = dict(result["report_ref"])
+    _write_json(result_path, result)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime._recover_terminal_result_locked(state)
+    assert exc_info.value.code == "runtime_terminal_result_recovery_mismatch"
+
+
+def test_resume_rejects_preserved_owner_identity_substitution(tmp_path: Path) -> None:
+    fixture = _fixture(tmp_path, objective_marker="FAKE_WAIT_FOR_INTERRUPT")
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    deadline = time.monotonic() + 10
+    running: dict[str, Any] | None = None
+    while time.monotonic() < deadline:
+        running = runtime.status(fixture["session_id"])
+        if running["thread_id"] and running["codex_pid"]:
+            break
+        time.sleep(0.05)
+    assert running is not None and running["thread_id"]
+    interrupted = runtime.interrupt(fixture["session_id"])
+
+    session_dir = runtime._session_dir(fixture["session_id"])
+    result_path = session_dir / "result.json"
+    preserved_path = session_dir / "attempts/001/runtime-result.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result["owner_admission_ref"] = dict(result["report_ref"])
+    _write_json(result_path, result)
+    preserved_path.chmod(0o600)
+    _write_json(preserved_path, result)
+    preserved_path.chmod(0o400)
+    preserved_path.with_name("runtime-result-evidence-closure.json").unlink()
+
+    state = runtime._load_state(fixture["session_id"])
+    state["result_digest"] = _digest_path(result_path)
+    runtime._save_state(state)
+    resume_path = tmp_path / "owner-identity-substitution-resume.json"
+    _write_json(
+        resume_path,
+        {
+            "schema_version": "abyss_stack_external_codex_resume_v1",
+            "session_id": fixture["session_id"],
+            "thread_id": interrupted["thread_id"],
+            "after_event_sequence": interrupted["last_event_sequence"],
+            "reason": "process_death_recovery",
+            "instruction": "Resume the exact bounded fixture.",
+            "previous_result_digest": state["result_digest"],
+        },
+    )
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.resume(fixture["session_id"], resume_path)
+    assert exc_info.value.code == "runtime_result_evidence_closure_drift"
 
 
 @pytest.mark.parametrize(

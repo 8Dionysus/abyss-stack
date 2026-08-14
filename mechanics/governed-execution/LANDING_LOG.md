@@ -6,7 +6,10 @@ Separated the cross-owner identity of an admitted `aoa-agents` execution
 request from the runtime-private path of its immutable materialized copy. The
 terminal result now returns the stable `request_ref` plus exact admitted byte
 digest in `owner_admission_ref`, while `evidence_refs` retains the verified
-local snapshot needed for recovery and continuation closure.
+local snapshot needed for recovery and continuation closure. Result reads,
+lost-final-save recovery, and exact-thread continuation independently rebind
+the stable identity and snapshot to durable admission state; neither may be
+substituted while retaining the other.
 
 The complete external-Codex deterministic suite passed. This is an ABI repair,
 not new role, model-fit, owner-acceptance, publication, or external-effect

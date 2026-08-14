@@ -9697,6 +9697,31 @@ class ExternalCodexRuntime:
             )
         return reference
 
+    def _validate_owner_admission_result_binding_locked(
+        self,
+        state: Mapping[str, Any],
+        result: Mapping[str, Any],
+        *,
+        failure_code: str,
+        label: str,
+    ) -> None:
+        """Rebind a result to both identities of its admitted owner request."""
+
+        expected_owner_ref = self._owner_admission_ref(state)
+        if result.get("owner_admission_ref") != expected_owner_ref:
+            raise ExternalCodexRuntimeError(
+                failure_code,
+                f"{label} changed the admitted owner request identity",
+            )
+        expected_evidence_ref = self._owner_admission_evidence_ref(state)
+        if expected_evidence_ref is not None and expected_evidence_ref not in result.get(
+            "evidence_refs", []
+        ):
+            raise ExternalCodexRuntimeError(
+                failure_code,
+                f"{label} does not retain the admitted owner request snapshot",
+            )
+
     def _attempt_has_completed_usage_event(
         self,
         state: Mapping[str, Any],
@@ -12262,6 +12287,13 @@ Runtime session identity: {state["session_id"]}
                 "terminal result changed the durable Codex thread identity",
             )
 
+        self._validate_owner_admission_result_binding_locked(
+            state,
+            result,
+            failure_code="runtime_terminal_result_recovery_mismatch",
+            label="recoverable terminal result",
+        )
+
         expected_events_path = self._events_path(session_id)
         events_ref = result["events_ref"]
         if (
@@ -12476,6 +12508,12 @@ Runtime session identity: {state["session_id"]}
                 )
             result = load_json(result_file, label="runtime result")
             validate_json(result, RESULT_SCHEMA_PATH, label="runtime result")
+            self._validate_owner_admission_result_binding_locked(
+                state,
+                result,
+                failure_code="runtime_result_identity_mismatch",
+                label="runtime result",
+            )
             return result
 
     def resume(self, session_id: str, resume_path: str | Path) -> dict[str, Any]:
@@ -12542,6 +12580,12 @@ Runtime session identity: {state["session_id"]}
             validate_json(
                 previous_result,
                 RESULT_SCHEMA_PATH,
+                label="prior runtime result",
+            )
+            self._validate_owner_admission_result_binding_locked(
+                state,
+                previous_result,
+                failure_code="runtime_result_evidence_closure_drift",
                 label="prior runtime result",
             )
             if (
