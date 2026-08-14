@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 21460935,
+  "allowed_tracked_bytes": 34919604,
+  "approved_by": "repository-owner",
+  "base_ref": "0a9ca55318c378931b4f68b9621adc9f11b6039e",
+  "changed_generated_bytes": 21460935,
+  "changed_generated_files": 222,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "f7b09c29e4119e45a6a3e6e82adb0f03898cf146d406bc899aefa128b427c838",
+  "reason": "Refresh the exact owner-local KAG family after separating the stable aoa-agents request identity from its runtime-private immutable evidence snapshot.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34919604,
+  "tracked_bytes_max": 24117248
+}
