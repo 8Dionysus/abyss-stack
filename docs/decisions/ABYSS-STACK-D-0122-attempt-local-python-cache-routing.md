@@ -23,7 +23,9 @@ not receive that environment. `PYTHONDONTWRITEBYTECODE` also does not constrain
 explicit `py_compile`, so a fixed validation turn can leave bytecode or pytest
 cache paths in the projection and make an otherwise bounded return
 authority-blocked. Resuming the same thread must not reuse the prior attempt's
-scratch coordinate.
+scratch coordinate. The earlier repair also decoded an entire matching text
+layer while removing source aliases, which could rewrite unrelated literal
+backslash, newline, slash, and nested-escape bytes in immutable evidence.
 
 ## Options considered
 
@@ -35,15 +37,27 @@ scratch coordinate.
   coordinate and inject it through the Codex shell environment policy. This
   keeps validation argv unchanged while placing all implicit imports, explicit
   compile output, and pytest cache controls outside the projection.
+- Decode an entire immutable text layer before replacement. This can remove a
+  source alias, but it silently normalizes unrelated source bytes and weakens
+  the evidence-byte boundary.
 
 ## Decision
 
-For every admitted external Codex attempt, the runtime derives a
-`PYTHONPYCACHEPREFIX` under the distinct attempt-local scratch directory and
-injects it, `PYTHONDONTWRITEBYTECODE=1`, `PYTHONNOUSERSITE=1`, and
+Admission preflight uses the shared stable Codex environment without attempt
+Python hygiene, so `state_root` is never treated as an attempt scratch
+coordinate and never receives a `PYTHONPYCACHEPREFIX`. For every real admitted
+start or resume attempt, the runtime derives a `PYTHONPYCACHEPREFIX` under the
+distinct attempt-local scratch directory and injects it,
+`PYTHONDONTWRITEBYTECODE=1`, `PYTHONNOUSERSITE=1`, and
 `PYTEST_ADDOPTS=-p no:cacheprovider` into both the process environment and the
 validated Codex shell environment map. The runtime owns the coordinate; task
 text, model commands, and owner-signed validation argv do not select it.
+
+For actor-safe UTF-8 text, the runtime decodes bounded JSON escape layers only
+to locate aliases, maps each match back to its original source span, and
+replaces those spans in the original text. Literal, Unicode-escaped,
+slash-escaped, mixed, and nested aliases are removed without normalizing
+unrelated bytes.
 
 ## Rationale
 
@@ -62,9 +76,12 @@ without widening workspace authority.
   are contained outside the actor projection for every admitted profile.
 - Positive: fixed validation argv and command IDs remain unchanged and
   independently auditable.
-- Tradeoff: each attempt owns a small runtime scratch cache that must be
+- Tradeoff: each real attempt owns a small runtime scratch cache that must be
   retained long enough for final observation and cleanup by the surrounding
-  lifecycle.
+  lifecycle; preflight remains intentionally cache-neutral.
+- Positive: immutable text evidence preserves all bytes outside exact source
+  replacement spans, including literal backslash/newline and nested escape
+  spellings.
 - Follow-up: independent review must inspect the exact source diff and focused
   lifecycle tests before any release, activation, or blocked-duty reproof.
 
@@ -79,6 +96,7 @@ without widening workspace authority.
 ## Follow-up route
 
 The external Codex owner reviewer should verify the focused lifecycle evidence,
-then route the proposed repair to the goal master for review filtering. Source
+including the preflight/attempt boundary and byte-preserving redaction, then
+route the proposed repair to the goal master for review filtering. Source
 landing, artifact trust admission, activation, and blocked-duty reproof remain
 separate owner decisions.

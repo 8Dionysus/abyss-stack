@@ -23,10 +23,14 @@ leaving role selection and domain meaning upstream; it does not fork the
 runtime into task-owned launchers. Landing now supplies its first actual
 specialized validation environment from the same verified release: exact
 pytest and `aoa_sdk` bytes, cache-free validation, and a pinned read-only
-`aoa-stats` owner snapshot. The runtime also applies attempt-local Python cache
-routing to every admitted profile, including structured owner-duty writers;
-this repairs explicit-compile and generic-profile residue without weakening
-the isolated session or growing a general-purpose host allowlist.
+`aoa-stats` owner snapshot. The runtime applies attempt-local Python cache
+routing to every real start/resume attempt, including structured owner-duty
+writers; admission preflight remains a stable non-attempt environment and does
+not receive a state-root cache prefix. This repairs explicit-compile and
+generic-profile residue without weakening the isolated session or growing a
+general-purpose host allowlist. Actor-safe UTF-8 text redaction maps literal and
+nested escaped source aliases back to exact replacement spans so unrelated
+escape bytes are preserved.
 
 ## Proof sequence
 

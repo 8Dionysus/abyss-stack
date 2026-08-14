@@ -333,6 +333,12 @@ once during admission; workspaces beneath Codex's built-in minimal-read system
 roots are rejected, and the controller-original directory is explicitly denied
 to the child permission profile.
 
+UTF-8 text redaction uses decoded layers only as matching views. Each matched
+literal or escaped alias is mapped back to its exact original character span
+before replacement, so unrelated bytes—including literal backslash escapes,
+newlines, and slash spellings—remain unchanged. The same bounded mapping covers
+literal, Unicode-escaped, slash-escaped, mixed, and nested source aliases.
+
 The projection receives sanitized actor-local Git configuration, network remains
 disabled, and the attempt-local scratch area is separate. The worker opens the
 projection with `O_PATH|O_DIRECTORY|O_NOFOLLOW`, inventories the open inode,
@@ -403,8 +409,10 @@ generic posture for its effect class: the read alias is `read_only` with
 `repo_mutation` effects. Both landing aliases additionally bind the same
 model-neutral `landing-validation-v1` environment. Its pytest distributions,
 packaged `aoa_sdk`, and clean tracked `aoa-stats` snapshot are files inside the
-verified content-addressed release. Every admitted external Codex attempt,
-including generic structured owner-duty writers, receives a runtime-generated
+verified content-addressed release. Admission preflight is a stable probe
+environment and does not receive attempt-local Python cache routing through the
+state root. Every real start or resume attempt, including generic structured
+owner-duty writers, receives a runtime-generated
 `PYTHONPYCACHEPREFIX` beneath its distinct attempt-local scratch directory,
 outside the actor projection. The same runtime-owned shell map supplies
 `PYTHONNOUSERSITE=1`, bytecode suppression, and pytest cache-provider
