@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 24724981,
+  "allowed_tracked_bytes": 35186302,
+  "approved_by": "repository-owner",
+  "base_ref": "76076b530d3798e53ab1b7e764e4433822aa8258",
+  "changed_generated_bytes": 24724981,
+  "changed_generated_files": 261,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "b9121d5c6457ad6018d97372a0a218a053891eee9545cf618e7809dbe38c46f5",
+  "reason": "Refresh the exact CI-pinned portable family after enabling the real Codex 0.147 modern MCP client for role-scoped actors and changing the credential relay to reject legacy traffic instead of relabeling it, without raising standing budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35186302,
+  "tracked_bytes_max": 24117248
+}
