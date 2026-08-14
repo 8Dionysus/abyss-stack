@@ -26,6 +26,12 @@ Tracking starts with the community-docs baseline for this repository.
   validation argv and `validation_command_id` receipts. Resumed attempts use
   distinct scratch coordinates and leave no Python or pytest residue in the
   actor final manifest.
+- Qualify nested external-Codex validation evidence by the producer result's
+  exact terminal model-report attempt, requiring its number to equal
+  result.attempt_count, record that attempt identity in the namespace, and fail
+  closed on absent, mismatched, or duplicate successful observations within
+  that attempt. Reordered observations from resumed attempts no longer select
+  a receipt by array position or global uniqueness.
 - Return an admitted external actor's stable `aoa-agents` owner-request
   identity in `owner_admission_ref` while retaining the runtime-private
   immutable request snapshot as separate path-addressable evidence. This lets

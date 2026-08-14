@@ -243,6 +243,7 @@
             "kind": {"const": "producer-validation-observation-exact"},
             "validation_command_id": {"type": "string", "minLength": 1},
             "producer_result_input_id": {"$ref": "#/$defs/inputId"},
+            "producer_attempt_id": {"type": "string", "minLength": 1},
             "observed_status": {"const": "passed"}
           }
         }

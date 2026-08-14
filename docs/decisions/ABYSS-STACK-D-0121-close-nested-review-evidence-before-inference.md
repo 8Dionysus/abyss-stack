@@ -99,9 +99,15 @@ are validated against the producer final manifest and exact producer
 projection, not the current reviewer workspace; the namespace carries the
 bounded anchored excerpt and its digest. Runtime output refs require both a
 final-manifest entry and an actor-delta edge to one admitted output. Validation
-refs require one exact successful observation in the producer result. Other
-valid final-manifest line, top-level-member, and content-entry anchors bind the
-exact historical manifest value rather than being misclassified as outputs.
+refs require one exact successful observation in the producer result's terminal
+model-report attempt, whose number must equal `result.attempt_count`.
+Reordered observations from resumed attempts do not affect selection; missing,
+mismatched, or multiply successful observations inside that terminal attempt
+remain fail-closed. The namespace records the selected producer attempt ID so
+an independent reviewer can inspect the qualification without relying on array
+order. Other valid final-manifest line,
+top-level-member, and content-entry anchors bind the exact historical manifest
+value rather than being misclassified as outputs.
 
 The controller writes one content-addressed, read-only
 `nested-evidence-namespace` derivative before inference. A reviewer may cite a
@@ -144,6 +150,9 @@ runtime can already prove incomplete.
 - Positive: same-name collisions, source drift, missing historical paths,
   output-manifest gaps, and validation-receipt gaps become typed pre-inference
   failures rather than ambiguous reviewer prose.
+- Positive: repeated fixed validations across writer resume attempts resolve
+  only through the exact terminal report attempt, with the selected attempt
+  identity carried in the namespace receipt.
 - Positive: the namespace is reusable across combined reviewers and preserves
   an exact serial/model-only rollback without introducing alias trust.
 - Tradeoff: reviewer packets that want deterministic transitive closure must

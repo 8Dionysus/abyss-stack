@@ -46,6 +46,9 @@ MAX_NAMESPACE_BYTES = 4 * 1024 * 1024
 LINE_ANCHOR_RE = re.compile(
     r"L(?P<start>[1-9][0-9]*)(?:-L(?P<end>[1-9][0-9]*))?"
 )
+TERMINAL_REPORT_PATH_RE = re.compile(
+    r"^attempts/(?P<number>[0-9]+)/model-report\.json$"
+)
 SECRET_PATH_PARTS = {
     ".aws",
     ".docker",
@@ -108,6 +111,7 @@ class _Producer:
     final_manifest_raw: bytes
     final_manifest_raw_digest: str
     workspace: Path
+    terminal_attempt_id: str
 
     @property
     def task_id(self) -> str:
@@ -303,6 +307,38 @@ def _safe_result_final_manifest(
     return final_manifest, final_raw, str(final_ref["artifact_digest"]), projection
 
 
+def _terminal_attempt_id(result: _Record, report_path: Path) -> str:
+    """Derive the terminal attempt from the result-bound model report path."""
+
+    projection = _producer_projection(result)
+    try:
+        relative = report_path.relative_to(projection.parent).as_posix()
+    except ValueError as exc:
+        raise NestedEvidenceNamespaceError(
+            "producer report does not bind a terminal attempt"
+        ) from exc
+    match = TERMINAL_REPORT_PATH_RE.fullmatch(relative)
+    if match is None:
+        raise NestedEvidenceNamespaceError(
+            "producer report does not bind a terminal attempt"
+        )
+    attempt_number = int(match.group("number"))
+    session_id = result.payload.get("session_id")
+    attempt_count = result.payload.get("attempt_count")
+    if (
+        not isinstance(session_id, str)
+        or not session_id
+        or attempt_number < 1
+        or isinstance(attempt_count, bool)
+        or not isinstance(attempt_count, int)
+        or attempt_number != attempt_count
+    ):
+        raise NestedEvidenceNamespaceError(
+            "producer report terminal attempt identity is not result-bound"
+        )
+    return f"{session_id}:attempt:{attempt_number}"
+
+
 def _producers(records: Sequence[_Record]) -> list[_Producer]:
     tasks = [
         record
@@ -366,7 +402,7 @@ def _producers(records: Sequence[_Record]) -> list[_Producer]:
             raise NestedEvidenceNamespaceError(
                 "producer task input is not its result-bound bytes"
             )
-        _, report_raw = _verified_result_artifact(
+        report_path, report_raw = _verified_result_artifact(
             result,
             report_ref,
             label="producer report",
@@ -398,6 +434,7 @@ def _producers(records: Sequence[_Record]) -> list[_Producer]:
         final_manifest, final_raw, final_digest, projection = (
             _safe_result_final_manifest(result)
         )
+        terminal_attempt_id = _terminal_attempt_id(result, report_path)
         if _sha256_bytes(_canonical_bytes(final_manifest)) != delta.payload.get(
             "final_manifest_digest"
         ):
@@ -433,6 +470,7 @@ def _producers(records: Sequence[_Record]) -> list[_Producer]:
                 final_manifest_raw=final_raw,
                 final_manifest_raw_digest=final_digest,
                 workspace=projection,
+                terminal_attempt_id=terminal_attempt_id,
             )
         )
     return sorted(
@@ -704,6 +742,28 @@ def _manifest_anchor_resolution(
     }
 
 
+def _select_validation_observation(
+    result_payload: Mapping[str, Any],
+    terminal_attempt_id: str,
+    command_id: str,
+) -> dict[str, Any]:
+    observations = [
+        item
+        for item in result_payload.get("executed_commands", [])
+        if isinstance(item, dict)
+        and item.get("attempt_id") == terminal_attempt_id
+        and item.get("validation_command_id") == command_id
+        and item.get("status") == "completed"
+        and item.get("exit_code") == 0
+    ]
+    if len(observations) != 1:
+        raise NestedEvidenceNamespaceError(
+            f"producer validation {command_id} has {len(observations)} exact "
+            f"observations in terminal attempt {terminal_attempt_id}"
+        )
+    return observations[0]
+
+
 def _resolve_runtime(
     producer: _Producer,
     records: Sequence[_Record],
@@ -714,22 +774,16 @@ def _resolve_runtime(
         if anchor:
             raise NestedEvidenceNamespaceError("nested validation ref carries an anchor")
         command_id = runtime_id.removeprefix("validation:")
-        observations = [
-            item
-            for item in producer.result.payload.get("executed_commands", [])
-            if isinstance(item, dict)
-            and item.get("validation_command_id") == command_id
-            and item.get("status") == "completed"
-            and item.get("exit_code") == 0
-        ]
-        if len(observations) != 1:
-            raise NestedEvidenceNamespaceError(
-                f"producer validation {command_id} has {len(observations)} exact observations"
-            )
+        _select_validation_observation(
+            producer.result.payload,
+            producer.terminal_attempt_id,
+            command_id,
+        )
         return {
             "kind": "producer-validation-observation-exact",
             "validation_command_id": command_id,
             "producer_result_input_id": producer.result.input_id,
+            "producer_attempt_id": producer.terminal_attempt_id,
             "observed_status": "passed",
         }
     if runtime_id != "workspace-final-manifest":

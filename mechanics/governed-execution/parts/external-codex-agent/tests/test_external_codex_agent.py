@@ -8062,6 +8062,20 @@ def test_nested_evidence_namespace_closes_exact_producer_graph(
     assert namespace["summary"]["immutable_exact"] >= 1
     assert namespace["summary"]["source_exact"] >= 1
     assert namespace["summary"]["same_name_digest_collisions"] >= 1
+    entries = [
+        entry
+        for producer in namespace["producers"]
+        for entry in producer["entries"]
+    ]
+    validation_entries = [
+        entry
+        for entry in entries
+        if entry["original_ref"].startswith("runtime:validation:")
+    ]
+    assert validation_entries
+    assert validation_entries[0]["resolution"]["producer_attempt_id"] == (
+        f"{result['session_id']}:attempt:1"
+    )
     assert namespace["namespace_digest"] == (
         RUNTIME.nested_evidence_namespace_digest(namespace)
     )
@@ -8070,11 +8084,6 @@ def test_nested_evidence_namespace_closes_exact_producer_graph(
         RUNTIME.NESTED_EVIDENCE_NAMESPACE_SCHEMA_PATH,
         label="test nested evidence namespace",
     )
-    entries = [
-        entry
-        for producer in namespace["producers"]
-        for entry in producer["entries"]
-    ]
     immutable_entry = next(
         entry
         for entry in entries
