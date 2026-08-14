@@ -187,6 +187,11 @@ Before launch the controller verifies:
     A legacy v3 receipt is accepted only when its materialized launch lacks
     that mode and the request's semantic self-digest plus `runtime_launch_ref`
     still bind the same launch. Any mixed state/launch generation fails closed.
+    The marker is mandatory for a new owner-contour admission. A markerless
+    launch may pass preflight or start only when an existing durable v3 session
+    has the same launch digest, owner-admission digest, materialized request,
+    and legacy generation. This permits recovery from a crash after durable
+    `prepared` state but before attempt one without reopening legacy admission.
 
 The two request-shaped objects are intentionally not collapsed. The
 `AgentIncarnationBinding.task_request_ref` is the canonical schema-valid SDK

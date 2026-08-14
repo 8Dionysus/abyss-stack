@@ -7581,15 +7581,6 @@ class ExternalCodexRuntime:
             )
         validate_json(launch, LAUNCH_SCHEMA_PATH, label="external Codex launch")
         if (
-            launch["admission_class"] == "owner_contour"
-            and launch.get("owner_admission_identity_mode")
-            != STABLE_OWNER_ADMISSION_IDENTITY_MODE
-        ):
-            raise ExternalCodexRuntimeError(
-                "owner_admission_identity_mode_required",
-                "new owner-contour launches require stable request identity binding",
-            )
-        if (
             launch["admission_class"] == "transport_study_fixture"
             and owner_request_path is not None
         ):
@@ -8121,6 +8112,62 @@ class ExternalCodexRuntime:
             "review_seed": review_seed,
         }
 
+    def _validate_owner_launch_identity_generation(
+        self,
+        validated: Mapping[str, Any],
+        state: Mapping[str, Any] | None,
+    ) -> None:
+        """Admit current launches or an exact already-durable legacy session."""
+
+        launch = validated["launch"]
+        if launch["admission_class"] != "owner_contour":
+            return
+        mode = launch.get("owner_admission_identity_mode")
+        if state is None:
+            if mode != STABLE_OWNER_ADMISSION_IDENTITY_MODE:
+                raise ExternalCodexRuntimeError(
+                    "owner_admission_identity_mode_required",
+                    "new owner-contour launches require stable request identity binding",
+                )
+            return
+        if state.get("launch_digest") != validated["launch_digest"]:
+            raise ExternalCodexRuntimeError(
+                "session_binding_conflict",
+                "session already exists with another launch binding",
+            )
+        owner_admission = validated.get("owner_admission")
+        if (
+            not isinstance(owner_admission, Mapping)
+            or state.get("owner_admission_digest")
+            != owner_admission.get("request_digest")
+        ):
+            raise ExternalCodexRuntimeError(
+                "session_binding_conflict",
+                "session already exists with another owner admission binding",
+            )
+        owner_request_path = state.get("materialized_inputs", {}).get(
+            "owner_execution_request"
+        )
+        if not isinstance(owner_request_path, str):
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "existing owner-contour state has no materialized owner request",
+            )
+        durable_mode = self._owner_admission_identity_mode(
+            state,
+            read_bounded(Path(owner_request_path)),
+        )
+        expected_mode = (
+            STABLE_OWNER_ADMISSION_IDENTITY_MODE
+            if mode == STABLE_OWNER_ADMISSION_IDENTITY_MODE
+            else "legacy_materialized_path_v1"
+        )
+        if durable_mode != expected_mode:
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "incoming launch generation differs from durable owner admission",
+            )
+
     def _review_seed_envelope_locked(
         self,
         state: Mapping[str, Any],
@@ -8357,6 +8404,15 @@ class ExternalCodexRuntime:
                 Path(owner_request_path) if owner_request_path is not None else None
             ),
         )
+        session_id = str(validated["launch"]["session_id"])
+        if self._state_path(session_id).is_file():
+            with self._lock(session_id):
+                self._validate_owner_launch_identity_generation(
+                    validated,
+                    self._load_state(session_id),
+                )
+        else:
+            self._validate_owner_launch_identity_generation(validated, None)
         binding: IncarnationBinding = validated["binding"]
         return {
             "admitted": True,
@@ -8396,6 +8452,7 @@ class ExternalCodexRuntime:
             state_path = self._state_path(session_id)
             if state_path.is_file():
                 state = self._load_state(session_id)
+                self._validate_owner_launch_identity_generation(validated, state)
                 if state.get("launch_digest") != validated["launch_digest"]:
                     raise ExternalCodexRuntimeError(
                         "session_binding_conflict",
@@ -8418,6 +8475,7 @@ class ExternalCodexRuntime:
                         )
                     self._spawn_worker(state, mode="start", resume_payload=None)
                 return self._public_state(state)
+            self._validate_owner_launch_identity_generation(validated, None)
             inputs_dir = session_dir / "inputs"
             materialized: dict[str, str] = {}
             for key, (_, raw, _) in validated["coordinates"].items():

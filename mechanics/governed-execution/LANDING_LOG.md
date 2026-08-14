@@ -25,7 +25,10 @@ request binds the exact launch digest. A genuine legacy v3 launch has no such
 mode. Result reads therefore require state version, materialized launch bytes,
 the owner request semantic self-digest, and its runtime-launch ref to agree.
 This keeps prior sessions usable across a runtime activation without weakening
-new-session identity closure.
+new-session identity closure. The current marker is required at new admission;
+an exact markerless launch is admitted only when it matches an already durable
+v3 owner state and owner-request digest. This also preserves a pre-upgrade
+session that crashed after `prepared` but before its first worker attempt.
 
 The complete external-Codex deterministic suite passed. This is an ABI repair,
 not new role, model-fit, owner-acceptance, publication, or external-effect

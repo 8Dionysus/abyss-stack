@@ -2300,10 +2300,14 @@ def _wait_terminal(
     raise AssertionError(f"external Codex fixture did not stop: {state}")
 
 
-def _rewrite_owner_receipt_as_legacy_v3(
-    runtime: Any, session_id: str, *, source_launch_path: Path
-) -> dict[str, Any]:
-    """Reproduce the exact owner-ref representation emitted by runtime state v3."""
+def _rewrite_owner_state_as_legacy_v3(
+    runtime: Any,
+    session_id: str,
+    *,
+    source_launch_path: Path,
+    source_owner_request_path: Path,
+) -> tuple[dict[str, Any], Path, dict[str, str]]:
+    """Reproduce the launch/request generation of a durable runtime state v3."""
 
     state = runtime._load_state(session_id)
     session_dir = runtime._session_dir(session_id)
@@ -2325,9 +2329,34 @@ def _rewrite_owner_receipt_as_legacy_v3(
     owner_request_path.chmod(0o600)
     _write_json(owner_request_path, owner_request)
     owner_request_path.chmod(0o400)
+    _write_json(source_owner_request_path, owner_request)
     owner_evidence_ref = RUNTIME._artifact_ref(
         owner_request_path,
         owner="aoa-agents",
+    )
+    state["schema_version"] = RUNTIME.LEGACY_STATE_V3_SCHEMA_VERSION
+    state["launch_digest"] = launch_digest
+    state["owner_admission_digest"] = owner_evidence_ref["artifact_digest"]
+    runtime._save_state(state)
+    return state, owner_request_path, owner_evidence_ref
+
+
+def _rewrite_owner_receipt_as_legacy_v3(
+    runtime: Any,
+    session_id: str,
+    *,
+    source_launch_path: Path,
+    source_owner_request_path: Path,
+) -> dict[str, Any]:
+    """Reproduce the exact owner-ref representation emitted by runtime state v3."""
+
+    state, owner_request_path, owner_evidence_ref = (
+        _rewrite_owner_state_as_legacy_v3(
+            runtime,
+            session_id,
+            source_launch_path=source_launch_path,
+            source_owner_request_path=source_owner_request_path,
+        )
     )
 
     result_path = runtime._session_dir(session_id) / "result.json"
@@ -2370,9 +2399,6 @@ def _rewrite_owner_receipt_as_legacy_v3(
             closure_path.chmod(0o600)
             _write_json(closure_path, closure)
             closure_path.chmod(0o400)
-    state["schema_version"] = RUNTIME.LEGACY_STATE_V3_SCHEMA_VERSION
-    state["launch_digest"] = launch_digest
-    state["owner_admission_digest"] = owner_evidence_ref["artifact_digest"]
     state["result_digest"] = _digest_path(result_path)
     runtime._save_state(state)
     return result
@@ -5609,6 +5635,7 @@ def test_legacy_v3_owner_receipt_remains_readable_and_reviewable_after_upgrade(
         runtime,
         fixture["session_id"],
         source_launch_path=fixture["launch_path"],
+        source_owner_request_path=fixture["owner_execution_request_path"],
     )
 
     assert runtime.result(fixture["session_id"]) == legacy_result
@@ -5624,6 +5651,53 @@ def test_legacy_v3_owner_receipt_remains_readable_and_reviewable_after_upgrade(
         )
     )
     assert preparation["prepared"] is True
+
+
+def test_exact_legacy_v3_prepared_owner_session_starts_after_upgrade(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True)
+    runtime = fixture["runtime"]
+    original_spawn = runtime._spawn_worker
+
+    def preserve_prepared_state(
+        self: Any,
+        state: dict[str, Any],
+        *,
+        mode: str,
+        resume_payload: Mapping[str, Any] | None,
+    ) -> None:
+        del self, state, mode, resume_payload
+
+    runtime._spawn_worker = MethodType(  # type: ignore[method-assign]
+        preserve_prepared_state,
+        runtime,
+    )
+    prepared = runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    assert prepared["status"] == "prepared"
+    assert prepared["attempt_count"] == 0
+    _rewrite_owner_state_as_legacy_v3(
+        runtime,
+        fixture["session_id"],
+        source_launch_path=fixture["launch_path"],
+        source_owner_request_path=fixture["owner_execution_request_path"],
+    )
+    runtime._spawn_worker = original_spawn  # type: ignore[method-assign]
+
+    preflight = runtime.preflight(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    assert preflight["admitted"] is True
+    restarted = runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    assert restarted["status"] == "running"
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
 
 
 def test_review_seed_rejects_live_writer_and_stale_terminal_result(
@@ -5938,6 +6012,7 @@ def test_owner_result_binding_accepts_exact_legacy_v3_path_receipt(
         runtime,
         fixture["session_id"],
         source_launch_path=fixture["launch_path"],
+        source_owner_request_path=fixture["owner_execution_request_path"],
     )
     state = runtime._load_state(fixture["session_id"])
 
@@ -5989,6 +6064,33 @@ def test_v4_owner_receipt_cannot_downgrade_to_legacy_path_identity(
     with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
         runtime.result(fixture["session_id"])
     assert exc_info.value.code == "runtime_state_owner_identity_invalid"
+
+
+def test_markerless_owner_launch_cannot_create_a_new_legacy_session(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True)
+    launch = json.loads(fixture["launch_path"].read_text(encoding="utf-8"))
+    launch.pop("owner_admission_identity_mode")
+    _write_json(fixture["launch_path"], launch)
+    launch_digest = _digest_path(fixture["launch_path"])
+    owner_request_path = fixture["owner_execution_request_path"]
+    owner_request = json.loads(owner_request_path.read_text(encoding="utf-8"))
+    owner_request["external_incarnation"]["runtime_launch_ref"]["digest"] = (
+        launch_digest
+    )
+    owner_request["request_digest"] = RUNTIME.owner_request_digest(owner_request)
+    _write_json(owner_request_path, owner_request)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        fixture["runtime"].preflight(
+            fixture["launch_path"],
+            owner_request_path=owner_request_path,
+        )
+    assert exc_info.value.code == "owner_admission_identity_mode_required"
+    assert (
+        fixture["runtime"]._state_path(fixture["session_id"]).exists() is False
+    )
 
 
 @pytest.mark.skipif(
@@ -10350,6 +10452,7 @@ def test_legacy_v3_owner_receipt_resumes_after_upgrade(tmp_path: Path) -> None:
         runtime,
         fixture["session_id"],
         source_launch_path=fixture["launch_path"],
+        source_owner_request_path=fixture["owner_execution_request_path"],
     )
     result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
     resume_path = tmp_path / "legacy-v3-resume.json"
@@ -12167,6 +12270,7 @@ def test_parent_reentry_accepts_exact_legacy_v3_owner_receipt_after_upgrade(
         fixture["runtime"],
         fixture["session_id"],
         source_launch_path=fixture["launch_path"],
+        source_owner_request_path=fixture["owner_execution_request_path"],
     )
     result_path = (
         fixture["runtime"]._session_dir(fixture["session_id"]) / "result.json"

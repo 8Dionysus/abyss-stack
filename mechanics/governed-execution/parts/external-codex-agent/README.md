@@ -522,7 +522,10 @@ identity mode. New sessions use `stable_request_ref_v1`; pre-upgrade v3
 receipts are recognized only by an exact legacy launch without that mode.
 Runtime reads verify the materialized launch digest, the owner request semantic
 self-digest, and its `runtime_launch_ref` before selecting either result form,
-so editing `state.json.schema_version` cannot downgrade a v4 receipt.
+so editing `state.json.schema_version` cannot downgrade a v4 receipt. New
+admission requires the current mode. A markerless launch is accepted only for
+an exact already-durable v3 session, including the crash-before-first-attempt
+`prepared` recovery path.
 
 See [CONTRACT.md](CONTRACT.md), [DIRECTION.md](DIRECTION.md),
 [PROVENANCE.md](PROVENANCE.md), [SUSPENSION.md](SUSPENSION.md), and
