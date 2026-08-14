@@ -544,7 +544,11 @@ before `state.json` is idempotent: the exact retry reuses the recorded anchor
 timestamp and the verified unpublished actor projection without deleting it.
 The external anchor also binds the actor-baseline manifest digest, so a
 same-UID rewrite of both the projection and its session-local manifest cannot
-be adopted. This binding is generation-anchor v2; v1 remains readable for
+be adopted merely by changing session files. The retry additionally builds a
+fresh, inode-pinned witness from the independently admitted source or exact
+review seed and requires the recovered content and private Git body to match;
+recreating the UID-owned anchor therefore cannot select substituted bytes.
+This binding is generation-anchor v2; v1 remains readable for
 already durable sessions but cannot recover an admission interrupted before
 its first state without an explicit migration. If the prepared event was
 already appended, its complete event object, including the anchor-derived

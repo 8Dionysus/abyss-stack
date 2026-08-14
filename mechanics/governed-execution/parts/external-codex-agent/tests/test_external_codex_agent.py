@@ -6335,6 +6335,14 @@ def test_owner_admission_retry_rejects_projection_and_baseline_coordinated_rewri
     )
     baseline_path.chmod(0o600)
     _write_json(baseline_path, rewritten_baseline)
+    generation_path = runtime._owner_admission_generation_path(
+        fixture["session_id"]
+    )
+    generation = json.loads(generation_path.read_text(encoding="utf-8"))
+    generation_path.unlink()
+    generation["actor_baseline_manifest_digest"] = _digest_path(baseline_path)
+    _write_json(generation_path, generation)
+    generation_path.chmod(0o400)
 
     with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as retry_exc_info:
         runtime.start(

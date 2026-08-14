@@ -57,6 +57,7 @@ from external_codex_projection import (  # noqa: E402
     build_actor_delta,
     build_actor_manifest,
     build_actor_manifest_from_descriptor,
+    build_private_git_admission_manifest,
     materialize_actor_projection,
     materialize_actor_projection_from_seed,
     remove_actor_projection,
@@ -6585,6 +6586,81 @@ class ExternalCodexRuntime:
                     "workspace_projection_retry_invalid",
                     "unpublished actor projection changed after generation publication",
                 )
+            witness_path = session_dir / (
+                ".actor-recovery-witness-" + os.urandom(16).hex()
+            )
+            witness_identity: Mapping[str, Any] | None = None
+            try:
+                observed_private_git = build_private_git_admission_manifest(
+                    projection_path
+                )
+                if review_seed is None:
+                    _, witness_baseline = materialize_actor_projection(
+                        source,
+                        witness_path,
+                        source_manifest=source_before,
+                        source_manifest_digest=str(
+                            source_before_ref["artifact_digest"]
+                        ),
+                    )
+                else:
+                    seed_path = Path(str(review_seed["writer_projection_path"]))
+                    seed_manifest = _load_verified_json_ref(
+                        review_seed["writer_final_manifest_ref"],
+                        label="actor projection recovery seed manifest",
+                        schema_path=ACTOR_MANIFEST_SCHEMA_PATH,
+                    )
+                    with self._lock(str(review_seed["writer_session_id"])):
+                        writer_state = self._load_state(
+                            str(review_seed["writer_session_id"])
+                        )
+                        if (
+                            self._review_seed_envelope_locked(writer_state)
+                            != review_seed
+                        ):
+                            raise ExternalCodexRuntimeError(
+                                "review_seed_envelope_drift",
+                                "writer changed before reviewer projection recovery",
+                            )
+                        _, witness_baseline = (
+                            materialize_actor_projection_from_seed(
+                                seed_path,
+                                witness_path,
+                                expected_manifest=seed_manifest,
+                            )
+                        )
+                witness_identity = witness_baseline["workspace_identity"]
+                witness_private_git = build_private_git_admission_manifest(
+                    witness_path
+                )
+                if any(
+                    observed_baseline[key] != witness_baseline[key]
+                    for key in (
+                        "content_entries",
+                        "source_git_head",
+                    )
+                ) or observed_private_git != witness_private_git:
+                    raise ExternalCodexRuntimeError(
+                        "workspace_projection_retry_invalid",
+                        "unpublished actor projection differs from independently admitted bytes",
+                    )
+            except (OSError, ProjectionError) as exc:
+                raise ExternalCodexRuntimeError(
+                    "workspace_projection_retry_invalid",
+                    "independent actor projection recovery witness could not be built",
+                ) from exc
+            finally:
+                if witness_identity is not None:
+                    try:
+                        remove_actor_projection(
+                            witness_path,
+                            expected_identity=witness_identity,
+                        )
+                    except (OSError, ProjectionError) as exc:
+                        raise ExternalCodexRuntimeError(
+                            "workspace_projection_cleanup_incomplete",
+                            "actor projection recovery witness could not be removed safely",
+                        ) from exc
             source_after = (
                 build_workspace_manifest(source)
                 if review_seed is None

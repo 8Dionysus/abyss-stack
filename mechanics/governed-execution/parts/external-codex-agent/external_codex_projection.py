@@ -367,6 +367,70 @@ def build_actor_manifest_from_descriptor(
     }
 
 
+def build_private_git_admission_manifest(
+    projection_root: str | Path,
+) -> dict[str, Any]:
+    """Observe stable private-Git meaning while excluding index stat cache bytes."""
+
+    root = Path(projection_root)
+    if not root.is_absolute() or root.is_symlink() or not root.is_dir():
+        raise ProjectionError("actor projection root is unavailable")
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(root, flags)
+    try:
+        observed = os.fstat(descriptor)
+        coordinate = root.stat(follow_symlinks=False)
+        if not _same_inode(observed, coordinate):
+            raise ProjectionError("actor projection coordinate changed")
+        descriptor_root = Path(f"/proc/self/fd/{descriptor}")
+        private_entries = [
+            entry
+            for entry in _inventory(
+                descriptor_root / ".git",
+                include_git=True,
+                descriptor_root=True,
+            )
+            if entry["path"] != "index"
+        ]
+        manifest = {
+            "private_git_entries": private_entries,
+            "index_stage_sha256": sha256_bytes(
+                _git(descriptor_root, "ls-files", "--stage", "-z")
+            ),
+            "index_flags_sha256": sha256_bytes(
+                _git(descriptor_root, "ls-files", "-v", "-z")
+            ),
+            "status_sha256": sha256_bytes(
+                _git(
+                    descriptor_root,
+                    "status",
+                    "--porcelain=v1",
+                    "-z",
+                    "--untracked-files=all",
+                )
+            ),
+            "diff_sha256": sha256_bytes(
+                _git(
+                    descriptor_root,
+                    "diff",
+                    "--no-ext-diff",
+                    "--no-textconv",
+                    "--binary",
+                    "HEAD",
+                    "--",
+                )
+            ),
+        }
+        after = root.stat(follow_symlinks=False)
+        if not _same_inode(observed, after):
+            raise ProjectionError("actor projection coordinate changed")
+        return manifest
+    finally:
+        os.close(descriptor)
+
+
 def _open_directory_at(parent_fd: int, name: str, relative: str) -> int:
     flags = os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY
     if hasattr(os, "O_NOFOLLOW"):
