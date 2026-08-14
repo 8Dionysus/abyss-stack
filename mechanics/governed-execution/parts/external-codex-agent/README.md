@@ -548,9 +548,10 @@ be adopted merely by changing session files. The retry additionally builds a
 fresh, inode-pinned witness from the independently admitted source or exact
 review seed and requires the recovered content and private Git body to match;
 recreating the UID-owned anchor therefore cannot select substituted bytes.
-This external digest binding is generation-anchor v2; v1 remains readable and
-an exact attempt-free v1 admission can recover through the independent witness
-without replacing or relabeling its anchor. Recovery never runs Git against the
+This external digest binding is generation-anchor v2. Stable-request v1
+anchors were never deployed and are rejected; deployed legacy-v3 sessions are
+admitted only by the release-cataloged explicit migration, which publishes a
+v2 anchor. Recovery never runs Git against the
 mutable projection. All non-index private-Git bytes are compared with the safe
 witness authority captured in memory before the staging inode receives its
 public session pathname. Later mutation of that published witness cannot change

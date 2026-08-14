@@ -224,9 +224,10 @@ Before launch the controller verifies:
     projection must also match a fresh one-time witness materialized directly
     from the admitted source or exact review seed; the witness is removed by
     its pinned inode before recovery continues. New admissions therefore
-    publish a v2 anchor. A v1 anchor remains readable and an exact attempt-free
-    v1 admission may use the independent witness path without pretending to be
-    v2 or replacing its anchor. No Git command runs against the mutable
+    publish a v2 anchor. Stable-request v1 anchors were never deployed and are
+    rejected rather than treated as historical compatibility; actual legacy
+    v3 sessions enter only through the release-cataloged explicit migration
+    above, which also publishes a v2 anchor. No Git command runs against the mutable
     recovered projection. All non-index Git bytes must match the safe witness,
     whose private-Git authority is captured in memory before its staging inode
     receives a public session pathname; later mutation of the published witness
@@ -239,8 +240,9 @@ Before launch the controller verifies:
     The same binding is checked after first-state publication: every durable
     v2 state must retain the anchor-bound baseline reference and bytes. If the
     state is still `prepared` with no attempt, the independent source/seed
-    witness is rebuilt before the first worker is retried. The same witness
-    safely admits an exact v1 attempt-free state despite its older anchor form.
+    witness is rebuilt before the first worker is retried. This recovery path
+    accepts current v2 anchors and catalog-authorized legacy-v3 migrations; it
+    cannot be entered by relabeling either as a v1 anchor.
 
 The two request-shaped objects are intentionally not collapsed. The
 `AgentIncarnationBinding.task_request_ref` is the canonical schema-valid SDK
