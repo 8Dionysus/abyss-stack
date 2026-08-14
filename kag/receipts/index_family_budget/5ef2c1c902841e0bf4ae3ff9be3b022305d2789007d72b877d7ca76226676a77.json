@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 24718797,
+  "allowed_tracked_bytes": 35180118,
+  "approved_by": "repository-owner",
+  "base_ref": "76076b530d3798e53ab1b7e764e4433822aa8258",
+  "changed_generated_bytes": 24718797,
+  "changed_generated_files": 261,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "5ef2c1c902841e0bf4ae3ff9be3b022305d2789007d72b877d7ca76226676a77",
+  "reason": "Refresh the exact CI-pinned portable family after binding external actor role-scoped MCP relay requests to the owner-supported 2026-07-28 protocol version without weakening endpoint admission or raising standing budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35180118,
+  "tracked_bytes_max": 24117248
+}

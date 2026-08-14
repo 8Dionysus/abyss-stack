@@ -359,7 +359,11 @@ name and value from the runtime's exec-time environment, and carries the exact
 bytes in one bounded sealed descriptor. The runtime retains the recovered
 credential outside Codex and starts an
 attempt-local loopback proxy which injects it only while relaying to the fixed
-owner endpoint. Codex receives a random attempt-scoped proxy path with no
+owner endpoint. The runtime explicitly enables Codex 0.147's
+`mcp_2026_07_28` client mode for MCP-bearing roles. The proxy rejects absent,
+legacy, duplicate, or otherwise mismatched protocol-version headers and
+preserves the admitted exact `2026-07-28` version on the upstream hop; it does
+not translate or relabel legacy traffic. Codex receives a random attempt-scoped proxy path with no
 bearer environment variable; its model shell has network disabled, its
 filesystem profile denies `/proc`, and it cannot use that path directly. The
 relay forwards streaming response bytes as they
