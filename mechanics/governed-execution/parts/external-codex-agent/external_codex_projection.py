@@ -457,6 +457,8 @@ def build_private_git_admission_manifest(
     projection_root: str | Path,
     *,
     expected_private_git_entries: list[dict[str, Any]] | None = None,
+    expected_source_git_head: str | None = None,
+    expected_object_ids: set[str] | frozenset[str] | None = None,
     semantic_workspace_root: str | Path | None = None,
 ) -> dict[str, Any]:
     """Observe stable private-Git meaning without executing recovered bytes."""
@@ -474,13 +476,14 @@ def build_private_git_admission_manifest(
         if not _same_inode(observed, coordinate):
             raise ProjectionError("actor projection coordinate changed")
         descriptor_root = Path(f"/proc/self/fd/{descriptor}")
+        full_private_entries = _inventory(
+            descriptor_root / ".git",
+            include_git=True,
+            descriptor_root=True,
+        )
         private_entries = [
             entry
-            for entry in _inventory(
-                descriptor_root / ".git",
-                include_git=True,
-                descriptor_root=True,
-            )
+            for entry in full_private_entries
             if entry["path"] != "index"
         ]
         if (
@@ -505,6 +508,64 @@ def build_private_git_admission_manifest(
             raise ProjectionError(
                 "actor private Git configuration is not the runtime-authored posture"
             )
+        if expected_source_git_head is not None:
+            expected_head = b"ref: refs/heads/actor-baseline\n"
+            expected_ref = (expected_source_git_head + "\n").encode("ascii")
+            identity_expectations = {
+                "HEAD": expected_head,
+                "refs/heads/actor-baseline": expected_ref,
+            }
+            identity_entries = {
+                str(entry.get("path")): entry
+                for entry in private_entries
+                if entry.get("kind") != "directory"
+                and (
+                    entry.get("path") == "HEAD"
+                    or str(entry.get("path", "")).startswith("refs/")
+                )
+            }
+            if set(identity_entries) != set(identity_expectations) or any(
+                identity_entries[path].get("kind") != "file"
+                or identity_entries[path].get("size_bytes") != len(raw)
+                or identity_entries[path].get("sha256") != sha256_bytes(raw)
+                for path, raw in identity_expectations.items()
+            ):
+                raise ProjectionError(
+                    "actor private Git identity differs from the admitted source head"
+                )
+        if expected_object_ids is not None:
+            actual_object_ids = {
+                value.decode("ascii")
+                for value in _git(
+                    descriptor_root,
+                    "-c",
+                    "core.fsmonitor=false",
+                    "-c",
+                    "core.hooksPath=/dev/null",
+                    "cat-file",
+                    "--batch-check=%(objectname)",
+                    "--batch-all-objects",
+                    environment_overrides={"GIT_NO_REPLACE_OBJECTS": "1"},
+                ).splitlines()
+                if value
+            }
+            if actual_object_ids != set(expected_object_ids):
+                raise ProjectionError(
+                    "actor private Git object closure differs from the admitted source"
+                )
+            _git(
+                descriptor_root,
+                "-c",
+                "core.fsmonitor=false",
+                "-c",
+                "core.hooksPath=/dev/null",
+                "fsck",
+                "--strict",
+                "--full",
+                "--no-reflogs",
+                "--no-dangling",
+                environment_overrides={"GIT_NO_REPLACE_OBJECTS": "1"},
+            )
         index_raw, _ = _read_regular_path(
             descriptor_root / ".git" / "index",
             label=".git/index",
@@ -523,18 +584,15 @@ def build_private_git_admission_manifest(
             raise ProjectionError("private Git semantic workspace is unavailable")
         manifest = {
             "private_git_entries": private_entries,
+            "private_git_digest": _canonical_digest(full_private_entries),
             **_private_git_index_semantics(semantic_root, index_raw),
         }
-        private_entries_after = [
-            entry
-            for entry in _inventory(
-                descriptor_root / ".git",
-                include_git=True,
-                descriptor_root=True,
-            )
-            if entry["path"] != "index"
-        ]
-        if private_entries_after != private_entries:
+        full_private_entries_after = _inventory(
+            descriptor_root / ".git",
+            include_git=True,
+            descriptor_root=True,
+        )
+        if full_private_entries_after != full_private_entries:
             raise ProjectionError(
                 "actor private Git bytes changed during semantic inspection"
             )
@@ -706,7 +764,7 @@ def _construct_private_git(
     staging: Path,
     *,
     source_manifest: Mapping[str, Any],
-) -> None:
+) -> frozenset[str]:
     source_head = str(source_manifest["git_head"])
     index_entries = _git(source, "ls-files", "--stage", "-z")
     object_ids = {source_head}
@@ -726,6 +784,23 @@ def _construct_private_git(
             ) from exc
         _safe_relative(path)
         object_ids.add(object_id)
+    reachable_object_ids = {
+        value.decode("ascii")
+        for value in _git(
+            source,
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "core.hooksPath=/dev/null",
+            "rev-list",
+            "--objects",
+            "--no-object-names",
+            source_head,
+            environment_overrides={"GIT_NO_REPLACE_OBJECTS": "1"},
+        ).splitlines()
+        if value
+    }
+    object_ids.update(reachable_object_ids)
     packed = _git(
         source,
         "pack-objects",
@@ -811,6 +886,7 @@ def _construct_private_git(
         raw, _ = _read_regular_path(candidate, label=f".git/{entry['path']}")
         if source_bytes and source_bytes in raw:
             raise ProjectionError("private actor Git body retained a source coordinate")
+    return frozenset(object_ids)
 
 
 def _remove_tree(root: Path) -> None:
@@ -1026,7 +1102,11 @@ def materialize_actor_projection(
                 raise ProjectionError(
                     "actor projection bytes differ from the admitted source manifest"
                 )
-            _construct_private_git(source, staging, source_manifest=source_manifest)
+            expected_object_ids = _construct_private_git(
+                source,
+                staging,
+                source_manifest=source_manifest,
+            )
             manifest = build_actor_manifest_from_descriptor(
                 staging_fd,
                 workspace_path=target,
@@ -1039,11 +1119,17 @@ def materialize_actor_projection(
                 raise ProjectionError(
                     "actor projection baseline differs from the admitted source manifest"
                 )
-            captured_private_git = (
-                build_private_git_admission_manifest(staging)
-                if private_git_admission is not None
-                else None
+            captured_private_git = build_private_git_admission_manifest(
+                staging,
+                expected_source_git_head=source_head,
+                expected_object_ids=expected_object_ids,
             )
+            if captured_private_git.get("private_git_digest") != manifest.get(
+                "private_git_digest"
+            ):
+                raise ProjectionError(
+                    "actor private Git changed before recovery authority capture"
+                )
             _publish_staging(
                 parent_fd=parent_fd,
                 parent_identity=parent_identity,
@@ -1133,11 +1219,18 @@ def materialize_actor_projection_from_seed(
                 raise ProjectionError(
                     "actor projection seed changed before reviewer materialization"
                 )
-            captured_private_git = (
-                build_private_git_admission_manifest(staging)
-                if private_git_admission is not None
-                else None
+            captured_private_git = build_private_git_admission_manifest(
+                staging,
+                expected_source_git_head=str(
+                    expected_manifest.get("source_git_head", "")
+                ),
             )
+            if captured_private_git.get("private_git_digest") != observed.get(
+                "private_git_digest"
+            ):
+                raise ProjectionError(
+                    "reviewer private Git changed before recovery authority capture"
+                )
             _publish_staging(
                 parent_fd=parent_fd,
                 parent_identity=parent_identity,

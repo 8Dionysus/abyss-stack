@@ -157,8 +157,8 @@ def test_recovery_authority_rejects_private_git_poison_before_publication(
         staging: Path,
         *,
         source_manifest: dict[str, object],
-    ) -> None:
-        original_construct(
+    ) -> frozenset[str]:
+        object_ids = original_construct(
             source_root,
             staging,
             source_manifest=source_manifest,
@@ -167,6 +167,7 @@ def test_recovery_authority_rejects_private_git_poison_before_publication(
             "a", encoding="utf-8"
         ) as handle:
             handle.write("[core]\n\tfsmonitor = /tmp/attacker-helper\n")
+        return object_ids
 
     monkeypatch.setattr(PROJECTION, "_construct_private_git", construct_then_poison)
     private_git_admission: dict[str, object] = {}
@@ -174,6 +175,58 @@ def test_recovery_authority_rejects_private_git_poison_before_publication(
     with pytest.raises(
         ProjectionError,
         match="runtime-authored posture",
+    ):
+        materialize_actor_projection(
+            source,
+            target,
+            source_manifest=source_manifest,
+            source_manifest_digest="sha256:" + "1" * 64,
+            private_git_admission=private_git_admission,
+        )
+
+    assert target.exists() is False
+    assert private_git_admission == {}
+
+
+def test_recovery_authority_rejects_object_poison_seen_by_baseline_and_capture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, source_manifest = _source_repo(tmp_path)
+    target = tmp_path / "runtime" / "actor-workspace"
+    original_construct = PROJECTION._construct_private_git
+
+    def construct_then_add_unadmitted_object(
+        source_root: Path,
+        staging: Path,
+        *,
+        source_manifest: dict[str, object],
+    ) -> frozenset[str]:
+        object_ids = original_construct(
+            source_root,
+            staging,
+            source_manifest=source_manifest,
+        )
+        poisoned_object_id = PROJECTION._git(
+            staging,
+            "hash-object",
+            "-w",
+            "--stdin",
+            input_bytes=b"same-uid staging poison\n",
+        )
+        assert poisoned_object_id.strip().decode("ascii") not in object_ids
+        return object_ids
+
+    monkeypatch.setattr(
+        PROJECTION,
+        "_construct_private_git",
+        construct_then_add_unadmitted_object,
+    )
+    private_git_admission: dict[str, object] = {}
+
+    with pytest.raises(
+        ProjectionError,
+        match="object closure differs from the admitted source",
     ):
         materialize_actor_projection(
             source,

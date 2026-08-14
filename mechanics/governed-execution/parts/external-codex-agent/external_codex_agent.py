@@ -6702,6 +6702,9 @@ class ExternalCodexRuntime:
                     expected_private_git_entries=witness_private_git[
                         "private_git_entries"
                     ],
+                    expected_source_git_head=str(
+                        prior_baseline["source_git_head"]
+                    ),
                     semantic_workspace_root=witness_path,
                 )
                 observed_baseline_after = _checked_actor_manifest(
@@ -6719,7 +6722,14 @@ class ExternalCodexRuntime:
                     )
                 ) or (
                     observed_baseline_after != observed_baseline
-                    or observed_private_git != witness_private_git
+                    or any(
+                        observed_private_git[key] != witness_private_git[key]
+                        for key in (
+                            "private_git_entries",
+                            "index_stage_sha256",
+                            "index_flags_sha256",
+                        )
+                    )
                 ):
                     raise ExternalCodexRuntimeError(
                         "workspace_projection_retry_invalid",
