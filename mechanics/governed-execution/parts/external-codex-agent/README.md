@@ -530,8 +530,11 @@ legacy route because `migrate-legacy-owner-admission` also requires an exact
 session/launch/request/request-ref entry from
 `legacy-owner-admission-migrations.v1.json`, verified as part of the
 content-addressed release and mounted into the controller's sealed read-only
-snapshot. The installer accepts an operator inventory through
-`--legacy-owner-migration-catalog`; the authored default is empty. New
+snapshot. The installer accepts an operator inventory only through
+`stage --legacy-owner-migration-catalog`; the authored default is empty. A
+non-empty catalog cannot pass ordinary `install` or ordinary `activate`: only
+`activate-admitted` may publish that release after the host artifact trust gate
+binds its complete release manifest. New
 admission requires the current mode, and ordinary reads never create a
 migration. A cataloged markerless v3 session may publish its anchor only when
 the operator-supplied expected digests and all durable bytes agree. The same

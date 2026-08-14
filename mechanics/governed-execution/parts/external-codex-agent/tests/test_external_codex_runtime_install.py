@@ -289,6 +289,128 @@ def test_stage_seals_operator_legacy_migration_catalog_into_release(
     ]
 
 
+def test_catalog_bearing_release_requires_artifact_admitted_activation(
+    tmp_path: Path,
+) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    catalog = tmp_path / "operator-legacy-catalog.json"
+    catalog.write_text(
+        json.dumps(
+            {
+                "schema_version": (
+                    runtime_install.LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION
+                ),
+                "catalog_id": "host-pre-upgrade-inventory",
+                "captured_at": "2026-08-13T12:00:00Z",
+                "entries": [
+                    {
+                        "session_id": "legacy-session",
+                        "launch_id": "launch:legacy-session",
+                        "launch_digest": "sha256:" + "1" * 64,
+                        "owner_admission_digest": "sha256:" + "2" * 64,
+                        "owner_request_ref": "task://legacy/owner-request",
+                    }
+                ],
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    runtime_root = tmp_path / "runtime"
+    bin_dir = tmp_path / "bin"
+    staged_result = runtime_install.stage(
+        source,
+        sdk,
+        agents,
+        skills,
+        runtime_root,
+        Path(sys.executable),
+        legacy_owner_migration_catalog=catalog,
+        allow_dirty_source=False,
+        allow_dirty_sdk=False,
+        allow_dirty_agents=False,
+        allow_dirty_skills=False,
+    )
+    staged = staged_result["staged"]
+
+    with pytest.raises(
+        runtime_install.InstallError,
+        match="requires activate-admitted artifact trust",
+    ):
+        runtime_install.activate(
+            runtime_root,
+            bin_dir,
+            str(staged["release_id"]),
+            Path(sys.executable),
+        )
+    assert not (runtime_root / "active.json").exists()
+    assert not bin_dir.exists()
+
+    release_root = Path(staged["release_root"])
+    registry = tmp_path / "registry"
+    registry.mkdir()
+    gate = tmp_path / "abyss-machine"
+    write_artifact_gate(
+        gate,
+        artifact_gate_payload(release_root, str(staged["source"]["head"])),
+    )
+    activated = runtime_install.activate_admitted(
+        runtime_root,
+        bin_dir,
+        str(staged["release_id"]),
+        Path(sys.executable),
+        gate,
+        registry,
+    )
+    assert activated["active"]["legacy_owner_migration_catalog"][
+        "entry_count"
+    ] == 1
+    assert activated["active"]["artifact_admission"] is not None
+
+
+def test_ordinary_install_refuses_nonempty_authored_catalog(tmp_path: Path) -> None:
+    source, sdk, agents, skills = make_sources(tmp_path)
+    catalog = (
+        source
+        / "mechanics/governed-execution/parts/external-codex-agent"
+        / runtime_install.LEGACY_OWNER_MIGRATION_CATALOG_NAME
+    )
+    payload = json.loads(catalog.read_text(encoding="utf-8"))
+    payload["catalog_id"] = "unadmitted-authored-inventory"
+    payload["entries"] = [
+        {
+            "session_id": "rewritten-session",
+            "launch_id": "launch:rewritten-session",
+            "launch_digest": "sha256:" + "3" * 64,
+            "owner_admission_digest": "sha256:" + "4" * 64,
+            "owner_request_ref": "task://rewritten/owner-request",
+        }
+    ]
+    catalog.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+    commit_all(source)
+
+    with pytest.raises(
+        runtime_install.InstallError,
+        match="ordinary install refuses a catalog-bearing release",
+    ):
+        runtime_install.install(
+            source,
+            sdk,
+            agents,
+            skills,
+            tmp_path / "runtime",
+            tmp_path / "bin",
+            Path(sys.executable),
+            allow_dirty_source=False,
+            allow_dirty_sdk=False,
+            allow_dirty_agents=False,
+            allow_dirty_skills=False,
+        )
+    assert not (tmp_path / "runtime/active.json").exists()
+    assert not (tmp_path / "bin").exists()
+
+
 def test_stage_rejects_ambiguous_legacy_migration_catalog(tmp_path: Path) -> None:
     source, sdk, agents, skills = make_sources(tmp_path)
     entry = {

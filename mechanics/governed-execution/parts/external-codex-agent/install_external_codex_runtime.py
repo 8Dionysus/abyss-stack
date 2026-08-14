@@ -486,6 +486,21 @@ def require_legacy_owner_migration_catalog(path: Path) -> Path:
     return candidate
 
 
+def legacy_owner_migration_catalog_summary(
+    path: Path,
+    *,
+    source_kind: str,
+) -> dict[str, object]:
+    candidate = require_legacy_owner_migration_catalog(path)
+    payload = json.loads(candidate.read_text(encoding="utf-8"))
+    return {
+        "catalog_id": payload["catalog_id"],
+        "digest": sha256_file(candidate),
+        "entry_count": len(payload["entries"]),
+        "source_kind": source_kind,
+    }
+
+
 def _base_installer_git_environment() -> dict[str, str]:
     """Return a fixed environment that cannot inherit Git executable hooks."""
 
@@ -1888,21 +1903,14 @@ def prepare_release(
 
     manifest = release_manifest(files)
     release_root, created = materialize_release(files, manifest, runtime_root / "releases")
-    release_catalog_path = require_regular_file(
+    catalog_summary = legacy_owner_migration_catalog_summary(
         release_root / "runtime" / LEGACY_OWNER_MIGRATION_CATALOG_NAME,
-        "release legacy owner migration catalog",
-    )
-    catalog_payload = json.loads(release_catalog_path.read_text(encoding="utf-8"))
-    catalog_summary = {
-        "catalog_id": catalog_payload["catalog_id"],
-        "digest": sha256_file(release_catalog_path),
-        "entry_count": len(catalog_payload["entries"]),
-        "source_kind": (
+        source_kind=(
             "operator_pre_upgrade_inventory"
             if legacy_owner_migration_catalog is not None
             else "authored_empty_default"
         ),
-    }
+    )
     current_files = source_files(
         source_root,
         sdk_root,
@@ -2028,7 +2036,6 @@ def install(
     *,
     stats_root: Path | None = None,
     validation_python_root: Path | None = None,
-    legacy_owner_migration_catalog: Path | None = None,
     allow_dirty_source: bool,
     allow_dirty_sdk: bool,
     allow_dirty_agents: bool,
@@ -2045,7 +2052,6 @@ def install(
         python_executable,
         stats_root=stats_root,
         validation_python_root=validation_python_root,
-        legacy_owner_migration_catalog=legacy_owner_migration_catalog,
         allow_dirty_source=allow_dirty_source,
         allow_dirty_sdk=allow_dirty_sdk,
         allow_dirty_agents=allow_dirty_agents,
@@ -2063,6 +2069,14 @@ def install(
     legacy_owner_migration_catalog_summary = prepared[
         "legacy_owner_migration_catalog"
     ]
+    if (
+        not isinstance(legacy_owner_migration_catalog_summary, dict)
+        or legacy_owner_migration_catalog_summary.get("entry_count") != 0
+    ):
+        raise InstallError(
+            "ordinary install refuses a catalog-bearing release; use stage then "
+            "activate-admitted"
+        )
     created = bool(prepared["release_created"])
     if (
         not isinstance(manifest, dict)
@@ -2399,6 +2413,30 @@ def activate(
     manifest = verify_release(release_root)
     if manifest["release_id"] != release_id:
         raise InstallError("requested release id differs from verified manifest")
+    staged_catalog = (
+        staged.get("legacy_owner_migration_catalog")
+        if isinstance(staged, dict)
+        else None
+    )
+    catalog_summary = legacy_owner_migration_catalog_summary(
+        release_root / "runtime" / LEGACY_OWNER_MIGRATION_CATALOG_NAME,
+        source_kind=(
+            str(staged_catalog.get("source_kind"))
+            if isinstance(staged_catalog, dict)
+            else "release_embedded"
+        ),
+    )
+    if isinstance(staged_catalog, dict) and any(
+        catalog_summary.get(key) != staged_catalog.get(key)
+        for key in ("catalog_id", "digest", "entry_count", "source_kind")
+    ):
+        raise InstallError("staged legacy owner migration catalog differs from release")
+    if catalog_summary["entry_count"] != 0 and (
+        artifact_admission is None or staged is None
+    ):
+        raise InstallError(
+            "catalog-bearing release requires activate-admitted artifact trust"
+        )
     python_executable, python_identity = require_python_executable(
         python_executable
     )
@@ -2428,9 +2466,7 @@ def activate(
         "agents": staged.get("agents") if staged else None,
         "skills": staged.get("skills") if staged else None,
         "stats": staged.get("stats") if staged else None,
-        "legacy_owner_migration_catalog": (
-            staged.get("legacy_owner_migration_catalog") if staged else None
-        ),
+        "legacy_owner_migration_catalog": catalog_summary,
         "installed_at": now,
         "previous_release_id": previous.get("release_id") if previous else None,
         "nonproduction_dirty_source": (
@@ -2645,7 +2681,6 @@ def parser() -> argparse.ArgumentParser:
     install_parser.add_argument("--skills-root", type=Path, required=True)
     install_parser.add_argument("--stats-root", type=Path)
     install_parser.add_argument("--validation-python-root", type=Path)
-    install_parser.add_argument("--legacy-owner-migration-catalog", type=Path)
     install_parser.add_argument("--runtime-root", type=Path, default=DEFAULT_RUNTIME_ROOT)
     install_parser.add_argument("--bin-dir", type=Path, default=DEFAULT_BIN_DIR)
     install_parser.add_argument("--python", type=Path, default=Path(sys.executable))
@@ -2699,7 +2734,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.python,
                 stats_root=args.stats_root,
                 validation_python_root=args.validation_python_root,
-                legacy_owner_migration_catalog=args.legacy_owner_migration_catalog,
                 allow_dirty_source=args.allow_dirty_source,
                 allow_dirty_sdk=args.allow_dirty_sdk,
                 allow_dirty_agents=args.allow_dirty_agents,

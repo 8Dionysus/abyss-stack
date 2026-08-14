@@ -185,7 +185,9 @@ writer report is absent, wrapper-delimiter effect observation,
 non-replacing owner-generation anchoring outside the session tree, rejection of
 a coordinated launch/request/state/result v4-to-v3 rewrite, refusal to reopen
 legacy migration after deleting that anchor, release-catalog-bound and
-digest-pinned legacy-v3 migration, unanchored-legacy refusal, and recovery of a
+digest-pinned legacy-v3 migration, refusal of catalog-bearing ordinary install
+and activation, artifact-admitted catalog activation, unanchored-legacy
+refusal, and recovery of a
 pre-attempt legacy prepared state,
 unclassified non-validation interpreter indirection with exact fixed-validation
 exemption, fail-closed `env --split-string` handling, value-aware `timeout`

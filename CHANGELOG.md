@@ -27,8 +27,11 @@ Tracking starts with the community-docs baseline for this repository.
   closed and cannot reopen legacy migration: only exact pre-upgrade sessions
   listed in a catalog sealed into the verified content-addressed release may
   use the explicit digest-pinned migration operation. The authored catalog is
-  empty; an operator inventory is admitted only while staging that release.
-  Normal reads cannot create a migration record.
+  empty; an operator inventory may be packaged only while staging that release,
+  and the release cannot be published by ordinary install or activation. Only
+  host-gated `activate-admitted` may activate the catalog after artifact trust
+  binds the complete release manifest. Normal reads cannot create a migration
+  record.
 - Pin both external Codex specialized-environment profiles to the landed
   `aoa-stats` actor-responsibility receipt revision, so a release built from
   the current validation dependency can package and verify that same owner

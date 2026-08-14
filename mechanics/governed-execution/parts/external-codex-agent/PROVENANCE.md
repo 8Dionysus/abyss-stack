@@ -69,6 +69,11 @@ command supplies the operator-observed expected digests and the exact session,
 launch, request bytes, and stable request ref are present in the pre-upgrade
 inventory sealed into the verified release snapshot. Normal result, recovery,
 continuation, and review routes never synthesize that provenance.
+The inventory becomes authoritative only through the existing artifact-trust
+activation contour. `stage` may package operator-observed legacy identities,
+but ordinary `install` and `activate` refuse any non-empty catalog. The host
+gate used by `activate-admitted` must first bind the entire content-addressed
+release before the catalog can enter the active controller snapshot.
 
 The neutral binder consumes already selected coordinates and writes only the
 runtime launch. Its response explicitly returns to `aoa-agents` to form the

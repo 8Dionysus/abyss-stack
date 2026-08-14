@@ -196,7 +196,12 @@ Before launch the controller verifies:
     exact pre-upgrade inventory sealed into the verified content-addressed
     release. The launcher verifies that catalog and mounts it from a sealed
     memfd in the read-only runtime snapshot; a session created after the
-    inventory cannot add itself to the migration set.
+    inventory cannot add itself to the migration set. Supplying a non-empty
+    inventory is a staging operation only. Ordinary `install` rejects a
+    catalog-bearing source, and ordinary `activate` rejects a catalog-bearing
+    staged release. Only `activate-admitted`, after the host artifact trust gate
+    has bound the complete release manifest and catalog bytes, may publish its
+    `active.json` and wrappers.
     A legacy v3 receipt is accepted only when its materialized launch lacks
     that mode and the request's semantic self-digest plus `runtime_launch_ref`
     still bind the same launch and an explicit operator migration has matched

@@ -37,6 +37,13 @@ ordinary reads fail closed and never invent that provenance. The anchored
 legacy path also preserves a pre-upgrade session that crashed after `prepared`
 but before its first worker attempt.
 
+Packaging the inventory does not itself authorize it. A non-empty catalog is
+accepted only by `stage`; ordinary `install` and `activate` reject the resulting
+release. `activate-admitted` must obtain a host artifact-trust decision over the
+complete content-addressed release before publishing its active record and
+wrappers, so the runtime UID cannot turn attacker-selected catalog bytes into
+an admitted migration authority.
+
 The complete external-Codex deterministic suite passed. This is an ABI repair,
 not new role, model-fit, owner-acceptance, publication, or external-effect
 authority.
