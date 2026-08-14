@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 22053434,
+  "allowed_tracked_bytes": 34944300,
+  "approved_by": "repository-owner",
+  "base_ref": "0a9ca55318c378931b4f68b9621adc9f11b6039e",
+  "changed_generated_bytes": 22053434,
+  "changed_generated_files": 229,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "ad9a7313f9ff85e82de71e14f9d184aaa24cfcf77a626191ef42c1a895a2b2d6",
+  "reason": "Refresh the exact owner-local KAG family after extending durable owner-request identity rebinding to review-seed issuance, reviewer preparation, and initial parent re-entry child admission.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34944300,
+  "tracked_bytes_max": 24117248
+}
