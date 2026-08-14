@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 18433479,
+  "allowed_tracked_bytes": 35278019,
+  "approved_by": "repository-owner",
+  "base_ref": "7db3e4cd4643a293437ad4d54152688481e8c559",
+  "changed_generated_bytes": 18433479,
+  "changed_generated_files": 183,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "b23de41d13f70f34d4cdf2451c42648315bda3d480578491ea413a3126bda4f4",
+  "reason": "Regenerate the exact terminal-attempt-qualified nested-evidence source, decision, and test inventory on current main; record generated-family growth without constraining actor work.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35278019,
+  "tracked_bytes_max": 24117248
+}
