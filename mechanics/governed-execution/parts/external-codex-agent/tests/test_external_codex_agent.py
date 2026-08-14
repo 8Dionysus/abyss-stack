@@ -5194,20 +5194,27 @@ def test_model_organ_landing_readonly_profile_admits_exact_runtime_binding(
     assert result["status"] == "completed"
     assert result["changed_paths"] == []
     codex_argv = result["codex_invocations"][0]["argv"]
-    assert (
-        "shell_environment_policy.set="
-        '{"AOA_STATS_ROOT"="'
-        + str((release / "owners/aoa-stats").resolve())
-        + '","PYTEST_ADDOPTS"="-p no:cacheprovider",'
-        '"PYTHONDONTWRITEBYTECODE"="1","PYTHONNOUSERSITE"="1","PYTHONPATH"="'
-        + str((release / "environments/landing-validation-v1/pythonpath").resolve())
-        + os.pathsep
-        + str((release / "sdk/src").resolve())
-        + '"}'
-    ) in codex_argv
+    shell_environment = next(
+        argument
+        for argument in codex_argv
+        if argument.startswith("shell_environment_policy.set=")
+    )
+    assert '"AOA_STATS_ROOT"="' + str(
+        (release / "owners/aoa-stats").resolve()
+    ) in shell_environment
+    assert '"PYTEST_ADDOPTS"="-p no:cacheprovider"' in shell_environment
+    assert '"PYTHONDONTWRITEBYTECODE"="1"' in shell_environment
+    assert '"PYTHONNOUSERSITE"="1"' in shell_environment
+    assert '"PYTHONPATH"="' + os.pathsep.join(
+        (
+            str((release / "environments/landing-validation-v1/pythonpath").resolve()),
+            str((release / "sdk/src").resolve()),
+        )
+    ) in shell_environment
+    assert '"PYTHONPYCACHEPREFIX"="' in shell_environment
 
 
-def test_generic_profile_does_not_inject_specialized_shell_environment(
+def test_generic_profile_injects_only_runtime_python_hygiene(
     tmp_path: Path,
 ) -> None:
     fixture = _fixture(tmp_path)
@@ -5216,10 +5223,16 @@ def test_generic_profile_does_not_inject_specialized_shell_environment(
     result = fixture["runtime"].result(fixture["session_id"])
 
     assert result is not None
-    assert not any(
-        argument.startswith("shell_environment_policy.set=")
+    shell_environment = next(
+        argument
         for argument in result["codex_invocations"][0]["argv"]
+        if argument.startswith("shell_environment_policy.set=")
     )
+    assert "AOA_STATS_ROOT" not in shell_environment
+    assert '"PYTHONPYCACHEPREFIX"="' in shell_environment
+    assert '"PYTEST_ADDOPTS"="-p no:cacheprovider"' in shell_environment
+    assert '"PYTHONDONTWRITEBYTECODE"="1"' in shell_environment
+    assert '"PYTHONNOUSERSITE"="1"' in shell_environment
 
 
 @pytest.mark.parametrize(

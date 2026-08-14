@@ -9,6 +9,23 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Close the external Codex workspace-hygiene boundary: admission preflight now
+  uses a stable environment without creating or receiving an attempt-local
+  Python cache prefix through `state_root`, while every real start/resume
+  attempt remains distinct and scratch-bound across admitted workspace-write
+  profiles. Actor-safe UTF-8 redaction now maps literal, Unicode-escaped,
+  slash-escaped, mixed, and nested source aliases back to exact source spans,
+  preserving unrelated backslash/newline/slash bytes instead of decoding an
+  entire evidence text layer. Focused regressions cover the exact validation
+  argv boundary and both invariants.
+- Route Python bytecode and pytest cache output for every external Codex profile
+  through a runtime-generated prefix beneath the current attempt's scratch
+  directory, outside the actor projection. The invariant covers generic
+  structured owner-duty writers and landing writers, including explicit
+  `py_compile` and ordinary imports, while preserving exact owner-signed
+  validation argv and `validation_command_id` receipts. Resumed attempts use
+  distinct scratch coordinates and leave no Python or pytest residue in the
+  actor final manifest.
 - Return an admitted external actor's stable `aoa-agents` owner-request
   identity in `owner_admission_ref` while retaining the runtime-private
   immutable request snapshot as separate path-addressable evidence. This lets

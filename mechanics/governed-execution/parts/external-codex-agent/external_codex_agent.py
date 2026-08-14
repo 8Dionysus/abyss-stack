@@ -5306,6 +5306,50 @@ def _toml_inline_string_map(values: Mapping[str, str]) -> str:
     return "{" + entries + "}"
 
 
+def _attempt_local_python_environment(scratch_root: str | Path) -> dict[str, str]:
+    """Return runtime-owned Python hygiene for one exact attempt scratch root.
+
+    ``PYTHONDONTWRITEBYTECODE`` does not constrain explicit ``py_compile``.
+    The prefix therefore remains necessary, and it must be derived from the
+    runtime-created attempt coordinate rather than from model or task input.
+    """
+
+    scratch = Path(scratch_root)
+    if not scratch.is_absolute() or scratch.is_symlink() or not scratch.is_dir():
+        raise ExternalCodexRuntimeError(
+            "attempt_scratch_unavailable",
+            "attempt-local Python hygiene requires a physical scratch directory",
+        )
+    prefix = scratch / "python-pycache"
+    try:
+        if prefix.is_symlink() or (prefix.exists() and not prefix.is_dir()):
+            raise OSError("attempt-local Python cache prefix is not a directory")
+        prefix.mkdir(mode=0o700, exist_ok=True)
+        prefix.chmod(0o700)
+    except OSError as exc:
+        raise ExternalCodexRuntimeError(
+            "attempt_python_cache_unavailable",
+            "cannot establish the attempt-local Python cache prefix",
+        ) from exc
+    return {
+        "PYTHONPYCACHEPREFIX": str(prefix),
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONNOUSERSITE": "1",
+        "PYTEST_ADDOPTS": "-p no:cacheprovider",
+    }
+
+
+def _attempt_shell_environment(
+    scratch_root: str | Path,
+    specialized_environment: Mapping[str, str],
+) -> dict[str, str]:
+    """Merge verified profile inputs with runtime-owned attempt hygiene."""
+
+    environment = dict(specialized_environment)
+    environment.update(_attempt_local_python_environment(scratch_root))
+    return environment
+
+
 def _specialized_environment(
     _profile: Mapping[str, Any],
     tool_entry: Mapping[str, Any],
@@ -5998,10 +6042,13 @@ def _contains_source_path(value: Any, source_path: str) -> bool:
     return False
 
 
-def _decode_one_json_escape_layer(value: str) -> str:
-    """Decode one JSON string-escape layer without requiring a JSON document."""
+def _decode_one_json_escape_layer_with_spans(
+    value: str,
+) -> tuple[str, tuple[tuple[int, int], ...]]:
+    """Decode one JSON escape layer and retain each output span in ``value``."""
 
     decoded: list[str] = []
+    spans: list[tuple[int, int]] = []
     index = 0
     simple = {
         '"': '"',
@@ -6016,11 +6063,13 @@ def _decode_one_json_escape_layer(value: str) -> str:
     while index < len(value):
         if value[index] != "\\" or index + 1 >= len(value):
             decoded.append(value[index])
+            spans.append((index, index + 1))
             index += 1
             continue
         escape = value[index + 1]
         if escape in simple:
             decoded.append(simple[escape])
+            spans.append((index, index + 2))
             index += 2
             continue
         if escape == "u" and index + 6 <= len(value):
@@ -6044,30 +6093,57 @@ def _decode_one_json_escape_layer(value: str) -> str:
                                     - 0xDC00
                                 )
                             )
+                            spans.append((index, next_index + 6))
                             index = next_index + 6
                             continue
                 if not 0xD800 <= code_unit <= 0xDFFF:
                     decoded.append(chr(code_unit))
+                    spans.append((index, next_index))
                     index = next_index
                     continue
         decoded.append(value[index])
+        spans.append((index, index + 1))
         index += 1
-    return "".join(decoded)
+    return "".join(decoded), tuple(spans)
+
+
+def _decode_one_json_escape_layer(value: str) -> str:
+    """Decode one JSON string-escape layer without requiring a JSON document."""
+
+    return _decode_one_json_escape_layer_with_spans(value)[0]
 
 
 def _json_escape_decoding_layers(value: str) -> tuple[str, ...]:
     """Expose bounded nested JSON escape spellings for source-alias checks."""
 
-    layers = [value]
+    return tuple(layer for layer, _spans in _json_escape_layers_with_spans(value))
+
+
+def _json_escape_layers_with_spans(
+    value: str,
+) -> tuple[tuple[str, tuple[tuple[int, int], ...]], ...]:
+    """Return bounded decoded layers mapped back to original string spans."""
+
+    identity = tuple((index, index + 1) for index in range(len(value)))
+    layers = [(value, identity)]
     current = value
+    current_spans = identity
     for _ in range(MAX_JSON_ESCAPE_LAYERS):
-        decoded = _decode_one_json_escape_layer(current)
+        decoded, local_spans = _decode_one_json_escape_layer_with_spans(current)
         if decoded == current:
             break
-        layers.append(decoded)
+        composed_spans = tuple(
+            (
+                current_spans[start][0],
+                current_spans[end - 1][1],
+            )
+            for start, end in local_spans
+        )
+        layers.append((decoded, composed_spans))
         current = decoded
+        current_spans = composed_spans
     else:
-        if _decode_one_json_escape_layer(current) != current:
+        if _decode_one_json_escape_layer_with_spans(current)[0] != current:
             raise ExternalCodexRuntimeError(
                 "actor_input_escape_depth_exceeded",
                 "actor-facing text exceeded the bounded JSON escape depth",
@@ -6079,17 +6155,67 @@ def _replace_source_aliases_in_text(
     value: str,
     replacements: Sequence[tuple[str, str]],
 ) -> str:
-    """Remove aliases revealed through literal or nested JSON string escapes."""
+    """Remove aliases while preserving every unrelated source character.
 
-    layers = _json_escape_decoding_layers(value)
-    if not any(alias in layer for alias, _ in replacements for layer in layers):
+    Source coordinates may only become visible after one or more JSON escape
+    decoding layers.  Decode for matching, but project each match back to its
+    original character span before replacing it; never return a wholly decoded
+    layer because that would rewrite unrelated ``\\n``/slash/escape bytes.
+    """
+
+    candidates: list[tuple[int, int, int, str]] = []
+    for layer_index, (layer, spans) in enumerate(
+        _json_escape_layers_with_spans(value)
+    ):
+        for alias, replacement in replacements:
+            if not alias:
+                continue
+            start = 0
+            while True:
+                match_start = layer.find(alias, start)
+                if match_start < 0:
+                    break
+                match_end = match_start + len(alias)
+                original_start = spans[match_start][0]
+                original_end = spans[match_end - 1][1]
+                candidates.append(
+                    (
+                        original_start,
+                        original_end,
+                        layer_index,
+                        replacement,
+                    )
+                )
+                start = match_start + 1
+    if not candidates:
         return value
-    matching_layers = [
-        layer for layer in layers if any(alias in layer for alias, _ in replacements)
-    ]
-    result = matching_layers[-1]
-    for alias, replacement in replacements:
-        result = result.replace(alias, replacement)
+
+    # Prefer the longest semantic alias at one source coordinate, then the
+    # widest mapped span.  Later decoded layers are only a matching view; the
+    # replacement always applies to the original spelling.
+    candidates.sort(
+        key=lambda item: (
+            item[0],
+            -(item[1] - item[0]),
+            -item[2],
+        )
+    )
+    selected: list[tuple[int, int, str]] = []
+    cursor = 0
+    for original_start, original_end, _layer_index, replacement in candidates:
+        if original_start < cursor:
+            continue
+        selected.append((original_start, original_end, replacement))
+        cursor = original_end
+
+    result_parts: list[str] = []
+    cursor = 0
+    for original_start, original_end, replacement in selected:
+        result_parts.append(value[cursor:original_start])
+        result_parts.append(replacement)
+        cursor = original_end
+    result_parts.append(value[cursor:])
+    result = "".join(result_parts)
     if any(
         alias in layer
         for alias, _ in replacements
@@ -7810,6 +7936,7 @@ class ExternalCodexRuntime:
             self.state_root,
             tool_entry,
             repository_workspace=repository_workspace,
+            apply_attempt_hygiene=False,
         )
         probes: list[tuple[str, list[str]]] = [
             ("version", [str(executable), "--version"]),
@@ -9746,7 +9873,16 @@ class ExternalCodexRuntime:
         tool_entry: Mapping[str, Any],
         *,
         repository_workspace: Path | None = None,
+        apply_attempt_hygiene: bool = True,
     ) -> dict[str, str]:
+        """Build a Codex environment for preflight or one real attempt.
+
+        Preflight is a stable admission probe and has no attempt coordinate;
+        only a real start/resume attempt may receive scratch-derived Python
+        cache routing.  The caller therefore disables that final merge during
+        preflight even though the shared shell/config isolation remains useful.
+        """
+
         environment: dict[str, str] = {}
         for key in launch.get("environment_allowlist", []):
             if SECRET_ENV_RE.search(str(key)):
@@ -9794,6 +9930,8 @@ class ExternalCodexRuntime:
                 tool_entry,
             )
             environment.update(specialized_environment)
+        if apply_attempt_hygiene:
+            environment.update(_attempt_local_python_environment(scratch_root))
         return environment
 
     def _materialized_payloads(
@@ -11459,7 +11597,10 @@ Runtime session identity: {state["session_id"]}
                     if binding.permission_posture.sandbox_mode == "workspace_write"
                     else "read"
                 ),
-                shell_environment=specialized_environment,
+                shell_environment=_attempt_shell_environment(
+                    scratch,
+                    specialized_environment,
+                ),
             )
             process_identity_path = attempt_dir / "process-identity.json"
             child_workspace_descriptor = os.dup(projection_descriptor)
@@ -15557,6 +15698,7 @@ class ExternalCodexParentReentry:
             "TMPDIR": str(scratch),
             "NO_COLOR": "1",
         }
+        environment.update(_attempt_local_python_environment(scratch))
         return environment
 
     def _codex_command(

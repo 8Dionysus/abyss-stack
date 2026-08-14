@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 121,
-  "edge_count": 2737,
+  "decision_count": 122,
+  "edge_count": 2757,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1014,
-    "DATED": 121,
-    "GUARDED_BY": 374,
-    "HAS_STATUS": 121,
-    "HAS_SURFACE_CLASS": 327,
-    "IN_STACK_LANE": 284,
-    "NEXT_DECISION": 120,
-    "OWNED_BY_SURFACE": 127,
-    "OWNS_DECISION": 121,
+    "CITES_SOURCE_SURFACE": 1019,
+    "DATED": 122,
+    "GUARDED_BY": 377,
+    "HAS_STATUS": 122,
+    "HAS_SURFACE_CLASS": 330,
+    "IN_STACK_LANE": 287,
+    "NEXT_DECISION": 121,
+    "OWNED_BY_SURFACE": 128,
+    "OWNS_DECISION": 122,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 126
+    "UNDER_MECHANIC_PARENT": 127
   },
   "edges": [
     {
@@ -13088,11 +13088,106 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0121",
+      "target": "decision:ABYSS-STACK-D-0122",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0121",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_nested_evidence.py",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0121",
+      "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
+      "target": "source_surface:CHANGELOG.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_workspace_hygiene.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
+      "target": "date:2026-08-14",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
+      "target": "guard_family:attempt%20isolation",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
+      "target": "guard_family:exact%20argv%20identity",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
+      "target": "guard_family:projection%20containment",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
+      "target": "status:proposed",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
+      "target": "surface_class:external%20actor%20runtime",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
+      "target": "surface_class:validation",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
+      "target": "surface_class:workspace%20hygiene",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
+      "target": "stack_lane:governed%20execution",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
+      "target": "stack_lane:review",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
       "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -13700,21 +13795,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0121",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0122",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1193,
+  "node_count": 1202,
   "node_type_counts": {
-    "date": 37,
-    "decision": 121,
-    "guard_family": 186,
+    "date": 38,
+    "decision": 122,
+    "guard_family": 189,
     "mechanic_parent": 10,
-    "owner_surface": 64,
+    "owner_surface": 65,
     "repo": 1,
-    "source_surface": 587,
+    "source_surface": 588,
     "stack_lane": 49,
-    "status": 3,
-    "surface_class": 135
+    "status": 4,
+    "surface_class": 136
   },
   "nodes": [
     {
@@ -13900,6 +14000,11 @@
     {
       "id": "date:2026-08-13",
       "label": "2026-08-13",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-08-14",
+      "label": "2026-08-14",
       "type": "date"
     },
     {
@@ -15113,6 +15218,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-14",
+      "id": "decision:ABYSS-STACK-D-0122",
+      "label": "ABYSS-STACK-D-0122",
+      "path": "docs/decisions/ABYSS-STACK-D-0122-attempt-local-python-cache-routing.md",
+      "posture": "proposed runtime invariant pending independent review",
+      "status": "proposed",
+      "title": "ABYSS-STACK-D-0122 Attempt-Local Python Cache Routing",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -15175,6 +15290,11 @@
     {
       "id": "guard_family:atomic%20projection",
       "label": "atomic projection",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:attempt%20isolation",
+      "label": "attempt isolation",
       "type": "guard_family"
     },
     {
@@ -15385,6 +15505,11 @@
     {
       "id": "guard_family:exact%20admission",
       "label": "exact admission",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:exact%20argv%20identity",
+      "label": "exact argv identity",
       "type": "guard_family"
     },
     {
@@ -15755,6 +15880,11 @@
     {
       "id": "guard_family:profile-topology",
       "label": "profile-topology",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:projection%20containment",
+      "label": "projection containment",
       "type": "guard_family"
     },
     {
@@ -16255,6 +16385,11 @@
     {
       "id": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/",
       "label": "mechanics/governed-execution/parts/external-codex-agent/",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
       "type": "owner_surface"
     },
     {
@@ -18359,6 +18494,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_workspace_hygiene.py",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_workspace_hygiene.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/governed-execution/parts/governed-runner/",
       "label": "mechanics/governed-execution/parts/governed-runner/",
       "type": "source_surface"
@@ -19609,6 +19749,11 @@
       "type": "status"
     },
     {
+      "id": "status:proposed",
+      "label": "proposed",
+      "type": "status"
+    },
+    {
       "id": "status:superseded",
       "label": "superseded",
       "type": "status"
@@ -20286,6 +20431,11 @@
     {
       "id": "surface_class:vector%20store",
       "label": "vector store",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:workspace%20hygiene",
+      "label": "workspace hygiene",
       "type": "surface_class"
     }
   ],

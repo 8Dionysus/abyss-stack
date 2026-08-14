@@ -65,8 +65,16 @@ admission against pinned `aoa-agents` and `aoa-skills` schemas, a neutral
 profile-bound specialized-environment release containing exact Python package
 metadata, the packaged SDK Python root, and a clean tracked owner snapshot,
 refusal of missing, drifted, or dirty specialized inputs, child environment
-injection without user-site inheritance or pytest cache residue, and read-only
-permission coordinates for those release roots; a neutral
+injection without user-site inheritance, attempt-local `PYTHONPYCACHEPREFIX`
+residue, or pytest cache residue—including explicit `py_compile`, ordinary
+imports, and resume-separated scratch coordinates across generic and landing
+workspace-write profiles—and read-only permission coordinates for those release
+roots. It also proves that admission preflight does not create or receive an
+attempt prefix through `state_root`, while every real start/resume path remains
+scratch-bound across the admitted workspace-write profiles. The focused
+runtime-invariant-closure tests additionally compare literal, Unicode-escaped,
+slash-escaped, mixed, and nested UTF-8 source text while preserving unrelated
+backslash/newline bytes. A neutral
 non-starting binder, accepted responsibility transfer with two exact holders,
 a ready task-local DAG and exact domain procedure refs, a distinct OS process,
 structured events and output, no built-in multi-agent flag, byte-aware
