@@ -1,5 +1,61 @@
 # Governed Execution Landing Log
 
+## 2026-08-13 - Stable external owner-request result identity
+
+Separated the cross-owner identity of an admitted `aoa-agents` execution
+request from the runtime-private path of its immutable materialized copy. The
+terminal result now returns the stable `request_ref` plus exact admitted byte
+digest in `owner_admission_ref`, while `evidence_refs` retains the verified
+local snapshot needed for recovery and continuation closure. Result reads,
+lost-final-save recovery, and exact-thread continuation independently rebind
+the stable identity and snapshot to durable admission state; neither may be
+substituted while retaining the other. The same check now precedes review-seed
+issuance, reviewer preparation, and initial parent re-entry child admission;
+later parent recovery continues from the already admitted immutable snapshot
+without reopening the mutable canonical child result.
+
+Runtime state v4 marks the new stable-reference representation. Upgrade reads
+of v3 receipts preserve the exact historical path-shaped reference, but still
+recompute its immutable request digest and require it in result evidence. A v3
+receipt cannot claim the v4 stable representation, and a v4 receipt cannot
+downgrade to the legacy path form. That distinction is not inferred from the
+mutable state version alone: every new owner-contour launch carries
+`owner_admission_identity_mode=stable_request_ref_v1`, and the admitted owner
+request binds the exact launch digest. A genuine legacy v3 launch has no such
+mode. The runtime now publishes a separate non-replacing generation anchor outside
+the session tree before first state publication. Result reads therefore require
+that external anchor, state version, materialized launch bytes, owner request
+semantic self-digest, and runtime-launch ref to agree. Rewriting the entire
+session-local closure cannot substitute the anchor. Its same-UID pathname is
+not claimed immutable: deletion makes the session fail closed. It cannot turn
+a rewritten v4 session into legacy state because migration additionally
+requires the exact session, launch, request, and stable request ref in an
+operator inventory sealed into the verified release snapshot. Prior v3
+sessions remain usable only after that catalog match and the explicit migration
+operation confirms their operator-observed expected launch and request digests;
+ordinary reads fail closed and never invent that provenance. The anchored
+legacy path also preserves a pre-upgrade session that crashed after `prepared`
+but before its first worker attempt.
+
+Packaging the inventory does not itself authorize it. A non-empty catalog is
+accepted only by `stage`; ordinary `install` and `activate` reject the resulting
+release. `activate-admitted` must obtain a host artifact-trust decision over the
+complete content-addressed release before publishing its active record and
+wrappers, so the runtime UID cannot turn attacker-selected catalog bytes into
+an admitted migration authority.
+
+The new-admission contour is also idempotent across its narrow publication
+window. If the controller stops after the current generation anchor is durable
+but before `state.json`, an exact retry reuses that anchor's `recorded_at` and
+reuses only an actor projection whose full baseline and inode identity still
+match the anchored admission. A single already-written prepared event is
+reconciled as the initial durable event prefix. Drift or extra events fail
+closed, and no recursive projection reset creates a second crash window.
+
+The complete external-Codex deterministic suite passed. This is an ABI repair,
+not new role, model-fit, owner-acceptance, publication, or external-effect
+authority.
+
 ## 2026-05-07 - Initial package landing
 
 Created the governed-execution package as the route home for governed local

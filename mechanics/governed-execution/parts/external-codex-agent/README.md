@@ -143,7 +143,7 @@ The controller:
 - emits result v2 with mandatory actor/source provenance for successful returns,
   while continuing to read legacy result v1 and durable state v1/v2 for status and
   terminal-result recovery, while refusing a new inference attempt unless a
-  safe v3 runtime-owned projection and its baseline are available;
+  safe v3-or-newer runtime-owned projection and its baseline are available;
 - turns read-only drift, out-of-scope paths, forbidden effects, identity drift,
   or report-contract drift into typed failure or authority-blocked evidence;
   non-owner-fixed interpreter, script, process-launch wrapper, `find -exec`,
@@ -516,6 +516,57 @@ Installation requires clean exact
 each dirty posture is admitted explicitly. A specialized owner snapshot such
 as `aoa-stats` must always be clean and match the source ref pinned by the tool
 profile; it has no dirty-source override.
+
+Owner-contour launch binding also carries an owner-request-bound receipt
+identity mode. New sessions use `stable_request_ref_v1`; pre-upgrade v3
+receipts are recognized only by an exact legacy launch without that mode.
+Runtime reads verify the materialized launch digest, the owner request semantic
+self-digest, its `runtime_launch_ref`, and a separate non-replacing generation
+anchor under `owner-admission-generations/` before selecting either result
+form. The anchor is published outside the session directory and retained as
+evidence by new results. Its pathname is deliberately not claimed to be
+same-UID immutable: deletion makes the session unusable. It cannot reopen the
+legacy route because `migrate-legacy-owner-admission` also requires an exact
+session/launch/request/request-ref entry from
+`legacy-owner-admission-migrations.v1.json`, verified as part of the
+content-addressed release and mounted into the controller's sealed read-only
+snapshot. The installer accepts an operator inventory only through
+`stage --legacy-owner-migration-catalog`; the authored default is empty. A
+non-empty catalog cannot pass ordinary `install` or ordinary `activate`: only
+`activate-admitted` may publish that release after the host artifact trust gate
+binds its complete release manifest. New
+admission requires the current mode, and ordinary reads never create a
+migration. A cataloged markerless v3 session may publish its anchor only when
+the operator-supplied expected digests and all durable bytes agree. The same
+anchor then preserves the crash-before-first-attempt `prepared` recovery path.
+For a new current-generation admission, a crash after anchor publication but
+before `state.json` is idempotent: the exact retry reuses the recorded anchor
+timestamp and the verified unpublished actor projection without deleting it.
+The external anchor also binds the actor-baseline manifest digest, so a
+same-UID rewrite of both the projection and its session-local manifest cannot
+be adopted merely by changing session files. The retry additionally builds a
+fresh, inode-pinned witness from the independently admitted source or exact
+review seed and requires the recovered content and private Git body to match;
+recreating the UID-owned anchor therefore cannot select substituted bytes.
+This external digest binding is generation-anchor v2. Stable-request v1
+anchors were never deployed and are rejected; deployed legacy-v3 sessions are
+admitted only by the release-cataloged explicit migration, which publishes a
+v2 anchor. Recovery never runs Git against the
+mutable projection. All non-index private-Git bytes are compared with the safe
+witness authority captured in memory before the staging inode receives its
+public session pathname. Later mutation of that published witness cannot change
+the comparison value. The recovered index is read through a pinned descriptor
+and sealed in a memfd, and only its stage/flag meaning is interpreted against
+the fresh witness with hooks and fsmonitor disabled. The mutable projection is
+then inventoried again, so a concurrent config, attribute, or worktree rewrite
+can fail closed without gaining controller-process execution. If the prepared event was
+already appended, its complete event object, including the anchor-derived
+timestamp, becomes the initial durable prefix rather than being duplicated. A
+different identity, changed projection, or additional event is rejected.
+After `state.json` exists, v2 reads continue to bind its baseline reference and
+bytes to the generation anchor. An attempt-free `prepared` retry also rebuilds
+the independent witness before spawning its first worker, closing the
+state-saved/process-not-yet-created crash window.
 
 See [CONTRACT.md](CONTRACT.md), [DIRECTION.md](DIRECTION.md),
 [PROVENANCE.md](PROVENANCE.md), [SUSPENSION.md](SUSPENSION.md), and

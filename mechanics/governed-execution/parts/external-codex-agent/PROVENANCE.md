@@ -58,6 +58,23 @@ and reaped.
 Historical v2 state without these newer digests remains evidence-readable; it is
 not silently upgraded into authority for another inference attempt.
 
+Owner-result identity has one additional controller provenance layer. New
+owner-contour admissions publish a non-replacing generation anchor in a
+state-root-level ledger before durable session state appears. It binds the
+stable request identity and exact launch/request digests independently of the
+mutable session tree. The local pathname is removable by the runtime UID, so
+absence is terminal rather than treated as proof of legacy state. Pre-upgrade
+v3 state receives equivalent legacy provenance only when an explicit migration
+command supplies the operator-observed expected digests and the exact session,
+launch, request bytes, and stable request ref are present in the pre-upgrade
+inventory sealed into the verified release snapshot. Normal result, recovery,
+continuation, and review routes never synthesize that provenance.
+The inventory becomes authoritative only through the existing artifact-trust
+activation contour. `stage` may package operator-observed legacy identities,
+but ordinary `install` and `activate` refuse any non-empty catalog. The host
+gate used by `activate-admitted` must first bind the entire content-addressed
+release before the catalog can enter the active controller snapshot.
+
 The neutral binder consumes already selected coordinates and writes only the
 runtime launch. Its response explicitly returns to `aoa-agents` to form the
 separate owner execution request; it cannot choose the obligation, role,

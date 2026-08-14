@@ -2157,6 +2157,11 @@ def _fixture(
         "admission_class": (
             "owner_contour" if owner_contour else "transport_study_fixture"
         ),
+        **(
+            {"owner_admission_identity_mode": "stable_request_ref_v1"}
+            if owner_contour
+            else {}
+        ),
         "plan": {"path": str(plan_path), "digest": _digest_path(plan_path)},
         "incarnation_binding": {
             "path": str(binding_path),
@@ -2293,6 +2298,178 @@ def _wait_terminal(
     if state["status"] != "running":
         return state
     raise AssertionError(f"external Codex fixture did not stop: {state}")
+
+
+def _rewrite_owner_state_as_legacy_v3(
+    runtime: Any,
+    session_id: str,
+    *,
+    source_launch_path: Path,
+    source_owner_request_path: Path,
+    migrate_generation: bool = True,
+) -> tuple[dict[str, Any], Path, dict[str, str]]:
+    """Reproduce the launch/request generation of a durable runtime state v3."""
+
+    state = runtime._load_state(session_id)
+    session_dir = runtime._session_dir(session_id)
+    materialized_launch_path = session_dir / "inputs" / "launch.json"
+    launch = json.loads(materialized_launch_path.read_text(encoding="utf-8"))
+    launch.pop("owner_admission_identity_mode")
+    materialized_launch_path.chmod(0o600)
+    _write_json(materialized_launch_path, launch)
+    materialized_launch_path.chmod(0o400)
+    _write_json(source_launch_path, launch)
+    launch_digest = _digest_path(materialized_launch_path)
+
+    owner_request_path = Path(state["materialized_inputs"]["owner_execution_request"])
+    owner_request = json.loads(owner_request_path.read_text(encoding="utf-8"))
+    owner_request["external_incarnation"]["runtime_launch_ref"]["digest"] = (
+        launch_digest
+    )
+    owner_request["request_digest"] = RUNTIME.owner_request_digest(owner_request)
+    owner_request_path.chmod(0o600)
+    _write_json(owner_request_path, owner_request)
+    owner_request_path.chmod(0o400)
+    _write_json(source_owner_request_path, owner_request)
+    owner_evidence_ref = RUNTIME._artifact_ref(
+        owner_request_path,
+        owner="aoa-agents",
+    )
+    state["schema_version"] = RUNTIME.LEGACY_STATE_V3_SCHEMA_VERSION
+    state["launch_digest"] = launch_digest
+    state["owner_admission_digest"] = owner_evidence_ref["artifact_digest"]
+    runtime._save_state(state)
+    # Emulate a state created before generation anchors existed, then perform
+    # the explicit one-time migration required by the upgraded runtime.  A
+    # normal v4 session can never replace its already-published stable anchor.
+    if migrate_generation:
+        generation_path = runtime._owner_admission_generation_path(session_id)
+        generation_path.unlink()
+        _admit_legacy_generation_for_test(
+            runtime,
+            state,
+            owner_request_path=owner_request_path,
+        )
+        runtime.migrate_legacy_owner_admission_generation(
+            session_id,
+            expected_launch_digest=launch_digest,
+            expected_owner_admission_digest=owner_evidence_ref["artifact_digest"],
+        )
+    return state, owner_request_path, owner_evidence_ref
+
+
+def _admit_legacy_generation_for_test(
+    runtime: Any,
+    state: Mapping[str, Any],
+    *,
+    owner_request_path: Path,
+) -> None:
+    """Model an exact pre-upgrade inventory sealed into the tested release."""
+
+    owner_request = json.loads(owner_request_path.read_text(encoding="utf-8"))
+    entry = {
+        "session_id": state["session_id"],
+        "launch_id": state["launch_id"],
+        "launch_digest": state["launch_digest"],
+        "owner_admission_digest": state["owner_admission_digest"],
+        "owner_request_ref": owner_request["request_ref"],
+    }
+    catalog = {
+        "schema_version": RUNTIME.LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION,
+        "catalog_id": "test-pre-upgrade-inventory",
+        "captured_at": "2026-08-13T00:00:00Z",
+        "entries": [entry],
+    }
+    raw = json.dumps(
+        catalog,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    catalog_path = runtime.state_root / "test-verified-release-legacy-catalog.json"
+    catalog_path.write_bytes(raw)
+    for runtime_class in (
+        RUNTIME.ExternalCodexRuntime,
+        PREPARER.ExternalCodexRuntime,
+    ):
+        runtime_class.__init__.__globals__[  # type: ignore[attr-defined]
+            "LEGACY_OWNER_MIGRATION_CATALOG_PATH"
+        ] = catalog_path
+    runtime.legacy_owner_migration_catalog_raw = raw
+    runtime.legacy_owner_migration_catalog = catalog
+    runtime.legacy_owner_migration_entries = {str(state["session_id"]): entry}
+    runtime.legacy_owner_migration_catalog_digest = RUNTIME.sha256_bytes(raw)
+
+
+def _rewrite_owner_receipt_as_legacy_v3(
+    runtime: Any,
+    session_id: str,
+    *,
+    source_launch_path: Path,
+    source_owner_request_path: Path,
+) -> dict[str, Any]:
+    """Reproduce the exact owner-ref representation emitted by runtime state v3."""
+
+    state, owner_request_path, owner_evidence_ref = (
+        _rewrite_owner_state_as_legacy_v3(
+            runtime,
+            session_id,
+            source_launch_path=source_launch_path,
+            source_owner_request_path=source_owner_request_path,
+        )
+    )
+
+    result_path = runtime._session_dir(session_id) / "result.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result["owner_admission_ref"] = owner_evidence_ref
+    result["evidence_refs"] = [
+        owner_evidence_ref
+        if item.get("owner_repo") == "aoa-agents"
+        and item.get("artifact_ref") == str(owner_request_path)
+        else item
+        for item in result["evidence_refs"]
+        if item.get("artifact_ref")
+        != str(runtime._owner_admission_generation_path(session_id))
+    ]
+    _write_json(result_path, result)
+    attempt_dir = (
+        runtime._session_dir(session_id)
+        / "attempts"
+        / f"{int(result['attempt_count']):03d}"
+    )
+    preserved_path = attempt_dir / "runtime-result.json"
+    if preserved_path.is_file():
+        preserved_path.chmod(0o600)
+        _write_json(preserved_path, result)
+        preserved_path.chmod(0o400)
+        closure_path = attempt_dir / "runtime-result-evidence-closure.json"
+        if closure_path.is_file():
+            closure = json.loads(closure_path.read_text(encoding="utf-8"))
+            closure["source_result_ref"] = RUNTIME._artifact_ref(preserved_path)
+            closure["preserved_evidence"] = [
+                item
+                for item in closure["preserved_evidence"]
+                if item["source_ref"].get("artifact_ref")
+                != str(runtime._owner_admission_generation_path(session_id))
+            ]
+            for item in closure["preserved_evidence"]:
+                if (
+                    item["source_ref"].get("owner_repo") == "aoa-agents"
+                    and item["source_ref"].get("artifact_ref")
+                    == str(owner_request_path)
+                ):
+                    item["source_ref"] = owner_evidence_ref
+                    snapshot_path = Path(item["snapshot_ref"]["artifact_ref"])
+                    snapshot_path.chmod(0o600)
+                    snapshot_path.write_bytes(owner_request_path.read_bytes())
+                    snapshot_path.chmod(0o400)
+                    item["snapshot_ref"] = RUNTIME._artifact_ref(snapshot_path)
+            closure_path.chmod(0o600)
+            _write_json(closure_path, closure)
+            closure_path.chmod(0o400)
+    state["result_digest"] = _digest_path(result_path)
+    runtime._save_state(state)
+    return result
 
 
 def test_schema_meta_validation_cache_is_exact_and_fail_closed(
@@ -5477,6 +5654,120 @@ def test_reviewer_preparation_requires_canonical_durable_writer_result(
         )
 
 
+def test_reviewer_preparation_rejects_substituted_owner_request_identity(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path / "writer", exact_baseline=True)
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    writer_result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    writer_result = json.loads(writer_result_path.read_text(encoding="utf-8"))
+    writer_result["owner_admission_ref"] = dict(writer_result["report_ref"])
+    _write_json(writer_result_path, writer_result)
+    state = runtime._load_state(fixture["session_id"])
+    state["result_digest"] = _digest_path(writer_result_path)
+    runtime._save_state(state)
+
+    with pytest.raises(
+        PREPARER.StudyPreparationError,
+        match="owner admission binding",
+    ):
+        PREPARER._prepare_reviewer(
+            argparse.Namespace(
+                writer_launch=str(fixture["launch_path"]),
+                writer_result=str(writer_result_path),
+                output_root=str(tmp_path / "review-preparation"),
+                state_root=str(runtime.state_root),
+                aoa_sdk_root=str(SDK_ROOT),
+            )
+        )
+
+
+def test_legacy_v3_owner_receipt_remains_readable_and_reviewable_after_upgrade(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "writer",
+        role_id="reviewer",
+        owner_contour=True,
+        omit_historical_reviewer_inputs=True,
+    )
+    runtime = fixture["runtime"]
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    legacy_result = _rewrite_owner_receipt_as_legacy_v3(
+        runtime,
+        fixture["session_id"],
+        source_launch_path=fixture["launch_path"],
+        source_owner_request_path=fixture["owner_execution_request_path"],
+    )
+
+    assert runtime.result(fixture["session_id"]) == legacy_result
+    preparation = PREPARER._prepare_reviewer(
+        argparse.Namespace(
+            writer_launch=str(fixture["launch_path"]),
+            writer_result=str(
+                runtime._session_dir(fixture["session_id"]) / "result.json"
+            ),
+            output_root=str(tmp_path / "review-preparation"),
+            state_root=str(runtime.state_root),
+            aoa_sdk_root=str(SDK_ROOT),
+        )
+    )
+    assert preparation["prepared"] is True
+
+
+def test_exact_legacy_v3_prepared_owner_session_starts_after_upgrade(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True)
+    runtime = fixture["runtime"]
+    original_spawn = runtime._spawn_worker
+
+    def preserve_prepared_state(
+        self: Any,
+        state: dict[str, Any],
+        *,
+        mode: str,
+        resume_payload: Mapping[str, Any] | None,
+    ) -> None:
+        del self, state, mode, resume_payload
+
+    runtime._spawn_worker = MethodType(  # type: ignore[method-assign]
+        preserve_prepared_state,
+        runtime,
+    )
+    prepared = runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    assert prepared["status"] == "prepared"
+    assert prepared["attempt_count"] == 0
+    _rewrite_owner_state_as_legacy_v3(
+        runtime,
+        fixture["session_id"],
+        source_launch_path=fixture["launch_path"],
+        source_owner_request_path=fixture["owner_execution_request_path"],
+    )
+    runtime._spawn_worker = original_spawn  # type: ignore[method-assign]
+
+    preflight = runtime.preflight(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    assert preflight["admitted"] is True
+    restarted = runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    assert restarted["status"] == "running"
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+
+
 def test_review_seed_rejects_live_writer_and_stale_terminal_result(
     tmp_path: Path,
 ) -> None:
@@ -5508,6 +5799,29 @@ def test_review_seed_rejects_live_writer_and_stale_terminal_result(
     stale = json.loads(result_path.read_text(encoding="utf-8"))
     stale["duration_seconds"] = float(stale["duration_seconds"]) + 1.0
     _write_json(result_path, stale)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.issue_review_seed(writer["session_id"])
+    assert exc_info.value.code == "review_seed_writer_result_unbound"
+
+
+def test_review_seed_rejects_substituted_owner_request_identity(
+    tmp_path: Path,
+) -> None:
+    writer = _fixture(
+        tmp_path / "terminal-writer",
+        identity_suffix="owner-identity-seed-writer",
+    )
+    runtime = writer["runtime"]
+    runtime.start(writer["launch_path"])
+    assert _wait_terminal(runtime, writer["session_id"])["status"] == "completed"
+    result_path = runtime._session_dir(writer["session_id"]) / "result.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result["owner_admission_ref"] = dict(result["report_ref"])
+    _write_json(result_path, result)
+    state = runtime._load_state(writer["session_id"])
+    state["result_digest"] = _digest_path(result_path)
+    runtime._save_state(state)
+
     with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
         runtime.issue_review_seed(writer["session_id"])
     assert exc_info.value.code == "review_seed_writer_result_unbound"
@@ -5698,10 +6012,745 @@ def test_owner_contour_admits_exact_role_first_request_and_runs_separate_process
     assert terminal["status"] == "completed"
     result = fixture["runtime"].result(started["session_id"])
     assert result["admission_class"] == "owner_contour"
+    request = json.loads(owner_request_path.read_text(encoding="utf-8"))
+    assert result["owner_admission_ref"] == {
+        "owner_repo": "aoa-agents",
+        "artifact_ref": request["request_ref"],
+        "artifact_digest": _digest_path(owner_request_path),
+    }
+    assert {
+        "owner_repo": "aoa-agents",
+        "artifact_ref": str(
+            fixture["runtime"]._session_dir(started["session_id"])
+            / "inputs"
+            / "owner-execution-request.json"
+        ),
+        "artifact_digest": _digest_path(owner_request_path),
+    } in result["evidence_refs"]
     assert result["owner_admission_ref"]["artifact_digest"] == _digest_path(
         owner_request_path
     )
     assert result["usage"]["input_tokens"] == 120
+
+
+def test_owner_result_binding_rejects_stable_request_identity_substitution(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True)
+    runtime = fixture["runtime"]
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    state = runtime._load_state(fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+    runtime._validate_owner_admission_result_binding_locked(
+        state,
+        result,
+        failure_code="fixture_owner_binding_mismatch",
+        label="fixture result",
+    )
+
+    result["owner_admission_ref"] = {
+        **result["owner_admission_ref"],
+        "artifact_ref": "external-execution-request:fixture:substituted",
+    }
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime._validate_owner_admission_result_binding_locked(
+            state,
+            result,
+            failure_code="fixture_owner_binding_mismatch",
+            label="fixture result",
+        )
+    assert exc_info.value.code == "fixture_owner_binding_mismatch"
+
+
+def test_owner_result_binding_accepts_exact_legacy_v3_path_receipt(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True)
+    runtime = fixture["runtime"]
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    result = _rewrite_owner_receipt_as_legacy_v3(
+        runtime,
+        fixture["session_id"],
+        source_launch_path=fixture["launch_path"],
+        source_owner_request_path=fixture["owner_execution_request_path"],
+    )
+    state = runtime._load_state(fixture["session_id"])
+
+    runtime._validate_owner_admission_result_binding_locked(
+        state,
+        result,
+        failure_code="fixture_owner_binding_mismatch",
+        label="legacy fixture result",
+    )
+
+    owner_request = json.loads(
+        Path(state["materialized_inputs"]["owner_execution_request"]).read_text(
+            encoding="utf-8"
+        )
+    )
+    result["owner_admission_ref"] = {
+        **result["owner_admission_ref"],
+        "artifact_ref": owner_request["request_ref"],
+    }
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime._validate_owner_admission_result_binding_locked(
+            state,
+            result,
+            failure_code="fixture_owner_binding_mismatch",
+            label="legacy fixture result",
+        )
+    assert exc_info.value.code == "fixture_owner_binding_mismatch"
+
+
+def test_v4_owner_receipt_cannot_downgrade_to_legacy_path_identity(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True)
+    runtime = fixture["runtime"]
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    state = runtime._load_state(fixture["session_id"])
+    result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result["owner_admission_ref"] = runtime._owner_admission_evidence_ref(state)
+    _write_json(result_path, result)
+    state["schema_version"] = RUNTIME.LEGACY_STATE_V3_SCHEMA_VERSION
+    state["result_digest"] = _digest_path(result_path)
+    runtime._save_state(state)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.result(fixture["session_id"])
+    assert exc_info.value.code == "runtime_state_owner_identity_invalid"
+
+
+def test_v4_owner_receipt_cannot_downgrade_by_rewriting_full_session_closure(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True)
+    runtime = fixture["runtime"]
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    state, owner_request_path, owner_evidence_ref = _rewrite_owner_state_as_legacy_v3(
+        runtime,
+        fixture["session_id"],
+        source_launch_path=fixture["launch_path"],
+        source_owner_request_path=fixture["owner_execution_request_path"],
+        migrate_generation=False,
+    )
+    result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result["owner_admission_ref"] = owner_evidence_ref
+    result["evidence_refs"] = [
+        owner_evidence_ref
+        if item.get("owner_repo") == "aoa-agents"
+        and item.get("artifact_ref") == str(owner_request_path)
+        else item
+        for item in result["evidence_refs"]
+    ]
+    _write_json(result_path, result)
+    state["result_digest"] = _digest_path(result_path)
+    runtime._save_state(state)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.result(fixture["session_id"])
+    assert exc_info.value.code == "runtime_state_owner_identity_invalid"
+
+
+def test_owner_admission_retry_reuses_generation_published_before_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="generation-before-state-retry",
+    )
+    runtime = fixture["runtime"]
+    original_publish = runtime._publish_owner_admission_generation
+    published_generation: dict[str, Any] = {}
+
+    def publish_then_crash(generation: Mapping[str, Any]) -> dict[str, Any]:
+        published = original_publish(generation)
+        published_generation.update(published)
+        raise RUNTIME.ExternalCodexRuntimeError(
+            "fixture_controller_crash",
+            "controller stopped after generation publication",
+        )
+
+    monkeypatch.setattr(
+        runtime,
+        "_publish_owner_admission_generation",
+        publish_then_crash,
+    )
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert exc_info.value.code == "fixture_controller_crash"
+    assert runtime._state_path(fixture["session_id"]).exists() is False
+
+    monkeypatch.setattr(
+        runtime,
+        "_publish_owner_admission_generation",
+        original_publish,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_spawn_worker",
+        MethodType(
+            lambda self, state, *, mode, resume_payload: None,
+            runtime,
+        ),
+    )
+    retried = runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    state = runtime._load_state(fixture["session_id"])
+    anchor = runtime._load_owner_admission_generation(fixture["session_id"])
+
+    assert retried["status"] == "prepared"
+    assert anchor == published_generation
+    assert state["created_at"] == anchor["recorded_at"]
+    assert anchor["actor_baseline_manifest_digest"] == state[
+        "actor_baseline_manifest_ref"
+    ]["artifact_digest"]
+
+
+def test_owner_admission_retry_reconciles_prepared_event_before_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="prepared-event-before-state-retry",
+    )
+    runtime = fixture["runtime"]
+    original_save = runtime._save_state
+
+    def crash_before_first_state(state: Mapping[str, Any]) -> None:
+        raise RUNTIME.ExternalCodexRuntimeError(
+            "fixture_controller_crash",
+            "controller stopped after prepared event publication",
+        )
+
+    monkeypatch.setattr(runtime, "_save_state", crash_before_first_state)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert exc_info.value.code == "fixture_controller_crash"
+    assert runtime._state_path(fixture["session_id"]).exists() is False
+    events_path = runtime._events_path(fixture["session_id"])
+    assert len(events_path.read_text(encoding="utf-8").splitlines()) == 1
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as retry_exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert retry_exc_info.value.code == "fixture_controller_crash"
+    assert runtime._state_path(fixture["session_id"]).exists() is False
+    assert len(events_path.read_text(encoding="utf-8").splitlines()) == 1
+
+    monkeypatch.setattr(runtime, "_save_state", original_save)
+    monkeypatch.setattr(
+        runtime,
+        "_spawn_worker",
+        MethodType(
+            lambda self, state, *, mode, resume_payload: None,
+            runtime,
+        ),
+    )
+    retried = runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    state = runtime._load_state(fixture["session_id"])
+    event = json.loads(events_path.read_text(encoding="utf-8"))
+
+    assert retried["status"] == "prepared"
+    assert state["last_event_sequence"] == 0
+    assert event["recorded_at"] == state["created_at"]
+    assert len(events_path.read_text(encoding="utf-8").splitlines()) == 1
+
+
+def test_owner_admission_retry_rejects_projection_and_baseline_coordinated_rewrite(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="projection-baseline-rewrite-before-state",
+    )
+    runtime = fixture["runtime"]
+
+    monkeypatch.setattr(
+        runtime,
+        "_save_state",
+        lambda state: (_ for _ in ()).throw(
+            RUNTIME.ExternalCodexRuntimeError(
+                "fixture_controller_crash",
+                "controller stopped after generation and event publication",
+            )
+        ),
+    )
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert exc_info.value.code == "fixture_controller_crash"
+
+    session_dir = runtime._session_dir(fixture["session_id"])
+    projection = session_dir / "actor-workspace"
+    baseline_path = session_dir / "actor-baseline-manifest.json"
+    original_baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    (projection / "README.md").write_text(
+        "coordinated same-uid replacement\n",
+        encoding="utf-8",
+    )
+    fsmonitor_marker = tmp_path / "forged-fsmonitor-ran"
+    fsmonitor_helper = tmp_path / "forged-fsmonitor"
+    fsmonitor_helper.write_text(
+        "#!/bin/sh\n/usr/bin/touch "
+        + shlex.quote(str(fsmonitor_marker))
+        + "\n",
+        encoding="utf-8",
+    )
+    fsmonitor_helper.chmod(0o700)
+    with (projection / ".git" / "config").open("a", encoding="utf-8") as handle:
+        handle.write(f"[core]\n\tfsmonitor = {fsmonitor_helper}\n")
+    rewritten_baseline = RUNTIME._checked_actor_manifest(
+        projection,
+        source_manifest_digest=original_baseline["source_manifest_digest"],
+        source_git_head=original_baseline["source_git_head"],
+    )
+    baseline_path.chmod(0o600)
+    _write_json(baseline_path, rewritten_baseline)
+    generation_path = runtime._owner_admission_generation_path(
+        fixture["session_id"]
+    )
+    generation = json.loads(generation_path.read_text(encoding="utf-8"))
+    generation_path.unlink()
+    generation["actor_baseline_manifest_digest"] = _digest_path(baseline_path)
+    _write_json(generation_path, generation)
+    generation_path.chmod(0o400)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as retry_exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert retry_exc_info.value.code == "workspace_projection_retry_invalid"
+    assert fsmonitor_marker.exists() is False
+
+
+def test_owner_admission_retry_rejects_matching_published_witness_poison(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="matching-published-witness-poison",
+    )
+    runtime = fixture["runtime"]
+    monkeypatch.setattr(
+        runtime,
+        "_save_state",
+        lambda state: (_ for _ in ()).throw(
+            RUNTIME.ExternalCodexRuntimeError(
+                "fixture_controller_crash",
+                "controller stopped after generation and event publication",
+            )
+        ),
+    )
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert exc_info.value.code == "fixture_controller_crash"
+
+    session_dir = runtime._session_dir(fixture["session_id"])
+    projection = session_dir / "actor-workspace"
+    baseline_path = session_dir / "actor-baseline-manifest.json"
+    original_baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    fsmonitor_marker = tmp_path / "matching-witness-fsmonitor-ran"
+    fsmonitor_helper = tmp_path / "matching-witness-fsmonitor"
+    fsmonitor_helper.write_text(
+        "#!/bin/sh\n/usr/bin/touch "
+        + shlex.quote(str(fsmonitor_marker))
+        + "\n",
+        encoding="utf-8",
+    )
+    fsmonitor_helper.chmod(0o700)
+    malicious_config = f"[core]\n\tfsmonitor = {fsmonitor_helper}\n"
+    with (projection / ".git" / "config").open("a", encoding="utf-8") as handle:
+        handle.write(malicious_config)
+    rewritten_baseline = RUNTIME._checked_actor_manifest(
+        projection,
+        source_manifest_digest=original_baseline["source_manifest_digest"],
+        source_git_head=original_baseline["source_git_head"],
+    )
+    baseline_path.chmod(0o600)
+    _write_json(baseline_path, rewritten_baseline)
+    generation_path = runtime._owner_admission_generation_path(
+        fixture["session_id"]
+    )
+    generation = json.loads(generation_path.read_text(encoding="utf-8"))
+    generation_path.unlink()
+    generation["actor_baseline_manifest_digest"] = _digest_path(baseline_path)
+    _write_json(generation_path, generation)
+    generation_path.chmod(0o400)
+
+    original_materialize = RUNTIME.materialize_actor_projection
+
+    def materialize_then_poison(*args: Any, **kwargs: Any) -> Any:
+        witness, manifest = original_materialize(*args, **kwargs)
+        with (witness / ".git" / "config").open(
+            "a", encoding="utf-8"
+        ) as handle:
+            handle.write(malicious_config)
+        return witness, manifest
+
+    monkeypatch.setattr(
+        RUNTIME,
+        "materialize_actor_projection",
+        materialize_then_poison,
+    )
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as retry_exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert retry_exc_info.value.code == "workspace_projection_retry_invalid"
+    assert fsmonitor_marker.exists() is False
+
+
+def test_owner_admission_retry_never_executes_racing_recovered_git_filter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="racing-recovered-git-filter",
+    )
+    runtime = fixture["runtime"]
+    monkeypatch.setattr(
+        runtime,
+        "_save_state",
+        lambda state: (_ for _ in ()).throw(
+            RUNTIME.ExternalCodexRuntimeError(
+                "fixture_controller_crash",
+                "controller stopped after generation and event publication",
+            )
+        ),
+    )
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert exc_info.value.code == "fixture_controller_crash"
+
+    monkeypatch.undo()
+    projection = runtime._session_dir(fixture["session_id"]) / "actor-workspace"
+    filter_marker = tmp_path / "racing-clean-filter-ran"
+    filter_helper = tmp_path / "racing-clean-filter"
+    filter_helper.write_text(
+        "#!/bin/sh\n/usr/bin/touch "
+        + shlex.quote(str(filter_marker))
+        + "\n/bin/cat\n",
+        encoding="utf-8",
+    )
+    filter_helper.chmod(0o700)
+
+    projection_module = sys.modules[
+        RUNTIME.build_private_git_admission_manifest.__module__
+    ]
+    original_inventory = projection_module._inventory
+    original_private_git_manifest = RUNTIME.build_private_git_admission_manifest
+    race_armed = False
+    race_completed = False
+
+    def racing_inventory(root: Path, **kwargs: Any) -> list[dict[str, Any]]:
+        nonlocal race_completed
+        entries = original_inventory(root, **kwargs)
+        try:
+            observed_root = Path(root).resolve()
+        except OSError:
+            return entries
+        if (
+            race_armed
+            and not race_completed
+            and observed_root == (projection / ".git").resolve()
+        ):
+            race_completed = True
+            with (projection / ".git" / "config").open(
+                "a", encoding="utf-8"
+            ) as handle:
+                handle.write(
+                    "[filter \"race\"]\n"
+                    f"\tclean = {filter_helper}\n"
+                    "\trequired = true\n"
+                )
+            (projection / ".gitattributes").write_text(
+                "README.md filter=race\n",
+                encoding="utf-8",
+            )
+        return entries
+
+    def arm_race(
+        projection_root: str | Path,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        nonlocal race_armed
+        if Path(projection_root) == projection:
+            race_armed = True
+        return original_private_git_manifest(projection_root, **kwargs)
+
+    monkeypatch.setattr(projection_module, "_inventory", racing_inventory)
+    monkeypatch.setattr(RUNTIME, "build_private_git_admission_manifest", arm_race)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as retry_exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert retry_exc_info.value.code == "workspace_projection_retry_invalid"
+    assert race_completed is True
+    assert filter_marker.exists() is False
+
+
+def test_owner_admission_retry_rejects_rewritten_prepared_event_timestamp(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="prepared-event-timestamp-rewrite",
+    )
+    runtime = fixture["runtime"]
+
+    monkeypatch.setattr(
+        runtime,
+        "_save_state",
+        lambda state: (_ for _ in ()).throw(
+            RUNTIME.ExternalCodexRuntimeError(
+                "fixture_controller_crash",
+                "controller stopped after prepared event publication",
+            )
+        ),
+    )
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert exc_info.value.code == "fixture_controller_crash"
+
+    events_path = runtime._events_path(fixture["session_id"])
+    event = json.loads(events_path.read_text(encoding="utf-8"))
+    event["recorded_at"] = "2030-01-01T00:00:00Z"
+    events_path.write_text(
+        json.dumps(event, ensure_ascii=True, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as retry_exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert retry_exc_info.value.code == "runtime_event_state_drift"
+
+
+def test_current_owner_generation_rejects_same_uid_v2_to_v1_downgrade(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="v2-to-v1-generation-downgrade",
+    )
+    runtime = fixture["runtime"]
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    generation_path = runtime._owner_admission_generation_path(
+        fixture["session_id"]
+    )
+    generation = json.loads(generation_path.read_text(encoding="utf-8"))
+    generation["schema_version"] = (
+        "abyss_stack_external_codex_owner_admission_generation_v1"
+    )
+    generation.pop("actor_baseline_manifest_digest")
+    generation_path.chmod(0o600)
+    generation_path.unlink()
+    _write_json(generation_path, generation)
+    generation_path.chmod(0o400)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.result(fixture["session_id"])
+    assert exc_info.value.code == "schema_validation_failed"
+
+
+def test_unanchored_legacy_v3_requires_explicit_generation_migration(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True)
+    runtime = fixture["runtime"]
+    original_spawn = runtime._spawn_worker
+    runtime._spawn_worker = MethodType(  # type: ignore[method-assign]
+        lambda self, state, *, mode, resume_payload: None,
+        runtime,
+    )
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    state, _owner_path, _owner_ref = _rewrite_owner_state_as_legacy_v3(
+        runtime,
+        fixture["session_id"],
+        source_launch_path=fixture["launch_path"],
+        source_owner_request_path=fixture["owner_execution_request_path"],
+        migrate_generation=False,
+    )
+    generation_path = runtime._owner_admission_generation_path(fixture["session_id"])
+    generation_path.unlink()
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.preflight(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert exc_info.value.code == "owner_admission_generation_anchor_required"
+
+    _admit_legacy_generation_for_test(
+        runtime,
+        state,
+        owner_request_path=_owner_path,
+    )
+    migrated = runtime.migrate_legacy_owner_admission_generation(
+        fixture["session_id"],
+        expected_launch_digest=state["launch_digest"],
+        expected_owner_admission_digest=state["owner_admission_digest"],
+    )
+    assert migrated["migrated"] is True
+    runtime._spawn_worker = original_spawn  # type: ignore[method-assign]
+    assert runtime.preflight(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )["admitted"] is True
+
+
+def test_deleted_v4_anchor_cannot_reopen_legacy_migration(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="deleted-v4-anchor",
+    )
+    runtime = fixture["runtime"]
+    runtime._spawn_worker = MethodType(  # type: ignore[method-assign]
+        lambda self, state, *, mode, resume_payload: None,
+        runtime,
+    )
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    state, _owner_path, _owner_ref = _rewrite_owner_state_as_legacy_v3(
+        runtime,
+        fixture["session_id"],
+        source_launch_path=fixture["launch_path"],
+        source_owner_request_path=fixture["owner_execution_request_path"],
+        migrate_generation=False,
+    )
+    runtime._owner_admission_generation_path(fixture["session_id"]).unlink()
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.migrate_legacy_owner_admission_generation(
+            fixture["session_id"],
+            expected_launch_digest=state["launch_digest"],
+            expected_owner_admission_digest=state["owner_admission_digest"],
+        )
+    assert exc_info.value.code == "legacy_owner_admission_not_cataloged"
+
+    owner_request = json.loads(_owner_path.read_text(encoding="utf-8"))
+    forged = {
+        "schema_version": RUNTIME.OWNER_ADMISSION_GENERATION_SCHEMA_VERSION,
+        "session_id": state["session_id"],
+        "launch_id": state["launch_id"],
+        "identity_mode": RUNTIME.LEGACY_OWNER_ADMISSION_IDENTITY_MODE,
+        "launch_digest": state["launch_digest"],
+        "owner_admission_digest": state["owner_admission_digest"],
+        "owner_request_ref": owner_request["request_ref"],
+        "migration_catalog_digest": runtime.legacy_owner_migration_catalog_digest,
+        "provenance": "explicit_legacy_migration",
+        "recorded_at": "2026-08-13T00:00:00Z",
+    }
+    generation_path = runtime._owner_admission_generation_path(fixture["session_id"])
+    _write_json(generation_path, forged)
+    generation_path.chmod(0o400)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.preflight(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert exc_info.value.code == "owner_admission_generation_anchor_invalid"
+
+
+def test_markerless_owner_launch_cannot_create_a_new_legacy_session(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True)
+    launch = json.loads(fixture["launch_path"].read_text(encoding="utf-8"))
+    launch.pop("owner_admission_identity_mode")
+    _write_json(fixture["launch_path"], launch)
+    launch_digest = _digest_path(fixture["launch_path"])
+    owner_request_path = fixture["owner_execution_request_path"]
+    owner_request = json.loads(owner_request_path.read_text(encoding="utf-8"))
+    owner_request["external_incarnation"]["runtime_launch_ref"]["digest"] = (
+        launch_digest
+    )
+    owner_request["request_digest"] = RUNTIME.owner_request_digest(owner_request)
+    _write_json(owner_request_path, owner_request)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        fixture["runtime"].preflight(
+            fixture["launch_path"],
+            owner_request_path=owner_request_path,
+        )
+    assert exc_info.value.code == "owner_admission_identity_mode_required"
+    assert (
+        fixture["runtime"]._state_path(fixture["session_id"]).exists() is False
+    )
 
 
 @pytest.mark.skipif(
@@ -5926,6 +6975,99 @@ def test_prepared_session_retries_launch_after_spawn_failure(
     retried = runtime.start(fixture["launch_path"])
     assert retried["status"] == "prepared"
     assert calls == 2
+
+
+def test_owner_prepared_session_revalidates_before_retrying_spawn(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="owner-prepared-spawn-retry",
+    )
+    runtime = fixture["runtime"]
+    calls = 0
+
+    def fail_once_then_hold(*args: Any, **kwargs: Any) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("fixture owner fork failure")
+
+    monkeypatch.setattr(runtime, "_spawn_worker", fail_once_then_hold)
+    with pytest.raises(OSError, match="fixture owner fork failure"):
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+
+    retried = runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+
+    assert retried["status"] == "prepared"
+    assert calls == 2
+
+
+def test_owner_prepared_session_rejects_forged_durable_projection_closure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="owner-prepared-forged-durable-closure",
+    )
+    runtime = fixture["runtime"]
+
+    monkeypatch.setattr(
+        runtime,
+        "_spawn_worker",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            OSError("fixture owner fork failure")
+        ),
+    )
+    with pytest.raises(OSError, match="fixture owner fork failure"):
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+
+    state = runtime._load_state(fixture["session_id"])
+    projection = Path(state["actor_projection_path"])
+    baseline_path = Path(state["actor_baseline_manifest_ref"]["artifact_ref"])
+    original_baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    (projection / "README.md").write_text(
+        "forged durable projection closure\n",
+        encoding="utf-8",
+    )
+    rewritten_baseline = RUNTIME._checked_actor_manifest(
+        projection,
+        source_manifest_digest=original_baseline["source_manifest_digest"],
+        source_git_head=original_baseline["source_git_head"],
+    )
+    baseline_path.chmod(0o600)
+    _write_json(baseline_path, rewritten_baseline)
+    state["actor_baseline_manifest_ref"] = RUNTIME._artifact_ref(baseline_path)
+    runtime._save_state(state)
+
+    generation_path = runtime._owner_admission_generation_path(
+        fixture["session_id"]
+    )
+    generation = json.loads(generation_path.read_text(encoding="utf-8"))
+    generation_path.unlink()
+    generation["actor_baseline_manifest_digest"] = _digest_path(baseline_path)
+    _write_json(generation_path, generation)
+    generation_path.chmod(0o400)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as retry_exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert retry_exc_info.value.code == "workspace_projection_retry_invalid"
 
 
 def test_active_attempts_use_distinct_runtime_owned_projections(
@@ -10039,6 +11181,58 @@ def test_interrupted_process_resumes_exact_thread(tmp_path: Path) -> None:
     )
 
 
+def test_legacy_v3_owner_receipt_resumes_after_upgrade(tmp_path: Path) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker="FAKE_WAIT_FOR_INTERRUPT",
+        owner_contour=True,
+    )
+    runtime = fixture["runtime"]
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    deadline = time.monotonic() + 10
+    running: dict[str, Any] | None = None
+    while time.monotonic() < deadline:
+        running = runtime.status(fixture["session_id"])
+        if running["thread_id"] and running["codex_pid"]:
+            break
+        time.sleep(0.05)
+    assert running is not None and running["thread_id"]
+    interrupted = runtime.interrupt(fixture["session_id"])
+    legacy_result = _rewrite_owner_receipt_as_legacy_v3(
+        runtime,
+        fixture["session_id"],
+        source_launch_path=fixture["launch_path"],
+        source_owner_request_path=fixture["owner_execution_request_path"],
+    )
+    result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    resume_path = tmp_path / "legacy-v3-resume.json"
+    _write_json(
+        resume_path,
+        {
+            "schema_version": "abyss_stack_external_codex_resume_v1",
+            "session_id": fixture["session_id"],
+            "thread_id": interrupted["thread_id"],
+            "after_event_sequence": interrupted["last_event_sequence"],
+            "reason": "process_death_recovery",
+            "instruction": "Resume the exact bounded fixture.",
+            "previous_result_digest": _digest_path(result_path),
+        },
+    )
+
+    resumed = runtime.resume(fixture["session_id"], resume_path)
+    assert resumed["status"] == "running"
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    result = runtime.result(fixture["session_id"])
+    assert result is not None
+    assert result["thread_id"] == legacy_result["thread_id"]
+    assert result["owner_admission_ref"]["artifact_ref"].endswith(
+        "/inputs/owner-execution-request.json"
+    )
+
+
 def test_workspace_write_resume_continues_from_exact_prior_actor_tree(
     tmp_path: Path,
 ) -> None:
@@ -10890,6 +12084,72 @@ def test_terminal_result_recovers_when_final_state_save_is_lost(
     )
 
 
+def test_terminal_result_recovery_rejects_owner_identity_substitution(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path)
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    _wait_terminal(runtime, fixture["session_id"])
+
+    state = runtime._load_state(fixture["session_id"])
+    result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result["owner_admission_ref"] = dict(result["report_ref"])
+    _write_json(result_path, result)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime._recover_terminal_result_locked(state)
+    assert exc_info.value.code == "runtime_terminal_result_recovery_mismatch"
+
+
+def test_resume_rejects_preserved_owner_identity_substitution(tmp_path: Path) -> None:
+    fixture = _fixture(tmp_path, objective_marker="FAKE_WAIT_FOR_INTERRUPT")
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    deadline = time.monotonic() + 10
+    running: dict[str, Any] | None = None
+    while time.monotonic() < deadline:
+        running = runtime.status(fixture["session_id"])
+        if running["thread_id"] and running["codex_pid"]:
+            break
+        time.sleep(0.05)
+    assert running is not None and running["thread_id"]
+    interrupted = runtime.interrupt(fixture["session_id"])
+
+    session_dir = runtime._session_dir(fixture["session_id"])
+    result_path = session_dir / "result.json"
+    preserved_path = session_dir / "attempts/001/runtime-result.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result["owner_admission_ref"] = dict(result["report_ref"])
+    _write_json(result_path, result)
+    preserved_path.chmod(0o600)
+    _write_json(preserved_path, result)
+    preserved_path.chmod(0o400)
+    preserved_path.with_name("runtime-result-evidence-closure.json").unlink()
+
+    state = runtime._load_state(fixture["session_id"])
+    state["result_digest"] = _digest_path(result_path)
+    runtime._save_state(state)
+    resume_path = tmp_path / "owner-identity-substitution-resume.json"
+    _write_json(
+        resume_path,
+        {
+            "schema_version": "abyss_stack_external_codex_resume_v1",
+            "session_id": fixture["session_id"],
+            "thread_id": interrupted["thread_id"],
+            "after_event_sequence": interrupted["last_event_sequence"],
+            "reason": "process_death_recovery",
+            "instruction": "Resume the exact bounded fixture.",
+            "previous_result_digest": state["result_digest"],
+        },
+    )
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.resume(fixture["session_id"], resume_path)
+    assert exc_info.value.code == "runtime_result_evidence_closure_drift"
+
+
 @pytest.mark.parametrize(
     ("mutator", "validate_request"),
     (
@@ -11735,6 +12995,83 @@ def test_parent_inference_yields_and_exact_authority_event_reenters_same_thread(
         "external_parent.reentry_started",
         "external_parent.reentry_completed",
     ]
+
+
+def test_parent_reentry_accepts_exact_legacy_v3_owner_receipt_after_upgrade(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_ambiguity_stop",
+        identity_suffix="legacy-v3-owner-reentry",
+        owner_contour=True,
+    )
+    reentry_id = "reentry:fixture:legacy-v3-owner-reentry"
+    obligation_path = _parent_reentry_obligation(
+        tmp_path,
+        fixture,
+        reentry_id=reentry_id,
+    )
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge.yield_parent(obligation_path)
+    assert fixture["runtime"].run_to_terminal(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )["status"] == "authority_blocked"
+    _rewrite_owner_receipt_as_legacy_v3(
+        fixture["runtime"],
+        fixture["session_id"],
+        source_launch_path=fixture["launch_path"],
+        source_owner_request_path=fixture["owner_execution_request_path"],
+    )
+    result_path = (
+        fixture["runtime"]._session_dir(fixture["session_id"]) / "result.json"
+    )
+
+    reentered = bridge.reenter_parent(reentry_id, result_path)["state"]
+    assert reentered["status"] == "reentered"
+    assert reentered["wake_evaluation"]["wake_parent"] is True
+
+
+def test_parent_reentry_rejects_substituted_child_owner_request_identity(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_ambiguity_stop",
+        identity_suffix="luna-xhigh-owner-identity-substitution",
+    )
+    reentry_id = "reentry:fixture:luna-xhigh-owner-identity-substitution"
+    obligation_path = _parent_reentry_obligation(
+        tmp_path,
+        fixture,
+        reentry_id=reentry_id,
+    )
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge.yield_parent(obligation_path)
+    assert fixture["runtime"].run_to_terminal(fixture["launch_path"])["status"] == (
+        "authority_blocked"
+    )
+
+    session_dir = fixture["runtime"]._session_dir(fixture["session_id"])
+    result_path = session_dir / "result.json"
+    preserved_path = session_dir / "attempts/001/runtime-result.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result["owner_admission_ref"] = dict(result["report_ref"])
+    _write_json(result_path, result)
+    preserved_path.chmod(0o600)
+    _write_json(preserved_path, result)
+    preserved_path.chmod(0o400)
+    preserved_path.with_name("runtime-result-evidence-closure.json").unlink()
+    state = fixture["runtime"]._load_state(fixture["session_id"])
+    state["result_digest"] = _digest_path(result_path)
+    fixture["runtime"]._save_state(state)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        bridge.reenter_parent(reentry_id, result_path)
+    assert exc_info.value.code == "reentry_child_receipt_mismatch"
 
 
 def test_parent_turn_disables_tools_before_inference_and_isolates_home(

@@ -75,8 +75,8 @@ from aoa_sdk.runtime_adapters import (  # noqa: E402
     load_abyss_stack_external_codex_runtime_profile,
 )
 from external_codex_agent import (  # noqa: E402
+    PROJECTION_STATE_SCHEMA_VERSIONS,
     STATE_SCHEMA_PATH,
-    STATE_SCHEMA_VERSION,
     ExternalCodexRuntime,
     ExternalCodexRuntimeError,
     _relative_path_is_allowed,
@@ -2165,7 +2165,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     validate_json(writer_state, STATE_SCHEMA_PATH, label="writer runtime state")
     writer_result_digest = _file_digest(writer_result_path)
     if (
-        writer_state.get("schema_version") != STATE_SCHEMA_VERSION
+        writer_state.get("schema_version") not in PROJECTION_STATE_SCHEMA_VERSIONS
         or writer_state.get("session_id") != writer_result.get("session_id")
         or writer_state.get("launch_id") != writer_launch.get("launch_id")
         or writer_state.get("launch_digest") != _file_digest(writer_launch_path)
@@ -2178,6 +2178,19 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     ):
         raise StudyPreparationError(
             "writer result differs from its canonical durable runtime state"
+        )
+    writer_state_root = writer_state_path.parents[2]
+    try:
+        bound_writer_result = ExternalCodexRuntime(writer_state_root).result(
+            str(writer_result["session_id"])
+        )
+    except ExternalCodexRuntimeError as exc:
+        raise StudyPreparationError(
+            "writer owner admission binding differs from canonical durable runtime state"
+        ) from exc
+    if bound_writer_result != writer_result:
+        raise StudyPreparationError(
+            "writer result differs from the runtime-validated canonical result"
         )
     workspace = Path(str(writer_state["workspace_path"]))
     if not workspace.is_absolute():
@@ -3186,7 +3199,6 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     )
     binding_path = output_root / "incarnation-binding.json"
     _write_exact(binding_path, _json_bytes(binding.model_dump(mode="json")))
-    writer_state_root = writer_state_path.parents[2]
     requested_state_root = Path(args.state_root).resolve()
     if requested_state_root != writer_state_root.resolve():
         raise StudyPreparationError(

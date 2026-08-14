@@ -57,6 +57,7 @@ from external_codex_projection import (  # noqa: E402
     build_actor_delta,
     build_actor_manifest,
     build_actor_manifest_from_descriptor,
+    build_private_git_admission_manifest,
     materialize_actor_projection,
     materialize_actor_projection_from_seed,
     remove_actor_projection,
@@ -83,6 +84,15 @@ RESULT_EVIDENCE_CLOSURE_SCHEMA_PATH = (
 )
 RESUME_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-resume.schema.json"
 STATE_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-state.schema.json"
+OWNER_ADMISSION_GENERATION_SCHEMA_PATH = (
+    SCHEMA_ROOT / "external-codex-owner-admission-generation.schema.json"
+)
+LEGACY_OWNER_MIGRATION_CATALOG_PATH = (
+    PART_ROOT / "legacy-owner-admission-migrations.v1.json"
+)
+LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_PATH = (
+    SCHEMA_ROOT / "external-codex-legacy-owner-migration-catalog.schema.json"
+)
 PARENT_OBLIGATION_SCHEMA_PATH = (
     SCHEMA_ROOT / "external-codex-parent-obligation.schema.json"
 )
@@ -115,7 +125,19 @@ IncarnationBinding = AgentIncarnationBinding | AgentIncarnationBindingV2
 
 LEGACY_STATE_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v1"
 LEGACY_STATE_V2_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v2"
-STATE_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v3"
+LEGACY_STATE_V3_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v3"
+STATE_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v4"
+STABLE_OWNER_ADMISSION_IDENTITY_MODE = "stable_request_ref_v1"
+LEGACY_OWNER_ADMISSION_IDENTITY_MODE = "legacy_materialized_path_v1"
+OWNER_ADMISSION_GENERATION_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_owner_admission_generation_v2"
+)
+LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_legacy_owner_migration_catalog_v1"
+)
+PROJECTION_STATE_SCHEMA_VERSIONS = frozenset(
+    {LEGACY_STATE_V3_SCHEMA_VERSION, STATE_SCHEMA_VERSION}
+)
 RESPONSE_SCHEMA_VERSION = "abyss_stack_external_codex_response_v1"
 LEGACY_REENTRY_STATE_SCHEMA_VERSION = "abyss_stack_external_codex_reentry_state_v1"
 REENTRY_STATE_SCHEMA_VERSION = "abyss_stack_external_codex_reentry_state_v2"
@@ -6249,9 +6271,291 @@ class ExternalCodexRuntime:
                 "runtime_profile_invalid", "runtime profile result schema ref drifted"
             )
         validate_structured_output_schema(load_schema(REPORT_SCHEMA_PATH))
+        self.legacy_owner_migration_catalog_raw = read_bounded(
+            LEGACY_OWNER_MIGRATION_CATALOG_PATH
+        )
+        self.legacy_owner_migration_catalog = load_json_bytes(
+            self.legacy_owner_migration_catalog_raw,
+            label="legacy owner migration catalog",
+        )
+        validate_json(
+            self.legacy_owner_migration_catalog,
+            LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_PATH,
+            label="legacy owner migration catalog",
+        )
+        if (
+            self.legacy_owner_migration_catalog.get("schema_version")
+            != LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION
+        ):
+            raise ExternalCodexRuntimeError(
+                "legacy_owner_migration_catalog_invalid",
+                "legacy owner migration catalog version is unsupported",
+            )
+        entries = self.legacy_owner_migration_catalog["entries"]
+        self.legacy_owner_migration_entries = {
+            str(entry["session_id"]): entry for entry in entries
+        }
+        if len(self.legacy_owner_migration_entries) != len(entries):
+            raise ExternalCodexRuntimeError(
+                "legacy_owner_migration_catalog_invalid",
+                "legacy owner migration catalog session identities must be unique",
+            )
+        self.legacy_owner_migration_catalog_digest = sha256_bytes(
+            self.legacy_owner_migration_catalog_raw
+        )
 
     def _session_dir(self, session_id: str) -> Path:
         return self.state_root / "sessions" / _session_token(session_id)
+
+    def _owner_admission_generation_path(self, session_id: str) -> Path:
+        return (
+            self.state_root
+            / "owner-admission-generations"
+            / f"{_session_token(session_id)}.json"
+        )
+
+    def _owner_admission_generation_ref(
+        self, state: Mapping[str, Any]
+    ) -> dict[str, str] | None:
+        if state.get("admission_class") != "owner_contour":
+            return None
+        generation = self._load_owner_admission_generation(str(state["session_id"]))
+        self._validate_owner_actor_baseline_anchor(
+            state,
+            generation=generation,
+        )
+        return _artifact_ref(
+            self._owner_admission_generation_path(str(state["session_id"])),
+            owner="abyss-stack",
+        )
+
+    def _validate_owner_actor_baseline_anchor(
+        self,
+        state: Mapping[str, Any],
+        *,
+        generation: Mapping[str, Any] | None = None,
+    ) -> None:
+        """Bind every durable v2 state back to its external baseline digest."""
+
+        if (
+            state.get("schema_version") != STATE_SCHEMA_VERSION
+            or state.get("admission_class") != "owner_contour"
+        ):
+            return
+        anchored = (
+            generation
+            if generation is not None
+            else self._load_owner_admission_generation(str(state["session_id"]))
+        )
+        if anchored.get("schema_version") != OWNER_ADMISSION_GENERATION_SCHEMA_VERSION:
+            return
+        baseline_ref = state.get("actor_baseline_manifest_ref")
+        baseline_path = self._session_dir(str(state["session_id"])) / (
+            "actor-baseline-manifest.json"
+        )
+        if (
+            not isinstance(baseline_ref, Mapping)
+            or baseline_ref.get("artifact_ref") != str(baseline_path)
+            or baseline_ref.get("artifact_digest")
+            != anchored.get("actor_baseline_manifest_digest")
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "durable actor baseline reference differs from its generation anchor",
+            )
+        baseline_raw = read_bounded(baseline_path)
+        if sha256_bytes(baseline_raw) != baseline_ref["artifact_digest"]:
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "durable actor baseline bytes differ from their generation anchor",
+            )
+        baseline = load_json_bytes(baseline_raw, label="durable actor baseline")
+        validate_json(
+            baseline,
+            ACTOR_MANIFEST_SCHEMA_PATH,
+            label="durable actor baseline",
+        )
+        source_before_ref = state.get("source_manifest_before_ref")
+        if (
+            baseline.get("workspace_path") != state.get("actor_projection_path")
+            or not isinstance(source_before_ref, Mapping)
+            or baseline.get("source_manifest_digest")
+            != source_before_ref.get("artifact_digest")
+            or baseline.get("source_git_head")
+            != state.get("workspace_expected_head")
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "durable actor baseline identity differs from runtime state",
+            )
+
+    def _load_owner_admission_generation(self, session_id: str) -> dict[str, Any]:
+        """Load the controller-owned generation anchor outside session files."""
+
+        path = self._owner_admission_generation_path(session_id)
+        try:
+            descriptor = os.open(
+                path,
+                os.O_RDONLY | os.O_CLOEXEC | getattr(os, "O_NOFOLLOW", 0),
+            )
+        except FileNotFoundError as exc:
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_required",
+                "owner-contour session requires an external generation anchor; "
+                "pre-upgrade v3 state must be migrated explicitly",
+            ) from exc
+        except OSError as exc:
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_invalid",
+                "owner admission generation anchor cannot be opened without following links",
+            ) from exc
+        try:
+            observed = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(observed.st_mode)
+                or observed.st_nlink != 1
+                or observed.st_uid != os.geteuid()
+                or stat.S_IMODE(observed.st_mode) != 0o400
+            ):
+                raise ExternalCodexRuntimeError(
+                    "owner_admission_generation_anchor_invalid",
+                    "owner admission generation anchor is not a private read-only regular file",
+                )
+            chunks: list[bytes] = []
+            total = 0
+            while True:
+                chunk = os.read(descriptor, min(65536, MAX_CONTROL_BYTES + 1 - total))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                total += len(chunk)
+                if total > MAX_CONTROL_BYTES:
+                    raise ExternalCodexRuntimeError(
+                        "owner_admission_generation_anchor_invalid",
+                        "owner admission generation anchor exceeds the control limit",
+                    )
+            coordinate = path.lstat()
+            if (
+                coordinate.st_dev != observed.st_dev
+                or coordinate.st_ino != observed.st_ino
+            ):
+                raise ExternalCodexRuntimeError(
+                    "owner_admission_generation_anchor_invalid",
+                    "owner admission generation anchor coordinate changed while read",
+                )
+        except FileNotFoundError as exc:
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_invalid",
+                "owner admission generation anchor disappeared while read",
+            ) from exc
+        finally:
+            os.close(descriptor)
+        generation = load_json_bytes(
+            b"".join(chunks), label="owner admission generation anchor"
+        )
+        validate_json(
+            generation,
+            OWNER_ADMISSION_GENERATION_SCHEMA_PATH,
+            label="owner admission generation anchor",
+        )
+        if generation.get("session_id") != session_id:
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_invalid",
+                "owner admission generation anchor names another session",
+            )
+        if generation.get("identity_mode") == LEGACY_OWNER_ADMISSION_IDENTITY_MODE:
+            catalog_entry = self.legacy_owner_migration_entries.get(session_id)
+            catalog_keys = (
+                "session_id",
+                "launch_id",
+                "launch_digest",
+                "owner_admission_digest",
+                "owner_request_ref",
+            )
+            if (
+                generation.get("migration_catalog_digest")
+                != self.legacy_owner_migration_catalog_digest
+                or catalog_entry is None
+                or any(
+                    generation.get(key) != catalog_entry.get(key)
+                    for key in catalog_keys
+                )
+            ):
+                raise ExternalCodexRuntimeError(
+                    "owner_admission_generation_anchor_invalid",
+                    "legacy owner generation is not authorized by this release catalog",
+                )
+        return generation
+
+    def _publish_owner_admission_generation(
+        self,
+        generation: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Publish one generation anchor without replacing a prior one."""
+
+        session_id = str(generation["session_id"])
+        path = self._owner_admission_generation_path(session_id)
+        directory = path.parent
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        try:
+            directory_stat = directory.lstat()
+        except OSError as exc:
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_invalid",
+                "owner admission generation directory is unavailable",
+            ) from exc
+        if (
+            not stat.S_ISDIR(directory_stat.st_mode)
+            or directory.is_symlink()
+            or directory_stat.st_uid != os.geteuid()
+            or stat.S_IMODE(directory_stat.st_mode) != 0o700
+        ):
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_invalid",
+                "owner admission generation directory must be a real directory",
+            )
+        value = dict(generation)
+        validate_json(
+            value,
+            OWNER_ADMISSION_GENERATION_SCHEMA_PATH,
+            label="owner admission generation anchor",
+        )
+        payload = (
+            json.dumps(value, ensure_ascii=True, sort_keys=True, indent=2) + "\n"
+        ).encode("utf-8")
+        descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=directory)
+        temp_path = Path(temporary)
+        published = False
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(temp_path, 0o400)
+            try:
+                os.link(temp_path, path, follow_symlinks=False)
+                published = True
+            except FileExistsError:
+                existing = self._load_owner_admission_generation(session_id)
+                if existing != value:
+                    raise ExternalCodexRuntimeError(
+                        "owner_admission_generation_conflict",
+                        "session already has another external owner admission generation",
+                    )
+                return existing
+            directory_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        finally:
+            temp_path.unlink(missing_ok=True)
+        if not published:
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_invalid",
+                "owner admission generation anchor was not published",
+            )
+        return self._load_owner_admission_generation(session_id)
 
     @staticmethod
     def _projection_path_from_state(state: Mapping[str, Any]) -> Path:
@@ -6274,6 +6578,7 @@ class ExternalCodexRuntime:
         *,
         validated: Mapping[str, Any],
         session_dir: Path,
+        recover_published_admission: bool = False,
     ) -> dict[str, Any]:
         """Materialize one source-checked actor tree before any worker fork."""
 
@@ -6296,6 +6601,173 @@ class ExternalCodexRuntime:
         source_before_ref = _artifact_ref(source_before_path)
         projection_path = session_dir / "actor-workspace"
         projection_identity: Mapping[str, Any] | None = None
+
+        if projection_path.exists() and recover_published_admission:
+            baseline_path = session_dir / "actor-baseline-manifest.json"
+            baseline_raw = read_bounded(baseline_path)
+            generation = self._load_owner_admission_generation(
+                str(validated["launch"]["session_id"])
+            )
+            if (
+                generation.get("schema_version")
+                == OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
+                and generation.get("actor_baseline_manifest_digest")
+                != sha256_bytes(baseline_raw)
+            ):
+                raise ExternalCodexRuntimeError(
+                    "workspace_projection_retry_invalid",
+                    "unpublished actor baseline differs from the external admission anchor",
+                )
+            prior_baseline = load_json_bytes(
+                baseline_raw,
+                label="unpublished actor baseline manifest",
+            )
+            validate_json(
+                prior_baseline,
+                ACTOR_MANIFEST_SCHEMA_PATH,
+                label="unpublished actor baseline manifest",
+            )
+            if (
+                prior_baseline.get("workspace_path") != str(projection_path)
+                or prior_baseline.get("source_manifest_digest")
+                != source_before_ref["artifact_digest"]
+                or prior_baseline.get("source_git_head")
+                != validated["launch"]["workspace_expected_head"]
+            ):
+                raise ExternalCodexRuntimeError(
+                    "workspace_projection_retry_invalid",
+                    "unpublished actor projection differs from the admitted retry",
+                )
+            observed_baseline = _checked_actor_manifest(
+                projection_path,
+                source_manifest_digest=str(
+                    prior_baseline["source_manifest_digest"]
+                ),
+                source_git_head=str(prior_baseline["source_git_head"]),
+            )
+            if observed_baseline != prior_baseline:
+                raise ExternalCodexRuntimeError(
+                    "workspace_projection_retry_invalid",
+                    "unpublished actor projection changed after generation publication",
+                )
+            witness_path = session_dir / (
+                ".actor-recovery-witness-" + os.urandom(16).hex()
+            )
+            witness_identity: Mapping[str, Any] | None = None
+            witness_private_git: dict[str, Any] = {}
+            try:
+                if review_seed is None:
+                    _, witness_baseline = materialize_actor_projection(
+                        source,
+                        witness_path,
+                        source_manifest=source_before,
+                        source_manifest_digest=str(
+                            source_before_ref["artifact_digest"]
+                        ),
+                        private_git_admission=witness_private_git,
+                    )
+                else:
+                    seed_path = Path(str(review_seed["writer_projection_path"]))
+                    seed_manifest = _load_verified_json_ref(
+                        review_seed["writer_final_manifest_ref"],
+                        label="actor projection recovery seed manifest",
+                        schema_path=ACTOR_MANIFEST_SCHEMA_PATH,
+                    )
+                    with self._lock(str(review_seed["writer_session_id"])):
+                        writer_state = self._load_state(
+                            str(review_seed["writer_session_id"])
+                        )
+                        if (
+                            self._review_seed_envelope_locked(writer_state)
+                            != review_seed
+                        ):
+                            raise ExternalCodexRuntimeError(
+                                "review_seed_envelope_drift",
+                                "writer changed before reviewer projection recovery",
+                            )
+                        _, witness_baseline = (
+                            materialize_actor_projection_from_seed(
+                                seed_path,
+                                witness_path,
+                                expected_manifest=seed_manifest,
+                                private_git_admission=witness_private_git,
+                            )
+                        )
+                witness_identity = witness_baseline["workspace_identity"]
+                observed_private_git = build_private_git_admission_manifest(
+                    projection_path,
+                    expected_private_git_entries=witness_private_git[
+                        "private_git_entries"
+                    ],
+                    expected_source_git_head=str(
+                        prior_baseline["source_git_head"]
+                    ),
+                    semantic_workspace_root=witness_path,
+                )
+                observed_baseline_after = _checked_actor_manifest(
+                    projection_path,
+                    source_manifest_digest=str(
+                        prior_baseline["source_manifest_digest"]
+                    ),
+                    source_git_head=str(prior_baseline["source_git_head"]),
+                )
+                if any(
+                    observed_baseline[key] != witness_baseline[key]
+                    for key in (
+                        "content_entries",
+                        "source_git_head",
+                    )
+                ) or (
+                    observed_baseline_after != observed_baseline
+                    or any(
+                        observed_private_git[key] != witness_private_git[key]
+                        for key in (
+                            "private_git_entries",
+                            "index_stage_sha256",
+                            "index_flags_sha256",
+                        )
+                    )
+                ):
+                    raise ExternalCodexRuntimeError(
+                        "workspace_projection_retry_invalid",
+                        "unpublished actor projection differs from independently admitted bytes",
+                    )
+            except (OSError, ProjectionError) as exc:
+                raise ExternalCodexRuntimeError(
+                    "workspace_projection_retry_invalid",
+                    "independent actor projection recovery witness could not be built",
+                ) from exc
+            finally:
+                if witness_identity is not None:
+                    try:
+                        remove_actor_projection(
+                            witness_path,
+                            expected_identity=witness_identity,
+                        )
+                    except (OSError, ProjectionError) as exc:
+                        raise ExternalCodexRuntimeError(
+                            "workspace_projection_cleanup_incomplete",
+                            "actor projection recovery witness could not be removed safely",
+                        ) from exc
+            source_after = (
+                build_workspace_manifest(source)
+                if review_seed is None
+                else source_before
+            )
+            if source_after != source_before:
+                raise ExternalCodexRuntimeError(
+                    "workspace_source_race",
+                    "source workspace changed after generation publication",
+                )
+            source_after_path = session_dir / "source-manifest-after.json"
+            _atomic_write_json(source_after_path, source_after, mode=0o400)
+            return {
+                "source_manifest_before_ref": source_before_ref,
+                "source_manifest_after_ref": _artifact_ref(source_after_path),
+                "actor_projection_path": str(projection_path),
+                "actor_baseline_manifest_ref": _artifact_ref(baseline_path),
+                "actor_baseline_manifest": prior_baseline,
+            }
 
         def cleanup_projection() -> None:
             try:
@@ -6476,6 +6948,7 @@ class ExternalCodexRuntime:
             not in {
                 LEGACY_STATE_SCHEMA_VERSION,
                 LEGACY_STATE_V2_SCHEMA_VERSION,
+                LEGACY_STATE_V3_SCHEMA_VERSION,
                 STATE_SCHEMA_VERSION,
             }
             or state.get("session_id") != session_id
@@ -6667,6 +7140,7 @@ class ExternalCodexRuntime:
         attempt_id: str | None = None,
         thread_id: str | None = None,
         source_event_type: str | None = None,
+        recorded_at: str | None = None,
         significance: Literal[
             "trace",
             "progress",
@@ -6681,7 +7155,7 @@ class ExternalCodexRuntime:
         event = {
             "schema_version": "abyss_stack_external_codex_event_v1",
             "sequence": sequence,
-            "recorded_at": iso_now(),
+            "recorded_at": recorded_at or iso_now(),
             "session_id": state["session_id"],
             "attempt_id": attempt_id
             or str(state.get("active_attempt_id") or "runtime"),
@@ -6695,6 +7169,71 @@ class ExternalCodexRuntime:
         validate_json(event, EVENT_SCHEMA_PATH, label="normalized runtime event")
         _append_jsonl(self._events_path(str(state["session_id"])), event)
         state["last_event_sequence"] = sequence
+        return event
+
+    def _record_initial_prepared_event(
+        self,
+        state: dict[str, Any],
+        *,
+        payload: Mapping[str, Any],
+        recover_published_admission: bool,
+    ) -> dict[str, Any]:
+        """Append or reconcile the only event allowed before first state."""
+
+        path = self._events_path(str(state["session_id"]))
+        if not path.exists():
+            return self._append_event(
+                state,
+                event_type="external_agent.prepared",
+                payload=payload,
+                recorded_at=str(state["created_at"]),
+                significance="progress",
+            )
+        if not recover_published_admission:
+            raise ExternalCodexRuntimeError(
+                "runtime_event_state_drift",
+                "new admission has an event stream without a generation anchor",
+            )
+        events: list[dict[str, Any]] = []
+        for line_number, line in _iter_jsonl_bytes(
+            path,
+            failure_code="runtime_event_state_drift",
+            label="unpublished runtime event stream",
+        ):
+            try:
+                event = json.loads(line)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ExternalCodexRuntimeError(
+                    "runtime_event_state_drift",
+                    f"unpublished runtime event line {line_number} is invalid",
+                ) from exc
+            validate_json(event, EVENT_SCHEMA_PATH, label="unpublished runtime event")
+            events.append(event)
+        if len(events) != 1:
+            raise ExternalCodexRuntimeError(
+                "runtime_event_state_drift",
+                "unpublished admission must have exactly one prepared event",
+            )
+        event = events[0]
+        expected = {
+            "schema_version": "abyss_stack_external_codex_event_v1",
+            "sequence": 0,
+            "recorded_at": state["created_at"],
+            "session_id": state["session_id"],
+            "attempt_id": "runtime",
+            "thread_id": None,
+            "event_type": "external_agent.prepared",
+            "source_event_type": None,
+            "payload_digest": canonical_digest(payload),
+            "significance": "progress",
+            "payload": dict(payload),
+        }
+        if event != expected:
+            raise ExternalCodexRuntimeError(
+                "runtime_event_state_drift",
+                "unpublished prepared event differs from the anchored admission",
+            )
+        state["last_event_sequence"] = 0
         return event
 
     def _load_coordinate(
@@ -8106,6 +8645,289 @@ class ExternalCodexRuntime:
             "review_seed": review_seed,
         }
 
+    def _validate_owner_launch_identity_generation(
+        self,
+        validated: Mapping[str, Any],
+        state: Mapping[str, Any] | None,
+    ) -> None:
+        """Admit current launches or an exact already-durable legacy session."""
+
+        launch = validated["launch"]
+        if launch["admission_class"] != "owner_contour":
+            return
+        mode = launch.get("owner_admission_identity_mode")
+        if state is None:
+            if mode != STABLE_OWNER_ADMISSION_IDENTITY_MODE:
+                raise ExternalCodexRuntimeError(
+                    "owner_admission_identity_mode_required",
+                    "new owner-contour launches require stable request identity binding",
+                )
+            anchor_path = self._owner_admission_generation_path(
+                str(launch["session_id"])
+            )
+            if anchor_path.exists():
+                anchor = self._load_owner_admission_generation(
+                    str(launch["session_id"])
+                )
+                expected = self._owner_admission_generation_from_validated(validated)
+                identity_keys = (
+                    "session_id",
+                    "launch_id",
+                    "identity_mode",
+                    "launch_digest",
+                    "owner_admission_digest",
+                    "owner_request_ref",
+                )
+                if any(anchor.get(key) != expected.get(key) for key in identity_keys):
+                    raise ExternalCodexRuntimeError(
+                        "owner_admission_generation_conflict",
+                        "session has an external owner generation for another launch",
+                    )
+            return
+        if state.get("launch_digest") != validated["launch_digest"]:
+            raise ExternalCodexRuntimeError(
+                "session_binding_conflict",
+                "session already exists with another launch binding",
+            )
+        owner_admission = validated.get("owner_admission")
+        if (
+            not isinstance(owner_admission, Mapping)
+            or state.get("owner_admission_digest")
+            != owner_admission.get("request_digest")
+        ):
+            raise ExternalCodexRuntimeError(
+                "session_binding_conflict",
+                "session already exists with another owner admission binding",
+            )
+        owner_request_path = state.get("materialized_inputs", {}).get(
+            "owner_execution_request"
+        )
+        if not isinstance(owner_request_path, str):
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "existing owner-contour state has no materialized owner request",
+            )
+        durable_mode = self._owner_admission_identity_mode(
+            state,
+            read_bounded(Path(owner_request_path)),
+        )
+        expected_mode = (
+            STABLE_OWNER_ADMISSION_IDENTITY_MODE
+            if mode == STABLE_OWNER_ADMISSION_IDENTITY_MODE
+            else "legacy_materialized_path_v1"
+        )
+        if durable_mode != expected_mode:
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "incoming launch generation differs from durable owner admission",
+            )
+        self._validate_owner_actor_baseline_anchor(state)
+
+    def _owner_admission_generation_from_validated(
+        self,
+        validated: Mapping[str, Any],
+        *,
+        identity_mode: str = STABLE_OWNER_ADMISSION_IDENTITY_MODE,
+        provenance: str = "new_admission",
+        recorded_at: str | None = None,
+        actor_baseline_manifest_digest: str | None = None,
+    ) -> dict[str, Any]:
+        launch = validated["launch"]
+        owner_admission = validated.get("owner_admission")
+        if launch.get("admission_class") != "owner_contour" or not isinstance(
+            owner_admission, Mapping
+        ):
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_invalid",
+                "generation anchor requires an admitted owner-contour request",
+            )
+        request = owner_admission["request"]
+        generation = {
+            "schema_version": OWNER_ADMISSION_GENERATION_SCHEMA_VERSION,
+            "session_id": str(launch["session_id"]),
+            "launch_id": str(launch["launch_id"]),
+            "identity_mode": identity_mode,
+            "launch_digest": str(validated["launch_digest"]),
+            "owner_admission_digest": str(owner_admission["request_digest"]),
+            "owner_request_ref": str(request["request_ref"]),
+            "provenance": provenance,
+            "recorded_at": recorded_at or iso_now(),
+        }
+        if actor_baseline_manifest_digest is not None:
+            generation["actor_baseline_manifest_digest"] = (
+                actor_baseline_manifest_digest
+            )
+        return generation
+
+    def _new_session_admission_epoch(
+        self,
+        validated: Mapping[str, Any],
+    ) -> tuple[str, bool]:
+        """Reuse an already-published current generation across admission retry."""
+
+        launch = validated["launch"]
+        if launch.get("admission_class") != "owner_contour":
+            return iso_now(), False
+        session_id = str(launch["session_id"])
+        anchor_path = self._owner_admission_generation_path(session_id)
+        if not anchor_path.exists():
+            return iso_now(), False
+        anchor = self._load_owner_admission_generation(session_id)
+        recorded_at = anchor.get("recorded_at")
+        if not isinstance(recorded_at, str):
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_anchor_invalid",
+                "owner admission generation anchor has no recorded timestamp",
+            )
+        expected = self._owner_admission_generation_from_validated(
+            validated,
+            recorded_at=recorded_at,
+        )
+        identity_keys = (
+            "session_id",
+            "launch_id",
+            "identity_mode",
+            "launch_digest",
+            "owner_admission_digest",
+            "owner_request_ref",
+            "provenance",
+            "recorded_at",
+        )
+        if any(anchor.get(key) != expected.get(key) for key in identity_keys):
+            raise ExternalCodexRuntimeError(
+                "owner_admission_generation_conflict",
+                "session has an external owner generation for another admission",
+            )
+        return recorded_at, True
+
+    def migrate_legacy_owner_admission_generation(
+        self,
+        session_id: str,
+        *,
+        expected_launch_digest: str,
+        expected_owner_admission_digest: str,
+    ) -> dict[str, Any]:
+        """Explicitly anchor one verified pre-upgrade v3 owner session."""
+
+        with self._lock(session_id):
+            anchor_path = self._owner_admission_generation_path(session_id)
+            if anchor_path.exists():
+                raise ExternalCodexRuntimeError(
+                    "owner_admission_generation_already_anchored",
+                    "owner admission generation already has a non-replacing anchor",
+                )
+            catalog_entry = self.legacy_owner_migration_entries.get(session_id)
+            if catalog_entry is None:
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_not_cataloged",
+                    "session is not an admitted pre-upgrade legacy generation in this release",
+                )
+            if (
+                catalog_entry.get("launch_digest") != expected_launch_digest
+                or catalog_entry.get("owner_admission_digest")
+                != expected_owner_admission_digest
+            ):
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_migration_mismatch",
+                    "legacy migration expectations differ from the release-bound catalog",
+                )
+            state = self._load_state(session_id)
+            if (
+                state.get("schema_version") != LEGACY_STATE_V3_SCHEMA_VERSION
+                or state.get("admission_class") != "owner_contour"
+                or state.get("launch_digest") != expected_launch_digest
+                or state.get("owner_admission_digest")
+                != expected_owner_admission_digest
+            ):
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_migration_mismatch",
+                    "legacy migration expectations do not match exact durable v3 state",
+                )
+            launch_path = self._session_dir(session_id) / "inputs" / "launch.json"
+            launch_raw = read_bounded(launch_path)
+            if sha256_bytes(launch_raw) != expected_launch_digest:
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_migration_mismatch",
+                    "legacy materialized launch differs from the expected digest",
+                )
+            launch = load_json_bytes(
+                launch_raw, label="legacy materialized external Codex launch"
+            )
+            validate_json(
+                launch,
+                LAUNCH_SCHEMA_PATH,
+                label="legacy materialized external Codex launch",
+            )
+            if (
+                launch.get("session_id") != session_id
+                or launch.get("launch_id") != state.get("launch_id")
+                or launch.get("launch_id") != catalog_entry.get("launch_id")
+                or launch.get("admission_class") != "owner_contour"
+                or launch.get("owner_admission_identity_mode") is not None
+            ):
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_migration_mismatch",
+                    "legacy launch does not describe the exact markerless v3 generation",
+                )
+            owner_request_path = state.get("materialized_inputs", {}).get(
+                "owner_execution_request"
+            )
+            if not isinstance(owner_request_path, str):
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_migration_mismatch",
+                    "legacy state has no materialized owner request",
+                )
+            owner_request_raw = read_bounded(Path(owner_request_path))
+            if sha256_bytes(owner_request_raw) != expected_owner_admission_digest:
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_migration_mismatch",
+                    "legacy owner request differs from the expected digest",
+                )
+            owner_request = load_json_bytes(
+                owner_request_raw, label="legacy durable owner execution request"
+            )
+            if owner_request.get("request_digest") != owner_request_digest(
+                owner_request
+            ):
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_migration_mismatch",
+                    "legacy owner request lost its semantic self-digest",
+                )
+            runtime_launch_ref = owner_request.get("external_incarnation", {}).get(
+                "runtime_launch_ref"
+            )
+            request_ref = owner_request.get("request_ref")
+            if (
+                not isinstance(request_ref, str)
+                or not request_ref
+                or request_ref != catalog_entry.get("owner_request_ref")
+                or not isinstance(runtime_launch_ref, dict)
+                or runtime_launch_ref.get("object_id") != launch.get("launch_id")
+                or runtime_launch_ref.get("digest") != expected_launch_digest
+            ):
+                raise ExternalCodexRuntimeError(
+                    "legacy_owner_admission_migration_mismatch",
+                    "legacy owner request does not bind the exact launch generation",
+                )
+            generation = {
+                "schema_version": OWNER_ADMISSION_GENERATION_SCHEMA_VERSION,
+                "session_id": session_id,
+                "launch_id": str(launch["launch_id"]),
+                "identity_mode": LEGACY_OWNER_ADMISSION_IDENTITY_MODE,
+                "launch_digest": expected_launch_digest,
+                "owner_admission_digest": expected_owner_admission_digest,
+                "owner_request_ref": request_ref,
+                "migration_catalog_digest": self.legacy_owner_migration_catalog_digest,
+                "provenance": "explicit_legacy_migration",
+                "recorded_at": iso_now(),
+            }
+            anchored = self._publish_owner_admission_generation(generation)
+            return {
+                "migrated": True,
+                "generation": anchored,
+                "generation_ref": _artifact_ref(anchor_path, owner="abyss-stack"),
+            }
+
     def _review_seed_envelope_locked(
         self,
         state: Mapping[str, Any],
@@ -8132,6 +8954,12 @@ class ExternalCodexRuntime:
                 "review_seed_writer_result_unbound",
                 "terminal writer result bytes differ from locked runtime state",
             )
+        self._validate_owner_admission_result_binding_locked(
+            state,
+            result,
+            failure_code="review_seed_writer_result_unbound",
+            label="terminal writer result",
+        )
         final_ref = state.get("actor_final_manifest_ref")
         delta_ref = state.get("actor_delta_ref")
         source_ref = state.get("source_manifest_before_ref")
@@ -8336,6 +9164,15 @@ class ExternalCodexRuntime:
                 Path(owner_request_path) if owner_request_path is not None else None
             ),
         )
+        session_id = str(validated["launch"]["session_id"])
+        if self._state_path(session_id).is_file():
+            with self._lock(session_id):
+                self._validate_owner_launch_identity_generation(
+                    validated,
+                    self._load_state(session_id),
+                )
+        else:
+            self._validate_owner_launch_identity_generation(validated, None)
         binding: IncarnationBinding = validated["binding"]
         return {
             "admitted": True,
@@ -8375,6 +9212,7 @@ class ExternalCodexRuntime:
             state_path = self._state_path(session_id)
             if state_path.is_file():
                 state = self._load_state(session_id)
+                self._validate_owner_launch_identity_generation(validated, state)
                 if state.get("launch_digest") != validated["launch_digest"]:
                     raise ExternalCodexRuntimeError(
                         "session_binding_conflict",
@@ -8388,15 +9226,43 @@ class ExternalCodexRuntime:
                 ):
                     if state.get(
                         "schema_version"
-                    ) != STATE_SCHEMA_VERSION or not isinstance(
+                    ) not in PROJECTION_STATE_SCHEMA_VERSIONS or not isinstance(
                         state.get("actor_projection_path"), str
                     ):
                         raise ExternalCodexRuntimeError(
                             "legacy_projection_unavailable",
                             "legacy session cannot receive a new inference attempt without a safe actor projection",
                         )
+                    if (
+                        state.get("schema_version") == STATE_SCHEMA_VERSION
+                        and state.get("admission_class") == "owner_contour"
+                    ):
+                        recovered_projection = self._prepare_actor_projection(
+                            validated=validated,
+                            session_dir=session_dir,
+                            recover_published_admission=True,
+                        )
+                        recovery_keys = (
+                            "source_manifest_before_ref",
+                            "source_manifest_after_ref",
+                            "actor_projection_path",
+                            "actor_baseline_manifest_ref",
+                        )
+                        if any(
+                            recovered_projection[key] != state.get(key)
+                            for key in recovery_keys
+                        ):
+                            raise ExternalCodexRuntimeError(
+                                "runtime_state_owner_identity_invalid",
+                                "attempt-free prepared state differs from recovered admission evidence",
+                            )
                     self._spawn_worker(state, mode="start", resume_payload=None)
                 return self._public_state(state)
+            self._validate_owner_launch_identity_generation(validated, None)
+            (
+                new_session_created_at,
+                recover_published_admission,
+            ) = self._new_session_admission_epoch(validated)
             inputs_dir = session_dir / "inputs"
             materialized: dict[str, str] = {}
             for key, (_, raw, _) in validated["coordinates"].items():
@@ -8537,6 +9403,7 @@ class ExternalCodexRuntime:
             projection = self._prepare_actor_projection(
                 validated=validated,
                 session_dir=session_dir,
+                recover_published_admission=recover_published_admission,
             )
             failure_closeout = self._failure_closeout_context(
                 binding=validated["binding"],
@@ -8601,7 +9468,7 @@ class ExternalCodexRuntime:
                 "materialized_task_inputs": materialized_task_inputs,
                 "failure_closeout": failure_closeout,
                 "preflight": validated["preflight"],
-                "created_at": iso_now(),
+                "created_at": new_session_created_at,
                 "started_at": None,
                 "finished_at": None,
                 "thread_id": None,
@@ -8629,9 +9496,23 @@ class ExternalCodexRuntime:
                 "result_digest": None,
                 "wake_evaluation": None,
             }
-            self._append_event(
+            if (
+                launch["admission_class"] == "owner_contour"
+                and not recover_published_admission
+            ):
+                self._publish_owner_admission_generation(
+                    self._owner_admission_generation_from_validated(
+                        validated,
+                        recorded_at=str(state["created_at"]),
+                        actor_baseline_manifest_digest=str(
+                            projection["actor_baseline_manifest_ref"][
+                                "artifact_digest"
+                            ]
+                        ),
+                    )
+                )
+            self._record_initial_prepared_event(
                 state,
-                event_type="external_agent.prepared",
                 payload={
                     "launch_digest": validated["launch_digest"],
                     "incarnation_id": validated["binding"].incarnation_id,
@@ -8641,7 +9522,7 @@ class ExternalCodexRuntime:
                         else None
                     ),
                 },
-                significance="progress",
+                recover_published_admission=recover_published_admission,
             )
             self._save_state(state)
             self._spawn_worker(state, mode="start", resume_payload=None)
@@ -9663,13 +10544,165 @@ class ExternalCodexRuntime:
         if path_value is None:
             return None
         path = Path(str(path_value))
-        reference = _artifact_ref(path, owner="aoa-agents")
+        raw = read_bounded(path)
+        artifact_digest = sha256_bytes(raw)
+        if artifact_digest != state.get("owner_admission_digest"):
+            raise ExternalCodexRuntimeError(
+                "materialized_input_drift",
+                "durable owner execution request changed after admission",
+            )
+        identity_mode = self._owner_admission_identity_mode(state, raw)
+        if identity_mode == "legacy_materialized_path_v1":
+            return self._owner_admission_evidence_ref(state)
+        request = load_json_bytes(raw, label="durable owner execution request")
+        request_ref = request.get("request_ref")
+        if not isinstance(request_ref, str) or not request_ref:
+            raise ExternalCodexRuntimeError(
+                "materialized_input_drift",
+                "durable owner execution request lost its stable request identity",
+            )
+        return {
+            "owner_repo": "aoa-agents",
+            "artifact_ref": request_ref,
+            "artifact_digest": artifact_digest,
+        }
+
+    def _owner_admission_identity_mode(
+        self,
+        state: Mapping[str, Any],
+        owner_request_raw: bytes,
+    ) -> str:
+        """Resolve owner-result identity from an external generation anchor."""
+
+        session_id = state.get("session_id")
+        if not isinstance(session_id, str) or not session_id:
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "owner identity resolution requires a durable session identity",
+            )
+        launch_path = self._session_dir(session_id) / "inputs" / "launch.json"
+        launch_raw = read_bounded(launch_path)
+        if sha256_bytes(launch_raw) != state.get("launch_digest"):
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "materialized launch differs from durable admission state",
+            )
+        launch = load_json_bytes(launch_raw, label="materialized external Codex launch")
+        validate_json(launch, LAUNCH_SCHEMA_PATH, label="materialized external Codex launch")
+        if (
+            launch.get("session_id") != session_id
+            or launch.get("launch_id") != state.get("launch_id")
+            or launch.get("admission_class") != "owner_contour"
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "materialized launch does not belong to this owner-contour state",
+            )
+        owner_request = load_json_bytes(
+            owner_request_raw,
+            label="durable owner execution request",
+        )
+        if owner_request.get("request_digest") != owner_request_digest(owner_request):
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "durable owner execution request lost its semantic self-digest",
+            )
+        runtime_launch_ref = owner_request.get("external_incarnation", {}).get(
+            "runtime_launch_ref"
+        )
+        if (
+            not isinstance(runtime_launch_ref, dict)
+            or runtime_launch_ref.get("object_id") != launch.get("launch_id")
+            or runtime_launch_ref.get("digest") != sha256_bytes(launch_raw)
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "durable owner request no longer binds the materialized launch bytes",
+            )
+        launch_mode = launch.get("owner_admission_identity_mode")
+        state_version = state.get("schema_version")
+        generation = self._load_owner_admission_generation(session_id)
+        request_ref = owner_request.get("request_ref")
+        if (
+            generation.get("launch_id") != launch.get("launch_id")
+            or generation.get("launch_digest") != sha256_bytes(launch_raw)
+            or generation.get("owner_admission_digest")
+            != sha256_bytes(owner_request_raw)
+            or generation.get("owner_request_ref") != request_ref
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "session-local owner bytes differ from the external generation anchor",
+            )
+        if (
+            state_version == STATE_SCHEMA_VERSION
+            and launch_mode == STABLE_OWNER_ADMISSION_IDENTITY_MODE
+            and generation.get("identity_mode")
+            == STABLE_OWNER_ADMISSION_IDENTITY_MODE
+            and generation.get("provenance") == "new_admission"
+        ):
+            return STABLE_OWNER_ADMISSION_IDENTITY_MODE
+        if (
+            state_version == LEGACY_STATE_V3_SCHEMA_VERSION
+            and launch_mode is None
+            and generation.get("identity_mode")
+            == LEGACY_OWNER_ADMISSION_IDENTITY_MODE
+            and generation.get("provenance") == "explicit_legacy_migration"
+        ):
+            return LEGACY_OWNER_ADMISSION_IDENTITY_MODE
+        raise ExternalCodexRuntimeError(
+            "runtime_state_owner_identity_invalid",
+            "runtime state version and owner-bound launch identity mode disagree",
+        )
+
+    def _owner_admission_evidence_ref(
+        self, state: Mapping[str, Any]
+    ) -> dict[str, Any] | None:
+        path_value = state["materialized_inputs"].get("owner_execution_request")
+        if path_value is None:
+            return None
+        reference = _artifact_ref(Path(str(path_value)), owner="aoa-agents")
         if reference["artifact_digest"] != state.get("owner_admission_digest"):
             raise ExternalCodexRuntimeError(
                 "materialized_input_drift",
                 "durable owner execution request changed after admission",
             )
         return reference
+
+    def _validate_owner_admission_result_binding_locked(
+        self,
+        state: Mapping[str, Any],
+        result: Mapping[str, Any],
+        *,
+        failure_code: str,
+        label: str,
+    ) -> None:
+        """Rebind a result to both identities of its admitted owner request."""
+
+        expected_owner_ref = self._owner_admission_ref(state)
+        if result.get("owner_admission_ref") != expected_owner_ref:
+            raise ExternalCodexRuntimeError(
+                failure_code,
+                f"{label} changed the admitted owner request identity",
+            )
+        expected_evidence_ref = self._owner_admission_evidence_ref(state)
+        if expected_evidence_ref is not None and expected_evidence_ref not in result.get(
+            "evidence_refs", []
+        ):
+            raise ExternalCodexRuntimeError(
+                failure_code,
+                f"{label} does not retain the admitted owner request snapshot",
+            )
+        if state.get("admission_class") != "owner_contour":
+            return
+        generation = self._load_owner_admission_generation(str(state["session_id"]))
+        if generation["identity_mode"] == STABLE_OWNER_ADMISSION_IDENTITY_MODE:
+            expected_generation_ref = self._owner_admission_generation_ref(state)
+            if expected_generation_ref not in result.get("evidence_refs", []):
+                raise ExternalCodexRuntimeError(
+                    failure_code,
+                    f"{label} does not retain the external owner generation anchor",
+                )
 
     def _attempt_has_completed_usage_event(
         self,
@@ -11747,8 +12780,12 @@ Runtime session identity: {state["session_id"]}
             if isinstance(ref, dict):
                 evidence_refs.append(ref)
         owner_admission_ref = self._owner_admission_ref(state)
-        if owner_admission_ref is not None:
-            evidence_refs.append(owner_admission_ref)
+        owner_admission_evidence_ref = self._owner_admission_evidence_ref(state)
+        if owner_admission_evidence_ref is not None:
+            evidence_refs.append(owner_admission_evidence_ref)
+        owner_generation_ref = self._owner_admission_generation_ref(state)
+        if owner_generation_ref is not None:
+            evidence_refs.append(owner_generation_ref)
         evidence_refs.extend(self._preserved_result_refs(state))
         result = {
             "schema_version": "abyss_stack_external_codex_result_v2",
@@ -12087,8 +13124,12 @@ Runtime session identity: {state["session_id"]}
             if isinstance(ref, dict):
                 evidence_refs.append(ref)
         owner_admission_ref = self._owner_admission_ref(state)
-        if owner_admission_ref is not None:
-            evidence_refs.append(owner_admission_ref)
+        owner_admission_evidence_ref = self._owner_admission_evidence_ref(state)
+        if owner_admission_evidence_ref is not None:
+            evidence_refs.append(owner_admission_evidence_ref)
+        owner_generation_ref = self._owner_admission_generation_ref(state)
+        if owner_generation_ref is not None:
+            evidence_refs.append(owner_generation_ref)
         evidence_refs.extend(self._preserved_result_refs(state))
         result = {
             "schema_version": "abyss_stack_external_codex_result_v2",
@@ -12233,6 +13274,13 @@ Runtime session identity: {state["session_id"]}
                 "runtime_terminal_result_recovery_mismatch",
                 "terminal result changed the durable Codex thread identity",
             )
+
+        self._validate_owner_admission_result_binding_locked(
+            state,
+            result,
+            failure_code="runtime_terminal_result_recovery_mismatch",
+            label="recoverable terminal result",
+        )
 
         expected_events_path = self._events_path(session_id)
         events_ref = result["events_ref"]
@@ -12448,6 +13496,12 @@ Runtime session identity: {state["session_id"]}
                 )
             result = load_json(result_file, label="runtime result")
             validate_json(result, RESULT_SCHEMA_PATH, label="runtime result")
+            self._validate_owner_admission_result_binding_locked(
+                state,
+                result,
+                failure_code="runtime_result_identity_mismatch",
+                label="runtime result",
+            )
             return result
 
     def resume(self, session_id: str, resume_path: str | Path) -> dict[str, Any]:
@@ -12455,10 +13509,10 @@ Runtime session identity: {state["session_id"]}
         validate_json(resume, RESUME_SCHEMA_PATH, label="resume request")
         with self._lock(session_id):
             state = self._load_state(session_id)
-            if state["schema_version"] != STATE_SCHEMA_VERSION:
+            if state["schema_version"] not in PROJECTION_STATE_SCHEMA_VERSIONS:
                 raise ExternalCodexRuntimeError(
                     "legacy_session_resume_unsupported",
-                    "legacy session has no v3 runtime-owned actor projection",
+                    "legacy session has no runtime-owned actor projection",
                 )
             projection_path = self._projection_path_from_state(state)
             if not isinstance(state.get("actor_baseline_manifest_ref"), dict):
@@ -12514,6 +13568,12 @@ Runtime session identity: {state["session_id"]}
             validate_json(
                 previous_result,
                 RESULT_SCHEMA_PATH,
+                label="prior runtime result",
+            )
+            self._validate_owner_admission_result_binding_locked(
+                state,
+                previous_result,
+                failure_code="runtime_result_evidence_closure_drift",
                 label="prior runtime result",
             )
             if (
@@ -15119,7 +16179,7 @@ class ExternalCodexParentReentry:
         expected_events_path = session_dir / "events.jsonl"
         events_ref = child_result["events_ref"]
         if (
-            child_state.get("schema_version") != STATE_SCHEMA_VERSION
+            child_state.get("schema_version") not in PROJECTION_STATE_SCHEMA_VERSIONS
             or child_state.get("session_id") != session_id
             or child_state.get("status") != child_result["status"]
             or child_state.get("status") not in {*TERMINAL_STATES, "interrupted"}
@@ -15135,6 +16195,12 @@ class ExternalCodexParentReentry:
                 "reentry_child_receipt_mismatch",
                 "child durable state does not bind the supplied terminal result",
             )
+        child_runtime._validate_owner_admission_result_binding_locked(
+            child_state,
+            child_result,
+            failure_code="reentry_child_receipt_mismatch",
+            label="child terminal result",
+        )
         verified_events_path = _verified_artifact_ref_path(
             events_ref, label="canonical child event stream"
         )
@@ -15654,6 +16720,7 @@ def build_parser() -> argparse.ArgumentParser:
             "result",
             "resume",
             "interrupt",
+            "migrate-legacy-owner-admission",
             "export-a2a-result",
             "yield-parent",
             "reenter-parent",
@@ -15665,6 +16732,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--launch")
     parser.add_argument("--owner-execution-request")
     parser.add_argument("--session-id")
+    parser.add_argument("--expected-launch-digest")
+    parser.add_argument("--expected-owner-admission-digest")
     parser.add_argument("--after-sequence", type=int, default=-1)
     parser.add_argument("--resume-request")
     parser.add_argument("--reviewer-session-id")
@@ -15751,6 +16820,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             elif args.operation == "interrupt":
                 result = runtime.interrupt(_require(args.session_id, "--session-id"))
+            elif args.operation == "migrate-legacy-owner-admission":
+                result = runtime.migrate_legacy_owner_admission_generation(
+                    _require(args.session_id, "--session-id"),
+                    expected_launch_digest=_require(
+                        args.expected_launch_digest, "--expected-launch-digest"
+                    ),
+                    expected_owner_admission_digest=_require(
+                        args.expected_owner_admission_digest,
+                        "--expected-owner-admission-digest",
+                    ),
+                )
             else:
                 result = runtime.export_a2a_result(
                     _require(args.session_id, "--session-id"),

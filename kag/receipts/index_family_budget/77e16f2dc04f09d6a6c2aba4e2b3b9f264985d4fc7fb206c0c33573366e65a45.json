@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 25283594,
+  "allowed_tracked_bytes": 34985642,
+  "approved_by": "repository-owner",
+  "base_ref": "0a9ca55318c378931b4f68b9621adc9f11b6039e",
+  "changed_generated_bytes": 25283594,
+  "changed_generated_files": 275,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "77e16f2dc04f09d6a6c2aba4e2b3b9f264985d4fc7fb206c0c33573366e65a45",
+  "reason": "Refresh the exact owner-local KAG family after preserving exact prepared legacy v3 owner-session restart without reopening markerless admission.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 34985642,
+  "tracked_bytes_max": 24117248
+}

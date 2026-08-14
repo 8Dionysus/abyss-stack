@@ -144,6 +144,149 @@ def test_inventory_distinguishes_disappearing_directory_from_other_scandir_error
         PROJECTION._inventory(root)
 
 
+def test_recovery_authority_rejects_private_git_poison_before_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, source_manifest = _source_repo(tmp_path)
+    target = tmp_path / "runtime" / "actor-workspace"
+    original_construct = PROJECTION._construct_private_git
+
+    def construct_then_poison(
+        source_root: Path,
+        staging: Path,
+        *,
+        source_manifest: dict[str, object],
+    ) -> tuple[frozenset[str], bytes]:
+        expectation = original_construct(
+            source_root,
+            staging,
+            source_manifest=source_manifest,
+        )
+        with (staging / ".git" / "config").open(
+            "a", encoding="utf-8"
+        ) as handle:
+            handle.write("[core]\n\tfsmonitor = /tmp/attacker-helper\n")
+        return expectation
+
+    monkeypatch.setattr(PROJECTION, "_construct_private_git", construct_then_poison)
+    private_git_admission: dict[str, object] = {}
+
+    with pytest.raises(
+        ProjectionError,
+        match="runtime-authored posture",
+    ):
+        materialize_actor_projection(
+            source,
+            target,
+            source_manifest=source_manifest,
+            source_manifest_digest="sha256:" + "1" * 64,
+            private_git_admission=private_git_admission,
+        )
+
+    assert target.exists() is False
+    assert private_git_admission == {}
+
+
+def test_recovery_authority_rejects_object_poison_seen_by_baseline_and_capture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, source_manifest = _source_repo(tmp_path)
+    target = tmp_path / "runtime" / "actor-workspace"
+    original_construct = PROJECTION._construct_private_git
+
+    def construct_then_add_unadmitted_object(
+        source_root: Path,
+        staging: Path,
+        *,
+        source_manifest: dict[str, object],
+    ) -> tuple[frozenset[str], bytes]:
+        object_ids, exclude_bytes = original_construct(
+            source_root,
+            staging,
+            source_manifest=source_manifest,
+        )
+        poisoned_object_id = PROJECTION._git(
+            staging,
+            "hash-object",
+            "-w",
+            "--stdin",
+            input_bytes=b"same-uid staging poison\n",
+        )
+        assert poisoned_object_id.strip().decode("ascii") not in object_ids
+        return object_ids, exclude_bytes
+
+    monkeypatch.setattr(
+        PROJECTION,
+        "_construct_private_git",
+        construct_then_add_unadmitted_object,
+    )
+    private_git_admission: dict[str, object] = {}
+
+    with pytest.raises(
+        ProjectionError,
+        match="topology contains unadmitted metadata",
+    ):
+        materialize_actor_projection(
+            source,
+            target,
+            source_manifest=source_manifest,
+            source_manifest_digest="sha256:" + "1" * 64,
+            private_git_admission=private_git_admission,
+        )
+
+    assert target.exists() is False
+    assert private_git_admission == {}
+
+
+@pytest.mark.parametrize("metadata_path", ["shallow", "packed-refs"])
+def test_recovery_authority_rejects_unadmitted_git_metadata_before_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    metadata_path: str,
+) -> None:
+    source, source_manifest = _source_repo(tmp_path)
+    target = tmp_path / "runtime" / "actor-workspace"
+    original_construct = PROJECTION._construct_private_git
+
+    def construct_then_add_metadata(
+        source_root: Path,
+        staging: Path,
+        *,
+        source_manifest: dict[str, object],
+    ) -> tuple[frozenset[str], bytes]:
+        expectation = original_construct(
+            source_root,
+            staging,
+            source_manifest=source_manifest,
+        )
+        (staging / ".git" / metadata_path).write_text(
+            str(source_manifest["git_head"]) + "\n",
+            encoding="ascii",
+        )
+        return expectation
+
+    monkeypatch.setattr(
+        PROJECTION,
+        "_construct_private_git",
+        construct_then_add_metadata,
+    )
+
+    with pytest.raises(
+        ProjectionError,
+        match="topology contains unadmitted metadata",
+    ):
+        materialize_actor_projection(
+            source,
+            target,
+            source_manifest=source_manifest,
+            source_manifest_digest="sha256:" + "1" * 64,
+        )
+
+    assert target.exists() is False
+
+
 def test_projection_owns_private_git_and_survives_source_parent_replacement(
     tmp_path: Path,
 ) -> None:

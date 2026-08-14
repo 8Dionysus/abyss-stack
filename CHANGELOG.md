@@ -9,6 +9,33 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Return an admitted external actor's stable `aoa-agents` owner-request
+  identity in `owner_admission_ref` while retaining the runtime-private
+  immutable request snapshot as separate path-addressable evidence. This lets
+  downstream summon closeout match the exact selected request without
+  weakening byte-drift detection. Terminal recovery, ordinary result reads,
+  and continuation admission now rebind both identities to durable state, so
+  a schema-valid semantic substitution cannot ride an intact evidence snapshot.
+  Review-seed issuance, reviewer preparation, and initial parent re-entry child
+  admission enforce the same binding before consuming a terminal result.
+  New receipts use runtime state v4 for this representation. Existing v3
+  receipts remain readable, reviewable, resumable, and re-enterable only with
+  their exact historical path-shaped owner reference and immutable digest;
+  the two representations cannot be interchanged within one state version.
+  A non-replacing owner-generation anchor now binds this distinction outside
+  the rewriteable session directory. Deleting its same-UID pathname fails
+  closed and cannot reopen legacy migration: only exact pre-upgrade sessions
+  listed in a catalog sealed into the verified content-addressed release may
+  use the explicit digest-pinned migration operation. The authored catalog is
+  empty; an operator inventory may be packaged only while staging that release,
+  and the release cannot be published by ordinary install or activation. Only
+  host-gated `activate-admitted` may activate the catalog after artifact trust
+  binds the complete release manifest. Normal reads cannot create a migration
+  record. If the controller crashes after publishing a new current-generation
+  anchor but before its first state, an exact retry reuses the anchor timestamp,
+  verifies and reuses the matching unpublished actor projection, reconciles an
+  already-durable prepared event when present, and completes the same admission
+  instead of conflicting with itself.
 - Pin both external Codex specialized-environment profiles to the landed
   `aoa-stats` actor-responsibility receipt revision, so a release built from
   the current validation dependency can package and verify that same owner

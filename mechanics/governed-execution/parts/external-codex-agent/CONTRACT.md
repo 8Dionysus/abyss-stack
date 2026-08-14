@@ -169,7 +169,80 @@ Before launch the controller verifies:
     external-process/session posture, and observe-only usage
     semantics must match the launch and continuation exactly. Owner semantic
     self-digests and immutable transport-byte digests remain distinct and both
-    are verified.
+    are verified. The terminal runtime result identifies the admitted owner
+    request by its stable `request_ref` and the digest of the exact admitted
+    bytes, rather than by the runtime-private materialization path. That
+    materialized immutable snapshot remains a separate path-addressable
+    `evidence_refs` member for runtime recovery and continuation closure.
+    Runtime state v4 owns this representation. A pre-upgrade v3 state instead
+    requires the exact historical path-shaped `owner_admission_ref`, including
+    the same admitted byte digest and evidence membership. Result reads,
+    recovery, resume, reviewer preparation, review-seed issuance, and initial
+    parent re-entry accept that legacy form only when the durable state is v3;
+    v4 cannot downgrade and v3 cannot claim the stable v4 form. The
+    discriminator is not the mutable state version or any closure of
+    session-local files. Every newly
+    admitted owner-contour launch contains
+    `owner_admission_identity_mode=stable_request_ref_v1`, and the owner
+    request binds the digest and object identity of those exact launch bytes.
+    Before first state publication the controller also publishes one
+    non-replacing, mode-0400 generation anchor under the state-root-level
+    `owner-admission-generations/` ledger. It binds session, launch, exact
+    launch bytes, exact owner-request bytes, stable request identity, identity
+    mode, and provenance outside the rewriteable session directory. Every
+    later owner-result read must agree with that anchor. Its same-UID pathname
+    is not treated as immutable: absence always fails closed. The only route
+    that may recreate a missing legacy anchor is additionally authorized by an
+    exact pre-upgrade inventory sealed into the verified content-addressed
+    release. The launcher verifies that catalog and mounts it from a sealed
+    memfd in the read-only runtime snapshot; a session created after the
+    inventory cannot add itself to the migration set. Supplying a non-empty
+    inventory is a staging operation only. Ordinary `install` rejects a
+    catalog-bearing source, and ordinary `activate` rejects a catalog-bearing
+    staged release. Only `activate-admitted`, after the host artifact trust gate
+    has bound the complete release manifest and catalog bytes, may publish its
+    `active.json` and wrappers.
+    A legacy v3 receipt is accepted only when its materialized launch lacks
+    that mode and the request's semantic self-digest plus `runtime_launch_ref`
+    still bind the same launch and an explicit operator migration has matched
+    its session, launch, request, and stable request identity against that
+    release-bound catalog before publishing a legacy-generation anchor.
+    Unanchored v3 state fails closed; ordinary reads never infer or create a
+    migration record. The marker is mandatory for a new owner-contour
+    admission. An anchored markerless launch may pass preflight or start only
+    when an existing durable v3 session has the same launch digest,
+    owner-admission digest, materialized request, and legacy generation. This
+    permits reviewed recovery from a crash after durable `prepared` state but
+    before attempt one without reopening legacy admission or allowing a v4
+    session to manufacture its own downgrade.
+    A current-generation crash after anchor publication but before first state
+    publication is also retryable: the same launch/request identity reuses the
+    anchor timestamp, only an unpublished actor projection whose baseline bytes
+    still match the digest held by that external anchor may be reused, and at
+    most one exact prepared event with the anchored timestamp may be reconciled
+    into first state. Because same-UID mode bits are not a trust boundary, the
+    projection must also match a fresh one-time witness materialized directly
+    from the admitted source or exact review seed; the witness is removed by
+    its pinned inode before recovery continues. New admissions therefore
+    publish a v2 anchor. Stable-request v1 anchors were never deployed and are
+    rejected rather than treated as historical compatibility; actual legacy
+    v3 sessions enter only through the release-cataloged explicit migration
+    above, which also publishes a v2 anchor. No Git command runs against the mutable
+    recovered projection. All non-index Git bytes must match the safe witness,
+    whose private-Git authority is captured in memory before its staging inode
+    receives a public session pathname; later mutation of the published witness
+    cannot alter that comparison value. The recovered index is copied from a
+    pinned descriptor into a sealed memfd, and only its stage/flag meaning is
+    interpreted against the fresh witness with hooks and fsmonitor disabled.
+    The recovered content and private Git body are inventoried again after that
+    inspection. Any mismatch fails closed without executing a concurrently
+    introduced repository config, attribute, hook, fsmonitor, or filter.
+    The same binding is checked after first-state publication: every durable
+    v2 state must retain the anchor-bound baseline reference and bytes. If the
+    state is still `prepared` with no attempt, the independent source/seed
+    witness is rebuilt before the first worker is retried. This recovery path
+    accepts current v2 anchors and catalog-authorized legacy-v3 migrations; it
+    cannot be entered by relabeling either as a v1 anchor.
 
 The two request-shaped objects are intentionally not collapsed. The
 `AgentIncarnationBinding.task_request_ref` is the canonical schema-valid SDK
@@ -373,9 +446,10 @@ controller descriptor plus final pathname identity check turns a same-UID
 replacement into typed authority-blocked evidence.
 
 Durable v1/v2 states remain readable for status, event, and terminal-result
-recovery. They cannot start another attempt without a safe v3 runtime-owned
-projection and baseline; the attempt fails closed instead of inventing or
-backfilling historical projection proof.
+recovery. They cannot start another attempt without a safe v3-or-newer
+runtime-owned projection and baseline; the attempt fails closed instead of
+inventing or backfilling historical projection proof. Durable v3 projections
+remain resumable after v4 introduces the stable owner-request identity form.
 
 The runtime emits result v2. Every v2 receipt carries the actor projection,
 baseline, source-before, and source-after references; completed,
@@ -685,7 +759,10 @@ If the worker exits after atomically replacing the canonical terminal
 `result.json` but before the final state rewrite, worker-death observation first
 attempts a locked semantic recovery. Recovery requires the current attempt
 count, session/model/task/thread identities, terminal status, complete event
-digest, invocation identities, and every evidence digest to remain exact. A
+digest, invocation identities, and every evidence digest to remain exact. For
+an owner-contour session it also recomputes the stable owner-request reference
+from the admitted request bytes and requires the separate path-addressable
+snapshot to remain in result evidence. A
 prior result deliberately left at the canonical path during resume has a lower
 attempt count and is not mistaken for the current terminal commit. Only when no
 current recoverable result exists does unexpected worker death produce its own
@@ -694,8 +771,9 @@ typed failure receipt.
 Every terminal closeout copies the exact `result.json` bytes into its attempt
 directory and snapshots every unique artifact named by that result before any
 later resume can change a session-wide evidence surface. Before admitting a
-resume, the controller validates the current terminal result and this preserved
-closure. A schema-validated closure receipt binds each
+resume, the controller rebinds its stable owner-request identity and immutable
+snapshot to durable admission state, then validates the current terminal result
+and this preserved closure. A schema-validated closure receipt binds each
 original coordinate and digest to its immutable snapshot; later event appends
 or final-manifest replacement therefore cannot make the prior result
 unverifiable. Both the exact result and closure receipt enter the
@@ -774,6 +852,10 @@ export accepts only the historical fixture pair or the exact
 `owner_contour`-writer/prepared-reviewer pair. The latter does not downgrade the
 writer: its owner request, SDK v4 transport preference, binding v2, durable
 state, report, and terminal actor evidence remain required and digest-bound.
+Before reviewer preparation consumes a terminal writer result, the writer
+runtime revalidates its canonical result under the durable session route and
+rebinds both the stable owner-request identity and path-addressable admitted
+snapshot. Review-seed issuance repeats the same check under the writer lock.
 
 A reviewer formed independently by the role-first `aoa-agents` route instead
 enters as `owner_contour`. The generic owner-contour exporter requires the exact
@@ -908,7 +990,9 @@ alive while the child works.
 obligation and binding. The supplied absolute `result.json` must occupy the
 canonical `sessions/<hash(session_id)>/` directory and match the sibling
 durable `state.json` result path/digest, terminal identity/status/thread, and
-canonical event path/terminal sequence. It then revalidates the child's task,
+canonical event path/terminal sequence. While holding the canonical child
+session lock it also rebinds the stable owner-request identity and immutable
+request snapshot to the child's durable admission state. It then revalidates the child's task,
 incarnation, result schema, event-stream digest, evidence inclusion,
 continuation, return owner, deferred decisions, and status-selected SDK wake
 condition while holding the canonical child session lock through the durable
