@@ -6864,6 +6864,99 @@ def test_prepared_session_retries_launch_after_spawn_failure(
     assert calls == 2
 
 
+def test_owner_prepared_session_revalidates_before_retrying_spawn(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="owner-prepared-spawn-retry",
+    )
+    runtime = fixture["runtime"]
+    calls = 0
+
+    def fail_once_then_hold(*args: Any, **kwargs: Any) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("fixture owner fork failure")
+
+    monkeypatch.setattr(runtime, "_spawn_worker", fail_once_then_hold)
+    with pytest.raises(OSError, match="fixture owner fork failure"):
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+
+    retried = runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+
+    assert retried["status"] == "prepared"
+    assert calls == 2
+
+
+def test_owner_prepared_session_rejects_forged_durable_projection_closure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="owner-prepared-forged-durable-closure",
+    )
+    runtime = fixture["runtime"]
+
+    monkeypatch.setattr(
+        runtime,
+        "_spawn_worker",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            OSError("fixture owner fork failure")
+        ),
+    )
+    with pytest.raises(OSError, match="fixture owner fork failure"):
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+
+    state = runtime._load_state(fixture["session_id"])
+    projection = Path(state["actor_projection_path"])
+    baseline_path = Path(state["actor_baseline_manifest_ref"]["artifact_ref"])
+    original_baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    (projection / "README.md").write_text(
+        "forged durable projection closure\n",
+        encoding="utf-8",
+    )
+    rewritten_baseline = RUNTIME._checked_actor_manifest(
+        projection,
+        source_manifest_digest=original_baseline["source_manifest_digest"],
+        source_git_head=original_baseline["source_git_head"],
+    )
+    baseline_path.chmod(0o600)
+    _write_json(baseline_path, rewritten_baseline)
+    state["actor_baseline_manifest_ref"] = RUNTIME._artifact_ref(baseline_path)
+    runtime._save_state(state)
+
+    generation_path = runtime._owner_admission_generation_path(
+        fixture["session_id"]
+    )
+    generation = json.loads(generation_path.read_text(encoding="utf-8"))
+    generation_path.unlink()
+    generation["actor_baseline_manifest_digest"] = _digest_path(baseline_path)
+    _write_json(generation_path, generation)
+    generation_path.chmod(0o400)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as retry_exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert retry_exc_info.value.code == "workspace_projection_retry_invalid"
+
+
 def test_active_attempts_use_distinct_runtime_owned_projections(
     tmp_path: Path,
 ) -> None:

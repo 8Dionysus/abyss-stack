@@ -228,6 +228,11 @@ Before launch the controller verifies:
     durable session created with the preceding v1 anchor remains readable, but
     a v1 crash before first state cannot enter this recovery path without an
     explicit migration. Any mismatch fails closed.
+    The same binding is checked after first-state publication: every durable
+    v2 state must retain the anchor-bound baseline reference and bytes. If the
+    state is still `prepared` with no attempt, the independent source/seed
+    witness is rebuilt before the first worker is retried. A v1 attempt-free
+    state requires explicit migration rather than inheriting the v2 path.
 
 The two request-shaped objects are intentionally not collapsed. The
 `AgentIncarnationBinding.task_request_ref` is the canonical schema-valid SDK

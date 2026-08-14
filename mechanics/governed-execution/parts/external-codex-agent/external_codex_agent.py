@@ -6322,11 +6322,75 @@ class ExternalCodexRuntime:
     ) -> dict[str, str] | None:
         if state.get("admission_class") != "owner_contour":
             return None
-        self._load_owner_admission_generation(str(state["session_id"]))
+        generation = self._load_owner_admission_generation(str(state["session_id"]))
+        self._validate_owner_actor_baseline_anchor(
+            state,
+            generation=generation,
+        )
         return _artifact_ref(
             self._owner_admission_generation_path(str(state["session_id"])),
             owner="abyss-stack",
         )
+
+    def _validate_owner_actor_baseline_anchor(
+        self,
+        state: Mapping[str, Any],
+        *,
+        generation: Mapping[str, Any] | None = None,
+    ) -> None:
+        """Bind every durable v2 state back to its external baseline digest."""
+
+        if (
+            state.get("schema_version") != STATE_SCHEMA_VERSION
+            or state.get("admission_class") != "owner_contour"
+        ):
+            return
+        anchored = (
+            generation
+            if generation is not None
+            else self._load_owner_admission_generation(str(state["session_id"]))
+        )
+        if anchored.get("schema_version") != OWNER_ADMISSION_GENERATION_SCHEMA_VERSION:
+            return
+        baseline_ref = state.get("actor_baseline_manifest_ref")
+        baseline_path = self._session_dir(str(state["session_id"])) / (
+            "actor-baseline-manifest.json"
+        )
+        if (
+            not isinstance(baseline_ref, Mapping)
+            or baseline_ref.get("artifact_ref") != str(baseline_path)
+            or baseline_ref.get("artifact_digest")
+            != anchored.get("actor_baseline_manifest_digest")
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "durable actor baseline reference differs from its generation anchor",
+            )
+        baseline_raw = read_bounded(baseline_path)
+        if sha256_bytes(baseline_raw) != baseline_ref["artifact_digest"]:
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "durable actor baseline bytes differ from their generation anchor",
+            )
+        baseline = load_json_bytes(baseline_raw, label="durable actor baseline")
+        validate_json(
+            baseline,
+            ACTOR_MANIFEST_SCHEMA_PATH,
+            label="durable actor baseline",
+        )
+        source_before_ref = state.get("source_manifest_before_ref")
+        if (
+            baseline.get("workspace_path") != state.get("actor_projection_path")
+            or not isinstance(source_before_ref, Mapping)
+            or baseline.get("source_manifest_digest")
+            != source_before_ref.get("artifact_digest")
+            or baseline.get("source_git_head")
+            != state.get("workspace_expected_head")
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "durable actor baseline identity differs from runtime state",
+            )
 
     def _load_owner_admission_generation(self, session_id: str) -> dict[str, Any]:
         """Load the controller-owned generation anchor outside session files."""
@@ -8641,6 +8705,7 @@ class ExternalCodexRuntime:
                 "runtime_state_owner_identity_invalid",
                 "incoming launch generation differs from durable owner admission",
             )
+        self._validate_owner_actor_baseline_anchor(state)
 
     def _owner_admission_generation_from_validated(
         self,
@@ -9158,6 +9223,40 @@ class ExternalCodexRuntime:
                             "legacy_projection_unavailable",
                             "legacy session cannot receive a new inference attempt without a safe actor projection",
                         )
+                    if (
+                        state.get("schema_version") == STATE_SCHEMA_VERSION
+                        and state.get("admission_class") == "owner_contour"
+                    ):
+                        generation = self._load_owner_admission_generation(
+                            session_id
+                        )
+                        if (
+                            generation.get("schema_version")
+                            != OWNER_ADMISSION_GENERATION_SCHEMA_VERSION
+                        ):
+                            raise ExternalCodexRuntimeError(
+                                "owner_admission_generation_upgrade_required",
+                                "an attempt-free pre-v2 owner admission cannot be resumed without explicit migration",
+                            )
+                        recovered_projection = self._prepare_actor_projection(
+                            validated=validated,
+                            session_dir=session_dir,
+                            recover_published_admission=True,
+                        )
+                        recovery_keys = (
+                            "source_manifest_before_ref",
+                            "source_manifest_after_ref",
+                            "actor_projection_path",
+                            "actor_baseline_manifest_ref",
+                        )
+                        if any(
+                            recovered_projection[key] != state.get(key)
+                            for key in recovery_keys
+                        ):
+                            raise ExternalCodexRuntimeError(
+                                "runtime_state_owner_identity_invalid",
+                                "attempt-free prepared state differs from recovered admission evidence",
+                            )
                     self._spawn_worker(state, mode="start", resume_payload=None)
                 return self._public_state(state)
             self._validate_owner_launch_identity_generation(validated, None)

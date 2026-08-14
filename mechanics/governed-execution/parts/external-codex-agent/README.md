@@ -554,6 +554,10 @@ its first state without an explicit migration. If the prepared event was
 already appended, its complete event object, including the anchor-derived
 timestamp, becomes the initial durable prefix rather than being duplicated. A
 different identity, changed projection, or additional event is rejected.
+After `state.json` exists, v2 reads continue to bind its baseline reference and
+bytes to the generation anchor. An attempt-free `prepared` retry also rebuilds
+the independent witness before spawning its first worker, closing the
+state-saved/process-not-yet-created crash window.
 
 See [CONTRACT.md](CONTRACT.md), [DIRECTION.md](DIRECTION.md),
 [PROVENANCE.md](PROVENANCE.md), [SUSPENSION.md](SUSPENSION.md), and
