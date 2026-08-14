@@ -217,8 +217,9 @@ Before launch the controller verifies:
     session to manufacture its own downgrade.
     A current-generation crash after anchor publication but before first state
     publication is also retryable: the same launch/request identity reuses the
-    anchor timestamp, and only a byte- and inode-identical unpublished actor
-    projection may be reset and rebuilt. Any mismatch fails closed.
+    anchor timestamp, only a byte- and inode-identical unpublished actor
+    projection may be reused, and at most one exact prepared event may be
+    reconciled into first state. Any mismatch fails closed.
 
 The two request-shaped objects are intentionally not collapsed. The
 `AgentIncarnationBinding.task_request_ref` is the canonical schema-valid SDK

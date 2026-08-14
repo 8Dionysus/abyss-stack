@@ -188,7 +188,8 @@ legacy migration after deleting that anchor, release-catalog-bound and
 digest-pinned legacy-v3 migration, refusal of catalog-bearing ordinary install
 and activation, artifact-admitted catalog activation, unanchored-legacy
 refusal, recovery of a pre-attempt legacy prepared state, and exact retry after
-a current generation anchor was published but first state was not,
+a current generation anchor or its prepared event was published but first state
+was not,
 unclassified non-validation interpreter indirection with exact fixed-validation
 exemption, fail-closed `env --split-string` handling, value-aware `timeout`
 wrapper parsing, opaque process-launch-wrapper refusal,

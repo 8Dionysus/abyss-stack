@@ -33,8 +33,9 @@ Tracking starts with the community-docs baseline for this repository.
   binds the complete release manifest. Normal reads cannot create a migration
   record. If the controller crashes after publishing a new current-generation
   anchor but before its first state, an exact retry reuses the anchor timestamp,
-  verifies and resets only the matching unpublished actor projection, and
-  completes the same admission instead of conflicting with itself.
+  verifies and reuses the matching unpublished actor projection, reconciles an
+  already-durable prepared event when present, and completes the same admission
+  instead of conflicting with itself.
 - Pin both external Codex specialized-environment profiles to the landed
   `aoa-stats` actor-responsibility receipt revision, so a release built from
   the current validation dependency can package and verify that same owner

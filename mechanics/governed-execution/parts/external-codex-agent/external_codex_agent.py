@@ -6572,16 +6572,25 @@ class ExternalCodexRuntime:
                     "workspace_projection_retry_invalid",
                     "unpublished actor projection changed after generation publication",
                 )
-            try:
-                remove_actor_projection(
-                    projection_path,
-                    expected_identity=prior_baseline["workspace_identity"],
-                )
-            except (OSError, ProjectionError) as exc:
+            source_after = (
+                build_workspace_manifest(source)
+                if review_seed is None
+                else source_before
+            )
+            if source_after != source_before:
                 raise ExternalCodexRuntimeError(
-                    "workspace_projection_cleanup_incomplete",
-                    "verified unpublished actor projection could not be reset",
-                ) from exc
+                    "workspace_source_race",
+                    "source workspace changed after generation publication",
+                )
+            source_after_path = session_dir / "source-manifest-after.json"
+            _atomic_write_json(source_after_path, source_after, mode=0o400)
+            return {
+                "source_manifest_before_ref": source_before_ref,
+                "source_manifest_after_ref": _artifact_ref(source_after_path),
+                "actor_projection_path": str(projection_path),
+                "actor_baseline_manifest_ref": _artifact_ref(baseline_path),
+                "actor_baseline_manifest": prior_baseline,
+            }
 
         def cleanup_projection() -> None:
             try:
@@ -6982,6 +6991,70 @@ class ExternalCodexRuntime:
         validate_json(event, EVENT_SCHEMA_PATH, label="normalized runtime event")
         _append_jsonl(self._events_path(str(state["session_id"])), event)
         state["last_event_sequence"] = sequence
+        return event
+
+    def _record_initial_prepared_event(
+        self,
+        state: dict[str, Any],
+        *,
+        payload: Mapping[str, Any],
+        recover_published_admission: bool,
+    ) -> dict[str, Any]:
+        """Append or reconcile the only event allowed before first state."""
+
+        path = self._events_path(str(state["session_id"]))
+        if not path.exists():
+            return self._append_event(
+                state,
+                event_type="external_agent.prepared",
+                payload=payload,
+                significance="progress",
+            )
+        if not recover_published_admission:
+            raise ExternalCodexRuntimeError(
+                "runtime_event_state_drift",
+                "new admission has an event stream without a generation anchor",
+            )
+        events: list[dict[str, Any]] = []
+        for line_number, line in _iter_jsonl_bytes(
+            path,
+            failure_code="runtime_event_state_drift",
+            label="unpublished runtime event stream",
+        ):
+            try:
+                event = json.loads(line)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ExternalCodexRuntimeError(
+                    "runtime_event_state_drift",
+                    f"unpublished runtime event line {line_number} is invalid",
+                ) from exc
+            validate_json(event, EVENT_SCHEMA_PATH, label="unpublished runtime event")
+            events.append(event)
+        if len(events) != 1:
+            raise ExternalCodexRuntimeError(
+                "runtime_event_state_drift",
+                "unpublished admission must have exactly one prepared event",
+            )
+        event = events[0]
+        expected = {
+            "schema_version": "abyss_stack_external_codex_event_v1",
+            "sequence": 0,
+            "recorded_at": event.get("recorded_at"),
+            "session_id": state["session_id"],
+            "attempt_id": "runtime",
+            "thread_id": None,
+            "event_type": "external_agent.prepared",
+            "source_event_type": None,
+            "payload_digest": canonical_digest(payload),
+            "significance": "progress",
+            "payload": dict(payload),
+        }
+        if event != expected:
+            raise ExternalCodexRuntimeError(
+                "runtime_event_state_drift",
+                "unpublished prepared event differs from the anchored admission",
+            )
+        state["last_event_sequence"] = 0
         return event
 
     def _load_coordinate(
@@ -9212,9 +9285,8 @@ class ExternalCodexRuntime:
                         recorded_at=str(state["created_at"]),
                     )
                 )
-            self._append_event(
+            self._record_initial_prepared_event(
                 state,
-                event_type="external_agent.prepared",
                 payload={
                     "launch_digest": validated["launch_digest"],
                     "incarnation_id": validated["binding"].incarnation_id,
@@ -9224,7 +9296,7 @@ class ExternalCodexRuntime:
                         else None
                     ),
                 },
-                significance="progress",
+                recover_published_admission=recover_published_admission,
             )
             self._save_state(state)
             self._spawn_worker(state, mode="start", resume_payload=None)

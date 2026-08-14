@@ -47,8 +47,10 @@ an admitted migration authority.
 The new-admission contour is also idempotent across its narrow publication
 window. If the controller stops after the current generation anchor is durable
 but before `state.json`, an exact retry reuses that anchor's `recorded_at` and
-resets only an actor projection whose full baseline and inode identity still
-match the anchored admission. Drift fails closed.
+reuses only an actor projection whose full baseline and inode identity still
+match the anchored admission. A single already-written prepared event is
+reconciled as the initial durable event prefix. Drift or extra events fail
+closed, and no recursive projection reset creates a second crash window.
 
 The complete external-Codex deterministic suite passed. This is an ABI repair,
 not new role, model-fit, owner-acceptance, publication, or external-effect
