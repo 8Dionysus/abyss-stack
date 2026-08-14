@@ -301,8 +301,10 @@ that a mismatched admitted subject fails before publication.
 It also proves role-scoped MCP argv isolation: the selected AoA server alone is
 configured through an attempt-local relay, its exact upstream token is required
 but absent from Codex argv, environment, and model shell, the relay injects it
-only at the fixed upstream hop, the relay replaces a missing or client-supplied
-protocol header with exact modern MCP version `2026-07-28`, and ambient/other
+only at the fixed upstream hop, the runtime explicitly enables the pinned
+Codex modern-MCP feature, the relay preserves exact modern MCP version
+`2026-07-28` while rejecting missing or stale client protocol headers before
+any upstream request, and ambient/other
 MCPs are absent.
 
 That suite does not prove the installed Codex binary, ChatGPT quota behavior,

@@ -149,6 +149,7 @@ MAX_CACHED_SCHEMA_BYTES = 512 * 1024
 MAX_JSON_ESCAPE_LAYERS = 32
 MCP_PROXY_CONNECT_TIMEOUT_SECONDS = 15
 MCP_PROXY_PROTOCOL_VERSION = "2026-07-28"
+MCP_CODEX_FEATURE = "mcp_2026_07_28"
 SHELL_NESTING_INSPECTION_LIMIT = 4
 FOREGROUND_OBSERVATION_INTERVAL_SECONDS = 0.25
 NESTED_EVIDENCE_ENV = "AOA_EXTERNAL_CODEX_NESTED_EVIDENCE"
@@ -255,6 +256,12 @@ class _McpCredentialProxy:
                     return
                 if length < 0 or length > MAX_MCP_PROXY_REQUEST_BYTES:
                     self.send_error(413)
+                    return
+                protocol_versions = self.headers.get_all(
+                    "MCP-Protocol-Version", failobj=[]
+                )
+                if protocol_versions != [MCP_PROXY_PROTOCOL_VERSION]:
+                    self.send_error(400, "modern MCP protocol version required")
                     return
                 body = self.rfile.read(length) if length else None
                 # Header and request-body admission is bounded. Once admitted,
@@ -11075,6 +11082,8 @@ Runtime session identity: {state["session_id"]}
             "-a",
             "never",
         ]
+        if tool_entry["mcp_server_configs"]:
+            base.extend(["--enable", MCP_CODEX_FEATURE])
         if tool_entry["codex_sandbox"] != "workspace-write":
             raise ExternalCodexRuntimeError(
                 "codex_permission_profile_invalid",

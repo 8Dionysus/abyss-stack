@@ -4470,6 +4470,7 @@ def test_role_scoped_mcp_injects_only_selected_server_config(
     argv = state["attempts"][0]["codex_argv"]
     rendered = "\n".join(argv)
     assert "mcp_servers.aoa_evals=" in rendered
+    assert argv[argv.index("--enable") + 1] == "mcp_2026_07_28"
     assert "AOA_EVALS_MCP_READ_BEARER_TOKEN" not in rendered
     assert "bearer_token_env_var" not in rendered
     assert re.search(r"http://127\.0\.0\.1:[0-9]+/mcp/[A-Za-z0-9_-]+", rendered)
@@ -4507,10 +4508,7 @@ def test_attempt_environment_excludes_upstream_mcp_credential(
     assert "upstream-token" not in environment.values()
 
 
-@pytest.mark.parametrize("client_protocol_version", [None, "stale-client-version"])
-def test_attempt_local_mcp_proxy_injects_upstream_credential_only_at_relay(
-    client_protocol_version: str | None,
-) -> None:
+def test_attempt_local_mcp_proxy_injects_upstream_credential_only_at_relay() -> None:
     observed: dict[str, Any] = {}
 
     class UpstreamHandler(http.server.BaseHTTPRequestHandler):
@@ -4542,9 +4540,10 @@ def test_attempt_local_mcp_proxy_injects_upstream_credential_only_at_relay(
     )
     proxy.start()
     try:
-        request_headers = {"Content-Type": "application/json"}
-        if client_protocol_version is not None:
-            request_headers["MCP-Protocol-Version"] = client_protocol_version
+        request_headers = {
+            "Content-Type": "application/json",
+            "MCP-Protocol-Version": "2026-07-28",
+        }
         request = urllib.request.Request(
             proxy.endpoint_url,
             data=b'{"jsonrpc":"2.0","id":1,"method":"initialize"}',
@@ -4571,6 +4570,53 @@ def test_attempt_local_mcp_proxy_injects_upstream_credential_only_at_relay(
         "body": b'{"jsonrpc":"2.0","id":1,"method":"initialize"}',
     }
     assert "upstream-token" not in proxy.endpoint_url
+
+
+@pytest.mark.parametrize("client_protocol_version", [None, "stale-client-version"])
+def test_attempt_local_mcp_proxy_rejects_nonmodern_client_protocol(
+    client_protocol_version: str | None,
+) -> None:
+    upstream_requests = 0
+
+    class UpstreamHandler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, _format: str, *_args: Any) -> None:
+            return
+
+        def do_POST(self) -> None:
+            nonlocal upstream_requests
+            upstream_requests += 1
+            self.send_response(204)
+            self.end_headers()
+
+    upstream = http.server.ThreadingHTTPServer(("127.0.0.1", 0), UpstreamHandler)
+    upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+    upstream_thread.start()
+    host, port = upstream.server_address
+    proxy = RUNTIME._McpCredentialProxy(
+        {"url": f"http://{host}:{port}/mcp"},
+        "upstream-token",
+    )
+    proxy.start()
+    try:
+        request_headers = {"Content-Type": "application/json"}
+        if client_protocol_version is not None:
+            request_headers["MCP-Protocol-Version"] = client_protocol_version
+        request = urllib.request.Request(
+            proxy.endpoint_url,
+            data=b'{"jsonrpc":"2.0","id":1,"method":"initialize"}',
+            headers=request_headers,
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(request, timeout=5)
+        assert exc_info.value.code == 400
+    finally:
+        proxy.close()
+        upstream.shutdown()
+        upstream.server_close()
+        upstream_thread.join(timeout=5)
+
+    assert upstream_requests == 0
 
 
 def test_mcp_proxy_connect_timeout_does_not_limit_response_duration(
@@ -4606,6 +4652,7 @@ def test_mcp_proxy_connect_timeout_does_not_limit_response_duration(
         request = urllib.request.Request(
             proxy.endpoint_url,
             data=b"{}",
+            headers={"MCP-Protocol-Version": "2026-07-28"},
             method="POST",
         )
         with urllib.request.urlopen(request, timeout=5) as response:
@@ -4653,7 +4700,12 @@ def test_mcp_proxy_forwards_stream_events_without_waiting_for_large_buffer() -> 
     proxy.start()
 
     def read_event() -> None:
-        request = urllib.request.Request(proxy.endpoint_url, data=b"{}", method="POST")
+        request = urllib.request.Request(
+            proxy.endpoint_url,
+            data=b"{}",
+            headers={"MCP-Protocol-Version": "2026-07-28"},
+            method="POST",
+        )
         with urllib.request.urlopen(request, timeout=5) as response:
             if response.read(len(event_payload)) == event_payload:
                 received.set()
@@ -4741,7 +4793,12 @@ def test_mcp_proxy_removes_request_timeout_before_response_streaming() -> None:
     client_result: list[bytes] = []
 
     def read_response() -> None:
-        request = urllib.request.Request(proxy.endpoint_url, data=b"{}", method="POST")
+        request = urllib.request.Request(
+            proxy.endpoint_url,
+            data=b"{}",
+            headers={"MCP-Protocol-Version": "2026-07-28"},
+            method="POST",
+        )
         with urllib.request.urlopen(request, timeout=5) as response:
             client_result.append(response.read())
 
@@ -4794,7 +4851,8 @@ def test_mcp_proxy_does_not_append_second_response_after_upstream_truncation() -
     client = socket.create_connection((proxy_host, proxy_port), timeout=5)
     request = (
         f"POST {urllib.parse.urlsplit(proxy.endpoint_url).path} HTTP/1.0\r\n"
-        "Content-Length: 2\r\n\r\n{}"
+        "Content-Length: 2\r\n"
+        "MCP-Protocol-Version: 2026-07-28\r\n\r\n{}"
     ).encode("ascii")
     client.sendall(request)
     response_parts: list[bytes] = []
@@ -4854,7 +4912,12 @@ def test_mcp_proxy_close_terminates_an_active_authenticated_relay() -> None:
     proxy.start()
 
     def hold_client() -> None:
-        request = urllib.request.Request(proxy.endpoint_url, data=b"{}", method="POST")
+        request = urllib.request.Request(
+            proxy.endpoint_url,
+            data=b"{}",
+            headers={"MCP-Protocol-Version": "2026-07-28"},
+            method="POST",
+        )
         try:
             with urllib.request.urlopen(request, timeout=5) as response:
                 response.read(1)
