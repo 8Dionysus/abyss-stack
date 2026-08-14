@@ -517,6 +517,13 @@ each dirty posture is admitted explicitly. A specialized owner snapshot such
 as `aoa-stats` must always be clean and match the source ref pinned by the tool
 profile; it has no dirty-source override.
 
+Owner-contour launch binding also carries an owner-request-bound receipt
+identity mode. New sessions use `stable_request_ref_v1`; pre-upgrade v3
+receipts are recognized only by an exact legacy launch without that mode.
+Runtime reads verify the materialized launch digest, the owner request semantic
+self-digest, and its `runtime_launch_ref` before selecting either result form,
+so editing `state.json.schema_version` cannot downgrade a v4 receipt.
+
 See [CONTRACT.md](CONTRACT.md), [DIRECTION.md](DIRECTION.md),
 [PROVENANCE.md](PROVENANCE.md), [SUSPENSION.md](SUSPENSION.md), and
 [VALIDATION.md](VALIDATION.md).

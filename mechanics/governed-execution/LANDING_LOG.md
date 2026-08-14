@@ -18,8 +18,14 @@ Runtime state v4 marks the new stable-reference representation. Upgrade reads
 of v3 receipts preserve the exact historical path-shaped reference, but still
 recompute its immutable request digest and require it in result evidence. A v3
 receipt cannot claim the v4 stable representation, and a v4 receipt cannot
-downgrade to the legacy path form. This keeps prior sessions usable across a
-runtime activation without weakening new-session identity closure.
+downgrade to the legacy path form. That distinction is not inferred from the
+mutable state version alone: every new owner-contour launch carries
+`owner_admission_identity_mode=stable_request_ref_v1`, and the admitted owner
+request binds the exact launch digest. A genuine legacy v3 launch has no such
+mode. Result reads therefore require state version, materialized launch bytes,
+the owner request semantic self-digest, and its runtime-launch ref to agree.
+This keeps prior sessions usable across a runtime activation without weakening
+new-session identity closure.
 
 The complete external-Codex deterministic suite passed. This is an ABI repair,
 not new role, model-fit, owner-acceptance, publication, or external-effect

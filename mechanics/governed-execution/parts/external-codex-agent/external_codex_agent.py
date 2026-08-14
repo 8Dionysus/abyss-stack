@@ -117,6 +117,7 @@ LEGACY_STATE_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v1"
 LEGACY_STATE_V2_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v2"
 LEGACY_STATE_V3_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v3"
 STATE_SCHEMA_VERSION = "abyss_stack_external_codex_runtime_state_v4"
+STABLE_OWNER_ADMISSION_IDENTITY_MODE = "stable_request_ref_v1"
 PROJECTION_STATE_SCHEMA_VERSIONS = frozenset(
     {LEGACY_STATE_V3_SCHEMA_VERSION, STATE_SCHEMA_VERSION}
 )
@@ -7580,6 +7581,15 @@ class ExternalCodexRuntime:
             )
         validate_json(launch, LAUNCH_SCHEMA_PATH, label="external Codex launch")
         if (
+            launch["admission_class"] == "owner_contour"
+            and launch.get("owner_admission_identity_mode")
+            != STABLE_OWNER_ADMISSION_IDENTITY_MODE
+        ):
+            raise ExternalCodexRuntimeError(
+                "owner_admission_identity_mode_required",
+                "new owner-contour launches require stable request identity binding",
+            )
+        if (
             launch["admission_class"] == "transport_study_fixture"
             and owner_request_path is not None
         ):
@@ -9681,7 +9691,8 @@ class ExternalCodexRuntime:
                 "materialized_input_drift",
                 "durable owner execution request changed after admission",
             )
-        if state.get("schema_version") != STATE_SCHEMA_VERSION:
+        identity_mode = self._owner_admission_identity_mode(state, raw)
+        if identity_mode == "legacy_materialized_path_v1":
             return self._owner_admission_evidence_ref(state)
         request = load_json_bytes(raw, label="durable owner execution request")
         request_ref = request.get("request_ref")
@@ -9695,6 +9706,72 @@ class ExternalCodexRuntime:
             "artifact_ref": request_ref,
             "artifact_digest": artifact_digest,
         }
+
+    def _owner_admission_identity_mode(
+        self,
+        state: Mapping[str, Any],
+        owner_request_raw: bytes,
+    ) -> str:
+        """Resolve owner-result identity from the admitted launch, not mutable state."""
+
+        session_id = state.get("session_id")
+        if not isinstance(session_id, str) or not session_id:
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "owner identity resolution requires a durable session identity",
+            )
+        launch_path = self._session_dir(session_id) / "inputs" / "launch.json"
+        launch_raw = read_bounded(launch_path)
+        if sha256_bytes(launch_raw) != state.get("launch_digest"):
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "materialized launch differs from durable admission state",
+            )
+        launch = load_json_bytes(launch_raw, label="materialized external Codex launch")
+        validate_json(launch, LAUNCH_SCHEMA_PATH, label="materialized external Codex launch")
+        if (
+            launch.get("session_id") != session_id
+            or launch.get("launch_id") != state.get("launch_id")
+            or launch.get("admission_class") != "owner_contour"
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "materialized launch does not belong to this owner-contour state",
+            )
+        owner_request = load_json_bytes(
+            owner_request_raw,
+            label="durable owner execution request",
+        )
+        if owner_request.get("request_digest") != owner_request_digest(owner_request):
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "durable owner execution request lost its semantic self-digest",
+            )
+        runtime_launch_ref = owner_request.get("external_incarnation", {}).get(
+            "runtime_launch_ref"
+        )
+        if (
+            not isinstance(runtime_launch_ref, dict)
+            or runtime_launch_ref.get("object_id") != launch.get("launch_id")
+            or runtime_launch_ref.get("digest") != sha256_bytes(launch_raw)
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_state_owner_identity_invalid",
+                "durable owner request no longer binds the materialized launch bytes",
+            )
+        launch_mode = launch.get("owner_admission_identity_mode")
+        state_version = state.get("schema_version")
+        if (
+            state_version == STATE_SCHEMA_VERSION
+            and launch_mode == STABLE_OWNER_ADMISSION_IDENTITY_MODE
+        ):
+            return STABLE_OWNER_ADMISSION_IDENTITY_MODE
+        if state_version == LEGACY_STATE_V3_SCHEMA_VERSION and launch_mode is None:
+            return "legacy_materialized_path_v1"
+        raise ExternalCodexRuntimeError(
+            "runtime_state_owner_identity_invalid",
+            "runtime state version and owner-bound launch identity mode disagree",
+        )
 
     def _owner_admission_evidence_ref(
         self, state: Mapping[str, Any]

@@ -10,6 +10,7 @@
     "launch_id": {"type": "string", "minLength": 1},
     "session_id": {"type": "string", "minLength": 1},
     "admission_class": {"enum": ["owner_contour", "transport_study_fixture"]},
+    "owner_admission_identity_mode": {"const": "stable_request_ref_v1"},
     "plan": {"$ref": "#/$defs/artifactCoordinate"},
     "incarnation_binding": {"$ref": "#/$defs/artifactCoordinate"},
     "model_realization": {"$ref": "#/$defs/artifactCoordinate"},
@@ -50,7 +51,8 @@
         "not": {
           "anyOf": [
             {"required": ["owner_execution_request_schema"]},
-            {"required": ["task_local_dag_schema"]}
+            {"required": ["task_local_dag_schema"]},
+            {"required": ["owner_admission_identity_mode"]}
           ]
         }
       }

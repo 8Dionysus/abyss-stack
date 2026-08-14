@@ -179,7 +179,14 @@ Before launch the controller verifies:
     the same admitted byte digest and evidence membership. Result reads,
     recovery, resume, reviewer preparation, review-seed issuance, and initial
     parent re-entry accept that legacy form only when the durable state is v3;
-    v4 cannot downgrade and v3 cannot claim the stable v4 form.
+    v4 cannot downgrade and v3 cannot claim the stable v4 form. The
+    discriminator is not the mutable state version by itself. Every newly
+    admitted owner-contour launch contains
+    `owner_admission_identity_mode=stable_request_ref_v1`, and the owner
+    request binds the digest and object identity of those exact launch bytes.
+    A legacy v3 receipt is accepted only when its materialized launch lacks
+    that mode and the request's semantic self-digest plus `runtime_launch_ref`
+    still bind the same launch. Any mixed state/launch generation fails closed.
 
 The two request-shaped objects are intentionally not collapsed. The
 `AgentIncarnationBinding.task_request_ref` is the canonical schema-valid SDK

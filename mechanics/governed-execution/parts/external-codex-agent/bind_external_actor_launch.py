@@ -170,6 +170,7 @@ def bind(manifest_path: Path, output_path: Path) -> dict[str, Any]:
         "launch_id": manifest["launch_id"],
         "session_id": manifest["session_id"],
         "admission_class": "owner_contour",
+        "owner_admission_identity_mode": "stable_request_ref_v1",
         **coordinates,
         "workspace_path": str(workspace),
         "workspace_expected_head": _git_head(workspace),

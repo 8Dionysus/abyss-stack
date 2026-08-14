@@ -2157,6 +2157,11 @@ def _fixture(
         "admission_class": (
             "owner_contour" if owner_contour else "transport_study_fixture"
         ),
+        **(
+            {"owner_admission_identity_mode": "stable_request_ref_v1"}
+            if owner_contour
+            else {}
+        ),
         "plan": {"path": str(plan_path), "digest": _digest_path(plan_path)},
         "incarnation_binding": {
             "path": str(binding_path),
@@ -2296,14 +2301,45 @@ def _wait_terminal(
 
 
 def _rewrite_owner_receipt_as_legacy_v3(
-    runtime: Any, session_id: str
+    runtime: Any, session_id: str, *, source_launch_path: Path
 ) -> dict[str, Any]:
     """Reproduce the exact owner-ref representation emitted by runtime state v3."""
 
     state = runtime._load_state(session_id)
+    session_dir = runtime._session_dir(session_id)
+    materialized_launch_path = session_dir / "inputs" / "launch.json"
+    launch = json.loads(materialized_launch_path.read_text(encoding="utf-8"))
+    launch.pop("owner_admission_identity_mode")
+    materialized_launch_path.chmod(0o600)
+    _write_json(materialized_launch_path, launch)
+    materialized_launch_path.chmod(0o400)
+    _write_json(source_launch_path, launch)
+    launch_digest = _digest_path(materialized_launch_path)
+
+    owner_request_path = Path(state["materialized_inputs"]["owner_execution_request"])
+    owner_request = json.loads(owner_request_path.read_text(encoding="utf-8"))
+    owner_request["external_incarnation"]["runtime_launch_ref"]["digest"] = (
+        launch_digest
+    )
+    owner_request["request_digest"] = RUNTIME.owner_request_digest(owner_request)
+    owner_request_path.chmod(0o600)
+    _write_json(owner_request_path, owner_request)
+    owner_request_path.chmod(0o400)
+    owner_evidence_ref = RUNTIME._artifact_ref(
+        owner_request_path,
+        owner="aoa-agents",
+    )
+
     result_path = runtime._session_dir(session_id) / "result.json"
     result = json.loads(result_path.read_text(encoding="utf-8"))
-    result["owner_admission_ref"] = runtime._owner_admission_evidence_ref(state)
+    result["owner_admission_ref"] = owner_evidence_ref
+    result["evidence_refs"] = [
+        owner_evidence_ref
+        if item.get("owner_repo") == "aoa-agents"
+        and item.get("artifact_ref") == str(owner_request_path)
+        else item
+        for item in result["evidence_refs"]
+    ]
     _write_json(result_path, result)
     attempt_dir = (
         runtime._session_dir(session_id)
@@ -2319,10 +2355,24 @@ def _rewrite_owner_receipt_as_legacy_v3(
         if closure_path.is_file():
             closure = json.loads(closure_path.read_text(encoding="utf-8"))
             closure["source_result_ref"] = RUNTIME._artifact_ref(preserved_path)
+            for item in closure["preserved_evidence"]:
+                if (
+                    item["source_ref"].get("owner_repo") == "aoa-agents"
+                    and item["source_ref"].get("artifact_ref")
+                    == str(owner_request_path)
+                ):
+                    item["source_ref"] = owner_evidence_ref
+                    snapshot_path = Path(item["snapshot_ref"]["artifact_ref"])
+                    snapshot_path.chmod(0o600)
+                    snapshot_path.write_bytes(owner_request_path.read_bytes())
+                    snapshot_path.chmod(0o400)
+                    item["snapshot_ref"] = RUNTIME._artifact_ref(snapshot_path)
             closure_path.chmod(0o600)
             _write_json(closure_path, closure)
             closure_path.chmod(0o400)
     state["schema_version"] = RUNTIME.LEGACY_STATE_V3_SCHEMA_VERSION
+    state["launch_digest"] = launch_digest
+    state["owner_admission_digest"] = owner_evidence_ref["artifact_digest"]
     state["result_digest"] = _digest_path(result_path)
     runtime._save_state(state)
     return result
@@ -5556,7 +5606,9 @@ def test_legacy_v3_owner_receipt_remains_readable_and_reviewable_after_upgrade(
     )
     assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
     legacy_result = _rewrite_owner_receipt_as_legacy_v3(
-        runtime, fixture["session_id"]
+        runtime,
+        fixture["session_id"],
+        source_launch_path=fixture["launch_path"],
     )
 
     assert runtime.result(fixture["session_id"]) == legacy_result
@@ -5842,29 +5894,15 @@ def test_owner_contour_admits_exact_role_first_request_and_runs_separate_process
 def test_owner_result_binding_rejects_stable_request_identity_substitution(
     tmp_path: Path,
 ) -> None:
-    runtime = RUNTIME.ExternalCodexRuntime(tmp_path / "state")
-    owner_request_path = tmp_path / "durable-owner-execution-request.json"
-    _write_json(
-        owner_request_path,
-        {"request_ref": "external-execution-request:fixture:original"},
+    fixture = _fixture(tmp_path, owner_contour=True)
+    runtime = fixture["runtime"]
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
     )
-    owner_digest = _digest_path(owner_request_path)
-    state = {
-        "schema_version": RUNTIME.STATE_SCHEMA_VERSION,
-        "materialized_inputs": {
-            "owner_execution_request": str(owner_request_path),
-        },
-        "owner_admission_digest": owner_digest,
-    }
-    evidence_ref = RUNTIME._artifact_ref(owner_request_path, owner="aoa-agents")
-    result = {
-        "owner_admission_ref": {
-            "owner_repo": "aoa-agents",
-            "artifact_ref": "external-execution-request:fixture:original",
-            "artifact_digest": owner_digest,
-        },
-        "evidence_refs": [evidence_ref],
-    }
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    state = runtime._load_state(fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
     runtime._validate_owner_admission_result_binding_locked(
         state,
         result,
@@ -5872,9 +5910,10 @@ def test_owner_result_binding_rejects_stable_request_identity_substitution(
         label="fixture result",
     )
 
-    result["owner_admission_ref"]["artifact_ref"] = (
-        "external-execution-request:fixture:substituted"
-    )
+    result["owner_admission_ref"] = {
+        **result["owner_admission_ref"],
+        "artifact_ref": "external-execution-request:fixture:substituted",
+    }
     with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
         runtime._validate_owner_admission_result_binding_locked(
             state,
@@ -5888,24 +5927,19 @@ def test_owner_result_binding_rejects_stable_request_identity_substitution(
 def test_owner_result_binding_accepts_exact_legacy_v3_path_receipt(
     tmp_path: Path,
 ) -> None:
-    runtime = RUNTIME.ExternalCodexRuntime(tmp_path / "state")
-    owner_request_path = tmp_path / "durable-owner-execution-request.json"
-    _write_json(
-        owner_request_path,
-        {"request_ref": "external-execution-request:fixture:legacy"},
+    fixture = _fixture(tmp_path, owner_contour=True)
+    runtime = fixture["runtime"]
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
     )
-    evidence_ref = RUNTIME._artifact_ref(owner_request_path, owner="aoa-agents")
-    state = {
-        "schema_version": RUNTIME.LEGACY_STATE_V3_SCHEMA_VERSION,
-        "materialized_inputs": {
-            "owner_execution_request": str(owner_request_path),
-        },
-        "owner_admission_digest": evidence_ref["artifact_digest"],
-    }
-    result = {
-        "owner_admission_ref": evidence_ref,
-        "evidence_refs": [evidence_ref],
-    }
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    result = _rewrite_owner_receipt_as_legacy_v3(
+        runtime,
+        fixture["session_id"],
+        source_launch_path=fixture["launch_path"],
+    )
+    state = runtime._load_state(fixture["session_id"])
 
     runtime._validate_owner_admission_result_binding_locked(
         state,
@@ -5914,9 +5948,14 @@ def test_owner_result_binding_accepts_exact_legacy_v3_path_receipt(
         label="legacy fixture result",
     )
 
+    owner_request = json.loads(
+        Path(state["materialized_inputs"]["owner_execution_request"]).read_text(
+            encoding="utf-8"
+        )
+    )
     result["owner_admission_ref"] = {
-        **evidence_ref,
-        "artifact_ref": "external-execution-request:fixture:legacy",
+        **result["owner_admission_ref"],
+        "artifact_ref": owner_request["request_ref"],
     }
     with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
         runtime._validate_owner_admission_result_binding_locked(
@@ -5926,6 +5965,30 @@ def test_owner_result_binding_accepts_exact_legacy_v3_path_receipt(
             label="legacy fixture result",
         )
     assert exc_info.value.code == "fixture_owner_binding_mismatch"
+
+
+def test_v4_owner_receipt_cannot_downgrade_to_legacy_path_identity(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True)
+    runtime = fixture["runtime"]
+    runtime.start(
+        fixture["launch_path"],
+        owner_request_path=fixture["owner_execution_request_path"],
+    )
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    state = runtime._load_state(fixture["session_id"])
+    result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result["owner_admission_ref"] = runtime._owner_admission_evidence_ref(state)
+    _write_json(result_path, result)
+    state["schema_version"] = RUNTIME.LEGACY_STATE_V3_SCHEMA_VERSION
+    state["result_digest"] = _digest_path(result_path)
+    runtime._save_state(state)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.result(fixture["session_id"])
+    assert exc_info.value.code == "runtime_state_owner_identity_invalid"
 
 
 @pytest.mark.skipif(
@@ -10284,7 +10347,9 @@ def test_legacy_v3_owner_receipt_resumes_after_upgrade(tmp_path: Path) -> None:
     assert running is not None and running["thread_id"]
     interrupted = runtime.interrupt(fixture["session_id"])
     legacy_result = _rewrite_owner_receipt_as_legacy_v3(
-        runtime, fixture["session_id"]
+        runtime,
+        fixture["session_id"],
+        source_launch_path=fixture["launch_path"],
     )
     result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
     resume_path = tmp_path / "legacy-v3-resume.json"
@@ -12099,7 +12164,9 @@ def test_parent_reentry_accepts_exact_legacy_v3_owner_receipt_after_upgrade(
         owner_request_path=fixture["owner_execution_request_path"],
     )["status"] == "authority_blocked"
     _rewrite_owner_receipt_as_legacy_v3(
-        fixture["runtime"], fixture["session_id"]
+        fixture["runtime"],
+        fixture["session_id"],
+        source_launch_path=fixture["launch_path"],
     )
     result_path = (
         fixture["runtime"]._session_dir(fixture["session_id"]) / "result.json"
