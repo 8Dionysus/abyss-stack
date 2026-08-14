@@ -782,6 +782,10 @@ export accepts only the historical fixture pair or the exact
 `owner_contour`-writer/prepared-reviewer pair. The latter does not downgrade the
 writer: its owner request, SDK v4 transport preference, binding v2, durable
 state, report, and terminal actor evidence remain required and digest-bound.
+Before reviewer preparation consumes a terminal writer result, the writer
+runtime revalidates its canonical result under the durable session route and
+rebinds both the stable owner-request identity and path-addressable admitted
+snapshot. Review-seed issuance repeats the same check under the writer lock.
 
 A reviewer formed independently by the role-first `aoa-agents` route instead
 enters as `owner_contour`. The generic owner-contour exporter requires the exact
@@ -916,7 +920,9 @@ alive while the child works.
 obligation and binding. The supplied absolute `result.json` must occupy the
 canonical `sessions/<hash(session_id)>/` directory and match the sibling
 durable `state.json` result path/digest, terminal identity/status/thread, and
-canonical event path/terminal sequence. It then revalidates the child's task,
+canonical event path/terminal sequence. While holding the canonical child
+session lock it also rebinds the stable owner-request identity and immutable
+request snapshot to the child's durable admission state. It then revalidates the child's task,
 incarnation, result schema, event-stream digest, evidence inclusion,
 continuation, return owner, deferred decisions, and status-selected SDK wake
 condition while holding the canonical child session lock through the durable

@@ -16,6 +16,8 @@ Tracking starts with the community-docs baseline for this repository.
   weakening byte-drift detection. Terminal recovery, ordinary result reads,
   and continuation admission now rebind both identities to durable state, so
   a schema-valid semantic substitution cannot ride an intact evidence snapshot.
+  Review-seed issuance, reviewer preparation, and initial parent re-entry child
+  admission enforce the same binding before consuming a terminal result.
 - Pin both external Codex specialized-environment profiles to the landed
   `aoa-stats` actor-responsibility receipt revision, so a release built from
   the current validation dependency can package and verify that same owner

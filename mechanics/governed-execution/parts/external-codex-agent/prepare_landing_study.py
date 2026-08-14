@@ -2179,6 +2179,19 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         raise StudyPreparationError(
             "writer result differs from its canonical durable runtime state"
         )
+    writer_state_root = writer_state_path.parents[2]
+    try:
+        bound_writer_result = ExternalCodexRuntime(writer_state_root).result(
+            str(writer_result["session_id"])
+        )
+    except ExternalCodexRuntimeError as exc:
+        raise StudyPreparationError(
+            "writer owner admission binding differs from canonical durable runtime state"
+        ) from exc
+    if bound_writer_result != writer_result:
+        raise StudyPreparationError(
+            "writer result differs from the runtime-validated canonical result"
+        )
     workspace = Path(str(writer_state["workspace_path"]))
     if not workspace.is_absolute():
         raise StudyPreparationError("writer historical workspace coordinate is not absolute")
@@ -3186,7 +3199,6 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
     )
     binding_path = output_root / "incarnation-binding.json"
     _write_exact(binding_path, _json_bytes(binding.model_dump(mode="json")))
-    writer_state_root = writer_state_path.parents[2]
     requested_state_root = Path(args.state_root).resolve()
     if requested_state_root != writer_state_root.resolve():
         raise StudyPreparationError(

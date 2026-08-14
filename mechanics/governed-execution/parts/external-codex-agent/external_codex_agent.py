@@ -8132,6 +8132,12 @@ class ExternalCodexRuntime:
                 "review_seed_writer_result_unbound",
                 "terminal writer result bytes differ from locked runtime state",
             )
+        self._validate_owner_admission_result_binding_locked(
+            state,
+            result,
+            failure_code="review_seed_writer_result_unbound",
+            label="terminal writer result",
+        )
         final_ref = state.get("actor_final_manifest_ref")
         delta_ref = state.get("actor_delta_ref")
         source_ref = state.get("source_manifest_before_ref")
@@ -15207,6 +15213,12 @@ class ExternalCodexParentReentry:
                 "reentry_child_receipt_mismatch",
                 "child durable state does not bind the supplied terminal result",
             )
+        child_runtime._validate_owner_admission_result_binding_locked(
+            child_state,
+            child_result,
+            failure_code="reentry_child_receipt_mismatch",
+            label="child terminal result",
+        )
         verified_events_path = _verified_artifact_ref_path(
             events_ref, label="canonical child event stream"
         )

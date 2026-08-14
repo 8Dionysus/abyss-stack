@@ -5477,6 +5477,36 @@ def test_reviewer_preparation_requires_canonical_durable_writer_result(
         )
 
 
+def test_reviewer_preparation_rejects_substituted_owner_request_identity(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path / "writer", exact_baseline=True)
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    assert _wait_terminal(runtime, fixture["session_id"])["status"] == "completed"
+    writer_result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    writer_result = json.loads(writer_result_path.read_text(encoding="utf-8"))
+    writer_result["owner_admission_ref"] = dict(writer_result["report_ref"])
+    _write_json(writer_result_path, writer_result)
+    state = runtime._load_state(fixture["session_id"])
+    state["result_digest"] = _digest_path(writer_result_path)
+    runtime._save_state(state)
+
+    with pytest.raises(
+        PREPARER.StudyPreparationError,
+        match="owner admission binding",
+    ):
+        PREPARER._prepare_reviewer(
+            argparse.Namespace(
+                writer_launch=str(fixture["launch_path"]),
+                writer_result=str(writer_result_path),
+                output_root=str(tmp_path / "review-preparation"),
+                state_root=str(runtime.state_root),
+                aoa_sdk_root=str(SDK_ROOT),
+            )
+        )
+
+
 def test_review_seed_rejects_live_writer_and_stale_terminal_result(
     tmp_path: Path,
 ) -> None:
@@ -5508,6 +5538,29 @@ def test_review_seed_rejects_live_writer_and_stale_terminal_result(
     stale = json.loads(result_path.read_text(encoding="utf-8"))
     stale["duration_seconds"] = float(stale["duration_seconds"]) + 1.0
     _write_json(result_path, stale)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.issue_review_seed(writer["session_id"])
+    assert exc_info.value.code == "review_seed_writer_result_unbound"
+
+
+def test_review_seed_rejects_substituted_owner_request_identity(
+    tmp_path: Path,
+) -> None:
+    writer = _fixture(
+        tmp_path / "terminal-writer",
+        identity_suffix="owner-identity-seed-writer",
+    )
+    runtime = writer["runtime"]
+    runtime.start(writer["launch_path"])
+    assert _wait_terminal(runtime, writer["session_id"])["status"] == "completed"
+    result_path = runtime._session_dir(writer["session_id"]) / "result.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result["owner_admission_ref"] = dict(result["report_ref"])
+    _write_json(result_path, result)
+    state = runtime._load_state(writer["session_id"])
+    state["result_digest"] = _digest_path(result_path)
+    runtime._save_state(state)
+
     with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
         runtime.issue_review_seed(writer["session_id"])
     assert exc_info.value.code == "review_seed_writer_result_unbound"
@@ -11862,6 +11915,46 @@ def test_parent_inference_yields_and_exact_authority_event_reenters_same_thread(
         "external_parent.reentry_started",
         "external_parent.reentry_completed",
     ]
+
+
+def test_parent_reentry_rejects_substituted_child_owner_request_identity(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_ambiguity_stop",
+        identity_suffix="luna-xhigh-owner-identity-substitution",
+    )
+    reentry_id = "reentry:fixture:luna-xhigh-owner-identity-substitution"
+    obligation_path = _parent_reentry_obligation(
+        tmp_path,
+        fixture,
+        reentry_id=reentry_id,
+    )
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge.yield_parent(obligation_path)
+    assert fixture["runtime"].run_to_terminal(fixture["launch_path"])["status"] == (
+        "authority_blocked"
+    )
+
+    session_dir = fixture["runtime"]._session_dir(fixture["session_id"])
+    result_path = session_dir / "result.json"
+    preserved_path = session_dir / "attempts/001/runtime-result.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result["owner_admission_ref"] = dict(result["report_ref"])
+    _write_json(result_path, result)
+    preserved_path.chmod(0o600)
+    _write_json(preserved_path, result)
+    preserved_path.chmod(0o400)
+    preserved_path.with_name("runtime-result-evidence-closure.json").unlink()
+    state = fixture["runtime"]._load_state(fixture["session_id"])
+    state["result_digest"] = _digest_path(result_path)
+    fixture["runtime"]._save_state(state)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        bridge.reenter_parent(reentry_id, result_path)
+    assert exc_info.value.code == "reentry_child_receipt_mismatch"
 
 
 def test_parent_turn_disables_tools_before_inference_and_isolates_home(

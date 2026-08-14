@@ -9,7 +9,10 @@ digest in `owner_admission_ref`, while `evidence_refs` retains the verified
 local snapshot needed for recovery and continuation closure. Result reads,
 lost-final-save recovery, and exact-thread continuation independently rebind
 the stable identity and snapshot to durable admission state; neither may be
-substituted while retaining the other.
+substituted while retaining the other. The same check now precedes review-seed
+issuance, reviewer preparation, and initial parent re-entry child admission;
+later parent recovery continues from the already admitted immutable snapshot
+without reopening the mutable canonical child result.
 
 The complete external-Codex deterministic suite passed. This is an ABI repair,
 not new role, model-fit, owner-acceptance, publication, or external-effect
