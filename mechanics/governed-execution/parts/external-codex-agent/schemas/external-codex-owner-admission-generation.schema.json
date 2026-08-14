@@ -27,6 +27,7 @@
     "launch_digest": {"$ref": "#/$defs/digest"},
     "owner_admission_digest": {"$ref": "#/$defs/digest"},
     "owner_request_ref": {"type": "string", "minLength": 1},
+    "actor_baseline_manifest_digest": {"$ref": "#/$defs/digest"},
     "migration_catalog_digest": {"$ref": "#/$defs/digest"},
     "provenance": {"enum": ["new_admission", "explicit_legacy_migration"]},
     "recorded_at": {"type": "string", "format": "date-time"}
@@ -37,7 +38,10 @@
         "properties": {"identity_mode": {"const": "stable_request_ref_v1"}},
         "required": ["identity_mode"]
       },
-      "then": {"properties": {"provenance": {"const": "new_admission"}}},
+      "then": {
+        "properties": {"provenance": {"const": "new_admission"}},
+        "required": ["actor_baseline_manifest_digest"]
+      },
       "else": {
         "properties": {"provenance": {"const": "explicit_legacy_migration"}},
         "required": ["migration_catalog_digest"]

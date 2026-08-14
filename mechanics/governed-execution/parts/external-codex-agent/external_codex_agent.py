@@ -6540,6 +6540,16 @@ class ExternalCodexRuntime:
         if projection_path.exists() and recover_published_admission:
             baseline_path = session_dir / "actor-baseline-manifest.json"
             baseline_raw = read_bounded(baseline_path)
+            generation = self._load_owner_admission_generation(
+                str(validated["launch"]["session_id"])
+            )
+            if generation.get("actor_baseline_manifest_digest") != sha256_bytes(
+                baseline_raw
+            ):
+                raise ExternalCodexRuntimeError(
+                    "workspace_projection_retry_invalid",
+                    "unpublished actor baseline differs from the external admission anchor",
+                )
             prior_baseline = load_json_bytes(
                 baseline_raw,
                 label="unpublished actor baseline manifest",
@@ -6963,6 +6973,7 @@ class ExternalCodexRuntime:
         attempt_id: str | None = None,
         thread_id: str | None = None,
         source_event_type: str | None = None,
+        recorded_at: str | None = None,
         significance: Literal[
             "trace",
             "progress",
@@ -6977,7 +6988,7 @@ class ExternalCodexRuntime:
         event = {
             "schema_version": "abyss_stack_external_codex_event_v1",
             "sequence": sequence,
-            "recorded_at": iso_now(),
+            "recorded_at": recorded_at or iso_now(),
             "session_id": state["session_id"],
             "attempt_id": attempt_id
             or str(state.get("active_attempt_id") or "runtime"),
@@ -7008,6 +7019,7 @@ class ExternalCodexRuntime:
                 state,
                 event_type="external_agent.prepared",
                 payload=payload,
+                recorded_at=str(state["created_at"]),
                 significance="progress",
             )
         if not recover_published_admission:
@@ -7039,7 +7051,7 @@ class ExternalCodexRuntime:
         expected = {
             "schema_version": "abyss_stack_external_codex_event_v1",
             "sequence": 0,
-            "recorded_at": event.get("recorded_at"),
+            "recorded_at": state["created_at"],
             "session_id": state["session_id"],
             "attempt_id": "runtime",
             "thread_id": None,
@@ -8551,6 +8563,7 @@ class ExternalCodexRuntime:
         identity_mode: str = STABLE_OWNER_ADMISSION_IDENTITY_MODE,
         provenance: str = "new_admission",
         recorded_at: str | None = None,
+        actor_baseline_manifest_digest: str | None = None,
     ) -> dict[str, Any]:
         launch = validated["launch"]
         owner_admission = validated.get("owner_admission")
@@ -8562,7 +8575,7 @@ class ExternalCodexRuntime:
                 "generation anchor requires an admitted owner-contour request",
             )
         request = owner_admission["request"]
-        return {
+        generation = {
             "schema_version": OWNER_ADMISSION_GENERATION_SCHEMA_VERSION,
             "session_id": str(launch["session_id"]),
             "launch_id": str(launch["launch_id"]),
@@ -8573,6 +8586,11 @@ class ExternalCodexRuntime:
             "provenance": provenance,
             "recorded_at": recorded_at or iso_now(),
         }
+        if actor_baseline_manifest_digest is not None:
+            generation["actor_baseline_manifest_digest"] = (
+                actor_baseline_manifest_digest
+            )
+        return generation
 
     def _new_session_admission_epoch(
         self,
@@ -8598,7 +8616,18 @@ class ExternalCodexRuntime:
             validated,
             recorded_at=recorded_at,
         )
-        if anchor != expected:
+        identity_keys = (
+            "schema_version",
+            "session_id",
+            "launch_id",
+            "identity_mode",
+            "launch_digest",
+            "owner_admission_digest",
+            "owner_request_ref",
+            "provenance",
+            "recorded_at",
+        )
+        if any(anchor.get(key) != expected.get(key) for key in identity_keys):
             raise ExternalCodexRuntimeError(
                 "owner_admission_generation_conflict",
                 "session has an external owner generation for another admission",
@@ -9283,6 +9312,11 @@ class ExternalCodexRuntime:
                     self._owner_admission_generation_from_validated(
                         validated,
                         recorded_at=str(state["created_at"]),
+                        actor_baseline_manifest_digest=str(
+                            projection["actor_baseline_manifest_ref"][
+                                "artifact_digest"
+                            ]
+                        ),
                     )
                 )
             self._record_initial_prepared_event(

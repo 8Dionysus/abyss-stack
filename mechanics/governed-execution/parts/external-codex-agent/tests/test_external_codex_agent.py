@@ -6227,6 +6227,9 @@ def test_owner_admission_retry_reuses_generation_published_before_state(
     assert retried["status"] == "prepared"
     assert anchor == published_generation
     assert state["created_at"] == anchor["recorded_at"]
+    assert anchor["actor_baseline_manifest_digest"] == state[
+        "actor_baseline_manifest_ref"
+    ]["artifact_digest"]
 
 
 def test_owner_admission_retry_reconciles_prepared_event_before_state(
@@ -6281,10 +6284,108 @@ def test_owner_admission_retry_reconciles_prepared_event_before_state(
         owner_request_path=fixture["owner_execution_request_path"],
     )
     state = runtime._load_state(fixture["session_id"])
+    event = json.loads(events_path.read_text(encoding="utf-8"))
 
     assert retried["status"] == "prepared"
     assert state["last_event_sequence"] == 0
+    assert event["recorded_at"] == state["created_at"]
     assert len(events_path.read_text(encoding="utf-8").splitlines()) == 1
+
+
+def test_owner_admission_retry_rejects_projection_and_baseline_coordinated_rewrite(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="projection-baseline-rewrite-before-state",
+    )
+    runtime = fixture["runtime"]
+
+    monkeypatch.setattr(
+        runtime,
+        "_save_state",
+        lambda state: (_ for _ in ()).throw(
+            RUNTIME.ExternalCodexRuntimeError(
+                "fixture_controller_crash",
+                "controller stopped after generation and event publication",
+            )
+        ),
+    )
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert exc_info.value.code == "fixture_controller_crash"
+
+    session_dir = runtime._session_dir(fixture["session_id"])
+    projection = session_dir / "actor-workspace"
+    baseline_path = session_dir / "actor-baseline-manifest.json"
+    original_baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    (projection / "README.md").write_text(
+        "coordinated same-uid replacement\n",
+        encoding="utf-8",
+    )
+    rewritten_baseline = RUNTIME._checked_actor_manifest(
+        projection,
+        source_manifest_digest=original_baseline["source_manifest_digest"],
+        source_git_head=original_baseline["source_git_head"],
+    )
+    baseline_path.chmod(0o600)
+    _write_json(baseline_path, rewritten_baseline)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as retry_exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert retry_exc_info.value.code == "workspace_projection_retry_invalid"
+
+
+def test_owner_admission_retry_rejects_rewritten_prepared_event_timestamp(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        owner_contour=True,
+        identity_suffix="prepared-event-timestamp-rewrite",
+    )
+    runtime = fixture["runtime"]
+
+    monkeypatch.setattr(
+        runtime,
+        "_save_state",
+        lambda state: (_ for _ in ()).throw(
+            RUNTIME.ExternalCodexRuntimeError(
+                "fixture_controller_crash",
+                "controller stopped after prepared event publication",
+            )
+        ),
+    )
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert exc_info.value.code == "fixture_controller_crash"
+
+    events_path = runtime._events_path(fixture["session_id"])
+    event = json.loads(events_path.read_text(encoding="utf-8"))
+    event["recorded_at"] = "2030-01-01T00:00:00Z"
+    events_path.write_text(
+        json.dumps(event, ensure_ascii=True, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as retry_exc_info:
+        runtime.start(
+            fixture["launch_path"],
+            owner_request_path=fixture["owner_execution_request_path"],
+        )
+    assert retry_exc_info.value.code == "runtime_event_state_drift"
 
 
 def test_unanchored_legacy_v3_requires_explicit_generation_migration(

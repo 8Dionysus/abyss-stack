@@ -542,9 +542,12 @@ anchor then preserves the crash-before-first-attempt `prepared` recovery path.
 For a new current-generation admission, a crash after anchor publication but
 before `state.json` is idempotent: the exact retry reuses the recorded anchor
 timestamp and the verified unpublished actor projection without deleting it.
-If the prepared event was already appended, that one exact event becomes the
-initial durable prefix rather than being duplicated. A different identity,
-changed projection, or additional event is rejected.
+The external anchor also binds the actor-baseline manifest digest, so a
+same-UID rewrite of both the projection and its session-local manifest cannot
+be adopted. If the prepared event was already appended, its complete event
+object, including the anchor-derived timestamp, becomes the initial durable
+prefix rather than being duplicated. A different identity, changed projection,
+or additional event is rejected.
 
 See [CONTRACT.md](CONTRACT.md), [DIRECTION.md](DIRECTION.md),
 [PROVENANCE.md](PROVENANCE.md), [SUSPENSION.md](SUSPENSION.md), and
