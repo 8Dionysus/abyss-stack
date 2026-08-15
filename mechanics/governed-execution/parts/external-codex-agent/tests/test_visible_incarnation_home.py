@@ -130,6 +130,19 @@ def test_bound_config_updates_indented_root_keys_without_touching_tables() -> No
     assert parsed["history"]["model"] == "nested-model"
 
 
+def test_bound_config_preserves_features_table_before_later_table() -> None:
+    bound = MODULE._bound_config(
+        b'[features]\nuse_legacy = true\n[mcp_servers.foo]\ncommand = "server"\n',
+        "gpt-5.6-luna",
+        "max",
+    )
+    parsed = tomllib.loads(bound.decode("utf-8"))
+
+    assert parsed["features"]["multi_agent"] is False
+    assert parsed["features"]["use_legacy"] is True
+    assert parsed["mcp_servers"]["foo"]["command"] == "server"
+
+
 def test_bound_config_rejects_unbound_model_provider() -> None:
     with pytest.raises(MODULE.IncarnationHomeError, match="model_provider"):
         MODULE._bound_config(

@@ -132,27 +132,30 @@ def _bind_multi_agent(text: str) -> str:
     if features is not None and not isinstance(features, dict):
         raise IncarnationHomeError("ambient Codex features table is not a TOML table")
     lines = text.splitlines(keepends=True)
-    table_header: int | None = None
-    table_end: int | None = None
+    features_header: int | None = None
+    features_end: int | None = None
+    features_active = False
     feature_index: int | None = None
     dotted_index: int | None = None
     for index, line in enumerate(lines):
         stripped = line.lstrip()
         if stripped.startswith("["):
-            if table_header is not None and table_end is None:
-                table_end = index
-            table_header = index if FEATURE_TABLE_LINE.match(line) else None
+            if features_active and features_end is None:
+                features_end = index
+            features_active = bool(FEATURE_TABLE_LINE.match(line))
+            if features_active:
+                features_header = index
             continue
-        if table_header is not None and FEATURE_KEY_LINE.match(line):
+        if features_active and FEATURE_KEY_LINE.match(line):
             feature_index = index
-        elif table_header is None and FEATURE_DOTTED_LINE.match(line):
+        elif not features_active and FEATURE_DOTTED_LINE.match(line):
             dotted_index = index
-    if table_header is not None and table_end is None:
-        table_end = len(lines)
+    if features_active and features_end is None:
+        features_end = len(lines)
     if feature_index is not None:
         _replace_line(lines, feature_index, "multi_agent = false")
-    elif table_header is not None and table_end is not None:
-        lines.insert(table_end, "multi_agent = false\n")
+    elif features_header is not None and features_end is not None:
+        lines.insert(features_end, "multi_agent = false\n")
     elif dotted_index is not None:
         _replace_line(lines, dotted_index, "features.multi_agent = false")
     elif features is None:
