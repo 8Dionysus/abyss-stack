@@ -204,7 +204,20 @@ def _load_manifest(path: Path) -> dict[str, Any]:
 def bound_codex_argv(
     *, codex_executable: Path, manifest: dict[str, Any], arguments: Sequence[str]
 ) -> list[str]:
-    executable = _regular_file(codex_executable, "Codex executable")
+    if not codex_executable.is_absolute():
+        raise IncarnationHomeError(
+            f"Codex executable must be absolute: {codex_executable}"
+        )
+    try:
+        executable = codex_executable.resolve(strict=True)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"Codex executable cannot be resolved: {codex_executable}"
+        ) from exc
+    if not executable.is_file():
+        raise IncarnationHomeError(
+            f"Codex executable is not a regular file: {codex_executable}"
+        )
     if not os.access(executable, os.X_OK):
         raise IncarnationHomeError("Codex executable is not executable")
     codex_home = str(manifest["codex_home"])

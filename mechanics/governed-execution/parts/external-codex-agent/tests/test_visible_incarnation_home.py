@@ -62,8 +62,10 @@ def test_prepared_home_binds_nested_default_without_rehoming_parent(tmp_path: Pa
     executable = tmp_path / "codex"
     executable.write_text("binary", encoding="utf-8")
     executable.chmod(0o700)
+    executable_link = tmp_path / "codex-link"
+    executable_link.symlink_to(executable)
     argv = MODULE.bound_codex_argv(
-        codex_executable=executable,
+        codex_executable=executable_link,
         manifest=manifest,
         arguments=["resume", "thread-id"],
     )
