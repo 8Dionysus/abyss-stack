@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 14495749,
+  "allowed_tracked_bytes": 35401626,
+  "approved_by": "repository-owner",
+  "base_ref": "21652f9204af4db36b04604ae89fe4d97771eb41",
+  "changed_generated_bytes": 14495749,
+  "changed_generated_files": 155,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "fea85669bfa35adc1f1c148e21141cc0405b5d58ba31cc71a370e6cc5220a2eb",
+  "reason": "Refresh the portable family after registering the visible incarnation home regression test in the canonical test inventory.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35401626,
+  "tracked_bytes_max": 24117248
+}
