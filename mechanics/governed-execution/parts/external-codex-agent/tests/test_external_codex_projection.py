@@ -113,6 +113,44 @@ def test_projection_packing_disables_promisor_lazy_fetch_helpers(
     assert marker.exists() is False
 
 
+def test_projection_accepts_exact_pre_full_index_source_manifest(
+    tmp_path: Path,
+) -> None:
+    source, source_manifest = _source_repo(tmp_path)
+    (source / "tracked.txt").write_text("dirty owner bytes\n", encoding="utf-8")
+    source_manifest = build_workspace_manifest(source)
+    legacy_diff = subprocess.run(
+        [
+            "/usr/bin/git",
+            "--no-optional-locks",
+            "-C",
+            str(source),
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--binary",
+            "HEAD",
+            "--",
+        ],
+        check=True,
+        capture_output=True,
+        env=PROJECTION._git_environment(),
+    ).stdout
+    source_manifest["git_diff_binary_sha256"] = PROJECTION.sha256_bytes(legacy_diff)
+
+    projection, baseline = materialize_actor_projection(
+        source,
+        tmp_path / "runtime" / "actor-workspace",
+        source_manifest=source_manifest,
+        source_manifest_digest="sha256:" + "9" * 64,
+    )
+
+    assert (projection / "tracked.txt").read_text(encoding="utf-8") == (
+        "dirty owner bytes\n"
+    )
+    assert baseline["source_manifest_digest"] == "sha256:" + "9" * 64
+
+
 def test_inventory_distinguishes_disappearing_directory_from_other_scandir_errors(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

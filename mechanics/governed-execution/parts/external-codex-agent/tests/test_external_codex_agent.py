@@ -10629,6 +10629,49 @@ def test_workspace_manifest_disables_repository_diff_and_filter_programs(
     assert filter_marker.exists() is False
 
 
+def test_workspace_manifest_accepts_exact_pre_full_index_baseline(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    tracked = workspace / "tracked.txt"
+    tracked.write_text("baseline\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    _git(workspace, "commit", "-m", "fixture")
+    tracked.write_text("dirty baseline\n", encoding="utf-8")
+
+    current = RUNTIME.build_workspace_manifest(workspace)
+    legacy_diff = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(workspace),
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--binary",
+            "HEAD",
+            "--",
+        ],
+        check=True,
+        capture_output=True,
+        env=RUNTIME._base_controller_git_environment(),
+    ).stdout
+    legacy = dict(current)
+    legacy["git_diff_binary_sha256"] = RUNTIME.sha256_bytes(legacy_diff)
+
+    RUNTIME.assert_workspace_manifest(legacy, workspace)
+
+    rejected = dict(legacy)
+    rejected["git_diff_binary_sha256"] = ZERO_DIGEST
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.assert_workspace_manifest(rejected, workspace)
+    assert exc_info.value.code == "workspace_manifest_drift"
+
+
 def test_workspace_manifest_disables_promisor_lazy_fetch_helpers(
     tmp_path: Path,
 ) -> None:

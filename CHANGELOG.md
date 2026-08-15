@@ -12,7 +12,9 @@ Tracking starts with the community-docs baseline for this repository.
 - Canonicalize external Codex actor baseline diffs with full Git object IDs
   on both the admitted source manifest and private actor projection, so a
   real workspace-write launch cannot fail on equivalent abbreviated index
-  lines.
+  lines. Existing v1 manifests retain a narrow exact legacy-digest admission
+  path, preserving already-prepared dirty workspaces without weakening byte,
+  status, or HEAD checks.
 - Keep `.agents/skills` portable for external Codex actor workspaces by
   representing absent host-only owner links as checkout-safe pointer files.
   The source workspace manifest and runtime-owned actor projection now retain

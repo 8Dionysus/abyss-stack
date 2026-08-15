@@ -571,7 +571,16 @@ task-declared order and whose last receipt equals the final manifest. A later
 model command, an incomplete or reordered suffix, or a final mismatch remains
 `model_report_validation_workspace_unbound`. Exact owner-fixed validation argv
 remain separately classified from model-selected commands, and finalization
-still inventories the complete content and private Git body. A manifest read that proves
+still inventories the complete content and private Git body.
+
+The v1 `git_diff_binary_sha256` is now emitted from a full-object-id diff. During
+the compatibility window, an existing v1 admission or durable session may retain
+the former abbreviated-object-id digest only when every other manifest field is
+unchanged and the current workspace reproduces that exact legacy digest. New
+manifests and private actor projections always use the canonical full-object-id
+form; an arbitrary digest substitution remains a drift failure.
+
+A manifest read that proves
 one regular file changed while its bytes or identity were being inventoried,
 or a queued directory disappeared before `scandir`, is retried only within one
 short bounded observation window. A stable retry is a new complete manifest,

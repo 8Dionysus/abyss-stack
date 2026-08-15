@@ -8,7 +8,7 @@
   "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
   "default_limit_bytes": 1048576,
   "head_family_digest": "e27c315aa6628a01c03ab899aec4666161323be0e2013971069f2598f22e5d20",
-  "reason": "Admit canonical external Codex actor baseline diff comparison for the merged runtime update while preserving the existing portable owner family.",
+  "reason": "Admit canonical external Codex actor baseline diff comparison with exact compatibility for pre-upgrade v1 manifests while preserving the existing portable owner family.",
   "repo": "abyss-stack",
   "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
   "scope": "generated_delta_and_tracked_size",
