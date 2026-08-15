@@ -256,6 +256,7 @@ EXPECTED_STATS_RECEIPT_PATHS = (
     "/srv/AbyssOS/aoa-playbooks/.aoa/live_receipts/playbook-receipts.jsonl",
     "/srv/AbyssOS/aoa-techniques/.aoa/live_receipts/technique-receipts.jsonl",
     "/srv/AbyssOS/aoa-memo/.aoa/live_receipts/memo-writeback-receipts.jsonl",
+    "/srv/AbyssOS/aoa-agents/.aoa/live_receipts/actor-responsibility-execution-receipts.jsonl",
 )
 MCP_SERVER_PACKAGES = {
     "aoa_decisions_mcp": ("aoa-decisions-mcp", 5420),
