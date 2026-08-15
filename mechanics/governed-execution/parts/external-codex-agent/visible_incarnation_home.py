@@ -16,14 +16,16 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any, Sequence
 
 
 SCHEMA_VERSION = "abyss_stack_codex_incarnation_home_v1"
 LOCAL_NAMES = frozenset({"config.toml", "cache", "log", "tmp"})
-MODEL_LINE = re.compile(r"(?m)^model\s*=.*$")
-EFFORT_LINE = re.compile(r"(?m)^model_reasoning_effort\s*=.*$")
+ROOT_KEY_LINE = re.compile(
+    r"^\s*(?P<key>model|model_reasoning_effort|\"model\"|\"model_reasoning_effort\")\s*="
+)
 
 
 class IncarnationHomeError(RuntimeError):
@@ -62,7 +64,7 @@ def _load_json(path: Path, label: str) -> dict[str, Any]:
     return value
 
 
-def _realization(path: Path) -> tuple[dict[str, Any], str, str, str]:
+def _realization(path: Path) -> tuple[dict[str, Any], str, str, str, str]:
     value = _load_json(path, "model realization")
     if value.get("schema_version") != "aoa_model_realization_v1":
         raise IncarnationHomeError("unsupported model realization schema")
@@ -73,15 +75,44 @@ def _realization(path: Path) -> tuple[dict[str, Any], str, str, str]:
     if not isinstance(runtime, dict) or runtime.get("product") != "codex-cli":
         raise IncarnationHomeError("model realization is not for Codex CLI")
     model_slug = runtime.get("model_slug")
+    runtime_version = runtime.get("version")
     effort = configuration.get("reasoning_effort")
     if not isinstance(model_slug, str) or not model_slug.strip():
         raise IncarnationHomeError("model realization lacks model_slug")
+    if not isinstance(runtime_version, str) or not runtime_version.strip():
+        raise IncarnationHomeError("model realization lacks runtime version")
     if not isinstance(effort, str) or not effort.strip():
         raise IncarnationHomeError("model realization lacks reasoning_effort")
     fingerprint = sha256_bytes(canonical_bytes(configuration))
     if value.get("configuration_fingerprint") != fingerprint:
         raise IncarnationHomeError("model realization configuration fingerprint mismatch")
-    return value, model_slug, effort, fingerprint
+    return value, model_slug, effort, runtime_version, fingerprint
+
+
+def _root_key_line(text: str, key: str, parsed: dict[str, Any]) -> int | None:
+    """Locate one unambiguous assignment in the TOML document root."""
+
+    if key not in parsed:
+        return None
+    for index, line in enumerate(text.splitlines(keepends=True)):
+        stripped = line.lstrip()
+        if stripped.startswith("["):
+            break
+        match = ROOT_KEY_LINE.match(line)
+        if match and match.group("key").strip('"') == key:
+            return index
+    raise IncarnationHomeError(
+        f"ambient Codex config has an ambiguous root assignment for {key}"
+    )
+
+
+def _replace_line(lines: list[str], index: int, value: str) -> None:
+    line_ending = ""
+    if lines[index].endswith("\r\n"):
+        line_ending = "\r\n"
+    elif lines[index].endswith("\n"):
+        line_ending = "\n"
+    lines[index] = value + line_ending
 
 
 def _bound_config(ambient_config: bytes, model_slug: str, effort: str) -> bytes:
@@ -89,17 +120,38 @@ def _bound_config(ambient_config: bytes, model_slug: str, effort: str) -> bytes:
         text = ambient_config.decode("utf-8")
     except UnicodeError as exc:
         raise IncarnationHomeError("ambient Codex config is not UTF-8") from exc
+    try:
+        parsed = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as exc:
+        raise IncarnationHomeError("ambient Codex config is not valid TOML") from exc
     model_value = f'model = {json.dumps(model_slug)}'
     effort_value = f'model_reasoning_effort = {json.dumps(effort)}'
-    if MODEL_LINE.search(text):
-        text = MODEL_LINE.sub(model_value, text, count=1)
+    lines = text.splitlines(keepends=True)
+    model_index = _root_key_line(text, "model", parsed)
+    effort_index = _root_key_line(text, "model_reasoning_effort", parsed)
+    if model_index is None:
+        lines.insert(0, model_value + "\n")
+        if effort_index is not None:
+            effort_index += 1
     else:
-        text = model_value + "\n" + text
-    if EFFORT_LINE.search(text):
-        text = EFFORT_LINE.sub(effort_value, text, count=1)
+        _replace_line(lines, model_index, model_value)
+    if effort_index is None:
+        lines.insert(0, effort_value + "\n")
     else:
-        text = effort_value + "\n" + text
-    return text.encode("utf-8")
+        _replace_line(lines, effort_index, effort_value)
+    bound = "".join(lines)
+    try:
+        bound_parsed = tomllib.loads(bound)
+    except tomllib.TOMLDecodeError as exc:
+        raise IncarnationHomeError(
+            "ambient Codex config cannot be safely rebound at the TOML root"
+        ) from exc
+    if (
+        bound_parsed.get("model") != model_slug
+        or bound_parsed.get("model_reasoning_effort") != effort
+    ):
+        raise IncarnationHomeError("ambient Codex config root binding did not take effect")
+    return bound.encode("utf-8")
 
 
 def _write_exact(path: Path, content: bytes, mode: int) -> None:
@@ -125,7 +177,13 @@ def prepare_home(
     ambient_home = _absolute_directory(ambient_home, "ambient Codex home")
     runtime_root = _absolute_directory(runtime_root, "runtime root")
     realization_path = _regular_file(realization_path, "model realization")
-    realization, model_slug, effort, fingerprint = _realization(realization_path)
+    if runtime_root == ambient_home or ambient_home in runtime_root.parents:
+        raise IncarnationHomeError(
+            "runtime root may not be nested under the ambient Codex home"
+        )
+    realization, model_slug, effort, runtime_version, fingerprint = _realization(
+        realization_path
+    )
     fingerprint_value = fingerprint.removeprefix("sha256:")
     incarnation_root = runtime_root / f"sha256-{fingerprint_value}"
     codex_home = incarnation_root / "codex-home"
@@ -169,7 +227,9 @@ def prepare_home(
         "configuration_fingerprint": fingerprint,
         "model_slug": model_slug,
         "reasoning_effort": effort,
+        "runtime_version": runtime_version,
         "ambient_codex_home": str(ambient_home),
+        "runtime_root": str(runtime_root),
         "codex_home": str(codex_home),
         "config_digest": sha256_bytes(config),
         "shared_state_names": shared_names,
@@ -198,12 +258,31 @@ def _load_manifest(path: Path) -> dict[str, Any]:
         raise IncarnationHomeError("incarnation Codex config drift")
     if codex_home == ambient_home:
         raise IncarnationHomeError("incarnation and ambient Codex homes must be distinct")
+    runtime_root = _absolute_directory(
+        Path(str(manifest.get("runtime_root"))), "runtime root"
+    )
+    try:
+        _, model_slug, effort, runtime_version, fingerprint = _realization(
+            Path(str(manifest.get("model_realization_ref")))
+        )
+    except IncarnationHomeError:
+        raise
+    if (
+        manifest.get("configuration_fingerprint") != fingerprint
+        or manifest.get("model_slug") != model_slug
+        or manifest.get("reasoning_effort") != effort
+        or manifest.get("runtime_version") != runtime_version
+    ):
+        raise IncarnationHomeError("model realization binding drift")
+    expected_home = (
+        runtime_root / f"sha256-{fingerprint.removeprefix('sha256:')}" / "codex-home"
+    ).resolve()
+    if codex_home != expected_home:
+        raise IncarnationHomeError("incarnation Codex home is not derived from realization")
     return manifest
 
 
-def bound_codex_argv(
-    *, codex_executable: Path, manifest: dict[str, Any], arguments: Sequence[str]
-) -> list[str]:
+def _resolved_executable(codex_executable: Path) -> Path:
     if not codex_executable.is_absolute():
         raise IncarnationHomeError(
             f"Codex executable must be absolute: {codex_executable}"
@@ -220,6 +299,62 @@ def bound_codex_argv(
         )
     if not os.access(executable, os.X_OK):
         raise IncarnationHomeError("Codex executable is not executable")
+    return executable
+
+
+def _verify_executable_version(executable: Path, runtime_version: str) -> None:
+    expected = "codex-cli " + runtime_version
+    try:
+        completed = subprocess.run(
+            [str(executable), "--version"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise IncarnationHomeError("Codex executable version probe failed") from exc
+    observed = completed.stdout.strip()
+    if completed.returncode != 0 or observed != expected:
+        raise IncarnationHomeError(
+            f"Codex runtime version mismatch: expected {expected}, got {observed or '<empty>'}"
+        )
+
+
+def _reject_binding_overrides(arguments: Sequence[str]) -> None:
+    forbidden = {"-m", "--model", "-c", "--config", "-p", "--profile"}
+    for index, argument in enumerate(arguments):
+        if (
+            argument in forbidden
+            or argument.startswith("--model=")
+            or argument.startswith("--config=")
+            or argument.startswith("--profile=")
+            or argument.startswith("-m") and argument != "--"
+            or argument.startswith("-c") and argument != "--"
+            or argument.startswith("-p") and argument != "--"
+        ):
+            raise IncarnationHomeError(
+                f"forwarded argument overrides incarnation binding: {argument}"
+            )
+        if argument in {"--enable", "--disable"} and index + 1 < len(arguments):
+                if arguments[index + 1] == "multi_agent":
+                    if argument == "--enable":
+                        raise IncarnationHomeError(
+                            "forwarded arguments override incarnation binding: "
+                            "may not re-enable multi_agent"
+                        )
+        if argument == "--enable=multi_agent":
+            raise IncarnationHomeError(
+                "forwarded arguments override incarnation binding: "
+                "may not re-enable multi_agent"
+            )
+
+
+def bound_codex_argv(
+    *, codex_executable: Path, manifest: dict[str, Any], arguments: Sequence[str]
+) -> list[str]:
+    executable = _resolved_executable(codex_executable)
+    _reject_binding_overrides(arguments)
     codex_home = str(manifest["codex_home"])
     return [
         str(executable),
@@ -232,6 +367,8 @@ def bound_codex_argv(
         + "{CODEX_HOME="
         + json.dumps(codex_home)
         + "}",
+        "--disable",
+        "multi_agent",
         *arguments,
     ]
 
@@ -248,8 +385,10 @@ def command_prepare(args: argparse.Namespace) -> int:
 
 def command_launch(args: argparse.Namespace) -> int:
     manifest = _load_manifest(Path(args.manifest))
+    executable = _resolved_executable(Path(args.codex_executable))
+    _verify_executable_version(executable, str(manifest["runtime_version"]))
     argv = bound_codex_argv(
-        codex_executable=Path(args.codex_executable),
+        codex_executable=executable,
         manifest=manifest,
         arguments=args.codex_arguments,
     )

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import tomllib
 from pathlib import Path
+
+import pytest
 
 
 PART = Path(__file__).resolve().parents[1]
@@ -73,7 +76,9 @@ def test_prepared_home_binds_nested_default_without_rehoming_parent(tmp_path: Pa
     assert (
         f'shell_environment_policy.set={{CODEX_HOME="{actor_home}"}}' in argv
     )
+    assert argv[argv.index("--disable") + 1] == "multi_agent"
     assert manifest["ambient_codex_home"] == str(ambient)
+    assert manifest["runtime_root"] == str(runtime_root)
 
 
 def test_preparation_rejects_realization_fingerprint_drift(tmp_path: Path) -> None:
@@ -97,3 +102,112 @@ def test_preparation_rejects_realization_fingerprint_drift(tmp_path: Path) -> No
         assert "fingerprint mismatch" in str(exc)
     else:
         raise AssertionError("fingerprint drift was accepted")
+
+
+def test_bound_config_updates_indented_root_keys_without_touching_tables() -> None:
+    ambient_config = (
+        '  model = "old-model"\n'
+        '  model_reasoning_effort = "high"\n'
+        "[history]\n"
+        'model = "nested-model"\n'
+    )
+
+    bound = MODULE._bound_config(
+        ambient_config.encode("utf-8"), "gpt-5.6-luna", "max"
+    )
+    parsed = tomllib.loads(bound.decode("utf-8"))
+
+    assert parsed["model"] == "gpt-5.6-luna"
+    assert parsed["model_reasoning_effort"] == "max"
+    assert parsed["history"]["model"] == "nested-model"
+
+
+def test_preparation_rejects_runtime_root_nested_under_ambient_home(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = ambient / "incarnations"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="nested"):
+        MODULE.prepare_home(
+            ambient_home=ambient,
+            realization_path=_realization(tmp_path / "realization.json"),
+            runtime_root=runtime_root,
+        )
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["exec", "-m", "other-model"],
+        ["exec", "--model=other-model"],
+        ["exec", "-c", "model=other-model"],
+        ["exec", "--config=shell_environment_policy.set={CODEX_HOME=other}"],
+        ["exec", "-p", "other-profile"],
+        ["exec", "--enable", "multi_agent"],
+        ["exec", "--enable=multi_agent"],
+    ],
+)
+def test_bound_argv_rejects_incarnation_binding_overrides(
+    tmp_path: Path, arguments: list[str]
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    executable = tmp_path / "codex"
+    executable.write_text("binary", encoding="utf-8")
+    executable.chmod(0o700)
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="binding"):
+        MODULE.bound_codex_argv(
+            codex_executable=executable,
+            manifest=manifest,
+            arguments=arguments,
+        )
+
+
+def test_load_manifest_revalidates_realization_and_derived_home(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+
+    payload = json.loads(realization.read_text(encoding="utf-8"))
+    payload["configuration"]["runtime"]["model_slug"] = "gpt-5.6-other"
+    payload["configuration_fingerprint"] = MODULE.sha256_bytes(
+        MODULE.canonical_bytes(payload["configuration"])
+    )
+    realization.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="binding drift"):
+        MODULE._load_manifest(manifest_path)
+
+
+def test_executable_version_must_match_realization_runtime(tmp_path: Path) -> None:
+    executable = tmp_path / "codex"
+    executable.write_text(
+        "#!/bin/sh\nprintf '%s\\n' 'codex-cli 0.147.0'\n", encoding="utf-8"
+    )
+    executable.chmod(0o700)
+
+    MODULE._verify_executable_version(executable, "0.147.0")
+    with pytest.raises(MODULE.IncarnationHomeError, match="version mismatch"):
+        MODULE._verify_executable_version(executable, "0.146.0")
