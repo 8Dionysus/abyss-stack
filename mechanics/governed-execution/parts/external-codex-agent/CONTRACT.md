@@ -578,7 +578,8 @@ the compatibility window, an existing v1 admission or durable session may retain
 the former abbreviated-object-id digest only when every other manifest field is
 unchanged and the current workspace reproduces that exact legacy digest. New
 manifests and private actor projections always use the canonical full-object-id
-form; an arbitrary digest substitution remains a drift failure.
+form; compatibility probes use the same sanitized Git environment as admission,
+and an arbitrary digest substitution remains a drift failure.
 
 A manifest read that proves
 one regular file changed while its bytes or identity were being inventoried,

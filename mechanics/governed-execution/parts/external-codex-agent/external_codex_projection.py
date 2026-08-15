@@ -107,6 +107,73 @@ def _git_environment() -> dict[str, str]:
     }
 
 
+def _source_git_environment(workspace: Path) -> dict[str, str]:
+    """Match controller Git probes while neutralizing repository filters."""
+
+    environment = _git_environment() | {
+        "GIT_ATTR_NOSYSTEM": "1",
+        "GIT_CONFIG_COUNT": "7",
+        "GIT_CONFIG_KEY_0": "core.hooksPath",
+        "GIT_CONFIG_KEY_1": "core.fsmonitor",
+        "GIT_CONFIG_KEY_2": "core.attributesFile",
+        "GIT_CONFIG_KEY_3": "gpg.program",
+        "GIT_CONFIG_KEY_4": "gpg.openpgp.program",
+        "GIT_CONFIG_KEY_5": "gpg.x509.program",
+        "GIT_CONFIG_KEY_6": "gpg.ssh.program",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_CONFIG_VALUE_0": "/dev/null",
+        "GIT_CONFIG_VALUE_1": "false",
+        "GIT_CONFIG_VALUE_2": "/dev/null",
+        "GIT_CONFIG_VALUE_3": "/usr/bin/false",
+        "GIT_CONFIG_VALUE_4": "/usr/bin/false",
+        "GIT_CONFIG_VALUE_5": "/usr/bin/false",
+        "GIT_CONFIG_VALUE_6": "/usr/bin/false",
+    }
+    completed = subprocess.run(
+        [
+            "/usr/bin/git",
+            "--no-optional-locks",
+            "-C",
+            str(workspace),
+            "config",
+            "--local",
+            "--includes",
+            "--name-only",
+            "--null",
+            "--get-regexp",
+            r"^filter\..*\.(clean|smudge|process|required)$",
+        ],
+        capture_output=True,
+        check=False,
+        timeout=15,
+        env=environment,
+    )
+    if completed.returncode not in {0, 1}:
+        raise ProjectionError("source Git filter configuration could not be inspected")
+    try:
+        keys = sorted(
+            {raw.decode("utf-8") for raw in completed.stdout.split(b"\0") if raw}
+        )
+    except UnicodeDecodeError as exc:
+        raise ProjectionError("source Git filter key is not UTF-8") from exc
+    if len(keys) > 128 or any(
+        re.fullmatch(r"filter\..+\.(?:clean|smudge|process|required)", key, re.I)
+        is None
+        for key in keys
+    ):
+        raise ProjectionError("source Git filter configuration exceeds its bound")
+    next_index = int(environment["GIT_CONFIG_COUNT"])
+    for key in keys:
+        environment[f"GIT_CONFIG_KEY_{next_index}"] = key
+        environment[f"GIT_CONFIG_VALUE_{next_index}"] = (
+            "false" if key.lower().endswith(".required") else ""
+        )
+        next_index += 1
+    environment["GIT_CONFIG_COUNT"] = str(next_index)
+    return environment
+
+
 def _git(
     workspace: Path,
     *arguments: str,
@@ -938,6 +1005,7 @@ def _construct_private_git(
         "git_diff_binary_sha256"
     )
     if status_matches and not diff_matches:
+        source_git_environment = _source_git_environment(source)
         source_full_diff_raw = _git(
             source,
             "diff",
@@ -947,6 +1015,7 @@ def _construct_private_git(
             "--full-index",
             "HEAD",
             "--",
+            environment_overrides=source_git_environment,
         )
         source_legacy_diff_raw = _git(
             source,
@@ -956,6 +1025,7 @@ def _construct_private_git(
             "--binary",
             "HEAD",
             "--",
+            environment_overrides=source_git_environment,
         )
         diff_matches = (
             sha256_bytes(source_legacy_diff_raw)

@@ -14,7 +14,8 @@ Tracking starts with the community-docs baseline for this repository.
   real workspace-write launch cannot fail on equivalent abbreviated index
   lines. Existing v1 manifests retain a narrow exact legacy-digest admission
   path, preserving already-prepared dirty workspaces without weakening byte,
-  status, or HEAD checks.
+  status, or HEAD checks; compatibility probes use the same sanitized Git
+  environment and never execute repository clean filters.
 - Keep `.agents/skills` portable for external Codex actor workspaces by
   representing absent host-only owner links as checkout-safe pointer files.
   The source workspace manifest and runtime-owned actor projection now retain
