@@ -168,6 +168,28 @@ def _ambient_home_identity(ambient_home: Path) -> str:
     )
 
 
+def _incarnation_coordinate(realization_id: str, fingerprint: str) -> str:
+    """Give equal configurations with different realization identities distinct homes."""
+
+    return sha256_bytes(
+        canonical_bytes(
+            {
+                "configuration_fingerprint": fingerprint,
+                "model_realization_id": realization_id,
+            }
+        )
+    )
+
+
+def _reject_custom_model_provider(parsed: dict[str, Any]) -> None:
+    """Fail closed when ambient config selects a provider outside the realization."""
+
+    if "model_provider" in parsed:
+        raise IncarnationHomeError(
+            "ambient Codex config must not select an unbound model_provider"
+        )
+
+
 def _bound_config(ambient_config: bytes, model_slug: str, effort: str) -> bytes:
     try:
         text = ambient_config.decode("utf-8")
@@ -177,6 +199,7 @@ def _bound_config(ambient_config: bytes, model_slug: str, effort: str) -> bytes:
         parsed = tomllib.loads(text)
     except tomllib.TOMLDecodeError as exc:
         raise IncarnationHomeError("ambient Codex config is not valid TOML") from exc
+    _reject_custom_model_provider(parsed)
     model_value = f'model = {json.dumps(model_slug)}'
     effort_value = f'model_reasoning_effort = {json.dumps(effort)}'
     lines = text.splitlines(keepends=True)
@@ -239,7 +262,10 @@ def prepare_home(
     realization, model_slug, effort, runtime_version, fingerprint = _realization(
         realization_path
     )
-    fingerprint_value = fingerprint.removeprefix("sha256:")
+    coordinate = _incarnation_coordinate(
+        str(realization.get("model_realization_id")), fingerprint
+    )
+    fingerprint_value = coordinate.removeprefix("sha256:")
     incarnation_root = runtime_root / f"sha256-{fingerprint_value}"
     codex_home = incarnation_root / "codex-home"
     ambient_identity = _ambient_home_identity(ambient_home)
@@ -258,6 +284,11 @@ def prepare_home(
             )
         if existing.get("ambient_home_identity") not in {None, ambient_identity}:
             raise IncarnationHomeError("incarnation ambient-home identity drift")
+        if existing.get("model_realization_id") not in {
+            None,
+            realization.get("model_realization_id"),
+        }:
+            raise IncarnationHomeError("incarnation model realization identity drift")
         if existing.get("codex_home") != str(codex_home):
             raise IncarnationHomeError("incarnation home coordinate drift")
     incarnation_root.mkdir(mode=0o700, exist_ok=True)
@@ -353,7 +384,14 @@ def _load_manifest(path: Path) -> dict[str, Any]:
     ):
         raise IncarnationHomeError("model realization binding drift")
     expected_home = (
-        runtime_root / f"sha256-{fingerprint.removeprefix('sha256:')}" / "codex-home"
+        runtime_root
+        / (
+            "sha256-"
+            + _incarnation_coordinate(
+                str(realization.get("model_realization_id")), fingerprint
+            ).removeprefix("sha256:")
+        )
+        / "codex-home"
     ).resolve()
     if codex_home != expected_home:
         raise IncarnationHomeError("incarnation Codex home is not derived from realization")
@@ -361,6 +399,7 @@ def _load_manifest(path: Path) -> dict[str, Any]:
         scoped_config = tomllib.loads(config.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, tomllib.TOMLDecodeError) as exc:
         raise IncarnationHomeError("incarnation Codex config is not valid TOML") from exc
+    _reject_custom_model_provider(scoped_config)
     if (
         scoped_config.get("model") != model_slug
         or scoped_config.get("model_reasoning_effort") != effort

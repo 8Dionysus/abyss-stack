@@ -130,6 +130,37 @@ def test_bound_config_updates_indented_root_keys_without_touching_tables() -> No
     assert parsed["history"]["model"] == "nested-model"
 
 
+def test_bound_config_rejects_unbound_model_provider() -> None:
+    with pytest.raises(MODULE.IncarnationHomeError, match="model_provider"):
+        MODULE._bound_config(
+            b'model_provider = "custom-endpoint"\nmodel = "old"\n',
+            "gpt-5.6-luna",
+            "max",
+        )
+
+
+def test_realization_identity_separates_equal_configurations(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    first = _realization(tmp_path / "first.json")
+    second_payload = json.loads(first.read_text(encoding="utf-8"))
+    second_payload["model_realization_id"] = "model-realization:test/luna/other"
+    second = tmp_path / "second.json"
+    second.write_text(json.dumps(second_payload), encoding="utf-8")
+
+    first_manifest = MODULE.prepare_home(
+        ambient_home=ambient, realization_path=first, runtime_root=runtime_root
+    )
+    second_manifest = MODULE.prepare_home(
+        ambient_home=ambient, realization_path=second, runtime_root=runtime_root
+    )
+
+    assert first_manifest["codex_home"] != second_manifest["codex_home"]
+
+
 def test_preparation_rejects_runtime_root_nested_under_ambient_home(
     tmp_path: Path,
 ) -> None:
