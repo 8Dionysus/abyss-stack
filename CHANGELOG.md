@@ -13,6 +13,14 @@ Tracking starts with the community-docs baseline for this repository.
   representing absent host-only owner links as checkout-safe pointer files.
   The source workspace manifest and runtime-owned actor projection now retain
   the required surface without copying the canonical `aoa-skills` content.
+- Let a fixed landing-track study packet explicitly carry the runtime's
+  `indirect_command_policy` into each bounded writer task. The default remains
+  fail-closed; a packet may opt into `sandbox_confined` only when the exact
+  runtime binding proves the matching workspace sandbox, disabled network, and
+  absence of secret or external-effect authority.
+- Normalize that packet policy in the writer-preparation path before emitting
+  `task.json`, so both the fail-closed default and an explicit
+  `sandbox_confined` selection remain executable.
 - Close the external Codex workspace-hygiene boundary: admission preflight now
   uses a stable environment without creating or receiving an attempt-local
   Python cache prefix through `state_root`, while every real start/resume
