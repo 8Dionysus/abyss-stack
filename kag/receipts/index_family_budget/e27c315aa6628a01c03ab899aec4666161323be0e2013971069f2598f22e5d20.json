@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 14328418,
+  "allowed_tracked_bytes": 35295706,
+  "approved_by": "repository-owner",
+  "base_ref": "d4dfcfce031bac1e9513cfc1347ff3c3a45b8fd4",
+  "changed_generated_bytes": 14328418,
+  "changed_generated_files": 141,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "e27c315aa6628a01c03ab899aec4666161323be0e2013971069f2598f22e5d20",
+  "reason": "Admit canonical external Codex actor baseline diff comparison for the merged runtime update while preserving the existing portable owner family.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35295706,
+  "tracked_bytes_max": 24117248
+}
