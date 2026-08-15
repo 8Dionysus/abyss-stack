@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 20026714,
+  "allowed_tracked_bytes": 35316035,
+  "approved_by": "repository-owner",
+  "base_ref": "d4dfcfce031bac1e9513cfc1347ff3c3a45b8fd4",
+  "changed_generated_bytes": 20026714,
+  "changed_generated_files": 200,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "5ecf61292e9190125ddf1d03b4fd470745e251ea0a89225d27a2aee66a93be40",
+  "reason": "Admit bounded legacy Git abbreviation recovery for pre-upgrade v1 external Codex actor manifests after canonical full-index migration, with sanitized source/private projection probes and owner compatibility evidence.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35316035,
+  "tracked_bytes_max": 24117248
+}
