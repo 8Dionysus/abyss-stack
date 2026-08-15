@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 6247180,
+  "allowed_tracked_bytes": 35317272,
+  "approved_by": "repository-owner",
+  "base_ref": "5334869edc6e905789c4006a27f34f59a13f1113",
+  "changed_generated_bytes": 6247180,
+  "changed_generated_files": 61,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "6fbcbdc74e430f98dad02e32b74841db85ee98829dcc6bad02050e2e98d3eaca",
+  "reason": "Watch the optional aoa-agents actor responsibility receipt path in the aoa-stats live-refresh user unit after rebasing onto the current main boundary.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35317272,
+  "tracked_bytes_max": 24117248
+}
