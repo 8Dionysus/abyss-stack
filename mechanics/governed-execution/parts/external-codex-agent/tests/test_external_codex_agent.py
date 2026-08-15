@@ -5205,6 +5205,7 @@ def test_model_organ_landing_readonly_profile_admits_exact_runtime_binding(
     assert '"PYTEST_ADDOPTS"="-p no:cacheprovider"' in shell_environment
     assert '"PYTHONDONTWRITEBYTECODE"="1"' in shell_environment
     assert '"PYTHONNOUSERSITE"="1"' in shell_environment
+    assert '"GIT_OPTIONAL_LOCKS"="0"' in shell_environment
     assert '"PYTHONPATH"="' + os.pathsep.join(
         (
             str((release / "environments/landing-validation-v1/pythonpath").resolve()),
@@ -5233,6 +5234,7 @@ def test_generic_profile_injects_only_runtime_python_hygiene(
     assert '"PYTEST_ADDOPTS"="-p no:cacheprovider"' in shell_environment
     assert '"PYTHONDONTWRITEBYTECODE"="1"' in shell_environment
     assert '"PYTHONNOUSERSITE"="1"' in shell_environment
+    assert '"GIT_OPTIONAL_LOCKS"="0"' in shell_environment
 
 
 @pytest.mark.parametrize(

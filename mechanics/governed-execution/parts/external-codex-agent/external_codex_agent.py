@@ -5346,6 +5346,11 @@ def _attempt_shell_environment(
     """Merge verified profile inputs with runtime-owned attempt hygiene."""
 
     environment = dict(specialized_environment)
+    # Codex's shell environment policy is a separate boundary from the
+    # supervisor process. Repeat this controller-owned Git invariant there so
+    # actor-side Git observations cannot refresh the private index and turn a
+    # valid workspace-write return into private-Git drift at closeout/resume.
+    environment["GIT_OPTIONAL_LOCKS"] = "0"
     environment.update(_attempt_local_python_environment(scratch_root))
     return environment
 

@@ -187,6 +187,7 @@ def test_all_external_profiles_keep_python_and_pytest_residue_outside_projection
         )
         assert shell_environment["PYTHONPYCACHEPREFIX"] == str(prefix)
         assert shell_environment["PYTEST_ADDOPTS"] == "-p no:cacheprovider"
+        assert shell_environment["GIT_OPTIONAL_LOCKS"] == "0"
 
     first_scratch = tmp_path / "attempts" / "resume-001" / "scratch"
     first_scratch.mkdir(parents=True)

@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 23843423,
+  "allowed_tracked_bytes": 35347584,
+  "approved_by": "repository-owner",
+  "base_ref": "a1ccb7c4664b61f216bba43014e290bf553185ff",
+  "changed_generated_bytes": 23843423,
+  "changed_generated_files": 242,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "be77bbdba2b9bbce8c45cd85d1cccb0a65c8bcd857747c2bda06b0b3db0bfb2f",
+  "reason": "regenerate owner KAG family after external actor shell Git lock inheritance fix",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35347584,
+  "tracked_bytes_max": 24117248
+}
