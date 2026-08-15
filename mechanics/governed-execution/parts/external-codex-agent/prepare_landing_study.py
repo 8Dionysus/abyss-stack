@@ -662,7 +662,7 @@ def _load_packet(path: Path) -> dict[str, Any]:
         "usage_metering",
         "validation_commands",
     }
-    optional = {"source_evidence_paths"}
+    optional = {"source_evidence_paths", "indirect_command_policy"}
     if not required.issubset(packet) or set(packet) - required - optional:
         raise StudyPreparationError(
             "study packet fields differ from the fixed v1 contract: "
@@ -670,6 +670,11 @@ def _load_packet(path: Path) -> dict[str, Any]:
             f"extra={sorted(set(packet) - required - optional)}"
         )
     packet.setdefault("source_evidence_paths", list(packet["allowed_paths"]))
+    indirect_command_policy = packet.get("indirect_command_policy", "fail_closed")
+    if indirect_command_policy not in {"fail_closed", "sandbox_confined"}:
+        raise StudyPreparationError(
+            "study packet indirect_command_policy is unsupported"
+        )
     packet_version = packet["schema_version"]
     if packet_version not in {
         READINESS_PACKET_VERSION,
@@ -1542,6 +1547,8 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
             "review_required": packet["review_required"],
             "return_owner": packet["return_owner"],
         }
+        if indirect_command_policy != "fail_closed":
+            task["indirect_command_policy"] = indirect_command_policy
         task_path = arm_root / "task.json"
         task_raw = _json_bytes(task)
         _write_exact(task_path, task_raw)
