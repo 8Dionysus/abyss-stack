@@ -51,6 +51,7 @@ RUNTIME_FILES = (
     "legacy-owner-admission-migrations.v1.json",
     "prepare_landing_study.py",
     "runtime-profile.v1.json",
+    "visible_incarnation_home.py",
 )
 SDK_CONTRACT_FILES = (
     "mechanics/boundary-bridge/parts/agent-incarnation-binding/schemas/agent-incarnation-binding.schema.json",
@@ -1680,6 +1681,7 @@ def release_manifest(files: Iterable[tuple[Path, Path]]) -> dict[str, object]:
     entrypoints = {
         "agent-entrypoint.py": entrypoint_text("external_codex_agent.py"),
         "bind-entrypoint.py": entrypoint_text("bind_external_actor_launch.py"),
+        "incarnation-entrypoint.py": entrypoint_text("visible_incarnation_home.py"),
         "study-entrypoint.py": entrypoint_text("prepare_landing_study.py"),
     }
     for path, text in entrypoints.items():
@@ -1785,6 +1787,7 @@ def materialize_release(
         for name, target in (
             ("agent-entrypoint.py", "external_codex_agent.py"),
             ("bind-entrypoint.py", "bind_external_actor_launch.py"),
+            ("incarnation-entrypoint.py", "visible_incarnation_home.py"),
             ("study-entrypoint.py", "prepare_landing_study.py"),
         ):
             path = staging / name
@@ -1793,6 +1796,7 @@ def materialize_release(
         for entrypoint_name in (
             "agent-entrypoint.py",
             "bind-entrypoint.py",
+            "incarnation-entrypoint.py",
             "study-entrypoint.py",
         ):
             path = staging / WRAPPER_MATERIAL_ROOT / f"{entrypoint_name}.bootstrap.py"
@@ -2103,6 +2107,7 @@ def install(
     wrappers = {
         "aoa-external-codex-agent": "agent-entrypoint.py",
         "aoa-external-actor-bind": "bind-entrypoint.py",
+        "aoa-external-codex-incarnation": "incarnation-entrypoint.py",
         "aoa-external-codex-study": "study-entrypoint.py",
     }
     verify_release(release_root)
@@ -2168,7 +2173,7 @@ def install(
                 "external-codex-agent/install_external_codex_runtime.py activate "
                 f"--runtime-root {runtime_root} --bin-dir {bin_dir} "
                 f"--release-id {previous_active.get('release_id')}"
-            ) if previous_active else "Remove the three newly created launcher/companion pairs and active.json after operator review; the immutable release may be retained.",
+            ) if previous_active else "Remove the four newly created launchers and active.json after operator review; the immutable release may be retained.",
         },
     }
     receipts = runtime_root / "receipts"
@@ -2449,6 +2454,7 @@ def activate(
     wrappers = {
         "aoa-external-codex-agent": "agent-entrypoint.py",
         "aoa-external-actor-bind": "bind-entrypoint.py",
+        "aoa-external-codex-incarnation": "incarnation-entrypoint.py",
         "aoa-external-codex-study": "study-entrypoint.py",
     }
     verify_release(release_root)
@@ -2646,6 +2652,7 @@ def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
     wrappers = {
         "aoa-external-codex-agent": "agent-entrypoint.py",
         "aoa-external-actor-bind": "bind-entrypoint.py",
+        "aoa-external-codex-incarnation": "incarnation-entrypoint.py",
         "aoa-external-codex-study": "study-entrypoint.py",
     }
     wrapper_status = wrapper_status_rows(
