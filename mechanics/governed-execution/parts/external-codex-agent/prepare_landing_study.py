@@ -1286,6 +1286,7 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
 
     study = load_json(study_path, label="aoa-models ModelStudy")
     packet = _load_packet(packet_path)
+    indirect_command_policy = packet.get("indirect_command_policy", "fail_closed")
     arms = _validate_study(
         study,
         packet=packet,
