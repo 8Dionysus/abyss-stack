@@ -15822,7 +15822,7 @@ class ExternalCodexParentReentry:
             "--disable",
             "shell_tool",
             "--disable",
-            "code_mode_host",
+            "code_mode",
             "--disable",
             "apps",
             "--disable",

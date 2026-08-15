@@ -237,3 +237,7 @@
 ## 2026-08-14
 
 - [ABYSS-STACK-D-0122 Attempt-Local Python Cache Routing](../ABYSS-STACK-D-0122-attempt-local-python-cache-routing.md) (`docs/decisions/ABYSS-STACK-D-0122-attempt-local-python-cache-routing.md`)
+
+## 2026-08-15
+
+- [ABYSS-STACK-D-0123 Parent Passive Turns Disable Code Mode](../ABYSS-STACK-D-0123-parent-passive-code-mode-disable.md) (`docs/decisions/ABYSS-STACK-D-0123-parent-passive-code-mode-disable.md`)
