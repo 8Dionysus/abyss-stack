@@ -237,6 +237,7 @@
             "kind",
             "validation_command_id",
             "producer_result_input_id",
+            "producer_attempt_id",
             "observed_status"
           ],
           "properties": {
