@@ -5535,6 +5535,54 @@ def _git_bytes(
     return completed.stdout
 
 
+def _legacy_git_diff_binary_sha256(
+    workspace: Path,
+    *,
+    git_env: Mapping[str, str],
+    abbrev: int,
+) -> str:
+    """Return one v1 digest emitted before full object ids were explicit."""
+
+    return sha256_bytes(
+        _git_bytes(
+            workspace,
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--binary",
+            f"--abbrev={abbrev}",
+            "HEAD",
+            "--",
+            timeout=60,
+            git_env=git_env,
+        )
+    )
+
+
+LEGACY_GIT_ABBREV_WIDTHS = tuple(range(4, 65))
+
+
+def _legacy_git_diff_matches(
+    workspace: Path,
+    expected_digest: Any,
+    *,
+    git_env: Mapping[str, str],
+) -> bool:
+    """Recover one bounded pre-canonical Git abbreviation width exactly."""
+
+    if not isinstance(expected_digest, str):
+        return False
+    return any(
+        _legacy_git_diff_binary_sha256(
+            workspace,
+            git_env=git_env,
+            abbrev=abbrev,
+        )
+        == expected_digest
+        for abbrev in LEGACY_GIT_ABBREV_WIDTHS
+    )
+
+
 def _nul_paths(payload: bytes, *, label: str) -> tuple[str, ...]:
     values: list[str] = []
     for raw in payload.split(b"\0"):
@@ -5724,6 +5772,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
         "--no-ext-diff",
         "--no-textconv",
         "--binary",
+        "--full-index",
         "HEAD",
         "--",
         timeout=60,
@@ -5884,11 +5933,46 @@ def assert_workspace_manifest(
         label="external Codex workspace manifest",
     )
     expected = build_workspace_manifest(workspace)
-    if manifest != expected:
+    if not _workspace_manifests_match(manifest, expected, workspace):
         raise ExternalCodexRuntimeError(
             "workspace_manifest_drift",
             "workspace bytes differ from the exact immutable baseline manifest",
         )
+
+
+def _workspace_manifests_match(
+    baseline: Mapping[str, Any],
+    current: Mapping[str, Any],
+    workspace: str | Path,
+) -> bool:
+    """Compare manifests while admitting only the exact pre-canonical v1 hash."""
+
+    if baseline == current:
+        return True
+    if (
+        baseline.get("schema_version")
+        != "abyss_stack_external_codex_workspace_manifest_v1"
+        or current.get("schema_version")
+        != "abyss_stack_external_codex_workspace_manifest_v1"
+    ):
+        return False
+    baseline_without_diff = dict(baseline)
+    current_without_diff = dict(current)
+    baseline_diff = baseline_without_diff.pop("git_diff_binary_sha256", None)
+    current_diff = current_without_diff.pop("git_diff_binary_sha256", None)
+    if (
+        baseline_without_diff != current_without_diff
+        or baseline_diff == current_diff
+        or not isinstance(baseline_diff, str)
+        or not isinstance(current_diff, str)
+    ):
+        return False
+    location = Path(workspace).resolve()
+    return _legacy_git_diff_matches(
+        location,
+        baseline_diff,
+        git_env=_controller_git_environment(location),
+    )
 
 
 def compare_workspace_manifest(
@@ -6890,7 +6974,7 @@ class ExternalCodexRuntime:
                 if review_seed is None
                 else source_before
             )
-            if source_after != source_before:
+            if not _workspace_manifests_match(source_before, source_after, source):
                 raise ExternalCodexRuntimeError(
                     "workspace_source_race",
                     "source workspace changed after generation publication",
@@ -7016,7 +7100,7 @@ class ExternalCodexRuntime:
         source_after_path = session_dir / "source-manifest-after.json"
         _atomic_write_json(source_after_path, source_after, mode=0o400)
         source_after_ref = _artifact_ref(source_after_path)
-        if source_after != source_before:
+        if not _workspace_manifests_match(source_before, source_after, source):
             cleanup_projection()
             raise ExternalCodexRuntimeError(
                 "workspace_source_race",
@@ -11388,7 +11472,11 @@ Runtime session identity: {state["session_id"]}
                         ),
                     )
                     return
-                if source_manifest != state["workspace_manifest_baseline"]:
+                if not _workspace_manifests_match(
+                    state["workspace_manifest_baseline"],
+                    source_manifest,
+                    source_workspace,
+                ):
                     self._worker_failure_locked(
                         state,
                         attempt_id=attempt_id,
@@ -11446,7 +11534,11 @@ Runtime session identity: {state["session_id"]}
                 return
             if state.get("review_seed_envelope_ref") is None:
                 current_manifest = build_workspace_manifest(source_workspace)
-                if current_manifest != state["workspace_manifest_baseline"]:
+                if not _workspace_manifests_match(
+                    state["workspace_manifest_baseline"],
+                    current_manifest,
+                    source_workspace,
+                ):
                     self._worker_failure_locked(
                         state,
                         attempt_id=attempt_id,
@@ -12715,8 +12807,10 @@ Runtime session identity: {state["session_id"]}
             _atomic_write_json(source_manifest_final_path, source_manifest, mode=0o400)
             source_manifest_final_ref = _artifact_ref(source_manifest_final_path)
             state["source_manifest_final_ref"] = source_manifest_final_ref
-            source_manifest_match = (
-                source_manifest == state["workspace_manifest_baseline"]
+            source_manifest_match = _workspace_manifests_match(
+                state["workspace_manifest_baseline"],
+                source_manifest,
+                Path(state["workspace_path"]),
             )
             head_drift = not source_manifest_match
         except (ExternalCodexRuntimeError, ProjectionError) as exc:
@@ -13151,7 +13245,13 @@ Runtime session identity: {state["session_id"]}
                 changed_paths = compare_workspace_manifest(
                     baseline_manifest, current_manifest
                 )
-                workspace_manifest_match = current_manifest == baseline_manifest
+                workspace_manifest_match = _workspace_manifests_match(
+                    baseline_manifest,
+                    current_manifest,
+                    Path(state["workspace_path"]),
+                )
+                if workspace_manifest_match:
+                    changed_paths = []
             source_manifest = (
                 state["workspace_manifest_baseline"]
                 if state.get("review_seed_envelope_ref") is not None
@@ -13160,8 +13260,10 @@ Runtime session identity: {state["session_id"]}
             source_final_path = session_dir / "source-manifest-final.json"
             _atomic_write_json(source_final_path, source_manifest, mode=0o400)
             source_final_ref = _artifact_ref(source_final_path)
-            source_manifest_match = (
-                source_manifest == state["workspace_manifest_baseline"]
+            source_manifest_match = _workspace_manifests_match(
+                state["workspace_manifest_baseline"],
+                source_manifest,
+                Path(state["workspace_path"]),
             )
             state["source_manifest_final_ref"] = source_final_ref
         except (ExternalCodexRuntimeError, ProjectionError) as exc:

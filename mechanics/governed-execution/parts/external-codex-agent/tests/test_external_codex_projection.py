@@ -113,6 +113,63 @@ def test_projection_packing_disables_promisor_lazy_fetch_helpers(
     assert marker.exists() is False
 
 
+def test_projection_accepts_exact_pre_full_index_source_manifest(
+    tmp_path: Path,
+) -> None:
+    source, source_manifest = _source_repo(tmp_path)
+    _git(source, "config", "core.abbrev", "12")
+    filter_marker = tmp_path / "projection-filter-ran"
+    filter_helper = tmp_path / "projection-clean-filter"
+    filter_helper.write_text(
+        "#!/bin/sh\n"
+        f"/usr/bin/touch {shlex.quote(str(filter_marker))}\n"
+        "/bin/cat\n",
+        encoding="utf-8",
+    )
+    filter_helper.chmod(0o700)
+    (source / ".gitattributes").write_text(
+        "tracked.txt filter=projection-clean\n", encoding="utf-8"
+    )
+    _git(source, "add", ".gitattributes")
+    _git(source, "commit", "-qm", "projection filter fixture")
+    _git(source, "config", "filter.projection-clean.clean", str(filter_helper))
+    (source / "tracked.txt").write_text("dirty owner bytes\n", encoding="utf-8")
+    source_manifest = build_workspace_manifest(source)
+    assert filter_marker.exists() is False
+    legacy_diff = subprocess.run(
+        [
+            "/usr/bin/git",
+            "--no-optional-locks",
+            "-C",
+            str(source),
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--binary",
+            "HEAD",
+            "--",
+        ],
+        check=True,
+        capture_output=True,
+        env=PROJECTION._source_git_environment(source),
+    ).stdout
+    source_manifest["git_diff_binary_sha256"] = PROJECTION.sha256_bytes(legacy_diff)
+    _git(source, "config", "core.abbrev", "4")
+
+    projection, baseline = materialize_actor_projection(
+        source,
+        tmp_path / "runtime" / "actor-workspace",
+        source_manifest=source_manifest,
+        source_manifest_digest="sha256:" + "9" * 64,
+    )
+
+    assert (projection / "tracked.txt").read_text(encoding="utf-8") == (
+        "dirty owner bytes\n"
+    )
+    assert baseline["source_manifest_digest"] == "sha256:" + "9" * 64
+    assert filter_marker.exists() is False
+
+
 def test_inventory_distinguishes_disappearing_directory_from_other_scandir_errors(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
