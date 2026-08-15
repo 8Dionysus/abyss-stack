@@ -351,6 +351,24 @@ def prepare_home(
             raise IncarnationHomeError("incarnation model realization identity drift")
         if existing.get("codex_home") != str(codex_home):
             raise IncarnationHomeError("incarnation home coordinate drift")
+
+    # Validate ambient inputs before creating a new content-addressed root. A
+    # failed first preparation must not leave an unowned directory that blocks
+    # the corrected retry.
+    ambient_config = _regular_file(
+        ambient_home / "config.toml", "ambient Codex config"
+    ).read_bytes()
+    config = _bound_config(ambient_config, model_slug, effort)
+    shared_sources: list[Path] = []
+    for source in sorted(ambient_home.iterdir(), key=lambda item: item.name):
+        if source.name in LOCAL_NAMES:
+            continue
+        if source.is_symlink():
+            raise IncarnationHomeError(
+                f"ambient shared state entry may not be a symlink: {source}"
+            )
+        shared_sources.append(source)
+
     incarnation_root.mkdir(mode=0o700, exist_ok=True)
     codex_home.mkdir(mode=0o700, exist_ok=True)
     if incarnation_root.is_symlink() or codex_home.is_symlink():
@@ -364,10 +382,6 @@ def prepare_home(
             raise IncarnationHomeError(f"actor-local {name} is not a real directory")
         local.chmod(0o700)
 
-    ambient_config = _regular_file(
-        ambient_home / "config.toml", "ambient Codex config"
-    ).read_bytes()
-    config = _bound_config(ambient_config, model_slug, effort)
     _write_exact(codex_home / "config.toml", config, 0o600)
 
     previous_shared_names: set[str] = set()
@@ -378,9 +392,7 @@ def prepare_home(
             if isinstance(name, str) and name not in LOCAL_NAMES and Path(name).name == name
         }
     shared_names: list[str] = []
-    for source in sorted(ambient_home.iterdir(), key=lambda item: item.name):
-        if source.name in LOCAL_NAMES:
-            continue
+    for source in shared_sources:
         if source.is_symlink():
             raise IncarnationHomeError(
                 f"ambient shared state entry may not be a symlink: {source}"

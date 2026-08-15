@@ -275,6 +275,14 @@ def test_preparation_rejects_symlinked_shared_state_entry(tmp_path: Path) -> Non
             runtime_root=runtime_root,
         )
 
+    (ambient / "skills").unlink()
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    assert Path(manifest["codex_home"]).is_dir()
+
 
 def test_preparation_rejects_runtime_root_nested_under_ambient_home(
     tmp_path: Path,
