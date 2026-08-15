@@ -321,3 +321,12 @@ That suite does not prove the installed Codex binary, ChatGPT quota behavior,
 Luna role performance, comparative net benefit, productive eval/stats/memo or
 landing work, packaged four-owner compatibility, or live deployment. Those
 require separate real-model and clean packaged-source receipts.
+
+The visible-incarnation tests additionally prove that a direct responsibility
+holder writes a non-replacing lifecycle receipt before `exec`, rejects receipt
+binding for detached Kitty launches, and keeps holder identity separate from
+runtime proof-actor identity. The installed `close` route is only valid after
+the exact wake receipt proves handoff delivery; it rechecks PID/start-ticks,
+argv, and the direct Kitty parent before sending `TERM`. A live visible trial
+must separately prove the installed release, delivery, holder disappearance,
+unrelated-terminal preservation, and the resulting closure receipt.

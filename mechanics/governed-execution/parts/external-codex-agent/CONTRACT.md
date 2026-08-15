@@ -109,6 +109,21 @@ Operations are:
 - `export-a2a-result` with exact writer/reviewer sessions, summon request, and
   output path.
 
+The operator-visible incarnation launcher has a separate lifecycle contour for
+the responsibility holder. `launch --holder-receipt <absolute json>` is valid
+only for the direct `exec` route (not detached Kitty): immediately before the
+Codex `exec`, it writes a non-replacing receipt containing the holder PID,
+parent Kitty PID, process start ticks, exact argv, and executable/manifest
+digests. This receipt is not a governed proof-actor result and must not be
+substituted with a nested actor's runtime identity. After a wake bridge has
+recorded confirmed handoff delivery, the installed launcher may run
+`close --holder-receipt ... --wake-receipt ... --handoff ...
+--closure-receipt ...`; it requires the delivered wake receipt, rechecks the
+holder's exact PID/start-ticks/argv and direct Kitty parent, sends `TERM` to
+that one terminal, and emits a non-replacing closure receipt only after both
+the holder and Kitty disappear. Ambiguous, reused, or drifted identities fail
+closed.
+
 Each CLI call writes one `abyss_stack_external_codex_response_v1` JSON object.
 `start` returns after the independent worker is durably recorded; later calls
 observe the persisted session. If a caller stops after the exact `prepared`

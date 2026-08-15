@@ -15,14 +15,19 @@ import json
 import os
 import re
 import shlex
+import signal
 import subprocess
 import sys
+import time
 import tomllib
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Sequence
 
 
 SCHEMA_VERSION = "abyss_stack_codex_incarnation_home_v1"
+HOLDER_RECEIPT_SCHEMA_VERSION = "abyss_stack_visible_incarnation_holder_terminal_v1"
+TERMINAL_CLOSURE_SCHEMA_VERSION = "abyss_stack_visible_incarnation_terminal_closure_v1"
 DESCENDANT_BIN_NAME = ".codex-incarnation-bin"
 LOCAL_NAMES = frozenset(
     {"config.toml", "cache", "log", "tmp", DESCENDANT_BIN_NAME}
@@ -306,6 +311,310 @@ def _write_exact(path: Path, content: bytes, mode: int) -> None:
     finally:
         if temporary.exists():
             temporary.unlink()
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _proc_stat_fields(pid: int) -> list[str]:
+    if pid <= 0:
+        raise IncarnationHomeError(f"process id must be positive: {pid}")
+    try:
+        raw = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise IncarnationHomeError(f"cannot read process identity: {pid}") from exc
+    closing = raw.rfind(")")
+    if closing < 0:
+        raise IncarnationHomeError(f"process stat is malformed: {pid}")
+    fields = raw[closing + 2 :].split()
+    if len(fields) < 20:
+        raise IncarnationHomeError(f"process stat is incomplete: {pid}")
+    return fields
+
+
+def _proc_start_ticks(pid: int) -> int:
+    try:
+        return int(_proc_stat_fields(pid)[19])
+    except ValueError as exc:
+        raise IncarnationHomeError(f"process start time is malformed: {pid}") from exc
+
+
+def _proc_identity_is_live(pid: int, start_ticks: int) -> bool:
+    try:
+        fields = _proc_stat_fields(pid)
+        return fields[0] != "Z" and int(fields[19]) == start_ticks
+    except (IncarnationHomeError, ValueError):
+        return False
+
+
+def _proc_parent_pid(pid: int) -> int:
+    try:
+        return int(_proc_stat_fields(pid)[1])
+    except ValueError as exc:
+        raise IncarnationHomeError(f"process parent is malformed: {pid}") from exc
+
+
+def _proc_comm(pid: int) -> str:
+    try:
+        return Path(f"/proc/{pid}/comm").read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError) as exc:
+        raise IncarnationHomeError(f"cannot read process name: {pid}") from exc
+
+
+def _proc_argv(pid: int) -> list[str]:
+    try:
+        raw = Path(f"/proc/{pid}/cmdline").read_bytes()
+    except OSError as exc:
+        raise IncarnationHomeError(f"cannot read process argv: {pid}") from exc
+    return [os.fsdecode(item) for item in raw.split(b"\0") if item]
+
+
+def _write_new_json(path: Path, value: dict[str, Any], label: str) -> None:
+    if not path.is_absolute() or path.is_symlink():
+        raise IncarnationHomeError(f"{label} must be an absolute non-symlink path: {path}")
+    parent = path.parent
+    if parent.is_symlink() or not parent.is_dir():
+        raise IncarnationHomeError(f"{label} parent must be a real directory: {parent}")
+    payload = canonical_bytes(value) + b"\n"
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd: int | None = None
+    try:
+        fd = os.open(path, flags, 0o600)
+        with os.fdopen(fd, "wb") as handle:
+            fd = None
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        path.chmod(0o600)
+    except FileExistsError as exc:
+        raise IncarnationHomeError(f"{label} already exists: {path}") from exc
+    except OSError as exc:
+        raise IncarnationHomeError(f"cannot write {label}: {path}") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def _holder_receipt(
+    *,
+    receipt_path: Path,
+    manifest_path: Path,
+    manifest: dict[str, Any],
+    executable: Path,
+    argv: Sequence[str],
+) -> dict[str, Any]:
+    holder_pid = os.getpid()
+    holder_parent_pid = os.getppid()
+    if holder_parent_pid <= 1:
+        raise IncarnationHomeError("visible holder has no usable terminal parent")
+    parent_comm = _proc_comm(holder_parent_pid)
+    if parent_comm != "kitty":
+        raise IncarnationHomeError(
+            f"visible holder parent must be Kitty, got {parent_comm or '<empty>'}"
+        )
+    try:
+        executable_digest = sha256_bytes(executable.read_bytes())
+        manifest_digest = sha256_bytes(manifest_path.read_bytes())
+    except OSError as exc:
+        raise IncarnationHomeError("holder identity inputs could not be hashed") from exc
+    receipt = {
+        "schema_version": HOLDER_RECEIPT_SCHEMA_VERSION,
+        "receipt_ref": str(receipt_path.resolve()),
+        "created_at": _utc_now(),
+        "lifecycle_role": "responsibility_holder",
+        "holder": {
+            "pid": holder_pid,
+            "start_ticks": _proc_start_ticks(holder_pid),
+            "parent_pid": holder_parent_pid,
+            "parent_start_ticks": _proc_start_ticks(holder_parent_pid),
+            "parent_comm": parent_comm,
+            "argv": list(argv),
+            "argv_digest": sha256_bytes(canonical_bytes(list(argv))),
+        },
+        "runtime": {
+            "codex_executable": str(executable),
+            "codex_executable_digest": executable_digest,
+            "incarnation_manifest": str(manifest_path.resolve()),
+            "incarnation_manifest_digest": manifest_digest,
+            "model": str(manifest["model_slug"]),
+            "reasoning_effort": str(manifest["reasoning_effort"]),
+            "ambient_codex_home": str(manifest["ambient_codex_home"]),
+            "incarnation_codex_home": str(manifest["codex_home"]),
+        },
+        "terminal": {
+            "binding": "direct_parent_at_exec",
+            "required_comm": "kitty",
+        },
+    }
+    _write_new_json(receipt_path, receipt, "holder terminal receipt")
+    return receipt
+
+
+def _validate_wake_delivery(
+    *, wake_receipt_path: Path, handoff_path: Path
+) -> dict[str, Any]:
+    wake = _load_json(wake_receipt_path, "wake receipt")
+    if wake.get("schema_version") != "task_local_actor_wake_receipt_v1":
+        raise IncarnationHomeError("unsupported wake receipt schema")
+    if wake.get("handoff_ref") != str(handoff_path.resolve()):
+        raise IncarnationHomeError("wake receipt handoff identity mismatch")
+    actions = wake.get("actions")
+    observed = wake.get("observed")
+    if (
+        not isinstance(actions, dict)
+        or actions.get("handoff_message_sent") is not True
+        or not isinstance(observed, dict)
+        or observed.get("handoff_delivery") is not True
+    ):
+        raise IncarnationHomeError("wake receipt does not prove handoff delivery")
+    return wake
+
+
+def _load_holder_receipt(path: Path) -> dict[str, Any]:
+    receipt = _load_json(path, "holder terminal receipt")
+    if receipt.get("schema_version") != HOLDER_RECEIPT_SCHEMA_VERSION:
+        raise IncarnationHomeError("unsupported holder terminal receipt schema")
+    if receipt.get("receipt_ref") != str(path.resolve()):
+        raise IncarnationHomeError("holder receipt path identity mismatch")
+    if receipt.get("lifecycle_role") != "responsibility_holder":
+        raise IncarnationHomeError("holder receipt is not a responsibility-holder receipt")
+    holder = receipt.get("holder")
+    runtime = receipt.get("runtime")
+    terminal = receipt.get("terminal")
+    required_holder = {
+        "pid",
+        "start_ticks",
+        "parent_pid",
+        "parent_start_ticks",
+        "parent_comm",
+        "argv",
+        "argv_digest",
+    }
+    required_runtime = {
+        "codex_executable",
+        "codex_executable_digest",
+        "incarnation_manifest",
+        "incarnation_manifest_digest",
+        "model",
+        "reasoning_effort",
+        "ambient_codex_home",
+        "incarnation_codex_home",
+    }
+    if (
+        not isinstance(holder, dict)
+        or not required_holder <= holder.keys()
+        or not isinstance(runtime, dict)
+        or not required_runtime <= runtime.keys()
+        or not isinstance(terminal, dict)
+        or terminal.get("binding") != "direct_parent_at_exec"
+        or terminal.get("required_comm") != "kitty"
+        or not isinstance(holder.get("argv"), list)
+        or not all(isinstance(item, str) for item in holder["argv"])
+    ):
+        raise IncarnationHomeError("holder terminal receipt is incomplete")
+    return receipt
+
+
+def _holder_terminal_identity(receipt: dict[str, Any]) -> tuple[int, int, str]:
+    holder = receipt["holder"]
+    runtime = receipt["runtime"]
+    pid = holder.get("pid")
+    start_ticks = holder.get("start_ticks")
+    parent_pid = holder.get("parent_pid")
+    parent_start_ticks = holder.get("parent_start_ticks")
+    if not all(isinstance(value, int) and value > 0 for value in (pid, start_ticks, parent_pid, parent_start_ticks)):
+        raise IncarnationHomeError("holder process identity is invalid")
+    if _proc_start_ticks(pid) != start_ticks:
+        raise IncarnationHomeError("holder PID was reused or has drifted")
+    if _proc_start_ticks(parent_pid) != parent_start_ticks:
+        raise IncarnationHomeError("holder terminal parent PID was reused or has drifted")
+    if _proc_parent_pid(pid) != parent_pid:
+        raise IncarnationHomeError("holder parent identity has changed")
+    if holder.get("parent_comm") != "kitty" or _proc_comm(parent_pid) != "kitty":
+        raise IncarnationHomeError("holder parent is not Kitty")
+    observed_argv = _proc_argv(pid)
+    expected_argv = holder["argv"]
+    if observed_argv != expected_argv:
+        raise IncarnationHomeError("holder argv identity has drifted")
+    if holder.get("argv_digest") != sha256_bytes(canonical_bytes(expected_argv)):
+        raise IncarnationHomeError("holder argv digest is invalid")
+    executable = _regular_file(
+        Path(str(runtime["codex_executable"])), "holder Codex executable"
+    )
+    manifest = _regular_file(
+        Path(str(runtime["incarnation_manifest"])), "holder incarnation manifest"
+    )
+    if sha256_bytes(executable.read_bytes()) != runtime.get("codex_executable_digest"):
+        raise IncarnationHomeError("holder Codex executable digest has drifted")
+    if sha256_bytes(manifest.read_bytes()) != runtime.get("incarnation_manifest_digest"):
+        raise IncarnationHomeError("holder incarnation manifest digest has drifted")
+    return pid, parent_pid, _proc_comm(parent_pid)
+
+
+def command_close(args: argparse.Namespace) -> int:
+    handoff_path = _regular_file(Path(args.handoff), "handoff")
+    _validate_wake_delivery(
+        wake_receipt_path=Path(args.wake_receipt), handoff_path=handoff_path
+    )
+    holder_receipt_path = _regular_file(
+        Path(args.holder_receipt), "holder terminal receipt"
+    )
+    receipt = _load_holder_receipt(holder_receipt_path)
+    holder_pid, kitty_pid, kitty_comm = _holder_terminal_identity(receipt)
+    kitty_start_ticks = _proc_start_ticks(kitty_pid)
+    kitty_argv = _proc_argv(kitty_pid)
+    signal_sent = False
+    try:
+        os.kill(kitty_pid, signal.SIGTERM)
+        signal_sent = True
+    except ProcessLookupError:
+        pass
+    closed = False
+    holder_gone = False
+    for _ in range(40):
+        kitty_gone = not _proc_identity_is_live(kitty_pid, kitty_start_ticks)
+        holder_gone = not _proc_identity_is_live(
+            holder_pid, receipt["holder"]["start_ticks"]
+        )
+        if kitty_gone and holder_gone:
+            closed = True
+            break
+        time.sleep(0.25)
+    closure = {
+        "schema_version": TERMINAL_CLOSURE_SCHEMA_VERSION,
+        "handoff_ref": str(handoff_path),
+        "holder_receipt_ref": str(holder_receipt_path),
+        "wake_receipt_ref": str(Path(args.wake_receipt).resolve()),
+        "verified_at": _utc_now(),
+        "holder": {
+            "pid": holder_pid,
+            "start_ticks": receipt["holder"]["start_ticks"],
+            "gone": holder_gone,
+        },
+        "terminal": {
+            "pid": kitty_pid,
+            "start_ticks": kitty_start_ticks,
+            "comm": kitty_comm,
+            "argv": kitty_argv,
+            "signal": "TERM",
+            "signal_sent": signal_sent,
+            "gone": closed and holder_gone,
+        },
+        "closed": closed,
+        "outcome": "closed" if closed else "close_unverified",
+        "route": "abyss_stack_visible_incarnation_runtime",
+        "trigger": "wake_bridge_after_confirmed_handoff_delivery",
+    }
+    _write_new_json(
+        Path(args.closure_receipt), closure, "terminal closure receipt"
+    )
+    if not closed:
+        raise IncarnationHomeError("holder terminal closure was not observed")
+    print(json.dumps(closure, ensure_ascii=False, sort_keys=True))
+    return 0
 
 
 def prepare_home(
@@ -702,7 +1011,12 @@ def command_prepare(args: argparse.Namespace) -> int:
 
 
 def command_launch(args: argparse.Namespace) -> int:
+    if args.holder_receipt and args.terminal_title:
+        raise IncarnationHomeError(
+            "holder terminal receipt requires direct exec; it cannot bind a detached Kitty"
+        )
     manifest = _load_manifest(Path(args.manifest))
+    manifest_path = _regular_file(Path(args.manifest), "incarnation-home manifest")
     command = Path(args.codex_executable)
     executable = _resolved_executable(command)
     _verify_executable_version(executable, str(manifest["runtime_version"]))
@@ -720,6 +1034,14 @@ def command_launch(args: argparse.Namespace) -> int:
             env=environment,
         )
         return completed.returncode
+    if args.holder_receipt:
+        _holder_receipt(
+            receipt_path=Path(args.holder_receipt),
+            manifest_path=manifest_path,
+            manifest=manifest,
+            executable=executable,
+            argv=argv,
+        )
     os.execvpe(argv[0], argv, environment)
     return 127
 
@@ -737,8 +1059,21 @@ def parser() -> argparse.ArgumentParser:
     launch.add_argument("--codex-executable", required=True)
     launch.add_argument("--terminal-title")
     launch.add_argument("--kitty-executable", default="/usr/bin/kitty")
+    launch.add_argument(
+        "--holder-receipt",
+        help=(
+            "non-replacing receipt for this direct responsibility-holder process; "
+            "the receipt is written immediately before exec"
+        ),
+    )
     launch.add_argument("codex_arguments", nargs=argparse.REMAINDER)
     launch.set_defaults(handler=command_launch)
+    close = subcommands.add_parser("close")
+    close.add_argument("--holder-receipt", required=True)
+    close.add_argument("--wake-receipt", required=True)
+    close.add_argument("--handoff", required=True)
+    close.add_argument("--closure-receipt", required=True)
+    close.set_defaults(handler=command_close)
     return root
 
 

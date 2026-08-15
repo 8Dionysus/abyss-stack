@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import tomllib
 from pathlib import Path
@@ -514,3 +515,95 @@ def test_executable_version_must_match_realization_runtime(tmp_path: Path) -> No
     MODULE._verify_executable_version(executable, "0.147.0")
     with pytest.raises(MODULE.IncarnationHomeError, match="version mismatch"):
         MODULE._verify_executable_version(executable, "0.146.0")
+
+
+def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    executable = tmp_path / "codex"
+    executable.write_text(
+        "#!/bin/sh\n"
+        "if [ \"$1\" = \"--version\" ]; then\n"
+        "  printf '%s\\n' 'codex-cli 0.147.0'\n"
+        "fi\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o700)
+    receipt_path = tmp_path / "holder.json"
+    captured: dict[str, object] = {}
+
+    def fake_exec(path: str, argv: list[str], environment: dict[str, str]) -> None:
+        captured.update(path=path, argv=argv, environment=environment)
+
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
+    monkeypatch.setattr(MODULE.os, "execvpe", fake_exec)
+    args = MODULE.argparse.Namespace(
+        holder_receipt=str(receipt_path),
+        terminal_title=None,
+        kitty_executable="/usr/bin/kitty",
+        manifest=str(manifest_path),
+        codex_executable=str(executable),
+        codex_arguments=["exec", "--help"],
+    )
+
+    assert MODULE.command_launch(args) == 127
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert receipt["schema_version"] == MODULE.HOLDER_RECEIPT_SCHEMA_VERSION
+    assert receipt["lifecycle_role"] == "responsibility_holder"
+    assert receipt["receipt_ref"] == str(receipt_path)
+    assert receipt["holder"]["pid"] == os.getpid()
+    assert receipt["holder"]["start_ticks"] == MODULE._proc_start_ticks(os.getpid())
+    assert receipt["holder"]["parent_pid"] == os.getppid()
+    assert receipt["holder"]["argv"] == captured["argv"]
+    assert receipt["runtime"]["incarnation_manifest"] == str(manifest_path)
+    assert receipt["runtime"]["model"] == "gpt-5.6-luna"
+    assert receipt["runtime"]["reasoning_effort"] == "max"
+    assert captured["environment"]["CODEX_HOME"] == str(ambient)
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="already exists"):
+        MODULE.command_launch(args)
+
+
+def test_holder_receipt_rejects_detached_kitty_route(tmp_path: Path) -> None:
+    args = MODULE.argparse.Namespace(
+        holder_receipt=str(tmp_path / "holder.json"),
+        terminal_title="visible-holder",
+        kitty_executable="/usr/bin/kitty",
+        manifest=str(tmp_path / "missing-manifest.json"),
+        codex_executable=str(tmp_path / "codex"),
+        codex_arguments=["exec", "--help"],
+    )
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="detached Kitty"):
+        MODULE.command_launch(args)
+
+
+def test_close_requires_confirmed_handoff_delivery(tmp_path: Path) -> None:
+    handoff = tmp_path / "handoff.json"
+    handoff.write_text("{}\n", encoding="utf-8")
+    wake = tmp_path / "wake.json"
+    wake.write_text(
+        json.dumps(
+            {
+                "schema_version": "task_local_actor_wake_receipt_v1",
+                "handoff_ref": str(handoff),
+                "actions": {"handoff_message_sent": True},
+                "observed": {"handoff_delivery": False},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="does not prove handoff"):
+        MODULE._validate_wake_delivery(wake_receipt_path=wake, handoff_path=handoff)

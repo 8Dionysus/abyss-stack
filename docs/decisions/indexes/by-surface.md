@@ -71,6 +71,7 @@
 - [ABYSS-STACK-D-0074 Telegram and Discord Connector MCP Access Planes](../ABYSS-STACK-D-0074-telegram-discord-connector-mcp-access-planes.md) (`docs/decisions/ABYSS-STACK-D-0074-telegram-discord-connector-mcp-access-planes.md`)
 - [ABYSS-STACK-D-0083 Tree of Sophia Foundation Laboratory Boundary](../ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md) (`docs/decisions/ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md`)
 - [ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md`)
+- [ABYSS-STACK-D-0124 Visible Holder Terminal Lifecycle Identity](../ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md) (`docs/decisions/ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md`)
 
 ## mechanic package
 
@@ -264,6 +265,10 @@
 
 - [ABYSS-STACK-D-0115 Preserve Writer Role Continuity for Report Repair](../ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md) (`docs/decisions/ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md`)
 - [ABYSS-STACK-D-0119 Preserve Actor Continuity Across Provider Capacity Loss](../ABYSS-STACK-D-0119-preserve-actor-continuity-across-provider-capacity-loss.md) (`docs/decisions/ABYSS-STACK-D-0119-preserve-actor-continuity-across-provider-capacity-loss.md`)
+
+## actor identity
+
+- [ABYSS-STACK-D-0124 Visible Holder Terminal Lifecycle Identity](../ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md) (`docs/decisions/ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md`)
 
 ## actor projection
 
@@ -643,6 +648,7 @@
 
 - [ABYSS-STACK-D-0051 Runtime Hygiene Validator Module](../ABYSS-STACK-D-0051-runtime-hygiene-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0051-runtime-hygiene-validator-module.md`)
 - [ABYSS-STACK-D-0109 Recover Expired Modern MCP Read Admission](../ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md) (`docs/decisions/ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md`)
+- [ABYSS-STACK-D-0124 Visible Holder Terminal Lifecycle Identity](../ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md) (`docs/decisions/ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md`)
 
 ## runtime policy
 

@@ -24,8 +24,12 @@ The controller:
   launcher binds model and effort explicitly and passes the scoped home only
   through Codex's shell environment policy, so ordinary descendant
   `codex exec` processes retain the selected incarnation while session and hook
-  trust identities remain stable. This operator surface is not A2A transport
-  and does not replace the governed JSONL runtime;
+  trust identities remain stable. A direct visible holder can additionally
+  emit its own PID/start-ticks/argv-bound lifecycle receipt immediately before
+  `exec`, and the installed launcher can close that exact holder terminal only
+  after a separate wake receipt proves delivery. This identity is distinct
+  from any nested proof actor. This operator surface is not A2A transport and
+  does not replace the governed JSONL runtime;
 - requires every task to preserve the complete runtime-wide forbidden-effect
   set, while terminal classification independently applies that set instead of
   trusting a caller-supplied subset;
