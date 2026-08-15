@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 4925941,
+  "allowed_tracked_bytes": 35288957,
+  "approved_by": "repository-owner",
+  "base_ref": "e61449fad7f93f2e68452709e4f100d8161db804",
+  "changed_generated_bytes": 4925941,
+  "changed_generated_files": 72,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "4d0f8236431d1c3c9e5690a7a96553ea4010c47bce53876d66a0677b5d604568",
+  "reason": "Refresh the owner-local KAG family after replacing absent host-only external actor skill links with checkout-safe canonical owner pointers; preserve the source projection without copying aoa-skills content.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35288957,
+  "tracked_bytes_max": 24117248
+}
