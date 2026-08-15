@@ -62,17 +62,17 @@ def test_prepared_home_binds_nested_default_without_rehoming_parent(tmp_path: Pa
     assert 'model_reasoning_effort = "max"' in actor_config
     assert (actor_home / "auth.json").readlink() == ambient / "auth.json"
     assert (actor_home / "sessions").readlink() == ambient / "sessions"
-    executable = tmp_path / "codex"
+    executable = tmp_path / "codex.js"
     executable.write_text("binary", encoding="utf-8")
     executable.chmod(0o700)
-    executable_link = tmp_path / "codex-link"
+    executable_link = tmp_path / "codex"
     executable_link.symlink_to(executable)
     argv = MODULE.bound_codex_argv(
         codex_executable=executable_link,
         manifest=manifest,
         arguments=["resume", "thread-id"],
     )
-    assert argv[:3] == [str(executable), "-m", "gpt-5.6-luna"]
+    assert argv[:3] == [str(executable_link), "-m", "gpt-5.6-luna"]
     assert any(
         f'shell_environment_policy.set={{CODEX_HOME="{actor_home}", PATH=' in item
         for item in argv
@@ -159,6 +159,36 @@ def test_realization_identity_separates_equal_configurations(tmp_path: Path) -> 
     )
 
     assert first_manifest["codex_home"] != second_manifest["codex_home"]
+
+
+def test_preparation_removes_obsolete_managed_shared_link(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    auth = ambient / "auth.json"
+    auth.write_text("{}", encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+    )
+    actor_home = Path(manifest["codex_home"])
+    assert (actor_home / "auth.json").is_symlink()
+
+    auth.unlink()
+    refreshed = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+    )
+
+    assert "auth.json" not in refreshed["shared_state_names"]
+    assert not (actor_home / "auth.json").exists()
+    assert not (actor_home / "auth.json").is_symlink()
 
 
 def test_preparation_rejects_runtime_root_nested_under_ambient_home(
@@ -312,6 +342,28 @@ def test_load_manifest_rejects_scoped_config_binding_drift(tmp_path: Path) -> No
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
     with pytest.raises(MODULE.IncarnationHomeError, match="scoped Codex config"):
+        MODULE._load_manifest(manifest_path)
+
+
+def test_load_manifest_rejects_ambient_provider_drift(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    ambient_config = ambient / "config.toml"
+    ambient_config.write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    ambient_config.write_text(
+        'model = "sol"\nmodel_provider = "custom-endpoint"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="model_provider"):
         MODULE._load_manifest(manifest_path)
 
 

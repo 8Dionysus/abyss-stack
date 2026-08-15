@@ -272,6 +272,7 @@ def prepare_home(
     if incarnation_root.is_symlink():
         raise IncarnationHomeError("incarnation root may not be a symlink")
     existing_marker = incarnation_root / "incarnation-home.json"
+    existing: dict[str, Any] = {}
     if incarnation_root.exists():
         if existing_marker.is_symlink() or not existing_marker.is_file():
             raise IncarnationHomeError(
@@ -310,6 +311,13 @@ def prepare_home(
     config = _bound_config(ambient_config, model_slug, effort)
     _write_exact(codex_home / "config.toml", config, 0o600)
 
+    previous_shared_names: set[str] = set()
+    if incarnation_root.exists() and isinstance(existing.get("shared_state_names"), list):
+        previous_shared_names = {
+            name
+            for name in existing["shared_state_names"]
+            if isinstance(name, str) and name not in LOCAL_NAMES and Path(name).name == name
+        }
     shared_names: list[str] = []
     for source in sorted(ambient_home.iterdir(), key=lambda item: item.name):
         if source.name in LOCAL_NAMES:
@@ -323,6 +331,13 @@ def prepare_home(
         else:
             target.symlink_to(source)
         shared_names.append(source.name)
+
+    for name in sorted(previous_shared_names - set(shared_names)):
+        target = codex_home / name
+        source = ambient_home / name
+        if not target.is_symlink() or target.readlink() != source:
+            raise IncarnationHomeError(f"obsolete shared state link drift: {target}")
+        target.unlink()
 
     manifest = {
         "schema_version": SCHEMA_VERSION,
@@ -400,6 +415,13 @@ def _load_manifest(path: Path) -> dict[str, Any]:
     except (OSError, UnicodeError, tomllib.TOMLDecodeError) as exc:
         raise IncarnationHomeError("incarnation Codex config is not valid TOML") from exc
     _reject_custom_model_provider(scoped_config)
+    try:
+        ambient_config = tomllib.loads(
+            (ambient_home / "config.toml").read_text(encoding="utf-8")
+        )
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as exc:
+        raise IncarnationHomeError("ambient Codex config is not valid TOML") from exc
+    _reject_custom_model_provider(ambient_config)
     if (
         scoped_config.get("model") != model_slug
         or scoped_config.get("model_reasoning_effort") != effort
@@ -524,18 +546,24 @@ def _reject_binding_overrides(arguments: Sequence[str]) -> None:
 def bound_codex_argv(
     *, codex_executable: Path, manifest: dict[str, Any], arguments: Sequence[str]
 ) -> list[str]:
-    executable = _resolved_executable(codex_executable)
-    _reject_binding_overrides(arguments)
-    if executable.name != "codex" or (executable.parent / "codex").resolve() != executable:
+    if not codex_executable.is_absolute() or codex_executable.name != "codex":
         raise IncarnationHomeError(
-            "Codex executable must be named codex so descendants can inherit the exact runtime"
+            "Codex executable command must be an absolute path named codex"
         )
+    try:
+        command = codex_executable.parent.resolve(strict=True) / "codex"
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"Codex executable parent cannot be resolved: {codex_executable}"
+        ) from exc
+    executable = _resolved_executable(command)
+    _reject_binding_overrides(arguments)
     codex_home = str(manifest["codex_home"])
     descendant_path = os.pathsep.join(
-        (str(executable.parent), "/usr/local/bin", "/usr/bin", "/bin")
+        (str(command.parent), "/usr/local/bin", "/usr/bin", "/bin")
     )
     return [
-        str(executable),
+        str(command),
         "-m",
         str(manifest["model_slug"]),
         "-c",
@@ -565,10 +593,11 @@ def command_prepare(args: argparse.Namespace) -> int:
 
 def command_launch(args: argparse.Namespace) -> int:
     manifest = _load_manifest(Path(args.manifest))
-    executable = _resolved_executable(Path(args.codex_executable))
+    command = Path(args.codex_executable)
+    executable = _resolved_executable(command)
     _verify_executable_version(executable, str(manifest["runtime_version"]))
     argv = bound_codex_argv(
-        codex_executable=executable,
+        codex_executable=command,
         manifest=manifest,
         arguments=args.codex_arguments,
     )
