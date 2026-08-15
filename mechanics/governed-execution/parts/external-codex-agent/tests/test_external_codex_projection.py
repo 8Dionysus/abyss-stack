@@ -154,6 +154,7 @@ def test_projection_accepts_exact_pre_full_index_source_manifest(
         env=PROJECTION._source_git_environment(source),
     ).stdout
     source_manifest["git_diff_binary_sha256"] = PROJECTION.sha256_bytes(legacy_diff)
+    _git(source, "config", "core.abbrev", "4")
 
     projection, baseline = materialize_actor_projection(
         source,

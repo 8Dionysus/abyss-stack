@@ -5539,8 +5539,9 @@ def _legacy_git_diff_binary_sha256(
     workspace: Path,
     *,
     git_env: Mapping[str, str],
+    abbrev: int,
 ) -> str:
-    """Return the v1 digest emitted before full object ids were explicit."""
+    """Return one v1 digest emitted before full object ids were explicit."""
 
     return sha256_bytes(
         _git_bytes(
@@ -5549,11 +5550,36 @@ def _legacy_git_diff_binary_sha256(
             "--no-ext-diff",
             "--no-textconv",
             "--binary",
+            f"--abbrev={abbrev}",
             "HEAD",
             "--",
             timeout=60,
             git_env=git_env,
         )
+    )
+
+
+LEGACY_GIT_ABBREV_WIDTHS = tuple(range(4, 65))
+
+
+def _legacy_git_diff_matches(
+    workspace: Path,
+    expected_digest: Any,
+    *,
+    git_env: Mapping[str, str],
+) -> bool:
+    """Recover one bounded pre-canonical Git abbreviation width exactly."""
+
+    if not isinstance(expected_digest, str):
+        return False
+    return any(
+        _legacy_git_diff_binary_sha256(
+            workspace,
+            git_env=git_env,
+            abbrev=abbrev,
+        )
+        == expected_digest
+        for abbrev in LEGACY_GIT_ABBREV_WIDTHS
     )
 
 
@@ -5942,8 +5968,9 @@ def _workspace_manifests_match(
     ):
         return False
     location = Path(workspace).resolve()
-    return baseline_diff == _legacy_git_diff_binary_sha256(
+    return _legacy_git_diff_matches(
         location,
+        baseline_diff,
         git_env=_controller_git_environment(location),
     )
 

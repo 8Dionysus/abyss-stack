@@ -27,6 +27,7 @@ PROJECTION_MANIFEST_SCHEMA_VERSION = (
 )
 PROJECTION_DELTA_SCHEMA_VERSION = "abyss_stack_external_codex_actor_delta_v1"
 MAX_GIT_OUTPUT_BYTES = 256 * 1024 * 1024
+LEGACY_GIT_ABBREV_WIDTHS = tuple(range(4, 65))
 PRIVATE_GIT_CONFIG_BYTES = (
     "[core]\n"
     "\trepositoryFormatVersion = 0\n"
@@ -208,6 +209,33 @@ def _git(
     if len(completed.stdout) > MAX_GIT_OUTPUT_BYTES:
         raise ProjectionError("private actor Git output exceeds its runtime bound")
     return completed.stdout
+
+
+def _legacy_git_diff_matches(
+    workspace: Path,
+    expected_digest: Any,
+    *,
+    environment_overrides: Mapping[str, str],
+) -> bool:
+    """Recover one bounded pre-canonical Git abbreviation width exactly."""
+
+    if not isinstance(expected_digest, str):
+        return False
+    for abbrev in LEGACY_GIT_ABBREV_WIDTHS:
+        diff_raw = _git(
+            workspace,
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--binary",
+            f"--abbrev={abbrev}",
+            "HEAD",
+            "--",
+            environment_overrides=environment_overrides,
+        )
+        if sha256_bytes(diff_raw) == expected_digest:
+            return True
+    return False
 
 
 def _sealed_memfd(name: str, raw: bytes) -> int:
@@ -1017,19 +1045,12 @@ def _construct_private_git(
             "--",
             environment_overrides=source_git_environment,
         )
-        source_legacy_diff_raw = _git(
-            source,
-            "diff",
-            "--no-ext-diff",
-            "--no-textconv",
-            "--binary",
-            "HEAD",
-            "--",
-            environment_overrides=source_git_environment,
-        )
         diff_matches = (
-            sha256_bytes(source_legacy_diff_raw)
-            == source_manifest.get("git_diff_binary_sha256")
+            _legacy_git_diff_matches(
+                source,
+                source_manifest.get("git_diff_binary_sha256"),
+                environment_overrides=source_git_environment,
+            )
             and sha256_bytes(diff_raw) == sha256_bytes(source_full_diff_raw)
         )
     if not status_matches or not diff_matches:

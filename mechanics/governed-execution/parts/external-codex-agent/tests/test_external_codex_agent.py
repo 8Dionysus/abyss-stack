@@ -10641,6 +10641,7 @@ def test_workspace_manifest_accepts_exact_pre_full_index_baseline(
     tracked.write_text("baseline\n", encoding="utf-8")
     _git(workspace, "add", "tracked.txt")
     _git(workspace, "commit", "-m", "fixture")
+    _git(workspace, "config", "core.abbrev", "12")
     tracked.write_text("dirty baseline\n", encoding="utf-8")
 
     current = RUNTIME.build_workspace_manifest(workspace)
@@ -10653,6 +10654,7 @@ def test_workspace_manifest_accepts_exact_pre_full_index_baseline(
             "--no-ext-diff",
             "--no-textconv",
             "--binary",
+            "--abbrev=12",
             "HEAD",
             "--",
         ],
@@ -10662,6 +10664,7 @@ def test_workspace_manifest_accepts_exact_pre_full_index_baseline(
     ).stdout
     legacy = dict(current)
     legacy["git_diff_binary_sha256"] = RUNTIME.sha256_bytes(legacy_diff)
+    _git(workspace, "config", "core.abbrev", "4")
 
     RUNTIME.assert_workspace_manifest(legacy, workspace)
 

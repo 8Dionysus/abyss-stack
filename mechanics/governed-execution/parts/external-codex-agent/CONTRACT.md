@@ -576,10 +576,13 @@ still inventories the complete content and private Git body.
 The v1 `git_diff_binary_sha256` is now emitted from a full-object-id diff. During
 the compatibility window, an existing v1 admission or durable session may retain
 the former abbreviated-object-id digest only when every other manifest field is
-unchanged and the current workspace reproduces that exact legacy digest. New
-manifests and private actor projections always use the canonical full-object-id
-form; compatibility probes use the same sanitized Git environment as admission,
-and an arbitrary digest substitution remains a drift failure.
+unchanged and the current workspace reproduces that exact legacy digest. The
+compatibility probe tries only the bounded explicit Git abbreviation widths 4
+through 64, so a later `core.abbrev` change cannot invalidate an unchanged
+legacy workspace and an arbitrary digest substitution remains a drift failure.
+New manifests and private actor projections always use the canonical full-object-
+id form; compatibility probes use the same sanitized Git environment as
+admission, including repository-filter neutralization.
 
 A manifest read that proves
 one regular file changed while its bytes or identity were being inventoried,
