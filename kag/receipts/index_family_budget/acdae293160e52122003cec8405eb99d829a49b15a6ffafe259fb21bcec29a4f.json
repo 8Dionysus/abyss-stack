@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 6562097,
+  "allowed_tracked_bytes": 35290944,
+  "approved_by": "repository-owner",
+  "base_ref": "c7298253fa9c87cf24d061ff36e294e395529944",
+  "changed_generated_bytes": 6562097,
+  "changed_generated_files": 65,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "acdae293160e52122003cec8405eb99d829a49b15a6ffafe259fb21bcec29a4f",
+  "reason": "Refresh the owner-local KAG family after correcting bounded writer policy normalization before task emission; preserve fail-closed defaults and exact runtime sandbox proof.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35290944,
+  "tracked_bytes_max": 24117248
+}
