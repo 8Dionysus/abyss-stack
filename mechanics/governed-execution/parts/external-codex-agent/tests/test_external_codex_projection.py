@@ -117,6 +117,7 @@ def test_projection_accepts_exact_pre_full_index_source_manifest(
     tmp_path: Path,
 ) -> None:
     source, source_manifest = _source_repo(tmp_path)
+    _git(source, "config", "core.abbrev", "12")
     (source / "tracked.txt").write_text("dirty owner bytes\n", encoding="utf-8")
     source_manifest = build_workspace_manifest(source)
     legacy_diff = subprocess.run(

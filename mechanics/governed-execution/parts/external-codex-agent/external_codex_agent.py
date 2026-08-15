@@ -6947,7 +6947,7 @@ class ExternalCodexRuntime:
                 if review_seed is None
                 else source_before
             )
-            if source_after != source_before:
+            if not _workspace_manifests_match(source_before, source_after, source):
                 raise ExternalCodexRuntimeError(
                     "workspace_source_race",
                     "source workspace changed after generation publication",
@@ -7073,7 +7073,7 @@ class ExternalCodexRuntime:
         source_after_path = session_dir / "source-manifest-after.json"
         _atomic_write_json(source_after_path, source_after, mode=0o400)
         source_after_ref = _artifact_ref(source_after_path)
-        if source_after != source_before:
+        if not _workspace_manifests_match(source_before, source_after, source):
             cleanup_projection()
             raise ExternalCodexRuntimeError(
                 "workspace_source_race",

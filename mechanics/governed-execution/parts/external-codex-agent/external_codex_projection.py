@@ -938,8 +938,18 @@ def _construct_private_git(
         "git_diff_binary_sha256"
     )
     if status_matches and not diff_matches:
-        legacy_diff_raw = _git(
-            staging,
+        source_full_diff_raw = _git(
+            source,
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--binary",
+            "--full-index",
+            "HEAD",
+            "--",
+        )
+        source_legacy_diff_raw = _git(
+            source,
             "diff",
             "--no-ext-diff",
             "--no-textconv",
@@ -947,8 +957,10 @@ def _construct_private_git(
             "HEAD",
             "--",
         )
-        diff_matches = sha256_bytes(legacy_diff_raw) == source_manifest.get(
-            "git_diff_binary_sha256"
+        diff_matches = (
+            sha256_bytes(source_legacy_diff_raw)
+            == source_manifest.get("git_diff_binary_sha256")
+            and sha256_bytes(diff_raw) == sha256_bytes(source_full_diff_raw)
         )
     if not status_matches or not diff_matches:
         raise ProjectionError(
