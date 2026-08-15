@@ -13255,7 +13255,7 @@ def test_parent_turn_disables_tools_before_inference_and_isolates_home(
     assert {
         "multi_agent",
         "shell_tool",
-        "code_mode_host",
+        "code_mode",
         "apps",
         "browser_use",
         "computer_use",
@@ -13267,6 +13267,7 @@ def test_parent_turn_disables_tools_before_inference_and_isolates_home(
         "hooks",
         "tool_suggest",
     }.issubset(disabled)
+    assert "code_mode_host" not in disabled
 
 
 def test_parent_yield_rejects_any_tool_event(tmp_path: Path) -> None:

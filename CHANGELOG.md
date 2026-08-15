@@ -9,6 +9,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Keep passive parent yield/re-entry turns tool-free without triggering a
+  Codex `item.error`: disable the `code_mode` feature rather than its host,
+  because current Codex emits a diagnostic item when `code_mode_host` is
+  explicitly disabled. The parent runtime still rejects every non-passive
+  item fail-closed.
 - Canonicalize external Codex actor baseline diffs with full Git object IDs
   on both the admitted source manifest and private actor projection, so a
   real workspace-write launch cannot fail on equivalent abbreviated index

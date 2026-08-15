@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 122,
-  "edge_count": 2757,
+  "decision_count": 123,
+  "edge_count": 2777,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1019,
-    "DATED": 122,
-    "GUARDED_BY": 377,
-    "HAS_STATUS": 122,
-    "HAS_SURFACE_CLASS": 330,
-    "IN_STACK_LANE": 287,
-    "NEXT_DECISION": 121,
-    "OWNED_BY_SURFACE": 128,
-    "OWNS_DECISION": 122,
+    "CITES_SOURCE_SURFACE": 1024,
+    "DATED": 123,
+    "GUARDED_BY": 380,
+    "HAS_STATUS": 123,
+    "HAS_SURFACE_CLASS": 333,
+    "IN_STACK_LANE": 290,
+    "NEXT_DECISION": 122,
+    "OWNED_BY_SURFACE": 129,
+    "OWNS_DECISION": 123,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 127
+    "UNDER_MECHANIC_PARENT": 128
   },
   "edges": [
     {
@@ -13183,11 +13183,106 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0122",
+      "target": "decision:ABYSS-STACK-D-0123",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0122",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0122",
+      "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
+      "target": "source_surface:CHANGELOG.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
+      "target": "date:2026-08-15",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
+      "target": "guard_family:passive%20parent%20turn",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
+      "target": "guard_family:process%20containment",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
+      "target": "guard_family:tool-event%20rejection",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
+      "target": "status:proposed",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
+      "target": "surface_class:external%20actor%20runtime",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
+      "target": "surface_class:parent%20re-entry",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
+      "target": "surface_class:security",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
+      "target": "stack_lane:governed%20execution",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
+      "target": "stack_lane:review",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0123",
       "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -13800,21 +13895,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0122",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0123",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1202,
+  "node_count": 1209,
   "node_type_counts": {
-    "date": 38,
-    "decision": 122,
-    "guard_family": 189,
+    "date": 39,
+    "decision": 123,
+    "guard_family": 192,
     "mechanic_parent": 10,
     "owner_surface": 65,
     "repo": 1,
     "source_surface": 588,
     "stack_lane": 49,
     "status": 4,
-    "surface_class": 136
+    "surface_class": 138
   },
   "nodes": [
     {
@@ -14005,6 +14105,11 @@
     {
       "id": "date:2026-08-14",
       "label": "2026-08-14",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-08-15",
+      "label": "2026-08-15",
       "type": "date"
     },
     {
@@ -15228,6 +15333,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-15",
+      "id": "decision:ABYSS-STACK-D-0123",
+      "label": "ABYSS-STACK-D-0123",
+      "path": "docs/decisions/ABYSS-STACK-D-0123-parent-passive-code-mode-disable.md",
+      "posture": "proposed runtime invariant pending independent review",
+      "status": "proposed",
+      "title": "ABYSS-STACK-D-0123 Parent Passive Turns Disable Code Mode",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -15843,6 +15958,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:passive%20parent%20turn",
+      "label": "passive parent turn",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:per-owner%20canary",
       "label": "per-owner canary",
       "type": "guard_family"
@@ -15860,6 +15980,11 @@
     {
       "id": "guard_family:post-reveal%20evidence%20join",
       "label": "post-reveal evidence join",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:process%20containment",
+      "label": "process containment",
       "type": "guard_family"
     },
     {
@@ -16160,6 +16285,11 @@
     {
       "id": "guard_family:tool%20allowlist",
       "label": "tool allowlist",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:tool-event%20rejection",
+      "label": "tool-event rejection",
       "type": "guard_family"
     },
     {
@@ -20194,6 +20324,11 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:parent%20re-entry",
+      "label": "parent re-entry",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:persistent%20session",
       "label": "persistent session",
       "type": "surface_class"
@@ -20356,6 +20491,11 @@
     {
       "id": "surface_class:schema/contract",
       "label": "schema/contract",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:security",
+      "label": "security",
       "type": "surface_class"
     },
     {

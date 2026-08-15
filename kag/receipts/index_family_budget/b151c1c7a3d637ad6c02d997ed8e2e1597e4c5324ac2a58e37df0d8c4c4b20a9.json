@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26721736,
+  "allowed_tracked_bytes": 35345622,
+  "approved_by": "repository-owner",
+  "base_ref": "73561e5136e2d89e9ce81994c0d6e169c5aabf43",
+  "changed_generated_bytes": 26721736,
+  "changed_generated_files": 290,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "b151c1c7a3d637ad6c02d997ed8e2e1597e4c5324ac2a58e37df0d8c4c4b20a9",
+  "reason": "Admit merged-main external Codex parent passive-turn runtime fix and decision surfaces after owner full-suite validation.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35345622,
+  "tracked_bytes_max": 24117248
+}
