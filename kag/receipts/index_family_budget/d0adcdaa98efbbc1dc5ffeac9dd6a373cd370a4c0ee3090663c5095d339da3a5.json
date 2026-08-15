@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 5570832,
+  "allowed_tracked_bytes": 35294116,
+  "approved_by": "repository-owner",
+  "base_ref": "d2ab0ffe889fea28213ce7d75f75f1be512b32b5",
+  "changed_generated_bytes": 5570832,
+  "changed_generated_files": 57,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "d0adcdaa98efbbc1dc5ffeac9dd6a373cd370a4c0ee3090663c5095d339da3a5",
+  "reason": "Preview-capable workspace-write ABI is required to bind the real bounded-change actor preview and mutation steps; admit the resulting derived-family delta explicitly.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35294116,
+  "tracked_bytes_max": 24117248
+}
