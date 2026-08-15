@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 6561962,
+  "allowed_tracked_bytes": 35290809,
+  "approved_by": "repository-owner",
+  "base_ref": "c7298253fa9c87cf24d061ff36e294e395529944",
+  "changed_generated_bytes": 6561962,
+  "changed_generated_files": 65,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "46a32348187dd9f909dfd49deaff2aa422ad75f3b89e147ccb1eee8c5e16249d",
+  "reason": "Refresh the owner-local KAG family after allowing a fixed landing-track packet to bind sandbox-confined local writer indirection; preserve fail-closed defaults and exact runtime sandbox proof.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35290809,
+  "tracked_bytes_max": 24117248
+}
