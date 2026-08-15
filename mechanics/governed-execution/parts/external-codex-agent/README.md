@@ -331,9 +331,11 @@ The runtime admits model-neutral exact aliases for the initial model-organ
 contours:
 `landing-readonly-v2` binds the independent reviewer realization,
 `landing-workspace-write-v2` binds the writer realization, while
+`landing-workspace-write-preview-v1` binds a writer whose selected bounded-change
+plan also owns the read-only preview step, and
 `structured-owner-duty-workspace-write-v1` binds an already selected task-local
-role for bounded eval, stats, or memo canaries. All three expose the same
-isolated projection posture as their corresponding generic read or write
+role for bounded eval, stats, or memo canaries. All listed aliases expose the
+same isolated projection posture as their corresponding generic read or write
 contour; the names preserve model-organ ABI and do not select a role, model,
 procedure, route, or acceptance outcome.
 

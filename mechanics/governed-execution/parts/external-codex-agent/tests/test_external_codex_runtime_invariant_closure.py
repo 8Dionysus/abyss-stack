@@ -57,6 +57,17 @@ def _git_workspace(path: Path) -> None:
     )
 
 
+def test_preview_writer_profile_matches_preview_bound_coder_effects() -> None:
+    tool = _tool_profile(
+        "abyss-stack:external_codex_agent/landing-workspace-write-preview-v1"
+    )
+
+    assert tool["sandbox_mode"] == "workspace_write"
+    assert tool["allowed_effect_classes"] == ["read_only", "repo_mutation"]
+    assert tool["network_access"] == "disabled"
+    assert tool["external_effects"] is False
+
+
 def test_preflight_does_not_bind_state_root_as_attempt_python_cache(
     tmp_path: Path,
 ) -> None:

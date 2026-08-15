@@ -402,12 +402,17 @@ commit, push, PR, merge, tag, release, publication, service mutation, secret
 access, or global config mutation.
 
 The initial model-organ contours expose exact ABI aliases:
-`landing-readonly-v2`, `landing-workspace-write-v2`, and
+`landing-readonly-v2`, `landing-workspace-write-v2`,
+`landing-workspace-write-preview-v1`, and
 `structured-owner-duty-workspace-write-v1`. Each retains the same bounded
-generic posture for its effect class: the read alias is `read_only` with
-`read_only` effects, while the write aliases are `workspace_write` with
-`repo_mutation` effects. Both landing aliases additionally bind the same
-model-neutral `landing-validation-v1` environment. Its pytest distributions,
+generic posture for its route: the read alias is `read_only` with `read_only`
+effects, the direct write aliases are `workspace_write` with `repo_mutation`
+effects, and the preview-capable write alias is `workspace_write` with the
+exact `read_only` plus `repo_mutation` effect classes required when one coder
+incarnation owns both a preview and mutation step. The task still names
+`repo_mutation` as the only mutation route. Both landing write aliases
+additionally bind the same model-neutral `landing-validation-v1` environment.
+Its pytest distributions,
 packaged `aoa_sdk`, and clean tracked `aoa-stats` snapshot are files inside the
 verified content-addressed release. Admission preflight is a stable probe
 environment and does not receive attempt-local Python cache routing through the

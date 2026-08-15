@@ -21,6 +21,9 @@ Tracking starts with the community-docs baseline for this repository.
 - Normalize that packet policy in the writer-preparation path before emitting
   `task.json`, so both the fail-closed default and an explicit
   `sandbox_confined` selection remain executable.
+- Add the explicit `landing-workspace-write-preview-v1` profile for bounded
+  change plans where one coder incarnation owns both the read-only preview and
+  the repo-mutation step; the task effect ceiling remains `repo_mutation`.
 - Close the external Codex workspace-hygiene boundary: admission preflight now
   uses a stable environment without creating or receiving an attempt-local
   Python cache prefix through `state_root`, while every real start/resume
