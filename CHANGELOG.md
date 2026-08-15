@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Propagate the controller-owned `GIT_OPTIONAL_LOCKS=0` invariant into the
+  external Codex shell environment policy as well as the supervisor
+  environment, so actor-side Git observations cannot refresh the private
+  index and make a valid workspace-write continuation fail at closeout.
 - Keep passive parent yield/re-entry turns tool-free without triggering a
   Codex `item.error`: disable the `code_mode` feature rather than its host,
   because current Codex emits a diagnostic item when `code_mode_host` is
