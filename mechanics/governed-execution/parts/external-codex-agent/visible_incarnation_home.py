@@ -368,6 +368,47 @@ def _load_manifest(path: Path) -> dict[str, Any]:
         or scoped_config["features"].get("multi_agent") is not False
     ):
         raise IncarnationHomeError("scoped Codex config binding drift")
+    shared_names = manifest.get("shared_state_names")
+    if (
+        not isinstance(shared_names, list)
+        or any(
+            not isinstance(name, str)
+            or not name
+            or name in {".", ".."}
+            or name in LOCAL_NAMES
+            or Path(name).name != name
+            for name in shared_names
+        )
+        or len(set(shared_names)) != len(shared_names)
+    ):
+        raise IncarnationHomeError("shared-state manifest is invalid")
+    expected_shared_names = sorted(
+        entry.name
+        for entry in ambient_home.iterdir()
+        if entry.name not in LOCAL_NAMES
+    )
+    if sorted(shared_names) != expected_shared_names:
+        raise IncarnationHomeError("shared-state manifest no longer matches ambient home")
+    expected_names = set(shared_names) | LOCAL_NAMES
+    for entry in codex_home.iterdir():
+        if entry.name not in expected_names:
+            raise IncarnationHomeError(
+                f"unexpected incarnation-home entry: {entry.name}"
+            )
+    for name in shared_names:
+        source = ambient_home / name
+        target = codex_home / name
+        if (
+            not source.exists()
+            or source.is_symlink()
+            or not target.is_symlink()
+            or target.readlink() != source
+        ):
+            raise IncarnationHomeError(f"shared-state link drift: {target}")
+    for name in LOCAL_NAMES - {"config.toml"}:
+        local = codex_home / name
+        if local.is_symlink() or not local.is_dir():
+            raise IncarnationHomeError(f"actor-local {name} is not a real directory")
     return manifest
 
 
@@ -421,6 +462,8 @@ def _reject_binding_overrides(arguments: Sequence[str]) -> None:
             or argument.startswith("-m") and argument != "--"
             or argument.startswith("-c") and argument != "--"
             or argument.startswith("-p") and argument != "--"
+            or argument in {"--oss", "--local-provider"}
+            or argument.startswith("--local-provider=")
         ):
             raise IncarnationHomeError(
                 f"forwarded argument overrides incarnation binding: {argument}"
@@ -444,7 +487,14 @@ def bound_codex_argv(
 ) -> list[str]:
     executable = _resolved_executable(codex_executable)
     _reject_binding_overrides(arguments)
+    if executable.name != "codex" or (executable.parent / "codex").resolve() != executable:
+        raise IncarnationHomeError(
+            "Codex executable must be named codex so descendants can inherit the exact runtime"
+        )
     codex_home = str(manifest["codex_home"])
+    descendant_path = os.pathsep.join(
+        (str(executable.parent), "/usr/local/bin", "/usr/bin", "/bin")
+    )
     return [
         str(executable),
         "-m",
@@ -455,6 +505,8 @@ def bound_codex_argv(
         "shell_environment_policy.set="
         + "{CODEX_HOME="
         + json.dumps(codex_home)
+        + ", PATH="
+        + json.dumps(descendant_path)
         + "}",
         "--disable",
         "multi_agent",

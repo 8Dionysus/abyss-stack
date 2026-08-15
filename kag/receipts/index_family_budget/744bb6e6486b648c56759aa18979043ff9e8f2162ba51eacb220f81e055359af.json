@@ -8,7 +8,7 @@
   "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
   "default_limit_bytes": 1048576,
   "head_family_digest": "744bb6e6486b648c56759aa18979043ff9e8f2162ba51eacb220f81e055359af",
-  "reason": "Refresh the portable family after binding descendant transport and ambient incarnation identity.",
+  "reason": "Refresh the portable family after binding local-provider selection, descendant executable path, and shared-state link integrity.",
   "repo": "abyss-stack",
   "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
   "scope": "generated_delta_and_tracked_size",

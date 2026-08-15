@@ -73,8 +73,13 @@ def test_prepared_home_binds_nested_default_without_rehoming_parent(tmp_path: Pa
         arguments=["resume", "thread-id"],
     )
     assert argv[:3] == [str(executable), "-m", "gpt-5.6-luna"]
-    assert (
-        f'shell_environment_policy.set={{CODEX_HOME="{actor_home}"}}' in argv
+    assert any(
+        f'shell_environment_policy.set={{CODEX_HOME="{actor_home}", PATH=' in item
+        for item in argv
+    )
+    assert any(
+        f'PATH="{executable.parent}:/usr/local/bin:/usr/bin:/bin"' in item
+        for item in argv
     )
     assert argv[argv.index("--disable") + 1] == "multi_agent"
     assert manifest["ambient_codex_home"] == str(ambient)
@@ -176,6 +181,9 @@ def test_preparation_rejects_a_different_ambient_owner(tmp_path: Path) -> None:
         ["exec", "-p", "other-profile"],
         ["exec", "--enable", "multi_agent"],
         ["exec", "--enable=multi_agent"],
+        ["exec", "--oss"],
+        ["exec", "--local-provider", "ollama"],
+        ["exec", "--local-provider=ollama"],
     ],
 )
 def test_bound_argv_rejects_incarnation_binding_overrides(
@@ -273,6 +281,50 @@ def test_load_manifest_rejects_scoped_config_binding_drift(tmp_path: Path) -> No
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
     with pytest.raises(MODULE.IncarnationHomeError, match="scoped Codex config"):
+        MODULE._load_manifest(manifest_path)
+
+
+def test_load_manifest_rejects_shared_state_link_drift(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    (ambient / "auth.json").write_text("{}", encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+    )
+    actor_home = Path(manifest["codex_home"])
+    manifest_path = actor_home.parent / "incarnation-home.json"
+    (actor_home / "auth.json").unlink()
+    (actor_home / "auth.json").symlink_to(tmp_path / "replacement.json")
+    (tmp_path / "replacement.json").write_text("{}", encoding="utf-8")
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="shared-state link drift"):
+        MODULE._load_manifest(manifest_path)
+
+
+def test_load_manifest_rejects_unexpected_shared_state_entry(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    actor_home = Path(manifest["codex_home"])
+    manifest_path = actor_home.parent / "incarnation-home.json"
+    (actor_home / "unexpected.json").write_text("{}", encoding="utf-8")
+
+    with pytest.raises(
+        MODULE.IncarnationHomeError, match="unexpected incarnation-home entry"
+    ):
         MODULE._load_manifest(manifest_path)
 
 
