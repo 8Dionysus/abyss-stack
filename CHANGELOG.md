@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Keep `.agents/skills` portable for external Codex actor workspaces by
+  representing absent host-only owner links as checkout-safe pointer files.
+  The source workspace manifest and runtime-owned actor projection now retain
+  the required surface without copying the canonical `aoa-skills` content.
 - Close the external Codex workspace-hygiene boundary: admission preflight now
   uses a stable environment without creating or receiving an attempt-local
   Python cache prefix through `state_root`, while every real start/resume
