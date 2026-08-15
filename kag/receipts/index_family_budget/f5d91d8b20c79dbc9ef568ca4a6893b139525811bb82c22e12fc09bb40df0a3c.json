@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 15413154,
+  "allowed_tracked_bytes": 35458900,
+  "approved_by": "repository-owner",
+  "base_ref": "21652f9204af4db36b04604ae89fe4d97771eb41",
+  "changed_generated_bytes": 15413154,
+  "changed_generated_files": 165,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "f5d91d8b20c79dbc9ef568ca4a6893b139525811bb82c22e12fc09bb40df0a3c",
+  "reason": "Refresh the portable family after provider binding rejection and realization-identity coordinates.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35458900,
+  "tracked_bytes_max": 24117248
+}
