@@ -887,6 +887,33 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
     assert repeated["active"]["release_id"] == active["release_id"]
 
 
+def test_wrapper_set_follows_legacy_release_contents(tmp_path: Path) -> None:
+    release_root = tmp_path / "release"
+    release_root.mkdir()
+    for entrypoint in (
+        "agent-entrypoint.py",
+        "bind-entrypoint.py",
+        "study-entrypoint.py",
+    ):
+        (release_root / entrypoint).write_text("#!/bin/false\n", encoding="utf-8")
+
+    legacy = runtime_install.wrapper_specs_for_release(release_root)
+
+    assert set(legacy) == {
+        "aoa-external-codex-agent",
+        "aoa-external-actor-bind",
+        "aoa-external-codex-study",
+    }
+    assert "aoa-external-codex-incarnation" not in legacy
+
+    (release_root / "incarnation-entrypoint.py").write_text(
+        "#!/bin/false\n", encoding="utf-8"
+    )
+    current = runtime_install.wrapper_specs_for_release(release_root)
+
+    assert "aoa-external-codex-incarnation" in current
+
+
 def test_stage_then_artifact_admitted_activation_is_fail_closed(
     tmp_path: Path,
 ) -> None:

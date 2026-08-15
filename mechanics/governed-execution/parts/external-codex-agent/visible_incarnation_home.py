@@ -279,6 +279,15 @@ def _load_manifest(path: Path) -> dict[str, Any]:
     ).resolve()
     if codex_home != expected_home:
         raise IncarnationHomeError("incarnation Codex home is not derived from realization")
+    try:
+        scoped_config = tomllib.loads(config.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as exc:
+        raise IncarnationHomeError("incarnation Codex config is not valid TOML") from exc
+    if (
+        scoped_config.get("model") != model_slug
+        or scoped_config.get("model_reasoning_effort") != effort
+    ):
+        raise IncarnationHomeError("scoped Codex config binding drift")
     return manifest
 
 

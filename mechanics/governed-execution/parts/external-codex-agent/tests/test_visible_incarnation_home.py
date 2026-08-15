@@ -201,6 +201,32 @@ def test_load_manifest_revalidates_realization_and_derived_home(tmp_path: Path) 
         MODULE._load_manifest(manifest_path)
 
 
+def test_load_manifest_rejects_scoped_config_binding_drift(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    actor_home = Path(manifest["codex_home"])
+    manifest_path = actor_home.parent / "incarnation-home.json"
+    (actor_home / "config.toml").write_text(
+        'model = "gpt-5.6-other"\nmodel_reasoning_effort = "max"\n',
+        encoding="utf-8",
+    )
+    manifest["config_digest"] = MODULE.sha256_bytes(
+        (actor_home / "config.toml").read_bytes()
+    )
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="scoped Codex config"):
+        MODULE._load_manifest(manifest_path)
+
+
 def test_executable_version_must_match_realization_runtime(tmp_path: Path) -> None:
     executable = tmp_path / "codex"
     executable.write_text(
