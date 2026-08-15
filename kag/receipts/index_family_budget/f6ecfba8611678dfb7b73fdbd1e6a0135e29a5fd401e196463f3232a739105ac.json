@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 14457612,
+  "allowed_tracked_bytes": 35401328,
+  "approved_by": "repository-owner",
+  "base_ref": "21652f9204af4db36b04604ae89fe4d97771eb41",
+  "changed_generated_bytes": 14457612,
+  "changed_generated_files": 154,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "f6ecfba8611678dfb7b73fdbd1e6a0135e29a5fd401e196463f3232a739105ac",
+  "reason": "Regenerate the owner portable family for the external Codex incarnation runtime source change and admit this measured one-change tracked-size exceedance without raising the standing budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35401328,
+  "tracked_bytes_max": 24117248
+}

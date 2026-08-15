@@ -19,6 +19,13 @@ The controller:
 - verifies the exact `RunPlan`, incarnation binding, task, role, model
   realization, runtime/tool profile, result schema, workspace HEAD, immutable
   inputs, Codex binary digest/version, ChatGPT login, and live model catalog;
+- prepares an incarnation-scoped Codex home for operator-visible external
+  actors without moving the top-level TUI out of the ambient trusted home. The
+  launcher binds model and effort explicitly and passes the scoped home only
+  through Codex's shell environment policy, so ordinary descendant
+  `codex exec` processes retain the selected incarnation while session and hook
+  trust identities remain stable. This operator surface is not A2A transport
+  and does not replace the governed JSONL runtime;
 - requires every task to preserve the complete runtime-wide forbidden-effect
   set, while terminal classification independently applies that set instead of
   trusting a caller-supplied subset;
@@ -436,11 +443,13 @@ with pytest's cache provider disabled so fixed validation cannot leave actor
 workspace residue; it does not inherit the user's Python site, mutable owner
 checkout, or general host paths. These bytes provide tools
 only: `aoa-stats` keeps validator and measurement authority.
-It atomically updates a regular-file `active.json` receipt and three stable
+It atomically updates a regular-file `active.json` receipt and four stable
 non-symlink wrappers in `~/.local/bin`:
 
 - `aoa-external-codex-agent` for the runtime controller;
 - `aoa-external-actor-bind` for model-neutral launch binding;
+- `aoa-external-codex-incarnation` for an operator-visible actor whose nested
+  Codex processes inherit the selected incarnation defaults;
 - `aoa-external-codex-study` for the canonical study preparer.
 
 Host-admitted canaries use a two-phase path instead of `install`. `stage`

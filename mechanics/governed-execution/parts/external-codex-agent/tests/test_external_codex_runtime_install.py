@@ -76,6 +76,10 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         "import aoa_sdk\nprint('study:' + aoa_sdk.MARKER)\n",
         encoding="utf-8",
     )
+    (part / "visible_incarnation_home.py").write_text(
+        "import aoa_sdk\nprint('incarnation:' + aoa_sdk.MARKER)\n",
+        encoding="utf-8",
+    )
     (part / "external_codex_supervisor.py").write_text(
         "PASS = True\n", encoding="utf-8"
     )
@@ -818,6 +822,13 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
         text=True,
     )
     assert bound.stdout == "bind:exact-sdk\n"
+    incarnation = subprocess.run(
+        [str(bin_dir / "aoa-external-codex-incarnation")],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert incarnation.stdout == "incarnation:exact-sdk\n"
     study = subprocess.run(
         [str(bin_dir / "aoa-external-codex-study")],
         check=True,
@@ -874,6 +885,33 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
     )
     assert repeated["release_created"] is False
     assert repeated["active"]["release_id"] == active["release_id"]
+
+
+def test_wrapper_set_follows_legacy_release_contents(tmp_path: Path) -> None:
+    release_root = tmp_path / "release"
+    release_root.mkdir()
+    for entrypoint in (
+        "agent-entrypoint.py",
+        "bind-entrypoint.py",
+        "study-entrypoint.py",
+    ):
+        (release_root / entrypoint).write_text("#!/bin/false\n", encoding="utf-8")
+
+    legacy = runtime_install.wrapper_specs_for_release(release_root)
+
+    assert set(legacy) == {
+        "aoa-external-codex-agent",
+        "aoa-external-actor-bind",
+        "aoa-external-codex-study",
+    }
+    assert "aoa-external-codex-incarnation" not in legacy
+
+    (release_root / "incarnation-entrypoint.py").write_text(
+        "#!/bin/false\n", encoding="utf-8"
+    )
+    current = runtime_install.wrapper_specs_for_release(release_root)
+
+    assert "aoa-external-codex-incarnation" in current
 
 
 def test_stage_then_artifact_admitted_activation_is_fail_closed(

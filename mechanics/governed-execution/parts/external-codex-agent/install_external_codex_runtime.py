@@ -51,6 +51,7 @@ RUNTIME_FILES = (
     "legacy-owner-admission-migrations.v1.json",
     "prepare_landing_study.py",
     "runtime-profile.v1.json",
+    "visible_incarnation_home.py",
 )
 SDK_CONTRACT_FILES = (
     "mechanics/boundary-bridge/parts/agent-incarnation-binding/schemas/agent-incarnation-binding.schema.json",
@@ -79,6 +80,13 @@ LEGACY_OWNER_MIGRATION_CATALOG_NAME = "legacy-owner-admission-migrations.v1.json
 LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION = (
     "abyss_stack_external_codex_legacy_owner_migration_catalog_v1"
 )
+WRAPPER_SPECS = {
+    "aoa-external-codex-agent": "agent-entrypoint.py",
+    "aoa-external-actor-bind": "bind-entrypoint.py",
+    "aoa-external-codex-incarnation": "incarnation-entrypoint.py",
+    "aoa-external-codex-study": "study-entrypoint.py",
+}
+MANAGED_WRAPPER_NAMES = frozenset(WRAPPER_SPECS)
 
 
 class InstallError(RuntimeError):
@@ -1564,6 +1572,26 @@ def wrapper_paths(bin_dir: Path, name: str) -> tuple[Path, Path]:
     return launcher, companion
 
 
+def wrapper_specs_for_release(release_root: Path) -> dict[str, str]:
+    """Use only launchers whose entrypoints exist in this release.
+
+    Releases predating the visible-incarnation entrypoint (and other older
+    optional wrappers) remain valid rollback targets.  The active wrapper set
+    must therefore be derived from the immutable release contents rather than
+    from today's four-wrapper set.
+    """
+
+    wrappers: dict[str, str] = {}
+    for name, entrypoint_name in WRAPPER_SPECS.items():
+        entrypoint = release_root / entrypoint_name
+        if entrypoint.exists() or entrypoint.is_symlink():
+            require_regular_file(entrypoint, f"release entrypoint {entrypoint_name}")
+            wrappers[name] = entrypoint_name
+    if not wrappers:
+        raise InstallError("release contains no recognized external Codex entrypoints")
+    return wrappers
+
+
 def wrapper_material_path(release_root: Path, entrypoint_name: str) -> Path:
     return release_root / WRAPPER_MATERIAL_ROOT / f"{entrypoint_name}.bootstrap.py"
 
@@ -1621,6 +1649,11 @@ def publish_wrappers(
     backups: dict[str, str | None] = {}
     if set(wrapper_artifacts) != set(wrappers):
         raise InstallError("compiled wrapper set is incomplete")
+    for name in sorted(MANAGED_WRAPPER_NAMES - set(wrappers)):
+        launcher, _legacy_companion = wrapper_paths(bin_dir, name)
+        if launcher.exists() or launcher.is_symlink():
+            backups[name] = backup_existing_wrapper(launcher, runtime_root)
+            launcher.unlink()
     for name in wrappers:
         launcher, _legacy_companion = wrapper_paths(bin_dir, name)
         expected, _embedded_payload = wrapper_artifacts[name]
@@ -1647,6 +1680,10 @@ def wrapper_status_rows(
     result: dict[str, dict[str, object]] = {}
     if set(wrapper_artifacts) != set(wrappers):
         raise InstallError("compiled wrapper set is incomplete")
+    for name in sorted(MANAGED_WRAPPER_NAMES - set(wrappers)):
+        launcher, _legacy_companion = wrapper_paths(bin_dir, name)
+        if launcher.exists() or launcher.is_symlink():
+            raise InstallError(f"stale wrapper for release: {launcher}")
     for name in wrappers:
         launcher, _legacy_companion = wrapper_paths(bin_dir, name)
         launcher = require_regular_file(launcher, f"wrapper {name}")
@@ -1680,6 +1717,7 @@ def release_manifest(files: Iterable[tuple[Path, Path]]) -> dict[str, object]:
     entrypoints = {
         "agent-entrypoint.py": entrypoint_text("external_codex_agent.py"),
         "bind-entrypoint.py": entrypoint_text("bind_external_actor_launch.py"),
+        "incarnation-entrypoint.py": entrypoint_text("visible_incarnation_home.py"),
         "study-entrypoint.py": entrypoint_text("prepare_landing_study.py"),
     }
     for path, text in entrypoints.items():
@@ -1785,6 +1823,7 @@ def materialize_release(
         for name, target in (
             ("agent-entrypoint.py", "external_codex_agent.py"),
             ("bind-entrypoint.py", "bind_external_actor_launch.py"),
+            ("incarnation-entrypoint.py", "visible_incarnation_home.py"),
             ("study-entrypoint.py", "prepare_landing_study.py"),
         ):
             path = staging / name
@@ -1793,6 +1832,7 @@ def materialize_release(
         for entrypoint_name in (
             "agent-entrypoint.py",
             "bind-entrypoint.py",
+            "incarnation-entrypoint.py",
             "study-entrypoint.py",
         ):
             path = staging / WRAPPER_MATERIAL_ROOT / f"{entrypoint_name}.bootstrap.py"
@@ -2100,11 +2140,7 @@ def install(
         require_regular_file(active_path, "active release record")
         previous_active = json.loads(active_path.read_text(encoding="utf-8"))
 
-    wrappers = {
-        "aoa-external-codex-agent": "agent-entrypoint.py",
-        "aoa-external-actor-bind": "bind-entrypoint.py",
-        "aoa-external-codex-study": "study-entrypoint.py",
-    }
+    wrappers = wrapper_specs_for_release(release_root)
     verify_release(release_root)
     assert_python_identity_unchanged(python_executable, python_identity)
     now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
@@ -2168,7 +2204,7 @@ def install(
                 "external-codex-agent/install_external_codex_runtime.py activate "
                 f"--runtime-root {runtime_root} --bin-dir {bin_dir} "
                 f"--release-id {previous_active.get('release_id')}"
-            ) if previous_active else "Remove the three newly created launcher/companion pairs and active.json after operator review; the immutable release may be retained.",
+            ) if previous_active else "Remove the four newly created launchers and active.json after operator review; the immutable release may be retained.",
         },
     }
     receipts = runtime_root / "receipts"
@@ -2446,11 +2482,7 @@ def activate(
     assert_python_identity_unchanged(python_executable, python_identity)
     active_path = runtime_root / "active.json"
     previous = json.loads(active_path.read_text(encoding="utf-8")) if active_path.exists() else None
-    wrappers = {
-        "aoa-external-codex-agent": "agent-entrypoint.py",
-        "aoa-external-actor-bind": "bind-entrypoint.py",
-        "aoa-external-codex-study": "study-entrypoint.py",
-    }
+    wrappers = wrapper_specs_for_release(release_root)
     verify_release(release_root)
     assert_python_identity_unchanged(python_executable, python_identity)
     now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
@@ -2643,11 +2675,7 @@ def status(runtime_root: Path, bin_dir: Path) -> dict[str, object]:
     if manifest["release_id"] != release_id:
         raise InstallError("active release id differs from verified manifest")
     artifact_admission = recorded_artifact_admission_status(active, release_root)
-    wrappers = {
-        "aoa-external-codex-agent": "agent-entrypoint.py",
-        "aoa-external-actor-bind": "bind-entrypoint.py",
-        "aoa-external-codex-study": "study-entrypoint.py",
-    }
+    wrappers = wrapper_specs_for_release(release_root)
     wrapper_status = wrapper_status_rows(
         bin_dir.resolve(),
         release_root,

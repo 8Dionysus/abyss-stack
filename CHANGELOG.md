@@ -9,6 +9,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Keep operator-visible external Codex actors in the ambient trusted home while
+  binding their selected model realization to ordinary descendant Codex
+  processes through an incarnation-scoped home and native shell environment
+  policy. Nested `codex exec` work can no longer silently fall back to the
+  operator's default model or force the top-level TUI to re-review known hooks.
 - Propagate the controller-owned `GIT_OPTIONAL_LOCKS=0` invariant into the
   external Codex shell environment policy as well as the supervisor
   environment, so actor-side Git observations cannot refresh the private
