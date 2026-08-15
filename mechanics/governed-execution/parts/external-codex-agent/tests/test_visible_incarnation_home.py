@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -78,9 +79,13 @@ def test_prepared_home_binds_nested_default_without_rehoming_parent(tmp_path: Pa
         for item in argv
     )
     assert any(
-        f'PATH="{executable.parent}:/usr/local/bin:/usr/bin:/bin"' in item
+        f'PATH="{actor_home / MODULE.DESCENDANT_BIN_NAME}:/usr/local/bin:/usr/bin:/bin"'
+        in item
         for item in argv
     )
+    shim = actor_home / MODULE.DESCENDANT_BIN_NAME / "codex"
+    assert shim.is_file()
+    assert "Codex executable changed after admission" in shim.read_text()
     assert argv[argv.index("--disable") + 1] == "multi_agent"
     assert manifest["ambient_codex_home"] == str(ambient)
     assert manifest["runtime_root"] == str(runtime_root)
@@ -143,6 +148,55 @@ def test_bound_config_preserves_features_table_before_later_table() -> None:
     assert parsed["mcp_servers"]["foo"]["command"] == "server"
 
 
+@pytest.mark.parametrize(
+    "ambient_config",
+    [
+        '["features"]\nuse_legacy = true\n',
+        'features = { use_legacy = true }\n',
+    ],
+)
+def test_bound_config_supports_quoted_and_inline_features_tables(
+    ambient_config: str,
+) -> None:
+    bound = MODULE._bound_config(
+        ambient_config.encode("utf-8"), "gpt-5.6-luna", "max"
+    )
+    parsed = tomllib.loads(bound.decode("utf-8"))
+
+    assert parsed["features"]["multi_agent"] is False
+    assert parsed["features"]["use_legacy"] is True
+
+
+def test_descendant_shim_rejects_executable_drift(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    executable = tmp_path / "codex.js"
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o700)
+    command = tmp_path / "codex"
+    command.symlink_to(executable)
+    MODULE.bound_codex_argv(
+        codex_executable=command,
+        manifest=manifest,
+        arguments=["exec", "--help"],
+    )
+    executable.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+
+    shim = Path(manifest["codex_home"]) / MODULE.DESCENDANT_BIN_NAME / "codex"
+    completed = subprocess.run([str(shim)], capture_output=True, text=True)
+
+    assert completed.returncode == 125
+    assert "changed after admission" in completed.stderr
+
+
 def test_bound_config_rejects_unbound_model_provider() -> None:
     with pytest.raises(MODULE.IncarnationHomeError, match="model_provider"):
         MODULE._bound_config(
@@ -202,6 +256,24 @@ def test_preparation_removes_obsolete_managed_shared_link(tmp_path: Path) -> Non
     assert "auth.json" not in refreshed["shared_state_names"]
     assert not (actor_home / "auth.json").exists()
     assert not (actor_home / "auth.json").is_symlink()
+
+
+def test_preparation_rejects_symlinked_shared_state_entry(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    shared_target = tmp_path / "shared-target"
+    shared_target.write_text("{}", encoding="utf-8")
+    (ambient / "skills").symlink_to(shared_target)
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="may not be a symlink"):
+        MODULE.prepare_home(
+            ambient_home=ambient,
+            realization_path=_realization(tmp_path / "realization.json"),
+            runtime_root=runtime_root,
+        )
 
 
 def test_preparation_rejects_runtime_root_nested_under_ambient_home(

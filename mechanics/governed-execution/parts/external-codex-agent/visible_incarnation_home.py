@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import tomllib
@@ -22,13 +23,22 @@ from typing import Any, Sequence
 
 
 SCHEMA_VERSION = "abyss_stack_codex_incarnation_home_v1"
-LOCAL_NAMES = frozenset({"config.toml", "cache", "log", "tmp"})
+DESCENDANT_BIN_NAME = ".codex-incarnation-bin"
+LOCAL_NAMES = frozenset(
+    {"config.toml", "cache", "log", "tmp", DESCENDANT_BIN_NAME}
+)
 ROOT_KEY_LINE = re.compile(
     r"^\s*(?P<key>model|model_reasoning_effort|\"model\"|\"model_reasoning_effort\")\s*="
 )
-FEATURE_TABLE_LINE = re.compile(r"^\s*\[\s*features\s*\]\s*(?:#.*)?$")
+FEATURE_TABLE_LINE = re.compile(
+    r"^\s*\[\s*(?:features|\"features\")\s*\]\s*(?:#.*)?$"
+)
 FEATURE_KEY_LINE = re.compile(r"^\s*(?:multi_agent|\"multi_agent\")\s*=")
 FEATURE_DOTTED_LINE = re.compile(r"^\s*features\.multi_agent\s*=")
+FEATURE_INLINE_LINE = re.compile(
+    r"^(?P<indent>\s*)(?P<key>features|\"features\")\s*=\s*"
+    r"(?P<value>\{.*\})(?P<suffix>\s*(?:#.*)?)$"
+)
 
 
 class IncarnationHomeError(RuntimeError):
@@ -121,6 +131,31 @@ def _replace_line(lines: list[str], index: int, value: str) -> None:
     lines[index] = value + line_ending
 
 
+def _toml_inline_key(value: str) -> str:
+    if re.fullmatch(r"[A-Za-z0-9_-]+", value):
+        return value
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _toml_inline_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    if isinstance(value, int | float):
+        return str(value)
+    if isinstance(value, list):
+        return "[" + ", ".join(_toml_inline_value(item) for item in value) + "]"
+    if isinstance(value, dict):
+        return "{ " + ", ".join(
+            f"{_toml_inline_key(str(key))} = {_toml_inline_value(item)}"
+            for key, item in value.items()
+        ) + " }"
+    raise IncarnationHomeError(
+        "ambient Codex inline features table contains an unsupported value"
+    )
+
+
 def _bind_multi_agent(text: str) -> str:
     """Force the descendant config to keep the governed transport boundary."""
 
@@ -135,11 +170,14 @@ def _bind_multi_agent(text: str) -> str:
     features_header: int | None = None
     features_end: int | None = None
     features_active = False
+    inline_index: int | None = None
+    table_seen = False
     feature_index: int | None = None
     dotted_index: int | None = None
     for index, line in enumerate(lines):
         stripped = line.lstrip()
         if stripped.startswith("["):
+            table_seen = True
             if features_active and features_end is None:
                 features_end = index
             features_active = bool(FEATURE_TABLE_LINE.match(line))
@@ -150,6 +188,8 @@ def _bind_multi_agent(text: str) -> str:
             feature_index = index
         elif not features_active and FEATURE_DOTTED_LINE.match(line):
             dotted_index = index
+        elif not table_seen and FEATURE_INLINE_LINE.match(line):
+            inline_index = index
     if features_active and features_end is None:
         features_end = len(lines)
     if feature_index is not None:
@@ -158,10 +198,26 @@ def _bind_multi_agent(text: str) -> str:
         lines.insert(features_end, "multi_agent = false\n")
     elif dotted_index is not None:
         _replace_line(lines, dotted_index, "features.multi_agent = false")
+    elif inline_index is not None:
+        match = FEATURE_INLINE_LINE.match(lines[inline_index])
+        if match is None or not isinstance(features, dict):
+            raise IncarnationHomeError(
+                "ambient Codex inline features table cannot be safely rebound"
+            )
+        inline_features = dict(features)
+        inline_features["multi_agent"] = False
+        _replace_line(
+            lines,
+            inline_index,
+            f"{match.group('indent')}{match.group('key')} = "
+            f"{_toml_inline_value(inline_features)}{match.group('suffix')}",
+        )
     elif features is None:
         lines.extend(["\n", "[features]\n", "multi_agent = false\n"])
     else:
-        lines.insert(0, "features.multi_agent = false\n")
+        raise IncarnationHomeError(
+            "ambient Codex features table representation is unsupported"
+        )
     return "".join(lines)
 
 
@@ -301,7 +357,7 @@ def prepare_home(
         raise IncarnationHomeError("incarnation home may not be a symlink")
     incarnation_root.chmod(0o700)
     codex_home.chmod(0o700)
-    for name in ("cache", "log", "tmp"):
+    for name in ("cache", "log", "tmp", DESCENDANT_BIN_NAME):
         local = codex_home / name
         local.mkdir(mode=0o700, exist_ok=True)
         if local.is_symlink() or not local.is_dir():
@@ -325,6 +381,10 @@ def prepare_home(
     for source in sorted(ambient_home.iterdir(), key=lambda item: item.name):
         if source.name in LOCAL_NAMES:
             continue
+        if source.is_symlink():
+            raise IncarnationHomeError(
+                f"ambient shared state entry may not be a symlink: {source}"
+            )
         target = codex_home / source.name
         if target.is_symlink():
             if target.readlink() != source:
@@ -515,6 +575,36 @@ def _verify_executable_version(executable: Path, runtime_version: str) -> None:
         )
 
 
+def _write_codex_identity_shim(
+    *, command: Path, executable: Path, codex_home: Path
+) -> Path:
+    """Make descendant PATH resolve through a digest-checking command shim."""
+
+    shim = codex_home / DESCENDANT_BIN_NAME / "codex"
+    try:
+        expected_digest = hashlib.sha256(executable.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise IncarnationHomeError(
+            "Codex executable could not be hashed for descendant binding"
+        ) from exc
+    command_literal = shlex.quote(str(command))
+    content = (
+        "#!/bin/sh\n"
+        "set -eu\n"
+        f"expected_digest={shlex.quote(expected_digest)}\n"
+        f"admitted_command={command_literal}\n"
+        "observed_digest=$(/usr/bin/sha256sum -- \"$admitted_command\" "
+        "| /usr/bin/cut -d ' ' -f 1) || exit 125\n"
+        "if [ \"$observed_digest\" != \"$expected_digest\" ]; then\n"
+        "  echo 'Codex executable changed after admission' >&2\n"
+        "  exit 125\n"
+        "fi\n"
+        "exec \"$admitted_command\" \"$@\"\n"
+    )
+    _write_exact(shim, content.encode("utf-8"), 0o700)
+    return shim
+
+
 def _reject_binding_overrides(arguments: Sequence[str]) -> None:
     forbidden = {"-m", "--model", "-c", "--config", "-p", "--profile"}
     for index, argument in enumerate(arguments):
@@ -562,8 +652,13 @@ def bound_codex_argv(
     executable = _resolved_executable(command)
     _reject_binding_overrides(arguments)
     codex_home = str(manifest["codex_home"])
+    shim = _write_codex_identity_shim(
+        command=command,
+        executable=executable,
+        codex_home=Path(codex_home),
+    )
     descendant_path = os.pathsep.join(
-        (str(command.parent), "/usr/local/bin", "/usr/bin", "/bin")
+        (str(shim.parent), "/usr/local/bin", "/usr/bin", "/bin")
     )
     return [
         str(command),
