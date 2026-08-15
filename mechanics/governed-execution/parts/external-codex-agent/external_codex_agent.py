@@ -5724,6 +5724,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
         "--no-ext-diff",
         "--no-textconv",
         "--binary",
+        "--full-index",
         "HEAD",
         "--",
         timeout=60,

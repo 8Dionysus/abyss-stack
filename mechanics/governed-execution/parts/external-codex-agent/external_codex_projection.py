@@ -927,6 +927,7 @@ def _construct_private_git(
         "--no-ext-diff",
         "--no-textconv",
         "--binary",
+        "--full-index",
         "HEAD",
         "--",
     )
