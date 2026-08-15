@@ -108,6 +108,8 @@ def test_bound_config_updates_indented_root_keys_without_touching_tables() -> No
     ambient_config = (
         '  model = "old-model"\n'
         '  model_reasoning_effort = "high"\n'
+        "[features]\n"
+        "multi_agent = true\n"
         "[history]\n"
         'model = "nested-model"\n'
     )
@@ -119,6 +121,7 @@ def test_bound_config_updates_indented_root_keys_without_touching_tables() -> No
 
     assert parsed["model"] == "gpt-5.6-luna"
     assert parsed["model_reasoning_effort"] == "max"
+    assert parsed["features"]["multi_agent"] is False
     assert parsed["history"]["model"] == "nested-model"
 
 
@@ -135,6 +138,30 @@ def test_preparation_rejects_runtime_root_nested_under_ambient_home(
         MODULE.prepare_home(
             ambient_home=ambient,
             realization_path=_realization(tmp_path / "realization.json"),
+            runtime_root=runtime_root,
+        )
+
+
+def test_preparation_rejects_a_different_ambient_owner(tmp_path: Path) -> None:
+    ambient_a = tmp_path / "ambient-a"
+    ambient_b = tmp_path / "ambient-b"
+    runtime_root = tmp_path / "runtime"
+    ambient_a.mkdir()
+    ambient_b.mkdir()
+    runtime_root.mkdir()
+    for ambient in (ambient_a, ambient_b):
+        (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+
+    MODULE.prepare_home(
+        ambient_home=ambient_a,
+        realization_path=realization,
+        runtime_root=runtime_root,
+    )
+    with pytest.raises(MODULE.IncarnationHomeError, match="another ambient"):
+        MODULE.prepare_home(
+            ambient_home=ambient_b,
+            realization_path=realization,
             runtime_root=runtime_root,
         )
 
@@ -195,6 +222,28 @@ def test_load_manifest_revalidates_realization_and_derived_home(tmp_path: Path) 
     payload["configuration_fingerprint"] = MODULE.sha256_bytes(
         MODULE.canonical_bytes(payload["configuration"])
     )
+    realization.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="binding drift"):
+        MODULE._load_manifest(manifest_path)
+
+
+def test_load_manifest_revalidates_realization_identifier(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+
+    payload = json.loads(realization.read_text(encoding="utf-8"))
+    payload["model_realization_id"] = "model-realization:test/other"
     realization.write_text(json.dumps(payload), encoding="utf-8")
 
     with pytest.raises(MODULE.IncarnationHomeError, match="binding drift"):

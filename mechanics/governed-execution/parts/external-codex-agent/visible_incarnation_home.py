@@ -26,6 +26,9 @@ LOCAL_NAMES = frozenset({"config.toml", "cache", "log", "tmp"})
 ROOT_KEY_LINE = re.compile(
     r"^\s*(?P<key>model|model_reasoning_effort|\"model\"|\"model_reasoning_effort\")\s*="
 )
+FEATURE_TABLE_LINE = re.compile(r"^\s*\[\s*features\s*\]\s*(?:#.*)?$")
+FEATURE_KEY_LINE = re.compile(r"^\s*(?:multi_agent|\"multi_agent\")\s*=")
+FEATURE_DOTTED_LINE = re.compile(r"^\s*features\.multi_agent\s*=")
 
 
 class IncarnationHomeError(RuntimeError):
@@ -76,7 +79,10 @@ def _realization(path: Path) -> tuple[dict[str, Any], str, str, str, str]:
         raise IncarnationHomeError("model realization is not for Codex CLI")
     model_slug = runtime.get("model_slug")
     runtime_version = runtime.get("version")
+    realization_id = value.get("model_realization_id")
     effort = configuration.get("reasoning_effort")
+    if not isinstance(realization_id, str) or not realization_id.strip():
+        raise IncarnationHomeError("model realization lacks model_realization_id")
     if not isinstance(model_slug, str) or not model_slug.strip():
         raise IncarnationHomeError("model realization lacks model_slug")
     if not isinstance(runtime_version, str) or not runtime_version.strip():
@@ -115,6 +121,53 @@ def _replace_line(lines: list[str], index: int, value: str) -> None:
     lines[index] = value + line_ending
 
 
+def _bind_multi_agent(text: str) -> str:
+    """Force the descendant config to keep the governed transport boundary."""
+
+    try:
+        parsed = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as exc:
+        raise IncarnationHomeError("ambient Codex config is not valid TOML") from exc
+    features = parsed.get("features")
+    if features is not None and not isinstance(features, dict):
+        raise IncarnationHomeError("ambient Codex features table is not a TOML table")
+    lines = text.splitlines(keepends=True)
+    table_header: int | None = None
+    table_end: int | None = None
+    feature_index: int | None = None
+    dotted_index: int | None = None
+    for index, line in enumerate(lines):
+        stripped = line.lstrip()
+        if stripped.startswith("["):
+            if table_header is not None and table_end is None:
+                table_end = index
+            table_header = index if FEATURE_TABLE_LINE.match(line) else None
+            continue
+        if table_header is not None and FEATURE_KEY_LINE.match(line):
+            feature_index = index
+        elif table_header is None and FEATURE_DOTTED_LINE.match(line):
+            dotted_index = index
+    if table_header is not None and table_end is None:
+        table_end = len(lines)
+    if feature_index is not None:
+        _replace_line(lines, feature_index, "multi_agent = false")
+    elif table_header is not None and table_end is not None:
+        lines.insert(table_end, "multi_agent = false\n")
+    elif dotted_index is not None:
+        _replace_line(lines, dotted_index, "features.multi_agent = false")
+    elif features is None:
+        lines.extend(["\n", "[features]\n", "multi_agent = false\n"])
+    else:
+        lines.insert(0, "features.multi_agent = false\n")
+    return "".join(lines)
+
+
+def _ambient_home_identity(ambient_home: Path) -> str:
+    return sha256_bytes(
+        canonical_bytes({"ambient_codex_home": str(ambient_home)})
+    )
+
+
 def _bound_config(ambient_config: bytes, model_slug: str, effort: str) -> bytes:
     try:
         text = ambient_config.decode("utf-8")
@@ -139,7 +192,7 @@ def _bound_config(ambient_config: bytes, model_slug: str, effort: str) -> bytes:
         lines.insert(0, effort_value + "\n")
     else:
         _replace_line(lines, effort_index, effort_value)
-    bound = "".join(lines)
+    bound = _bind_multi_agent("".join(lines))
     try:
         bound_parsed = tomllib.loads(bound)
     except tomllib.TOMLDecodeError as exc:
@@ -149,6 +202,8 @@ def _bound_config(ambient_config: bytes, model_slug: str, effort: str) -> bytes:
     if (
         bound_parsed.get("model") != model_slug
         or bound_parsed.get("model_reasoning_effort") != effort
+        or not isinstance(bound_parsed.get("features"), dict)
+        or bound_parsed["features"].get("multi_agent") is not False
     ):
         raise IncarnationHomeError("ambient Codex config root binding did not take effect")
     return bound.encode("utf-8")
@@ -187,6 +242,24 @@ def prepare_home(
     fingerprint_value = fingerprint.removeprefix("sha256:")
     incarnation_root = runtime_root / f"sha256-{fingerprint_value}"
     codex_home = incarnation_root / "codex-home"
+    ambient_identity = _ambient_home_identity(ambient_home)
+    if incarnation_root.is_symlink():
+        raise IncarnationHomeError("incarnation root may not be a symlink")
+    existing_marker = incarnation_root / "incarnation-home.json"
+    if incarnation_root.exists():
+        if existing_marker.is_symlink() or not existing_marker.is_file():
+            raise IncarnationHomeError(
+                "existing incarnation home lacks an ownership marker"
+            )
+        existing = _load_json(existing_marker, "existing incarnation-home manifest")
+        if existing.get("ambient_codex_home") != str(ambient_home):
+            raise IncarnationHomeError(
+                "incarnation home is owned by another ambient Codex home"
+            )
+        if existing.get("ambient_home_identity") not in {None, ambient_identity}:
+            raise IncarnationHomeError("incarnation ambient-home identity drift")
+        if existing.get("codex_home") != str(codex_home):
+            raise IncarnationHomeError("incarnation home coordinate drift")
     incarnation_root.mkdir(mode=0o700, exist_ok=True)
     codex_home.mkdir(mode=0o700, exist_ok=True)
     if incarnation_root.is_symlink() or codex_home.is_symlink():
@@ -229,6 +302,7 @@ def prepare_home(
         "reasoning_effort": effort,
         "runtime_version": runtime_version,
         "ambient_codex_home": str(ambient_home),
+        "ambient_home_identity": ambient_identity,
         "runtime_root": str(runtime_root),
         "codex_home": str(codex_home),
         "config_digest": sha256_bytes(config),
@@ -258,17 +332,21 @@ def _load_manifest(path: Path) -> dict[str, Any]:
         raise IncarnationHomeError("incarnation Codex config drift")
     if codex_home == ambient_home:
         raise IncarnationHomeError("incarnation and ambient Codex homes must be distinct")
+    if manifest.get("ambient_home_identity") != _ambient_home_identity(ambient_home):
+        raise IncarnationHomeError("ambient Codex home identity drift")
     runtime_root = _absolute_directory(
         Path(str(manifest.get("runtime_root"))), "runtime root"
     )
     try:
-        _, model_slug, effort, runtime_version, fingerprint = _realization(
+        realization, model_slug, effort, runtime_version, fingerprint = _realization(
             Path(str(manifest.get("model_realization_ref")))
         )
     except IncarnationHomeError:
         raise
     if (
         manifest.get("configuration_fingerprint") != fingerprint
+        or manifest.get("model_realization_id")
+        != realization.get("model_realization_id")
         or manifest.get("model_slug") != model_slug
         or manifest.get("reasoning_effort") != effort
         or manifest.get("runtime_version") != runtime_version
@@ -286,6 +364,8 @@ def _load_manifest(path: Path) -> dict[str, Any]:
     if (
         scoped_config.get("model") != model_slug
         or scoped_config.get("model_reasoning_effort") != effort
+        or not isinstance(scoped_config.get("features"), dict)
+        or scoped_config["features"].get("multi_agent") is not False
     ):
         raise IncarnationHomeError("scoped Codex config binding drift")
     return manifest
