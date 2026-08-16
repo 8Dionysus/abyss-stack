@@ -36,7 +36,7 @@ jobs:
         run: |
           git init "$RUNNER_TEMP/aoa-agents-source"
           git -C "$RUNNER_TEMP/aoa-agents-source" remote add origin https://github.com/8Dionysus/aoa-agents
-          git -C "$RUNNER_TEMP/aoa-agents-source" fetch --depth 1 origin f6656abf1780d9b27133ed39d03a2c9ff11dfd5e
+          git -C "$RUNNER_TEMP/aoa-agents-source" fetch --depth 1 origin 4be21e25258128d36db80ce08b9f648495f22d0e
           git -C "$RUNNER_TEMP/aoa-agents-source" checkout --detach FETCH_HEAD
 
       - name: Checkout canonical aoa-skills outside the source tree

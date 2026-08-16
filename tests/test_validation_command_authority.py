@@ -93,7 +93,7 @@ def test_workflow_routes_reusable_commands_through_ci_gate() -> None:
     ) in workflow
     assert (
         "git -C \"$RUNNER_TEMP/aoa-agents-source\" fetch --depth 1 origin "
-        "f6656abf1780d9b27133ed39d03a2c9ff11dfd5e"
+        "4be21e25258128d36db80ce08b9f648495f22d0e"
     ) in workflow
     assert (
         "git -C \"$RUNNER_TEMP/aoa-skills-source\" fetch --depth 1 origin "
