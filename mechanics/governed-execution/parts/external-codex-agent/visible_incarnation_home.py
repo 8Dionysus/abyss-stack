@@ -606,6 +606,16 @@ def _write_atomic_json(
             os.replace(temporary_path, path)
         else:
             os.link(temporary_path, path)
+        directory_flags = os.O_RDONLY
+        if hasattr(os, "O_DIRECTORY"):
+            directory_flags |= os.O_DIRECTORY
+        if hasattr(os, "O_NOFOLLOW"):
+            directory_flags |= os.O_NOFOLLOW
+        directory_fd = os.open(parent, directory_flags)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
     except FileExistsError as exc:
         raise IncarnationHomeError(f"{label} already exists: {path}") from exc
     except OSError as exc:
@@ -1567,6 +1577,10 @@ def _open_verified_executable(
     fd: int | None = None
     try:
         fd = os.open(executable, flags)
+        # A shebang exec reopens the script through /proc/self/fd/<fd>; Python
+        # creates descriptors non-inheritable by default, so make this exact
+        # inode descriptor survive the interpreter transition.
+        os.set_inheritable(fd, True)
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode):
             raise IncarnationHomeError(

@@ -549,10 +549,12 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     original_executable.chmod(0o700)
 
     def fake_exec(path: str, argv: list[str], environment: dict[str, str]) -> None:
+        executable_fd = int(path.rsplit("/", 1)[-1])
         captured.update(
             path=path,
             argv=argv,
             environment=environment,
+            executable_inheritable=os.get_inheritable(executable_fd),
             inode_content=Path(path).read_bytes(),
         )
 
@@ -616,6 +618,7 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert receipt["runtime"]["reasoning_effort"] == "max"
     assert captured["environment"]["CODEX_HOME"] == str(ambient)
     assert str(captured["path"]).startswith("/proc/self/fd/")
+    assert captured["executable_inheritable"] is True
     assert captured["inode_content"] == original_content
     assert executable.read_text(encoding="utf-8") == "replacement"
 
@@ -623,6 +626,26 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     executable.chmod(0o700)
     with pytest.raises(MODULE.IncarnationHomeError, match="already exists"):
         MODULE.command_launch(args)
+
+
+def test_atomic_json_fsyncs_publication_directory(tmp_path: Path) -> None:
+    path = tmp_path / "receipt.json"
+    fsync_targets: list[str] = []
+    original_fsync = os.fsync
+
+    def recording_fsync(fd: int) -> None:
+        fsync_targets.append(os.readlink(f"/proc/self/fd/{fd}"))
+        original_fsync(fd)
+
+    original_module_fsync = MODULE.os.fsync
+    MODULE.os.fsync = recording_fsync
+    try:
+        MODULE._write_new_json(path, {"ok": True}, "test receipt")
+    finally:
+        MODULE.os.fsync = original_module_fsync
+
+    assert str(tmp_path) in fsync_targets
+    assert json.loads(path.read_text(encoding="utf-8")) == {"ok": True}
 
 
 def test_holder_terminal_binds_first_kitty_ancestor_through_wrapper(

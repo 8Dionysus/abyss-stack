@@ -37,8 +37,10 @@ The controller:
   binds the kernel boot ID alongside each process start tick. The closer publishes a
   recoverable sidecar reservation before signaling. The sidecar records the
   signal attempt before TERM and recovery never repeats an existing attempt;
-  state and final receipts are atomically published, and replay of an
-  unclosed receipt remains failed. Direct launch retains the verified
+  state and final receipts are atomically published with their containing
+  directory fsynced before lifecycle progress, and replay of an unclosed
+  receipt remains failed. Direct shebang launch retains an inheritable verified
+  descriptor across the interpreter exec, so it retains the verified
   executable inode rather than reopening its pathname. A naturally exited
   exact pair is recorded as `already_gone` without marker reconstruction.
   This identity is

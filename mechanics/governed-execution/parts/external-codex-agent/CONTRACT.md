@@ -139,8 +139,12 @@ first `TERM`; each state transition is an atomic replacement under a separate
 stable lock inode, recovery rechecks the completed receipt after lock
 acquisition, and never sends a second `TERM` for an existing attempt. The
 final receipt is also published as one complete non-replacing file, and a
-completed `closed: false` receipt remains a failure on replay. The launcher
-retains the verified executable inode through direct exec rather than
+completed `closed: false` receipt remains a failure on replay. Every atomic
+publication fsyncs both the complete file and its containing directory before
+lifecycle code can proceed, so recovery sees the reservation/attempt entry
+rather than a merely cached directory update. Direct shebang launch keeps the
+verified descriptor inheritable across the interpreter exec; the launcher
+therefore retains the verified executable inode through direct exec rather than
 reopening its pathname. It then sends `TERM` to the exact holder process
 through a pidfd opened after the final identity check; the receipt records that signal target
 separately from the terminal it observes. The non-replacing closure receipt
