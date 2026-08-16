@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 27757761,
+  "allowed_tracked_bytes": 35654217,
+  "approved_by": "repository-owner",
+  "base_ref": "ac41011c42731f5bf40e91f63978ab8d2f18a43c",
+  "changed_generated_bytes": 27757761,
+  "changed_generated_files": 309,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "443e0a202d254adfc5317340c895de311d694eaf5c26aaaa0c2588b14fe9bff4",
+  "reason": "Regenerate exact PR #388 consumer portable family under the repository CI merge-base for recoverable signal-attempt state and concurrent close idempotence; digest-bound, no standing budget raise.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35654217,
+  "tracked_bytes_max": 24117248
+}
