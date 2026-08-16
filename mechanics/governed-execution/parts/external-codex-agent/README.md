@@ -37,8 +37,11 @@ The controller:
   binds the kernel boot ID alongside each process start tick. The closer publishes a
   recoverable sidecar reservation before signaling. The sidecar records the
   signal attempt before TERM and recovery never repeats an existing attempt;
-  a naturally exited exact pair is recorded as `already_gone` without marker
-  reconstruction. This identity is
+  state and final receipts are atomically published, and replay of an
+  unclosed receipt remains failed. Direct launch retains the verified
+  executable inode rather than reopening its pathname. A naturally exited
+  exact pair is recorded as `already_gone` without marker reconstruction.
+  This identity is
   distinct from any nested proof actor. This operator surface is not A2A transport and
   does not replace the governed JSONL runtime;
 - requires every task to preserve the complete runtime-wide forbidden-effect

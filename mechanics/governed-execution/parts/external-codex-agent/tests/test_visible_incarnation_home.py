@@ -543,8 +543,32 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     receipt_path = tmp_path / "holder.json"
     captured: dict[str, object] = {}
 
+    original_content = executable.read_bytes()
+    original_executable = tmp_path / "original-codex"
+    original_executable.write_bytes(original_content)
+    original_executable.chmod(0o700)
+
     def fake_exec(path: str, argv: list[str], environment: dict[str, str]) -> None:
-        captured.update(path=path, argv=argv, environment=environment)
+        captured.update(
+            path=path,
+            argv=argv,
+            environment=environment,
+            inode_content=Path(path).read_bytes(),
+        )
+
+    original_holder_receipt = MODULE._holder_receipt
+
+    def replace_command_path_after_receipt(**kwargs: object) -> dict[str, object]:
+        receipt = original_holder_receipt(**kwargs)
+        replacement = tmp_path / "replacement-codex"
+        replacement.write_text("replacement", encoding="utf-8")
+        replacement.chmod(0o700)
+        os.replace(replacement, executable)
+        return receipt
+
+    monkeypatch.setattr(
+        MODULE, "_holder_receipt", replace_command_path_after_receipt
+    )
 
     terminal_pid = os.getppid()
     terminal_argv = ["/usr/bin/kitty", "--detach", "--title", "test-holder"]
@@ -560,7 +584,7 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
         lambda _pid: {"KITTY_PID": str(terminal_pid), "KITTY_WINDOW_ID": "1"},
     )
     monkeypatch.setattr(MODULE, "_proc_children", lambda _pid: [os.getpid()])
-    monkeypatch.setattr(MODULE.os, "execvpe", fake_exec)
+    monkeypatch.setattr(MODULE.os, "execve", fake_exec)
     args = MODULE.argparse.Namespace(
         holder_receipt=str(receipt_path),
         terminal_title=None,
@@ -580,7 +604,7 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert receipt["holder"]["start_ticks"] == MODULE._proc_start_ticks(os.getpid())
     assert receipt["holder"]["parent_pid"] == os.getppid()
     assert receipt["holder"]["argv"] == MODULE._post_exec_argv(
-        executable, captured["argv"]
+        original_executable, captured["argv"]
     )
     assert receipt["terminal"]["binding"] == "kitty_ancestor_at_exec"
     assert receipt["terminal"]["pid"] == terminal_pid
@@ -591,7 +615,12 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert receipt["runtime"]["model"] == "gpt-5.6-luna"
     assert receipt["runtime"]["reasoning_effort"] == "max"
     assert captured["environment"]["CODEX_HOME"] == str(ambient)
+    assert str(captured["path"]).startswith("/proc/self/fd/")
+    assert captured["inode_content"] == original_content
+    assert executable.read_text(encoding="utf-8") == "replacement"
 
+    executable.write_bytes(original_content)
+    executable.chmod(0o700)
     with pytest.raises(MODULE.IncarnationHomeError, match="already exists"):
         MODULE.command_launch(args)
 
@@ -865,6 +894,7 @@ def test_closure_reservation_reopens_after_interrupted_attempt(tmp_path: Path) -
     reservation = json.loads(reservation_path.read_text(encoding="utf-8"))
     assert reservation["holder_pid"] == 101
     assert reservation["terminal_pid"] == 202
+    assert MODULE._closure_reservation_lock_path(closure).is_file()
 
     retry_fd, retry_path, completed = MODULE._reserve_closure_receipt(
         closure_receipt_path=closure,
@@ -938,6 +968,66 @@ def test_closure_reservation_rechecks_completed_receipt_after_lock(
     finally:
         MODULE.fcntl.flock(retry_fd, MODULE.fcntl.LOCK_UN)
         os.close(retry_fd)
+
+
+def test_completed_unclosed_receipt_preserves_failure_status(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    handoff = tmp_path / "handoff.json"
+    holder = tmp_path / "holder.json"
+    wake = tmp_path / "wake.json"
+    closure = tmp_path / "closure.json"
+    for path in (handoff, holder, wake):
+        path.write_text("{}", encoding="utf-8")
+
+    reservation_fd, reservation_path, completed = MODULE._reserve_closure_receipt(
+        closure_receipt_path=closure,
+        handoff_path=handoff,
+        holder_receipt_path=holder,
+        wake_receipt_path=wake,
+        holder_pid=101,
+        terminal_pid=202,
+    )
+    assert completed is None
+    MODULE.fcntl.flock(reservation_fd, MODULE.fcntl.LOCK_UN)
+    os.close(reservation_fd)
+    closure.write_text(
+        json.dumps(
+            {
+                "reservation_ref": str(reservation_path.resolve()),
+                "holder": {"pid": 101},
+                "terminal": {"pid": 202},
+                "closed": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_load_holder_receipt",
+        lambda _path: {
+            "holder": {"pid": 101},
+            "terminal": {
+                "pid": 202,
+                "argv": ["/usr/bin/kitty"],
+                "required_comm": "kitty",
+            },
+        },
+    )
+    monkeypatch.setattr(MODULE, "_validate_wake_delivery", lambda **_kwargs: {})
+    monkeypatch.setattr(
+        MODULE, "_holder_receipt_process_ids", lambda _receipt: (101, 11, 202, 12)
+    )
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="unclosed"):
+        MODULE.command_close(
+            MODULE.argparse.Namespace(
+                handoff=str(handoff),
+                holder_receipt=str(holder),
+                wake_receipt=str(wake),
+                closure_receipt=str(closure),
+            )
+        )
 
 
 def test_interrupted_signal_attempt_is_not_retried(
@@ -1024,8 +1114,8 @@ def test_interrupted_signal_attempt_is_not_retried(
         terminal_pid=holder_payload["terminal"]["pid"],
     )
     assert completed is None
-    reservation = MODULE._read_locked_json(
-        reservation_fd, "terminal closure reservation"
+    reservation = MODULE._load_json(
+        reservation_path, "terminal closure reservation"
     )
     reservation.update(
         {
@@ -1037,8 +1127,8 @@ def test_interrupted_signal_attempt_is_not_retried(
             "signal_sent": False,
         }
     )
-    MODULE._write_locked_json(
-        reservation_fd, reservation, "terminal closure reservation"
+    MODULE._write_reservation_json(
+        reservation_path, reservation, "terminal closure reservation"
     )
     MODULE.fcntl.flock(reservation_fd, MODULE.fcntl.LOCK_UN)
     os.close(reservation_fd)

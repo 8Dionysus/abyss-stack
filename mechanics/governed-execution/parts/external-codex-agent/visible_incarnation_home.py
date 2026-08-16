@@ -18,6 +18,7 @@ import re
 import shlex
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -440,14 +441,20 @@ def _proc_children(pid: int) -> list[int]:
 
 
 def _post_exec_argv(
-    executable: Path, argv: Sequence[str], *, path: str | None = None
+    executable: Path,
+    argv: Sequence[str],
+    *,
+    path: str | None = None,
+    executable_bytes: bytes | None = None,
 ) -> list[str]:
     """Derive Linux's post-exec argv for ELF and shebang-backed commands."""
 
     if not argv:
         raise IncarnationHomeError("holder argv must not be empty")
     try:
-        first_line = executable.read_bytes().splitlines(keepends=True)[0]
+        first_line = (
+            executable_bytes if executable_bytes is not None else executable.read_bytes()
+        ).splitlines(keepends=True)[0]
     except (IndexError, OSError) as exc:
         raise IncarnationHomeError("Codex executable could not be inspected") from exc
     if not first_line.startswith(b"#!"):
@@ -568,25 +575,37 @@ def _send_verified_term(pid: int, start_ticks: int) -> bool:
         os.close(pidfd)
 
 
-def _write_new_json(path: Path, value: dict[str, Any], label: str) -> None:
+def _write_atomic_json(
+    path: Path,
+    value: dict[str, Any],
+    label: str,
+    *,
+    replace: bool,
+) -> None:
     if not path.is_absolute() or path.is_symlink():
         raise IncarnationHomeError(f"{label} must be an absolute non-symlink path: {path}")
     parent = path.parent
     if parent.is_symlink() or not parent.is_dir():
         raise IncarnationHomeError(f"{label} parent must be a real directory: {parent}")
     payload = canonical_bytes(value) + b"\n"
-    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
     fd: int | None = None
+    temporary_path: Path | None = None
     try:
-        fd = os.open(path, flags, 0o600)
-        with os.fdopen(fd, "wb") as handle:
-            fd = None
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
-        path.chmod(0o600)
+        fd, temporary_name = tempfile.mkstemp(prefix=path.name + ".tmp.", dir=str(parent))
+        temporary_path = Path(temporary_name)
+        os.fchmod(fd, 0o600)
+        view = memoryview(payload)
+        while view:
+            view = view[os.write(fd, view) :]
+        os.fsync(fd)
+        if replace:
+            if path.is_symlink():
+                raise IncarnationHomeError(
+                    f"{label} became a symlink before publication: {path}"
+                )
+            os.replace(temporary_path, path)
+        else:
+            os.link(temporary_path, path)
     except FileExistsError as exc:
         raise IncarnationHomeError(f"{label} already exists: {path}") from exc
     except OSError as exc:
@@ -594,35 +613,26 @@ def _write_new_json(path: Path, value: dict[str, Any], label: str) -> None:
     finally:
         if fd is not None:
             os.close(fd)
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+
+def _write_new_json(path: Path, value: dict[str, Any], label: str) -> None:
+    _write_atomic_json(path, value, label, replace=False)
+
+
+def _write_reservation_json(
+    path: Path, value: dict[str, Any], label: str
+) -> None:
+    _write_atomic_json(path, value, label, replace=True)
 
 
 def _closure_reservation_path(path: Path) -> Path:
     return path.with_name(path.name + ".reservation.json")
 
 
-def _read_locked_json(fd: int, label: str) -> dict[str, Any]:
-    try:
-        os.lseek(fd, 0, os.SEEK_SET)
-        payload = os.read(fd, 1 << 20)
-        value = json.loads(payload.decode("utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise IncarnationHomeError(f"cannot read {label}") from exc
-    if not isinstance(value, dict):
-        raise IncarnationHomeError(f"{label} must be a JSON object")
-    return value
-
-
-def _write_locked_json(fd: int, value: dict[str, Any], label: str) -> None:
-    payload = canonical_bytes(value) + b"\n"
-    try:
-        os.ftruncate(fd, 0)
-        os.lseek(fd, 0, os.SEEK_SET)
-        view = memoryview(payload)
-        while view:
-            view = view[os.write(fd, view) :]
-        os.fsync(fd)
-    except OSError as exc:
-        raise IncarnationHomeError(f"cannot update {label}") from exc
+def _closure_reservation_lock_path(path: Path) -> Path:
+    return path.with_name(path.name + ".lock")
 
 
 def _reserve_closure_receipt(
@@ -674,44 +684,28 @@ def _reserve_closure_receipt(
         "holder_pid": holder_pid,
         "terminal_pid": terminal_pid,
     }
-    reservation_fd: int | None = None
-    temporary_fd = -1
-    temporary_path: Path | None = None
-    try:
-        # Publish a complete sidecar atomically.  A process death between
-        # path creation and JSON publication must not expose an empty file to
-        # a concurrent retry: the next closer either opens the complete
-        # reservation or creates its own complete candidate.
-        temporary_fd, temporary_name = tempfile.mkstemp(
-            prefix=reservation_path.name + ".tmp.", dir=str(parent)
+    lock_path = _closure_reservation_lock_path(closure_receipt_path)
+    if lock_path.is_symlink():
+        raise IncarnationHomeError(
+            f"terminal closure reservation lock may not be a symlink: {lock_path}"
         )
-        temporary_path = Path(temporary_name)
-        payload = canonical_bytes({**expected, "reserved_at": _utc_now()}) + b"\n"
-        view = memoryview(payload)
-        while view:
-            view = view[os.write(temporary_fd, view) :]
-        os.fsync(temporary_fd)
-        fcntl.flock(temporary_fd, fcntl.LOCK_EX)
-        try:
-            os.link(temporary_path, reservation_path)
-        except FileExistsError:
-            fcntl.flock(temporary_fd, fcntl.LOCK_UN)
-            os.close(temporary_fd)
-            temporary_fd = -1
-            temporary_path.unlink(missing_ok=True)
-            reservation_fd = os.open(
+    lock_fd: int | None = None
+    try:
+        lock_flags = os.O_CREAT | os.O_RDWR
+        if hasattr(os, "O_NOFOLLOW"):
+            lock_flags |= os.O_NOFOLLOW
+        lock_fd = os.open(lock_path, lock_flags, 0o600)
+        os.fchmod(lock_fd, 0o600)
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        if not reservation_path.exists():
+            _write_new_json(
                 reservation_path,
-                os.O_RDWR
-                | (os.O_NOFOLLOW if hasattr(os, "O_NOFOLLOW") else 0),
+                {**expected, "reserved_at": _utc_now()},
+                "terminal closure reservation",
             )
-            fcntl.flock(reservation_fd, fcntl.LOCK_EX)
-        else:
-            temporary_path.unlink(missing_ok=True)
-            temporary_path = None
-            reservation_fd = temporary_fd
-            temporary_fd = -1
-        fcntl.flock(reservation_fd, fcntl.LOCK_EX)
-        recorded = _read_locked_json(reservation_fd, "terminal closure reservation")
+        recorded = _load_json(
+            reservation_path, "terminal closure reservation"
+        )
         if any(recorded.get(key) != value for key, value in expected.items()):
             raise IncarnationHomeError("terminal closure reservation identity mismatch")
         completed: dict[str, Any] | None = None
@@ -731,15 +725,11 @@ def _reserve_closure_receipt(
                 raise IncarnationHomeError(
                     "completed terminal closure terminal identity mismatch"
                 )
-        return reservation_fd, reservation_path, completed
+        return lock_fd, reservation_path, completed
     except BaseException:
-        if reservation_fd is not None:
-            fcntl.flock(reservation_fd, fcntl.LOCK_UN)
-            os.close(reservation_fd)
-        if temporary_path is not None:
-            temporary_path.unlink(missing_ok=True)
-        if temporary_fd >= 0:
-            os.close(temporary_fd)
+        if lock_fd is not None:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            os.close(lock_fd)
         raise
 
 
@@ -750,6 +740,8 @@ def _holder_receipt(
     manifest: dict[str, Any],
     executable: Path,
     argv: Sequence[str],
+    executable_bytes: bytes | None = None,
+    executable_digest: str | None = None,
 ) -> dict[str, Any]:
     holder_pid = os.getpid()
     holder_parent_pid = os.getppid()
@@ -763,10 +755,14 @@ def _holder_receipt(
         terminal_argv=terminal_argv,
     )
     post_exec_argv = _post_exec_argv(
-        executable, argv, path=os.environ.get("PATH")
+        executable,
+        argv,
+        path=os.environ.get("PATH"),
+        executable_bytes=executable_bytes,
     )
     try:
-        executable_digest = sha256_bytes(executable.read_bytes())
+        if executable_digest is None:
+            executable_digest = sha256_bytes(executable.read_bytes())
         manifest_digest = sha256_bytes(manifest_path.read_bytes())
     except OSError as exc:
         raise IncarnationHomeError("holder identity inputs could not be hashed") from exc
@@ -1048,8 +1044,8 @@ def command_close(args: argparse.Namespace) -> int:
         terminal_pid=kitty_pid,
     )
     try:
-        reservation = _read_locked_json(
-            reservation_fd, "terminal closure reservation"
+        reservation = _load_json(
+            reservation_path, "terminal closure reservation"
         )
     except BaseException:
         fcntl.flock(reservation_fd, fcntl.LOCK_UN)
@@ -1057,6 +1053,10 @@ def command_close(args: argparse.Namespace) -> int:
         raise
     if completed is not None:
         try:
+            if completed.get("closed") is not True:
+                raise IncarnationHomeError(
+                    "terminal closure receipt records an unclosed close attempt"
+                )
             print(json.dumps(completed, ensure_ascii=False, sort_keys=True))
         finally:
             fcntl.flock(reservation_fd, fcntl.LOCK_UN)
@@ -1140,8 +1140,8 @@ def command_close(args: argparse.Namespace) -> int:
                     # This state transition is durable and locked before the
                     # destructive syscall.  A closer that dies after TERM
                     # cannot be mistaken for a never-attempted retry.
-                    _write_locked_json(
-                        reservation_fd,
+                    _write_reservation_json(
+                        reservation_path,
                         reservation,
                         "terminal closure reservation",
                     )
@@ -1159,8 +1159,8 @@ def command_close(args: argparse.Namespace) -> int:
                             "signal_sent": False,
                             "signal_observed_at": _utc_now(),
                         }
-                        _write_locked_json(
-                            reservation_fd,
+                        _write_reservation_json(
+                            reservation_path,
                             reservation,
                             "terminal closure reservation",
                         )
@@ -1187,8 +1187,8 @@ def command_close(args: argparse.Namespace) -> int:
                             "signal_sent": signal_sent,
                             "signal_observed_at": _utc_now(),
                         }
-                        _write_locked_json(
-                            reservation_fd,
+                        _write_reservation_json(
+                            reservation_path,
                             reservation,
                             "terminal closure reservation",
                         )
@@ -1558,7 +1558,55 @@ def _resolved_executable(codex_executable: Path) -> Path:
     return executable
 
 
-def _verify_executable_version(executable: Path, runtime_version: str) -> None:
+def _open_verified_executable(
+    executable: Path,
+) -> tuple[int, Path, bytes, str]:
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd: int | None = None
+    try:
+        fd = os.open(executable, flags)
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode):
+            raise IncarnationHomeError(
+                f"Codex executable is not a regular file: {executable}"
+            )
+        os.lseek(fd, 0, os.SEEK_SET)
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(fd, 1 << 20)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        os.lseek(fd, 0, os.SEEK_SET)
+        content = b"".join(chunks)
+        return fd, Path(f"/proc/self/fd/{fd}"), content, sha256_bytes(content)
+    except IncarnationHomeError:
+        if fd is not None:
+            os.close(fd)
+        raise
+    except OSError as exc:
+        if fd is not None:
+            os.close(fd)
+        raise IncarnationHomeError(
+            f"Codex executable could not be opened for inode-bound exec: {executable}"
+        ) from exc
+
+
+def _inode_exec_argv(
+    *, executable_bytes: bytes, executable_fd_path: Path, argv: Sequence[str]
+) -> list[str]:
+    if not argv:
+        raise IncarnationHomeError("Codex executable argv must not be empty")
+    if executable_bytes.startswith(b"#!"):
+        return [str(executable_fd_path), *argv[1:]]
+    return list(argv)
+
+
+def _verify_executable_version(
+    executable: Path, runtime_version: str, *, pass_fds: Sequence[int] = ()
+) -> None:
     expected = "codex-cli " + runtime_version
     try:
         completed = subprocess.run(
@@ -1567,6 +1615,7 @@ def _verify_executable_version(executable: Path, runtime_version: str) -> None:
             capture_output=True,
             text=True,
             timeout=30,
+            pass_fds=tuple(pass_fds),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise IncarnationHomeError("Codex executable version probe failed") from exc
@@ -1578,17 +1627,23 @@ def _verify_executable_version(executable: Path, runtime_version: str) -> None:
 
 
 def _write_codex_identity_shim(
-    *, command: Path, executable: Path, codex_home: Path
+    *,
+    command: Path,
+    executable: Path,
+    codex_home: Path,
+    executable_digest: str | None = None,
 ) -> Path:
     """Make descendant PATH resolve through a digest-checking command shim."""
 
     shim = codex_home / DESCENDANT_BIN_NAME / "codex"
-    try:
-        expected_digest = hashlib.sha256(executable.read_bytes()).hexdigest()
-    except OSError as exc:
-        raise IncarnationHomeError(
-            "Codex executable could not be hashed for descendant binding"
-        ) from exc
+    if executable_digest is None:
+        try:
+            executable_digest = hashlib.sha256(executable.read_bytes()).hexdigest()
+        except OSError as exc:
+            raise IncarnationHomeError(
+                "Codex executable could not be hashed for descendant binding"
+            ) from exc
+    expected_digest = executable_digest.removeprefix("sha256:")
     command_literal = shlex.quote(str(command))
     content = (
         "#!/bin/sh\n"
@@ -1639,7 +1694,12 @@ def _reject_binding_overrides(arguments: Sequence[str]) -> None:
 
 
 def bound_codex_argv(
-    *, codex_executable: Path, manifest: dict[str, Any], arguments: Sequence[str]
+    *,
+    codex_executable: Path,
+    manifest: dict[str, Any],
+    arguments: Sequence[str],
+    resolved_executable: Path | None = None,
+    executable_digest: str | None = None,
 ) -> list[str]:
     if not codex_executable.is_absolute() or codex_executable.name != "codex":
         raise IncarnationHomeError(
@@ -1651,13 +1711,14 @@ def bound_codex_argv(
         raise IncarnationHomeError(
             f"Codex executable parent cannot be resolved: {codex_executable}"
         ) from exc
-    executable = _resolved_executable(command)
+    executable = resolved_executable or _resolved_executable(command)
     _reject_binding_overrides(arguments)
     codex_home = str(manifest["codex_home"])
     shim = _write_codex_identity_shim(
         command=command,
         executable=executable,
         codex_home=Path(codex_home),
+        executable_digest=executable_digest,
     )
     descendant_path = os.pathsep.join(
         (str(shim.parent), "/usr/local/bin", "/usr/bin", "/bin")
@@ -1700,31 +1761,57 @@ def command_launch(args: argparse.Namespace) -> int:
     manifest_path = _regular_file(Path(args.manifest), "incarnation-home manifest")
     command = Path(args.codex_executable)
     executable = _resolved_executable(command)
-    _verify_executable_version(executable, str(manifest["runtime_version"]))
-    argv = bound_codex_argv(
-        codex_executable=command,
-        manifest=manifest,
-        arguments=args.codex_arguments,
-    )
     environment = dict(os.environ)
     environment["CODEX_HOME"] = str(manifest["ambient_codex_home"])
     if args.terminal_title:
+        _verify_executable_version(executable, str(manifest["runtime_version"]))
+        argv = bound_codex_argv(
+            codex_executable=command,
+            manifest=manifest,
+            arguments=args.codex_arguments,
+            resolved_executable=executable,
+        )
         completed = subprocess.run(
             [args.kitty_executable, "--detach", "--title", args.terminal_title, *argv],
             check=False,
             env=environment,
         )
         return completed.returncode
-    if args.holder_receipt:
-        _holder_receipt(
-            receipt_path=Path(args.holder_receipt),
-            manifest_path=manifest_path,
+    executable_fd, executable_fd_path, executable_bytes, executable_digest = (
+        _open_verified_executable(executable)
+    )
+    try:
+        _verify_executable_version(
+            executable_fd_path,
+            str(manifest["runtime_version"]),
+            pass_fds=(executable_fd,),
+        )
+        argv = bound_codex_argv(
+            codex_executable=command,
             manifest=manifest,
-            executable=executable,
+            arguments=args.codex_arguments,
+            resolved_executable=executable,
+            executable_digest=executable_digest,
+        )
+        exec_argv = _inode_exec_argv(
+            executable_bytes=executable_bytes,
+            executable_fd_path=executable_fd_path,
             argv=argv,
         )
-    os.execvpe(argv[0], argv, environment)
-    return 127
+        if args.holder_receipt:
+            _holder_receipt(
+                receipt_path=Path(args.holder_receipt),
+                manifest_path=manifest_path,
+                manifest=manifest,
+                executable=executable,
+                argv=exec_argv,
+                executable_bytes=executable_bytes,
+                executable_digest=executable_digest,
+            )
+        os.execve(str(executable_fd_path), exec_argv, environment)
+        return 127
+    finally:
+        os.close(executable_fd)
 
 
 def parser() -> argparse.ArgumentParser:

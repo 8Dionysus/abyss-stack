@@ -135,10 +135,14 @@ kernel boot ID and PID/start-ticks/argv, its process-parent identity, the record
 and the dedicated Kitty process, reserves the closure receipt before
 signaling in a recoverable, atomically published sidecar reservation. The
 sidecar is locked and advanced to a durable signal-attempt state before the
-first `TERM`; recovery rechecks the completed receipt after lock acquisition
-and never sends a second `TERM` for an existing attempt. It then sends `TERM`
-to the exact holder process through a pidfd opened
-after the final identity check; the receipt records that signal target
+first `TERM`; each state transition is an atomic replacement under a separate
+stable lock inode, recovery rechecks the completed receipt after lock
+acquisition, and never sends a second `TERM` for an existing attempt. The
+final receipt is also published as one complete non-replacing file, and a
+completed `closed: false` receipt remains a failure on replay. The launcher
+retains the verified executable inode through direct exec rather than
+reopening its pathname. It then sends `TERM` to the exact holder process
+through a pidfd opened after the final identity check; the receipt records that signal target
 separately from the terminal it observes. The non-replacing closure receipt
 records the final Kitty disappearance
 independently and is written even when closure is unverified. If delivery is
