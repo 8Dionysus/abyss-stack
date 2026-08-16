@@ -116,8 +116,12 @@ Codex `exec`, it writes a non-replacing receipt containing the holder PID,
 process-parent PID/start ticks, the first Kitty ancestor PID/start ticks/argv,
 the detached Kitty window identity/dedication proof, and executable/manifest
 digests. The holder argv is the post-exec `/proc` shape, including the
-interpreter argv of a shebang-backed executable. This receipt is not a governed
-proof-actor result and must not be substituted with a nested actor's runtime
+interpreter argv of a shebang-backed executable. For that shebang route, an
+internal `payload-launch` helper runs as bubblewrap's payload, revalidates the
+manifest and private launcher digests, writes the receipt from its own PID
+immediately before `exec`, and then replaces itself with the private launcher;
+the bubblewrap monitor is retained only for snapshot cleanup and is bound to its
+parent lifetime. This receipt is not a governed proof-actor result and must not be substituted with a nested actor's runtime
 identity. The Kitty-ancestor binding covers the installed bubblewrap wrapper as
 well as a direct host exec while retaining one exact terminal identity; the
 holder environment must bind `KITTY_PID` and `KITTY_WINDOW_ID`, and no sibling

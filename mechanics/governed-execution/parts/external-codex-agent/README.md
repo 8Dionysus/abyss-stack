@@ -28,7 +28,10 @@ The controller:
   emit its own PID/start-ticks/post-exec-argv-bound lifecycle receipt immediately
   before `exec`, including the first detached Kitty ancestor, its window identity,
   and a no-sibling dedication proof across the installed bubblewrap wrapper;
-  the installed launcher can close that exact holder terminal only after a
+  for a shebang launcher, an internal payload handoff writes that receipt from
+  the exact bubblewrap payload PID immediately before replacing itself with the
+  private launcher; the bubblewrap monitor remains only the snapshot-cleanup
+  supervisor. The installed launcher can close that exact holder terminal only after a
   separate wake receipt binds the holder receipt and proves delivery. The
   produced handoff must bind both receipt paths under
   `runtime.responsibility_holder`, while the wake receipt binds the SHA-256 of
@@ -46,8 +49,10 @@ The controller:
   memfd; bubblewrap materializes those sealed bytes into the matching
   package-relative tree in a private `/var/tmp` tmpfs, applies the admitted
   modes, and remounts that tree read-only before both version probing and final
-  exec. This execution coordinate cannot be renamed or chmodded by the
-  same-UID holder. The mirror preserves the launcher's `$0`/module-relative
+  exec. With a holder receipt, the payload helper revalidates the manifest and
+  private launcher digests inside the namespace before writing the receipt;
+  bubblewrap also binds the payload lifetime to its parent. This execution
+  coordinate cannot be renamed or chmodded by the same-UID holder. The mirror preserves the launcher's `$0`/module-relative
   coordinate, including parent-relative paths such as `bin/` launchers
   resolving `../vendor`. Source-ancestor links are retained only outside the
   detected package boundary; the package subtree is copied without writing to

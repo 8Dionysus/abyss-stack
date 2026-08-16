@@ -2213,6 +2213,7 @@ def _snapshot_bwrap_prefix(snapshot_mount: dict[str, Any]) -> list[str]:
     namespace_root = snapshot_mount["namespace_root"]
     arguments = [
         os.fspath(bwrap),
+        "--die-with-parent",
         "--bind",
         "/",
         "/",
@@ -2637,6 +2638,54 @@ def command_prepare(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_payload_launch(args: argparse.Namespace) -> int:
+    """Bind the receipt to the exact process that owns the private payload."""
+
+    manifest_path = _regular_file(Path(args.manifest), "incarnation-home manifest")
+    manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(manifest_path)
+    if manifest_digest != args.manifest_digest:
+        raise IncarnationHomeError("payload launch manifest digest drifted")
+
+    payload_path = _regular_file(
+        Path(args.payload_executable), "private payload executable"
+    )
+    try:
+        payload_bytes = payload_path.read_bytes()
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"private payload executable could not be read: {payload_path}"
+        ) from exc
+    if sha256_bytes(payload_bytes) != args.executable_digest:
+        raise IncarnationHomeError("private payload executable digest drifted")
+
+    executable = Path(args.codex_executable)
+    if not executable.is_absolute() or executable.is_symlink():
+        raise IncarnationHomeError(
+            "payload launch Codex executable must be an absolute real path"
+        )
+    payload_argv = list(args.codex_arguments)
+    if not payload_argv or payload_argv[0] != str(payload_path):
+        raise IncarnationHomeError(
+            "payload launch argv is not bound to the private executable"
+        )
+    environment = dict(os.environ)
+    environment["CODEX_HOME"] = str(manifest["ambient_codex_home"])
+    if args.holder_receipt:
+        _holder_receipt(
+            receipt_path=Path(args.holder_receipt),
+            manifest_path=manifest_path,
+            manifest=manifest,
+            executable=executable,
+            argv=payload_argv,
+            executable_bytes=payload_bytes,
+            executable_digest=args.executable_digest,
+            manifest_bytes=manifest_bytes,
+            manifest_digest=manifest_digest,
+        )
+    os.execve(str(payload_path), payload_argv, environment)
+    return 127
+
+
 def command_launch(args: argparse.Namespace) -> int:
     if args.holder_receipt and args.terminal_title:
         raise IncarnationHomeError(
@@ -2718,7 +2767,7 @@ def command_launch(args: argparse.Namespace) -> int:
                 executable_fd_path=launch_path,
                 argv=argv,
             )
-        if args.holder_receipt:
+        if args.holder_receipt and executable_snapshot_mount is None:
             _holder_receipt(
                 receipt_path=Path(args.holder_receipt),
                 manifest_path=manifest_path,
@@ -2730,6 +2779,30 @@ def command_launch(args: argparse.Namespace) -> int:
                 manifest_bytes=manifest_bytes,
                 manifest_digest=manifest_digest,
             )
+        final_argv = launch_argv
+        if executable_snapshot_mount is not None and args.holder_receipt:
+            # The bwrap monitor is not the responsibility holder.  Its payload
+            # helper records its own PID immediately before replacing itself
+            # with the private shebang launcher.
+            final_argv = [
+                sys.executable,
+                str(Path(__file__).resolve()),
+                "payload-launch",
+                "--manifest",
+                str(manifest_path),
+                "--holder-receipt",
+                str(args.holder_receipt),
+                "--codex-executable",
+                str(executable),
+                "--payload-executable",
+                str(launch_path),
+                "--manifest-digest",
+                manifest_digest,
+                "--executable-digest",
+                executable_digest,
+                "--",
+                *launch_argv,
+            ]
         if executable_snapshot_dir is not None:
             _spawn_named_snapshot_cleanup(
                 snapshot_path=executable_snapshot_path,
@@ -2744,7 +2817,7 @@ def command_launch(args: argparse.Namespace) -> int:
             os.execve(str(executable_fd_path), launch_argv, environment)
         os.execve(
             snapshot_prefix[0],
-            [*snapshot_prefix, "--", *launch_argv],
+            [*snapshot_prefix, "--", *final_argv],
             environment,
         )
         return 127
@@ -2787,11 +2860,20 @@ def parser() -> argparse.ArgumentParser:
         "--holder-receipt",
         help=(
             "non-replacing receipt for this direct responsibility-holder process; "
-            "the receipt is written immediately before exec"
+            "the shebang payload writes it immediately before exec"
         ),
     )
     launch.add_argument("codex_arguments", nargs=argparse.REMAINDER)
     launch.set_defaults(handler=command_launch)
+    payload = subcommands.add_parser("payload-launch")
+    payload.add_argument("--manifest", required=True)
+    payload.add_argument("--holder-receipt")
+    payload.add_argument("--codex-executable", required=True)
+    payload.add_argument("--payload-executable", required=True)
+    payload.add_argument("--manifest-digest", required=True)
+    payload.add_argument("--executable-digest", required=True)
+    payload.add_argument("codex_arguments", nargs=argparse.REMAINDER)
+    payload.set_defaults(handler=command_payload_launch)
     close = subcommands.add_parser("close")
     close.add_argument("--holder-receipt", required=True)
     close.add_argument("--wake-receipt", required=True)
@@ -2803,10 +2885,15 @@ def parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parser().parse_args(argv)
-    if args.command == "launch" and args.codex_arguments[:1] == ["--"]:
+    if (
+        args.command in {"launch", "payload-launch"}
+        and args.codex_arguments[:1] == ["--"]
+    ):
         args.codex_arguments = args.codex_arguments[1:]
-    if args.command == "launch" and not args.codex_arguments:
-        raise IncarnationHomeError("launch requires Codex arguments after --")
+    if args.command in {"launch", "payload-launch"} and not args.codex_arguments:
+        raise IncarnationHomeError(
+            f"{args.command} requires Codex arguments after --"
+        )
     return int(args.handler(args))
 
 

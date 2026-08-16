@@ -6,6 +6,7 @@ import os
 import shutil
 import stat
 import subprocess
+import sys
 import tomllib
 from types import SimpleNamespace
 from pathlib import Path
@@ -553,7 +554,10 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     original_executable.chmod(0o700)
 
     def fake_exec(path: str, argv: list[str], environment: dict[str, str]) -> None:
-        inner_argv = argv[argv.index("--") + 1 :]
+        bwrap_inner_argv = argv[argv.index("--") + 1 :]
+        payload_separator = bwrap_inner_argv.index("--")
+        payload_argv = bwrap_inner_argv[:payload_separator]
+        inner_argv = bwrap_inner_argv[payload_separator + 1 :]
         launcher_file_index = next(
             index
             for index, value in enumerate(argv)
@@ -569,6 +573,7 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
         captured.update(
             path=path,
             argv=argv,
+            payload_argv=payload_argv,
             inner_argv=inner_argv,
             environment=environment,
             inode_content=os.read(launcher_fd, 1 << 20),
@@ -576,6 +581,17 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
         captured["snapshot_path"] = Path(inner_argv[0])
         captured["snapshot_mode"] = int(
             argv[launcher_mode_index + 1], 8
+        )
+        MODULE._holder_receipt(
+            receipt_path=receipt_path,
+            manifest_path=manifest_path,
+            manifest=manifest,
+            executable=executable,
+            argv=inner_argv,
+            executable_bytes=original_content,
+            executable_digest=MODULE.sha256_bytes(original_content),
+            manifest_bytes=manifest_snapshot,
+            manifest_digest=MODULE.sha256_bytes(manifest_snapshot),
         )
 
     original_holder_receipt = MODULE._holder_receipt
@@ -654,6 +670,14 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert receipt["runtime"]["reasoning_effort"] == "max"
     assert captured["environment"]["CODEX_HOME"] == str(ambient)
     assert captured["path"] == "/usr/bin/bwrap"
+    assert captured["payload_argv"][0] == sys.executable
+    assert captured["payload_argv"][1] == str(Path(MODULE.__file__).resolve())
+    assert captured["payload_argv"][2] == "payload-launch"
+    payload_executable_index = captured["payload_argv"].index(
+        "--payload-executable"
+    )
+    assert captured["payload_argv"][payload_executable_index + 1] == "/var/tmp/codex"
+    assert "--die-with-parent" in captured["argv"]
     assert captured["snapshot_path"] == Path("/var/tmp/codex")
     assert captured["inner_argv"][0] == "/var/tmp/codex"
     assert "--tmpfs" in captured["argv"]
@@ -680,6 +704,60 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     executable.chmod(0o700)
     with pytest.raises(MODULE.IncarnationHomeError, match="already exists"):
         MODULE.command_launch(args)
+
+
+def test_payload_launch_binds_receipt_to_payload_process(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    manifest_bytes = manifest_path.read_bytes()
+    payload = tmp_path / "private-codex"
+    payload_bytes = b"#!/bin/sh\nexit 0\n"
+    payload.write_bytes(payload_bytes)
+    payload.chmod(0o500)
+    receipt_path = tmp_path / "holder.json"
+    observed: dict[str, object] = {}
+
+    def fake_holder_receipt(**kwargs: object) -> dict[str, object]:
+        observed["pid"] = os.getpid()
+        observed.update(kwargs)
+        return {}
+
+    def fake_exec(path: str, argv: list[str], environment: dict[str, str]) -> None:
+        observed["exec"] = (path, argv, environment)
+
+    monkeypatch.setattr(MODULE, "_holder_receipt", fake_holder_receipt)
+    monkeypatch.setattr(MODULE.os, "execve", fake_exec)
+    args = MODULE.argparse.Namespace(
+        manifest=str(manifest_path),
+        holder_receipt=str(receipt_path),
+        codex_executable=str(tmp_path / "codex"),
+        payload_executable=str(payload),
+        manifest_digest=MODULE.sha256_bytes(manifest_bytes),
+        executable_digest=MODULE.sha256_bytes(payload_bytes),
+        codex_arguments=[str(payload), "exec", "--help"],
+    )
+
+    assert MODULE.command_payload_launch(args) == 127
+    assert observed["pid"] == os.getpid()
+    assert observed["executable"] == Path(args.codex_executable)
+    assert observed["argv"] == args.codex_arguments
+    assert observed["executable_bytes"] == payload_bytes
+    assert observed["executable_digest"] == args.executable_digest
+    exec_path, exec_argv, environment = observed["exec"]
+    assert exec_path == str(payload)
+    assert exec_argv == args.codex_arguments
+    assert environment["CODEX_HOME"] == str(ambient)
 
 
 def test_atomic_json_fsyncs_publication_directory(tmp_path: Path) -> None:
