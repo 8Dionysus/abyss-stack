@@ -866,6 +866,8 @@ def _validate_wake_delivery(
     holder_receipt_path: Path,
     closure_receipt_path: Path,
     holder_receipt: dict[str, Any],
+    holder_receipt_bytes: bytes | None = None,
+    holder_receipt_digest: str | None = None,
 ) -> dict[str, Any]:
     wake = _load_json(wake_receipt_path, "wake receipt")
     if wake.get("schema_version") != "task_local_actor_wake_receipt_v1":
@@ -904,11 +906,16 @@ def _validate_wake_delivery(
         raise IncarnationHomeError("handoff holder receipt identity mismatch")
     if responsibility_holder.get("closure_receipt") != closure_ref:
         raise IncarnationHomeError("handoff closure receipt identity mismatch")
-    try:
-        holder_digest = sha256_bytes(holder_receipt_path.read_bytes())
-    except OSError as exc:
-        raise IncarnationHomeError("holder receipt could not be hashed") from exc
-    if responsibility_holder.get("terminal_receipt_sha256") != holder_digest:
+    if holder_receipt_digest is None:
+        try:
+            holder_receipt_digest = sha256_bytes(
+                holder_receipt_bytes
+                if holder_receipt_bytes is not None
+                else holder_receipt_path.read_bytes()
+            )
+        except OSError as exc:
+            raise IncarnationHomeError("holder receipt could not be hashed") from exc
+    if responsibility_holder.get("terminal_receipt_sha256") != holder_receipt_digest:
         raise IncarnationHomeError("handoff holder receipt digest mismatch")
     if responsibility_holder.get("holder_pid") != holder_receipt["holder"].get("pid"):
         raise IncarnationHomeError("handoff responsibility-holder PID mismatch")
@@ -917,8 +924,10 @@ def _validate_wake_delivery(
     return wake
 
 
-def _load_holder_receipt(path: Path) -> dict[str, Any]:
-    receipt = _load_json(path, "holder terminal receipt")
+def _load_holder_receipt_snapshot(
+    path: Path,
+) -> tuple[dict[str, Any], bytes, str]:
+    receipt, raw = _load_json_snapshot(path, "holder terminal receipt")
     if receipt.get("schema_version") != HOLDER_RECEIPT_SCHEMA_VERSION:
         raise IncarnationHomeError("unsupported holder terminal receipt schema")
     if receipt.get("receipt_ref") != str(path.resolve()):
@@ -966,7 +975,11 @@ def _load_holder_receipt(path: Path) -> dict[str, Any]:
         or not all(isinstance(item, str) for item in holder["argv"])
     ):
         raise IncarnationHomeError("holder terminal receipt is incomplete")
-    return receipt
+    return receipt, raw, sha256_bytes(raw)
+
+
+def _load_holder_receipt(path: Path) -> dict[str, Any]:
+    return _load_holder_receipt_snapshot(path)[0]
 
 
 def _holder_receipt_process_ids(
@@ -1074,13 +1087,17 @@ def command_close(args: argparse.Namespace) -> int:
         Path(args.holder_receipt), "holder terminal receipt"
     )
     closure_receipt_path = Path(args.closure_receipt)
-    receipt = _load_holder_receipt(holder_receipt_path)
+    receipt, holder_receipt_bytes, holder_receipt_digest = (
+        _load_holder_receipt_snapshot(holder_receipt_path)
+    )
     _validate_wake_delivery(
         wake_receipt_path=Path(args.wake_receipt),
         handoff_path=handoff_path,
         holder_receipt_path=holder_receipt_path,
         closure_receipt_path=closure_receipt_path,
         holder_receipt=receipt,
+        holder_receipt_bytes=holder_receipt_bytes,
+        holder_receipt_digest=holder_receipt_digest,
     )
     holder_pid, holder_start_ticks, kitty_pid, kitty_start_ticks = (
         _holder_receipt_process_ids(receipt)
@@ -1254,6 +1271,17 @@ def command_close(args: argparse.Namespace) -> int:
                         )
                         kitty_gone = kitty_state == "gone"
                         holder_gone = holder_state == "gone"
+                        if kitty_gone or holder_gone:
+                            holder_state, kitty_state = _wait_for_natural_pair_exit(
+                                holder_pid=holder_pid,
+                                holder_start_ticks=holder_start_ticks,
+                                kitty_pid=kitty_pid,
+                                kitty_start_ticks=kitty_start_ticks,
+                                holder_state=holder_state,
+                                kitty_state=kitty_state,
+                            )
+                            kitty_gone = kitty_state == "gone"
+                            holder_gone = holder_state == "gone"
                         if kitty_gone and holder_gone:
                             identity_state = "already_gone"
                             closed = True
@@ -1658,18 +1686,37 @@ def _resolved_executable(codex_executable: Path) -> Path:
     return executable
 
 
-def _remove_named_snapshot(snapshot_path: Path) -> None:
+def _remove_named_snapshot(
+    snapshot_path: Path, *, snapshot_dir: Path | None = None
+) -> None:
+    cleanup_dir = snapshot_dir
+    if cleanup_dir is not None:
+        try:
+            os.chmod(cleanup_dir, 0o700)
+        except OSError:
+            return
     try:
         snapshot_path.unlink(missing_ok=True)
     except OSError:
         return
+    if cleanup_dir is not None:
+        try:
+            for entry in cleanup_dir.iterdir():
+                if entry.is_symlink():
+                    entry.unlink(missing_ok=True)
+            cleanup_dir.rmdir()
+        except OSError:
+            return
+        sync_path = cleanup_dir.parent
+    else:
+        sync_path = snapshot_path.parent
     try:
         directory_flags = os.O_RDONLY
         if hasattr(os, "O_DIRECTORY"):
             directory_flags |= os.O_DIRECTORY
         if hasattr(os, "O_NOFOLLOW"):
             directory_flags |= os.O_NOFOLLOW
-        directory_fd = os.open(snapshot_path.parent, directory_flags)
+        directory_fd = os.open(sync_path, directory_flags)
         try:
             os.fsync(directory_fd)
         finally:
@@ -1681,6 +1728,7 @@ def _remove_named_snapshot(snapshot_path: Path) -> None:
 def _spawn_named_snapshot_cleanup(
     *,
     snapshot_path: Path,
+    snapshot_dir: Path | None = None,
     holder_pid: int,
     holder_start_ticks: int,
     snapshot_fd: int,
@@ -1706,7 +1754,7 @@ def _spawn_named_snapshot_cleanup(
             if state != "live":
                 break
             time.sleep(0.25)
-        _remove_named_snapshot(snapshot_path)
+        _remove_named_snapshot(snapshot_path, snapshot_dir=snapshot_dir)
     except BaseException:
         pass
     finally:
@@ -1738,24 +1786,39 @@ def _open_verified_executable(
         content = b"".join(chunks)
         if content.startswith(b"#!"):
             snapshot_path: Path | None = None
+            snapshot_dir: Path | None = None
             try:
-                snapshot_fd, snapshot_name = tempfile.mkstemp(
-                    prefix=f".{executable.name}.aoa-snapshot-",
-                    dir=str(executable.parent),
+                snapshot_dir = Path(
+                    tempfile.mkdtemp(prefix="abyss-stack-codex-package-")
                 )
-                snapshot_path = Path(snapshot_name)
+                os.chmod(snapshot_dir, 0o700)
+                snapshot_path = snapshot_dir / executable.name
+                snapshot_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                if hasattr(os, "O_NOFOLLOW"):
+                    snapshot_flags |= os.O_NOFOLLOW
+                snapshot_fd = os.open(snapshot_path, snapshot_flags, 0o500)
                 view = memoryview(content)
                 while view:
                     view = view[os.write(snapshot_fd, view) :]
                 os.fsync(snapshot_fd)
                 os.fchmod(snapshot_fd, 0o500)
                 os.fsync(snapshot_fd)
+                for entry in executable.parent.iterdir():
+                    if entry.name == executable.name:
+                        continue
+                    mirror_entry = snapshot_dir / entry.name
+                    os.symlink(
+                        os.fspath(entry),
+                        os.fspath(mirror_entry),
+                        target_is_directory=entry.is_dir(),
+                    )
                 directory_flags = os.O_RDONLY
                 if hasattr(os, "O_DIRECTORY"):
                     directory_flags |= os.O_DIRECTORY
                 if hasattr(os, "O_NOFOLLOW"):
                     directory_flags |= os.O_NOFOLLOW
-                directory_fd = os.open(executable.parent, directory_flags)
+                os.chmod(snapshot_dir, 0o500)
+                directory_fd = os.open(snapshot_dir, directory_flags)
                 try:
                     os.fsync(directory_fd)
                 finally:
@@ -1798,16 +1861,20 @@ def _open_verified_executable(
                     os.close(snapshot_fd)
                     snapshot_fd = None
                 if snapshot_path is not None:
-                    _remove_named_snapshot(snapshot_path)
+                    _remove_named_snapshot(
+                        snapshot_path, snapshot_dir=snapshot_dir
+                    )
                 raise
             except OSError as exc:
                 if snapshot_fd is not None:
                     os.close(snapshot_fd)
                     snapshot_fd = None
                 if snapshot_path is not None:
-                    _remove_named_snapshot(snapshot_path)
+                    _remove_named_snapshot(
+                        snapshot_path, snapshot_dir=snapshot_dir
+                    )
                 raise IncarnationHomeError(
-                    "Codex shebang executable could not be snapshotted beside its package"
+                    "Codex shebang executable could not be snapshotted in a private package mirror"
                 ) from exc
         memfd_create = getattr(os, "memfd_create", None)
         allow_sealing = getattr(os, "MFD_ALLOW_SEALING", None)
@@ -2087,6 +2154,7 @@ def command_launch(args: argparse.Namespace) -> int:
         if not str(executable_fd_path).startswith("/proc/self/fd/"):
             _spawn_named_snapshot_cleanup(
                 snapshot_path=executable_fd_path,
+                snapshot_dir=executable_fd_path.parent,
                 holder_pid=os.getpid(),
                 holder_start_ticks=_proc_start_ticks(os.getpid()),
                 snapshot_fd=executable_fd,

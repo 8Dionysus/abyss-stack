@@ -646,11 +646,16 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert captured["environment"]["CODEX_HOME"] == str(ambient)
     assert not str(captured["path"]).startswith("/proc/self/fd/")
     snapshot_path = Path(str(captured["path"]))
-    assert snapshot_path.name.startswith(".codex.aoa-snapshot-")
-    assert snapshot_path.parent == executable.parent
+    assert snapshot_path.name == "codex"
+    assert snapshot_path.parent.name.startswith("abyss-stack-codex-package-")
+    assert snapshot_path.parent != executable.parent
+    assert stat.S_IMODE(snapshot_path.parent.stat().st_mode) == 0o500
     assert captured["snapshot_mode"] == 0o500
     assert captured["inode_content"] == original_content
     assert executable.read_text(encoding="utf-8") == "replacement"
+    MODULE._remove_named_snapshot(
+        snapshot_path, snapshot_dir=snapshot_path.parent
+    )
 
     executable.write_bytes(original_content)
     executable.chmod(0o700)
@@ -788,9 +793,11 @@ def test_shebang_node_launcher_reopens_named_snapshot(
     executable.write_bytes(original)
     executable.chmod(0o700)
 
+    package.chmod(0o555)
     snapshot_fd, snapshot_path, content, _ = MODULE._open_verified_executable(
         executable
     )
+    package.chmod(0o755)
     try:
         executable.write_text("#!/bin/sh\necho replaced\n", encoding="utf-8")
         process = subprocess.Popen(
@@ -812,7 +819,9 @@ def test_shebang_node_launcher_reopens_named_snapshot(
             process.terminate()
             process.wait(timeout=5)
         os.close(snapshot_fd)
-        snapshot_path.unlink(missing_ok=True)
+        MODULE._remove_named_snapshot(
+            snapshot_path, snapshot_dir=snapshot_path.parent
+        )
 
     assert content == original
     assert observed_argv[:2] == ["node", str(snapshot_path)]
@@ -1139,15 +1148,19 @@ def test_completed_unclosed_receipt_preserves_failure_status(
     )
     monkeypatch.setattr(
         MODULE,
-        "_load_holder_receipt",
-        lambda _path: {
-            "holder": {"pid": 101},
-            "terminal": {
-                "pid": 202,
-                "argv": ["/usr/bin/kitty"],
-                "required_comm": "kitty",
+        "_load_holder_receipt_snapshot",
+        lambda _path: (
+            {
+                "holder": {"pid": 101},
+                "terminal": {
+                    "pid": 202,
+                    "argv": ["/usr/bin/kitty"],
+                    "required_comm": "kitty",
+                },
             },
-        },
+            b"{}",
+            MODULE.sha256_bytes(b"{}"),
+        ),
     )
     monkeypatch.setattr(MODULE, "_validate_wake_delivery", lambda **_kwargs: {})
     monkeypatch.setattr(
@@ -1311,18 +1324,22 @@ def test_undelivered_term_waits_for_natural_pair_exit(
 
     monkeypatch.setattr(
         MODULE,
-        "_load_holder_receipt",
-        lambda _path: {
-            "holder": {"pid": 101, "start_ticks": 11},
-            "terminal": {
-                "pid": 202,
-                "start_ticks": 12,
-                "argv": ["/usr/bin/kitty"],
-                "required_comm": "kitty",
-                "window_id": "7",
-                "dedicated": True,
+        "_load_holder_receipt_snapshot",
+        lambda _path: (
+            {
+                "holder": {"pid": 101, "start_ticks": 11},
+                "terminal": {
+                    "pid": 202,
+                    "start_ticks": 12,
+                    "argv": ["/usr/bin/kitty"],
+                    "required_comm": "kitty",
+                    "window_id": "7",
+                    "dedicated": True,
+                },
             },
-        },
+            b"{}",
+            MODULE.sha256_bytes(b"{}"),
+        ),
     )
     monkeypatch.setattr(MODULE, "_validate_wake_delivery", lambda **_kwargs: None)
     monkeypatch.setattr(
@@ -1366,6 +1383,83 @@ def test_undelivered_term_waits_for_natural_pair_exit(
     assert recorded["outcome"] == "already_gone"
     assert recorded["identity_state"] == "already_gone"
     assert recorded["terminal"]["signal_delivery"] == "not_delivered"
+    assert recorded["terminal"]["signal_sent"] is False
+    assert seen == ["live", "live", "live", "gone", "gone", "gone"]
+
+
+def test_signal_failure_waits_for_natural_pair_exit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    handoff = tmp_path / "handoff.json"
+    holder = tmp_path / "holder.json"
+    wake = tmp_path / "wake.json"
+    closure = tmp_path / "closure.json"
+    for path in (handoff, holder, wake):
+        path.write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(
+        MODULE,
+        "_load_holder_receipt_snapshot",
+        lambda _path: (
+            {
+                "holder": {"pid": 101, "start_ticks": 11},
+                "terminal": {
+                    "pid": 202,
+                    "start_ticks": 12,
+                    "argv": ["/usr/bin/kitty"],
+                    "required_comm": "kitty",
+                    "window_id": "7",
+                    "dedicated": True,
+                },
+            },
+            b"{}",
+            MODULE.sha256_bytes(b"{}"),
+        ),
+    )
+    monkeypatch.setattr(MODULE, "_validate_wake_delivery", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        MODULE, "_holder_receipt_process_ids", lambda _receipt: (101, 11, 202, 12)
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_holder_terminal_identity",
+        lambda _receipt: (101, 202, "kitty", "7", True),
+    )
+
+    def fail_signal(*_args: object) -> bool:
+        raise MODULE.IncarnationHomeError("signal race")
+
+    monkeypatch.setattr(MODULE, "_send_verified_term", fail_signal)
+    states = iter(
+        [
+            "live", "live",  # initial exact identity check
+            "live", "gone",  # holder exits during signaling
+            "gone", "gone",  # Kitty follows during bounded natural wait
+        ]
+    )
+    seen: list[str] = []
+
+    def state(_pid: int, _start: int) -> str:
+        value = next(states, "gone")
+        seen.append(value)
+        return value
+
+    monkeypatch.setattr(MODULE, "_proc_identity_state", state)
+    monkeypatch.setattr(MODULE.time, "sleep", lambda _seconds: None)
+
+    assert MODULE.command_close(
+        MODULE.argparse.Namespace(
+            handoff=str(handoff),
+            holder_receipt=str(holder),
+            wake_receipt=str(wake),
+            closure_receipt=str(closure),
+        )
+    ) == 0
+    recorded = json.loads(closure.read_text(encoding="utf-8"))
+    assert recorded["closed"] is True
+    assert recorded["outcome"] == "already_gone"
+    assert recorded["identity_state"] == "already_gone"
+    assert recorded["terminal"]["signal_delivery"] == "failed"
     assert recorded["terminal"]["signal_sent"] is False
     assert seen == ["live", "live", "live", "gone", "gone", "gone"]
 
@@ -1451,3 +1545,58 @@ def test_wake_delivery_requires_exact_holder_and_closure_binding(
             closure_receipt_path=closure,
             holder_receipt=holder_payload,
         )
+
+
+def test_wake_delivery_hashes_the_parsed_holder_snapshot(
+    tmp_path: Path,
+) -> None:
+    handoff = tmp_path / "handoff.json"
+    holder = tmp_path / "holder.json"
+    closure = tmp_path / "closure.json"
+    wake = tmp_path / "wake.json"
+    holder_payload = {
+        "holder": {"pid": 101},
+        "terminal": {"pid": 202},
+    }
+    holder_bytes = json.dumps(holder_payload).encode("utf-8")
+    holder.write_bytes(holder_bytes)
+    holder_digest = MODULE.sha256_bytes(holder_bytes)
+    handoff.write_text(
+        json.dumps(
+            {
+                "runtime": {
+                    "responsibility_holder": {
+                        "terminal_receipt": str(holder),
+                        "terminal_receipt_sha256": holder_digest,
+                        "closure_receipt": str(closure),
+                        "holder_pid": 101,
+                        "terminal_pid": 202,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    wake.write_text(
+        json.dumps(
+            {
+                "schema_version": "task_local_actor_wake_receipt_v1",
+                "handoff_ref": str(handoff),
+                "handoff_sha256": MODULE.sha256_bytes(handoff.read_bytes()),
+                "actions": {"handoff_message_sent": True},
+                "observed": {"handoff_delivery": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+    holder.write_text(json.dumps({"replacement": True}), encoding="utf-8")
+
+    MODULE._validate_wake_delivery(
+        wake_receipt_path=wake,
+        handoff_path=handoff,
+        holder_receipt_path=holder,
+        closure_receipt_path=closure,
+        holder_receipt=holder_payload,
+        holder_receipt_bytes=holder_bytes,
+        holder_receipt_digest=holder_digest,
+    )
