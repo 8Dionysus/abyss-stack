@@ -609,6 +609,7 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
         lambda _pid: {"KITTY_PID": str(terminal_pid), "KITTY_WINDOW_ID": "1"},
     )
     monkeypatch.setattr(MODULE, "_proc_children", lambda _pid: [os.getpid()])
+    monkeypatch.setattr(MODULE, "_spawn_named_snapshot_cleanup", lambda **_: None)
     monkeypatch.setattr(MODULE.os, "execve", fake_exec)
     args = MODULE.argparse.Namespace(
         holder_receipt=str(receipt_path),
@@ -645,8 +646,8 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert captured["environment"]["CODEX_HOME"] == str(ambient)
     assert not str(captured["path"]).startswith("/proc/self/fd/")
     snapshot_path = Path(str(captured["path"]))
-    assert snapshot_path.name == "codex"
-    assert snapshot_path.parent.name.startswith("abyss-stack-codex-executable-")
+    assert snapshot_path.name.startswith(".codex.aoa-snapshot-")
+    assert snapshot_path.parent == executable.parent
     assert captured["snapshot_mode"] == 0o500
     assert captured["inode_content"] == original_content
     assert executable.read_text(encoding="utf-8") == "replacement"
@@ -771,10 +772,17 @@ def test_post_exec_argv_resolves_env_interpreter_reexec(
 def test_shebang_node_launcher_reopens_named_snapshot(
     tmp_path: Path,
 ) -> None:
-    executable = tmp_path / "codex"
+    package = tmp_path / "package"
+    package.mkdir()
+    executable = package / "codex"
+    (package / "package-relative.txt").write_text(
+        "package-relative\n", encoding="utf-8"
+    )
     original = (
         "#!/usr/bin/env node\n"
         "process.stdout.write(String(process.pid) + '\\n');\n"
+        "process.stdout.write(require('fs').readFileSync(__dirname + "
+        "'/package-relative.txt', 'utf8'));\n"
         "setTimeout(() => {}, 30000);\n"
     ).encode()
     executable.write_bytes(original)
@@ -793,6 +801,7 @@ def test_shebang_node_launcher_reopens_named_snapshot(
             pass_fds=(snapshot_fd,),
         )
         process_pid = int(process.stdout.readline().strip())
+        resource_line = process.stdout.readline()
         observed_argv = [
             os.fsdecode(item)
             for item in Path(f"/proc/{process_pid}/cmdline").read_bytes().split(b"\0")
@@ -804,10 +813,35 @@ def test_shebang_node_launcher_reopens_named_snapshot(
             process.wait(timeout=5)
         os.close(snapshot_fd)
         snapshot_path.unlink(missing_ok=True)
-        snapshot_path.parent.rmdir()
 
     assert content == original
     assert observed_argv[:2] == ["node", str(snapshot_path)]
+    assert resource_line == "package-relative\n"
+
+
+def test_named_snapshot_cleanup_waits_for_exact_holder_exit(tmp_path: Path) -> None:
+    snapshot_path = tmp_path / ".codex.aoa-snapshot-test"
+    snapshot_path.write_bytes(b"snapshot")
+    snapshot_path.chmod(0o500)
+    snapshot_fd = os.open(snapshot_path, os.O_RDONLY)
+    holder_pid = os.fork()
+    if holder_pid == 0:
+        MODULE.time.sleep(0.2)
+        os._exit(0)
+
+    cleanup_pid = MODULE._spawn_named_snapshot_cleanup(
+        snapshot_path=snapshot_path,
+        holder_pid=holder_pid,
+        holder_start_ticks=MODULE._proc_start_ticks(holder_pid),
+        snapshot_fd=snapshot_fd,
+    )
+    os.close(snapshot_fd)
+    _, holder_status = os.waitpid(holder_pid, 0)
+    _, cleanup_status = os.waitpid(cleanup_pid, 0)
+
+    assert os.waitstatus_to_exitcode(holder_status) == 0
+    assert os.waitstatus_to_exitcode(cleanup_status) == 0
+    assert not snapshot_path.exists()
 
 
 def test_kitty_dedication_rejects_sibling_terminal_child(
@@ -1263,6 +1297,77 @@ def test_interrupted_signal_attempt_is_not_retried(
     assert recorded["terminal"]["signal_delivery"] == "unknown"
     assert recorded["terminal"]["signal_sent"] is False
     assert recorded["reservation_ref"] == str(reservation_path.resolve())
+
+
+def test_undelivered_term_waits_for_natural_pair_exit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    handoff = tmp_path / "handoff.json"
+    holder = tmp_path / "holder.json"
+    wake = tmp_path / "wake.json"
+    closure = tmp_path / "closure.json"
+    for path in (handoff, holder, wake):
+        path.write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(
+        MODULE,
+        "_load_holder_receipt",
+        lambda _path: {
+            "holder": {"pid": 101, "start_ticks": 11},
+            "terminal": {
+                "pid": 202,
+                "start_ticks": 12,
+                "argv": ["/usr/bin/kitty"],
+                "required_comm": "kitty",
+                "window_id": "7",
+                "dedicated": True,
+            },
+        },
+    )
+    monkeypatch.setattr(MODULE, "_validate_wake_delivery", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        MODULE, "_holder_receipt_process_ids", lambda _receipt: (101, 11, 202, 12)
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_holder_terminal_identity",
+        lambda _receipt: (101, 202, "kitty", "7", True),
+    )
+    monkeypatch.setattr(MODULE, "_send_verified_term", lambda *_args: False)
+    states = iter(
+        [
+            "live", "live",  # initial exact identity check
+            "live", "gone",  # holder exits before pidfd TERM delivery
+            "gone", "gone",  # Kitty follows during bounded natural wait
+        ]
+    )
+    seen: list[str] = []
+
+    def state(_pid: int, _start: int) -> str:
+        value = next(states, "gone")
+        seen.append(value)
+        return value
+
+    monkeypatch.setattr(
+        MODULE, "_proc_identity_state", state
+    )
+    monkeypatch.setattr(MODULE.time, "sleep", lambda _seconds: None)
+
+    assert MODULE.command_close(
+        MODULE.argparse.Namespace(
+            handoff=str(handoff),
+            holder_receipt=str(holder),
+            wake_receipt=str(wake),
+            closure_receipt=str(closure),
+        )
+    ) == 0
+    recorded = json.loads(closure.read_text(encoding="utf-8"))
+    assert recorded["closed"] is True
+    assert recorded["outcome"] == "already_gone"
+    assert recorded["identity_state"] == "already_gone"
+    assert recorded["terminal"]["signal_delivery"] == "not_delivered"
+    assert recorded["terminal"]["signal_sent"] is False
+    assert seen == ["live", "live", "live", "gone", "gone", "gone"]
 
 
 def test_wake_delivery_requires_exact_holder_and_closure_binding(

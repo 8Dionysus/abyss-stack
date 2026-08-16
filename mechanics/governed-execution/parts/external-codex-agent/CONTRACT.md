@@ -144,11 +144,13 @@ publication fsyncs both the complete file and its containing directory before
 lifecycle code can proceed, so recovery sees the reservation/attempt entry
 rather than a merely cached directory update. Direct launch copies the exact
 verified executable bytes into an immutable launch snapshot: a sealed memfd for
-ELF and a private stable read-only named file for shebang launchers. The
-descriptor remains inheritable across interpreter exec, while the named form
-also remains reopenable for Node-backed `#!/usr/bin/env node` launchers. The
-launch executes that snapshot rather than mutable source-inode bytes or a
-reopened source pathname. It then
+ELF and a private stable read-only named file beside the admitted shebang
+launcher. Keeping that package-relative coordinate preserves `$0`/module-relative
+vendor resolution, while the named form remains reopenable for Node-backed
+`#!/usr/bin/env node` launchers. The descriptor remains inheritable across
+interpreter exec, and a lifecycle child removes the exact named snapshot after
+the holder's PID/start-tick identity exits. The launch executes that snapshot
+rather than mutable source-inode bytes or a reopened source pathname. It then
 sends `TERM` to the exact holder process
 through a pidfd opened after the final identity check; the receipt records that signal target
 separately from the terminal it observes. The non-replacing closure receipt

@@ -1283,6 +1283,17 @@ def command_close(args: argparse.Namespace) -> int:
                     holder_state = _proc_identity_state(holder_pid, holder_start_ticks)
                     kitty_gone = kitty_state == "gone"
                     holder_gone = holder_state == "gone"
+                    if kitty_gone or holder_gone:
+                        holder_state, kitty_state = _wait_for_natural_pair_exit(
+                            holder_pid=holder_pid,
+                            holder_start_ticks=holder_start_ticks,
+                            kitty_pid=kitty_pid,
+                            kitty_start_ticks=kitty_start_ticks,
+                            holder_state=holder_state,
+                            kitty_state=kitty_state,
+                        )
+                        kitty_gone = kitty_state == "gone"
+                        holder_gone = holder_state == "gone"
                     if kitty_gone and holder_gone:
                         identity_state = "already_gone"
                         closed = True
@@ -1299,7 +1310,7 @@ def command_close(args: argparse.Namespace) -> int:
                     failure = IncarnationHomeError(
                         "verified holder TERM delivery failed"
                     )
-                if failure is None:
+                if failure is None and not closed:
                     for _ in range(40):
                         kitty_state = _proc_identity_state(
                             kitty_pid, kitty_start_ticks
@@ -1647,6 +1658,61 @@ def _resolved_executable(codex_executable: Path) -> Path:
     return executable
 
 
+def _remove_named_snapshot(snapshot_path: Path) -> None:
+    try:
+        snapshot_path.unlink(missing_ok=True)
+    except OSError:
+        return
+    try:
+        directory_flags = os.O_RDONLY
+        if hasattr(os, "O_DIRECTORY"):
+            directory_flags |= os.O_DIRECTORY
+        if hasattr(os, "O_NOFOLLOW"):
+            directory_flags |= os.O_NOFOLLOW
+        directory_fd = os.open(snapshot_path.parent, directory_flags)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except OSError:
+        pass
+
+
+def _spawn_named_snapshot_cleanup(
+    *,
+    snapshot_path: Path,
+    holder_pid: int,
+    holder_start_ticks: int,
+    snapshot_fd: int,
+) -> int:
+    """Remove one package-relative snapshot after the exact holder exits."""
+
+    try:
+        child_pid = os.fork()
+    except OSError as exc:
+        raise IncarnationHomeError(
+            "cannot start named executable snapshot cleanup"
+        ) from exc
+    if child_pid != 0:
+        return child_pid
+    try:
+        os.close(snapshot_fd)
+        while Path(f"/proc/{holder_pid}").exists():
+            try:
+                state = _proc_identity_state(holder_pid, holder_start_ticks)
+            except IncarnationHomeError:
+                time.sleep(0.25)
+                continue
+            if state != "live":
+                break
+            time.sleep(0.25)
+        _remove_named_snapshot(snapshot_path)
+    except BaseException:
+        pass
+    finally:
+        os._exit(0)
+
+
 def _open_verified_executable(
     executable: Path,
 ) -> tuple[int, Path, bytes, str]:
@@ -1671,15 +1737,13 @@ def _open_verified_executable(
             chunks.append(chunk)
         content = b"".join(chunks)
         if content.startswith(b"#!"):
-            snapshot_dir = Path(
-                tempfile.mkdtemp(prefix="abyss-stack-codex-executable-")
-            )
-            snapshot_path = snapshot_dir / "codex"
+            snapshot_path: Path | None = None
             try:
-                snapshot_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-                if hasattr(os, "O_NOFOLLOW"):
-                    snapshot_flags |= os.O_NOFOLLOW
-                snapshot_fd = os.open(snapshot_path, snapshot_flags, 0o700)
+                snapshot_fd, snapshot_name = tempfile.mkstemp(
+                    prefix=f".{executable.name}.aoa-snapshot-",
+                    dir=str(executable.parent),
+                )
+                snapshot_path = Path(snapshot_name)
                 view = memoryview(content)
                 while view:
                     view = view[os.write(snapshot_fd, view) :]
@@ -1691,7 +1755,7 @@ def _open_verified_executable(
                     directory_flags |= os.O_DIRECTORY
                 if hasattr(os, "O_NOFOLLOW"):
                     directory_flags |= os.O_NOFOLLOW
-                directory_fd = os.open(snapshot_dir, directory_flags)
+                directory_fd = os.open(executable.parent, directory_flags)
                 try:
                     os.fsync(directory_fd)
                 finally:
@@ -1733,17 +1797,17 @@ def _open_verified_executable(
                 if snapshot_fd is not None:
                     os.close(snapshot_fd)
                     snapshot_fd = None
-                snapshot_path.unlink(missing_ok=True)
-                snapshot_dir.rmdir()
+                if snapshot_path is not None:
+                    _remove_named_snapshot(snapshot_path)
                 raise
             except OSError as exc:
                 if snapshot_fd is not None:
                     os.close(snapshot_fd)
                     snapshot_fd = None
-                snapshot_path.unlink(missing_ok=True)
-                snapshot_dir.rmdir()
+                if snapshot_path is not None:
+                    _remove_named_snapshot(snapshot_path)
                 raise IncarnationHomeError(
-                    "Codex shebang executable could not be snapshotted"
+                    "Codex shebang executable could not be snapshotted beside its package"
                 ) from exc
         memfd_create = getattr(os, "memfd_create", None)
         allow_sealing = getattr(os, "MFD_ALLOW_SEALING", None)
@@ -2019,6 +2083,13 @@ def command_launch(args: argparse.Namespace) -> int:
                 executable_digest=executable_digest,
                 manifest_bytes=manifest_bytes,
                 manifest_digest=manifest_digest,
+            )
+        if not str(executable_fd_path).startswith("/proc/self/fd/"):
+            _spawn_named_snapshot_cleanup(
+                snapshot_path=executable_fd_path,
+                holder_pid=os.getpid(),
+                holder_start_ticks=_proc_start_ticks(os.getpid()),
+                snapshot_fd=executable_fd,
             )
         os.execve(str(executable_fd_path), exec_argv, environment)
         return 127
