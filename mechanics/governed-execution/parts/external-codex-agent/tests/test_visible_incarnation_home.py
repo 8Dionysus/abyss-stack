@@ -666,6 +666,24 @@ def test_post_exec_argv_expands_shebang_interpreter(tmp_path: Path) -> None:
     ) == ["/usr/bin/env", "python3 -u", str(executable), "exec", "--help"]
 
 
+def test_post_exec_argv_resolves_env_interpreter_reexec(
+    tmp_path: Path,
+) -> None:
+    executable = tmp_path / "codex"
+    executable.write_text("#!/usr/bin/env node\n", encoding="utf-8")
+    executable.chmod(0o700)
+    node = tmp_path / "bin" / "node"
+    node.parent.mkdir()
+    node.write_text("", encoding="utf-8")
+    node.chmod(0o700)
+
+    assert MODULE._post_exec_argv(
+        executable,
+        [str(executable), "exec", "--help"],
+        path=str(node.parent),
+    ) == [str(node), str(executable), "exec", "--help"]
+
+
 def test_kitty_dedication_rejects_sibling_terminal_child(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -15,6 +15,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -420,7 +421,9 @@ def _proc_children(pid: int) -> list[int]:
         raise IncarnationHomeError(f"process children are malformed: {pid}") from exc
 
 
-def _post_exec_argv(executable: Path, argv: Sequence[str]) -> list[str]:
+def _post_exec_argv(
+    executable: Path, argv: Sequence[str], *, path: str | None = None
+) -> list[str]:
     """Derive Linux's post-exec argv for ELF and shebang-backed commands."""
 
     if not argv:
@@ -435,6 +438,24 @@ def _post_exec_argv(executable: Path, argv: Sequence[str]) -> list[str]:
     fields = shebang.split(maxsplit=1)
     if not fields or not fields[0].startswith("/"):
         raise IncarnationHomeError("Codex shebang interpreter is not absolute")
+    if fields[0] == "/usr/bin/env" and len(fields) == 2 and fields[1]:
+        env_fields = shlex.split(fields[1])
+        if env_fields and env_fields[0] in {"-S", "--split-string"}:
+            env_fields = env_fields[1:]
+        elif len(env_fields) != 1:
+            # Without env -S, Linux passes the optional shebang argument as
+            # one command-name string; do not invent an interpreter re-exec
+            # for an invalid multi-token env command.
+            env_fields = []
+        if env_fields and not env_fields[0].startswith("-"):
+            resolved = shutil.which(env_fields[0], path=path or os.environ.get("PATH"))
+            if resolved is not None:
+                return [
+                    str(Path(resolved).resolve()),
+                    *env_fields[1:],
+                    argv[0],
+                    *argv[1:],
+                ]
     post_exec = [fields[0]]
     if len(fields) == 2 and fields[1]:
         post_exec.append(fields[1])
@@ -505,7 +526,7 @@ def _kitty_dedication(
 
 
 def _send_verified_term(pid: int, start_ticks: int) -> bool:
-    """Send TERM through a pidfd opened after a final identity recheck."""
+    """Send TERM to the exact holder through a pidfd after rechecking it."""
 
     pidfd_open = getattr(os, "pidfd_open", None)
     pidfd_send_signal = getattr(signal, "pidfd_send_signal", None)
@@ -517,14 +538,14 @@ def _send_verified_term(pid: int, start_ticks: int) -> bool:
         return False
     try:
         if _proc_start_ticks(pid) != start_ticks:
-            raise IncarnationHomeError("holder Kitty identity changed before signaling")
+            raise IncarnationHomeError("holder identity changed before signaling")
         try:
             pidfd_send_signal(pidfd, signal.SIGTERM)
         except ProcessLookupError:
             return False
         return True
     except OSError as exc:
-        raise IncarnationHomeError("verified Kitty TERM delivery failed") from exc
+        raise IncarnationHomeError("verified holder TERM delivery failed") from exc
     finally:
         os.close(pidfd)
 
@@ -611,7 +632,9 @@ def _holder_receipt(
         kitty_pid=terminal_pid,
         terminal_argv=terminal_argv,
     )
-    post_exec_argv = _post_exec_argv(executable, argv)
+    post_exec_argv = _post_exec_argv(
+        executable, argv, path=os.environ.get("PATH")
+    )
     try:
         executable_digest = sha256_bytes(executable.read_bytes())
         manifest_digest = sha256_bytes(manifest_path.read_bytes())
@@ -918,7 +941,7 @@ def command_close(args: argparse.Namespace) -> int:
                     failure = exc
             if failure is None and not closed:
                 try:
-                    signal_sent = _send_verified_term(kitty_pid, kitty_start_ticks)
+                    signal_sent = _send_verified_term(holder_pid, holder_start_ticks)
                 except IncarnationHomeError as exc:
                     kitty_state = _proc_identity_state(kitty_pid, kitty_start_ticks)
                     holder_state = _proc_identity_state(holder_pid, holder_start_ticks)
@@ -940,7 +963,7 @@ def command_close(args: argparse.Namespace) -> int:
                     else:
                         identity_state = "identity_drift"
                         failure = IncarnationHomeError(
-                            "holder Kitty exited before verified TERM delivery"
+                            "holder exited before verified TERM delivery"
                         )
                 if failure is None:
                     for _ in range(40):
@@ -971,6 +994,7 @@ def command_close(args: argparse.Namespace) -> int:
             "comm": kitty_comm,
             "argv": kitty_argv,
             "signal": "TERM",
+            "signal_target": "holder_process",
             "signal_sent": signal_sent,
             "gone": kitty_gone,
         }

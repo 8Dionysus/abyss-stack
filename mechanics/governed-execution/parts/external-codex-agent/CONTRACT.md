@@ -131,8 +131,10 @@ holder/terminal PIDs, and reserved closure path under
 only under a live-proof projection. It then rechecks the holder's exact
 PID/start-ticks/argv, its process-parent identity, the recorded Kitty window,
 and the dedicated Kitty process, reserves the closure receipt before
-signaling, and sends `TERM` through a pidfd opened after the final identity
-check. The non-replacing closure receipt records the final Kitty disappearance
+signaling, and sends `TERM` to the exact holder process through a pidfd opened
+after the final identity check; the receipt records that signal target
+separately from the terminal it observes. The non-replacing closure receipt
+records the final Kitty disappearance
 independently and is written even when closure is unverified. If delivery is
 proven but both exact identities have naturally disappeared before the closer
 runs, it records the successful non-signaling `already_gone` outcome without

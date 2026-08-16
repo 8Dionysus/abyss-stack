@@ -24,7 +24,7 @@
     "terminal": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["pid", "start_ticks", "comm", "argv", "signal", "signal_sent", "gone"],
+      "required": ["pid", "start_ticks", "comm", "argv", "signal", "signal_target", "signal_sent", "gone"],
       "properties": {
         "pid": {"type": "integer", "minimum": 1},
         "start_ticks": {"type": "integer", "minimum": 1},
@@ -33,6 +33,7 @@
         "window_id": {"type": "string", "pattern": "^[1-9][0-9]*$"},
         "dedicated": {"const": true},
         "signal": {"const": "TERM"},
+        "signal_target": {"const": "holder_process"},
         "signal_sent": {"type": "boolean"},
         "gone": {"type": "boolean"}
       }
