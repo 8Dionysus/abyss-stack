@@ -560,13 +560,12 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
             inode_content=Path(path).read_bytes(),
         )
         if path.startswith("/proc/self/fd/"):
-            executable_fd = int(path.rsplit("/", 1)[-1])
-            captured.update(
-                executable_inheritable=os.get_inheritable(executable_fd),
-                executable_seals=MODULE.fcntl.fcntl(
-                    executable_fd, MODULE.fcntl.F_GET_SEALS
-                ),
+            root_fd = int(path.removeprefix("/proc/self/fd/").split("/", 1)[0])
+            captured["snapshot_path"] = Path(path).resolve()
+            captured["snapshot_mode"] = stat.S_IMODE(
+                Path(path).resolve().stat().st_mode
             )
+            captured["snapshot_root_inheritable"] = os.get_inheritable(root_fd)
         else:
             captured["snapshot_mode"] = stat.S_IMODE(Path(path).stat().st_mode)
 
@@ -645,8 +644,8 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert receipt["runtime"]["model"] == "gpt-5.6-luna"
     assert receipt["runtime"]["reasoning_effort"] == "max"
     assert captured["environment"]["CODEX_HOME"] == str(ambient)
-    assert not str(captured["path"]).startswith("/proc/self/fd/")
-    snapshot_path = Path(str(captured["path"]))
+    assert str(captured["path"]).startswith("/proc/self/fd/")
+    snapshot_path = Path(str(captured["snapshot_path"]))
     assert snapshot_path.name == "codex"
     snapshot_dir = next(
         parent
@@ -657,6 +656,7 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert snapshot_path.parent != executable.parent
     assert stat.S_IMODE(snapshot_path.parent.stat().st_mode) == 0o500
     assert captured["snapshot_mode"] == 0o500
+    assert captured["snapshot_root_inheritable"] is True
     assert captured["inode_content"] == original_content
     assert executable.read_text(encoding="utf-8") == "replacement"
     MODULE._load_manifest_snapshot(manifest_path)
@@ -821,11 +821,16 @@ def test_shebang_node_launcher_reopens_named_snapshot(
 
     package.chmod(0o555)
     executable.parent.chmod(0o555)
-    snapshot_fd, snapshot_path, content, _, snapshot_dir = (
+    snapshot_fd, snapshot_exec_path, content, _, snapshot_dir, snapshot_path = (
         MODULE._open_verified_executable(executable, snapshot_root=tmp_path)
     )
     package.chmod(0o755)
     executable.parent.chmod(0o755)
+    snapshot_relative = snapshot_path.relative_to(snapshot_dir)
+    moved_snapshot_dir = snapshot_dir.with_name(snapshot_dir.name + "-moved")
+    snapshot_dir.rename(moved_snapshot_dir)
+    snapshot_dir = moved_snapshot_dir
+    snapshot_path = snapshot_dir / snapshot_relative
     snapshot_resource = snapshot_path.parent.parent / "package-relative.txt"
     assert snapshot_resource.is_file()
     assert not snapshot_resource.is_symlink()
@@ -836,7 +841,7 @@ def test_shebang_node_launcher_reopens_named_snapshot(
             "replaced-resource\n", encoding="utf-8"
         )
         process = subprocess.Popen(
-            [str(snapshot_path)],
+            [str(snapshot_exec_path)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -860,7 +865,7 @@ def test_shebang_node_launcher_reopens_named_snapshot(
         assert not snapshot_dir.exists()
 
     assert content == original
-    assert observed_argv[:2] == ["node", str(snapshot_path)]
+    assert observed_argv[:2] == ["node", str(snapshot_exec_path)]
     assert resource_line == "package-relative\n"
 
 
@@ -973,6 +978,20 @@ def test_identity_bound_close_records_already_gone_without_reopening_manifest(
             "dedicated": True,
         },
     }
+    holder.write_text(json.dumps(holder_payload), encoding="utf-8")
+    for missing_terminal_field in ("window_id", "dedicated"):
+        invalid_payload = {
+            **holder_payload,
+            "terminal": {
+                **holder_payload["terminal"],
+            },
+        }
+        invalid_payload["terminal"].pop(missing_terminal_field)
+        holder.write_text(json.dumps(invalid_payload), encoding="utf-8")
+        with pytest.raises(
+            MODULE.IncarnationHomeError, match="holder terminal receipt is incomplete"
+        ):
+            MODULE._load_holder_receipt_snapshot(holder)
     holder.write_text(json.dumps(holder_payload), encoding="utf-8")
     handoff.write_text(
         json.dumps(

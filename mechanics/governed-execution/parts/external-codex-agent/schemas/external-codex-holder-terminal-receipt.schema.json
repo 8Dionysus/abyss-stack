@@ -43,7 +43,7 @@
     "terminal": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["binding", "required_comm", "pid", "start_ticks", "argv"],
+      "required": ["binding", "required_comm", "pid", "start_ticks", "argv", "window_id", "dedicated"],
       "properties": {
         "binding": {"const": "kitty_ancestor_at_exec"},
         "required_comm": {"const": "kitty"},

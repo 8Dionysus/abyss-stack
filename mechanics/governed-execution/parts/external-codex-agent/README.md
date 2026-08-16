@@ -49,9 +49,11 @@ The controller:
   copied into regular read-only snapshot files without writing to a root-owned
   installed package. The snapshot lives under the admitted `codex_home/tmp`
   local directory, and its filesystem is rejected when marked `noexec`; the
-  mirror is frozen non-writable before version probing and exec. A lifecycle
-  child removes the exact snapshot and mirror after the holder's PID/start-tick
-  identity exits. Both routes execute
+  mirror is frozen non-writable before version probing and exec. The named
+  shebang path is rooted through an inherited directory descriptor, so the
+  writable `tmp` entry cannot redirect the final exec after probing. A
+  lifecycle child removes the exact snapshot and mirror after the holder's
+  PID/start-tick identity exits. Both routes execute
   the exact admitted bytes rather than mutable source-inode bytes or a
   replaceable source pathname, and the named route remains reopenable for
   Node-backed `#!/usr/bin/env node` launchers. A naturally exited exact pair is

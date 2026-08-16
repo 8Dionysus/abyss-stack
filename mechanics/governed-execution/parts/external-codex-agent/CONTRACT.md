@@ -154,9 +154,11 @@ lives under the manifest's admitted `codex_home/tmp` local directory, and its
 `noexec` filesystem is rejected before materialization. The named form remains
 reopenable for Node-backed
 `#!/usr/bin/env node` launchers. The mirror directory is frozen non-writable
-before version probing and exec, the descriptor remains inheritable across
-interpreter exec, and a lifecycle child removes the exact snapshot and mirror
-after the holder's PID/start-tick identity exits. The launch executes that
+before version probing and exec; the named shebang path is rooted through an
+inherited directory descriptor so a writable `tmp` entry cannot redirect the
+final exec after probing. The descriptor remains inheritable across interpreter
+exec, and a lifecycle child removes the exact snapshot and mirror after the
+holder's PID/start-tick identity exits. The launch executes that
 snapshot rather than mutable source-inode bytes or a replaceable source
 pathname. It then
 sends `TERM` to the exact holder process

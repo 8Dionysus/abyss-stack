@@ -971,6 +971,9 @@ def _load_holder_receipt_snapshot(
         or not isinstance(terminal.get("start_ticks"), int)
         or not isinstance(terminal.get("argv"), list)
         or not all(isinstance(item, str) for item in terminal["argv"])
+        or not isinstance(terminal.get("window_id"), str)
+        or not re.fullmatch(r"[1-9][0-9]*", terminal["window_id"])
+        or terminal.get("dedicated") is not True
         or not isinstance(holder.get("argv"), list)
         or not all(isinstance(item, str) for item in holder["argv"])
     ):
@@ -1980,7 +1983,7 @@ def _open_verified_executable(
     executable: Path,
     *,
     snapshot_root: Path | None = None,
-) -> tuple[int, Path, bytes, str, Path | None]:
+) -> tuple[int, Path, bytes, str, Path | None, Path | None]:
     flags = os.O_RDONLY
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
@@ -2004,6 +2007,7 @@ def _open_verified_executable(
         if content.startswith(b"#!"):
             snapshot_path: Path | None = None
             snapshot_dir: Path | None = None
+            snapshot_root_fd: int | None = None
             try:
                 snapshot_path, snapshot_dir = _mirror_package_layout(
                     executable=executable,
@@ -2020,12 +2024,12 @@ def _open_verified_executable(
                 os.fchmod(snapshot_fd, 0o500)
                 os.fsync(snapshot_fd)
                 _freeze_snapshot_tree(snapshot_dir)
-                os.close(snapshot_fd)
-                snapshot_fd = None
                 # A shebang interpreter must reopen a named path. Every
                 # actual directory from the private mirror root through the
                 # launcher's parent is frozen before that reopen, so a normal
                 # same-user rename cannot replace the verified final entry.
+                os.close(snapshot_fd)
+                snapshot_fd = None
                 snapshot_fd = os.open(snapshot_path, os.O_RDONLY)
                 if hasattr(os, "O_NOFOLLOW"):
                     os.close(snapshot_fd)
@@ -2049,19 +2053,34 @@ def _open_verified_executable(
                     raise IncarnationHomeError(
                         "named executable snapshot bytes changed before exec"
                     )
-                os.set_inheritable(snapshot_fd, True)
-                os.lseek(snapshot_fd, 0, os.SEEK_SET)
+                directory_flags = os.O_RDONLY
+                if hasattr(os, "O_DIRECTORY"):
+                    directory_flags |= os.O_DIRECTORY
+                if hasattr(os, "O_NOFOLLOW"):
+                    directory_flags |= os.O_NOFOLLOW
+                snapshot_root_fd = os.open(snapshot_dir, directory_flags)
+                os.set_inheritable(snapshot_root_fd, True)
+                execution_path = Path(
+                    f"/proc/self/fd/{snapshot_root_fd}/"
+                    f"{snapshot_path.relative_to(snapshot_dir)}"
+                )
+                os.close(snapshot_fd)
+                snapshot_fd = None
                 return (
-                    snapshot_fd,
-                    snapshot_path,
+                    snapshot_root_fd,
+                    execution_path,
                     content,
                     sha256_bytes(content),
                     snapshot_dir,
+                    snapshot_path,
                 )
             except IncarnationHomeError:
                 if snapshot_fd is not None:
                     os.close(snapshot_fd)
                     snapshot_fd = None
+                if snapshot_root_fd is not None:
+                    os.close(snapshot_root_fd)
+                    snapshot_root_fd = None
                 if snapshot_path is not None:
                     _remove_named_snapshot(
                         snapshot_path, snapshot_dir=snapshot_dir
@@ -2071,6 +2090,9 @@ def _open_verified_executable(
                 if snapshot_fd is not None:
                     os.close(snapshot_fd)
                     snapshot_fd = None
+                if snapshot_root_fd is not None:
+                    os.close(snapshot_root_fd)
+                    snapshot_root_fd = None
                 if snapshot_path is not None:
                     _remove_named_snapshot(
                         snapshot_path, snapshot_dir=snapshot_dir
@@ -2121,6 +2143,7 @@ def _open_verified_executable(
             Path(f"/proc/self/fd/{snapshot_fd}"),
             content,
             sha256_bytes(content),
+            None,
             None,
         )
     except IncarnationHomeError:
@@ -2327,6 +2350,7 @@ def command_launch(args: argparse.Namespace) -> int:
         executable_bytes,
         executable_digest,
         executable_snapshot_dir,
+        executable_snapshot_path,
     ) = _open_verified_executable(
         executable,
         snapshot_root=Path(str(manifest["codex_home"])) / "tmp",
@@ -2361,9 +2385,9 @@ def command_launch(args: argparse.Namespace) -> int:
                 manifest_bytes=manifest_bytes,
                 manifest_digest=manifest_digest,
             )
-        if not str(executable_fd_path).startswith("/proc/self/fd/"):
+        if executable_snapshot_dir is not None:
             _spawn_named_snapshot_cleanup(
-                snapshot_path=executable_fd_path,
+                snapshot_path=executable_snapshot_path,
                 snapshot_dir=executable_snapshot_dir,
                 holder_pid=os.getpid(),
                 holder_start_ticks=_proc_start_ticks(os.getpid()),
