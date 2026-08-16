@@ -1690,11 +1690,24 @@ def _resolved_executable(codex_executable: Path) -> Path:
 
 
 def _remove_named_snapshot(
-    snapshot_path: Path, *, snapshot_dir: Path | None = None
+    snapshot_path: Path,
+    *,
+    snapshot_dir: Path | None = None,
+    snapshot_dir_fd: int | None = None,
 ) -> None:
     cleanup_dir = snapshot_dir
     if cleanup_dir is not None:
         try:
+            if snapshot_dir_fd is not None:
+                expected = os.fstat(snapshot_dir_fd)
+                observed = os.lstat(cleanup_dir)
+                if (
+                    not stat.S_ISDIR(expected.st_mode)
+                    or not stat.S_ISDIR(observed.st_mode)
+                    or (expected.st_dev, expected.st_ino)
+                    != (observed.st_dev, observed.st_ino)
+                ):
+                    return
             if (
                 cleanup_dir.is_symlink()
                 or not cleanup_dir.is_dir()
@@ -1753,6 +1766,7 @@ def _spawn_named_snapshot_cleanup(
     holder_pid: int,
     holder_start_ticks: int,
     snapshot_fd: int,
+    snapshot_component_fds: Sequence[int] = (),
 ) -> int:
     """Remove one package-relative snapshot after the exact holder exits."""
 
@@ -1765,7 +1779,6 @@ def _spawn_named_snapshot_cleanup(
     if child_pid != 0:
         return child_pid
     try:
-        os.close(snapshot_fd)
         while Path(f"/proc/{holder_pid}").exists():
             try:
                 state = _proc_identity_state(holder_pid, holder_start_ticks)
@@ -1775,10 +1788,37 @@ def _spawn_named_snapshot_cleanup(
             if state != "live":
                 break
             time.sleep(0.25)
-        _remove_named_snapshot(snapshot_path, snapshot_dir=snapshot_dir)
+        cleanup_path = snapshot_path
+        cleanup_dir = snapshot_dir
+        if snapshot_dir is not None:
+            try:
+                bound_dir = Path(os.readlink(f"/proc/self/fd/{snapshot_fd}"))
+            except OSError:
+                bound_dir = snapshot_dir
+            if bound_dir.is_absolute() and not str(bound_dir).endswith(" (deleted)"):
+                try:
+                    relative = snapshot_path.relative_to(snapshot_dir)
+                except ValueError:
+                    relative = Path(snapshot_path.name)
+                cleanup_dir = bound_dir
+                cleanup_path = bound_dir / relative
+        _remove_named_snapshot(
+            cleanup_path,
+            snapshot_dir=cleanup_dir,
+            snapshot_dir_fd=snapshot_fd if snapshot_dir is not None else None,
+        )
     except BaseException:
         pass
     finally:
+        for fd in snapshot_component_fds:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+        try:
+            os.close(snapshot_fd)
+        except OSError:
+            pass
         os._exit(0)
 
 
@@ -1818,7 +1858,56 @@ def _package_root(executable: Path) -> Path:
     return executable.parent
 
 
-def _copy_package_file(source: Path, target: Path) -> None:
+def _sealed_memfd(name: str, content: bytes, *, mode: int = 0o400) -> int:
+    memfd_create = getattr(os, "memfd_create", None)
+    allow_sealing = getattr(os, "MFD_ALLOW_SEALING", None)
+    add_seals = getattr(fcntl, "F_ADD_SEALS", None)
+    seal_write = getattr(fcntl, "F_SEAL_WRITE", None)
+    seal_grow = getattr(fcntl, "F_SEAL_GROW", None)
+    seal_shrink = getattr(fcntl, "F_SEAL_SHRINK", None)
+    seal_seal = getattr(fcntl, "F_SEAL_SEAL", None)
+    if (
+        not callable(memfd_create)
+        or not isinstance(allow_sealing, int)
+        or not isinstance(add_seals, int)
+        or not all(
+            isinstance(value, int)
+            for value in (seal_write, seal_grow, seal_shrink, seal_seal)
+        )
+    ):
+        raise IncarnationHomeError(
+            "shebang dependency snapshot requires sealed memfd support"
+        )
+    descriptor: int | None = None
+    try:
+        descriptor = memfd_create(name, allow_sealing)
+        view = memoryview(content)
+        while view:
+            view = view[os.write(descriptor, view) :]
+        os.fsync(descriptor)
+        os.fchmod(descriptor, mode)
+        fcntl.fcntl(
+            descriptor,
+            add_seals,
+            seal_write | seal_grow | seal_shrink | seal_seal,
+        )
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        os.set_inheritable(descriptor, True)
+        return descriptor
+    except OSError as exc:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise IncarnationHomeError(
+            f"shebang dependency could not be sealed: {name}"
+        ) from exc
+
+
+def _copy_package_file(
+    source: Path,
+    target: Path,
+    *,
+    records: dict[Path, tuple[int, int, str, int]],
+) -> None:
     source_flags = os.O_RDONLY
     if hasattr(os, "O_NOFOLLOW"):
         source_flags |= os.O_NOFOLLOW
@@ -1866,6 +1955,13 @@ def _copy_package_file(source: Path, target: Path) -> None:
         os.fsync(target_fd)
         os.fchmod(target_fd, target_mode)
         os.fsync(target_fd)
+        target_info = os.fstat(target_fd)
+        records[target] = (
+            target_info.st_dev,
+            target_info.st_ino,
+            sha256_bytes(content),
+            target_mode,
+        )
     except IncarnationHomeError:
         raise
     except OSError as exc:
@@ -1880,7 +1976,12 @@ def _copy_package_file(source: Path, target: Path) -> None:
 
 
 def _copy_package_tree(
-    source: Path, target: Path, *, excluded: Path, ignored_source: Path
+    source: Path,
+    target: Path,
+    *,
+    excluded: Path,
+    ignored_source: Path,
+    records: dict[Path, tuple[int, int, str, int]],
 ) -> None:
     """Copy a package subtree without retaining mutable dependency links."""
 
@@ -1898,6 +1999,12 @@ def _copy_package_tree(
         raise IncarnationHomeError(
             f"package snapshot target is not a directory: {target}"
         )
+    target_info = os.stat(target, follow_symlinks=False)
+    if not stat.S_ISDIR(target_info.st_mode):
+        raise IncarnationHomeError(
+            f"package snapshot target is not a real directory: {target}"
+        )
+    records.setdefault(target, (target_info.st_dev, target_info.st_ino, "", 0))
     for entry in sorted(source.iterdir(), key=lambda item: item.name):
         if entry == excluded or entry == ignored_source:
             continue
@@ -1912,9 +2019,10 @@ def _copy_package_tree(
                 target_entry,
                 excluded=excluded,
                 ignored_source=ignored_source,
+                records=records,
             )
         elif entry.is_file():
-            _copy_package_file(entry, target_entry)
+            _copy_package_file(entry, target_entry, records=records)
         else:
             raise IncarnationHomeError(
                 f"package dependency is not a regular file or directory: {entry}"
@@ -1923,7 +2031,7 @@ def _copy_package_tree(
 
 def _mirror_package_layout(
     *, executable: Path, snapshot_root: Path
-) -> tuple[Path, Path]:
+) -> tuple[Path, Path, dict[Path, tuple[int, int, str, int]], Path]:
     """Build a private package snapshot with stable ancestor coordinates."""
 
     snapshot_dir = Path(
@@ -1933,6 +2041,7 @@ def _mirror_package_layout(
         os.chmod(snapshot_dir, 0o700)
         source_dir = Path("/")
         target_dir = snapshot_dir
+        records: dict[Path, tuple[int, int, str, int]] = {}
         package_root = _package_root(executable)
         source_parts = package_root.parts
         if not source_parts or source_parts[0] != "/":
@@ -1954,8 +2063,14 @@ def _mirror_package_layout(
             target_dir,
             excluded=executable,
             ignored_source=snapshot_dir,
+            records=records,
         )
-        return target_dir / executable.relative_to(package_root), snapshot_dir
+        return (
+            target_dir / executable.relative_to(package_root),
+            snapshot_dir,
+            records,
+            target_dir,
+        )
     except BaseException:
         _remove_named_snapshot(
             snapshot_dir / executable.name, snapshot_dir=snapshot_dir
@@ -1979,11 +2094,181 @@ def _freeze_snapshot_tree(snapshot_dir: Path) -> None:
             os.close(directory_fd)
 
 
+def _open_snapshot_mount(
+    *,
+    snapshot_path: Path,
+    snapshot_dir: Path,
+    package_root: Path,
+    records: dict[Path, tuple[int, int, str, int]],
+) -> dict[str, Any]:
+    """Open every copied component and seal every regular file for bwrap."""
+
+    try:
+        snapshot_path.relative_to(package_root)
+        package_root.relative_to(snapshot_dir)
+    except ValueError as exc:
+        raise IncarnationHomeError(
+            "named executable snapshot package boundary escaped its private mirror"
+        ) from exc
+    directory_flags = getattr(os, "O_PATH", os.O_RDONLY)
+    if hasattr(os, "O_DIRECTORY"):
+        directory_flags |= os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        directory_flags |= os.O_NOFOLLOW
+    file_flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        file_flags |= os.O_NOFOLLOW
+    directory_paths: list[Path] = []
+    file_fds: list[tuple[Path, int, int]] = []
+    try:
+        directory_records = sorted(
+            (
+                (path, identity)
+                for path, identity in records.items()
+                if identity[2] == "" and path.is_relative_to(package_root)
+            ),
+            key=lambda item: (len(item[0].parts), os.fspath(item[0])),
+        )
+        if package_root not in {path for path, _ in directory_records}:
+            raise IncarnationHomeError(
+                "package snapshot boundary was not recorded as a directory"
+            )
+        for path, expected in directory_records:
+            descriptor = os.open(path, directory_flags)
+            observed = os.fstat(descriptor)
+            if (
+                not stat.S_ISDIR(observed.st_mode)
+                or (observed.st_dev, observed.st_ino) != expected[:2]
+            ):
+                os.close(descriptor)
+                raise IncarnationHomeError(
+                    f"package snapshot directory changed before binding: {path}"
+                )
+            os.close(descriptor)
+            directory_paths.append(path.relative_to(package_root))
+
+        file_records = sorted(
+            (
+                (path, identity)
+                for path, identity in records.items()
+                if identity[2] and path.is_relative_to(package_root)
+            ),
+            key=lambda item: os.fspath(item[0]),
+        )
+        for path, expected in file_records:
+            source_fd = os.open(path, file_flags)
+            try:
+                observed = os.fstat(source_fd)
+                if (
+                    not stat.S_ISREG(observed.st_mode)
+                    or (observed.st_dev, observed.st_ino) != expected[:2]
+                ):
+                    raise IncarnationHomeError(
+                        f"package snapshot file changed before binding: {path}"
+                    )
+                os.lseek(source_fd, 0, os.SEEK_SET)
+                chunks: list[bytes] = []
+                while True:
+                    chunk = os.read(source_fd, 1 << 20)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                content = b"".join(chunks)
+                if sha256_bytes(content) != expected[2]:
+                    raise IncarnationHomeError(
+                        f"package snapshot file bytes changed before binding: {path}"
+                    )
+            finally:
+                os.close(source_fd)
+            descriptor = _sealed_memfd(
+                f"aoa-codex-shebang-{path.name}",
+                content,
+                mode=expected[3],
+            )
+            file_fds.append(
+                (path.relative_to(package_root), descriptor, expected[3])
+            )
+        return {
+            "directory_paths": directory_paths,
+            "file_fds": file_fds,
+            "namespace_root": Path("/var/tmp"),
+            "executable_path": Path("/var/tmp")
+            / snapshot_path.relative_to(package_root),
+        }
+    except BaseException:
+        for _, descriptor, _ in file_fds:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        raise
+
+
+def _snapshot_bwrap_prefix(snapshot_mount: dict[str, Any]) -> list[str]:
+    """Build a mount-namespace prefix with inode-bound package components."""
+
+    bwrap = Path("/usr/bin/bwrap")
+    if not bwrap.is_file() or not os.access(bwrap, os.X_OK):
+        raise IncarnationHomeError("shebang launch requires /usr/bin/bwrap")
+    namespace_root = snapshot_mount["namespace_root"]
+    arguments = [
+        os.fspath(bwrap),
+        "--bind",
+        "/",
+        "/",
+        "--tmpfs",
+        os.fspath(namespace_root),
+    ]
+    for relative in sorted(
+        snapshot_mount["directory_paths"],
+        key=lambda path: (len(path.parts), os.fspath(path)),
+    ):
+        if relative == Path("."):
+            continue
+        arguments.extend(["--dir", os.fspath(namespace_root / relative)])
+    for relative, descriptor, mode in snapshot_mount["file_fds"]:
+        arguments.extend(
+            [
+                "--file",
+                str(descriptor),
+                os.fspath(namespace_root / relative),
+                "--chmod",
+                f"{mode:04o}",
+                os.fspath(namespace_root / relative),
+            ]
+        )
+    arguments.extend(["--remount-ro", os.fspath(namespace_root)])
+    return arguments
+
+
+def _close_snapshot_mount(snapshot_mount: dict[str, Any] | None) -> None:
+    if snapshot_mount is None:
+        return
+    descriptors: set[int] = {
+        int(descriptor) for _, descriptor, _ in snapshot_mount["file_fds"]
+    }
+    for descriptor in descriptors:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+
+
+def _rewind_snapshot_components(snapshot_component_fds: Sequence[int]) -> None:
+    for descriptor in snapshot_component_fds:
+        try:
+            os.lseek(descriptor, 0, os.SEEK_SET)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                "shebang snapshot component could not be rewound"
+            ) from exc
+
+
 def _open_verified_executable(
     executable: Path,
     *,
     snapshot_root: Path | None = None,
-) -> tuple[int, Path, bytes, str, Path | None, Path | None]:
+) -> tuple[int, Path, bytes, str, Path | None, Path | None, dict[str, Any] | None]:
     flags = os.O_RDONLY
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
@@ -2008,8 +2293,14 @@ def _open_verified_executable(
             snapshot_path: Path | None = None
             snapshot_dir: Path | None = None
             snapshot_root_fd: int | None = None
+            snapshot_mount: dict[str, Any] | None = None
             try:
-                snapshot_path, snapshot_dir = _mirror_package_layout(
+                (
+                    snapshot_path,
+                    snapshot_dir,
+                    snapshot_records,
+                    snapshot_package_root,
+                ) = _mirror_package_layout(
                     executable=executable,
                     snapshot_root=_execution_snapshot_root(snapshot_root),
                 )
@@ -2023,6 +2314,13 @@ def _open_verified_executable(
                 os.fsync(snapshot_fd)
                 os.fchmod(snapshot_fd, 0o500)
                 os.fsync(snapshot_fd)
+                snapshot_info = os.fstat(snapshot_fd)
+                snapshot_records[snapshot_path] = (
+                    snapshot_info.st_dev,
+                    snapshot_info.st_ino,
+                    sha256_bytes(content),
+                    0o500,
+                )
                 _freeze_snapshot_tree(snapshot_dir)
                 # A shebang interpreter must reopen a named path. Every
                 # actual directory from the private mirror root through the
@@ -2053,6 +2351,12 @@ def _open_verified_executable(
                     raise IncarnationHomeError(
                         "named executable snapshot bytes changed before exec"
                     )
+                snapshot_mount = _open_snapshot_mount(
+                    snapshot_path=snapshot_path,
+                    snapshot_dir=snapshot_dir,
+                    package_root=snapshot_package_root,
+                    records=snapshot_records,
+                )
                 directory_flags = os.O_RDONLY
                 if hasattr(os, "O_DIRECTORY"):
                     directory_flags |= os.O_DIRECTORY
@@ -2060,10 +2364,7 @@ def _open_verified_executable(
                     directory_flags |= os.O_NOFOLLOW
                 snapshot_root_fd = os.open(snapshot_dir, directory_flags)
                 os.set_inheritable(snapshot_root_fd, True)
-                execution_path = Path(
-                    f"/proc/self/fd/{snapshot_root_fd}/"
-                    f"{snapshot_path.relative_to(snapshot_dir)}"
-                )
+                execution_path = snapshot_mount["executable_path"]
                 os.close(snapshot_fd)
                 snapshot_fd = None
                 return (
@@ -2073,6 +2374,7 @@ def _open_verified_executable(
                     sha256_bytes(content),
                     snapshot_dir,
                     snapshot_path,
+                    snapshot_mount,
                 )
             except IncarnationHomeError:
                 if snapshot_fd is not None:
@@ -2081,6 +2383,7 @@ def _open_verified_executable(
                 if snapshot_root_fd is not None:
                     os.close(snapshot_root_fd)
                     snapshot_root_fd = None
+                _close_snapshot_mount(snapshot_mount)
                 if snapshot_path is not None:
                     _remove_named_snapshot(
                         snapshot_path, snapshot_dir=snapshot_dir
@@ -2093,6 +2396,7 @@ def _open_verified_executable(
                 if snapshot_root_fd is not None:
                     os.close(snapshot_root_fd)
                     snapshot_root_fd = None
+                _close_snapshot_mount(snapshot_mount)
                 if snapshot_path is not None:
                     _remove_named_snapshot(
                         snapshot_path, snapshot_dir=snapshot_dir
@@ -2145,6 +2449,7 @@ def _open_verified_executable(
             sha256_bytes(content),
             None,
             None,
+            None,
         )
     except IncarnationHomeError:
         if snapshot_fd is not None:
@@ -2174,10 +2479,21 @@ def _inode_exec_argv(
 def _verify_executable_version(
     executable: Path, runtime_version: str, *, pass_fds: Sequence[int] = ()
 ) -> None:
+    _verify_command_version(
+        [str(executable)], runtime_version, pass_fds=pass_fds
+    )
+
+
+def _verify_command_version(
+    command: Sequence[str],
+    runtime_version: str,
+    *,
+    pass_fds: Sequence[int] = (),
+) -> None:
     expected = "codex-cli " + runtime_version
     try:
         completed = subprocess.run(
-            [str(executable), "--version"],
+            [*command, "--version"],
             check=False,
             capture_output=True,
             text=True,
@@ -2189,7 +2505,9 @@ def _verify_executable_version(
     observed = completed.stdout.strip()
     if completed.returncode != 0 or observed != expected:
         raise IncarnationHomeError(
-            f"Codex runtime version mismatch: expected {expected}, got {observed or '<empty>'}"
+            f"Codex runtime version mismatch: expected {expected}, got "
+            f"{observed or '<empty>'}; returncode={completed.returncode}; "
+            f"stderr={completed.stderr.strip() or '<empty>'}"
         )
 
 
@@ -2351,16 +2669,34 @@ def command_launch(args: argparse.Namespace) -> int:
         executable_digest,
         executable_snapshot_dir,
         executable_snapshot_path,
+        executable_snapshot_mount,
     ) = _open_verified_executable(
         executable,
         snapshot_root=Path(str(manifest["codex_home"])) / "tmp",
     )
+    snapshot_component_fds: list[int] = []
+    cleanup_started = False
     try:
-        _verify_executable_version(
-            executable_fd_path,
-            str(manifest["runtime_version"]),
-            pass_fds=(executable_fd,),
-        )
+        if executable_snapshot_mount is None:
+            _verify_executable_version(
+                executable_fd_path,
+                str(manifest["runtime_version"]),
+                pass_fds=(executable_fd,),
+            )
+        else:
+            snapshot_prefix = _snapshot_bwrap_prefix(executable_snapshot_mount)
+            snapshot_component_fds = [
+                *(
+                    int(descriptor)
+                    for _, descriptor, _ in executable_snapshot_mount["file_fds"]
+                ),
+            ]
+            _verify_command_version(
+                [*snapshot_prefix, "--", str(executable_fd_path)],
+                str(manifest["runtime_version"]),
+                pass_fds=tuple(snapshot_component_fds),
+            )
+            _rewind_snapshot_components(snapshot_component_fds)
         argv = bound_codex_argv(
             codex_executable=command,
             manifest=manifest,
@@ -2373,13 +2709,22 @@ def command_launch(args: argparse.Namespace) -> int:
             executable_fd_path=executable_fd_path,
             argv=argv,
         )
+        launch_path = executable_fd_path
+        launch_argv = exec_argv
+        if executable_snapshot_mount is not None:
+            launch_path = executable_snapshot_mount["executable_path"]
+            launch_argv = _inode_exec_argv(
+                executable_bytes=executable_bytes,
+                executable_fd_path=launch_path,
+                argv=argv,
+            )
         if args.holder_receipt:
             _holder_receipt(
                 receipt_path=Path(args.holder_receipt),
                 manifest_path=manifest_path,
                 manifest=manifest,
                 executable=executable,
-                argv=exec_argv,
+                argv=launch_argv,
                 executable_bytes=executable_bytes,
                 executable_digest=executable_digest,
                 manifest_bytes=manifest_bytes,
@@ -2392,11 +2737,37 @@ def command_launch(args: argparse.Namespace) -> int:
                 holder_pid=os.getpid(),
                 holder_start_ticks=_proc_start_ticks(os.getpid()),
                 snapshot_fd=executable_fd,
+                snapshot_component_fds=snapshot_component_fds,
             )
-        os.execve(str(executable_fd_path), exec_argv, environment)
+            cleanup_started = True
+        if executable_snapshot_mount is None:
+            os.execve(str(executable_fd_path), launch_argv, environment)
+        os.execve(
+            snapshot_prefix[0],
+            [*snapshot_prefix, "--", *launch_argv],
+            environment,
+        )
         return 127
     finally:
-        os.close(executable_fd)
+        if (
+            executable_snapshot_dir is not None
+            and executable_snapshot_path is not None
+            and not cleanup_started
+        ):
+            _remove_named_snapshot(
+                executable_snapshot_path,
+                snapshot_dir=executable_snapshot_dir,
+                snapshot_dir_fd=executable_fd,
+            )
+        for descriptor in snapshot_component_fds:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        try:
+            os.close(executable_fd)
+        except OSError:
+            pass
 
 
 def parser() -> argparse.ArgumentParser:

@@ -553,21 +553,30 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     original_executable.chmod(0o700)
 
     def fake_exec(path: str, argv: list[str], environment: dict[str, str]) -> None:
+        inner_argv = argv[argv.index("--") + 1 :]
+        launcher_file_index = next(
+            index
+            for index, value in enumerate(argv)
+            if value == "--file" and argv[index + 2] == "/var/tmp/codex"
+        )
+        launcher_fd = int(argv[launcher_file_index + 1])
+        launcher_mode_index = next(
+            index
+            for index, value in enumerate(argv)
+            if value == "--chmod" and argv[index + 2] == "/var/tmp/codex"
+        )
+        os.lseek(launcher_fd, 0, os.SEEK_SET)
         captured.update(
             path=path,
             argv=argv,
+            inner_argv=inner_argv,
             environment=environment,
-            inode_content=Path(path).read_bytes(),
+            inode_content=os.read(launcher_fd, 1 << 20),
         )
-        if path.startswith("/proc/self/fd/"):
-            root_fd = int(path.removeprefix("/proc/self/fd/").split("/", 1)[0])
-            captured["snapshot_path"] = Path(path).resolve()
-            captured["snapshot_mode"] = stat.S_IMODE(
-                Path(path).resolve().stat().st_mode
-            )
-            captured["snapshot_root_inheritable"] = os.get_inheritable(root_fd)
-        else:
-            captured["snapshot_mode"] = stat.S_IMODE(Path(path).stat().st_mode)
+        captured["snapshot_path"] = Path(inner_argv[0])
+        captured["snapshot_mode"] = int(
+            argv[launcher_mode_index + 1], 8
+        )
 
     original_holder_receipt = MODULE._holder_receipt
 
@@ -630,7 +639,7 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert receipt["holder"]["start_ticks"] == MODULE._proc_start_ticks(os.getpid())
     assert receipt["holder"]["parent_pid"] == os.getppid()
     assert receipt["holder"]["argv"] == MODULE._post_exec_argv(
-        original_executable, captured["argv"]
+        original_executable, captured["inner_argv"]
     )
     assert receipt["terminal"]["binding"] == "kitty_ancestor_at_exec"
     assert receipt["terminal"]["pid"] == terminal_pid
@@ -644,19 +653,21 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert receipt["runtime"]["model"] == "gpt-5.6-luna"
     assert receipt["runtime"]["reasoning_effort"] == "max"
     assert captured["environment"]["CODEX_HOME"] == str(ambient)
-    assert str(captured["path"]).startswith("/proc/self/fd/")
-    snapshot_path = Path(str(captured["snapshot_path"]))
-    assert snapshot_path.name == "codex"
+    assert captured["path"] == "/usr/bin/bwrap"
+    assert captured["snapshot_path"] == Path("/var/tmp/codex")
+    assert captured["inner_argv"][0] == "/var/tmp/codex"
+    assert "--tmpfs" in captured["argv"]
+    assert "--remount-ro" in captured["argv"]
     snapshot_dir = next(
-        parent
-        for parent in snapshot_path.parents
-        if parent.name.startswith("abyss-stack-codex-package-")
+        path
+        for path in (Path(manifest["codex_home"]) / "tmp").iterdir()
+        if path.name.startswith("abyss-stack-codex-package-")
     )
+    snapshot_path = next(snapshot_dir.rglob("codex"))
     assert snapshot_dir.name.startswith("abyss-stack-codex-package-")
     assert snapshot_path.parent != executable.parent
     assert stat.S_IMODE(snapshot_path.parent.stat().st_mode) == 0o500
     assert captured["snapshot_mode"] == 0o500
-    assert captured["snapshot_root_inheritable"] is True
     assert captured["inode_content"] == original_content
     assert executable.read_text(encoding="utf-8") == "replacement"
     MODULE._load_manifest_snapshot(manifest_path)
@@ -821,9 +832,15 @@ def test_shebang_node_launcher_reopens_named_snapshot(
 
     package.chmod(0o555)
     executable.parent.chmod(0o555)
-    snapshot_fd, snapshot_exec_path, content, _, snapshot_dir, snapshot_path = (
-        MODULE._open_verified_executable(executable, snapshot_root=tmp_path)
-    )
+    (
+        snapshot_fd,
+        snapshot_exec_path,
+        content,
+        _,
+        snapshot_dir,
+        snapshot_path,
+        snapshot_mount,
+    ) = MODULE._open_verified_executable(executable, snapshot_root=tmp_path)
     package.chmod(0o755)
     executable.parent.chmod(0o755)
     snapshot_relative = snapshot_path.relative_to(snapshot_dir)
@@ -840,12 +857,17 @@ def test_shebang_node_launcher_reopens_named_snapshot(
         (package / "package-relative.txt").write_text(
             "replaced-resource\n", encoding="utf-8"
         )
+        snapshot_prefix = MODULE._snapshot_bwrap_prefix(snapshot_mount)
+        snapshot_component_fds = tuple(
+            descriptor
+            for _, descriptor, _ in snapshot_mount["file_fds"]
+        )
         process = subprocess.Popen(
-            [str(snapshot_exec_path)],
+            [*snapshot_prefix, "--", str(snapshot_exec_path)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            pass_fds=(snapshot_fd,),
+            pass_fds=snapshot_component_fds,
         )
         process_pid = int(process.stdout.readline().strip())
         resource_line = process.stdout.readline()
@@ -858,10 +880,13 @@ def test_shebang_node_launcher_reopens_named_snapshot(
         if "process" in locals() and process.poll() is None:
             process.terminate()
             process.wait(timeout=5)
-        os.close(snapshot_fd)
+        MODULE._close_snapshot_mount(snapshot_mount)
         MODULE._remove_named_snapshot(
-            snapshot_path, snapshot_dir=snapshot_dir
+            snapshot_path,
+            snapshot_dir=snapshot_dir,
+            snapshot_dir_fd=snapshot_fd,
         )
+        os.close(snapshot_fd)
         assert not snapshot_dir.exists()
 
     assert content == original
@@ -892,6 +917,46 @@ def test_named_snapshot_cleanup_waits_for_exact_holder_exit(tmp_path: Path) -> N
     assert os.waitstatus_to_exitcode(holder_status) == 0
     assert os.waitstatus_to_exitcode(cleanup_status) == 0
     assert not snapshot_path.exists()
+
+
+def test_named_snapshot_cleanup_refuses_replacement_directory(
+    tmp_path: Path,
+) -> None:
+    original_dir = tmp_path / "abyss-stack-codex-package-original"
+    original_dir.mkdir()
+    original_path = original_dir / "codex"
+    original_path.write_bytes(b"original")
+    original_path.chmod(0o500)
+    snapshot_fd = os.open(
+        original_dir,
+        os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+    )
+    moved_dir = tmp_path / "abyss-stack-codex-package-moved"
+    replacement_dir = original_dir
+    try:
+        original_dir.rename(moved_dir)
+        replacement_dir.mkdir()
+        replacement_path = replacement_dir / "codex"
+        replacement_path.write_bytes(b"replacement")
+        replacement_path.chmod(0o500)
+
+        MODULE._remove_named_snapshot(
+            replacement_path,
+            snapshot_dir=replacement_dir,
+            snapshot_dir_fd=snapshot_fd,
+        )
+        assert replacement_dir.exists()
+        assert replacement_path.exists()
+
+        MODULE._remove_named_snapshot(
+            moved_dir / "codex",
+            snapshot_dir=moved_dir,
+            snapshot_dir_fd=snapshot_fd,
+        )
+        assert not moved_dir.exists()
+        assert replacement_dir.exists()
+    finally:
+        os.close(snapshot_fd)
 
 
 def test_kitty_dedication_rejects_sibling_terminal_child(

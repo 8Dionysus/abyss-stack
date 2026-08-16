@@ -144,23 +144,25 @@ publication fsyncs both the complete file and its containing directory before
 lifecycle code can proceed, so recovery sees the reservation/attempt entry
 rather than a merely cached directory update. Direct launch copies the exact
 verified executable bytes into an immutable launch snapshot: a sealed memfd for
-ELF and a filesystem-rooted private package-layout mirror containing a stable
-read-only named snapshot for the admitted shebang launcher. The mirror keeps
-the launcher's `$0`/module-relative coordinate, including parent-relative paths
-from nested launchers. Only source ancestors outside the detected package
-boundary are linked; the package subtree is copied into regular read-only
-snapshot files without writing to a root-owned installed package. The snapshot
+ELF and a filesystem-rooted private package-layout mirror for the admitted
+shebang launcher. Before shebang execution, the runtime reopens every copied
+directory and regular file, verifies its recorded device/inode and digest, and
+copies each verified regular file into a sealed memfd. Bubblewrap then
+materializes those sealed bytes into the matching package-relative tree in a
+private `/var/tmp` tmpfs, applies the admitted modes, and remounts that tree
+read-only before both version probing and final exec. This prevents the
+same-UID holder from replacing or chmodding the exact launcher or dependency
+coordinate. The mirror keeps the launcher's `$0`/module-relative coordinate,
+including parent-relative paths from nested launchers. Only source ancestors
+outside the detected package boundary are linked; the package subtree is
+copied without writing to a root-owned installed package. The host snapshot
 lives under the manifest's admitted `codex_home/tmp` local directory, and its
-`noexec` filesystem is rejected before materialization. The named form remains
-reopenable for Node-backed
-`#!/usr/bin/env node` launchers. The mirror directory is frozen non-writable
-before version probing and exec; the named shebang path is rooted through an
-inherited directory descriptor so a writable `tmp` entry cannot redirect the
-final exec after probing. The descriptor remains inheritable across interpreter
-exec, and a lifecycle child removes the exact snapshot and mirror after the
-holder's PID/start-tick identity exits. The launch executes that
-snapshot rather than mutable source-inode bytes or a replaceable source
-pathname. It then
+`noexec` filesystem is rejected before materialization; it is lifecycle cleanup
+evidence, not the final execution coordinate. The named form remains reopenable
+for Node-backed `#!/usr/bin/env node` launchers. A lifecycle child removes the
+exact snapshot and mirror after the holder's PID/start-tick identity exits. The
+launch executes the verified private namespace bytes rather than mutable
+source-inode bytes or a replaceable source pathname. It then
 sends `TERM` to the exact holder process
 through a pidfd opened after the final identity check; the receipt records that signal target
 separately from the terminal it observes. The non-replacing closure receipt

@@ -39,21 +39,23 @@ The controller:
   signal attempt before TERM and recovery never repeats an existing attempt;
   state and final receipts are atomically published with their containing
   directory fsynced before lifecycle progress, and replay of an unclosed
-  receipt remains failed. Direct ELF launch uses an inheritable sealed memfd;
-  direct shebang launch uses a private filesystem-rooted package-layout mirror
-  with a stable, read-only named snapshot of the admitted launcher and retains
-  its verified descriptor across interpreter exec. The mirror preserves the
-  launcher's `$0`/module-relative coordinate, including parent-relative paths
-  such as `bin/` launchers resolving `../vendor`. Source-ancestor links are
-  retained only outside the detected package boundary; the package subtree is
-  copied into regular read-only snapshot files without writing to a root-owned
-  installed package. The snapshot lives under the admitted `codex_home/tmp`
-  local directory, and its filesystem is rejected when marked `noexec`; the
-  mirror is frozen non-writable before version probing and exec. The named
-  shebang path is rooted through an inherited directory descriptor, so the
-  writable `tmp` entry cannot redirect the final exec after probing. A
-  lifecycle child removes the exact snapshot and mirror after the holder's
-  PID/start-tick identity exits. Both routes execute
+  receipt remains failed. Direct ELF launch uses an inheritable sealed memfd.
+  Direct shebang launch first builds a private filesystem-rooted package-layout
+  mirror, then reopens every copied directory and regular file to verify its
+  device/inode and bytes. Each verified regular file is copied into a sealed
+  memfd; bubblewrap materializes those sealed bytes into the matching
+  package-relative tree in a private `/var/tmp` tmpfs, applies the admitted
+  modes, and remounts that tree read-only before both version probing and final
+  exec. This execution coordinate cannot be renamed or chmodded by the
+  same-UID holder. The mirror preserves the launcher's `$0`/module-relative
+  coordinate, including parent-relative paths such as `bin/` launchers
+  resolving `../vendor`. Source-ancestor links are retained only outside the
+  detected package boundary; the package subtree is copied without writing to
+  a root-owned installed package. The host snapshot lives under the admitted
+  `codex_home/tmp` local directory, and its filesystem is rejected when marked
+  `noexec`; it remains lifecycle cleanup evidence rather than the mutable
+  final execution coordinate. A lifecycle child removes the exact snapshot and
+  mirror after the holder's PID/start-tick identity exits. Both routes execute
   the exact admitted bytes rather than mutable source-inode bytes or a
   replaceable source pathname, and the named route remains reopenable for
   Node-backed `#!/usr/bin/env node` launchers. A naturally exited exact pair is
