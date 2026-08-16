@@ -1799,10 +1799,129 @@ def _execution_snapshot_root(preferred: Path | None) -> Path:
     return root
 
 
+def _package_root(executable: Path) -> Path:
+    """Find the nearest package boundary without following a marker link."""
+
+    for candidate in (executable.parent, *executable.parent.parents):
+        if candidate == Path("/"):
+            break
+        marker = candidate / "package.json"
+        if marker.is_symlink():
+            raise IncarnationHomeError(
+                f"package marker may not be a symlink: {marker}"
+            )
+        if marker.is_file():
+            return candidate
+    return executable.parent
+
+
+def _copy_package_file(source: Path, target: Path) -> None:
+    source_flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        source_flags |= os.O_NOFOLLOW
+    source_fd: int | None = None
+    target_fd: int | None = None
+    try:
+        source_fd = os.open(source, source_flags)
+        before = os.fstat(source_fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise IncarnationHomeError(
+                f"package snapshot source is not a regular file: {source}"
+            )
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(source_fd, 1 << 20)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(source_fd)
+        if (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        ) != (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        ):
+            raise IncarnationHomeError(
+                f"package snapshot source changed while reading: {source}"
+            )
+        content = b"".join(chunks)
+        target_mode = 0o500 if before.st_mode & stat.S_IXUSR else 0o400
+        target_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        if hasattr(os, "O_NOFOLLOW"):
+            target_flags |= os.O_NOFOLLOW
+        target_fd = os.open(target, target_flags, target_mode)
+        view = memoryview(content)
+        while view:
+            view = view[os.write(target_fd, view) :]
+        os.fsync(target_fd)
+        os.fchmod(target_fd, target_mode)
+        os.fsync(target_fd)
+    except IncarnationHomeError:
+        raise
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"package dependency could not be snapshotted: {source}"
+        ) from exc
+    finally:
+        if target_fd is not None:
+            os.close(target_fd)
+        if source_fd is not None:
+            os.close(source_fd)
+
+
+def _copy_package_tree(
+    source: Path, target: Path, *, excluded: Path, ignored_source: Path
+) -> None:
+    """Copy a package subtree without retaining mutable dependency links."""
+
+    if source.is_symlink() or not source.is_dir():
+        raise IncarnationHomeError(
+            f"package snapshot root is not a real directory: {source}"
+        )
+    if target.is_symlink():
+        raise IncarnationHomeError(
+            f"package snapshot target is a symlink: {target}"
+        )
+    if not target.exists():
+        target.mkdir(mode=0o700)
+    if not target.is_dir():
+        raise IncarnationHomeError(
+            f"package snapshot target is not a directory: {target}"
+        )
+    for entry in sorted(source.iterdir(), key=lambda item: item.name):
+        if entry == excluded or entry == ignored_source:
+            continue
+        target_entry = target / entry.name
+        if entry.is_symlink():
+            raise IncarnationHomeError(
+                f"package dependency may not be a symlink: {entry}"
+            )
+        if entry.is_dir():
+            _copy_package_tree(
+                entry,
+                target_entry,
+                excluded=excluded,
+                ignored_source=ignored_source,
+            )
+        elif entry.is_file():
+            _copy_package_file(entry, target_entry)
+        else:
+            raise IncarnationHomeError(
+                f"package dependency is not a regular file or directory: {entry}"
+            )
+
+
 def _mirror_package_layout(
     *, executable: Path, snapshot_root: Path
 ) -> tuple[Path, Path]:
-    """Build a private symlinked path layout rooted at the filesystem root."""
+    """Build a private package snapshot with stable ancestor coordinates."""
 
     snapshot_dir = Path(
         tempfile.mkdtemp(prefix="abyss-stack-codex-package-", dir=snapshot_root)
@@ -1811,7 +1930,8 @@ def _mirror_package_layout(
         os.chmod(snapshot_dir, 0o700)
         source_dir = Path("/")
         target_dir = snapshot_dir
-        source_parts = executable.parent.parts
+        package_root = _package_root(executable)
+        source_parts = package_root.parts
         if not source_parts or source_parts[0] != "/":
             raise IncarnationHomeError("shebang executable parent must be absolute")
         for component in source_parts[1:]:
@@ -1826,15 +1946,13 @@ def _mirror_package_layout(
             source_dir = source_dir / component
             target_dir = target_dir / component
             target_dir.mkdir(mode=0o700)
-        for entry in source_dir.iterdir():
-            if entry.name == executable.name:
-                continue
-            os.symlink(
-                os.fspath(entry),
-                os.fspath(target_dir / entry.name),
-                target_is_directory=entry.is_dir(),
-            )
-        return target_dir / executable.name, snapshot_dir
+        _copy_package_tree(
+            source_dir,
+            target_dir,
+            excluded=executable,
+            ignored_source=snapshot_dir,
+        )
+        return target_dir / executable.relative_to(package_root), snapshot_dir
     except BaseException:
         _remove_named_snapshot(
             snapshot_dir / executable.name, snapshot_dir=snapshot_dir
@@ -2210,7 +2328,8 @@ def command_launch(args: argparse.Namespace) -> int:
         executable_digest,
         executable_snapshot_dir,
     ) = _open_verified_executable(
-        executable, snapshot_root=Path(str(manifest["codex_home"]))
+        executable,
+        snapshot_root=Path(str(manifest["codex_home"])) / "tmp",
     )
     try:
         _verify_executable_version(

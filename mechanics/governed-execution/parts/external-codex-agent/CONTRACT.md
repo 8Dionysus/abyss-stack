@@ -147,10 +147,12 @@ verified executable bytes into an immutable launch snapshot: a sealed memfd for
 ELF and a filesystem-rooted private package-layout mirror containing a stable
 read-only named snapshot for the admitted shebang launcher. The mirror keeps
 the launcher's `$0`/module-relative coordinate, including parent-relative paths
-from nested launchers, by linking each source ancestor's siblings without
-writing to a root-owned installed package. The preferred private execution root
-is the manifest's `codex_home`; a `noexec` filesystem is rejected before
-materialization. The named form remains reopenable for Node-backed
+from nested launchers. Only source ancestors outside the detected package
+boundary are linked; the package subtree is copied into regular read-only
+snapshot files without writing to a root-owned installed package. The snapshot
+lives under the manifest's admitted `codex_home/tmp` local directory, and its
+`noexec` filesystem is rejected before materialization. The named form remains
+reopenable for Node-backed
 `#!/usr/bin/env node` launchers. The mirror directory is frozen non-writable
 before version probing and exec, the descriptor remains inheritable across
 interpreter exec, and a lifecycle child removes the exact snapshot and mirror

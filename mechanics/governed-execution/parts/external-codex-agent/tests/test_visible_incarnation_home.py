@@ -659,6 +659,7 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert captured["snapshot_mode"] == 0o500
     assert captured["inode_content"] == original_content
     assert executable.read_text(encoding="utf-8") == "replacement"
+    MODULE._load_manifest_snapshot(manifest_path)
     MODULE._remove_named_snapshot(
         snapshot_path, snapshot_dir=snapshot_dir
     )
@@ -804,6 +805,7 @@ def test_shebang_node_launcher_reopens_named_snapshot(
     package.mkdir()
     executable = package / "bin" / "codex"
     executable.parent.mkdir()
+    (package / "package.json").write_text("{}\n", encoding="utf-8")
     (package / "package-relative.txt").write_text(
         "package-relative\n", encoding="utf-8"
     )
@@ -824,8 +826,15 @@ def test_shebang_node_launcher_reopens_named_snapshot(
     )
     package.chmod(0o755)
     executable.parent.chmod(0o755)
+    snapshot_resource = snapshot_path.parent.parent / "package-relative.txt"
+    assert snapshot_resource.is_file()
+    assert not snapshot_resource.is_symlink()
+    assert snapshot_resource.read_text(encoding="utf-8") == "package-relative\n"
     try:
         executable.write_text("#!/bin/sh\necho replaced\n", encoding="utf-8")
+        (package / "package-relative.txt").write_text(
+            "replaced-resource\n", encoding="utf-8"
+        )
         process = subprocess.Popen(
             [str(snapshot_path)],
             stdout=subprocess.PIPE,

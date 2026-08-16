@@ -44,12 +44,14 @@ The controller:
   with a stable, read-only named snapshot of the admitted launcher and retains
   its verified descriptor across interpreter exec. The mirror preserves the
   launcher's `$0`/module-relative coordinate, including parent-relative paths
-  such as `bin/` launchers resolving `../vendor`, through symlinked source
-  siblings without writing to a root-owned installed package. The selected
-  `codex_home` is the preferred private execution root and is rejected when its
-  filesystem is marked `noexec`; the mirror is frozen non-writable before
-  version probing and exec. A lifecycle child removes the exact snapshot and
-  mirror after the holder's PID/start-tick identity exits. Both routes execute
+  such as `bin/` launchers resolving `../vendor`. Source-ancestor links are
+  retained only outside the detected package boundary; the package subtree is
+  copied into regular read-only snapshot files without writing to a root-owned
+  installed package. The snapshot lives under the admitted `codex_home/tmp`
+  local directory, and its filesystem is rejected when marked `noexec`; the
+  mirror is frozen non-writable before version probing and exec. A lifecycle
+  child removes the exact snapshot and mirror after the holder's PID/start-tick
+  identity exits. Both routes execute
   the exact admitted bytes rather than mutable source-inode bytes or a
   replaceable source pathname, and the named route remains reopenable for
   Node-backed `#!/usr/bin/env node` launchers. A naturally exited exact pair is
