@@ -115,7 +115,12 @@ only for the direct `exec` route (not detached Kitty): immediately before the
 Codex `exec`, it writes a non-replacing receipt containing the holder PID,
 process-parent PID/start ticks, the first Kitty ancestor PID/start ticks/argv,
 the detached Kitty window identity/dedication proof, and executable/manifest
-digests. The holder argv is the post-exec `/proc` shape, including the
+digests. The receipt also carries the exact launch-time manifest bytes as a
+base64 snapshot bound to that digest. After launch, the recorded manifest
+pathname is provenance only: the closer validates the holder-bound snapshot so
+preparation/profile refreshes may rewrite the content-addressed pathname
+without changing the live holder identity. Legacy receipts without the
+snapshot retain their prior fail-closed pathname check. The holder argv is the post-exec `/proc` shape, including the
 interpreter argv of a shebang-backed executable. For that shebang route, an
 internal `payload-launch` helper runs as bubblewrap's payload, revalidates the
 manifest and private launcher digests, writes the receipt from its own PID
@@ -787,7 +792,10 @@ escaping paths, out-of-evidence-scope paths, and false anchors fail the report
 before its findings can enter independent review. Stable immutable-input refs
 remain `immutable:<input-id>#<anchor>`. A report may additionally cite only the
 reserved `runtime:workspace-final-manifest#<anchor>` identity for post-exit
-workspace state. The controller creates that manifest before report admission
+workspace state. A mutation task that expects a model to cite a produced artifact
+must enumerate that artifact path in `source_evidence_paths` during preparation;
+`allowed_paths` grants mutation and artifact production, but does not implicitly
+grant source-evidence authority. The controller creates that manifest before report admission
 and validates a line anchor against the exact runtime-owned bytes. A symbolic
 anchor must name either one exact top-level JSON member or one exact
 `content_entries[].path`; substring matches such as `git_head` inside
