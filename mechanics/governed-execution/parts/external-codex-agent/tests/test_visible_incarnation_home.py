@@ -531,6 +531,7 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
         runtime_root=runtime_root,
     )
     manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    manifest_snapshot = manifest_path.read_bytes()
     executable = tmp_path / "codex"
     executable.write_text(
         "#!/bin/sh\n"
@@ -555,6 +556,9 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
             argv=argv,
             environment=environment,
             executable_inheritable=os.get_inheritable(executable_fd),
+            executable_seals=MODULE.fcntl.fcntl(
+                executable_fd, MODULE.fcntl.F_GET_SEALS
+            ),
             inode_content=Path(path).read_bytes(),
         )
 
@@ -562,14 +566,26 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
 
     def replace_command_path_after_receipt(**kwargs: object) -> dict[str, object]:
         receipt = original_holder_receipt(**kwargs)
+        executable.write_text("mutated-in-place", encoding="utf-8")
         replacement = tmp_path / "replacement-codex"
         replacement.write_text("replacement", encoding="utf-8")
         replacement.chmod(0o700)
         os.replace(replacement, executable)
+        manifest_path.write_bytes(manifest_snapshot)
         return receipt
+
+    original_bound_codex_argv = MODULE.bound_codex_argv
+
+    def replace_manifest_after_binding(**kwargs: object) -> list[str]:
+        result = original_bound_codex_argv(**kwargs)
+        manifest_path.write_bytes(b"replaced-after-manifest-load")
+        return result
 
     monkeypatch.setattr(
         MODULE, "_holder_receipt", replace_command_path_after_receipt
+    )
+    monkeypatch.setattr(
+        MODULE, "bound_codex_argv", replace_manifest_after_binding
     )
 
     terminal_pid = os.getppid()
@@ -614,11 +630,21 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert receipt["terminal"]["window_id"] == "1"
     assert receipt["terminal"]["dedicated"] is True
     assert receipt["runtime"]["incarnation_manifest"] == str(manifest_path)
+    assert receipt["runtime"]["incarnation_manifest_digest"] == MODULE.sha256_bytes(
+        manifest_snapshot
+    )
     assert receipt["runtime"]["model"] == "gpt-5.6-luna"
     assert receipt["runtime"]["reasoning_effort"] == "max"
     assert captured["environment"]["CODEX_HOME"] == str(ambient)
     assert str(captured["path"]).startswith("/proc/self/fd/")
     assert captured["executable_inheritable"] is True
+    required_seals = (
+        MODULE.fcntl.F_SEAL_WRITE
+        | MODULE.fcntl.F_SEAL_GROW
+        | MODULE.fcntl.F_SEAL_SHRINK
+        | MODULE.fcntl.F_SEAL_SEAL
+    )
+    assert captured["executable_seals"] & required_seals == required_seals
     assert captured["inode_content"] == original_content
     assert executable.read_text(encoding="utf-8") == "replacement"
 
@@ -853,7 +879,13 @@ def test_identity_bound_close_records_already_gone_without_reopening_manifest(
         ),
         encoding="utf-8",
     )
-    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _start: "gone")
+    states = iter(["live", "gone", "gone", "gone"])
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_identity_state",
+        lambda _pid, _start: next(states, "gone"),
+    )
+    monkeypatch.setattr(MODULE.time, "sleep", lambda _seconds: None)
 
     assert MODULE.command_close(
         MODULE.argparse.Namespace(

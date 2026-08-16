@@ -40,9 +40,10 @@ The controller:
   state and final receipts are atomically published with their containing
   directory fsynced before lifecycle progress, and replay of an unclosed
   receipt remains failed. Direct shebang launch retains an inheritable verified
-  descriptor across the interpreter exec, so it retains the verified
-  executable inode rather than reopening its pathname. A naturally exited
-  exact pair is recorded as `already_gone` without marker reconstruction.
+  descriptor across the interpreter exec, so it executes a sealed immutable
+  snapshot rather than mutable source-inode bytes or a reopened pathname. A
+  naturally exited exact pair is recorded as `already_gone` without marker
+  reconstruction.
   This identity is
   distinct from any nested proof actor. This operator surface is not A2A transport and
   does not replace the governed JSONL runtime;

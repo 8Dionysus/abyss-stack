@@ -80,13 +80,19 @@ def _regular_file(path: Path, label: str) -> Path:
     return path.resolve()
 
 
-def _load_json(path: Path, label: str) -> dict[str, Any]:
+def _load_json_snapshot(path: Path, label: str) -> tuple[dict[str, Any], bytes]:
     try:
-        value = json.loads(_regular_file(path, label).read_text(encoding="utf-8"))
+        raw = _regular_file(path, label).read_bytes()
+        value = json.loads(raw)
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise IncarnationHomeError(f"cannot read {label}: {path}") from exc
     if not isinstance(value, dict):
         raise IncarnationHomeError(f"{label} must be a JSON object")
+    return value, raw
+
+
+def _load_json(path: Path, label: str) -> dict[str, Any]:
+    value, _ = _load_json_snapshot(path, label)
     return value
 
 
@@ -391,6 +397,28 @@ def _proc_identity_state(pid: int, start_ticks: int) -> str:
     if observed_start_ticks != start_ticks:
         return "drifted"
     return "live"
+
+
+def _wait_for_natural_pair_exit(
+    *,
+    holder_pid: int,
+    holder_start_ticks: int,
+    kitty_pid: int,
+    kitty_start_ticks: int,
+    holder_state: str,
+    kitty_state: str,
+) -> tuple[str, str]:
+    """Give a surviving exact identity time to finish natural shutdown."""
+
+    for _ in range(40):
+        if holder_state == "gone" and kitty_state == "gone":
+            return holder_state, kitty_state
+        if holder_state == "drifted" or kitty_state == "drifted":
+            return holder_state, kitty_state
+        time.sleep(0.25)
+        kitty_state = _proc_identity_state(kitty_pid, kitty_start_ticks)
+        holder_state = _proc_identity_state(holder_pid, holder_start_ticks)
+    return holder_state, kitty_state
 
 
 def _proc_parent_pid(pid: int) -> int:
@@ -752,6 +780,8 @@ def _holder_receipt(
     argv: Sequence[str],
     executable_bytes: bytes | None = None,
     executable_digest: str | None = None,
+    manifest_bytes: bytes | None = None,
+    manifest_digest: str | None = None,
 ) -> dict[str, Any]:
     holder_pid = os.getpid()
     holder_parent_pid = os.getppid()
@@ -772,8 +802,17 @@ def _holder_receipt(
     )
     try:
         if executable_digest is None:
-            executable_digest = sha256_bytes(executable.read_bytes())
-        manifest_digest = sha256_bytes(manifest_path.read_bytes())
+            executable_digest = sha256_bytes(
+                executable_bytes
+                if executable_bytes is not None
+                else executable.read_bytes()
+            )
+        if manifest_digest is None:
+            manifest_digest = sha256_bytes(
+                manifest_bytes
+                if manifest_bytes is not None
+                else manifest_path.read_bytes()
+            )
     except OSError as exc:
         raise IncarnationHomeError("holder identity inputs could not be hashed") from exc
     receipt = {
@@ -1107,10 +1146,27 @@ def command_close(args: argparse.Namespace) -> int:
             identity_state = "already_gone"
             closed = True
         elif kitty_state != "live" or holder_state != "live":
-            identity_state = "partial_gone" if (kitty_gone or holder_gone) else "identity_drift"
-            failure = IncarnationHomeError(
-                "holder terminal identity was not simultaneously live or already gone"
-            )
+            if kitty_gone or holder_gone:
+                holder_state, kitty_state = _wait_for_natural_pair_exit(
+                    holder_pid=holder_pid,
+                    holder_start_ticks=holder_start_ticks,
+                    kitty_pid=kitty_pid,
+                    kitty_start_ticks=kitty_start_ticks,
+                    holder_state=holder_state,
+                    kitty_state=kitty_state,
+                )
+                kitty_gone = kitty_state == "gone"
+                holder_gone = holder_state == "gone"
+                if kitty_gone and holder_gone:
+                    identity_state = "already_gone"
+                    closed = True
+            if not closed:
+                identity_state = (
+                    "partial_gone" if (kitty_gone or holder_gone) else "identity_drift"
+                )
+                failure = IncarnationHomeError(
+                    "holder terminal identity was not simultaneously live or already gone"
+                )
         else:
             try:
                 (
@@ -1130,6 +1186,17 @@ def command_close(args: argparse.Namespace) -> int:
                 holder_state = _proc_identity_state(holder_pid, holder_start_ticks)
                 kitty_gone = kitty_state == "gone"
                 holder_gone = holder_state == "gone"
+                if kitty_gone or holder_gone:
+                    holder_state, kitty_state = _wait_for_natural_pair_exit(
+                        holder_pid=holder_pid,
+                        holder_start_ticks=holder_start_ticks,
+                        kitty_pid=kitty_pid,
+                        kitty_start_ticks=kitty_start_ticks,
+                        holder_state=holder_state,
+                        kitty_state=kitty_state,
+                    )
+                    kitty_gone = kitty_state == "gone"
+                    holder_gone = holder_state == "gone"
                 if kitty_gone and holder_gone:
                     identity_state = "already_gone"
                     closed = True
@@ -1440,8 +1507,10 @@ def prepare_home(
     return manifest
 
 
-def _load_manifest(path: Path) -> dict[str, Any]:
-    manifest = _load_json(path, "incarnation-home manifest")
+def _load_manifest_snapshot(
+    path: Path,
+) -> tuple[dict[str, Any], bytes, str]:
+    manifest, raw = _load_json_snapshot(path, "incarnation-home manifest")
     if manifest.get("schema_version") != SCHEMA_VERSION:
         raise IncarnationHomeError("unsupported incarnation-home manifest")
     codex_home = _absolute_directory(Path(str(manifest.get("codex_home"))), "incarnation Codex home")
@@ -1545,6 +1614,11 @@ def _load_manifest(path: Path) -> dict[str, Any]:
         local = codex_home / name
         if local.is_symlink() or not local.is_dir():
             raise IncarnationHomeError(f"actor-local {name} is not a real directory")
+    return manifest, raw, sha256_bytes(raw)
+
+
+def _load_manifest(path: Path) -> dict[str, Any]:
+    manifest, _, _ = _load_manifest_snapshot(path)
     return manifest
 
 
@@ -1574,38 +1648,80 @@ def _open_verified_executable(
     flags = os.O_RDONLY
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
-    fd: int | None = None
+    source_fd: int | None = None
+    snapshot_fd: int | None = None
     try:
-        fd = os.open(executable, flags)
-        # A shebang exec reopens the script through /proc/self/fd/<fd>; Python
-        # creates descriptors non-inheritable by default, so make this exact
-        # inode descriptor survive the interpreter transition.
-        os.set_inheritable(fd, True)
-        info = os.fstat(fd)
+        source_fd = os.open(executable, flags)
+        info = os.fstat(source_fd)
         if not stat.S_ISREG(info.st_mode):
             raise IncarnationHomeError(
                 f"Codex executable is not a regular file: {executable}"
             )
-        os.lseek(fd, 0, os.SEEK_SET)
+        os.lseek(source_fd, 0, os.SEEK_SET)
         chunks: list[bytes] = []
         while True:
-            chunk = os.read(fd, 1 << 20)
+            chunk = os.read(source_fd, 1 << 20)
             if not chunk:
                 break
             chunks.append(chunk)
-        os.lseek(fd, 0, os.SEEK_SET)
         content = b"".join(chunks)
-        return fd, Path(f"/proc/self/fd/{fd}"), content, sha256_bytes(content)
+        memfd_create = getattr(os, "memfd_create", None)
+        allow_sealing = getattr(os, "MFD_ALLOW_SEALING", None)
+        add_seals = getattr(fcntl, "F_ADD_SEALS", None)
+        seal_write = getattr(fcntl, "F_SEAL_WRITE", None)
+        seal_grow = getattr(fcntl, "F_SEAL_GROW", None)
+        seal_shrink = getattr(fcntl, "F_SEAL_SHRINK", None)
+        seal_seal = getattr(fcntl, "F_SEAL_SEAL", None)
+        if (
+            not callable(memfd_create)
+            or not isinstance(allow_sealing, int)
+            or not isinstance(add_seals, int)
+            or not all(
+                isinstance(value, int)
+                for value in (seal_write, seal_grow, seal_shrink, seal_seal)
+            )
+        ):
+            raise IncarnationHomeError(
+                "sealed executable snapshot is unavailable on this host"
+            )
+        snapshot_fd = memfd_create(
+            "abyss-stack-codex-executable",
+            allow_sealing,
+        )
+        os.fchmod(snapshot_fd, 0o700)
+        view = memoryview(content)
+        while view:
+            view = view[os.write(snapshot_fd, view) :]
+        os.fsync(snapshot_fd)
+        fcntl.fcntl(
+            snapshot_fd,
+            add_seals,
+            seal_write | seal_grow | seal_shrink | seal_seal,
+        )
+        # A shebang exec reopens the immutable snapshot through
+        # /proc/self/fd/<fd>; keep this descriptor across the interpreter
+        # transition instead of relying on Python's non-inheritable default.
+        os.set_inheritable(snapshot_fd, True)
+        os.lseek(snapshot_fd, 0, os.SEEK_SET)
+        return (
+            snapshot_fd,
+            Path(f"/proc/self/fd/{snapshot_fd}"),
+            content,
+            sha256_bytes(content),
+        )
     except IncarnationHomeError:
-        if fd is not None:
-            os.close(fd)
+        if snapshot_fd is not None:
+            os.close(snapshot_fd)
         raise
     except OSError as exc:
-        if fd is not None:
-            os.close(fd)
+        if snapshot_fd is not None:
+            os.close(snapshot_fd)
         raise IncarnationHomeError(
-            f"Codex executable could not be opened for inode-bound exec: {executable}"
+            f"Codex executable could not be sealed for immutable exec: {executable}"
         ) from exc
+    finally:
+        if source_fd is not None:
+            os.close(source_fd)
 
 
 def _inode_exec_argv(
@@ -1771,8 +1887,8 @@ def command_launch(args: argparse.Namespace) -> int:
         raise IncarnationHomeError(
             "holder terminal receipt requires direct exec; it cannot bind a detached Kitty"
         )
-    manifest = _load_manifest(Path(args.manifest))
     manifest_path = _regular_file(Path(args.manifest), "incarnation-home manifest")
+    manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(manifest_path)
     command = Path(args.codex_executable)
     executable = _resolved_executable(command)
     environment = dict(os.environ)
@@ -1821,6 +1937,8 @@ def command_launch(args: argparse.Namespace) -> int:
                 argv=exec_argv,
                 executable_bytes=executable_bytes,
                 executable_digest=executable_digest,
+                manifest_bytes=manifest_bytes,
+                manifest_digest=manifest_digest,
             )
         os.execve(str(executable_fd_path), exec_argv, environment)
         return 127

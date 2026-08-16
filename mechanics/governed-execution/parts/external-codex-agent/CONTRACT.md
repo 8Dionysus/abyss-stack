@@ -142,10 +142,11 @@ final receipt is also published as one complete non-replacing file, and a
 completed `closed: false` receipt remains a failure on replay. Every atomic
 publication fsyncs both the complete file and its containing directory before
 lifecycle code can proceed, so recovery sees the reservation/attempt entry
-rather than a merely cached directory update. Direct shebang launch keeps the
-verified descriptor inheritable across the interpreter exec; the launcher
-therefore retains the verified executable inode through direct exec rather than
-reopening its pathname. It then sends `TERM` to the exact holder process
+rather than a merely cached directory update. Direct launch copies the exact
+verified executable bytes into a sealed immutable snapshot, keeps that
+descriptor inheritable across a shebang interpreter exec, and executes the
+snapshot rather than mutable source-inode bytes or a reopened pathname. It then
+sends `TERM` to the exact holder process
 through a pidfd opened after the final identity check; the receipt records that signal target
 separately from the terminal it observes. The non-replacing closure receipt
 records the final Kitty disappearance
@@ -490,9 +491,10 @@ the credential-bearing worker. Before it
 launches Codex, the supervisor verifies the exact worker PPID, enables
 `PR_SET_CHILD_SUBREAPER`, requests `SIGTERM` through `PR_SET_PDEATHSIG`, and
 checks the PPID again to close the parent-death setup race. It then opens the
-resolved executable without following symlinks, re-hashes that exact file
-descriptor against the admitted digest, checks that the inode did not change
-during hashing, and executes `/proc/self/fd/<fd>` with the descriptor inherited.
+resolved executable without following symlinks, copies and re-hashes those
+exact bytes into a sealed immutable descriptor, and executes
+`/proc/self/fd/<fd>` with that descriptor inherited. In-place source mutation
+after admission therefore cannot change the bytes that execute.
 If identity publication or the final parent check fails, the supervisor retains
 its launch-gate endpoint until the blocked wrapper has been killed and reaped.
 The wrapper itself retains the peer endpoint, so even an abnormal supervisor
