@@ -133,7 +133,11 @@ of the exact handoff bytes delivered to the master; the closer hashes and
 parses that same snapshot before accepting delivery. It then rechecks the holder's exact
 kernel boot ID and PID/start-ticks/argv, its process-parent identity, the recorded Kitty window,
 and the dedicated Kitty process, reserves the closure receipt before
-signaling in a recoverable, atomically published sidecar reservation, and sends `TERM` to the exact holder process through a pidfd opened
+signaling in a recoverable, atomically published sidecar reservation. The
+sidecar is locked and advanced to a durable signal-attempt state before the
+first `TERM`; recovery rechecks the completed receipt after lock acquisition
+and never sends a second `TERM` for an existing attempt. It then sends `TERM`
+to the exact holder process through a pidfd opened
 after the final identity check; the receipt records that signal target
 separately from the terminal it observes. The non-replacing closure receipt
 records the final Kitty disappearance

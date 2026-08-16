@@ -35,8 +35,10 @@ The controller:
   the exact handoff bytes delivered to the master; after delivery, a host-side
   bridge may run the closer in the same host unit. The holder receipt also
   binds the kernel boot ID alongside each process start tick. The closer publishes a
-  recoverable sidecar reservation before signaling, and a naturally exited
-  exact pair is recorded as `already_gone` without marker reconstruction. This identity is
+  recoverable sidecar reservation before signaling. The sidecar records the
+  signal attempt before TERM and recovery never repeats an existing attempt;
+  a naturally exited exact pair is recorded as `already_gone` without marker
+  reconstruction. This identity is
   distinct from any nested proof actor. This operator surface is not A2A transport and
   does not replace the governed JSONL runtime;
 - requires every task to preserve the complete runtime-wide forbidden-effect

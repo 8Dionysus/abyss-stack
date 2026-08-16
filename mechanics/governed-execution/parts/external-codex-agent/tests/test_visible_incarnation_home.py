@@ -849,7 +849,7 @@ def test_closure_reservation_reopens_after_interrupted_attempt(tmp_path: Path) -
     for path in (handoff, holder, wake):
         path.write_text("{}", encoding="utf-8")
 
-    reservation_fd, reservation_path = MODULE._reserve_closure_receipt(
+    reservation_fd, reservation_path, completed = MODULE._reserve_closure_receipt(
         closure_receipt_path=closure,
         handoff_path=handoff,
         holder_receipt_path=holder,
@@ -857,6 +857,7 @@ def test_closure_reservation_reopens_after_interrupted_attempt(tmp_path: Path) -
         holder_pid=101,
         terminal_pid=202,
     )
+    assert completed is None
     MODULE.fcntl.flock(reservation_fd, MODULE.fcntl.LOCK_UN)
     os.close(reservation_fd)
     assert not closure.exists()
@@ -865,7 +866,7 @@ def test_closure_reservation_reopens_after_interrupted_attempt(tmp_path: Path) -
     assert reservation["holder_pid"] == 101
     assert reservation["terminal_pid"] == 202
 
-    retry_fd, retry_path = MODULE._reserve_closure_receipt(
+    retry_fd, retry_path, completed = MODULE._reserve_closure_receipt(
         closure_receipt_path=closure,
         handoff_path=handoff,
         holder_receipt_path=holder,
@@ -873,6 +874,7 @@ def test_closure_reservation_reopens_after_interrupted_attempt(tmp_path: Path) -
         holder_pid=101,
         terminal_pid=202,
     )
+    assert completed is None
     MODULE.fcntl.flock(retry_fd, MODULE.fcntl.LOCK_UN)
     os.close(retry_fd)
     assert retry_path == reservation_path
@@ -886,6 +888,190 @@ def test_closure_reservation_reopens_after_interrupted_attempt(tmp_path: Path) -
             holder_pid=303,
             terminal_pid=202,
         )
+
+
+def test_closure_reservation_rechecks_completed_receipt_after_lock(
+    tmp_path: Path,
+) -> None:
+    handoff = tmp_path / "handoff.json"
+    holder = tmp_path / "holder.json"
+    wake = tmp_path / "wake.json"
+    closure = tmp_path / "closure.json"
+    for path in (handoff, holder, wake):
+        path.write_text("{}", encoding="utf-8")
+
+    reservation_fd, reservation_path, completed = MODULE._reserve_closure_receipt(
+        closure_receipt_path=closure,
+        handoff_path=handoff,
+        holder_receipt_path=holder,
+        wake_receipt_path=wake,
+        holder_pid=101,
+        terminal_pid=202,
+    )
+    assert completed is None
+    MODULE.fcntl.flock(reservation_fd, MODULE.fcntl.LOCK_UN)
+    os.close(reservation_fd)
+    closure.write_text(
+        json.dumps(
+            {
+                "reservation_ref": str(reservation_path.resolve()),
+                "holder": {"pid": 101},
+                "terminal": {"pid": 202},
+                "closed": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    retry_fd, retry_path, completed = MODULE._reserve_closure_receipt(
+        closure_receipt_path=closure,
+        handoff_path=handoff,
+        holder_receipt_path=holder,
+        wake_receipt_path=wake,
+        holder_pid=101,
+        terminal_pid=202,
+    )
+    try:
+        assert retry_path == reservation_path
+        assert completed is not None
+        assert completed["closed"] is True
+    finally:
+        MODULE.fcntl.flock(retry_fd, MODULE.fcntl.LOCK_UN)
+        os.close(retry_fd)
+
+
+def test_interrupted_signal_attempt_is_not_retried(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    holder = tmp_path / "holder.json"
+    handoff = tmp_path / "handoff.json"
+    wake = tmp_path / "wake.json"
+    closure = tmp_path / "closure.json"
+    holder_payload = {
+        "schema_version": MODULE.HOLDER_RECEIPT_SCHEMA_VERSION,
+        "receipt_ref": str(holder),
+        "created_at": "2026-08-15T00:00:00Z",
+        "lifecycle_role": "responsibility_holder",
+        "boot_id": MODULE._proc_boot_id(),
+        "holder": {
+            "pid": 987654321,
+            "start_ticks": 11,
+            "parent_pid": 987654322,
+            "parent_start_ticks": 12,
+            "parent_comm": "kitty",
+            "argv": ["/usr/bin/codex", "exec"],
+            "argv_digest": MODULE.sha256_bytes(
+                MODULE.canonical_bytes(["/usr/bin/codex", "exec"])
+            ),
+        },
+        "runtime": {
+            "codex_executable": str(tmp_path / "missing-codex"),
+            "codex_executable_digest": "sha256:" + "0" * 64,
+            "incarnation_manifest": str(tmp_path / "missing-manifest"),
+            "incarnation_manifest_digest": "sha256:" + "1" * 64,
+            "model": "gpt-5.6-luna",
+            "reasoning_effort": "max",
+            "ambient_codex_home": str(tmp_path),
+            "incarnation_codex_home": str(tmp_path),
+        },
+        "terminal": {
+            "binding": "kitty_ancestor_at_exec",
+            "required_comm": "kitty",
+            "pid": 987654323,
+            "start_ticks": 13,
+            "argv": ["/usr/bin/kitty", "--detach", "--title", "holder"],
+            "window_id": "7",
+            "dedicated": True,
+        },
+    }
+    holder.write_text(json.dumps(holder_payload), encoding="utf-8")
+    handoff.write_text(
+        json.dumps(
+            {
+                "runtime": {
+                    "responsibility_holder": {
+                        "terminal_receipt": str(holder),
+                        "terminal_receipt_sha256": MODULE.sha256_bytes(
+                            holder.read_bytes()
+                        ),
+                        "closure_receipt": str(closure),
+                        "holder_pid": holder_payload["holder"]["pid"],
+                        "terminal_pid": holder_payload["terminal"]["pid"],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    wake.write_text(
+        json.dumps(
+            {
+                "schema_version": "task_local_actor_wake_receipt_v1",
+                "handoff_ref": str(handoff),
+                "handoff_sha256": MODULE.sha256_bytes(handoff.read_bytes()),
+                "actions": {"handoff_message_sent": True},
+                "observed": {"handoff_delivery": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+    reservation_fd, reservation_path, completed = MODULE._reserve_closure_receipt(
+        closure_receipt_path=closure,
+        handoff_path=handoff,
+        holder_receipt_path=holder,
+        wake_receipt_path=wake,
+        holder_pid=holder_payload["holder"]["pid"],
+        terminal_pid=holder_payload["terminal"]["pid"],
+    )
+    assert completed is None
+    reservation = MODULE._read_locked_json(
+        reservation_fd, "terminal closure reservation"
+    )
+    reservation.update(
+        {
+            "signal": "TERM",
+            "signal_target": "holder_process",
+            "signal_attempted": True,
+            "signal_attempted_at": "2026-08-15T00:00:01Z",
+            "signal_delivery": "unknown",
+            "signal_sent": False,
+        }
+    )
+    MODULE._write_locked_json(
+        reservation_fd, reservation, "terminal closure reservation"
+    )
+    MODULE.fcntl.flock(reservation_fd, MODULE.fcntl.LOCK_UN)
+    os.close(reservation_fd)
+
+    states = iter(["live", "live", "gone", "gone"])
+    monkeypatch.setattr(
+        MODULE, "_proc_identity_state", lambda _pid, _start: next(states, "gone")
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_holder_terminal_identity",
+        lambda _receipt: (987654321, 987654323, "kitty", "7", True),
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_send_verified_term",
+        lambda *_args: pytest.fail("interrupted TERM attempt was retried"),
+    )
+
+    assert MODULE.command_close(
+        MODULE.argparse.Namespace(
+            handoff=str(handoff),
+            holder_receipt=str(holder),
+            wake_receipt=str(wake),
+            closure_receipt=str(closure),
+        )
+    ) == 0
+    recorded = json.loads(closure.read_text(encoding="utf-8"))
+    assert recorded["closed"] is True
+    assert recorded["terminal"]["signal_attempted"] is True
+    assert recorded["terminal"]["signal_delivery"] == "unknown"
+    assert recorded["terminal"]["signal_sent"] is False
+    assert recorded["reservation_ref"] == str(reservation_path.resolve())
 
 
 def test_wake_delivery_requires_exact_holder_and_closure_binding(

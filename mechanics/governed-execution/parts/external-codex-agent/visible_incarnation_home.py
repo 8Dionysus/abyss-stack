@@ -612,6 +612,19 @@ def _read_locked_json(fd: int, label: str) -> dict[str, Any]:
     return value
 
 
+def _write_locked_json(fd: int, value: dict[str, Any], label: str) -> None:
+    payload = canonical_bytes(value) + b"\n"
+    try:
+        os.ftruncate(fd, 0)
+        os.lseek(fd, 0, os.SEEK_SET)
+        view = memoryview(payload)
+        while view:
+            view = view[os.write(fd, view) :]
+        os.fsync(fd)
+    except OSError as exc:
+        raise IncarnationHomeError(f"cannot update {label}") from exc
+
+
 def _reserve_closure_receipt(
     *,
     closure_receipt_path: Path,
@@ -620,16 +633,20 @@ def _reserve_closure_receipt(
     wake_receipt_path: Path,
     holder_pid: int,
     terminal_pid: int,
-) -> tuple[int, Path]:
+) -> tuple[int, Path, dict[str, Any] | None]:
     """Reserve a recoverable close attempt before any external signal."""
 
     if (
         not closure_receipt_path.is_absolute()
         or closure_receipt_path.is_symlink()
-        or closure_receipt_path.exists()
     ):
         raise IncarnationHomeError(
-            "terminal closure receipt already exists or is invalid: "
+            "terminal closure receipt path is invalid: "
+            f"{closure_receipt_path}"
+        )
+    if closure_receipt_path.exists() and not closure_receipt_path.is_file():
+        raise IncarnationHomeError(
+            "terminal closure receipt path is not a regular file: "
             f"{closure_receipt_path}"
         )
     parent = closure_receipt_path.parent
@@ -642,6 +659,11 @@ def _reserve_closure_receipt(
     if reservation_path.is_symlink():
         raise IncarnationHomeError(
             f"terminal closure reservation may not be a symlink: {reservation_path}"
+        )
+    if closure_receipt_path.exists() and not reservation_path.exists():
+        raise IncarnationHomeError(
+            "terminal closure receipt already exists without its reservation: "
+            f"{closure_receipt_path}"
         )
     expected = {
         "schema_version": CLOSURE_RESERVATION_SCHEMA_VERSION,
@@ -692,7 +714,24 @@ def _reserve_closure_receipt(
         recorded = _read_locked_json(reservation_fd, "terminal closure reservation")
         if any(recorded.get(key) != value for key, value in expected.items()):
             raise IncarnationHomeError("terminal closure reservation identity mismatch")
-        return reservation_fd, reservation_path
+        completed: dict[str, Any] | None = None
+        if closure_receipt_path.exists():
+            completed = _load_json(
+                closure_receipt_path, "terminal closure receipt"
+            )
+            if completed.get("reservation_ref") != str(reservation_path.resolve()):
+                raise IncarnationHomeError(
+                    "completed terminal closure reservation identity mismatch"
+                )
+            if completed.get("holder", {}).get("pid") != holder_pid:
+                raise IncarnationHomeError(
+                    "completed terminal closure holder identity mismatch"
+                )
+            if completed.get("terminal", {}).get("pid") != terminal_pid:
+                raise IncarnationHomeError(
+                    "completed terminal closure terminal identity mismatch"
+                )
+        return reservation_fd, reservation_path, completed
     except BaseException:
         if reservation_fd is not None:
             fcntl.flock(reservation_fd, fcntl.LOCK_UN)
@@ -1000,7 +1039,7 @@ def command_close(args: argparse.Namespace) -> int:
     kitty_comm = receipt["terminal"].get("required_comm", "kitty")
     kitty_window_id = receipt["terminal"].get("window_id")
     kitty_dedicated = receipt["terminal"].get("dedicated")
-    reservation_fd, reservation_path = _reserve_closure_receipt(
+    reservation_fd, reservation_path, completed = _reserve_closure_receipt(
         closure_receipt_path=closure_receipt_path,
         handoff_path=handoff_path,
         holder_receipt_path=holder_receipt_path,
@@ -1008,7 +1047,39 @@ def command_close(args: argparse.Namespace) -> int:
         holder_pid=holder_pid,
         terminal_pid=kitty_pid,
     )
-    signal_sent = False
+    try:
+        reservation = _read_locked_json(
+            reservation_fd, "terminal closure reservation"
+        )
+    except BaseException:
+        fcntl.flock(reservation_fd, fcntl.LOCK_UN)
+        os.close(reservation_fd)
+        raise
+    if completed is not None:
+        try:
+            print(json.dumps(completed, ensure_ascii=False, sort_keys=True))
+        finally:
+            fcntl.flock(reservation_fd, fcntl.LOCK_UN)
+            os.close(reservation_fd)
+        return 0
+
+    signal_attempted = reservation.get("signal_attempted") is True
+    signal_delivery = reservation.get("signal_delivery")
+    if signal_delivery not in {
+        "not_attempted",
+        "confirmed",
+        "not_delivered",
+        "failed",
+        "unknown",
+    }:
+        signal_delivery = (
+            "confirmed"
+            if reservation.get("signal_sent") is True
+            else "unknown"
+            if signal_attempted
+            else "not_attempted"
+        )
+    signal_sent = signal_delivery == "confirmed"
     closed = False
     kitty_gone = False
     holder_gone = False
@@ -1056,19 +1127,76 @@ def command_close(args: argparse.Namespace) -> int:
                     identity_state = "identity_drift"
                     failure = exc
             if failure is None and not closed:
-                try:
-                    signal_sent = _send_verified_term(holder_pid, holder_start_ticks)
-                except IncarnationHomeError as exc:
-                    kitty_state = _proc_identity_state(kitty_pid, kitty_start_ticks)
-                    holder_state = _proc_identity_state(holder_pid, holder_start_ticks)
-                    kitty_gone = kitty_state == "gone"
-                    holder_gone = holder_state == "gone"
-                    if kitty_gone and holder_gone:
-                        identity_state = "already_gone"
-                        closed = True
+                if not signal_attempted:
+                    reservation = {
+                        **reservation,
+                        "signal": "TERM",
+                        "signal_target": "holder_process",
+                        "signal_attempted": True,
+                        "signal_attempted_at": _utc_now(),
+                        "signal_delivery": "unknown",
+                        "signal_sent": False,
+                    }
+                    # This state transition is durable and locked before the
+                    # destructive syscall.  A closer that dies after TERM
+                    # cannot be mistaken for a never-attempted retry.
+                    _write_locked_json(
+                        reservation_fd,
+                        reservation,
+                        "terminal closure reservation",
+                    )
+                    signal_attempted = True
+                    signal_delivery = "unknown"
+                    try:
+                        signal_sent = _send_verified_term(
+                            holder_pid, holder_start_ticks
+                        )
+                    except IncarnationHomeError as exc:
+                        signal_delivery = "failed"
+                        reservation = {
+                            **reservation,
+                            "signal_delivery": signal_delivery,
+                            "signal_sent": False,
+                            "signal_observed_at": _utc_now(),
+                        }
+                        _write_locked_json(
+                            reservation_fd,
+                            reservation,
+                            "terminal closure reservation",
+                        )
+                        kitty_state = _proc_identity_state(
+                            kitty_pid, kitty_start_ticks
+                        )
+                        holder_state = _proc_identity_state(
+                            holder_pid, holder_start_ticks
+                        )
+                        kitty_gone = kitty_state == "gone"
+                        holder_gone = holder_state == "gone"
+                        if kitty_gone and holder_gone:
+                            identity_state = "already_gone"
+                            closed = True
+                        else:
+                            failure = exc
                     else:
-                        failure = exc
-                if failure is None and not signal_sent:
+                        signal_delivery = (
+                            "confirmed" if signal_sent else "not_delivered"
+                        )
+                        reservation = {
+                            **reservation,
+                            "signal_delivery": signal_delivery,
+                            "signal_sent": signal_sent,
+                            "signal_observed_at": _utc_now(),
+                        }
+                        _write_locked_json(
+                            reservation_fd,
+                            reservation,
+                            "terminal closure reservation",
+                        )
+                if (
+                    failure is None
+                    and not closed
+                    and signal_delivery == "not_delivered"
+                ):
                     kitty_state = _proc_identity_state(kitty_pid, kitty_start_ticks)
                     holder_state = _proc_identity_state(holder_pid, holder_start_ticks)
                     kitty_gone = kitty_state == "gone"
@@ -1081,6 +1209,14 @@ def command_close(args: argparse.Namespace) -> int:
                         failure = IncarnationHomeError(
                             "holder exited before verified TERM delivery"
                         )
+                if (
+                    failure is None
+                    and not closed
+                    and signal_delivery == "failed"
+                ):
+                    failure = IncarnationHomeError(
+                        "verified holder TERM delivery failed"
+                    )
                 if failure is None:
                     for _ in range(40):
                         kitty_state = _proc_identity_state(
@@ -1111,6 +1247,8 @@ def command_close(args: argparse.Namespace) -> int:
             "argv": kitty_argv,
             "signal": "TERM",
             "signal_target": "holder_process",
+            "signal_attempted": signal_attempted,
+            "signal_delivery": signal_delivery,
             "signal_sent": signal_sent,
             "gone": kitty_gone,
         }

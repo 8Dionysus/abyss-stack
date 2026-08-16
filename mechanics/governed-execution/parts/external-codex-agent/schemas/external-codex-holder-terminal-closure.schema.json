@@ -25,7 +25,7 @@
     "terminal": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["pid", "start_ticks", "comm", "argv", "signal", "signal_target", "signal_sent", "gone"],
+      "required": ["pid", "start_ticks", "comm", "argv", "signal", "signal_target", "signal_attempted", "signal_delivery", "signal_sent", "gone"],
       "properties": {
         "pid": {"type": "integer", "minimum": 1},
         "start_ticks": {"type": "integer", "minimum": 1},
@@ -35,6 +35,8 @@
         "dedicated": {"const": true},
         "signal": {"const": "TERM"},
         "signal_target": {"const": "holder_process"},
+        "signal_attempted": {"type": "boolean"},
+        "signal_delivery": {"enum": ["not_attempted", "confirmed", "not_delivered", "failed", "unknown"]},
         "signal_sent": {"type": "boolean"},
         "gone": {"type": "boolean"}
       }
