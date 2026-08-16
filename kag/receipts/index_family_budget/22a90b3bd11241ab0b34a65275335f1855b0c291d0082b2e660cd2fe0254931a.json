@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 27836864,
+  "allowed_tracked_bytes": 35737531,
+  "approved_by": "repository-owner",
+  "base_ref": "ac41011c42731f5bf40e91f63978ab8d2f18a43c",
+  "changed_generated_bytes": 27836864,
+  "changed_generated_files": 309,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "22a90b3bd11241ab0b34a65275335f1855b0c291d0082b2e660cd2fe0254931a",
+  "reason": "Regenerate exact PR #388 consumer portable family after fd-pinned shebang exec and required terminal proof fields; digest-bound, no standing budget raise.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35737531,
+  "tracked_bytes_max": 24117248
+}
