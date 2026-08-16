@@ -799,6 +799,13 @@ if "FAKE_ARTIFACT_PREEXISTING" in task["objective"]:
     report["artifact_paths"] = ["README.md"]
 if "FAKE_ARTIFACT_PRODUCED" in task["objective"]:
     report["artifact_paths"] = ["landing-note.md"]
+if "FAKE_ARTIFACT_SOURCE_EVIDENCE" in task["objective"]:
+    report["findings"] = [{
+        "severity": "info",
+        "category": "produced-artifact-evidence",
+        "summary": "The bounded actor cites its produced artifact within declared source scope.",
+        "evidence_refs": ["source:landing-note.md#L1"],
+    }]
 if "FAKE_NESTED_ARTIFACT_PRODUCED" in task["objective"]:
     report["artifact_paths"] = ["actor-output/result.json"]
 if "FAKE_INVALID_SOURCE_EVIDENCE" in task["objective"]:
@@ -7835,6 +7842,62 @@ def test_source_evidence_scope_is_distinct_from_mutation_scope(
     assert terminal["status"] == "completed"
     assert result is not None
     assert result["changed_paths"] == [{"path": "landing-note.md", "status": "created"}]
+
+
+def test_produced_artifact_source_evidence_requires_explicit_declared_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_specialized_test_release(monkeypatch, tmp_path)
+    fixture = _fixture(
+        tmp_path,
+        objective_marker=(
+            "FAKE_WRITE_ALLOWED FAKE_ARTIFACT_PRODUCED "
+            "FAKE_ARTIFACT_SOURCE_EVIDENCE"
+        ),
+        role_id="coder",
+        task_family="landing_preparation",
+        workspace_write=True,
+        allowed_paths=("landing-note.md",),
+        source_evidence_paths=("README.md", "landing-note.md"),
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "completed"
+    assert result is not None and result["status"] == "completed"
+    assert result["changed_paths"] == [
+        {"path": "landing-note.md", "status": "created"}
+    ]
+
+
+def test_produced_artifact_source_evidence_outside_declared_scope_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_specialized_test_release(monkeypatch, tmp_path)
+    fixture = _fixture(
+        tmp_path,
+        objective_marker=(
+            "FAKE_WRITE_ALLOWED FAKE_ARTIFACT_PRODUCED "
+            "FAKE_ARTIFACT_SOURCE_EVIDENCE"
+        ),
+        role_id="coder",
+        task_family="landing_preparation",
+        workspace_write=True,
+        allowed_paths=("landing-note.md",),
+        source_evidence_paths=("README.md",),
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+
+    terminal = _wait_terminal(runtime, fixture["session_id"])
+    result = runtime.result(fixture["session_id"])
+
+    assert terminal["status"] == "failed"
+    assert result is not None
+    assert result["failure_code"] == "model_report_source_evidence_out_of_scope"
 
 
 def test_workspace_root_source_evidence_scope_admits_only_safe_relative_paths() -> None:

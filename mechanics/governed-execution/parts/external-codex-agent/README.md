@@ -31,7 +31,10 @@ The controller:
   for a shebang launcher, an internal payload handoff writes that receipt from
   the exact bubblewrap payload PID immediately before replacing itself with the
   private launcher; the bubblewrap monitor remains only the snapshot-cleanup
-  supervisor. The installed launcher can close that exact holder terminal only after a
+  supervisor. The receipt includes the exact launch-time incarnation manifest
+  bytes as a digest-bound base64 snapshot; after launch, its pathname is
+  provenance only, so profile preparation may refresh that pathname without
+  changing holder identity. The installed launcher can close that exact holder terminal only after a
   separate wake receipt binds the holder receipt and proves delivery. The
   produced handoff must bind both receipt paths under
   `runtime.responsibility_holder`, while the wake receipt binds the SHA-256 of

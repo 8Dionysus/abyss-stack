@@ -10,6 +10,7 @@ incarnation home through Codex's shell environment policy; a plain nested
 from __future__ import annotations
 
 import argparse
+import base64
 import fcntl
 import hashlib
 import json
@@ -806,6 +807,8 @@ def _holder_receipt(
         executable_bytes=executable_bytes,
     )
     try:
+        if manifest_bytes is None:
+            manifest_bytes = manifest_path.read_bytes()
         if executable_digest is None:
             executable_digest = sha256_bytes(
                 executable_bytes
@@ -813,13 +816,28 @@ def _holder_receipt(
                 else executable.read_bytes()
             )
         if manifest_digest is None:
-            manifest_digest = sha256_bytes(
-                manifest_bytes
-                if manifest_bytes is not None
-                else manifest_path.read_bytes()
-            )
+            manifest_digest = sha256_bytes(manifest_bytes)
     except OSError as exc:
         raise IncarnationHomeError("holder identity inputs could not be hashed") from exc
+    if manifest_bytes is None or sha256_bytes(manifest_bytes) != manifest_digest:
+        raise IncarnationHomeError("holder incarnation manifest snapshot digest is invalid")
+    runtime = {
+        "codex_executable": str(executable),
+        "codex_executable_digest": executable_digest,
+        "incarnation_manifest": str(manifest_path.resolve()),
+        "incarnation_manifest_digest": manifest_digest,
+        # The pathname above is provenance only after launch.  The receipt's
+        # exact bytes are the holder-bound identity source because preparation
+        # may refresh that pathname while this process remains alive.
+        "incarnation_manifest_snapshot_b64": base64.b64encode(manifest_bytes).decode(
+            "ascii"
+        ),
+        "model": str(manifest["model_slug"]),
+        "reasoning_effort": str(manifest["reasoning_effort"]),
+        "ambient_codex_home": str(manifest["ambient_codex_home"]),
+        "incarnation_codex_home": str(manifest["codex_home"]),
+    }
+    _decode_holder_manifest_snapshot(runtime)
     receipt = {
         "schema_version": HOLDER_RECEIPT_SCHEMA_VERSION,
         "receipt_ref": str(receipt_path.resolve()),
@@ -835,16 +853,7 @@ def _holder_receipt(
             "argv": post_exec_argv,
             "argv_digest": sha256_bytes(canonical_bytes(post_exec_argv)),
         },
-        "runtime": {
-            "codex_executable": str(executable),
-            "codex_executable_digest": executable_digest,
-            "incarnation_manifest": str(manifest_path.resolve()),
-            "incarnation_manifest_digest": manifest_digest,
-            "model": str(manifest["model_slug"]),
-            "reasoning_effort": str(manifest["reasoning_effort"]),
-            "ambient_codex_home": str(manifest["ambient_codex_home"]),
-            "incarnation_codex_home": str(manifest["codex_home"]),
-        },
+        "runtime": runtime,
         "terminal": {
             "binding": "kitty_ancestor_at_exec",
             "required_comm": "kitty",
@@ -857,6 +866,52 @@ def _holder_receipt(
     }
     _write_new_json(receipt_path, receipt, "holder terminal receipt")
     return receipt
+
+
+def _decode_holder_manifest_snapshot(runtime: dict[str, Any]) -> bytes | None:
+    """Validate and return the immutable manifest snapshot in a holder receipt.
+
+    Receipts written before this field existed remain readable for bounded
+    recovery, but every repaired launch writes the snapshot and the live
+    closer uses it instead of reopening the mutable preparation pathname.
+    """
+
+    encoded = runtime.get("incarnation_manifest_snapshot_b64")
+    if encoded is None:
+        return None
+    if not isinstance(encoded, str) or not encoded:
+        raise IncarnationHomeError("holder incarnation manifest snapshot is invalid")
+    try:
+        snapshot = base64.b64decode(encoded.encode("ascii"), validate=True)
+    except (UnicodeEncodeError, ValueError, base64.binascii.Error) as exc:
+        raise IncarnationHomeError(
+            "holder incarnation manifest snapshot is not valid base64"
+        ) from exc
+    if not snapshot:
+        raise IncarnationHomeError("holder incarnation manifest snapshot is empty")
+    if sha256_bytes(snapshot) != runtime.get("incarnation_manifest_digest"):
+        raise IncarnationHomeError(
+            "holder incarnation manifest snapshot digest has drifted"
+        )
+    try:
+        manifest = json.loads(snapshot.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise IncarnationHomeError(
+            "holder incarnation manifest snapshot is not valid JSON"
+        ) from exc
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != SCHEMA_VERSION:
+        raise IncarnationHomeError("holder incarnation manifest snapshot is unsupported")
+    for manifest_key, runtime_key in (
+        ("model_slug", "model"),
+        ("reasoning_effort", "reasoning_effort"),
+        ("ambient_codex_home", "ambient_codex_home"),
+        ("codex_home", "incarnation_codex_home"),
+    ):
+        if manifest.get(manifest_key) != runtime.get(runtime_key):
+            raise IncarnationHomeError(
+                "holder incarnation manifest snapshot binding has drifted"
+            )
+    return snapshot
 
 
 def _validate_wake_delivery(
@@ -978,6 +1033,7 @@ def _load_holder_receipt_snapshot(
         or not all(isinstance(item, str) for item in holder["argv"])
     ):
         raise IncarnationHomeError("holder terminal receipt is incomplete")
+    _decode_holder_manifest_snapshot(runtime)
     return receipt, raw, sha256_bytes(raw)
 
 
@@ -1074,13 +1130,19 @@ def _holder_terminal_identity(
     executable = _regular_file(
         Path(str(runtime["codex_executable"])), "holder Codex executable"
     )
-    manifest = _regular_file(
-        Path(str(runtime["incarnation_manifest"])), "holder incarnation manifest"
-    )
     if sha256_bytes(executable.read_bytes()) != runtime.get("codex_executable_digest"):
         raise IncarnationHomeError("holder Codex executable digest has drifted")
-    if sha256_bytes(manifest.read_bytes()) != runtime.get("incarnation_manifest_digest"):
-        raise IncarnationHomeError("holder incarnation manifest digest has drifted")
+    manifest_snapshot = _decode_holder_manifest_snapshot(runtime)
+    if manifest_snapshot is None:
+        # Legacy receipts predate the holder-bound snapshot.  Preserve their
+        # old fail-closed behavior; repaired receipts never take this branch.
+        manifest = _regular_file(
+            Path(str(runtime["incarnation_manifest"])), "holder incarnation manifest"
+        )
+        if sha256_bytes(manifest.read_bytes()) != runtime.get(
+            "incarnation_manifest_digest"
+        ):
+            raise IncarnationHomeError("holder incarnation manifest digest has drifted")
     return pid, kitty_pid, _proc_comm(kitty_pid), window_id, dedicated
 
 

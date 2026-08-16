@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import importlib.util
 import json
 import os
@@ -666,6 +667,9 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert receipt["runtime"]["incarnation_manifest_digest"] == MODULE.sha256_bytes(
         manifest_snapshot
     )
+    assert base64.b64decode(
+        receipt["runtime"]["incarnation_manifest_snapshot_b64"]
+    ) == manifest_snapshot
     assert receipt["runtime"]["model"] == "gpt-5.6-luna"
     assert receipt["runtime"]["reasoning_effort"] == "max"
     assert captured["environment"]["CODEX_HOME"] == str(ambient)
@@ -813,6 +817,81 @@ def test_holder_receipt_rejects_detached_kitty_route(tmp_path: Path) -> None:
 
     with pytest.raises(MODULE.IncarnationHomeError, match="detached Kitty"):
         MODULE.command_launch(args)
+
+
+def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "codex"
+    executable.write_bytes(b"codex-holder\n")
+    executable.chmod(0o700)
+    manifest_path = tmp_path / "incarnation-home.json"
+    launch_manifest = {
+        "schema_version": MODULE.SCHEMA_VERSION,
+        "model_slug": "gpt-5.6-luna",
+        "reasoning_effort": "max",
+        "ambient_codex_home": str(tmp_path / "ambient"),
+        "codex_home": str(tmp_path / "incarnation"),
+    }
+    snapshot = json.dumps(launch_manifest, sort_keys=True).encode("utf-8")
+    manifest_path.write_bytes(b"profile-refresh-replaced-this-path\n")
+    holder_pid, parent_pid, kitty_pid = 101, 102, 103
+    holder_argv = ["/usr/bin/codex", "exec"]
+    kitty_argv = ["/usr/bin/kitty", "--title", "holder"]
+    receipt = {
+        "boot_id": "00000000-0000-0000-0000-000000000001",
+        "holder": {
+            "pid": holder_pid,
+            "start_ticks": 11,
+            "parent_pid": parent_pid,
+            "parent_start_ticks": 12,
+            "parent_comm": "bwrap",
+            "argv": holder_argv,
+            "argv_digest": MODULE.sha256_bytes(MODULE.canonical_bytes(holder_argv)),
+        },
+        "runtime": {
+            "codex_executable": str(executable),
+            "codex_executable_digest": MODULE.sha256_bytes(executable.read_bytes()),
+            "incarnation_manifest": str(manifest_path),
+            "incarnation_manifest_digest": MODULE.sha256_bytes(snapshot),
+            "incarnation_manifest_snapshot_b64": base64.b64encode(snapshot).decode(
+                "ascii"
+            ),
+            "model": "gpt-5.6-luna",
+            "reasoning_effort": "max",
+            "ambient_codex_home": str(tmp_path / "ambient"),
+            "incarnation_codex_home": str(tmp_path / "incarnation"),
+        },
+        "terminal": {
+            "pid": kitty_pid,
+            "start_ticks": 13,
+            "argv": kitty_argv,
+            "window_id": "7",
+            "dedicated": True,
+        },
+    }
+    monkeypatch.setattr(MODULE, "_proc_boot_id", lambda: receipt["boot_id"])
+    monkeypatch.setattr(
+        MODULE, "_proc_start_ticks", lambda pid: {101: 11, 102: 12, 103: 13}[pid]
+    )
+    monkeypatch.setattr(
+        MODULE, "_proc_parent_pid", lambda pid: {101: 102, 102: 103, 103: 1}[pid]
+    )
+    monkeypatch.setattr(
+        MODULE, "_proc_comm", lambda pid: {102: "bwrap", 103: "kitty"}[pid]
+    )
+    monkeypatch.setattr(
+        MODULE, "_proc_argv", lambda pid: {101: holder_argv, 103: kitty_argv}[pid]
+    )
+    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("7", True))
+
+    assert MODULE._holder_terminal_identity(receipt) == (
+        holder_pid,
+        kitty_pid,
+        "kitty",
+        "7",
+        True,
+    )
 
 
 def test_close_requires_confirmed_handoff_delivery(tmp_path: Path) -> None:
