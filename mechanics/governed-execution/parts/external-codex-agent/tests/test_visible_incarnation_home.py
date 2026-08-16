@@ -774,7 +774,8 @@ def test_shebang_node_launcher_reopens_named_snapshot(
     executable = tmp_path / "codex"
     original = (
         "#!/usr/bin/env node\n"
-        "process.stdout.write('named-node-snapshot\\n');\n"
+        "process.stdout.write(String(process.pid) + '\\n');\n"
+        "setTimeout(() => {}, 30000);\n"
     ).encode()
     executable.write_bytes(original)
     executable.chmod(0o700)
@@ -784,21 +785,29 @@ def test_shebang_node_launcher_reopens_named_snapshot(
     )
     try:
         executable.write_text("#!/bin/sh\necho replaced\n", encoding="utf-8")
-        completed = subprocess.run(
+        process = subprocess.Popen(
             [str(snapshot_path)],
-            check=False,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
             pass_fds=(snapshot_fd,),
         )
+        process_pid = int(process.stdout.readline().strip())
+        observed_argv = [
+            os.fsdecode(item)
+            for item in Path(f"/proc/{process_pid}/cmdline").read_bytes().split(b"\0")
+            if item
+        ]
     finally:
+        if "process" in locals() and process.poll() is None:
+            process.terminate()
+            process.wait(timeout=5)
         os.close(snapshot_fd)
         snapshot_path.unlink(missing_ok=True)
         snapshot_path.parent.rmdir()
 
     assert content == original
-    assert completed.returncode == 0
-    assert completed.stdout == "named-node-snapshot\n"
+    assert observed_argv[:2] == ["node", str(snapshot_path)]
 
 
 def test_kitty_dedication_rejects_sibling_terminal_child(
