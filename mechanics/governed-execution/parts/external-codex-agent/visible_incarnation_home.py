@@ -348,6 +348,31 @@ def _proc_identity_is_live(pid: int, start_ticks: int) -> bool:
         return False
 
 
+def _proc_identity_state(pid: int, start_ticks: int) -> str:
+    """Classify one recorded process without confusing exit and PID reuse."""
+
+    try:
+        fields = _proc_stat_fields(pid)
+    except IncarnationHomeError:
+        # A process can disappear between the stat read and this check.  Only
+        # a genuinely absent /proc entry is an already-gone identity; any
+        # other read failure remains fail-closed.
+        if not Path(f"/proc/{pid}").exists():
+            return "gone"
+        raise
+    if fields[0] == "Z":
+        return "gone"
+    try:
+        observed_start_ticks = int(fields[19])
+    except ValueError as exc:
+        raise IncarnationHomeError(
+            f"process start time is malformed: {pid}"
+        ) from exc
+    if observed_start_ticks != start_ticks:
+        return "drifted"
+    return "live"
+
+
 def _proc_parent_pid(pid: int) -> int:
     try:
         return int(_proc_stat_fields(pid)[1])
@@ -726,18 +751,43 @@ def _load_holder_receipt(path: Path) -> dict[str, Any]:
     return receipt
 
 
+def _holder_receipt_process_ids(
+    receipt: dict[str, Any],
+) -> tuple[int, int, int, int]:
+    holder = receipt["holder"]
+    terminal = receipt["terminal"]
+    pid = holder.get("pid")
+    start_ticks = holder.get("start_ticks")
+    parent_pid = holder.get("parent_pid")
+    parent_start_ticks = holder.get("parent_start_ticks")
+    kitty_pid = terminal.get("pid")
+    kitty_start_ticks = terminal.get("start_ticks")
+    if not all(
+        isinstance(value, int) and value > 0
+        for value in (pid, start_ticks, parent_pid, parent_start_ticks)
+    ):
+        raise IncarnationHomeError("holder process identity is invalid")
+    if not isinstance(kitty_pid, int) or kitty_pid <= 1:
+        raise IncarnationHomeError("holder Kitty identity is invalid")
+    if not isinstance(kitty_start_ticks, int) or kitty_start_ticks <= 0:
+        raise IncarnationHomeError("holder Kitty identity is invalid")
+    expected_argv = holder["argv"]
+    if holder.get("argv_digest") != sha256_bytes(canonical_bytes(expected_argv)):
+        raise IncarnationHomeError("holder argv digest is invalid")
+    return pid, start_ticks, kitty_pid, kitty_start_ticks
+
+
 def _holder_terminal_identity(
     receipt: dict[str, Any],
 ) -> tuple[int, int, str, str, bool]:
     holder = receipt["holder"]
     runtime = receipt["runtime"]
     terminal = receipt["terminal"]
-    pid = holder.get("pid")
-    start_ticks = holder.get("start_ticks")
-    parent_pid = holder.get("parent_pid")
-    parent_start_ticks = holder.get("parent_start_ticks")
-    if not all(isinstance(value, int) and value > 0 for value in (pid, start_ticks, parent_pid, parent_start_ticks)):
-        raise IncarnationHomeError("holder process identity is invalid")
+    pid, start_ticks, kitty_pid, kitty_start_ticks = _holder_receipt_process_ids(
+        receipt
+    )
+    parent_pid = holder["parent_pid"]
+    parent_start_ticks = holder["parent_start_ticks"]
     if _proc_start_ticks(pid) != start_ticks:
         raise IncarnationHomeError("holder PID was reused or has drifted")
     if _proc_start_ticks(parent_pid) != parent_start_ticks:
@@ -752,10 +802,6 @@ def _holder_terminal_identity(
         raise IncarnationHomeError("holder argv identity has drifted")
     if holder.get("argv_digest") != sha256_bytes(canonical_bytes(expected_argv)):
         raise IncarnationHomeError("holder argv digest is invalid")
-    kitty_pid = terminal["pid"]
-    kitty_start_ticks = terminal["start_ticks"]
-    if kitty_pid <= 1 or kitty_start_ticks <= 0:
-        raise IncarnationHomeError("holder Kitty identity is invalid")
     if _proc_start_ticks(kitty_pid) != kitty_start_ticks:
         raise IncarnationHomeError("holder Kitty PID was reused or has drifted")
     if _proc_comm(kitty_pid) != "kitty":
@@ -813,15 +859,13 @@ def command_close(args: argparse.Namespace) -> int:
         closure_receipt_path=closure_receipt_path,
         holder_receipt=receipt,
     )
-    (
-        holder_pid,
-        kitty_pid,
-        kitty_comm,
-        kitty_window_id,
-        kitty_dedicated,
-    ) = _holder_terminal_identity(receipt)
-    kitty_start_ticks = receipt["terminal"]["start_ticks"]
+    holder_pid, holder_start_ticks, kitty_pid, kitty_start_ticks = (
+        _holder_receipt_process_ids(receipt)
+    )
     kitty_argv = receipt["terminal"]["argv"]
+    kitty_comm = receipt["terminal"].get("required_comm", "kitty")
+    kitty_window_id = receipt["terminal"].get("window_id")
+    kitty_dedicated = receipt["terminal"].get("dedicated")
     closure_fd = _reserve_new_json(
         closure_receipt_path, "terminal closure receipt"
     )
@@ -829,23 +873,111 @@ def command_close(args: argparse.Namespace) -> int:
     closed = False
     kitty_gone = False
     holder_gone = False
+    identity_state = "unverified"
     failure: IncarnationHomeError | None = None
     try:
-        try:
-            signal_sent = _send_verified_term(kitty_pid, kitty_start_ticks)
-        except IncarnationHomeError as exc:
-            failure = exc
-        if failure is None:
-            for _ in range(40):
-                kitty_gone = not _proc_identity_is_live(kitty_pid, kitty_start_ticks)
-                holder_gone = not _proc_identity_is_live(
-                    holder_pid, receipt["holder"]["start_ticks"]
-                )
+        kitty_state = _proc_identity_state(kitty_pid, kitty_start_ticks)
+        holder_state = _proc_identity_state(holder_pid, holder_start_ticks)
+        kitty_gone = kitty_state == "gone"
+        holder_gone = holder_state == "gone"
+        if kitty_gone and holder_gone:
+            # Delivery was already proven and both exact identities have
+            # naturally exited.  This is a successful, non-signaling close;
+            # do not require reopening a mutable incarnation marker.
+            identity_state = "already_gone"
+            closed = True
+        elif kitty_state != "live" or holder_state != "live":
+            identity_state = "partial_gone" if (kitty_gone or holder_gone) else "identity_drift"
+            failure = IncarnationHomeError(
+                "holder terminal identity was not simultaneously live or already gone"
+            )
+        else:
+            try:
+                (
+                    holder_pid,
+                    kitty_pid,
+                    kitty_comm,
+                    kitty_window_id,
+                    kitty_dedicated,
+                ) = _holder_terminal_identity(receipt)
+                identity_state = "live"
+            except IncarnationHomeError as exc:
+                # Re-check the exact recorded identities after a natural
+                # exit race.  PID reuse or a surviving process remains a
+                # hard failure; only both exact identities being gone may be
+                # recorded as already_gone.
+                kitty_state = _proc_identity_state(kitty_pid, kitty_start_ticks)
+                holder_state = _proc_identity_state(holder_pid, holder_start_ticks)
+                kitty_gone = kitty_state == "gone"
+                holder_gone = holder_state == "gone"
                 if kitty_gone and holder_gone:
+                    identity_state = "already_gone"
                     closed = True
-                    break
-                time.sleep(0.25)
+                else:
+                    identity_state = "identity_drift"
+                    failure = exc
+            if failure is None and not closed:
+                try:
+                    signal_sent = _send_verified_term(kitty_pid, kitty_start_ticks)
+                except IncarnationHomeError as exc:
+                    kitty_state = _proc_identity_state(kitty_pid, kitty_start_ticks)
+                    holder_state = _proc_identity_state(holder_pid, holder_start_ticks)
+                    kitty_gone = kitty_state == "gone"
+                    holder_gone = holder_state == "gone"
+                    if kitty_gone and holder_gone:
+                        identity_state = "already_gone"
+                        closed = True
+                    else:
+                        failure = exc
+                if failure is None and not signal_sent:
+                    kitty_state = _proc_identity_state(kitty_pid, kitty_start_ticks)
+                    holder_state = _proc_identity_state(holder_pid, holder_start_ticks)
+                    kitty_gone = kitty_state == "gone"
+                    holder_gone = holder_state == "gone"
+                    if kitty_gone and holder_gone:
+                        identity_state = "already_gone"
+                        closed = True
+                    else:
+                        identity_state = "identity_drift"
+                        failure = IncarnationHomeError(
+                            "holder Kitty exited before verified TERM delivery"
+                        )
+                if failure is None:
+                    for _ in range(40):
+                        kitty_state = _proc_identity_state(
+                            kitty_pid, kitty_start_ticks
+                        )
+                        holder_state = _proc_identity_state(
+                            holder_pid, holder_start_ticks
+                        )
+                        kitty_gone = kitty_state == "gone"
+                        holder_gone = holder_state == "gone"
+                        if kitty_state == "drifted" or holder_state == "drifted":
+                            identity_state = "identity_drift"
+                            failure = IncarnationHomeError(
+                                "holder terminal identity changed during closure"
+                            )
+                            break
+                        if kitty_gone and holder_gone:
+                            closed = True
+                            break
+                        time.sleep(0.25)
+                    if not closed:
+                        identity_state = "close_unverified"
     finally:
+        terminal = {
+            "pid": kitty_pid,
+            "start_ticks": kitty_start_ticks,
+            "comm": kitty_comm,
+            "argv": kitty_argv,
+            "signal": "TERM",
+            "signal_sent": signal_sent,
+            "gone": kitty_gone,
+        }
+        if kitty_window_id is not None:
+            terminal["window_id"] = kitty_window_id
+        if kitty_dedicated is not None:
+            terminal["dedicated"] = kitty_dedicated
         closure = {
             "schema_version": TERMINAL_CLOSURE_SCHEMA_VERSION,
             "handoff_ref": str(handoff_path.resolve()),
@@ -854,22 +986,19 @@ def command_close(args: argparse.Namespace) -> int:
             "verified_at": _utc_now(),
             "holder": {
                 "pid": holder_pid,
-                "start_ticks": receipt["holder"]["start_ticks"],
+                "start_ticks": holder_start_ticks,
                 "gone": holder_gone,
             },
-            "terminal": {
-                "pid": kitty_pid,
-                "start_ticks": kitty_start_ticks,
-                "comm": kitty_comm,
-                "argv": kitty_argv,
-                "window_id": kitty_window_id,
-                "dedicated": kitty_dedicated,
-                "signal": "TERM",
-                "signal_sent": signal_sent,
-                "gone": kitty_gone,
-            },
+            "terminal": terminal,
             "closed": closed,
-            "outcome": "closed" if closed else "close_unverified",
+            "outcome": (
+                "already_gone"
+                if identity_state == "already_gone"
+                else "closed"
+                if closed
+                else "close_unverified"
+            ),
+            "identity_state": identity_state,
             "route": "abyss_stack_visible_incarnation_runtime",
             "trigger": "wake_bridge_after_confirmed_handoff_delivery",
         }

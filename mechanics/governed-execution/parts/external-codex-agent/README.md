@@ -29,9 +29,12 @@ The controller:
   before `exec`, including the first detached Kitty ancestor, its window identity,
   and a no-sibling dedication proof across the installed bubblewrap wrapper;
   the installed launcher can close that exact holder terminal only after a
-  separate wake receipt binds the holder receipt and proves delivery. This
-  identity is distinct from any nested proof actor. This operator surface is
-  not A2A transport and
+  separate wake receipt binds the holder receipt and proves delivery. The
+  produced handoff must bind both receipt paths under
+  `runtime.responsibility_holder`; after delivery, a host-side bridge may run
+  the closer in the same host unit, and a naturally exited exact pair is
+  recorded as `already_gone` without marker reconstruction. This identity is
+  distinct from any nested proof actor. This operator surface is not A2A transport and
   does not replace the governed JSONL runtime;
 - requires every task to preserve the complete runtime-wide forbidden-effect
   set, while terminal classification independently applies that set instead of

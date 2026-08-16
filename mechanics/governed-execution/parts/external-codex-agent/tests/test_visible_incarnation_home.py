@@ -706,6 +706,96 @@ def test_verified_term_uses_pidfd_after_identity_recheck(
     assert calls[2] == ("close", 42)
 
 
+def test_identity_bound_close_records_already_gone_without_reopening_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    holder = tmp_path / "holder.json"
+    handoff = tmp_path / "handoff.json"
+    wake = tmp_path / "wake.json"
+    closure = tmp_path / "closure.json"
+    holder_payload = {
+        "schema_version": MODULE.HOLDER_RECEIPT_SCHEMA_VERSION,
+        "receipt_ref": str(holder),
+        "created_at": "2026-08-15T00:00:00Z",
+        "lifecycle_role": "responsibility_holder",
+        "holder": {
+            "pid": 987654321,
+            "start_ticks": 11,
+            "parent_pid": 987654322,
+            "parent_start_ticks": 12,
+            "parent_comm": "kitty",
+            "argv": ["/usr/bin/codex", "exec"],
+            "argv_digest": MODULE.sha256_bytes(
+                MODULE.canonical_bytes(["/usr/bin/codex", "exec"])
+            ),
+        },
+        "runtime": {
+            "codex_executable": str(tmp_path / "missing-codex"),
+            "codex_executable_digest": "sha256:" + "0" * 64,
+            "incarnation_manifest": str(tmp_path / "missing-manifest"),
+            "incarnation_manifest_digest": "sha256:" + "1" * 64,
+            "model": "gpt-5.6-luna",
+            "reasoning_effort": "max",
+            "ambient_codex_home": str(tmp_path),
+            "incarnation_codex_home": str(tmp_path),
+        },
+        "terminal": {
+            "binding": "kitty_ancestor_at_exec",
+            "required_comm": "kitty",
+            "pid": 987654323,
+            "start_ticks": 13,
+            "argv": ["/usr/bin/kitty", "--detach", "--title", "holder"],
+            "window_id": "7",
+            "dedicated": True,
+        },
+    }
+    holder.write_text(json.dumps(holder_payload), encoding="utf-8")
+    handoff.write_text(
+        json.dumps(
+            {
+                "runtime": {
+                    "responsibility_holder": {
+                        "terminal_receipt": str(holder),
+                        "terminal_receipt_sha256": MODULE.sha256_bytes(
+                            holder.read_bytes()
+                        ),
+                        "closure_receipt": str(closure),
+                        "holder_pid": holder_payload["holder"]["pid"],
+                        "terminal_pid": holder_payload["terminal"]["pid"],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    wake.write_text(
+        json.dumps(
+            {
+                "schema_version": "task_local_actor_wake_receipt_v1",
+                "handoff_ref": str(handoff),
+                "actions": {"handoff_message_sent": True},
+                "observed": {"handoff_delivery": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _start: "gone")
+
+    assert MODULE.command_close(
+        MODULE.argparse.Namespace(
+            handoff=str(handoff),
+            holder_receipt=str(holder),
+            wake_receipt=str(wake),
+            closure_receipt=str(closure),
+        )
+    ) == 0
+    recorded = json.loads(closure.read_text(encoding="utf-8"))
+    assert recorded["closed"] is True
+    assert recorded["outcome"] == "already_gone"
+    assert recorded["identity_state"] == "already_gone"
+    assert recorded["terminal"]["signal_sent"] is False
+
+
 def test_wake_delivery_requires_exact_holder_and_closure_binding(
     tmp_path: Path,
 ) -> None:

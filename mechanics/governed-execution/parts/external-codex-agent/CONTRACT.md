@@ -126,13 +126,21 @@ processes. After a wake bridge has recorded confirmed handoff delivery, the
 installed launcher may run `close --holder-receipt ... --wake-receipt ...
 --handoff ... --closure-receipt ...`; before selecting a signal target it
 requires the handoff to bind the exact holder receipt path, receipt digest,
-holder/terminal PIDs, and reserved closure path. It then rechecks the holder's
-exact PID/start-ticks/argv, its process-parent identity, the recorded Kitty
-window, and the dedicated Kitty process, reserves the closure receipt before
+holder/terminal PIDs, and reserved closure path under
+`runtime.responsibility_holder`. A producer must not leave the closure path
+only under a live-proof projection. It then rechecks the holder's exact
+PID/start-ticks/argv, its process-parent identity, the recorded Kitty window,
+and the dedicated Kitty process, reserves the closure receipt before
 signaling, and sends `TERM` through a pidfd opened after the final identity
 check. The non-replacing closure receipt records the final Kitty disappearance
-independently and is written even when closure is unverified. Ambiguous,
-reused, or drifted identities fail closed.
+independently and is written even when closure is unverified. If delivery is
+proven but both exact identities have naturally disappeared before the closer
+runs, it records the successful non-signaling `already_gone` outcome without
+reopening or reconstructing the incarnation marker. A host-side wake route
+may own the bridge and closer in one same-user systemd unit so wake delivery,
+closure, and after-inventory remain ordered even when the visible actor is
+the terminal being closed. Ambiguous, reused, or drifted identities fail
+closed.
 
 Each CLI call writes one `abyss_stack_external_codex_response_v1` JSON object.
 `start` returns after the independent worker is durably recorded; later calls

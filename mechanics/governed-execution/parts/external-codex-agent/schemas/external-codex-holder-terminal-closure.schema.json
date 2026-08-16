@@ -4,7 +4,7 @@
   "title": "Visible responsibility-holder terminal closure receipt",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "handoff_ref", "holder_receipt_ref", "wake_receipt_ref", "verified_at", "holder", "terminal", "closed", "outcome", "route", "trigger"],
+  "required": ["schema_version", "handoff_ref", "holder_receipt_ref", "wake_receipt_ref", "verified_at", "holder", "terminal", "closed", "outcome", "identity_state", "route", "trigger"],
   "properties": {
     "schema_version": {"const": "abyss_stack_visible_incarnation_terminal_closure_v1"},
     "handoff_ref": {"type": "string", "pattern": "^/"},
@@ -38,7 +38,8 @@
       }
     },
     "closed": {"type": "boolean"},
-    "outcome": {"enum": ["closed", "close_unverified"]},
+    "outcome": {"enum": ["closed", "already_gone", "close_unverified"]},
+    "identity_state": {"enum": ["live", "already_gone", "partial_gone", "identity_drift", "close_unverified", "unverified"]},
     "route": {"const": "abyss_stack_visible_incarnation_runtime"},
     "trigger": {"const": "wake_bridge_after_confirmed_handoff_delivery"}
   }
