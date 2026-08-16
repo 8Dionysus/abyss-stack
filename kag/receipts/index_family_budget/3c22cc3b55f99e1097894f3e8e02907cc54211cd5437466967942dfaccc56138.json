@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 27792862,
+  "allowed_tracked_bytes": 35679069,
+  "approved_by": "repository-owner",
+  "base_ref": "ac41011c42731f5bf40e91f63978ab8d2f18a43c",
+  "changed_generated_bytes": 27792862,
+  "changed_generated_files": 310,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "3c22cc3b55f99e1097894f3e8e02907cc54211cd5437466967942dfaccc56138",
+  "reason": "Regenerate exact PR #388 consumer portable family for sealed immutable launch snapshots, manifest snapshot binding, and natural holder-exit closure wait; digest-bound, no standing budget raise.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35679069,
+  "tracked_bytes_max": 24117248
+}
