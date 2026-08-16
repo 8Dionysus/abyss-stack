@@ -504,7 +504,12 @@ def _post_exec_argv(
             resolved = shutil.which(env_fields[0], path=path or os.environ.get("PATH"))
             if resolved is not None:
                 return [
-                    str(Path(resolved).resolve()),
+                    # env resolves the command for lookup but preserves the
+                    # command token as argv[0] for the re-exec.  Recording the
+                    # resolved filesystem path here rejects a valid holder
+                    # whose /proc argv starts with the admitted token (for
+                    # example, "node").
+                    env_fields[0],
                     *env_fields[1:],
                     argv[0],
                     *argv[1:],
@@ -1665,6 +1670,81 @@ def _open_verified_executable(
                 break
             chunks.append(chunk)
         content = b"".join(chunks)
+        if content.startswith(b"#!"):
+            snapshot_dir = Path(
+                tempfile.mkdtemp(prefix="abyss-stack-codex-executable-")
+            )
+            snapshot_path = snapshot_dir / "codex"
+            try:
+                snapshot_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                if hasattr(os, "O_NOFOLLOW"):
+                    snapshot_flags |= os.O_NOFOLLOW
+                snapshot_fd = os.open(snapshot_path, snapshot_flags, 0o700)
+                view = memoryview(content)
+                while view:
+                    view = view[os.write(snapshot_fd, view) :]
+                os.fsync(snapshot_fd)
+                os.fchmod(snapshot_fd, 0o500)
+                os.fsync(snapshot_fd)
+                directory_flags = os.O_RDONLY
+                if hasattr(os, "O_DIRECTORY"):
+                    directory_flags |= os.O_DIRECTORY
+                if hasattr(os, "O_NOFOLLOW"):
+                    directory_flags |= os.O_NOFOLLOW
+                directory_fd = os.open(snapshot_dir, directory_flags)
+                try:
+                    os.fsync(directory_fd)
+                finally:
+                    os.close(directory_fd)
+                os.close(snapshot_fd)
+                snapshot_fd = None
+                snapshot_fd = os.open(snapshot_path, os.O_RDONLY)
+                if hasattr(os, "O_NOFOLLOW"):
+                    os.close(snapshot_fd)
+                    snapshot_fd = None
+                    snapshot_fd = os.open(
+                        snapshot_path, os.O_RDONLY | os.O_NOFOLLOW
+                    )
+                info = os.fstat(snapshot_fd)
+                if not stat.S_ISREG(info.st_mode):
+                    raise IncarnationHomeError(
+                        "named executable snapshot is not a regular file"
+                    )
+                os.lseek(snapshot_fd, 0, os.SEEK_SET)
+                observed: list[bytes] = []
+                while True:
+                    chunk = os.read(snapshot_fd, 1 << 20)
+                    if not chunk:
+                        break
+                    observed.append(chunk)
+                if b"".join(observed) != content:
+                    raise IncarnationHomeError(
+                        "named executable snapshot bytes changed before exec"
+                    )
+                os.set_inheritable(snapshot_fd, True)
+                os.lseek(snapshot_fd, 0, os.SEEK_SET)
+                return (
+                    snapshot_fd,
+                    snapshot_path,
+                    content,
+                    sha256_bytes(content),
+                )
+            except IncarnationHomeError:
+                if snapshot_fd is not None:
+                    os.close(snapshot_fd)
+                    snapshot_fd = None
+                snapshot_path.unlink(missing_ok=True)
+                snapshot_dir.rmdir()
+                raise
+            except OSError as exc:
+                if snapshot_fd is not None:
+                    os.close(snapshot_fd)
+                    snapshot_fd = None
+                snapshot_path.unlink(missing_ok=True)
+                snapshot_dir.rmdir()
+                raise IncarnationHomeError(
+                    "Codex shebang executable could not be snapshotted"
+                ) from exc
         memfd_create = getattr(os, "memfd_create", None)
         allow_sealing = getattr(os, "MFD_ALLOW_SEALING", None)
         add_seals = getattr(fcntl, "F_ADD_SEALS", None)

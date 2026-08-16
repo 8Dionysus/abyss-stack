@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
+import stat
 import subprocess
 import tomllib
 from pathlib import Path
@@ -550,17 +552,22 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     original_executable.chmod(0o700)
 
     def fake_exec(path: str, argv: list[str], environment: dict[str, str]) -> None:
-        executable_fd = int(path.rsplit("/", 1)[-1])
         captured.update(
             path=path,
             argv=argv,
             environment=environment,
-            executable_inheritable=os.get_inheritable(executable_fd),
-            executable_seals=MODULE.fcntl.fcntl(
-                executable_fd, MODULE.fcntl.F_GET_SEALS
-            ),
             inode_content=Path(path).read_bytes(),
         )
+        if path.startswith("/proc/self/fd/"):
+            executable_fd = int(path.rsplit("/", 1)[-1])
+            captured.update(
+                executable_inheritable=os.get_inheritable(executable_fd),
+                executable_seals=MODULE.fcntl.fcntl(
+                    executable_fd, MODULE.fcntl.F_GET_SEALS
+                ),
+            )
+        else:
+            captured["snapshot_mode"] = stat.S_IMODE(Path(path).stat().st_mode)
 
     original_holder_receipt = MODULE._holder_receipt
 
@@ -636,15 +643,11 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert receipt["runtime"]["model"] == "gpt-5.6-luna"
     assert receipt["runtime"]["reasoning_effort"] == "max"
     assert captured["environment"]["CODEX_HOME"] == str(ambient)
-    assert str(captured["path"]).startswith("/proc/self/fd/")
-    assert captured["executable_inheritable"] is True
-    required_seals = (
-        MODULE.fcntl.F_SEAL_WRITE
-        | MODULE.fcntl.F_SEAL_GROW
-        | MODULE.fcntl.F_SEAL_SHRINK
-        | MODULE.fcntl.F_SEAL_SEAL
-    )
-    assert captured["executable_seals"] & required_seals == required_seals
+    assert not str(captured["path"]).startswith("/proc/self/fd/")
+    snapshot_path = Path(str(captured["path"]))
+    assert snapshot_path.name == "codex"
+    assert snapshot_path.parent.name.startswith("abyss-stack-codex-executable-")
+    assert captured["snapshot_mode"] == 0o500
     assert captured["inode_content"] == original_content
     assert executable.read_text(encoding="utf-8") == "replacement"
 
@@ -761,7 +764,41 @@ def test_post_exec_argv_resolves_env_interpreter_reexec(
         executable,
         [str(executable), "exec", "--help"],
         path=str(node.parent),
-    ) == [str(node), str(executable), "exec", "--help"]
+    ) == ["node", str(executable), "exec", "--help"]
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node is unavailable")
+def test_shebang_node_launcher_reopens_named_snapshot(
+    tmp_path: Path,
+) -> None:
+    executable = tmp_path / "codex"
+    original = (
+        "#!/usr/bin/env node\n"
+        "process.stdout.write('named-node-snapshot\\n');\n"
+    ).encode()
+    executable.write_bytes(original)
+    executable.chmod(0o700)
+
+    snapshot_fd, snapshot_path, content, _ = MODULE._open_verified_executable(
+        executable
+    )
+    try:
+        executable.write_text("#!/bin/sh\necho replaced\n", encoding="utf-8")
+        completed = subprocess.run(
+            [str(snapshot_path)],
+            check=False,
+            capture_output=True,
+            text=True,
+            pass_fds=(snapshot_fd,),
+        )
+    finally:
+        os.close(snapshot_fd)
+        snapshot_path.unlink(missing_ok=True)
+        snapshot_path.parent.rmdir()
+
+    assert content == original
+    assert completed.returncode == 0
+    assert completed.stdout == "named-node-snapshot\n"
 
 
 def test_kitty_dedication_rejects_sibling_terminal_child(

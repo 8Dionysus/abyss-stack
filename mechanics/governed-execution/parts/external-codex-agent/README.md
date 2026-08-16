@@ -39,10 +39,13 @@ The controller:
   signal attempt before TERM and recovery never repeats an existing attempt;
   state and final receipts are atomically published with their containing
   directory fsynced before lifecycle progress, and replay of an unclosed
-  receipt remains failed. Direct shebang launch retains an inheritable verified
-  descriptor across the interpreter exec, so it executes a sealed immutable
-  snapshot rather than mutable source-inode bytes or a reopened pathname. A
-  naturally exited exact pair is recorded as `already_gone` without marker
+  receipt remains failed. Direct ELF launch uses an inheritable sealed memfd;
+  direct shebang launch uses a private, stable read-only named snapshot and
+  retains its verified descriptor across the interpreter exec. Both routes
+  execute the exact admitted bytes rather than mutable source-inode bytes or a
+  reopened source pathname; the named route also remains reopenable for
+  Node-backed `#!/usr/bin/env node` launchers. A naturally exited exact pair is
+  recorded as `already_gone` without marker
   reconstruction.
   This identity is
   distinct from any nested proof actor. This operator surface is not A2A transport and
