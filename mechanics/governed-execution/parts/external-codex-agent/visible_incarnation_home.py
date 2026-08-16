@@ -370,6 +370,54 @@ def _proc_argv(pid: int) -> list[str]:
     return [os.fsdecode(item) for item in raw.split(b"\0") if item]
 
 
+def _proc_environ(pid: int) -> dict[str, str]:
+    try:
+        raw = Path(f"/proc/{pid}/environ").read_bytes()
+    except OSError as exc:
+        raise IncarnationHomeError(f"cannot read process environment: {pid}") from exc
+    environment: dict[str, str] = {}
+    for item in raw.split(b"\0"):
+        key, separator, value = item.partition(b"=")
+        if not separator:
+            continue
+        environment[os.fsdecode(key)] = os.fsdecode(value)
+    return environment
+
+
+def _proc_children(pid: int) -> list[int]:
+    try:
+        raw = Path(f"/proc/{pid}/task/{pid}/children").read_text(encoding="ascii")
+    except (OSError, UnicodeError) as exc:
+        raise IncarnationHomeError(f"cannot read process children: {pid}") from exc
+    try:
+        return [int(value) for value in raw.split()]
+    except ValueError as exc:
+        raise IncarnationHomeError(f"process children are malformed: {pid}") from exc
+
+
+def _post_exec_argv(executable: Path, argv: Sequence[str]) -> list[str]:
+    """Derive Linux's post-exec argv for ELF and shebang-backed commands."""
+
+    if not argv:
+        raise IncarnationHomeError("holder argv must not be empty")
+    try:
+        first_line = executable.read_bytes().splitlines(keepends=True)[0]
+    except (IndexError, OSError) as exc:
+        raise IncarnationHomeError("Codex executable could not be inspected") from exc
+    if not first_line.startswith(b"#!"):
+        return list(argv)
+    shebang = os.fsdecode(first_line[2:]).strip()
+    fields = shebang.split(maxsplit=1)
+    if not fields or not fields[0].startswith("/"):
+        raise IncarnationHomeError("Codex shebang interpreter is not absolute")
+    post_exec = [fields[0]]
+    if len(fields) == 2 and fields[1]:
+        post_exec.append(fields[1])
+    post_exec.append(argv[0])
+    post_exec.extend(argv[1:])
+    return post_exec
+
+
 def _kitty_ancestor(pid: int) -> tuple[int, int, list[str]]:
     """Return the first exact Kitty ancestor of one visible holder."""
 
@@ -385,6 +433,75 @@ def _kitty_ancestor(pid: int) -> tuple[int, int, list[str]]:
             return parent_pid, _proc_start_ticks(parent_pid), _proc_argv(parent_pid)
         cursor = parent_pid
     raise IncarnationHomeError("visible holder has no Kitty terminal ancestor")
+
+
+def _kitty_dedication(
+    *, holder_pid: int, kitty_pid: int, terminal_argv: Sequence[str]
+) -> tuple[str, bool]:
+    """Prove the Kitty process is the detached, single-window holder terminal."""
+
+    if "--detach" not in terminal_argv:
+        raise IncarnationHomeError(
+            "holder Kitty terminal is not a detached dedicated process"
+        )
+    environment = _proc_environ(holder_pid)
+    if environment.get("KITTY_PID") != str(kitty_pid):
+        raise IncarnationHomeError("holder Kitty window does not bind its Kitty PID")
+    window_id = environment.get("KITTY_WINDOW_ID", "")
+    if not re.fullmatch(r"[1-9][0-9]*", window_id):
+        raise IncarnationHomeError("holder Kitty window identity is missing")
+
+    cursor = holder_pid
+    visited: set[int] = set()
+    direct_child: int | None = None
+    for _ in range(64):
+        parent_pid = _proc_parent_pid(cursor)
+        if parent_pid <= 1 or parent_pid in visited:
+            break
+        if parent_pid == kitty_pid:
+            direct_child = cursor
+            break
+        visited.add(parent_pid)
+        cursor = parent_pid
+    if direct_child is None:
+        raise IncarnationHomeError("holder Kitty window is no longer an ancestor")
+
+    for child_pid in _proc_children(kitty_pid):
+        if child_pid == direct_child:
+            continue
+        # Kitty creates short-lived kitten helper processes for configuration
+        # watching and exit cleanup. They are not terminal tabs/windows.
+        if _proc_comm(child_pid) == "kitten":
+            continue
+        raise IncarnationHomeError(
+            "holder Kitty process is not dedicated to this responsibility holder"
+        )
+    return window_id, True
+
+
+def _send_verified_term(pid: int, start_ticks: int) -> bool:
+    """Send TERM through a pidfd opened after a final identity recheck."""
+
+    pidfd_open = getattr(os, "pidfd_open", None)
+    pidfd_send_signal = getattr(signal, "pidfd_send_signal", None)
+    if not callable(pidfd_open) or not callable(pidfd_send_signal):
+        raise IncarnationHomeError("verified pidfd signaling is unavailable")
+    try:
+        pidfd = pidfd_open(pid, 0)
+    except ProcessLookupError:
+        return False
+    try:
+        if _proc_start_ticks(pid) != start_ticks:
+            raise IncarnationHomeError("holder Kitty identity changed before signaling")
+        try:
+            pidfd_send_signal(pidfd, signal.SIGTERM)
+        except ProcessLookupError:
+            return False
+        return True
+    except OSError as exc:
+        raise IncarnationHomeError("verified Kitty TERM delivery failed") from exc
+    finally:
+        os.close(pidfd)
 
 
 def _write_new_json(path: Path, value: dict[str, Any], label: str) -> None:
@@ -415,6 +532,41 @@ def _write_new_json(path: Path, value: dict[str, Any], label: str) -> None:
             os.close(fd)
 
 
+def _reserve_new_json(path: Path, label: str) -> int:
+    """Reserve a non-replacing receipt path before an external signal."""
+
+    if not path.is_absolute() or path.is_symlink():
+        raise IncarnationHomeError(f"{label} must be an absolute non-symlink path: {path}")
+    parent = path.parent
+    if parent.is_symlink() or not parent.is_dir():
+        raise IncarnationHomeError(f"{label} parent must be a real directory: {parent}")
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        fd = os.open(path, flags, 0o600)
+        os.fchmod(fd, 0o600)
+        return fd
+    except FileExistsError as exc:
+        raise IncarnationHomeError(f"{label} already exists: {path}") from exc
+    except OSError as exc:
+        raise IncarnationHomeError(f"cannot reserve {label}: {path}") from exc
+
+
+def _write_reserved_json(
+    fd: int, path: Path, value: dict[str, Any], label: str
+) -> None:
+    payload = canonical_bytes(value) + b"\n"
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        path.chmod(0o600)
+    except OSError as exc:
+        raise IncarnationHomeError(f"cannot write reserved {label}: {path}") from exc
+
+
 def _holder_receipt(
     *,
     receipt_path: Path,
@@ -429,6 +581,12 @@ def _holder_receipt(
         raise IncarnationHomeError("visible holder has no usable process parent")
     parent_comm = _proc_comm(holder_parent_pid)
     terminal_pid, terminal_start_ticks, terminal_argv = _kitty_ancestor(holder_pid)
+    window_id, dedicated = _kitty_dedication(
+        holder_pid=holder_pid,
+        kitty_pid=terminal_pid,
+        terminal_argv=terminal_argv,
+    )
+    post_exec_argv = _post_exec_argv(executable, argv)
     try:
         executable_digest = sha256_bytes(executable.read_bytes())
         manifest_digest = sha256_bytes(manifest_path.read_bytes())
@@ -445,8 +603,8 @@ def _holder_receipt(
             "parent_pid": holder_parent_pid,
             "parent_start_ticks": _proc_start_ticks(holder_parent_pid),
             "parent_comm": parent_comm,
-            "argv": list(argv),
-            "argv_digest": sha256_bytes(canonical_bytes(list(argv))),
+            "argv": post_exec_argv,
+            "argv_digest": sha256_bytes(canonical_bytes(post_exec_argv)),
         },
         "runtime": {
             "codex_executable": str(executable),
@@ -464,6 +622,8 @@ def _holder_receipt(
             "pid": terminal_pid,
             "start_ticks": terminal_start_ticks,
             "argv": terminal_argv,
+            "window_id": window_id,
+            "dedicated": dedicated,
         },
     }
     _write_new_json(receipt_path, receipt, "holder terminal receipt")
@@ -471,7 +631,12 @@ def _holder_receipt(
 
 
 def _validate_wake_delivery(
-    *, wake_receipt_path: Path, handoff_path: Path
+    *,
+    wake_receipt_path: Path,
+    handoff_path: Path,
+    holder_receipt_path: Path,
+    closure_receipt_path: Path,
+    holder_receipt: dict[str, Any],
 ) -> dict[str, Any]:
     wake = _load_json(wake_receipt_path, "wake receipt")
     if wake.get("schema_version") != "task_local_actor_wake_receipt_v1":
@@ -487,6 +652,28 @@ def _validate_wake_delivery(
         or observed.get("handoff_delivery") is not True
     ):
         raise IncarnationHomeError("wake receipt does not prove handoff delivery")
+    runtime = _load_json(handoff_path, "handoff").get("runtime")
+    responsibility_holder = (
+        runtime.get("responsibility_holder") if isinstance(runtime, dict) else None
+    )
+    if not isinstance(responsibility_holder, dict):
+        raise IncarnationHomeError("handoff lacks responsibility-holder binding")
+    holder_ref = str(holder_receipt_path.resolve())
+    closure_ref = str(closure_receipt_path.resolve())
+    if responsibility_holder.get("terminal_receipt") != holder_ref:
+        raise IncarnationHomeError("handoff holder receipt identity mismatch")
+    if responsibility_holder.get("closure_receipt") != closure_ref:
+        raise IncarnationHomeError("handoff closure receipt identity mismatch")
+    try:
+        holder_digest = sha256_bytes(holder_receipt_path.read_bytes())
+    except OSError as exc:
+        raise IncarnationHomeError("holder receipt could not be hashed") from exc
+    if responsibility_holder.get("terminal_receipt_sha256") != holder_digest:
+        raise IncarnationHomeError("handoff holder receipt digest mismatch")
+    if responsibility_holder.get("holder_pid") != holder_receipt["holder"].get("pid"):
+        raise IncarnationHomeError("handoff responsibility-holder PID mismatch")
+    if responsibility_holder.get("terminal_pid") != holder_receipt["terminal"].get("pid"):
+        raise IncarnationHomeError("handoff terminal PID mismatch")
     return wake
 
 
@@ -539,7 +726,9 @@ def _load_holder_receipt(path: Path) -> dict[str, Any]:
     return receipt
 
 
-def _holder_terminal_identity(receipt: dict[str, Any]) -> tuple[int, int, str]:
+def _holder_terminal_identity(
+    receipt: dict[str, Any],
+) -> tuple[int, int, str, str, bool]:
     holder = receipt["holder"]
     runtime = receipt["runtime"]
     terminal = receipt["terminal"]
@@ -587,6 +776,16 @@ def _holder_terminal_identity(receipt: dict[str, Any]) -> tuple[int, int, str]:
         cursor = current_parent_pid
     if not terminal_found:
         raise IncarnationHomeError("holder Kitty terminal is no longer an ancestor")
+    window_id, dedicated = _kitty_dedication(
+        holder_pid=pid,
+        kitty_pid=kitty_pid,
+        terminal_argv=terminal["argv"],
+    )
+    recorded_window_id = terminal.get("window_id")
+    if recorded_window_id is not None and recorded_window_id != window_id:
+        raise IncarnationHomeError("holder Kitty window identity has drifted")
+    if terminal.get("dedicated") is not None and terminal.get("dedicated") is not dedicated:
+        raise IncarnationHomeError("holder Kitty dedication proof has drifted")
     executable = _regular_file(
         Path(str(runtime["codex_executable"])), "holder Codex executable"
     )
@@ -597,67 +796,92 @@ def _holder_terminal_identity(receipt: dict[str, Any]) -> tuple[int, int, str]:
         raise IncarnationHomeError("holder Codex executable digest has drifted")
     if sha256_bytes(manifest.read_bytes()) != runtime.get("incarnation_manifest_digest"):
         raise IncarnationHomeError("holder incarnation manifest digest has drifted")
-    return pid, kitty_pid, _proc_comm(kitty_pid)
+    return pid, kitty_pid, _proc_comm(kitty_pid), window_id, dedicated
 
 
 def command_close(args: argparse.Namespace) -> int:
     handoff_path = _regular_file(Path(args.handoff), "handoff")
-    _validate_wake_delivery(
-        wake_receipt_path=Path(args.wake_receipt), handoff_path=handoff_path
-    )
     holder_receipt_path = _regular_file(
         Path(args.holder_receipt), "holder terminal receipt"
     )
+    closure_receipt_path = Path(args.closure_receipt)
     receipt = _load_holder_receipt(holder_receipt_path)
-    holder_pid, kitty_pid, kitty_comm = _holder_terminal_identity(receipt)
+    _validate_wake_delivery(
+        wake_receipt_path=Path(args.wake_receipt),
+        handoff_path=handoff_path,
+        holder_receipt_path=holder_receipt_path,
+        closure_receipt_path=closure_receipt_path,
+        holder_receipt=receipt,
+    )
+    (
+        holder_pid,
+        kitty_pid,
+        kitty_comm,
+        kitty_window_id,
+        kitty_dedicated,
+    ) = _holder_terminal_identity(receipt)
     kitty_start_ticks = receipt["terminal"]["start_ticks"]
     kitty_argv = receipt["terminal"]["argv"]
-    signal_sent = False
-    try:
-        os.kill(kitty_pid, signal.SIGTERM)
-        signal_sent = True
-    except ProcessLookupError:
-        pass
-    closed = False
-    holder_gone = False
-    for _ in range(40):
-        kitty_gone = not _proc_identity_is_live(kitty_pid, kitty_start_ticks)
-        holder_gone = not _proc_identity_is_live(
-            holder_pid, receipt["holder"]["start_ticks"]
-        )
-        if kitty_gone and holder_gone:
-            closed = True
-            break
-        time.sleep(0.25)
-    closure = {
-        "schema_version": TERMINAL_CLOSURE_SCHEMA_VERSION,
-        "handoff_ref": str(handoff_path),
-        "holder_receipt_ref": str(holder_receipt_path),
-        "wake_receipt_ref": str(Path(args.wake_receipt).resolve()),
-        "verified_at": _utc_now(),
-        "holder": {
-            "pid": holder_pid,
-            "start_ticks": receipt["holder"]["start_ticks"],
-            "gone": holder_gone,
-        },
-        "terminal": {
-            "pid": kitty_pid,
-            "start_ticks": kitty_start_ticks,
-            "comm": kitty_comm,
-            "argv": kitty_argv,
-            "signal": "TERM",
-            "signal_sent": signal_sent,
-            "gone": closed and holder_gone,
-        },
-        "closed": closed,
-        "outcome": "closed" if closed else "close_unverified",
-        "route": "abyss_stack_visible_incarnation_runtime",
-        "trigger": "wake_bridge_after_confirmed_handoff_delivery",
-    }
-    _write_new_json(
-        Path(args.closure_receipt), closure, "terminal closure receipt"
+    closure_fd = _reserve_new_json(
+        closure_receipt_path, "terminal closure receipt"
     )
+    signal_sent = False
+    closed = False
+    kitty_gone = False
+    holder_gone = False
+    failure: IncarnationHomeError | None = None
+    try:
+        try:
+            signal_sent = _send_verified_term(kitty_pid, kitty_start_ticks)
+        except IncarnationHomeError as exc:
+            failure = exc
+        if failure is None:
+            for _ in range(40):
+                kitty_gone = not _proc_identity_is_live(kitty_pid, kitty_start_ticks)
+                holder_gone = not _proc_identity_is_live(
+                    holder_pid, receipt["holder"]["start_ticks"]
+                )
+                if kitty_gone and holder_gone:
+                    closed = True
+                    break
+                time.sleep(0.25)
+    finally:
+        closure = {
+            "schema_version": TERMINAL_CLOSURE_SCHEMA_VERSION,
+            "handoff_ref": str(handoff_path.resolve()),
+            "holder_receipt_ref": str(holder_receipt_path.resolve()),
+            "wake_receipt_ref": str(Path(args.wake_receipt).resolve()),
+            "verified_at": _utc_now(),
+            "holder": {
+                "pid": holder_pid,
+                "start_ticks": receipt["holder"]["start_ticks"],
+                "gone": holder_gone,
+            },
+            "terminal": {
+                "pid": kitty_pid,
+                "start_ticks": kitty_start_ticks,
+                "comm": kitty_comm,
+                "argv": kitty_argv,
+                "window_id": kitty_window_id,
+                "dedicated": kitty_dedicated,
+                "signal": "TERM",
+                "signal_sent": signal_sent,
+                "gone": kitty_gone,
+            },
+            "closed": closed,
+            "outcome": "closed" if closed else "close_unverified",
+            "route": "abyss_stack_visible_incarnation_runtime",
+            "trigger": "wake_bridge_after_confirmed_handoff_delivery",
+        }
+        _write_reserved_json(
+            closure_fd,
+            closure_receipt_path,
+            closure,
+            "terminal closure receipt",
+        )
     if not closed:
+        if failure is not None:
+            raise failure
         raise IncarnationHomeError("holder terminal closure was not observed")
     print(json.dumps(closure, ensure_ascii=False, sort_keys=True))
     return 0

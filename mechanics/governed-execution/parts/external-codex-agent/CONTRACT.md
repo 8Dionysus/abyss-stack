@@ -114,17 +114,25 @@ the responsibility holder. `launch --holder-receipt <absolute json>` is valid
 only for the direct `exec` route (not detached Kitty): immediately before the
 Codex `exec`, it writes a non-replacing receipt containing the holder PID,
 process-parent PID/start ticks, the first Kitty ancestor PID/start ticks/argv,
-and executable/manifest digests. This receipt is not a governed proof-actor
-result and must not be substituted with a nested actor's runtime identity. The
-Kitty-ancestor binding covers the installed bubblewrap wrapper as well as a
-direct host exec while retaining one exact terminal identity. After a wake
-bridge has recorded confirmed handoff delivery, the installed launcher may run
-`close --holder-receipt ... --wake-receipt ... --handoff ...
---closure-receipt ...`; it requires the delivered wake receipt, rechecks the
-holder's exact PID/start-ticks/argv, its process-parent identity, and the
-recorded Kitty ancestor, sends `TERM` to that one terminal, and emits a
-non-replacing closure receipt only after both the holder and Kitty disappear.
-Ambiguous, reused, or drifted identities fail closed.
+the detached Kitty window identity/dedication proof, and executable/manifest
+digests. The holder argv is the post-exec `/proc` shape, including the
+interpreter argv of a shebang-backed executable. This receipt is not a governed
+proof-actor result and must not be substituted with a nested actor's runtime
+identity. The Kitty-ancestor binding covers the installed bubblewrap wrapper as
+well as a direct host exec while retaining one exact terminal identity; the
+holder environment must bind `KITTY_PID` and `KITTY_WINDOW_ID`, and no sibling
+terminal child may remain outside the holder lineage and Kitty helper
+processes. After a wake bridge has recorded confirmed handoff delivery, the
+installed launcher may run `close --holder-receipt ... --wake-receipt ...
+--handoff ... --closure-receipt ...`; before selecting a signal target it
+requires the handoff to bind the exact holder receipt path, receipt digest,
+holder/terminal PIDs, and reserved closure path. It then rechecks the holder's
+exact PID/start-ticks/argv, its process-parent identity, the recorded Kitty
+window, and the dedicated Kitty process, reserves the closure receipt before
+signaling, and sends `TERM` through a pidfd opened after the final identity
+check. The non-replacing closure receipt records the final Kitty disappearance
+independently and is written even when closure is unverified. Ambiguous,
+reused, or drifted identities fail closed.
 
 Each CLI call writes one `abyss_stack_external_codex_response_v1` JSON object.
 `start` returns after the independent worker is durably recorded; later calls

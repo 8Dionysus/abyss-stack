@@ -546,7 +546,20 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     def fake_exec(path: str, argv: list[str], environment: dict[str, str]) -> None:
         captured.update(path=path, argv=argv, environment=environment)
 
+    terminal_pid = os.getppid()
+    terminal_argv = ["/usr/bin/kitty", "--detach", "--title", "test-holder"]
+    monkeypatch.setattr(
+        MODULE,
+        "_kitty_ancestor",
+        lambda _pid: (terminal_pid, MODULE._proc_start_ticks(terminal_pid), terminal_argv),
+    )
     monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_environ",
+        lambda _pid: {"KITTY_PID": str(terminal_pid), "KITTY_WINDOW_ID": "1"},
+    )
+    monkeypatch.setattr(MODULE, "_proc_children", lambda _pid: [os.getpid()])
     monkeypatch.setattr(MODULE.os, "execvpe", fake_exec)
     args = MODULE.argparse.Namespace(
         holder_receipt=str(receipt_path),
@@ -565,10 +578,14 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert receipt["holder"]["pid"] == os.getpid()
     assert receipt["holder"]["start_ticks"] == MODULE._proc_start_ticks(os.getpid())
     assert receipt["holder"]["parent_pid"] == os.getppid()
-    assert receipt["holder"]["argv"] == captured["argv"]
+    assert receipt["holder"]["argv"] == MODULE._post_exec_argv(
+        executable, captured["argv"]
+    )
     assert receipt["terminal"]["binding"] == "kitty_ancestor_at_exec"
-    assert receipt["terminal"]["pid"] == os.getppid()
-    assert receipt["terminal"]["argv"] == MODULE._proc_argv(os.getppid())
+    assert receipt["terminal"]["pid"] == terminal_pid
+    assert receipt["terminal"]["argv"] == terminal_argv
+    assert receipt["terminal"]["window_id"] == "1"
+    assert receipt["terminal"]["dedicated"] is True
     assert receipt["runtime"]["incarnation_manifest"] == str(manifest_path)
     assert receipt["runtime"]["model"] == "gpt-5.6-luna"
     assert receipt["runtime"]["reasoning_effort"] == "max"
@@ -630,4 +647,121 @@ def test_close_requires_confirmed_handoff_delivery(tmp_path: Path) -> None:
     )
 
     with pytest.raises(MODULE.IncarnationHomeError, match="does not prove handoff"):
-        MODULE._validate_wake_delivery(wake_receipt_path=wake, handoff_path=handoff)
+        MODULE._validate_wake_delivery(
+            wake_receipt_path=wake,
+            handoff_path=handoff,
+            holder_receipt_path=tmp_path / "holder.json",
+            closure_receipt_path=tmp_path / "closure.json",
+            holder_receipt={"holder": {}, "terminal": {}},
+        )
+
+
+def test_post_exec_argv_expands_shebang_interpreter(tmp_path: Path) -> None:
+    executable = tmp_path / "codex"
+    executable.write_text("#!/usr/bin/env python3 -u\n", encoding="utf-8")
+    executable.chmod(0o700)
+
+    assert MODULE._post_exec_argv(
+        executable, [str(executable), "exec", "--help"]
+    ) == ["/usr/bin/env", "python3 -u", str(executable), "exec", "--help"]
+
+
+def test_kitty_dedication_rejects_sibling_terminal_child(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    holder_pid = 7001
+    kitty_pid = 7003
+    sibling_pid = 7004
+    parents = {holder_pid: kitty_pid, kitty_pid: 1}
+    commands = {kitty_pid: "kitty", sibling_pid: "zsh"}
+
+    monkeypatch.setattr(MODULE, "_proc_parent_pid", parents.__getitem__)
+    monkeypatch.setattr(MODULE, "_proc_environ", lambda _pid: {
+        "KITTY_PID": str(kitty_pid),
+        "KITTY_WINDOW_ID": "7",
+    })
+    monkeypatch.setattr(MODULE, "_proc_children", lambda _pid: [holder_pid, sibling_pid])
+    monkeypatch.setattr(MODULE, "_proc_comm", commands.__getitem__)
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="not dedicated"):
+        MODULE._kitty_dedication(
+            holder_pid=holder_pid,
+            kitty_pid=kitty_pid,
+            terminal_argv=["/usr/bin/kitty", "--detach", "--title", "holder"],
+        )
+
+
+def test_verified_term_uses_pidfd_after_identity_recheck(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[object, ...]] = []
+    monkeypatch.setattr(MODULE.os, "pidfd_open", lambda pid, flags: (calls.append(("open", pid, flags)) or 42))
+    monkeypatch.setattr(MODULE.signal, "pidfd_send_signal", lambda fd, sig: calls.append(("signal", fd, sig)))
+    monkeypatch.setattr(MODULE, "_proc_start_ticks", lambda _pid: 99)
+    monkeypatch.setattr(MODULE.os, "close", lambda fd: calls.append(("close", fd)))
+
+    assert MODULE._send_verified_term(7003, 99) is True
+    assert calls[0] == ("open", 7003, 0)
+    assert calls[1] == ("signal", 42, MODULE.signal.SIGTERM)
+    assert calls[2] == ("close", 42)
+
+
+def test_wake_delivery_requires_exact_holder_and_closure_binding(
+    tmp_path: Path,
+) -> None:
+    handoff = tmp_path / "handoff.json"
+    holder = tmp_path / "holder.json"
+    closure = tmp_path / "closure.json"
+    wake = tmp_path / "wake.json"
+    holder_payload = {
+        "holder": {"pid": 101},
+        "terminal": {"pid": 202},
+    }
+    holder.write_text(json.dumps(holder_payload), encoding="utf-8")
+    handoff.write_text(
+        json.dumps(
+            {
+                "runtime": {
+                    "responsibility_holder": {
+                        "terminal_receipt": str(holder),
+                        "terminal_receipt_sha256": MODULE.sha256_bytes(holder.read_bytes()),
+                        "closure_receipt": str(closure),
+                        "holder_pid": 101,
+                        "terminal_pid": 202,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    wake.write_text(
+        json.dumps(
+            {
+                "schema_version": "task_local_actor_wake_receipt_v1",
+                "handoff_ref": str(handoff),
+                "actions": {"handoff_message_sent": True},
+                "observed": {"handoff_delivery": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    MODULE._validate_wake_delivery(
+        wake_receipt_path=wake,
+        handoff_path=handoff,
+        holder_receipt_path=holder,
+        closure_receipt_path=closure,
+        holder_receipt=holder_payload,
+    )
+    handoff.write_text(
+        handoff.read_text(encoding="utf-8").replace(str(closure), str(tmp_path / "other.json")),
+        encoding="utf-8",
+    )
+    with pytest.raises(MODULE.IncarnationHomeError, match="closure receipt identity"):
+        MODULE._validate_wake_delivery(
+            wake_receipt_path=wake,
+            handoff_path=handoff,
+            holder_receipt_path=holder,
+            closure_receipt_path=closure,
+            holder_receipt=holder_payload,
+        )
