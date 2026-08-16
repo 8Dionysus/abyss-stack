@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 24557333,
+  "allowed_tracked_bytes": 35791688,
+  "approved_by": "repository-owner",
+  "base_ref": "9612534996957f2a5655fd456bf592de236bf8a1",
+  "changed_generated_bytes": 24557333,
+  "changed_generated_files": 249,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "c6ab02366e94cbfd4b780cc2da4e84b2e771007cec676529b496dd7da669b83d",
+  "reason": "Owner-derived KAG projection for the external holder identity and task-evidence scope repair.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35791688,
+  "tracked_bytes_max": 24117248
+}
