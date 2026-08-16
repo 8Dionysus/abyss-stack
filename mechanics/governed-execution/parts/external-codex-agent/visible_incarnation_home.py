@@ -370,6 +370,23 @@ def _proc_argv(pid: int) -> list[str]:
     return [os.fsdecode(item) for item in raw.split(b"\0") if item]
 
 
+def _kitty_ancestor(pid: int) -> tuple[int, int, list[str]]:
+    """Return the first exact Kitty ancestor of one visible holder."""
+
+    cursor = pid
+    visited: set[int] = set()
+    for _ in range(64):
+        parent_pid = _proc_parent_pid(cursor)
+        if parent_pid <= 1 or parent_pid in visited:
+            break
+        visited.add(parent_pid)
+        parent_comm = _proc_comm(parent_pid)
+        if parent_comm == "kitty":
+            return parent_pid, _proc_start_ticks(parent_pid), _proc_argv(parent_pid)
+        cursor = parent_pid
+    raise IncarnationHomeError("visible holder has no Kitty terminal ancestor")
+
+
 def _write_new_json(path: Path, value: dict[str, Any], label: str) -> None:
     if not path.is_absolute() or path.is_symlink():
         raise IncarnationHomeError(f"{label} must be an absolute non-symlink path: {path}")
@@ -409,12 +426,9 @@ def _holder_receipt(
     holder_pid = os.getpid()
     holder_parent_pid = os.getppid()
     if holder_parent_pid <= 1:
-        raise IncarnationHomeError("visible holder has no usable terminal parent")
+        raise IncarnationHomeError("visible holder has no usable process parent")
     parent_comm = _proc_comm(holder_parent_pid)
-    if parent_comm != "kitty":
-        raise IncarnationHomeError(
-            f"visible holder parent must be Kitty, got {parent_comm or '<empty>'}"
-        )
+    terminal_pid, terminal_start_ticks, terminal_argv = _kitty_ancestor(holder_pid)
     try:
         executable_digest = sha256_bytes(executable.read_bytes())
         manifest_digest = sha256_bytes(manifest_path.read_bytes())
@@ -445,8 +459,11 @@ def _holder_receipt(
             "incarnation_codex_home": str(manifest["codex_home"]),
         },
         "terminal": {
-            "binding": "direct_parent_at_exec",
+            "binding": "kitty_ancestor_at_exec",
             "required_comm": "kitty",
+            "pid": terminal_pid,
+            "start_ticks": terminal_start_ticks,
+            "argv": terminal_argv,
         },
     }
     _write_new_json(receipt_path, receipt, "holder terminal receipt")
@@ -509,8 +526,12 @@ def _load_holder_receipt(path: Path) -> dict[str, Any]:
         or not isinstance(runtime, dict)
         or not required_runtime <= runtime.keys()
         or not isinstance(terminal, dict)
-        or terminal.get("binding") != "direct_parent_at_exec"
+        or terminal.get("binding") != "kitty_ancestor_at_exec"
         or terminal.get("required_comm") != "kitty"
+        or not isinstance(terminal.get("pid"), int)
+        or not isinstance(terminal.get("start_ticks"), int)
+        or not isinstance(terminal.get("argv"), list)
+        or not all(isinstance(item, str) for item in terminal["argv"])
         or not isinstance(holder.get("argv"), list)
         or not all(isinstance(item, str) for item in holder["argv"])
     ):
@@ -521,6 +542,7 @@ def _load_holder_receipt(path: Path) -> dict[str, Any]:
 def _holder_terminal_identity(receipt: dict[str, Any]) -> tuple[int, int, str]:
     holder = receipt["holder"]
     runtime = receipt["runtime"]
+    terminal = receipt["terminal"]
     pid = holder.get("pid")
     start_ticks = holder.get("start_ticks")
     parent_pid = holder.get("parent_pid")
@@ -533,14 +555,38 @@ def _holder_terminal_identity(receipt: dict[str, Any]) -> tuple[int, int, str]:
         raise IncarnationHomeError("holder terminal parent PID was reused or has drifted")
     if _proc_parent_pid(pid) != parent_pid:
         raise IncarnationHomeError("holder parent identity has changed")
-    if holder.get("parent_comm") != "kitty" or _proc_comm(parent_pid) != "kitty":
-        raise IncarnationHomeError("holder parent is not Kitty")
+    if _proc_comm(parent_pid) != holder.get("parent_comm"):
+        raise IncarnationHomeError("holder process parent identity has drifted")
     observed_argv = _proc_argv(pid)
     expected_argv = holder["argv"]
     if observed_argv != expected_argv:
         raise IncarnationHomeError("holder argv identity has drifted")
     if holder.get("argv_digest") != sha256_bytes(canonical_bytes(expected_argv)):
         raise IncarnationHomeError("holder argv digest is invalid")
+    kitty_pid = terminal["pid"]
+    kitty_start_ticks = terminal["start_ticks"]
+    if kitty_pid <= 1 or kitty_start_ticks <= 0:
+        raise IncarnationHomeError("holder Kitty identity is invalid")
+    if _proc_start_ticks(kitty_pid) != kitty_start_ticks:
+        raise IncarnationHomeError("holder Kitty PID was reused or has drifted")
+    if _proc_comm(kitty_pid) != "kitty":
+        raise IncarnationHomeError("holder terminal is not Kitty")
+    if _proc_argv(kitty_pid) != terminal["argv"]:
+        raise IncarnationHomeError("holder Kitty argv identity has drifted")
+    cursor = pid
+    visited: set[int] = set()
+    terminal_found = False
+    for _ in range(64):
+        current_parent_pid = _proc_parent_pid(cursor)
+        if current_parent_pid <= 1 or current_parent_pid in visited:
+            break
+        visited.add(current_parent_pid)
+        if current_parent_pid == kitty_pid:
+            terminal_found = True
+            break
+        cursor = current_parent_pid
+    if not terminal_found:
+        raise IncarnationHomeError("holder Kitty terminal is no longer an ancestor")
     executable = _regular_file(
         Path(str(runtime["codex_executable"])), "holder Codex executable"
     )
@@ -551,7 +597,7 @@ def _holder_terminal_identity(receipt: dict[str, Any]) -> tuple[int, int, str]:
         raise IncarnationHomeError("holder Codex executable digest has drifted")
     if sha256_bytes(manifest.read_bytes()) != runtime.get("incarnation_manifest_digest"):
         raise IncarnationHomeError("holder incarnation manifest digest has drifted")
-    return pid, parent_pid, _proc_comm(parent_pid)
+    return pid, kitty_pid, _proc_comm(kitty_pid)
 
 
 def command_close(args: argparse.Namespace) -> int:
@@ -564,8 +610,8 @@ def command_close(args: argparse.Namespace) -> int:
     )
     receipt = _load_holder_receipt(holder_receipt_path)
     holder_pid, kitty_pid, kitty_comm = _holder_terminal_identity(receipt)
-    kitty_start_ticks = _proc_start_ticks(kitty_pid)
-    kitty_argv = _proc_argv(kitty_pid)
+    kitty_start_ticks = receipt["terminal"]["start_ticks"]
+    kitty_argv = receipt["terminal"]["argv"]
     signal_sent = False
     try:
         os.kill(kitty_pid, signal.SIGTERM)

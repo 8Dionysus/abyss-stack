@@ -31,36 +31,39 @@ successful.
   for visible terminals.
 - Have the visible launcher write a non-replacing holder receipt before its
   direct `exec`, then let the installed owner runtime close only that exact
-  PID/start-ticks/argv and direct Kitty parent after a delivered wake receipt.
+  PID/start-ticks/argv and first Kitty ancestor after a delivered wake receipt.
 
 ## Decision
 
 Use the third route. `launch --holder-receipt` is valid only for the direct
 operator-visible `exec` route and records the actual responsibility-holder
-process, its direct Kitty parent, exact argv, and executable/manifest digests.
-The installed `close` operation requires a wake receipt that proves the exact
-handoff was delivered, revalidates the recorded process identity, sends `TERM`
-to that one Kitty, and emits a closure receipt only after the holder and Kitty
-are gone. A nested proof actor's runtime result or process identity is never a
-holder-close target.
+process, its process parent, the first Kitty ancestor, exact argv, and
+executable/manifest digests. The ancestor binding is necessary because the
+installed runtime places the holder behind bubblewrap. The installed `close`
+operation requires a wake receipt that proves the exact handoff was delivered,
+revalidates the recorded process and Kitty identities, sends `TERM` to that one
+Kitty, and emits a closure receipt only after the holder and Kitty are gone. A
+nested proof actor's runtime result or process identity is never a holder-close
+target.
 
 ## Rationale
 
 The launcher is the only source-owned point that sees the operator-visible
 process immediately before `exec`, so it can preserve the PID identity without
 guessing from later process scans. Start ticks and exact argv prevent PID reuse
-or a same-model/worktree process from satisfying the close route. Requiring the
-already-generated wake receipt keeps terminal disappearance after confirmed
-return delivery, while rejecting detached Kitty receipt binding avoids an
-unobservable child identity.
+or a same-model/worktree process from satisfying the close route. Binding the
+first Kitty ancestor works across the installed bubblewrap boundary while
+keeping the terminal address exact. Requiring the already-generated wake
+receipt keeps terminal disappearance after confirmed return delivery, while
+rejecting detached Kitty receipt binding avoids an unobservable child identity.
 
 ## Consequences
 
 - Positive: responsibility-holder and proof-actor lifecycle evidence remain
   distinct and auditable.
 - Positive: an ambiguous, reused, drifted, or undelivered target fails closed.
-- Tradeoff: this first route requires a direct Kitty parent and does not claim a
-  generic detached-terminal lifecycle.
+- Tradeoff: this first route requires a visible Kitty ancestor and does not
+  claim a generic detached-terminal lifecycle.
 - Unchanged: no host exposure, secret, storage, recurrence, service, model-fit,
   owner acceptance, or semantic proof authority is added.
 

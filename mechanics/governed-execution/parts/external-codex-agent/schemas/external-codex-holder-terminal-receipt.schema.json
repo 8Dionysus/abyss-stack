@@ -42,10 +42,13 @@
     "terminal": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["binding", "required_comm"],
+      "required": ["binding", "required_comm", "pid", "start_ticks", "argv"],
       "properties": {
-        "binding": {"const": "direct_parent_at_exec"},
-        "required_comm": {"const": "kitty"}
+        "binding": {"const": "kitty_ancestor_at_exec"},
+        "required_comm": {"const": "kitty"},
+        "pid": {"type": "integer", "minimum": 1},
+        "start_ticks": {"type": "integer", "minimum": 1},
+        "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}}
       }
     }
   }

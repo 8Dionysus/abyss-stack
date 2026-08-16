@@ -566,6 +566,9 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert receipt["holder"]["start_ticks"] == MODULE._proc_start_ticks(os.getpid())
     assert receipt["holder"]["parent_pid"] == os.getppid()
     assert receipt["holder"]["argv"] == captured["argv"]
+    assert receipt["terminal"]["binding"] == "kitty_ancestor_at_exec"
+    assert receipt["terminal"]["pid"] == os.getppid()
+    assert receipt["terminal"]["argv"] == MODULE._proc_argv(os.getppid())
     assert receipt["runtime"]["incarnation_manifest"] == str(manifest_path)
     assert receipt["runtime"]["model"] == "gpt-5.6-luna"
     assert receipt["runtime"]["reasoning_effort"] == "max"
@@ -573,6 +576,27 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
 
     with pytest.raises(MODULE.IncarnationHomeError, match="already exists"):
         MODULE.command_launch(args)
+
+
+def test_holder_terminal_binds_first_kitty_ancestor_through_wrapper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    holder_pid = 7001
+    wrapper_pid = 7002
+    kitty_pid = 7003
+    parents = {holder_pid: wrapper_pid, wrapper_pid: kitty_pid, kitty_pid: 1}
+    commands = {wrapper_pid: "bwrap", kitty_pid: "kitty"}
+
+    monkeypatch.setattr(MODULE, "_proc_parent_pid", parents.__getitem__)
+    monkeypatch.setattr(MODULE, "_proc_comm", commands.__getitem__)
+    monkeypatch.setattr(MODULE, "_proc_start_ticks", lambda pid: pid + 100)
+    monkeypatch.setattr(MODULE, "_proc_argv", lambda pid: [f"process-{pid}"])
+
+    assert MODULE._kitty_ancestor(holder_pid) == (
+        kitty_pid,
+        kitty_pid + 100,
+        [f"process-{kitty_pid}"],
+    )
 
 
 def test_holder_receipt_rejects_detached_kitty_route(tmp_path: Path) -> None:
