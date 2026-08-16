@@ -1692,23 +1692,41 @@ def _remove_named_snapshot(
     cleanup_dir = snapshot_dir
     if cleanup_dir is not None:
         try:
+            if (
+                cleanup_dir.is_symlink()
+                or not cleanup_dir.is_dir()
+                or not cleanup_dir.name.startswith("abyss-stack-codex-package-")
+            ):
+                return
+            snapshot_path.relative_to(cleanup_dir)
             os.chmod(cleanup_dir, 0o700)
-        except OSError:
+        except (OSError, ValueError):
             return
-    try:
-        snapshot_path.unlink(missing_ok=True)
-    except OSError:
-        return
     if cleanup_dir is not None:
         try:
-            for entry in cleanup_dir.iterdir():
-                if entry.is_symlink():
-                    entry.unlink(missing_ok=True)
-            cleanup_dir.rmdir()
+            def remove_tree(root: Path) -> None:
+                os.chmod(root, 0o700)
+                with os.scandir(root) as entries:
+                    for entry in entries:
+                        child = Path(entry.path)
+                        if entry.is_symlink():
+                            child.unlink(missing_ok=True)
+                        elif entry.is_dir(follow_symlinks=False):
+                            remove_tree(child)
+                        else:
+                            child.unlink(missing_ok=True)
+                os.chmod(root, 0o700)
+                root.rmdir()
+
+            remove_tree(cleanup_dir)
         except OSError:
             return
         sync_path = cleanup_dir.parent
     else:
+        try:
+            snapshot_path.unlink(missing_ok=True)
+        except OSError:
+            return
         sync_path = snapshot_path.parent
     try:
         directory_flags = os.O_RDONLY
@@ -1761,9 +1779,90 @@ def _spawn_named_snapshot_cleanup(
         os._exit(0)
 
 
+def _execution_snapshot_root(preferred: Path | None) -> Path:
+    root = Path(preferred) if preferred is not None else Path(tempfile.gettempdir())
+    if not root.is_absolute() or root.is_symlink() or not root.is_dir():
+        raise IncarnationHomeError(
+            f"shebang snapshot root must be an absolute real directory: {root}"
+        )
+    try:
+        flags = os.statvfs(root).f_flag
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"shebang snapshot filesystem could not be inspected: {root}"
+        ) from exc
+    noexec = getattr(os, "ST_NOEXEC", 0)
+    if isinstance(noexec, int) and noexec and flags & noexec:
+        raise IncarnationHomeError(
+            f"shebang snapshot filesystem is mounted noexec: {root}"
+        )
+    return root
+
+
+def _mirror_package_layout(
+    *, executable: Path, snapshot_root: Path
+) -> tuple[Path, Path]:
+    """Build a private symlinked path layout rooted at the filesystem root."""
+
+    snapshot_dir = Path(
+        tempfile.mkdtemp(prefix="abyss-stack-codex-package-", dir=snapshot_root)
+    )
+    try:
+        os.chmod(snapshot_dir, 0o700)
+        source_dir = Path("/")
+        target_dir = snapshot_dir
+        source_parts = executable.parent.parts
+        if not source_parts or source_parts[0] != "/":
+            raise IncarnationHomeError("shebang executable parent must be absolute")
+        for component in source_parts[1:]:
+            for entry in source_dir.iterdir():
+                if entry.name == component:
+                    continue
+                os.symlink(
+                    os.fspath(entry),
+                    os.fspath(target_dir / entry.name),
+                    target_is_directory=entry.is_dir(),
+                )
+            source_dir = source_dir / component
+            target_dir = target_dir / component
+            target_dir.mkdir(mode=0o700)
+        for entry in source_dir.iterdir():
+            if entry.name == executable.name:
+                continue
+            os.symlink(
+                os.fspath(entry),
+                os.fspath(target_dir / entry.name),
+                target_is_directory=entry.is_dir(),
+            )
+        return target_dir / executable.name, snapshot_dir
+    except BaseException:
+        _remove_named_snapshot(
+            snapshot_dir / executable.name, snapshot_dir=snapshot_dir
+        )
+        raise
+
+
+def _freeze_snapshot_tree(snapshot_dir: Path) -> None:
+    directory_flags = os.O_RDONLY
+    if hasattr(os, "O_DIRECTORY"):
+        directory_flags |= os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        directory_flags |= os.O_NOFOLLOW
+    for root, _directories, _files in os.walk(snapshot_dir, followlinks=False):
+        directory = Path(root)
+        os.chmod(directory, 0o500)
+        directory_fd = os.open(directory, directory_flags)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+
+
 def _open_verified_executable(
     executable: Path,
-) -> tuple[int, Path, bytes, str]:
+    *,
+    snapshot_root: Path | None = None,
+) -> tuple[int, Path, bytes, str, Path | None]:
     flags = os.O_RDONLY
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
@@ -1788,11 +1887,10 @@ def _open_verified_executable(
             snapshot_path: Path | None = None
             snapshot_dir: Path | None = None
             try:
-                snapshot_dir = Path(
-                    tempfile.mkdtemp(prefix="abyss-stack-codex-package-")
+                snapshot_path, snapshot_dir = _mirror_package_layout(
+                    executable=executable,
+                    snapshot_root=_execution_snapshot_root(snapshot_root),
                 )
-                os.chmod(snapshot_dir, 0o700)
-                snapshot_path = snapshot_dir / executable.name
                 snapshot_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
                 if hasattr(os, "O_NOFOLLOW"):
                     snapshot_flags |= os.O_NOFOLLOW
@@ -1803,28 +1901,13 @@ def _open_verified_executable(
                 os.fsync(snapshot_fd)
                 os.fchmod(snapshot_fd, 0o500)
                 os.fsync(snapshot_fd)
-                for entry in executable.parent.iterdir():
-                    if entry.name == executable.name:
-                        continue
-                    mirror_entry = snapshot_dir / entry.name
-                    os.symlink(
-                        os.fspath(entry),
-                        os.fspath(mirror_entry),
-                        target_is_directory=entry.is_dir(),
-                    )
-                directory_flags = os.O_RDONLY
-                if hasattr(os, "O_DIRECTORY"):
-                    directory_flags |= os.O_DIRECTORY
-                if hasattr(os, "O_NOFOLLOW"):
-                    directory_flags |= os.O_NOFOLLOW
-                os.chmod(snapshot_dir, 0o500)
-                directory_fd = os.open(snapshot_dir, directory_flags)
-                try:
-                    os.fsync(directory_fd)
-                finally:
-                    os.close(directory_fd)
+                _freeze_snapshot_tree(snapshot_dir)
                 os.close(snapshot_fd)
                 snapshot_fd = None
+                # A shebang interpreter must reopen a named path. Every
+                # actual directory from the private mirror root through the
+                # launcher's parent is frozen before that reopen, so a normal
+                # same-user rename cannot replace the verified final entry.
                 snapshot_fd = os.open(snapshot_path, os.O_RDONLY)
                 if hasattr(os, "O_NOFOLLOW"):
                     os.close(snapshot_fd)
@@ -1855,6 +1938,7 @@ def _open_verified_executable(
                     snapshot_path,
                     content,
                     sha256_bytes(content),
+                    snapshot_dir,
                 )
             except IncarnationHomeError:
                 if snapshot_fd is not None:
@@ -1919,6 +2003,7 @@ def _open_verified_executable(
             Path(f"/proc/self/fd/{snapshot_fd}"),
             content,
             sha256_bytes(content),
+            None,
         )
     except IncarnationHomeError:
         if snapshot_fd is not None:
@@ -2118,8 +2203,14 @@ def command_launch(args: argparse.Namespace) -> int:
             env=environment,
         )
         return completed.returncode
-    executable_fd, executable_fd_path, executable_bytes, executable_digest = (
-        _open_verified_executable(executable)
+    (
+        executable_fd,
+        executable_fd_path,
+        executable_bytes,
+        executable_digest,
+        executable_snapshot_dir,
+    ) = _open_verified_executable(
+        executable, snapshot_root=Path(str(manifest["codex_home"]))
     )
     try:
         _verify_executable_version(
@@ -2154,7 +2245,7 @@ def command_launch(args: argparse.Namespace) -> int:
         if not str(executable_fd_path).startswith("/proc/self/fd/"):
             _spawn_named_snapshot_cleanup(
                 snapshot_path=executable_fd_path,
-                snapshot_dir=executable_fd_path.parent,
+                snapshot_dir=executable_snapshot_dir,
                 holder_pid=os.getpid(),
                 holder_start_ticks=_proc_start_ticks(os.getpid()),
                 snapshot_fd=executable_fd,

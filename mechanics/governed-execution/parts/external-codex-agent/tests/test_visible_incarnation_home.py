@@ -7,6 +7,7 @@ import shutil
 import stat
 import subprocess
 import tomllib
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -647,15 +648,21 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert not str(captured["path"]).startswith("/proc/self/fd/")
     snapshot_path = Path(str(captured["path"]))
     assert snapshot_path.name == "codex"
-    assert snapshot_path.parent.name.startswith("abyss-stack-codex-package-")
+    snapshot_dir = next(
+        parent
+        for parent in snapshot_path.parents
+        if parent.name.startswith("abyss-stack-codex-package-")
+    )
+    assert snapshot_dir.name.startswith("abyss-stack-codex-package-")
     assert snapshot_path.parent != executable.parent
     assert stat.S_IMODE(snapshot_path.parent.stat().st_mode) == 0o500
     assert captured["snapshot_mode"] == 0o500
     assert captured["inode_content"] == original_content
     assert executable.read_text(encoding="utf-8") == "replacement"
     MODULE._remove_named_snapshot(
-        snapshot_path, snapshot_dir=snapshot_path.parent
+        snapshot_path, snapshot_dir=snapshot_dir
     )
+    assert not snapshot_dir.exists()
 
     executable.write_bytes(original_content)
     executable.chmod(0o700)
@@ -773,13 +780,30 @@ def test_post_exec_argv_resolves_env_interpreter_reexec(
     ) == ["node", str(executable), "exec", "--help"]
 
 
+def test_shebang_snapshot_root_rejects_noexec_filesystem(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    noexec = getattr(MODULE.os, "ST_NOEXEC", 0)
+    if not isinstance(noexec, int) or not noexec:
+        pytest.skip("host Python does not expose ST_NOEXEC")
+
+    monkeypatch.setattr(
+        MODULE.os,
+        "statvfs",
+        lambda _path: SimpleNamespace(f_flag=noexec),
+    )
+    with pytest.raises(MODULE.IncarnationHomeError, match="mounted noexec"):
+        MODULE._execution_snapshot_root(tmp_path)
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node is unavailable")
 def test_shebang_node_launcher_reopens_named_snapshot(
     tmp_path: Path,
 ) -> None:
     package = tmp_path / "package"
     package.mkdir()
-    executable = package / "codex"
+    executable = package / "bin" / "codex"
+    executable.parent.mkdir()
     (package / "package-relative.txt").write_text(
         "package-relative\n", encoding="utf-8"
     )
@@ -787,17 +811,19 @@ def test_shebang_node_launcher_reopens_named_snapshot(
         "#!/usr/bin/env node\n"
         "process.stdout.write(String(process.pid) + '\\n');\n"
         "process.stdout.write(require('fs').readFileSync(__dirname + "
-        "'/package-relative.txt', 'utf8'));\n"
+        "'/../package-relative.txt', 'utf8'));\n"
         "setTimeout(() => {}, 30000);\n"
     ).encode()
     executable.write_bytes(original)
     executable.chmod(0o700)
 
     package.chmod(0o555)
-    snapshot_fd, snapshot_path, content, _ = MODULE._open_verified_executable(
-        executable
+    executable.parent.chmod(0o555)
+    snapshot_fd, snapshot_path, content, _, snapshot_dir = (
+        MODULE._open_verified_executable(executable, snapshot_root=tmp_path)
     )
     package.chmod(0o755)
+    executable.parent.chmod(0o755)
     try:
         executable.write_text("#!/bin/sh\necho replaced\n", encoding="utf-8")
         process = subprocess.Popen(
@@ -820,8 +846,9 @@ def test_shebang_node_launcher_reopens_named_snapshot(
             process.wait(timeout=5)
         os.close(snapshot_fd)
         MODULE._remove_named_snapshot(
-            snapshot_path, snapshot_dir=snapshot_path.parent
+            snapshot_path, snapshot_dir=snapshot_dir
         )
+        assert not snapshot_dir.exists()
 
     assert content == original
     assert observed_argv[:2] == ["node", str(snapshot_path)]

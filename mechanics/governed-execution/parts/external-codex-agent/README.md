@@ -40,11 +40,14 @@ The controller:
   state and final receipts are atomically published with their containing
   directory fsynced before lifecycle progress, and replay of an unclosed
   receipt remains failed. Direct ELF launch uses an inheritable sealed memfd;
-  direct shebang launch uses a private package-layout mirror with a stable,
-  read-only named snapshot of the admitted launcher and retains its verified
-  descriptor across interpreter exec. The mirror preserves `$0`/module-relative
-  vendor resolution through package-sibling links without writing to a
-  root-owned installed package; its directory is frozen non-writable before
+  direct shebang launch uses a private filesystem-rooted package-layout mirror
+  with a stable, read-only named snapshot of the admitted launcher and retains
+  its verified descriptor across interpreter exec. The mirror preserves the
+  launcher's `$0`/module-relative coordinate, including parent-relative paths
+  such as `bin/` launchers resolving `../vendor`, through symlinked source
+  siblings without writing to a root-owned installed package. The selected
+  `codex_home` is the preferred private execution root and is rejected when its
+  filesystem is marked `noexec`; the mirror is frozen non-writable before
   version probing and exec. A lifecycle child removes the exact snapshot and
   mirror after the holder's PID/start-tick identity exits. Both routes execute
   the exact admitted bytes rather than mutable source-inode bytes or a
