@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 293530,
+  "allowed_tracked_bytes": 35793012,
+  "approved_by": "repository-owner",
+  "base_ref": "e98030a3f0180e37057cee38bdd0f58d70bbc4d1",
+  "changed_generated_bytes": 293530,
+  "changed_generated_files": 6,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "39277f01120d56a71cf38d89f630ea551e85a1f31fa952b33fe23dfe78c2967e",
+  "reason": "Owner-derived KAG projection for the current aoa-agents profile pin after causal holder and task-evidence repair.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "tracked_size",
+  "tracked_bytes": 35793012,
+  "tracked_bytes_max": 24117248
+}
