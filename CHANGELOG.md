@@ -9,6 +9,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Bind the operator-visible responsibility holder to its own non-replacing
+  lifecycle receipt before direct Codex `exec`, distinct from nested proof
+  actors. The installed incarnation runtime now closes only that exact
+  PID/start-ticks/argv and first Kitty ancestor across the bubblewrap wrapper
+  after a wake receipt proves handoff delivery, and emits a separate closure
+  receipt instead of selecting a proof actor from generic runtime fields.
 - Keep operator-visible external Codex actors in the ambient trusted home while
   binding their selected model realization to ordinary descendant Codex
   processes through an incarnation-scoped home and native shell environment

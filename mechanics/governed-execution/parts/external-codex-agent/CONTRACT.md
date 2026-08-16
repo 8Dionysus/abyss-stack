@@ -109,6 +109,77 @@ Operations are:
 - `export-a2a-result` with exact writer/reviewer sessions, summon request, and
   output path.
 
+The operator-visible incarnation launcher has a separate lifecycle contour for
+the responsibility holder. `launch --holder-receipt <absolute json>` is valid
+only for the direct `exec` route (not detached Kitty): immediately before the
+Codex `exec`, it writes a non-replacing receipt containing the holder PID,
+process-parent PID/start ticks, the first Kitty ancestor PID/start ticks/argv,
+the detached Kitty window identity/dedication proof, and executable/manifest
+digests. The holder argv is the post-exec `/proc` shape, including the
+interpreter argv of a shebang-backed executable. For that shebang route, an
+internal `payload-launch` helper runs as bubblewrap's payload, revalidates the
+manifest and private launcher digests, writes the receipt from its own PID
+immediately before `exec`, and then replaces itself with the private launcher;
+the bubblewrap monitor is retained only for snapshot cleanup and is bound to its
+parent lifetime. This receipt is not a governed proof-actor result and must not be substituted with a nested actor's runtime
+identity. The Kitty-ancestor binding covers the installed bubblewrap wrapper as
+well as a direct host exec while retaining one exact terminal identity; the
+holder environment must bind `KITTY_PID` and `KITTY_WINDOW_ID`, and no sibling
+terminal child may remain outside the holder lineage and Kitty helper
+processes. After a wake bridge has recorded confirmed handoff delivery, the
+installed launcher may run `close --holder-receipt ... --wake-receipt ...
+--handoff ... --closure-receipt ...`; before selecting a signal target it
+requires the handoff to bind the exact holder receipt path, receipt digest,
+holder/terminal PIDs, and reserved closure path under
+`runtime.responsibility_holder`. A producer must not leave the closure path
+only under a live-proof projection. The wake receipt also carries the SHA-256
+of the exact handoff bytes delivered to the master; the closer hashes and
+parses that same snapshot before accepting delivery. It then rechecks the holder's exact
+kernel boot ID and PID/start-ticks/argv, its process-parent identity, the recorded Kitty window,
+and the dedicated Kitty process, reserves the closure receipt before
+signaling in a recoverable, atomically published sidecar reservation. The
+sidecar is locked and advanced to a durable signal-attempt state before the
+first `TERM`; each state transition is an atomic replacement under a separate
+stable lock inode, recovery rechecks the completed receipt after lock
+acquisition, and never sends a second `TERM` for an existing attempt. The
+final receipt is also published as one complete non-replacing file, and a
+completed `closed: false` receipt remains a failure on replay. Every atomic
+publication fsyncs both the complete file and its containing directory before
+lifecycle code can proceed, so recovery sees the reservation/attempt entry
+rather than a merely cached directory update. Direct launch copies the exact
+verified executable bytes into an immutable launch snapshot: a sealed memfd for
+ELF and a filesystem-rooted private package-layout mirror for the admitted
+shebang launcher. Before shebang execution, the runtime reopens every copied
+directory and regular file, verifies its recorded device/inode and digest, and
+copies each verified regular file into a sealed memfd. Bubblewrap then
+materializes those sealed bytes into the matching package-relative tree in a
+private `/var/tmp` tmpfs, applies the admitted modes, and remounts that tree
+read-only before both version probing and final exec. This prevents the
+same-UID holder from replacing or chmodding the exact launcher or dependency
+coordinate. The mirror keeps the launcher's `$0`/module-relative coordinate,
+including parent-relative paths from nested launchers. Only source ancestors
+outside the detected package boundary are linked; the package subtree is
+copied without writing to a root-owned installed package. The host snapshot
+lives under the manifest's admitted `codex_home/tmp` local directory, and its
+`noexec` filesystem is rejected before materialization; it is lifecycle cleanup
+evidence, not the final execution coordinate. The named form remains reopenable
+for Node-backed `#!/usr/bin/env node` launchers. A lifecycle child removes the
+exact snapshot and mirror after the holder's PID/start-tick identity exits. The
+launch executes the verified private namespace bytes rather than mutable
+source-inode bytes or a replaceable source pathname. It then
+sends `TERM` to the exact holder process
+through a pidfd opened after the final identity check; the receipt records that signal target
+separately from the terminal it observes. The non-replacing closure receipt
+records the final Kitty disappearance
+independently and is written even when closure is unverified. If delivery is
+proven but both exact identities have naturally disappeared before the closer
+runs, it records the successful non-signaling `already_gone` outcome without
+reopening or reconstructing the incarnation marker. A host-side wake route
+may own the bridge and closer in one same-user systemd unit so wake delivery,
+closure, and after-inventory remain ordered even when the visible actor is
+the terminal being closed. Ambiguous, reused, or drifted identities fail
+closed.
+
 Each CLI call writes one `abyss_stack_external_codex_response_v1` JSON object.
 `start` returns after the independent worker is durably recorded; later calls
 observe the persisted session. If a caller stops after the exact `prepared`
@@ -441,9 +512,10 @@ the credential-bearing worker. Before it
 launches Codex, the supervisor verifies the exact worker PPID, enables
 `PR_SET_CHILD_SUBREAPER`, requests `SIGTERM` through `PR_SET_PDEATHSIG`, and
 checks the PPID again to close the parent-death setup race. It then opens the
-resolved executable without following symlinks, re-hashes that exact file
-descriptor against the admitted digest, checks that the inode did not change
-during hashing, and executes `/proc/self/fd/<fd>` with the descriptor inherited.
+resolved executable without following symlinks, copies and re-hashes those
+exact bytes into a sealed immutable descriptor, and executes
+`/proc/self/fd/<fd>` with that descriptor inherited. In-place source mutation
+after admission therefore cannot change the bytes that execute.
 If identity publication or the final parent check fails, the supervisor retains
 its launch-gate endpoint until the blocked wrapper has been killed and reaped.
 The wrapper itself retains the peer endpoint, so even an abnormal supervisor

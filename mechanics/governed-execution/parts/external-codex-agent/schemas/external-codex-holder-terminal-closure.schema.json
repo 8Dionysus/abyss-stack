@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-closure.schema.json",
+  "title": "Visible responsibility-holder terminal closure receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "handoff_ref", "holder_receipt_ref", "wake_receipt_ref", "reservation_ref", "verified_at", "holder", "terminal", "closed", "outcome", "identity_state", "route", "trigger"],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_visible_incarnation_terminal_closure_v1"},
+    "handoff_ref": {"type": "string", "pattern": "^/"},
+    "holder_receipt_ref": {"type": "string", "pattern": "^/"},
+    "wake_receipt_ref": {"type": "string", "pattern": "^/"},
+    "reservation_ref": {"type": "string", "pattern": "^/"},
+    "verified_at": {"type": "string", "format": "date-time"},
+    "holder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pid", "start_ticks", "gone"],
+      "properties": {
+        "pid": {"type": "integer", "minimum": 1},
+        "start_ticks": {"type": "integer", "minimum": 1},
+        "gone": {"type": "boolean"}
+      }
+    },
+    "terminal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pid", "start_ticks", "comm", "argv", "signal", "signal_target", "signal_attempted", "signal_delivery", "signal_sent", "gone"],
+      "properties": {
+        "pid": {"type": "integer", "minimum": 1},
+        "start_ticks": {"type": "integer", "minimum": 1},
+        "comm": {"const": "kitty"},
+        "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "window_id": {"type": "string", "pattern": "^[1-9][0-9]*$"},
+        "dedicated": {"const": true},
+        "signal": {"const": "TERM"},
+        "signal_target": {"const": "holder_process"},
+        "signal_attempted": {"type": "boolean"},
+        "signal_delivery": {"enum": ["not_attempted", "confirmed", "not_delivered", "failed", "unknown"]},
+        "signal_sent": {"type": "boolean"},
+        "gone": {"type": "boolean"}
+      }
+    },
+    "closed": {"type": "boolean"},
+    "outcome": {"enum": ["closed", "already_gone", "close_unverified"]},
+    "identity_state": {"enum": ["live", "already_gone", "partial_gone", "identity_drift", "close_unverified", "unverified"]},
+    "route": {"const": "abyss_stack_visible_incarnation_runtime"},
+    "trigger": {"const": "wake_bridge_after_confirmed_handoff_delivery"}
+  }
+}

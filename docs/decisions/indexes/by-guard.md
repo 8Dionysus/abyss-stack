@@ -434,6 +434,10 @@
 
 - [ABYSS-STACK-D-0096 Fail-Closed MCP Protocol Migration Lab](../ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md) (`docs/decisions/ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md`)
 
+## exact process identity
+
+- [ABYSS-STACK-D-0124 Visible Holder Terminal Lifecycle Identity](../ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md) (`docs/decisions/ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md`)
+
 ## exact target
 
 - [ABYSS-STACK-D-0106 Admit One Exact Stack MCP Read Restart Pilot](../ABYSS-STACK-D-0106-admit-one-exact-stack-mcp-read-restart-pilot.md) (`docs/decisions/ABYSS-STACK-D-0106-admit-one-exact-stack-mcp-read-restart-pilot.md`)
@@ -517,6 +521,10 @@
 ## governed policy envelope
 
 - [ABYSS-STACK-D-0059 Runtime Route Contracts Validator Module](../ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md`)
+
+## handoff delivery
+
+- [ABYSS-STACK-D-0124 Visible Holder Terminal Lifecycle Identity](../ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md) (`docs/decisions/ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md`)
 
 ## host evidence posture
 
@@ -941,6 +949,10 @@
 ## task-local DAG
 
 - [ABYSS-STACK-D-0110 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md`)
+
+## terminal closeout
+
+- [ABYSS-STACK-D-0124 Visible Holder Terminal Lifecycle Identity](../ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md) (`docs/decisions/ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md`)
 
 ## test topology
 

@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 27769564,
+  "allowed_tracked_bytes": 35669419,
+  "approved_by": "repository-owner",
+  "base_ref": "ac41011c42731f5bf40e91f63978ab8d2f18a43c",
+  "changed_generated_bytes": 27769564,
+  "changed_generated_files": 309,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "bdf1014cb745d4381a4d11563fc36455a5397c2e92f467e2289e6b674567408b",
+  "reason": "Regenerate exact PR #388 consumer portable family for inheritable inode-bound launch descriptors and directory-durable holder closure publication; digest-bound, no standing budget raise.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35669419,
+  "tracked_bytes_max": 24117248
+}

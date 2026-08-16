@@ -89,6 +89,7 @@
 - [ABYSS-STACK-D-0121 Close Nested Review Evidence Before Inference](../ABYSS-STACK-D-0121-close-nested-review-evidence-before-inference.md) (`docs/decisions/ABYSS-STACK-D-0121-close-nested-review-evidence-before-inference.md`)
 - [ABYSS-STACK-D-0122 Attempt-Local Python Cache Routing](../ABYSS-STACK-D-0122-attempt-local-python-cache-routing.md) (`docs/decisions/ABYSS-STACK-D-0122-attempt-local-python-cache-routing.md`)
 - [ABYSS-STACK-D-0123 Parent Passive Turns Disable Code Mode](../ABYSS-STACK-D-0123-parent-passive-code-mode-disable.md) (`docs/decisions/ABYSS-STACK-D-0123-parent-passive-code-mode-disable.md`)
+- [ABYSS-STACK-D-0124 Visible Holder Terminal Lifecycle Identity](../ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md) (`docs/decisions/ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md`)
 
 ## inference-pilots
 

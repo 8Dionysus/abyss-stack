@@ -24,8 +24,51 @@ The controller:
   launcher binds model and effort explicitly and passes the scoped home only
   through Codex's shell environment policy, so ordinary descendant
   `codex exec` processes retain the selected incarnation while session and hook
-  trust identities remain stable. This operator surface is not A2A transport
-  and does not replace the governed JSONL runtime;
+  trust identities remain stable. A direct visible holder can additionally
+  emit its own PID/start-ticks/post-exec-argv-bound lifecycle receipt immediately
+  before `exec`, including the first detached Kitty ancestor, its window identity,
+  and a no-sibling dedication proof across the installed bubblewrap wrapper;
+  for a shebang launcher, an internal payload handoff writes that receipt from
+  the exact bubblewrap payload PID immediately before replacing itself with the
+  private launcher; the bubblewrap monitor remains only the snapshot-cleanup
+  supervisor. The installed launcher can close that exact holder terminal only after a
+  separate wake receipt binds the holder receipt and proves delivery. The
+  produced handoff must bind both receipt paths under
+  `runtime.responsibility_holder`, while the wake receipt binds the SHA-256 of
+  the exact handoff bytes delivered to the master; after delivery, a host-side
+  bridge may run the closer in the same host unit. The holder receipt also
+  binds the kernel boot ID alongside each process start tick. The closer publishes a
+  recoverable sidecar reservation before signaling. The sidecar records the
+  signal attempt before TERM and recovery never repeats an existing attempt;
+  state and final receipts are atomically published with their containing
+  directory fsynced before lifecycle progress, and replay of an unclosed
+  receipt remains failed. Direct ELF launch uses an inheritable sealed memfd.
+  Direct shebang launch first builds a private filesystem-rooted package-layout
+  mirror, then reopens every copied directory and regular file to verify its
+  device/inode and bytes. Each verified regular file is copied into a sealed
+  memfd; bubblewrap materializes those sealed bytes into the matching
+  package-relative tree in a private `/var/tmp` tmpfs, applies the admitted
+  modes, and remounts that tree read-only before both version probing and final
+  exec. With a holder receipt, the payload helper revalidates the manifest and
+  private launcher digests inside the namespace before writing the receipt;
+  bubblewrap also binds the payload lifetime to its parent. This execution
+  coordinate cannot be renamed or chmodded by the same-UID holder. The mirror preserves the launcher's `$0`/module-relative
+  coordinate, including parent-relative paths such as `bin/` launchers
+  resolving `../vendor`. Source-ancestor links are retained only outside the
+  detected package boundary; the package subtree is copied without writing to
+  a root-owned installed package. The host snapshot lives under the admitted
+  `codex_home/tmp` local directory, and its filesystem is rejected when marked
+  `noexec`; it remains lifecycle cleanup evidence rather than the mutable
+  final execution coordinate. A lifecycle child removes the exact snapshot and
+  mirror after the holder's PID/start-tick identity exits. Both routes execute
+  the exact admitted bytes rather than mutable source-inode bytes or a
+  replaceable source pathname, and the named route remains reopenable for
+  Node-backed `#!/usr/bin/env node` launchers. A naturally exited exact pair is
+  recorded as `already_gone` without marker
+  reconstruction.
+  This identity is
+  distinct from any nested proof actor. This operator surface is not A2A transport and
+  does not replace the governed JSONL runtime;
 - requires every task to preserve the complete runtime-wide forbidden-effect
   set, while terminal classification independently applies that set instead of
   trusting a caller-supplied subset;

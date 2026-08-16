@@ -68,6 +68,12 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
     Path(
         "mechanics/config-projection/parts/sync/schemas/mcp-deployment-manifest.schema.json"
     ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-closure.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-receipt.schema.json"
+    ),
     Path("schemas/workspace_decision_repo_source_posture.schema.json"),
     Path("schemas/workspace_decision_graph.schema.json"),
     Path("schemas/workspace_decision_graph_edge.schema.json"),

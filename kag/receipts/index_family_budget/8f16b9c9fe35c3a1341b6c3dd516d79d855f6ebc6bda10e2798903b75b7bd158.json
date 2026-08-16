@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 27794814,
+  "allowed_tracked_bytes": 35688011,
+  "approved_by": "repository-owner",
+  "base_ref": "ac41011c42731f5bf40e91f63978ab8d2f18a43c",
+  "changed_generated_bytes": 27794814,
+  "changed_generated_files": 309,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "8f16b9c9fe35c3a1341b6c3dd516d79d855f6ebc6bda10e2798903b75b7bd158",
+  "reason": "Regenerate exact PR #388 consumer portable family for stable named shebang snapshots and env-reexec argv identity; digest-bound, no standing budget raise.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35688011,
+  "tracked_bytes_max": 24117248
+}
