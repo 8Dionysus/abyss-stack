@@ -4,12 +4,13 @@
   "title": "Visible responsibility-holder terminal closure receipt",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "handoff_ref", "holder_receipt_ref", "wake_receipt_ref", "verified_at", "holder", "terminal", "closed", "outcome", "identity_state", "route", "trigger"],
+  "required": ["schema_version", "handoff_ref", "holder_receipt_ref", "wake_receipt_ref", "reservation_ref", "verified_at", "holder", "terminal", "closed", "outcome", "identity_state", "route", "trigger"],
   "properties": {
     "schema_version": {"const": "abyss_stack_visible_incarnation_terminal_closure_v1"},
     "handoff_ref": {"type": "string", "pattern": "^/"},
     "holder_receipt_ref": {"type": "string", "pattern": "^/"},
     "wake_receipt_ref": {"type": "string", "pattern": "^/"},
+    "reservation_ref": {"type": "string", "pattern": "^/"},
     "verified_at": {"type": "string", "format": "date-time"},
     "holder": {
       "type": "object",

@@ -574,6 +574,7 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
     assert receipt["schema_version"] == MODULE.HOLDER_RECEIPT_SCHEMA_VERSION
     assert receipt["lifecycle_role"] == "responsibility_holder"
+    assert receipt["boot_id"] == MODULE._proc_boot_id()
     assert receipt["receipt_ref"] == str(receipt_path)
     assert receipt["holder"]["pid"] == os.getpid()
     assert receipt["holder"]["start_ticks"] == MODULE._proc_start_ticks(os.getpid())
@@ -639,6 +640,7 @@ def test_close_requires_confirmed_handoff_delivery(tmp_path: Path) -> None:
             {
                 "schema_version": "task_local_actor_wake_receipt_v1",
                 "handoff_ref": str(handoff),
+                "handoff_sha256": MODULE.sha256_bytes(handoff.read_bytes()),
                 "actions": {"handoff_message_sent": True},
                 "observed": {"handoff_delivery": False},
             }
@@ -736,6 +738,7 @@ def test_identity_bound_close_records_already_gone_without_reopening_manifest(
         "receipt_ref": str(holder),
         "created_at": "2026-08-15T00:00:00Z",
         "lifecycle_role": "responsibility_holder",
+        "boot_id": MODULE._proc_boot_id(),
         "holder": {
             "pid": 987654321,
             "start_ticks": 11,
@@ -791,6 +794,7 @@ def test_identity_bound_close_records_already_gone_without_reopening_manifest(
             {
                 "schema_version": "task_local_actor_wake_receipt_v1",
                 "handoff_ref": str(handoff),
+                "handoff_sha256": MODULE.sha256_bytes(handoff.read_bytes()),
                 "actions": {"handoff_message_sent": True},
                 "observed": {"handoff_delivery": True},
             }
@@ -812,6 +816,76 @@ def test_identity_bound_close_records_already_gone_without_reopening_manifest(
     assert recorded["outcome"] == "already_gone"
     assert recorded["identity_state"] == "already_gone"
     assert recorded["terminal"]["signal_sent"] is False
+    assert recorded["reservation_ref"] == str(
+        MODULE._closure_reservation_path(closure).resolve()
+    )
+    assert MODULE._closure_reservation_path(closure).is_file()
+
+
+def test_holder_boot_identity_is_bound_to_current_kernel() -> None:
+    receipt = {
+        "boot_id": "00000000-0000-0000-0000-000000000000",
+        "holder": {
+            "pid": 101,
+            "start_ticks": 11,
+            "parent_pid": 102,
+            "parent_start_ticks": 12,
+            "argv": ["/usr/bin/codex"],
+            "argv_digest": MODULE.sha256_bytes(
+                MODULE.canonical_bytes(["/usr/bin/codex"])
+            ),
+        },
+        "terminal": {"pid": 103, "start_ticks": 13},
+    }
+    with pytest.raises(MODULE.IncarnationHomeError, match="boot identity"):
+        MODULE._holder_receipt_process_ids(receipt)
+
+
+def test_closure_reservation_reopens_after_interrupted_attempt(tmp_path: Path) -> None:
+    handoff = tmp_path / "handoff.json"
+    holder = tmp_path / "holder.json"
+    wake = tmp_path / "wake.json"
+    closure = tmp_path / "closure.json"
+    for path in (handoff, holder, wake):
+        path.write_text("{}", encoding="utf-8")
+
+    reservation_fd, reservation_path = MODULE._reserve_closure_receipt(
+        closure_receipt_path=closure,
+        handoff_path=handoff,
+        holder_receipt_path=holder,
+        wake_receipt_path=wake,
+        holder_pid=101,
+        terminal_pid=202,
+    )
+    MODULE.fcntl.flock(reservation_fd, MODULE.fcntl.LOCK_UN)
+    os.close(reservation_fd)
+    assert not closure.exists()
+    assert reservation_path.is_file()
+    reservation = json.loads(reservation_path.read_text(encoding="utf-8"))
+    assert reservation["holder_pid"] == 101
+    assert reservation["terminal_pid"] == 202
+
+    retry_fd, retry_path = MODULE._reserve_closure_receipt(
+        closure_receipt_path=closure,
+        handoff_path=handoff,
+        holder_receipt_path=holder,
+        wake_receipt_path=wake,
+        holder_pid=101,
+        terminal_pid=202,
+    )
+    MODULE.fcntl.flock(retry_fd, MODULE.fcntl.LOCK_UN)
+    os.close(retry_fd)
+    assert retry_path == reservation_path
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="identity mismatch"):
+        MODULE._reserve_closure_receipt(
+            closure_receipt_path=closure,
+            handoff_path=handoff,
+            holder_receipt_path=holder,
+            wake_receipt_path=wake,
+            holder_pid=303,
+            terminal_pid=202,
+        )
 
 
 def test_wake_delivery_requires_exact_holder_and_closure_binding(
@@ -847,6 +921,7 @@ def test_wake_delivery_requires_exact_holder_and_closure_binding(
             {
                 "schema_version": "task_local_actor_wake_receipt_v1",
                 "handoff_ref": str(handoff),
+                "handoff_sha256": MODULE.sha256_bytes(handoff.read_bytes()),
                 "actions": {"handoff_message_sent": True},
                 "observed": {"handoff_delivery": True},
             }
@@ -861,8 +936,29 @@ def test_wake_delivery_requires_exact_holder_and_closure_binding(
         closure_receipt_path=closure,
         holder_receipt=holder_payload,
     )
+    original_handoff = handoff.read_text(encoding="utf-8")
     handoff.write_text(
-        handoff.read_text(encoding="utf-8").replace(str(closure), str(tmp_path / "other.json")),
+        original_handoff.replace(str(closure), str(tmp_path / "other.json")),
+        encoding="utf-8",
+    )
+    with pytest.raises(MODULE.IncarnationHomeError, match="handoff digest"):
+        MODULE._validate_wake_delivery(
+            wake_receipt_path=wake,
+            handoff_path=handoff,
+            holder_receipt_path=holder,
+            closure_receipt_path=closure,
+            holder_receipt=holder_payload,
+        )
+    handoff.write_text(original_handoff, encoding="utf-8")
+    handoff.write_text(
+        original_handoff.replace(str(closure), str(tmp_path / "other.json")),
+        encoding="utf-8",
+    )
+    wake.write_text(
+        wake.read_text(encoding="utf-8").replace(
+            MODULE.sha256_bytes(original_handoff.encode("utf-8")),
+            MODULE.sha256_bytes(handoff.read_bytes()),
+        ),
         encoding="utf-8",
     )
     with pytest.raises(MODULE.IncarnationHomeError, match="closure receipt identity"):

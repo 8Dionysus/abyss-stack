@@ -10,6 +10,7 @@ incarnation home through Codex's shell environment policy; a plain nested
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
 import os
@@ -19,6 +20,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 import tomllib
 from datetime import UTC, datetime
@@ -29,6 +31,7 @@ from typing import Any, Sequence
 SCHEMA_VERSION = "abyss_stack_codex_incarnation_home_v1"
 HOLDER_RECEIPT_SCHEMA_VERSION = "abyss_stack_visible_incarnation_holder_terminal_v1"
 TERMINAL_CLOSURE_SCHEMA_VERSION = "abyss_stack_visible_incarnation_terminal_closure_v1"
+CLOSURE_RESERVATION_SCHEMA_VERSION = "abyss_stack_visible_incarnation_terminal_closure_reservation_v1"
 DESCENDANT_BIN_NAME = ".codex-incarnation-bin"
 LOCAL_NAMES = frozenset(
     {"config.toml", "cache", "log", "tmp", DESCENDANT_BIN_NAME}
@@ -44,6 +47,9 @@ FEATURE_DOTTED_LINE = re.compile(r"^\s*features\.multi_agent\s*=")
 FEATURE_INLINE_LINE = re.compile(
     r"^(?P<indent>\s*)(?P<key>features|\"features\")\s*=\s*"
     r"(?P<value>\{.*\})(?P<suffix>\s*(?:#.*)?)$"
+)
+BOOT_ID_PATTERN = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 )
 
 
@@ -341,6 +347,18 @@ def _proc_start_ticks(pid: int) -> int:
         raise IncarnationHomeError(f"process start time is malformed: {pid}") from exc
 
 
+def _proc_boot_id() -> str:
+    try:
+        boot_id = Path("/proc/sys/kernel/random/boot_id").read_text(
+            encoding="ascii"
+        ).strip()
+    except (OSError, UnicodeError) as exc:
+        raise IncarnationHomeError("cannot read kernel boot identity") from exc
+    if not BOOT_ID_PATTERN.fullmatch(boot_id):
+        raise IncarnationHomeError("kernel boot identity is malformed")
+    return boot_id
+
+
 def _proc_identity_is_live(pid: int, start_ticks: int) -> bool:
     try:
         fields = _proc_stat_fields(pid)
@@ -578,39 +596,112 @@ def _write_new_json(path: Path, value: dict[str, Any], label: str) -> None:
             os.close(fd)
 
 
-def _reserve_new_json(path: Path, label: str) -> int:
-    """Reserve a non-replacing receipt path before an external signal."""
+def _closure_reservation_path(path: Path) -> Path:
+    return path.with_name(path.name + ".reservation.json")
 
-    if not path.is_absolute() or path.is_symlink():
-        raise IncarnationHomeError(f"{label} must be an absolute non-symlink path: {path}")
-    parent = path.parent
+
+def _read_locked_json(fd: int, label: str) -> dict[str, Any]:
+    try:
+        os.lseek(fd, 0, os.SEEK_SET)
+        payload = os.read(fd, 1 << 20)
+        value = json.loads(payload.decode("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise IncarnationHomeError(f"cannot read {label}") from exc
+    if not isinstance(value, dict):
+        raise IncarnationHomeError(f"{label} must be a JSON object")
+    return value
+
+
+def _reserve_closure_receipt(
+    *,
+    closure_receipt_path: Path,
+    handoff_path: Path,
+    holder_receipt_path: Path,
+    wake_receipt_path: Path,
+    holder_pid: int,
+    terminal_pid: int,
+) -> tuple[int, Path]:
+    """Reserve a recoverable close attempt before any external signal."""
+
+    if (
+        not closure_receipt_path.is_absolute()
+        or closure_receipt_path.is_symlink()
+        or closure_receipt_path.exists()
+    ):
+        raise IncarnationHomeError(
+            "terminal closure receipt already exists or is invalid: "
+            f"{closure_receipt_path}"
+        )
+    parent = closure_receipt_path.parent
     if parent.is_symlink() or not parent.is_dir():
-        raise IncarnationHomeError(f"{label} parent must be a real directory: {parent}")
-    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
+        raise IncarnationHomeError(
+            "terminal closure receipt parent must be a real directory: "
+            f"{parent}"
+        )
+    reservation_path = _closure_reservation_path(closure_receipt_path)
+    if reservation_path.is_symlink():
+        raise IncarnationHomeError(
+            f"terminal closure reservation may not be a symlink: {reservation_path}"
+        )
+    expected = {
+        "schema_version": CLOSURE_RESERVATION_SCHEMA_VERSION,
+        "closure_receipt_ref": str(closure_receipt_path.resolve()),
+        "handoff_ref": str(handoff_path.resolve()),
+        "holder_receipt_ref": str(holder_receipt_path.resolve()),
+        "wake_receipt_ref": str(wake_receipt_path.resolve()),
+        "holder_pid": holder_pid,
+        "terminal_pid": terminal_pid,
+    }
+    reservation_fd: int | None = None
+    temporary_fd = -1
+    temporary_path: Path | None = None
     try:
-        fd = os.open(path, flags, 0o600)
-        os.fchmod(fd, 0o600)
-        return fd
-    except FileExistsError as exc:
-        raise IncarnationHomeError(f"{label} already exists: {path}") from exc
-    except OSError as exc:
-        raise IncarnationHomeError(f"cannot reserve {label}: {path}") from exc
-
-
-def _write_reserved_json(
-    fd: int, path: Path, value: dict[str, Any], label: str
-) -> None:
-    payload = canonical_bytes(value) + b"\n"
-    try:
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
-        path.chmod(0o600)
-    except OSError as exc:
-        raise IncarnationHomeError(f"cannot write reserved {label}: {path}") from exc
+        # Publish a complete sidecar atomically.  A process death between
+        # path creation and JSON publication must not expose an empty file to
+        # a concurrent retry: the next closer either opens the complete
+        # reservation or creates its own complete candidate.
+        temporary_fd, temporary_name = tempfile.mkstemp(
+            prefix=reservation_path.name + ".tmp.", dir=str(parent)
+        )
+        temporary_path = Path(temporary_name)
+        payload = canonical_bytes({**expected, "reserved_at": _utc_now()}) + b"\n"
+        view = memoryview(payload)
+        while view:
+            view = view[os.write(temporary_fd, view) :]
+        os.fsync(temporary_fd)
+        fcntl.flock(temporary_fd, fcntl.LOCK_EX)
+        try:
+            os.link(temporary_path, reservation_path)
+        except FileExistsError:
+            fcntl.flock(temporary_fd, fcntl.LOCK_UN)
+            os.close(temporary_fd)
+            temporary_fd = -1
+            temporary_path.unlink(missing_ok=True)
+            reservation_fd = os.open(
+                reservation_path,
+                os.O_RDWR
+                | (os.O_NOFOLLOW if hasattr(os, "O_NOFOLLOW") else 0),
+            )
+            fcntl.flock(reservation_fd, fcntl.LOCK_EX)
+        else:
+            temporary_path.unlink(missing_ok=True)
+            temporary_path = None
+            reservation_fd = temporary_fd
+            temporary_fd = -1
+        fcntl.flock(reservation_fd, fcntl.LOCK_EX)
+        recorded = _read_locked_json(reservation_fd, "terminal closure reservation")
+        if any(recorded.get(key) != value for key, value in expected.items()):
+            raise IncarnationHomeError("terminal closure reservation identity mismatch")
+        return reservation_fd, reservation_path
+    except BaseException:
+        if reservation_fd is not None:
+            fcntl.flock(reservation_fd, fcntl.LOCK_UN)
+            os.close(reservation_fd)
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+        if temporary_fd >= 0:
+            os.close(temporary_fd)
+        raise
 
 
 def _holder_receipt(
@@ -645,6 +736,7 @@ def _holder_receipt(
         "receipt_ref": str(receipt_path.resolve()),
         "created_at": _utc_now(),
         "lifecycle_role": "responsibility_holder",
+        "boot_id": _proc_boot_id(),
         "holder": {
             "pid": holder_pid,
             "start_ticks": _proc_start_ticks(holder_pid),
@@ -700,7 +792,18 @@ def _validate_wake_delivery(
         or observed.get("handoff_delivery") is not True
     ):
         raise IncarnationHomeError("wake receipt does not prove handoff delivery")
-    runtime = _load_json(handoff_path, "handoff").get("runtime")
+    try:
+        handoff_file = _regular_file(handoff_path, "handoff")
+        handoff_bytes = handoff_file.read_bytes()
+        handoff_digest = sha256_bytes(handoff_bytes)
+        handoff_value = json.loads(handoff_bytes.decode("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise IncarnationHomeError("cannot read delivered handoff snapshot") from exc
+    if wake.get("handoff_sha256") != handoff_digest:
+        raise IncarnationHomeError("wake receipt handoff digest mismatch")
+    if not isinstance(handoff_value, dict):
+        raise IncarnationHomeError("handoff must be a JSON object")
+    runtime = handoff_value.get("runtime")
     responsibility_holder = (
         runtime.get("responsibility_holder") if isinstance(runtime, dict) else None
     )
@@ -733,6 +836,9 @@ def _load_holder_receipt(path: Path) -> dict[str, Any]:
         raise IncarnationHomeError("holder receipt path identity mismatch")
     if receipt.get("lifecycle_role") != "responsibility_holder":
         raise IncarnationHomeError("holder receipt is not a responsibility-holder receipt")
+    boot_id = receipt.get("boot_id")
+    if not isinstance(boot_id, str) or not BOOT_ID_PATTERN.fullmatch(boot_id):
+        raise IncarnationHomeError("holder terminal receipt is incomplete")
     holder = receipt.get("holder")
     runtime = receipt.get("runtime")
     terminal = receipt.get("terminal")
@@ -777,6 +883,11 @@ def _load_holder_receipt(path: Path) -> dict[str, Any]:
 def _holder_receipt_process_ids(
     receipt: dict[str, Any],
 ) -> tuple[int, int, int, int]:
+    boot_id = receipt.get("boot_id")
+    if not isinstance(boot_id, str) or not BOOT_ID_PATTERN.fullmatch(boot_id):
+        raise IncarnationHomeError("holder kernel boot identity is invalid")
+    if boot_id != _proc_boot_id():
+        raise IncarnationHomeError("holder kernel boot identity has drifted")
     holder = receipt["holder"]
     terminal = receipt["terminal"]
     pid = holder.get("pid")
@@ -889,8 +1000,13 @@ def command_close(args: argparse.Namespace) -> int:
     kitty_comm = receipt["terminal"].get("required_comm", "kitty")
     kitty_window_id = receipt["terminal"].get("window_id")
     kitty_dedicated = receipt["terminal"].get("dedicated")
-    closure_fd = _reserve_new_json(
-        closure_receipt_path, "terminal closure receipt"
+    reservation_fd, reservation_path = _reserve_closure_receipt(
+        closure_receipt_path=closure_receipt_path,
+        handoff_path=handoff_path,
+        holder_receipt_path=holder_receipt_path,
+        wake_receipt_path=Path(args.wake_receipt),
+        holder_pid=holder_pid,
+        terminal_pid=kitty_pid,
     )
     signal_sent = False
     closed = False
@@ -1007,6 +1123,7 @@ def command_close(args: argparse.Namespace) -> int:
             "handoff_ref": str(handoff_path.resolve()),
             "holder_receipt_ref": str(holder_receipt_path.resolve()),
             "wake_receipt_ref": str(Path(args.wake_receipt).resolve()),
+            "reservation_ref": str(reservation_path.resolve()),
             "verified_at": _utc_now(),
             "holder": {
                 "pid": holder_pid,
@@ -1026,12 +1143,15 @@ def command_close(args: argparse.Namespace) -> int:
             "route": "abyss_stack_visible_incarnation_runtime",
             "trigger": "wake_bridge_after_confirmed_handoff_delivery",
         }
-        _write_reserved_json(
-            closure_fd,
-            closure_receipt_path,
-            closure,
-            "terminal closure receipt",
-        )
+        try:
+            _write_new_json(
+                closure_receipt_path,
+                closure,
+                "terminal closure receipt",
+            )
+        finally:
+            fcntl.flock(reservation_fd, fcntl.LOCK_UN)
+            os.close(reservation_fd)
     if not closed:
         if failure is not None:
             raise failure

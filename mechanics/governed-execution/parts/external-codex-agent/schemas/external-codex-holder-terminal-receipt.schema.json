@@ -4,12 +4,13 @@
   "title": "Visible responsibility-holder terminal receipt",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "receipt_ref", "created_at", "lifecycle_role", "holder", "runtime", "terminal"],
+  "required": ["schema_version", "receipt_ref", "created_at", "lifecycle_role", "boot_id", "holder", "runtime", "terminal"],
   "properties": {
     "schema_version": {"const": "abyss_stack_visible_incarnation_holder_terminal_v1"},
     "receipt_ref": {"type": "string", "pattern": "^/"},
     "created_at": {"type": "string", "format": "date-time"},
     "lifecycle_role": {"const": "responsibility_holder"},
+    "boot_id": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
     "holder": {
       "type": "object",
       "additionalProperties": false,
