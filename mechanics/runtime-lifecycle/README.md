@@ -72,15 +72,17 @@ route through
 `scripts/aoa-install-systemd --verify-abyss-stack-mcp-runtime`; provisioning
 mutates only while all three planes are stopped, while verification only compares
 deployed source-and-lock and measured runtime identities. The guarded automatic
-repair action is deliberately different: it holds an exclusive operation lock,
-builds and verifies a replacement under shared source/runtime locks while the
-read plane remains available, then enumerates and briefly quiesces the active
-stack and organ readers for the atomic swap. Every direct shared-venv consumer
-is serialized: recurring maintenance and candidate units hold operation/runtime
-locks, while long-lived organ readers retain a runtime lock until that final
-quiescence. A dependency or build failure therefore leaves the active read
-plane untouched; a post-quiesce activation failure restores the previous runtime
-and every reader that had been active. Before quiescence, repair issues a
+repair action is deliberately different: it stages under shared operation,
+source, and runtime locks while the read plane and non-read consumers remain
+available. After verification it records and quiesces the exact active
+candidate/internal-effect consumer set, upgrades the operation lock to
+exclusive, then enumerates and briefly quiesces the active stack and organ
+readers for the atomic swap. Every direct shared-venv consumer is serialized:
+recurring maintenance and candidate units hold operation/runtime locks, while
+long-lived organ readers retain a runtime lock until that final quiescence. A
+dependency or build failure therefore leaves every live plane untouched; a
+post-quiesce activation failure restores the previous runtime, every reader,
+and every non-read consumer that had been active. Before quiescence, repair issues a
 private rollback grant bound to the exact measured content and recorded identity
 of the still-running runtime. Only the read contour may consume that grant after
 rollback; candidate, internal-effect, and general verification remain strict,

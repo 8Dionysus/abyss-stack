@@ -1365,6 +1365,7 @@ aoa_rotate_abyss_stack_mcp_auth() {
 
 aoa_require_abyss_stack_mcp_units_stopped() {
   local allow_active_read_units="${1:-0}"
+  local allow_active_repair_consumers="${2:-0}"
   local unit=""
   local unit_properties=""
   local unit_load_state=""
@@ -1474,6 +1475,11 @@ aoa_require_abyss_stack_mcp_units_stopped() {
                "$unit" == "abyss-stack-mcp-read-fallback.service") ]]; then
           continue
         fi
+        if [[ "$allow_active_repair_consumers" -eq 1 && \
+              ("$unit" == "abyss-stack-mcp-candidate.service" || \
+               "$unit" == "abyss-stack-mcp-internal-effect.service") ]]; then
+          continue
+        fi
         abyss_stack_mcp_units_error="refusing to replace abyss-stack MCP runtime while ${unit} is ${unit_state}"
         return 1
         ;;
@@ -1565,8 +1571,8 @@ aoa_verify_abyss_stack_mcp_repair_eligibility() {
        ! -L "$abyss_stack_mcp_operation_lock" ]] || \
       aoa_die "abyss-stack MCP operation lock must be a regular non-symlink file"
     exec {operation_lock_fd}< "$abyss_stack_mcp_operation_lock"
-    if ! /usr/bin/flock --exclusive --nonblock "$operation_lock_fd"; then
-      aoa_die "another provisioner or a managed non-read abyss-stack MCP plane holds the operation lock"
+    if ! /usr/bin/flock --shared --nonblock "$operation_lock_fd"; then
+      aoa_die "another provisioner holds the abyss-stack MCP operation lock"
     fi
   fi
   exec {source_lock_fd}< "$abyss_stack_mcp_source_lock"
@@ -1596,7 +1602,7 @@ aoa_verify_abyss_stack_mcp_repair_eligibility() {
   fi
   aoa_verify_abyss_stack_mcp_repair_paths
   aoa_verify_abyss_stack_mcp_audit_journals all
-  if ! aoa_require_abyss_stack_mcp_units_stopped 1; then
+  if ! aoa_require_abyss_stack_mcp_units_stopped 1 1; then
     aoa_die "$abyss_stack_mcp_units_error"
   fi
   exec {runtime_lock_fd}>&-
@@ -1933,6 +1939,14 @@ aoa_provision_abyss_stack_mcp_runtime() {
   local organ_unit=""
   local -a active_organ_read_units=()
   local -a repair_fallback_units=()
+  local -a runtime_consumer_units=(
+    abyss-stack-mcp-candidate.service
+    abyss-stack-mcp-internal-effect.service
+    aoa-memo-mcp-candidate.service
+    aoa-evals-mcp-candidate.service
+  )
+  local -a active_runtime_consumer_units=()
+  local runtime_consumers_quiesced=0
   local fallback_marker_temp=""
   local operation_lock_fd=""
   local runtime_lock_fd=""
@@ -1945,6 +1959,48 @@ aoa_provision_abyss_stack_mcp_runtime() {
       aoa_die "unsupported abyss-stack MCP runtime provision mode: ${provision_mode}"
       ;;
   esac
+
+  aoa_restore_abyss_stack_mcp_runtime_consumers() {
+    local consumer_unit=""
+
+    for consumer_unit in "${active_runtime_consumer_units[@]}"; do
+      systemctl --user reset-failed "$consumer_unit" >/dev/null 2>&1 || true
+      systemctl --user start "$consumer_unit" || return 1
+    done
+    runtime_consumers_quiesced=0
+  }
+
+  aoa_quiesce_abyss_stack_mcp_runtime_consumers() {
+    local consumer_unit=""
+    local consumer_state=""
+
+    active_runtime_consumer_units=()
+    for consumer_unit in "${runtime_consumer_units[@]}"; do
+      consumer_state="$(
+        systemctl --user show \
+          --property=ActiveState \
+          --value \
+          "$consumer_unit"
+      )" || return 1
+      case "$consumer_state" in
+        active|activating|reloading)
+          active_runtime_consumer_units+=("$consumer_unit")
+          ;;
+        inactive|failed|deactivating)
+          ;;
+        *)
+          return 1
+          ;;
+      esac
+    done
+    runtime_consumers_quiesced=1
+    systemctl --user stop "${runtime_consumer_units[@]}" || return 1
+    for consumer_unit in "${runtime_consumer_units[@]}"; do
+      if systemctl --user is-active --quiet "$consumer_unit"; then
+        return 1
+      fi
+    done
+  }
 
   aoa_cleanup_abyss_stack_mcp_runtime_stage() {
     local exit_status="${1:-1}"
@@ -2060,6 +2116,17 @@ aoa_provision_abyss_stack_mcp_runtime() {
         done
       fi
     fi
+    if ((runtime_consumers_quiesced)); then
+      if ((runtime_swapped && ! runtime_activated)); then
+        printf '%s\n' \
+          'not restarting MCP runtime consumers because runtime rollback did not complete' \
+          >&2
+      elif ! aoa_restore_abyss_stack_mcp_runtime_consumers; then
+        printf '%s\n' \
+          'failed to restore active MCP runtime consumers during repair cleanup' \
+          >&2
+      fi
+    fi
     exit "$exit_status"
   }
 
@@ -2158,7 +2225,11 @@ aoa_provision_abyss_stack_mcp_runtime() {
   fi
   chmod 0600 "$abyss_stack_mcp_operation_lock"
   exec {operation_lock_fd}<> "$abyss_stack_mcp_operation_lock"
-  if ! /usr/bin/flock --exclusive --nonblock "$operation_lock_fd"; then
+  if [[ "$provision_mode" == "repair" ]]; then
+    if ! /usr/bin/flock --shared --nonblock "$operation_lock_fd"; then
+      aoa_die "another provisioner holds the abyss-stack MCP operation lock"
+    fi
+  elif ! /usr/bin/flock --exclusive --nonblock "$operation_lock_fd"; then
     aoa_die "another provisioner or a managed non-read abyss-stack MCP plane holds the operation lock"
   fi
   if [[ -e "$abyss_stack_mcp_read_rollback_grant" || \
@@ -2241,7 +2312,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
     aoa_die "another provisioner or a managed abyss-stack MCP plane holds the runtime lock"
   fi
   if [[ "$provision_mode" == "repair" ]]; then
-    if ! aoa_require_abyss_stack_mcp_units_stopped 1; then
+    if ! aoa_require_abyss_stack_mcp_units_stopped 1 1; then
       aoa_die "$abyss_stack_mcp_units_error"
     fi
   elif ! aoa_require_abyss_stack_mcp_units_stopped; then
@@ -2349,6 +2420,16 @@ aoa_provision_abyss_stack_mcp_runtime() {
   chmod 0644 "${temp_venv}/${marker}"
 
   if [[ "$provision_mode" == "repair" ]]; then
+    if [[ -e "$abyss_stack_mcp_repair_fallback" || \
+          -L "$abyss_stack_mcp_repair_fallback" ]]; then
+      aoa_die "an unresolved MCP runtime-repair fallback already exists"
+    fi
+    if ! aoa_quiesce_abyss_stack_mcp_runtime_consumers; then
+      aoa_die "failed to quiesce the shared-runtime MCP consumers for activation"
+    fi
+    if ! /usr/bin/flock --exclusive --nonblock "$operation_lock_fd"; then
+      aoa_die "failed to obtain the exclusive abyss-stack MCP operation lock after consumer quiescence"
+    fi
     if systemctl --user is-active --quiet abyss-stack-mcp-read.service; then
       read_unit_was_active=1
     fi
@@ -2389,11 +2470,6 @@ aoa_provision_abyss_stack_mcp_runtime() {
         abyss-stack-mcp-read-fallback.service
         "${repair_fallback_units[@]}"
       )
-    fi
-    if ((${#repair_fallback_units[@]})) && \
-       [[ -e "$abyss_stack_mcp_repair_fallback" || \
-          -L "$abyss_stack_mcp_repair_fallback" ]]; then
-      aoa_die "an unresolved MCP runtime-repair fallback already exists"
     fi
     if ((read_unit_was_active || bootstrap_unit_was_active || fallback_unit_was_active)); then
       observed_content_digest="$(
@@ -2484,9 +2560,14 @@ aoa_provision_abyss_stack_mcp_runtime() {
   fi
   backup_venv=""
   read_fleet_quiesced=0
-  trap - EXIT HUP INT TERM
   exec {source_lock_fd}>&-
+  source_lock_fd=""
   exec {operation_lock_fd}>&-
+  operation_lock_fd=""
+  if ! aoa_restore_abyss_stack_mcp_runtime_consumers; then
+    aoa_die "failed to restore active MCP runtime consumers after repair"
+  fi
+  trap - EXIT HUP INT TERM
   aoa_note "provisioned abyss-stack MCP runtime for deployed source ${source_digest} and lock ${lock_digest}"
 }
 

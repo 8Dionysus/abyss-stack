@@ -112,15 +112,16 @@ runtime parent chain, every existing observation/admission/orchestration/tasks/
 effect path, audit journals, and exact loaded unit topology are safe while
 allowing the current read/bootstrap processes to remain active. Repair then
 builds and verifies the replacement while the read fleet keeps its shared
-runtime locks. Only a fully built replacement may enumerate and quiesce the
-active stack and organ readers for the final exclusive-lock swap. Recurring and
-candidate shared-venv consumers hold operation/runtime locks throughout their
-run. Pre-quiescence failures leave every reader active; post-quiescence failures
-restore the prior runtime and every reader that had been active; the stack peer
-uses an exact, private, read-only rollback grant. The repair still refuses an
-independently active candidate or internal-effect plane and unsafe source,
-operation lock, runtime lock, journal, runtime path, or unit topology without
-taking the working read fleet down.
+runtime locks. The eligibility probe shares the operation lock with known
+candidate/internal-effect consumers but still rejects an exclusive provisioner.
+Only a fully built replacement may record and quiesce the exact active non-read
+consumer set, upgrade the operation lock to exclusive, and then enumerate and
+quiesce active stack and organ readers for the final runtime-lock swap.
+Pre-quiescence failures leave every plane active; later failures restore the
+prior runtime, every reader, and every non-read consumer that had been active;
+the stack peer uses an exact, private, read-only rollback grant. Unsafe source,
+operation lock, runtime lock, journal, runtime path, or unit topology still
+fails closed without taking the working read fleet down.
 Successful activation starts exact repair-fallback counterparts for the prior active
 endpoint set. Admission removes their private fallback list only after the
 production handoff validates, and restores those peers on any later failure.
