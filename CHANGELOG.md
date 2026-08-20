@@ -32,6 +32,11 @@ Tracking starts with the community-docs baseline for this repository.
   ancestors, including the shared `internal-effects` directory, as validated
   inputs and changes modes only on its sandbox-owned `read-restart-pilot`
   root, so guarded repair works under its narrow `ReadWritePaths` allowlist.
+  Managed-topology derivation now includes the organ readers' shared runtime
+  lock in the exact `ExecStart` identity and binds preflight to the production,
+  bootstrap, or fallback template that issued the signed canary. Recovery and
+  final production admission therefore validate the deployed serialized unit
+  actually serving each phase instead of accepting a stale sibling template.
 - Make the Intel OVMS cutover safe for first launch and upgrades: link and
   reload owner units before socket activation, retire only the same-project
   legacy Compose owner, allow the digest-pinned Quadlet image to pull when

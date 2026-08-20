@@ -39,6 +39,10 @@ from abyss_stack_mcp.managed_catalog import (
     build_managed_catalog,
     publish_catalog,
 )
+from abyss_stack_mcp.managed_topology import (
+    _managed_unit_template_path,
+    _organ_read_unit_exec_start_binding,
+)
 from abyss_stack_mcp.keeper_specs import build_keeper_specs
 from abyss_stack_mcp.admission_automation import (
     AdmissionAutomationStatus,
@@ -52,6 +56,56 @@ from abyss_stack_mcp.system_status import build_system_status
 
 NOW = datetime(2026, 8, 8, 12, 0, tzinfo=timezone.utc)
 SIGNING_KEY = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+
+
+def test_organ_managed_topology_exec_binding_matches_runtime_unit() -> None:
+    repo_root = Path(__file__).resolve().parents[4]
+    unit = repo_root / "systemd/user/aoa-organ-mcp-read@.service"
+    exec_start_lines = tuple(
+        line
+        for line in unit.read_text(encoding="utf-8").splitlines()
+        if line.startswith("ExecStart=")
+    )
+
+    assert exec_start_lines == (
+        _organ_read_unit_exec_start_binding(Path("/srv/AbyssOS/abyss-stack")),
+    )
+
+
+@pytest.mark.parametrize(
+    ("production_unit", "observed_unit", "template"),
+    (
+        (
+            "aoa-organ-mcp-read@demo.service",
+            "aoa-organ-mcp-read@demo.service",
+            "aoa-organ-mcp-read@.service",
+        ),
+        (
+            "aoa-organ-mcp-read@demo.service",
+            "aoa-organ-mcp-read-bootstrap@demo.service",
+            "aoa-organ-mcp-read-bootstrap@.service",
+        ),
+        (
+            "aoa-organ-mcp-read@demo.service",
+            "aoa-organ-mcp-read-fallback@demo.service",
+            "aoa-organ-mcp-read-fallback@.service",
+        ),
+        (
+            "abyss-stack-mcp-read.service",
+            "abyss-stack-mcp-read-fallback.service",
+            "abyss-stack-mcp-read-fallback.service",
+        ),
+    ),
+)
+def test_managed_topology_selects_observed_canary_template(
+    production_unit: str,
+    observed_unit: str,
+    template: str,
+) -> None:
+    root = Path("/srv/AbyssOS/abyss-stack")
+    assert _managed_unit_template_path(root, production_unit, observed_unit) == (
+        root / "Configs/systemd/user" / template
+    )
 
 
 def _write(path: Path, payload: str, mode: int = 0o600) -> None:
@@ -265,6 +319,7 @@ def _fixture(
         unit_exec_start_binding=f"ExecStart={executable}",
         canary_receipt_path=str(canary_path),
         canary_receipt_id=receipt.receipt_id,
+        canary_process_unit_name=receipt_process_unit_name,
         canary_observed_at=receipt.observed_at,
         canary_expires_at=receipt.expires_at,
         canary_deployment_manifest_id=receipt.deployment_manifest_id,
@@ -595,6 +650,36 @@ def test_recovery_canary_builds_preflight_catalog_before_production_start(
     )
 
 
+def test_recovery_preflight_rejects_stale_fallback_template(tmp_path: Path) -> None:
+    fallback_unit = "aoa-organ-mcp-read-fallback@demo.service"
+    binding = _fixture(
+        tmp_path,
+        receipt_process_unit_name=fallback_unit,
+        receipt_process_identity=(
+            f"systemd-user:{fallback_unit}:pid:777:start:888"
+        ),
+    )
+    fallback_template = tmp_path / "systemd/aoa-organ-mcp-read-fallback@.service"
+    _write(
+        fallback_template,
+        "[Service]\n"
+        "Environment=AOA_MCP_POLICY_FAMILY=read\n"
+        f"LoadCredential=demo:{binding.credential_path}\n"
+        "ExecStart=/tmp/stale-unserialized-server\n",
+    )
+    recovery_binding = binding.model_copy(
+        update={
+            "unit_path": str(fallback_template),
+            "canary_process_unit_name": fallback_unit,
+        }
+    )
+
+    report = run_preflight(recovery_binding, checked_at=NOW)
+
+    assert not report.eligible_to_start
+    assert "unit_exec_start_binding_mismatch" in report.reason_codes
+
+
 def test_runtime_overlay_rejects_canary_from_predecessor_process(
     tmp_path: Path,
 ) -> None:
@@ -772,6 +857,7 @@ def test_managed_catalog_is_derived_from_exact_owner_and_runtime_inputs(
                 unit_exec_start_binding=binding.unit_exec_start_binding,
                 canary_receipt_path=binding.canary_receipt_path,
                 canary_receipt_id=binding.canary_receipt_id,
+                canary_process_unit_name=binding.canary_process_unit_name,
                 canary_observed_at=binding.canary_observed_at,
                 canary_expires_at=binding.canary_expires_at,
                 canary_deployment_manifest_id=(binding.canary_deployment_manifest_id),

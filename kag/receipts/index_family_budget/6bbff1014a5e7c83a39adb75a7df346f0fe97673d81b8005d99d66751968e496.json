@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 11052130,
+  "allowed_tracked_bytes": 36181731,
+  "approved_by": "repository-owner",
+  "base_ref": "07ecd9105374b51d1db588b79119e29257cc3c55",
+  "changed_generated_bytes": 11052130,
+  "changed_generated_files": 109,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "6bbff1014a5e7c83a39adb75a7df346f0fe97673d81b8005d99d66751968e496",
+  "reason": "Index exact MCP canary-serving unit bindings and their generated JSON Schema contracts.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36181731,
+  "tracked_bytes_max": 24117248
+}

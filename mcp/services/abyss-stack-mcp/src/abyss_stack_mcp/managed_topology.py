@@ -12,7 +12,53 @@ from .managed_catalog import (
     ManagedContourTopologyEntry,
     publish_private_json,
 )
+from .canary import _bootstrap_unit_name, _fallback_unit_name
 from .preflight import PreflightError, _bundle_digest, _safe_json, _sha256_file
+
+
+def _organ_read_unit_exec_start_binding(deployed_root: Path) -> str:
+    runtime_root = deployed_root / "Services/abyss-stack-mcp"
+    return (
+        "ExecStart=/usr/bin/flock --shared --no-fork "
+        f"{runtime_root}/.runtime-provision.lock "
+        f"{runtime_root}/venv/bin/python -I -B -m "
+        "abyss_stack_mcp.process_launcher --executable "
+        "/srv/AbyssOS/.codex/bin/%i-mcp-server.py"
+    )
+
+
+def _managed_unit_template_path(
+    deployed_root: Path,
+    production_unit_name: str,
+    observed_unit_name: str,
+) -> Path:
+    unit_root = deployed_root / "Configs/systemd/user"
+    if production_unit_name == "abyss-stack-mcp-read.service":
+        paths = {
+            production_unit_name: unit_root / "abyss-stack-mcp-read.service",
+            _bootstrap_unit_name(production_unit_name): (
+                unit_root / "abyss-stack-mcp-read-bootstrap.service"
+            ),
+            _fallback_unit_name(production_unit_name): (
+                unit_root / "abyss-stack-mcp-read-fallback.service"
+            ),
+        }
+    elif production_unit_name.startswith("aoa-organ-mcp-read@"):
+        paths = {
+            production_unit_name: unit_root / "aoa-organ-mcp-read@.service",
+            _bootstrap_unit_name(production_unit_name): (
+                unit_root / "aoa-organ-mcp-read-bootstrap@.service"
+            ),
+            _fallback_unit_name(production_unit_name): (
+                unit_root / "aoa-organ-mcp-read-fallback@.service"
+            ),
+        }
+    else:
+        raise PreflightError("managed production unit is unsupported")
+    try:
+        return paths[observed_unit_name]
+    except KeyError as exc:
+        raise PreflightError("managed canary unit is outside recovery bounds") from exc
 
 
 def derive_managed_topology(
@@ -42,6 +88,13 @@ def derive_managed_topology(
         contour_id = _required(contour, "contour_id")
         policy = _required_from_registry_style(contour, contour_id)
         process_ref = _required(runtime, "process_ref")
+        canary_receipt_path = _required(canary, "receipt_ref")
+        canary_receipt = _safe_json(Path(canary_receipt_path), "canary receipt")
+        if canary_receipt.get("receipt_id") != _required(canary, "receipt_id"):
+            raise PreflightError("managed canary receipt identity changed")
+        canary_process_unit_name = _required(
+            canary_receipt, "process_unit_name"
+        )
         executable = Path(process_ref)
         if not executable.is_file() or not executable.exists():
             raise PreflightError("managed executable is unavailable")
@@ -51,7 +104,9 @@ def derive_managed_topology(
         if organ_id == "abyss-stack":
             binding_id = f"abyss-stack-{contour_id}"
             unit_name = f"abyss-stack-mcp-{contour_id}.service"
-            unit_path = deployed_root / "Configs/systemd/user" / unit_name
+            unit_path = _managed_unit_template_path(
+                deployed_root, unit_name, canary_process_unit_name
+            )
             credential_name = f"abyss-stack-mcp-{policy.replace('_', '-')}-bearer-token"
             auth_manifest = (
                 deployed_root / "Secrets/Configs/abyss-stack-mcp-auth-manifest.json"
@@ -81,8 +136,8 @@ def derive_managed_topology(
             instance = "tos-corpus" if organ_id == "tree-of-sophia" else organ_id
             binding_id = f"{instance}-{contour_id}"
             unit_name = f"aoa-organ-mcp-{contour_id}@{instance}.service"
-            unit_path = (
-                deployed_root / "Configs/systemd/user/aoa-organ-mcp-read@.service"
+            unit_path = _managed_unit_template_path(
+                deployed_root, unit_name, canary_process_unit_name
             )
             credential_name = f"{instance}-mcp-{policy.replace('_', '-')}-bearer-token"
             auth_manifest = (
@@ -99,11 +154,8 @@ def derive_managed_topology(
                 raise PreflightError(
                     "organ unit executable conflicts with its instance template"
                 )
-            unit_exec_start_binding = (
-                "ExecStart=/srv/AbyssOS/abyss-stack/Services/"
-                "abyss-stack-mcp/venv/bin/python -I -B -m "
-                "abyss_stack_mcp.process_launcher --executable "
-                "/srv/AbyssOS/.codex/bin/%i-mcp-server.py"
+            unit_exec_start_binding = _organ_read_unit_exec_start_binding(
+                deployed_root
             )
         dependency_lock = package_root / "requirements.lock"
         entries.append(
@@ -134,8 +186,9 @@ def derive_managed_topology(
                 required_environment=required_environment,
                 unit_credential_binding=unit_credential_binding,
                 unit_exec_start_binding=unit_exec_start_binding,
-                canary_receipt_path=_required(canary, "receipt_ref"),
+                canary_receipt_path=canary_receipt_path,
                 canary_receipt_id=_required(canary, "receipt_id"),
+                canary_process_unit_name=canary_process_unit_name,
                 canary_observed_at=_required(canary, "observed_at"),
                 canary_expires_at=_required(canary, "expires_at"),
                 canary_deployment_manifest_id=_required(

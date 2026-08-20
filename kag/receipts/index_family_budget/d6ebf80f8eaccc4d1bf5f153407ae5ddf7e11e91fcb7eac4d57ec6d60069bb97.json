@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 11012768,
+  "allowed_tracked_bytes": 36181059,
+  "approved_by": "repository-owner",
+  "base_ref": "07ecd9105374b51d1db588b79119e29257cc3c55",
+  "changed_generated_bytes": 11012768,
+  "changed_generated_files": 107,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "d6ebf80f8eaccc4d1bf5f153407ae5ddf7e11e91fcb7eac4d57ec6d60069bb97",
+  "reason": "Index the exact canary-serving unit template binding used by recovery and production MCP preflight.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36181059,
+  "tracked_bytes_max": 24117248
+}

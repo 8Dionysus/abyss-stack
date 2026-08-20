@@ -482,6 +482,12 @@ endpoint. The stack fallback retains the production read Tasks surface.
 Production start then performs the single bounded endpoint handoff. A
 failure before final production admission stops any production units started by
 the controller and restores the same manifest-bound fallback fleet.
+The managed topology derives each organ reader's exact `ExecStart`, including
+the shared runtime-provision lock, and binds the signed canary's exact process
+unit to its production, bootstrap, or fallback template. Intermediate preflight
+therefore verifies the template actually serving the recovery canary; final
+preflight independently verifies production, without accepting a stale sibling
+template or an unserialized reader command.
 
 Within each bootstrap, repair-fallback, and production phase, canary pairs for
 independent organs run through a bounded dynamic worker pool. Each organ still captures
