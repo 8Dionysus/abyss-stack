@@ -2540,6 +2540,22 @@ def _open_verified_executable(
                 raise IncarnationHomeError(
                     "Codex executable changed while binding companion"
                 )
+        else:
+            rebound_content, rebound_info = _read_verified_regular_file(
+                executable, label="Codex executable"
+            )
+            if (
+                rebound_info.st_dev != info.st_dev
+                or rebound_info.st_ino != info.st_ino
+                or rebound_content != content
+            ):
+                raise IncarnationHomeError(
+                    "Codex executable changed while binding companion"
+                )
+            if _adjacent_code_mode_host(executable) is not None:
+                raise IncarnationHomeError(
+                    "Codex companion appeared while binding executable"
+                )
         if content.startswith(b"#!"):
             snapshot_path: Path | None = None
             snapshot_dir: Path | None = None

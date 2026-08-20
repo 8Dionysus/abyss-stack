@@ -934,6 +934,36 @@ def test_elf_binding_rejects_executable_replacement_during_companion_read(
         MODULE._open_verified_executable(executable)
 
 
+def test_elf_binding_rechecks_absent_companion_before_anonymous_launch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "codex"
+    executable.write_bytes(b"executable")
+    executable.chmod(0o700)
+    companion = tmp_path / MODULE.CODE_MODE_HOST_NAME
+    original_adjacent = MODULE._adjacent_code_mode_host
+    calls = 0
+
+    def companion_appears(
+        path: Path,
+    ) -> tuple[Path, bytes, dict[str, str]] | None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return None
+        companion.write_bytes(b"companion")
+        companion.chmod(0o700)
+        return original_adjacent(path)
+
+    monkeypatch.setattr(MODULE, "_adjacent_code_mode_host", companion_appears)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="companion appeared while binding executable",
+    ):
+        MODULE._open_verified_executable(executable)
+    assert calls == 2
+
+
 def test_companion_binding_rejects_permission_revocation_before_open(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
