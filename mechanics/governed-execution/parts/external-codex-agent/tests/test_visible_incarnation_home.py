@@ -809,6 +809,7 @@ def test_payload_launch_uses_private_companion_after_host_copy_disappears(
     monkeypatch.setattr(MODULE, "_holder_receipt", fake_holder_receipt)
     monkeypatch.setattr(MODULE.os, "execve", fake_exec)
     host_companion.unlink()
+    (host_package / "package.json").unlink()
     args = MODULE.argparse.Namespace(
         manifest=str(manifest_path),
         holder_receipt=str(tmp_path / "holder.json"),

@@ -2983,12 +2983,14 @@ def command_payload_launch(args: argparse.Namespace) -> int:
         _private_companion_path, _companion_bytes, private_companion_binding = (
             detected_companion
         )
-        expected_host_companion = (
-            executable.parent / CODE_MODE_HOST_NAME
-        ).resolve(strict=False)
-        expected_package_relative = expected_host_companion.relative_to(
-            _package_root(executable)
-        ).as_posix()
+        expected_host_companion = executable.parent / CODE_MODE_HOST_NAME
+        forwarded_package_relative = Path(companion_relative_argument)
+        if (
+            forwarded_package_relative.is_absolute()
+            or ".." in forwarded_package_relative.parts
+            or forwarded_package_relative.name != CODE_MODE_HOST_NAME
+        ):
+            raise IncarnationHomeError("payload companion provenance is invalid")
         private_package_root = _package_root(payload_path)
         expected_private_relative = (
             companion_relative_argument
@@ -2997,7 +2999,6 @@ def command_payload_launch(args: argparse.Namespace) -> int:
         )
         if (
             str(expected_host_companion) != companion_path_argument
-            or companion_relative_argument != expected_package_relative
             or private_companion_binding["package_relative"]
             != expected_private_relative
             or private_companion_binding["digest"] != companion_digest_argument
