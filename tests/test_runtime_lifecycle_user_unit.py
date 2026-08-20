@@ -1613,6 +1613,12 @@ esac
                 STACK_MCP_INTERNAL_EFFECT_UNIT,
                 MEMO_MCP_CANDIDATE_UNIT,
                 EVALS_MCP_CANDIDATE_UNIT,
+                STACK_MCP_OBSERVATION_UNIT,
+                MCP_ADMISSION_KEEPER_UNIT,
+                MCP_PREFLIGHT_SWEEP_UNIT,
+                ORGAN_MCP_READ_TEMPLATE,
+                ORGAN_MCP_READ_BOOTSTRAP_TEMPLATE,
+                ORGAN_MCP_READ_FALLBACK_TEMPLATE,
             ):
                 source_path = unit_source_dir / source_unit.name
                 source_path.write_text(
@@ -1692,7 +1698,19 @@ esac
                 "load_state=loaded\n"
                 "active_state=inactive\n"
                 'fragment_path="${XDG_CONFIG_HOME}/systemd/user/${unit}"\n'
+                'case "$unit" in\n'
+                '  aoa-organ-mcp-read@aoa-memo.service) '
+                'fragment_path="${XDG_CONFIG_HOME}/systemd/user/'
+                'aoa-organ-mcp-read@.service" ;;\n'
+                '  aoa-organ-mcp-read-bootstrap@aoa-memo.service) '
+                'fragment_path="${XDG_CONFIG_HOME}/systemd/user/'
+                'aoa-organ-mcp-read-bootstrap@.service" ;;\n'
+                '  aoa-organ-mcp-read-fallback@aoa-memo.service) '
+                'fragment_path="${XDG_CONFIG_HOME}/systemd/user/'
+                'aoa-organ-mcp-read-fallback@.service" ;;\n'
+                "esac\n"
                 'exec_start="$(sed -n \'s/^ExecStart=//p\' "$fragment_path")"\n'
+                'exec_start="${exec_start//%i/aoa-memo}"\n'
                 'exec_path="${exec_start%% *}"\n'
                 'if [[ "${ABYSS_STACK_MCP_TEST_UNLOADED_UNIT:-}" == '
                 '"$unit" ]]; then\n'
@@ -2044,6 +2062,9 @@ esac
                 "abyss-stack-mcp-read.service",
                 "abyss-stack-mcp-read-bootstrap.service",
                 "abyss-stack-mcp-read-fallback.service",
+                "aoa-organ-mcp-read@aoa-memo.service",
+                "aoa-organ-mcp-read-bootstrap@aoa-memo.service",
+                "aoa-organ-mcp-read-fallback@aoa-memo.service",
             ):
                 with self.subTest(active_read_unit=active_read_unit):
                     eligible = subprocess.run(
@@ -2078,6 +2099,33 @@ esac
                         text=True,
                     )
                     self.assertEqual(eligible.returncode, 0, eligible.stderr)
+
+            for active_scheduled_consumer in (
+                "abyss-stack-mcp-observation.service",
+                "abyss-mcp-admission-keeper.service",
+                "abyss-mcp-preflight-sweep.service",
+            ):
+                with self.subTest(
+                    active_scheduled_consumer=active_scheduled_consumer
+                ):
+                    ineligible = subprocess.run(
+                        repair_eligibility_command,
+                        cwd=REPO_ROOT,
+                        env={
+                            **env,
+                            "ABYSS_STACK_MCP_TEST_ACTIVE_UNIT": (
+                                active_scheduled_consumer
+                            ),
+                        },
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(ineligible.returncode, 0)
+                    self.assertIn(
+                        f"while {active_scheduled_consumer} is active",
+                        ineligible.stderr,
+                    )
 
             shared_operation_marker = root / "shared-operation-lock-held"
             shared_operation_holder = subprocess.Popen(
@@ -2553,6 +2601,12 @@ esac
             for stale_consumer_unit in (
                 "aoa-memo-mcp-candidate.service",
                 "aoa-evals-mcp-candidate.service",
+                "abyss-stack-mcp-observation.service",
+                "abyss-mcp-admission-keeper.service",
+                "abyss-mcp-preflight-sweep.service",
+                "aoa-organ-mcp-read@aoa-memo.service",
+                "aoa-organ-mcp-read-bootstrap@aoa-memo.service",
+                "aoa-organ-mcp-read-fallback@aoa-memo.service",
             ):
                 with self.subTest(stale_consumer_unit=stale_consumer_unit):
                     stale_consumer = subprocess.run(

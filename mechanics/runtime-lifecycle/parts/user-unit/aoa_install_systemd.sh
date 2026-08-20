@@ -1377,6 +1377,8 @@ aoa_require_abyss_stack_mcp_units_stopped() {
   local resolved_unit_source=""
   local resolved_unit_fragment=""
   local expected_exec_start=""
+  local expected_source_exec_start=""
+  local unit_source_name=""
   local unit_contour=""
   local workspace_root=""
 
@@ -1389,7 +1391,25 @@ aoa_require_abyss_stack_mcp_units_stopped() {
     abyss-stack-mcp-candidate.service \
     abyss-stack-mcp-internal-effect.service \
     aoa-memo-mcp-candidate.service \
-    aoa-evals-mcp-candidate.service; do
+    aoa-evals-mcp-candidate.service \
+    abyss-stack-mcp-observation.service \
+    abyss-mcp-admission-keeper.service \
+    abyss-mcp-preflight-sweep.service \
+    aoa-organ-mcp-read@aoa-memo.service \
+    aoa-organ-mcp-read-bootstrap@aoa-memo.service \
+    aoa-organ-mcp-read-fallback@aoa-memo.service; do
+    unit_source_name="$unit"
+    case "$unit" in
+      aoa-organ-mcp-read@aoa-memo.service)
+        unit_source_name="aoa-organ-mcp-read@.service"
+        ;;
+      aoa-organ-mcp-read-bootstrap@aoa-memo.service)
+        unit_source_name="aoa-organ-mcp-read-bootstrap@.service"
+        ;;
+      aoa-organ-mcp-read-fallback@aoa-memo.service)
+        unit_source_name="aoa-organ-mcp-read-fallback@.service"
+        ;;
+    esac
     unit_contour="${unit#abyss-stack-mcp-}"
     unit_contour="${unit_contour%.service}"
     if [[ "$unit_contour" == "internal-effect" ]]; then
@@ -1398,14 +1418,36 @@ aoa_require_abyss_stack_mcp_units_stopped() {
             "$unit_contour" == "read-fallback" ]]; then
       unit_contour="read"
     fi
-    expected_unit_source="${AOA_CONFIGS_ROOT}/systemd/user/${unit}"
-    expected_unit_target="${XDG_CONFIG_HOME:-${HOME}/.config}/systemd/user/${unit}"
+    expected_unit_source="${AOA_CONFIGS_ROOT}/systemd/user/${unit_source_name}"
+    expected_unit_target="${XDG_CONFIG_HOME:-${HOME}/.config}/systemd/user/${unit_source_name}"
+    if [[ ! -f "$expected_unit_source" || -L "$expected_unit_source" ]]; then
+      abyss_stack_mcp_units_error="lock-aware source unit is unavailable for ${unit}; link and reload managed user units before provisioning"
+      return 1
+    fi
     case "$unit" in
       aoa-memo-mcp-candidate.service)
         expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_operation_lock} /usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} ${abyss_stack_mcp_venv}/bin/python -I -B -m abyss_stack_mcp.process_launcher --executable ${workspace_root}/.codex/bin/aoa-memo-mcp-server.py"
         ;;
       aoa-evals-mcp-candidate.service)
         expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_operation_lock} /usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} ${abyss_stack_mcp_venv}/bin/python -I -B -m abyss_stack_mcp.process_launcher --executable ${workspace_root}/.codex/bin/aoa-evals-mcp-server.py"
+        ;;
+      abyss-stack-mcp-observation.service|abyss-mcp-admission-keeper.service|abyss-mcp-preflight-sweep.service)
+        expected_exec_start="$(sed -n 's/^ExecStart=//p' "$expected_unit_source")"
+        if [[ -z "$expected_exec_start" || "$expected_exec_start" == *$'\n'* || \
+              "$expected_exec_start" != "/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_operation_lock} /usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} ${abyss_stack_mcp_venv}/bin/python "* ]]; then
+          abyss_stack_mcp_units_error="managed source unit is not lock-aware for ${unit}; refusing runtime replacement"
+          return 1
+        fi
+        ;;
+      aoa-organ-mcp-read@aoa-memo.service|aoa-organ-mcp-read-bootstrap@aoa-memo.service|aoa-organ-mcp-read-fallback@aoa-memo.service)
+        expected_source_exec_start="$(sed -n 's/^ExecStart=//p' "$expected_unit_source")"
+        if [[ -z "$expected_source_exec_start" || \
+              "$expected_source_exec_start" == *$'\n'* || \
+              "$expected_source_exec_start" != "/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} ${abyss_stack_mcp_venv}/bin/python "* ]]; then
+          abyss_stack_mcp_units_error="managed source unit is not lock-aware for ${unit_source_name}; refusing runtime replacement"
+          return 1
+        fi
+        expected_exec_start="${expected_source_exec_start//%i/aoa-memo}"
         ;;
       *)
         expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_source_lock} /usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} /usr/bin/env ${AOA_CONFIGS_ROOT}/scripts/aoa-install-systemd --launch-verified-abyss-stack-mcp=${unit_contour}"
@@ -1415,15 +1457,15 @@ aoa_require_abyss_stack_mcp_units_stopped() {
         fi
         ;;
     esac
-    if [[ ! -f "$expected_unit_source" || -L "$expected_unit_source" ]]; then
-      abyss_stack_mcp_units_error="lock-aware source unit is unavailable for ${unit}; link and reload managed user units before provisioning"
-      return 1
+    if [[ -z "$expected_source_exec_start" ]]; then
+      expected_source_exec_start="$expected_exec_start"
     fi
-    if ! grep -Fqx -- "ExecStart=${expected_exec_start}" \
+    if ! grep -Fqx -- "ExecStart=${expected_source_exec_start}" \
         "$expected_unit_source"; then
-      abyss_stack_mcp_units_error="managed source unit is not lock-aware for ${unit}; refusing runtime replacement"
+      abyss_stack_mcp_units_error="managed source unit is not lock-aware for ${unit_source_name}; refusing runtime replacement"
       return 1
     fi
+    expected_source_exec_start=""
     if [[ ! -L "$expected_unit_target" || \
           "$(readlink -- "$expected_unit_target" 2>/dev/null)" != \
             "$expected_unit_source" ]]; then
@@ -1486,7 +1528,10 @@ aoa_require_abyss_stack_mcp_units_stopped() {
         if [[ "$allow_active_read_units" -eq 1 && \
               ("$unit" == "abyss-stack-mcp-read.service" || \
                "$unit" == "abyss-stack-mcp-read-bootstrap.service" || \
-               "$unit" == "abyss-stack-mcp-read-fallback.service") ]]; then
+               "$unit" == "abyss-stack-mcp-read-fallback.service" || \
+               "$unit" == "aoa-organ-mcp-read@aoa-memo.service" || \
+               "$unit" == "aoa-organ-mcp-read-bootstrap@aoa-memo.service" || \
+               "$unit" == "aoa-organ-mcp-read-fallback@aoa-memo.service") ]]; then
           continue
         fi
         if [[ "$allow_active_repair_consumers" -eq 1 && \

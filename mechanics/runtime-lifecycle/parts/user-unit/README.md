@@ -122,8 +122,11 @@ prior runtime, every reader, and every non-read consumer that had been active;
 the stack peer uses an exact, private, read-only rollback grant. Unsafe source,
 operation lock, runtime lock, journal, runtime path, or unit topology still
 fails closed without taking the working read fleet down. That topology check
-also proves the loaded Memo and Evals candidate fragments use both shared locks,
-so a stale pre-reload definition cannot be restored after the swap.
+also proves the loaded Memo/Evals candidate and recurring
+observation/admission/preflight fragments use both shared locks, so a stale
+pre-reload definition cannot run during or be restored after the swap. Loaded
+production/bootstrap/fallback organ instances likewise prove their shared
+runtime-lock templates.
 Successful activation starts exact repair-fallback counterparts for the prior active
 endpoint set. Admission removes their private fallback list only after the
 production handoff validates, and restores those peers on any later failure.

@@ -225,8 +225,10 @@ failure preserves every live plane; later failure restores the previous
 runtime, every active reader, and every recorded non-read consumer, with the
 stack peer using an exact, private, read-only rollback grant. The all-user-unit
 installer creates the operation lock before reload. Repair also validates that
-the loaded Memo and Evals candidate fragments match their managed lock-aware
-sources before either can be restored. Unsafe lifecycle topology
+the loaded Memo/Evals candidate and recurring observation/admission/preflight
+fragments match their managed lock-aware sources before any runtime replacement.
+Representative production/bootstrap/fallback organ instances also prove the
+loaded template generation. Unsafe lifecycle topology
 still fails closed. Successful activation keeps exact repair-fallback counterparts
 for the prior endpoint set while fallback-bound canaries and preflight run.
 A partial prior set is completed by bootstrap peers only for missing organs;
