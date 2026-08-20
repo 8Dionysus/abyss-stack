@@ -18,6 +18,7 @@ provision_abyss_stack_mcp_auth=0
 rotate_abyss_stack_mcp_auth=0
 provision_abyss_stack_mcp_runtime=0
 verify_abyss_stack_mcp_runtime=0
+verify_abyss_stack_mcp_repair_eligibility=0
 launch_verified_abyss_stack_mcp=0
 enable_abyss_stack_mcp_auto_repair=0
 disable_abyss_stack_mcp_auto_repair=0
@@ -112,6 +113,9 @@ while (($#)); do
     --verify-abyss-stack-mcp-runtime=*)
       verify_abyss_stack_mcp_runtime=1
       verify_abyss_stack_mcp_runtime_contour="${1#*=}"
+      ;;
+    --verify-abyss-stack-mcp-repair-eligibility)
+      verify_abyss_stack_mcp_repair_eligibility=1
       ;;
     --launch-verified-abyss-stack-mcp)
       launch_verified_abyss_stack_mcp=1
@@ -223,6 +227,17 @@ if ((verify_abyss_stack_mcp_runtime && \
        launch_verified_abyss_stack_mcp || link_all_user_units || \
        link_system_units || selection_set || overlay_set))); then
   aoa_die "abyss-stack MCP runtime verification must be a standalone read-only action"
+fi
+if ((verify_abyss_stack_mcp_repair_eligibility && \
+      (provision_mcp_http_auth || provision_organ_mcp_read_auth || \
+       provision_organ_mcp_candidate_auth || \
+       provision_abyss_stack_mcp_auth || rotate_abyss_stack_mcp_auth || \
+       provision_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_runtime || \
+       launch_verified_abyss_stack_mcp || enable_abyss_stack_mcp_auto_repair || \
+       disable_abyss_stack_mcp_auto_repair || install_mcp_http_codex_client || \
+       remove_mcp_http_codex_client || enable_now || restart_now || \
+       link_all_user_units || link_system_units || selection_set || overlay_set))); then
+  aoa_die "abyss-stack MCP repair eligibility verification must be a standalone read-only action"
 fi
 if ((launch_verified_abyss_stack_mcp && \
       (provision_mcp_http_auth || provision_organ_mcp_read_auth || \
@@ -1260,6 +1275,7 @@ aoa_rotate_abyss_stack_mcp_auth() {
 }
 
 aoa_require_abyss_stack_mcp_units_stopped() {
+  local allow_active_read_units="${1:-0}"
   local unit=""
   local unit_properties=""
   local unit_load_state=""
@@ -1356,7 +1372,16 @@ aoa_require_abyss_stack_mcp_units_stopped() {
     case "$unit_state" in
       inactive|failed)
         ;;
-      active|activating|reloading|deactivating)
+      active)
+        if [[ "$allow_active_read_units" -eq 1 && \
+              ("$unit" == "abyss-stack-mcp-read.service" || \
+               "$unit" == "abyss-stack-mcp-read-bootstrap.service") ]]; then
+          continue
+        fi
+        abyss_stack_mcp_units_error="refusing to replace abyss-stack MCP runtime while ${unit} is ${unit_state}"
+        return 1
+        ;;
+      activating|reloading|deactivating)
         abyss_stack_mcp_units_error="refusing to replace abyss-stack MCP runtime while ${unit} is ${unit_state}"
         return 1
         ;;
@@ -1366,6 +1391,60 @@ aoa_require_abyss_stack_mcp_units_stopped() {
         ;;
     esac
   done
+}
+
+aoa_verify_abyss_stack_mcp_repair_eligibility() {
+  local lock_path="${abyss_stack_mcp_service_root}/requirements.lock"
+  local resolved_bootstrap_python=""
+  local source_lock_fd=""
+  local runtime_lock_fd=""
+
+  [[ "$abyss_stack_mcp_bootstrap_python" == /* ]] || \
+    aoa_die "ABYSS_STACK_MCP_BOOTSTRAP_PYTHON must be an absolute path"
+  resolved_bootstrap_python="$(
+    readlink -f -- "$abyss_stack_mcp_bootstrap_python"
+  )" || aoa_die "failed to resolve abyss-stack MCP bootstrap Python"
+  [[ "$resolved_bootstrap_python" == /* && \
+     -f "$resolved_bootstrap_python" && \
+     ! -L "$resolved_bootstrap_python" && \
+     -x "$resolved_bootstrap_python" ]] || \
+    aoa_die "abyss-stack MCP bootstrap Python is not an executable regular file"
+  [[ -f "$abyss_stack_mcp_source_lock" && \
+     ! -L "$abyss_stack_mcp_source_lock" ]] || \
+    aoa_die "abyss-stack MCP source projection lock is unavailable"
+  [[ -f "$abyss_stack_mcp_runtime_lock" && \
+     ! -L "$abyss_stack_mcp_runtime_lock" ]] || \
+    aoa_die "abyss-stack MCP runtime lock is unavailable"
+  exec {source_lock_fd}< "$abyss_stack_mcp_source_lock"
+  if ! /usr/bin/flock --shared --nonblock "$source_lock_fd"; then
+    aoa_die "Configs sync or runtime provisioning holds the abyss-stack MCP source projection lock"
+  fi
+  exec {runtime_lock_fd}< "$abyss_stack_mcp_runtime_lock"
+  if ! /usr/bin/flock --shared --nonblock "$runtime_lock_fd"; then
+    aoa_die "runtime provisioning holds the abyss-stack MCP runtime lock"
+  fi
+  [[ -d "$abyss_stack_mcp_service_root" && \
+     ! -L "$abyss_stack_mcp_service_root" ]] || \
+    aoa_die "deployed abyss-stack MCP package root is unavailable"
+  [[ -f "${abyss_stack_mcp_service_root}/pyproject.toml" && \
+     ! -L "${abyss_stack_mcp_service_root}/pyproject.toml" ]] || \
+    aoa_die "deployed abyss-stack MCP package metadata is unavailable"
+  [[ -f "$lock_path" && ! -L "$lock_path" ]] || \
+    aoa_die "deployed abyss-stack MCP hash lock is unavailable"
+  if [[ -n "$(
+    find "$abyss_stack_mcp_service_root" \
+      ! -type f \
+      ! -type d \
+      -print \
+      -quit
+  )" ]]; then
+    aoa_die "deployed abyss-stack MCP package must contain only regular files and directories"
+  fi
+  if ! aoa_require_abyss_stack_mcp_units_stopped 1; then
+    aoa_die "$abyss_stack_mcp_units_error"
+  fi
+  exec {runtime_lock_fd}>&-
+  exec {source_lock_fd}>&-
 }
 
 aoa_digest_abyss_stack_mcp_package() {
@@ -2060,6 +2139,9 @@ if ((verify_abyss_stack_mcp_runtime)); then
   aoa_verify_abyss_stack_mcp_runtime \
     "$verify_abyss_stack_mcp_runtime_contour"
 fi
+if ((verify_abyss_stack_mcp_repair_eligibility)); then
+  aoa_verify_abyss_stack_mcp_repair_eligibility
+fi
 if ((launch_verified_abyss_stack_mcp)); then
   aoa_launch_verified_abyss_stack_mcp \
     "$launch_verified_abyss_stack_mcp_contour"
@@ -2076,7 +2158,7 @@ fi
 if ((remove_mcp_http_codex_client)); then
   aoa_remove_mcp_http_codex_client
 fi
-if ((provision_mcp_http_auth || provision_organ_mcp_read_auth || provision_organ_mcp_candidate_auth || provision_abyss_stack_mcp_auth || rotate_abyss_stack_mcp_auth || provision_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_runtime || launch_verified_abyss_stack_mcp || enable_abyss_stack_mcp_auto_repair || disable_abyss_stack_mcp_auto_repair || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
+if ((provision_mcp_http_auth || provision_organ_mcp_read_auth || provision_organ_mcp_candidate_auth || provision_abyss_stack_mcp_auth || rotate_abyss_stack_mcp_auth || provision_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_repair_eligibility || launch_verified_abyss_stack_mcp || enable_abyss_stack_mcp_auto_repair || disable_abyss_stack_mcp_auto_repair || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
   ((!enable_now && !restart_now && !link_all_user_units && !link_system_units && !selection_set && !overlay_set)); then
   exit 0
 fi

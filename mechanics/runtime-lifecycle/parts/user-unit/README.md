@@ -85,10 +85,14 @@ manual-only `abyss-stack-mcp-runtime-repair.service` when it has drifted. This
 automatic delegation is denied until the operator persists the reversible
 host policy with `aoa-install-systemd --enable-abyss-stack-mcp-auto-repair`;
 `--disable-abyss-stack-mcp-auto-repair` removes only that opt-in. The repair
-delegation first stops the exact read and bootstrap fleet so managed shared
-locks are released, then rebuilds before admission starts the read fleet again.
-The repair still refuses an independently active candidate or internal-effect
-plane and unsafe source, lock, journal, or unit topology.
+delegation first runs the standalone read-only repair-eligibility verifier. It
+proves the source package, bootstrap interpreter, shared locks, and exact loaded
+unit topology are safe while allowing the current read/bootstrap processes to
+remain active. Only after that gate succeeds does admission stop the exact read
+and bootstrap fleet so their managed shared locks are released, then rebuild
+before admission starts the read fleet again. The repair still refuses an
+independently active candidate or internal-effect plane and unsafe source,
+lock, journal, or unit topology without taking the working read fleet down.
 
 The separately linked `abyss-mcp-protocol-watch.path` reacts to Codex and
 protocol-lab source changes; its hourly timer observes new upstream

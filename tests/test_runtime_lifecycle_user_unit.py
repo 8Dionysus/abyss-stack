@@ -1440,6 +1440,11 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 str(INSTALL_SYSTEMD),
                 "--verify-abyss-stack-mcp-runtime",
             ]
+            repair_eligibility_command = [
+                "bash",
+                str(INSTALL_SYSTEMD),
+                "--verify-abyss-stack-mcp-repair-eligibility",
+            ]
 
             read_unit_source = unit_source_dir / "abyss-stack-mcp-read.service"
             lock_aware_source = read_unit_source.read_text(encoding="utf-8")
@@ -1644,6 +1649,65 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 )
             )
             self.assertTrue(all(str(service_root) not in line for line in pip_calls))
+
+            for active_read_unit in (
+                "abyss-stack-mcp-read.service",
+                "abyss-stack-mcp-read-bootstrap.service",
+            ):
+                with self.subTest(active_read_unit=active_read_unit):
+                    eligible = subprocess.run(
+                        repair_eligibility_command,
+                        cwd=REPO_ROOT,
+                        env={
+                            **env,
+                            "ABYSS_STACK_MCP_TEST_ACTIVE_UNIT": active_read_unit,
+                        },
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(eligible.returncode, 0, eligible.stderr)
+
+            for active_non_read_unit in (
+                "abyss-stack-mcp-candidate.service",
+                "abyss-stack-mcp-internal-effect.service",
+            ):
+                with self.subTest(active_non_read_unit=active_non_read_unit):
+                    ineligible = subprocess.run(
+                        repair_eligibility_command,
+                        cwd=REPO_ROOT,
+                        env={
+                            **env,
+                            "ABYSS_STACK_MCP_TEST_ACTIVE_UNIT": active_non_read_unit,
+                        },
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(ineligible.returncode, 0)
+                    self.assertIn(
+                        f"while {active_non_read_unit} is active",
+                        ineligible.stderr,
+                    )
+
+            stale_eligibility = subprocess.run(
+                repair_eligibility_command,
+                cwd=REPO_ROOT,
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_STALE_UNIT": (
+                        "abyss-stack-mcp-read.service"
+                    ),
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(stale_eligibility.returncode, 0)
+            self.assertIn(
+                "is not loaded with the lock-aware ExecStart",
+                stale_eligibility.stderr,
+            )
 
             runtime_python = venv / "bin" / "python"
             runtime_python.unlink()
@@ -2202,6 +2266,16 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             "runtime verification contour must be all, read, candidate, or "
             "internal_effect",
             invalid_contour.stderr,
+        )
+
+        repair_eligibility = self.run_install_systemd(
+            "--verify-abyss-stack-mcp-repair-eligibility",
+            "--restart-now",
+        )
+        self.assertNotEqual(repair_eligibility.returncode, 0)
+        self.assertIn(
+            "repair eligibility verification must be a standalone read-only action",
+            repair_eligibility.stderr,
         )
 
     def test_stack_mcp_auto_repair_policy_is_explicit_reversible_and_standalone(
@@ -2980,6 +3054,12 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         repair_start = script.index(
             'systemctl --user start "$RUNTIME_REPAIR_SERVICE"'
         )
+        repair_eligibility = script.rindex(
+            '"$INSTALL_SYSTEMD" '
+            "--verify-abyss-stack-mcp-repair-eligibility",
+            0,
+            repair_start,
+        )
         repair_read_stop = script.rindex(
             'systemctl --user stop "${bootstrap_units[@]}" '
             '"${production_units[@]}"',
@@ -2991,6 +3071,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             0,
             repair_start,
         )
+        self.assertLess(repair_eligibility, repair_read_stop)
         self.assertLess(repair_read_stop, repair_reset)
         self.assertLess(repair_reset, repair_start)
         self.assertIn(
