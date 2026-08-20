@@ -9,6 +9,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Keep the modern MCP read fleet available across recoverable runtime-repair
+  failures. Guarded repair now builds and verifies the replacement before
+  quiescing the stack read peer, excludes candidate/internal-effect launches
+  with an operation lock, and restores the previous runtime and active reader
+  if the final atomic activation fails.
 - Bind the operator-visible responsibility holder to its own non-replacing
   lifecycle receipt before direct Codex `exec`, distinct from nested proof
   actors. The installed incarnation runtime now closes only that exact

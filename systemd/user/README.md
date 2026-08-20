@@ -22,7 +22,7 @@ This directory stores user-unit skeletons for the deployed runtime.
   plane
 - `abyss-stack-mcp-internal-effect.service`, the separately credentialed exact
   read-service restart-and-rollback pilot on port `5439`
-- `abyss-stack-mcp-runtime-repair.service`, the manual-only guarded exact-lock
+- `abyss-stack-mcp-runtime-repair.service`, the host-opt-in guarded exact-lock
   reprovisioner used by admission recovery when the measured runtime drifts
 - `abyss-stack-mcp-observation.service` and
   `abyss-stack-mcp-observation.timer`, the bounded five-minute observation
@@ -203,9 +203,14 @@ backstop for missed or coalesced events.
 The modern admission timer starts one second after the user manager and uses a
 five-minute recurrence. A failed two-phase transaction therefore cannot thrash
 the machine every thirty seconds. Before bootstrap it verifies the stack MCP
-runtime and may invoke the manual-only guarded repair service; that service
-rebuilds only from the deployed package and hash lock and still refuses active
-stack planes or unsafe lifecycle topology. Keeper
+runtime and may invoke the opt-in guarded repair service; that service
+rebuilds only from the deployed package and hash lock. It holds a shared
+source/runtime snapshot while the read plane remains live, excludes candidate
+and internal-effect launches through a distinct operation lock, and stops only
+the stack read/bootstrap pair after the replacement passes dependency checks.
+Pre-stop failure preserves the live reader; post-stop failure restores the
+previous runtime and active read peer. Unsafe lifecycle topology still fails
+closed. Keeper
 and preflight services are ordered behind that transaction and allow finite
 publication bursts without becoming permanently failed through
 `unit-start-limit-hit`.
@@ -219,7 +224,9 @@ replace a changed environment while any stack MCP unit is active or its
 state cannot be observed; it never stops a plane implicitly.
 The lifetime locks mean an applying MCP Configs sync and changed runtime
 provisioning fail closed while any plane is active; stop all three planes
-explicitly before sync or reprovisioning. The units execute the installed venv
+explicitly before sync or manual reprovisioning. Automatic repair is the bounded
+exception described above and never swaps while a plane holds the runtime lock.
+The units execute the installed venv
 module, not the mutable `Configs/src` tree, clear inherited `PYTHONHOME` and
 `PYTHONPATH`, invoke Python in isolated mode, and pass `-B` explicitly. Neither
 a Configs sync nor ambient user-manager imports can replace the measured module
