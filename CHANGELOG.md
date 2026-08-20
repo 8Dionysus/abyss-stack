@@ -9,6 +9,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Give every canonical detached visible Codex holder a unique owner-private
+  Kitty socket and a persisted Goal/actor/incarnation/session, process,
+  window, TTY, runtime-root, and closeout binding. Add read-only owner status
+  and explicit directed input through that binding; the status projection
+  whitelists safe Kitty fields and never emits environment, command lines,
+  tokens, or credentials.
 - Preserve the packaged `codex-code-mode-host` beside an ELF Codex executable
   when the visible incarnation runtime seals and launches it. The companion
   now shares the same digest-bound private read-only execution coordinate,

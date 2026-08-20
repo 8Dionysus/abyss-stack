@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import shlex
 import shutil
 import signal
@@ -34,8 +35,34 @@ SCHEMA_VERSION = "abyss_stack_codex_incarnation_home_v1"
 HOLDER_RECEIPT_SCHEMA_VERSION = "abyss_stack_visible_incarnation_holder_terminal_v1"
 TERMINAL_CLOSURE_SCHEMA_VERSION = "abyss_stack_visible_incarnation_terminal_closure_v1"
 CLOSURE_RESERVATION_SCHEMA_VERSION = "abyss_stack_visible_incarnation_terminal_closure_reservation_v1"
+TERMINAL_BINDING_SCHEMA_VERSION = "abyss_stack_visible_terminal_binding_v1"
 DESCENDANT_BIN_NAME = ".codex-incarnation-bin"
 CODE_MODE_HOST_NAME = "codex-code-mode-host"
+CONTROL_SOCKET_ROOT_NAME = "aoa-external-codex"
+CONTROL_SOCKET_MODE = 0o600
+CONTROL_SOCKET_PARENT_MODE = 0o700
+CONTROL_SOCKET_MAX_LENGTH = 103
+SAFE_PROJECTION_FORBIDDEN_KEYS = frozenset(
+    {
+        "env",
+        "environment",
+        "environ",
+        "token",
+        "tokens",
+        "secret",
+        "secrets",
+        "password",
+        "credential",
+        "credentials",
+        "auth",
+        "authorization",
+        "bearer",
+        "api_key",
+        "apikey",
+        "cookie",
+        "cookies",
+    }
+)
 LOCAL_NAMES = frozenset(
     {"config.toml", "cache", "log", "tmp", DESCENDANT_BIN_NAME}
 )
@@ -478,6 +505,385 @@ def _proc_children(pid: int) -> list[int]:
         raise IncarnationHomeError(f"process children are malformed: {pid}") from exc
 
 
+def _safe_projection_string(value: object, label: str) -> str:
+    """Keep human-readable status fields from becoming credential sinks."""
+
+    if not isinstance(value, str):
+        raise IncarnationHomeError(f"safe status field is not text: {label}")
+    if "\x00" in value:
+        raise IncarnationHomeError(f"safe status field contains NUL: {label}")
+    return re.sub(
+        r"(?i)(token|secret|password|api[_-]?key|authorization|bearer)"
+        r"(\s*[:=]\s*)([^\s,;]+)",
+        r"\1\2<redacted>",
+        value,
+    )
+
+
+def _assert_safe_projection(value: object) -> None:
+    """Defence-in-depth check for every owner-visible Kitty projection."""
+
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            normalized_key = str(key).casefold().replace("-", "_")
+            if normalized_key in SAFE_PROJECTION_FORBIDDEN_KEYS:
+                raise IncarnationHomeError(
+                    f"unsafe field entered terminal status projection: {key}"
+                )
+            _assert_safe_projection(nested)
+    elif isinstance(value, list):
+        for nested in value:
+            _assert_safe_projection(nested)
+
+
+def _binding_ref(value: object, label: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise IncarnationHomeError(f"terminal binding {label} is missing")
+    if any(character in value for character in "\x00\r\n"):
+        raise IncarnationHomeError(f"terminal binding {label} contains control text")
+    return _safe_projection_string(value, label)
+
+
+def _socket_path(address: object, label: str = "control socket") -> Path:
+    if not isinstance(address, str) or not address.startswith("unix:"):
+        raise IncarnationHomeError(f"{label} must use a unix: address")
+    path = Path(address.removeprefix("unix:"))
+    if (
+        not path.is_absolute()
+        or path.is_symlink()
+        or not path.parent.is_absolute()
+        or len(str(path)) > CONTROL_SOCKET_MAX_LENGTH
+    ):
+        raise IncarnationHomeError(f"{label} path is not an absolute private socket")
+    return path
+
+
+def _validate_socket_parent(path: Path, *, create: bool = False) -> Path:
+    parent = path.parent
+    if create and not parent.exists():
+        parent.mkdir(mode=CONTROL_SOCKET_PARENT_MODE, parents=False)
+    if parent.is_symlink() or not parent.is_dir():
+        raise IncarnationHomeError(f"control socket parent is not a directory: {parent}")
+    try:
+        parent_stat = parent.stat()
+    except OSError as exc:
+        raise IncarnationHomeError(f"control socket parent cannot be inspected: {parent}") from exc
+    if parent_stat.st_uid != os.getuid() or stat.S_IMODE(parent_stat.st_mode) & 0o077:
+        raise IncarnationHomeError(
+            f"control socket parent is not private to the owner: {parent}"
+        )
+    return parent
+
+
+def _secure_control_socket(
+    address: str, *, require_exists: bool = True, harden: bool = False
+) -> dict[str, object]:
+    path = _socket_path(address)
+    _validate_socket_parent(path)
+    if not path.exists():
+        if require_exists:
+            raise IncarnationHomeError(f"control socket does not exist: {path}")
+        return {"address": address, "path": str(path), "mode": None}
+    if path.is_symlink():
+        raise IncarnationHomeError(f"control socket may not be a symlink: {path}")
+    try:
+        observed = path.stat()
+    except OSError as exc:
+        raise IncarnationHomeError(f"control socket cannot be inspected: {path}") from exc
+    if not stat.S_ISSOCK(observed.st_mode) or observed.st_uid != os.getuid():
+        raise IncarnationHomeError(f"control socket is not an owner socket: {path}")
+    if harden:
+        try:
+            os.chmod(path, CONTROL_SOCKET_MODE)
+            observed = path.stat()
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"control socket permissions cannot be hardened: {path}"
+            ) from exc
+    mode = stat.S_IMODE(observed.st_mode)
+    if mode & 0o077:
+        raise IncarnationHomeError(f"control socket permissions are not private: {path}")
+    return {"address": address, "path": str(path), "mode": mode}
+
+
+def _allocate_control_socket() -> str:
+    runtime_dir_value = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+    runtime_dir = Path(runtime_dir_value)
+    if runtime_dir.is_symlink() or not runtime_dir.is_dir():
+        raise IncarnationHomeError("XDG runtime directory is not a real directory")
+    root = runtime_dir / CONTROL_SOCKET_ROOT_NAME
+    if not root.exists():
+        root.mkdir(mode=CONTROL_SOCKET_PARENT_MODE)
+    _validate_socket_parent(root)
+    for _ in range(32):
+        path = root / f"kitty-{secrets.token_hex(16)}.sock"
+        if not path.exists() and not path.is_symlink():
+            return f"unix:{path}"
+    raise IncarnationHomeError("could not allocate a unique Kitty control socket")
+
+
+def _holder_tty(pid: int) -> str:
+    try:
+        target = os.readlink(f"/proc/{pid}/fd/0")
+    except OSError as exc:
+        raise IncarnationHomeError(f"holder tty cannot be observed: {pid}") from exc
+    if not re.fullmatch(r"/dev/(?:pts/[0-9]+|tty[0-9]+)", target):
+        raise IncarnationHomeError(f"holder stdin is not a terminal: {target}")
+    return target
+
+
+def _load_binding_context(path: Path) -> dict[str, str]:
+    context = _load_json(path, "terminal binding context")
+    required = (
+        "goal_ref",
+        "actor_ref",
+        "incarnation_ref",
+        "session_ref",
+        "runtime_state_root",
+        "closeout_route",
+    )
+    values = {key: _binding_ref(context.get(key), key) for key in required}
+    runtime_state_root = Path(values["runtime_state_root"])
+    if (
+        not runtime_state_root.is_absolute()
+        or runtime_state_root.is_symlink()
+        or not runtime_state_root.is_dir()
+    ):
+        raise IncarnationHomeError("terminal runtime state root is not a real directory")
+    closeout_route = Path(values["closeout_route"])
+    if not closeout_route.is_absolute():
+        raise IncarnationHomeError("terminal closeout route must be absolute")
+    return values
+
+
+def _terminal_binding(
+    *,
+    context: dict[str, str],
+    control_socket: str,
+    terminal_title: str,
+    window_id: str,
+    tty: str,
+    holder_pid: int,
+    holder_start_ticks: int,
+    terminal_pid: int,
+    terminal_start_ticks: int,
+    source_receipt: Path | None = None,
+    source_receipt_digest: str | None = None,
+    harden_socket: bool = True,
+) -> dict[str, object]:
+    socket_record = _secure_control_socket(
+        control_socket, harden=harden_socket
+    )
+    binding: dict[str, object] = {
+        "schema_version": TERMINAL_BINDING_SCHEMA_VERSION,
+        "goal_ref": context["goal_ref"],
+        "actor_ref": context["actor_ref"],
+        "incarnation_ref": context["incarnation_ref"],
+        "session_ref": context["session_ref"],
+        "runtime_state_root": context["runtime_state_root"],
+        "closeout_route": context["closeout_route"],
+        "holder": {
+            "pid": holder_pid,
+            "start_ticks": holder_start_ticks,
+        },
+        "terminal": {
+            "pid": terminal_pid,
+            "start_ticks": terminal_start_ticks,
+            "window_id": window_id,
+            "tty": tty,
+            "title": _safe_projection_string(terminal_title, "terminal title"),
+            "control_socket": socket_record,
+        },
+        "remote_control": "socket-only",
+        "dedicated": True,
+    }
+    if source_receipt is not None:
+        binding["source_receipt"] = {
+            "path": str(source_receipt.resolve()),
+            "sha256": source_receipt_digest
+            or sha256_bytes(source_receipt.read_bytes()),
+        }
+    _assert_safe_projection(binding)
+    return binding
+
+
+def _validate_terminal_binding_shape(binding: object) -> dict[str, object]:
+    if not isinstance(binding, dict):
+        raise IncarnationHomeError("terminal binding is not an object")
+    if binding.get("schema_version") != TERMINAL_BINDING_SCHEMA_VERSION:
+        raise IncarnationHomeError("unsupported terminal binding schema")
+    for key in (
+        "goal_ref",
+        "actor_ref",
+        "incarnation_ref",
+        "session_ref",
+        "runtime_state_root",
+        "closeout_route",
+    ):
+        _binding_ref(binding.get(key), key)
+    state_root = Path(str(binding["runtime_state_root"]))
+    if not state_root.is_absolute() or state_root.is_symlink():
+        raise IncarnationHomeError("terminal binding runtime state root is invalid")
+    closeout_route = Path(str(binding["closeout_route"]))
+    if not closeout_route.is_absolute():
+        raise IncarnationHomeError("terminal binding closeout route is invalid")
+    if binding.get("remote_control") != "socket-only" or binding.get("dedicated") is not True:
+        raise IncarnationHomeError("terminal binding control posture is invalid")
+    holder = binding.get("holder")
+    terminal = binding.get("terminal")
+    if not isinstance(holder, dict) or not isinstance(terminal, dict):
+        raise IncarnationHomeError("terminal binding process records are missing")
+    if not all(
+        isinstance(holder.get(key), int) and holder[key] > 0
+        for key in ("pid", "start_ticks")
+    ):
+        raise IncarnationHomeError("terminal binding holder identity is invalid")
+    if not all(
+        isinstance(terminal.get(key), int) and terminal[key] > 0
+        for key in ("pid", "start_ticks")
+    ):
+        raise IncarnationHomeError("terminal binding Kitty identity is invalid")
+    if not isinstance(terminal.get("window_id"), str) or not re.fullmatch(
+        r"[1-9][0-9]*", terminal["window_id"]
+    ):
+        raise IncarnationHomeError("terminal binding window identity is invalid")
+    if not isinstance(terminal.get("tty"), str) or not terminal["tty"]:
+        raise IncarnationHomeError("terminal binding tty is invalid")
+    if not isinstance(terminal.get("title"), str):
+        raise IncarnationHomeError("terminal binding title is invalid")
+    socket_record = terminal.get("control_socket")
+    if not isinstance(socket_record, dict):
+        raise IncarnationHomeError("terminal binding socket record is missing")
+    address = socket_record.get("address")
+    path = _socket_path(address)
+    if socket_record.get("path") != str(path):
+        raise IncarnationHomeError("terminal binding socket path drifted")
+    mode = socket_record.get("mode")
+    if not isinstance(mode, int) or mode & 0o077:
+        raise IncarnationHomeError("terminal binding socket mode is not private")
+    _assert_safe_projection(binding)
+    return binding
+
+
+def _kitty_ls(
+    *, kitty_executable: str, control_socket: str, window_id: str
+) -> list[dict[str, object]]:
+    """Query Kitty while never returning its raw, environment-bearing payload."""
+
+    _secure_control_socket(control_socket, harden=False)
+    try:
+        completed = subprocess.run(
+            [
+                kitty_executable,
+                "@",
+                "--to",
+                control_socket,
+                "ls",
+                "--output-format",
+                "json",
+                "--all-env-vars=no",
+                "--match",
+                f"id:{window_id}",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise IncarnationHomeError("Kitty read-only status query failed") from exc
+    if completed.returncode != 0:
+        raise IncarnationHomeError("Kitty read-only status query returned an error")
+    try:
+        payload = json.loads(completed.stdout)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise IncarnationHomeError("Kitty status payload was not valid JSON") from exc
+    if not isinstance(payload, list):
+        raise IncarnationHomeError("Kitty status payload was not a window list")
+    matches: list[dict[str, object]] = []
+    for os_window in payload:
+        if not isinstance(os_window, dict):
+            continue
+        tabs = os_window.get("tabs")
+        if not isinstance(tabs, list):
+            continue
+        for tab in tabs:
+            if not isinstance(tab, dict) or not isinstance(tab.get("windows"), list):
+                continue
+            for window in tab["windows"]:
+                if not isinstance(window, dict):
+                    continue
+                if str(window.get("id")) != window_id:
+                    continue
+                foreground: list[dict[str, object]] = []
+                raw_foreground = window.get("foreground_processes")
+                if isinstance(raw_foreground, list):
+                    for process in raw_foreground:
+                        if not isinstance(process, dict):
+                            continue
+                        pid = process.get("pid")
+                        if not isinstance(pid, int) or pid <= 0:
+                            continue
+                        try:
+                            comm = _proc_comm(pid)
+                        except IncarnationHomeError:
+                            comm = "unknown"
+                        process_projection: dict[str, object] = {
+                            "pid": pid,
+                            "comm": _safe_projection_string(comm, "foreground comm"),
+                        }
+                        if isinstance(process.get("cwd"), str):
+                            process_projection["cwd"] = _safe_projection_string(
+                                process["cwd"], "foreground cwd"
+                            )
+                        foreground.append(process_projection)
+                safe_window: dict[str, object] = {
+                    "id": window_id,
+                    "title": _safe_projection_string(
+                        window.get("title", ""), "window title"
+                    ),
+                    "cwd": _safe_projection_string(window.get("cwd", ""), "window cwd"),
+                    "pid": window.get("pid")
+                    if isinstance(window.get("pid"), int)
+                    else None,
+                    "is_active": window.get("is_active") is True,
+                    "is_focused": window.get("is_focused") is True,
+                    "needs_attention": window.get("needs_attention") is True,
+                    "in_alternate_screen": window.get("in_alternate_screen") is True,
+                    "foreground_processes": foreground,
+                    "tab": {
+                        "id": tab.get("id") if isinstance(tab.get("id"), int) else None,
+                        "is_active": tab.get("is_active") is True,
+                        "is_focused": tab.get("is_focused") is True,
+                    },
+                    "os_window": {
+                        "id": os_window.get("id")
+                        if isinstance(os_window.get("id"), int)
+                        else None,
+                        "is_active": os_window.get("is_active") is True,
+                        "is_focused": os_window.get("is_focused") is True,
+                    },
+                }
+                matches.append(safe_window)
+    if len(matches) > 1:
+        raise IncarnationHomeError("Kitty control socket matched multiple bound windows")
+    _assert_safe_projection(matches)
+    return matches
+
+
+def _descends_from(pid: int, ancestor_pid: int) -> bool:
+    cursor = pid
+    visited: set[int] = set()
+    for _ in range(64):
+        if cursor == ancestor_pid:
+            return True
+        if cursor in visited or cursor <= 1:
+            return False
+        visited.add(cursor)
+        cursor = _proc_parent_pid(cursor)
+    return False
+
+
 def _post_exec_argv(
     executable: Path,
     argv: Sequence[str],
@@ -798,6 +1204,9 @@ def _holder_receipt(
     manifest_bytes: bytes | None = None,
     manifest_digest: str | None = None,
     companion_binding: dict[str, str] | None = None,
+    binding_context: dict[str, str] | None = None,
+    control_socket: str | None = None,
+    terminal_title: str | None = None,
 ) -> dict[str, Any]:
     holder_pid = os.getpid()
     holder_parent_pid = os.getppid()
@@ -850,6 +1259,40 @@ def _holder_receipt(
     if companion_binding is not None:
         runtime["codex_companion"] = dict(companion_binding)
     _decode_holder_manifest_snapshot(runtime)
+    binding: dict[str, object] | None = None
+    terminal: dict[str, object] = {
+        "binding": "kitty_ancestor_at_exec",
+        "required_comm": "kitty",
+        "pid": terminal_pid,
+        "start_ticks": terminal_start_ticks,
+        "argv": terminal_argv,
+        "window_id": window_id,
+        "dedicated": dedicated,
+    }
+    if binding_context is not None:
+        if control_socket is None or terminal_title is None:
+            raise IncarnationHomeError(
+                "canonical visible holder binding lacks socket or title"
+            )
+        tty = _holder_tty(holder_pid)
+        binding = _terminal_binding(
+            context=binding_context,
+            control_socket=control_socket,
+            terminal_title=terminal_title,
+            window_id=window_id,
+            tty=tty,
+            holder_pid=holder_pid,
+            holder_start_ticks=_proc_start_ticks(holder_pid),
+            terminal_pid=terminal_pid,
+            terminal_start_ticks=terminal_start_ticks,
+        )
+        terminal.update(
+            {
+                "tty": tty,
+                "title": binding["terminal"]["title"],
+                "control_socket": binding["terminal"]["control_socket"],
+            }
+        )
     receipt = {
         "schema_version": HOLDER_RECEIPT_SCHEMA_VERSION,
         "receipt_ref": str(receipt_path.resolve()),
@@ -866,16 +1309,10 @@ def _holder_receipt(
             "argv_digest": sha256_bytes(canonical_bytes(post_exec_argv)),
         },
         "runtime": runtime,
-        "terminal": {
-            "binding": "kitty_ancestor_at_exec",
-            "required_comm": "kitty",
-            "pid": terminal_pid,
-            "start_ticks": terminal_start_ticks,
-            "argv": terminal_argv,
-            "window_id": window_id,
-            "dedicated": dedicated,
-        },
+        "terminal": terminal,
     }
+    if binding is not None:
+        receipt["binding"] = binding
     _write_new_json(receipt_path, receipt, "holder terminal receipt")
     return receipt
 
@@ -1046,6 +1483,8 @@ def _load_holder_receipt_snapshot(
     ):
         raise IncarnationHomeError("holder terminal receipt is incomplete")
     _decode_holder_manifest_snapshot(runtime)
+    if "binding" in receipt:
+        _validate_terminal_binding_shape(receipt["binding"])
     return receipt, raw, sha256_bytes(raw)
 
 
@@ -1199,6 +1638,350 @@ def _holder_terminal_identity(
         ):
             raise IncarnationHomeError("holder incarnation manifest digest has drifted")
     return pid, kitty_pid, _proc_comm(kitty_pid), window_id, dedicated
+
+
+def _load_terminal_binding_input(
+    *,
+    binding_path: Path | None,
+    holder_receipt_path: Path | None,
+    context_path: Path | None,
+    harden_socket: bool,
+) -> tuple[dict[str, object], dict[str, object], dict[str, object], Path | None, str | None]:
+    if (binding_path is None) == (holder_receipt_path is None):
+        raise IncarnationHomeError(
+            "provide exactly one terminal binding or holder receipt"
+        )
+    if binding_path is not None:
+        binding_document, raw = _load_json_snapshot(
+            binding_path, "terminal binding"
+        )
+        if binding_document.get("schema_version") != TERMINAL_BINDING_SCHEMA_VERSION:
+            raise IncarnationHomeError("unsupported terminal binding schema")
+        binding = _validate_terminal_binding_shape(binding_document["binding"])
+        holder = binding.get("holder")
+        terminal = binding.get("terminal")
+        if not isinstance(holder, dict) or not isinstance(terminal, dict):
+            raise IncarnationHomeError("terminal binding process records are missing")
+        socket_address = terminal["control_socket"]["address"]
+        _secure_control_socket(socket_address, harden=harden_socket)
+        return (
+            binding,
+            holder,
+            terminal,
+            binding_path,
+            sha256_bytes(raw),
+        )
+
+    assert holder_receipt_path is not None
+    receipt, raw = _load_json_snapshot(
+        holder_receipt_path, "holder terminal receipt"
+    )
+    source_digest = sha256_bytes(raw)
+    schema = receipt.get("schema_version")
+    holder = receipt.get("holder")
+    terminal = receipt.get("terminal")
+    if not isinstance(holder, dict) or not isinstance(terminal, dict):
+        raise IncarnationHomeError("holder receipt process records are missing")
+    if schema == HOLDER_RECEIPT_SCHEMA_VERSION:
+        _load_holder_receipt_snapshot(holder_receipt_path)
+        binding_value = receipt.get("binding")
+        if binding_value is not None:
+            binding = _validate_terminal_binding_shape(binding_value)
+            terminal_binding = binding["terminal"]
+            assert isinstance(terminal_binding, dict)
+            _secure_control_socket(
+                terminal_binding["control_socket"]["address"],
+                harden=harden_socket,
+            )
+            return binding, binding["holder"], terminal_binding, holder_receipt_path, source_digest  # type: ignore[return-value]
+    elif schema != "task_local_observable_external_cli_holder_v1":
+        raise IncarnationHomeError("unsupported holder terminal receipt schema")
+
+    if context_path is None:
+        raise IncarnationHomeError(
+            "legacy holder receipt requires an explicit terminal binding context"
+        )
+    context = _load_binding_context(context_path)
+    socket_address = terminal.get("listen_on")
+    if not isinstance(socket_address, str):
+        socket_address = terminal.get("control_socket")
+    window_id = terminal.get("kitty_window_id", terminal.get("window_id"))
+    title = terminal.get("title", "")
+    tty = terminal.get("tty")
+    terminal_pid = terminal.get("pid")
+    terminal_start_ticks = terminal.get("start_ticks")
+    holder_pid = holder.get("pid")
+    holder_start_ticks = holder.get("start_ticks")
+    if (
+        not isinstance(socket_address, str)
+        or not isinstance(window_id, (str, int))
+        or not isinstance(title, str)
+        or not isinstance(tty, str)
+        or not all(
+            isinstance(value, int) and value > 0
+            for value in (
+                terminal_pid,
+                terminal_start_ticks,
+                holder_pid,
+                holder_start_ticks,
+            )
+        )
+    ):
+        raise IncarnationHomeError("legacy holder receipt lacks a complete binding")
+    binding = _terminal_binding(
+        context=context,
+        control_socket=socket_address,
+        terminal_title=title,
+        window_id=str(window_id),
+        tty=tty,
+        holder_pid=holder_pid,
+        holder_start_ticks=holder_start_ticks,
+        terminal_pid=terminal_pid,
+        terminal_start_ticks=terminal_start_ticks,
+        source_receipt=holder_receipt_path,
+        source_receipt_digest=source_digest,
+        harden_socket=harden_socket,
+    )
+    binding_holder = binding["holder"]
+    binding_terminal = binding["terminal"]
+    assert isinstance(binding_holder, dict) and isinstance(binding_terminal, dict)
+    return binding, binding_holder, binding_terminal, holder_receipt_path, source_digest
+
+
+def _observe_terminal_binding(
+    *,
+    binding: dict[str, object],
+    holder: dict[str, object],
+    terminal: dict[str, object],
+    kitty_executable: str,
+) -> tuple[dict[str, object], str]:
+    holder_pid = holder["pid"]
+    holder_start_ticks = holder["start_ticks"]
+    terminal_pid = terminal["pid"]
+    terminal_start_ticks = terminal["start_ticks"]
+    assert isinstance(holder_pid, int) and isinstance(holder_start_ticks, int)
+    assert isinstance(terminal_pid, int) and isinstance(terminal_start_ticks, int)
+    holder_state = _proc_identity_state(holder_pid, holder_start_ticks)
+    terminal_state = _proc_identity_state(terminal_pid, terminal_start_ticks)
+    identity_state = "live"
+    if holder_state == "drifted" or terminal_state == "drifted":
+        identity_state = "stale"
+    elif holder_state == "gone" or terminal_state == "gone":
+        identity_state = "missing"
+    elif _proc_comm(terminal_pid) != "kitty" or not _descends_from(
+        holder_pid, terminal_pid
+    ):
+        identity_state = "stale"
+
+    kitty_projection: dict[str, object] | None = None
+    kitty_query_state = "not_attempted"
+    if identity_state == "live":
+        socket_record = terminal["control_socket"]
+        assert isinstance(socket_record, dict)
+        try:
+            matches = _kitty_ls(
+                kitty_executable=kitty_executable,
+                control_socket=str(socket_record["address"]),
+                window_id=str(terminal["window_id"]),
+            )
+        except IncarnationHomeError:
+            kitty_query_state = "unknown"
+        else:
+            if matches:
+                kitty_projection = matches[0]
+                kitty_query_state = "present"
+            else:
+                kitty_query_state = "missing"
+                identity_state = "missing"
+    elif identity_state == "missing":
+        kitty_query_state = "not_available_after_exit"
+
+    status: dict[str, object] = {
+        "schema_version": TERMINAL_BINDING_SCHEMA_VERSION,
+        "observation": {
+            "state": identity_state,
+            "mode": "read_only",
+            "desktop_effect": "none",
+            "kitty_query": kitty_query_state,
+        },
+        "binding": binding,
+        "processes": {
+            "holder": {
+                "pid": holder_pid,
+                "start_ticks": holder_start_ticks,
+                "state": holder_state,
+            },
+            "kitty": {
+                "pid": terminal_pid,
+                "start_ticks": terminal_start_ticks,
+                "state": terminal_state,
+                "comm": "kitty" if terminal_state == "live" else "unknown",
+            },
+        },
+        "terminal": {
+            "exists": kitty_query_state == "present",
+            "window_id": terminal["window_id"],
+            "tty": terminal["tty"],
+            "title": terminal["title"],
+            "kitty": kitty_projection,
+        },
+        "compositor": {
+            "visibility": "unknown",
+            "reason": "owner evidence does not prove compositor visibility",
+        },
+        "claim_limits": [
+            "Kitty control-plane state is observed directly through the bound socket.",
+            "Compositor visibility remains unknown.",
+            "This read-only observation does not prove A2A responsibility or owner acceptance.",
+        ],
+    }
+    _assert_safe_projection(status)
+    return status, identity_state
+
+
+def _write_terminal_binding(
+    *,
+    output_path: Path,
+    binding: dict[str, object],
+    holder: dict[str, object],
+    terminal: dict[str, object],
+    source_receipt: Path,
+    source_digest: str,
+) -> dict[str, object]:
+    document: dict[str, object] = {
+        "schema_version": TERMINAL_BINDING_SCHEMA_VERSION,
+        "created_at": _utc_now(),
+        "source_receipt": {
+            "path": str(source_receipt.resolve()),
+            "sha256": source_digest,
+        },
+        "binding": binding,
+        "holder": holder,
+        "terminal": terminal,
+    }
+    _assert_safe_projection(document)
+    _write_new_json(output_path, document, "terminal binding")
+    return document
+
+
+def _emit_safe_json(
+    value: dict[str, object], *, output_path: Path | None = None, label: str
+) -> None:
+    _assert_safe_projection(value)
+    if output_path is not None:
+        _write_new_json(output_path, value, label)
+    print(json.dumps(value, ensure_ascii=False, sort_keys=True))
+
+
+def command_bind(args: argparse.Namespace) -> int:
+    holder_receipt_path = _regular_file(
+        Path(args.holder_receipt), "holder terminal receipt"
+    )
+    binding, holder, terminal, source_receipt, source_digest = (
+        _load_terminal_binding_input(
+            binding_path=None,
+            holder_receipt_path=holder_receipt_path,
+            context_path=Path(args.binding_context),
+            harden_socket=True,
+        )
+    )
+    assert source_receipt is not None and source_digest is not None
+    document = _write_terminal_binding(
+        output_path=Path(args.output),
+        binding=binding,
+        holder=holder,
+        terminal=terminal,
+        source_receipt=source_receipt,
+        source_digest=source_digest,
+    )
+    print(json.dumps(document, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
+def command_status(args: argparse.Namespace) -> int:
+    binding_path = Path(args.binding) if args.binding else None
+    holder_receipt_path = (
+        Path(args.holder_receipt) if args.holder_receipt else None
+    )
+    binding, holder, terminal, _source_receipt, _source_digest = (
+        _load_terminal_binding_input(
+            binding_path=binding_path,
+            holder_receipt_path=holder_receipt_path,
+            context_path=Path(args.binding_context) if args.binding_context else None,
+            harden_socket=False,
+        )
+    )
+    projection, state = _observe_terminal_binding(
+        binding=binding,
+        holder=holder,
+        terminal=terminal,
+        kitty_executable=args.kitty_executable,
+    )
+    _emit_safe_json(
+        projection,
+        output_path=Path(args.output) if args.output else None,
+        label="terminal status projection",
+    )
+    return 0 if state in {"live", "missing"} else 2
+
+
+def command_send_text(args: argparse.Namespace) -> int:
+    binding_path = Path(args.binding) if args.binding else None
+    holder_receipt_path = (
+        Path(args.holder_receipt) if args.holder_receipt else None
+    )
+    binding, holder, terminal, _source_receipt, _source_digest = (
+        _load_terminal_binding_input(
+            binding_path=binding_path,
+            holder_receipt_path=holder_receipt_path,
+            context_path=Path(args.binding_context) if args.binding_context else None,
+            harden_socket=False,
+        )
+    )
+    status, state = _observe_terminal_binding(
+        binding=binding,
+        holder=holder,
+        terminal=terminal,
+        kitty_executable=args.kitty_executable,
+    )
+    if state != "live" or status["observation"]["kitty_query"] != "present":
+        raise IncarnationHomeError("directed input requires a live bound terminal")
+    socket_record = terminal["control_socket"]
+    assert isinstance(socket_record, dict)
+    try:
+        completed = subprocess.run(
+            [
+                args.kitty_executable,
+                "@",
+                "--to",
+                str(socket_record["address"]),
+                "send-text",
+                "--match",
+                f"id:{terminal['window_id']}",
+                "--stdin",
+            ],
+            input=args.text,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise IncarnationHomeError("directed terminal input failed") from exc
+    if completed.returncode != 0:
+        raise IncarnationHomeError("directed terminal input returned an error")
+    result = {
+        "schema_version": TERMINAL_BINDING_SCHEMA_VERSION,
+        "sent": True,
+        "target": {
+            "window_id": terminal["window_id"],
+            "control_socket": socket_record,
+        },
+        "desktop_effect": "operator-interactive input explicitly requested",
+    }
+    _assert_safe_projection(result)
+    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+    return 0
 
 
 def command_close(args: argparse.Namespace) -> int:
@@ -3012,6 +3795,17 @@ def command_payload_launch(args: argparse.Namespace) -> int:
     if manifest_digest != args.manifest_digest:
         raise IncarnationHomeError("payload launch manifest digest drifted")
 
+    binding_context: dict[str, str] | None = None
+    binding_context_path = getattr(args, "binding_context", None)
+    control_socket = getattr(args, "control_socket", None)
+    terminal_title = getattr(args, "terminal_title", None)
+    if binding_context_path is not None:
+        binding_context = _load_binding_context(Path(binding_context_path))
+        if not isinstance(control_socket, str) or not isinstance(terminal_title, str):
+            raise IncarnationHomeError(
+                "payload terminal binding lacks control socket or title"
+            )
+
     payload_path = _regular_file(
         Path(args.payload_executable), "private payload executable"
     )
@@ -3100,15 +3894,21 @@ def command_payload_launch(args: argparse.Namespace) -> int:
             manifest_bytes=manifest_bytes,
             manifest_digest=manifest_digest,
             companion_binding=companion_binding,
+            binding_context=binding_context,
+            control_socket=control_socket,
+            terminal_title=terminal_title,
         )
     os.execve(str(payload_path), payload_argv, environment)
     return 127
 
 
 def command_launch(args: argparse.Namespace) -> int:
-    if args.holder_receipt and args.terminal_title:
+    terminal_title = getattr(args, "terminal_title", None)
+    holder_receipt_argument = getattr(args, "holder_receipt", None)
+    binding_context_argument = getattr(args, "binding_context", None)
+    if terminal_title and (not holder_receipt_argument or not binding_context_argument):
         raise IncarnationHomeError(
-            "holder terminal receipt requires direct exec; it cannot bind a detached Kitty"
+            "canonical visible launch requires --holder-receipt and --binding-context"
         )
     manifest_path = _regular_file(Path(args.manifest), "incarnation-home manifest")
     manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(manifest_path)
@@ -3116,7 +3916,15 @@ def command_launch(args: argparse.Namespace) -> int:
     executable = _resolved_executable(command)
     environment = dict(os.environ)
     environment["CODEX_HOME"] = str(manifest["ambient_codex_home"])
-    if args.terminal_title:
+    if terminal_title:
+        _load_binding_context(Path(binding_context_argument))
+        control_socket = getattr(args, "control_socket", None) or _allocate_control_socket()
+        _socket_path(control_socket)
+        _validate_socket_parent(_socket_path(control_socket))
+        if _socket_path(control_socket).exists() or _socket_path(control_socket).is_symlink():
+            raise IncarnationHomeError(
+                f"control socket path is already occupied: {control_socket}"
+            )
         _verify_executable_version(executable, str(manifest["runtime_version"]))
         argv = bound_codex_argv(
             codex_executable=command,
@@ -3124,12 +3932,82 @@ def command_launch(args: argparse.Namespace) -> int:
             arguments=args.codex_arguments,
             resolved_executable=executable,
         )
+        payload_argv = [
+            sys.executable,
+            str(Path(__file__).resolve()),
+            "payload-launch",
+            "--manifest",
+            str(manifest_path),
+            "--manifest-snapshot-b64",
+            base64.b64encode(manifest_bytes).decode("ascii"),
+            "--holder-receipt",
+            str(Path(holder_receipt_argument)),
+            "--binding-context",
+            str(Path(binding_context_argument)),
+            "--control-socket",
+            control_socket,
+            "--terminal-title",
+            terminal_title,
+            "--codex-executable",
+            str(executable),
+            "--payload-executable",
+            str(executable),
+            "--manifest-digest",
+            manifest_digest,
+            "--executable-digest",
+            sha256_bytes(executable.read_bytes()),
+            "--",
+            str(executable),
+            *argv[1:],
+        ]
         completed = subprocess.run(
-            [args.kitty_executable, "--detach", "--title", args.terminal_title, *argv],
+            [
+                args.kitty_executable,
+                "--detach",
+                "--title",
+                terminal_title,
+                "--listen-on",
+                control_socket,
+                "--override",
+                "allow_remote_control=socket-only",
+                *payload_argv,
+            ],
             check=False,
             env=environment,
         )
-        return completed.returncode
+        if completed.returncode != 0:
+            return completed.returncode
+        holder_receipt_path = _regular_file(
+            Path(holder_receipt_argument), "holder terminal receipt"
+        )
+        receipt: dict[str, Any] | None = None
+        for _ in range(100):
+            if holder_receipt_path.exists():
+                try:
+                    receipt = _load_holder_receipt(holder_receipt_path)
+                except IncarnationHomeError:
+                    receipt = None
+                if (
+                    receipt is not None
+                    and isinstance(receipt.get("binding"), dict)
+                    and receipt["binding"].get("remote_control") == "socket-only"
+                ):
+                    break
+            time.sleep(0.1)
+        if receipt is None or not isinstance(receipt.get("binding"), dict):
+            raise IncarnationHomeError(
+                "visible launch did not publish its terminal binding"
+            )
+        binding = _validate_terminal_binding_shape(receipt["binding"])
+        _emit_safe_json(
+            {
+                "schema_version": TERMINAL_BINDING_SCHEMA_VERSION,
+                "launched": True,
+                "binding": binding,
+            },
+            label="visible launch binding",
+        )
+        return 0
     (
         executable_fd,
         executable_fd_path,
@@ -3297,6 +4175,14 @@ def parser() -> argparse.ArgumentParser:
             "the shebang payload writes it immediately before exec"
         ),
     )
+    launch.add_argument(
+        "--binding-context",
+        help="owner context required for a canonical detached visible holder",
+    )
+    launch.add_argument(
+        "--control-socket",
+        help="optional owner-selected unix: Kitty socket; otherwise allocate one",
+    )
     launch.add_argument("codex_arguments", nargs=argparse.REMAINDER)
     launch.set_defaults(handler=command_launch)
     payload = subcommands.add_parser("payload-launch")
@@ -3310,8 +4196,30 @@ def parser() -> argparse.ArgumentParser:
     payload.add_argument("--companion-path")
     payload.add_argument("--companion-digest")
     payload.add_argument("--companion-relative")
+    payload.add_argument("--binding-context")
+    payload.add_argument("--control-socket")
+    payload.add_argument("--terminal-title")
     payload.add_argument("codex_arguments", nargs=argparse.REMAINDER)
     payload.set_defaults(handler=command_payload_launch)
+    bind = subcommands.add_parser("bind")
+    bind.add_argument("--holder-receipt", required=True)
+    bind.add_argument("--binding-context", required=True)
+    bind.add_argument("--output", required=True)
+    bind.set_defaults(handler=command_bind)
+    status = subcommands.add_parser("status")
+    status.add_argument("--binding")
+    status.add_argument("--holder-receipt")
+    status.add_argument("--binding-context")
+    status.add_argument("--kitty-executable", default="/usr/bin/kitty")
+    status.add_argument("--output")
+    status.set_defaults(handler=command_status)
+    send_text = subcommands.add_parser("send-text")
+    send_text.add_argument("--binding")
+    send_text.add_argument("--holder-receipt")
+    send_text.add_argument("--binding-context")
+    send_text.add_argument("--kitty-executable", default="/usr/bin/kitty")
+    send_text.add_argument("--text", required=True)
+    send_text.set_defaults(handler=command_send_text)
     close = subcommands.add_parser("close")
     close.add_argument("--holder-receipt", required=True)
     close.add_argument("--wake-receipt", required=True)

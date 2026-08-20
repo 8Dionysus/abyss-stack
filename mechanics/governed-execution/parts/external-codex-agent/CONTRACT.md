@@ -110,9 +110,9 @@ Operations are:
   output path.
 
 The operator-visible incarnation launcher has a separate lifecycle contour for
-the responsibility holder. `launch --holder-receipt <absolute json>` is valid
-only for the direct `exec` route (not detached Kitty): immediately before the
-Codex `exec`, it writes a non-replacing receipt containing the holder PID,
+the responsibility holder. `launch --holder-receipt <absolute json>` remains
+valid for the direct `exec` route: immediately before the Codex `exec`, it
+writes a non-replacing receipt containing the holder PID,
 process-parent PID/start ticks, the first Kitty ancestor PID/start ticks/argv,
 the detached Kitty window identity/dedication proof, and executable/manifest
 digests. The receipt also carries the exact launch-time manifest bytes as a
@@ -131,7 +131,32 @@ identity. The Kitty-ancestor binding covers the installed bubblewrap wrapper as
 well as a direct host exec while retaining one exact terminal identity; the
 holder environment must bind `KITTY_PID` and `KITTY_WINDOW_ID`, and no sibling
 terminal child may remain outside the holder lineage and Kitty helper
-processes. After a wake bridge has recorded confirmed handoff delivery, the
+processes.
+
+A visible detached launch is canonical only when it additionally supplies
+`--terminal-title`, `--binding-context`, and, optionally, an owner-selected
+`--control-socket`. The runtime allocates a unique owner-private UNIX socket
+when one is not supplied, starts Kitty with
+`allow_remote_control=socket-only`, and waits for the payload holder to
+publish the same binding before reporting launch success. The binding records
+the Goal, actor/incarnation/session, holder and Kitty PID/start ticks, Kitty
+window ID, TTY, title, socket, runtime state root, and closeout route. The
+`bind` command can materialize that binding from a legacy task-local receipt
+only with an explicit owner context.
+
+The canonical terminal observability surface is
+`status --binding <absolute json> [--output <absolute json>]`. It validates
+the exact process identities, queries Kitty through the bound socket, and
+returns only an explicit safe projection: window/title/cwd, focus and
+attention booleans, foreground PID and comm, tab/OS-window IDs and focus
+booleans, terminal existence, socket mode, and typed identity/query state. It
+never returns Kitty's raw `ls` object, environment, command line, tokens,
+credentials, or credential-shaped fields; unknown compositor visibility
+remains `unknown`. Status is read-only and has no desktop effect.
+`send-text` is a separate explicitly invoked operator transport targeting
+the exact bound socket and window; it is not A2A responsibility transfer.
+These terminal surfaces do not replace the governed JSONL runtime or owner
+acceptance. After a wake bridge has recorded confirmed handoff delivery, the
 installed launcher may run `close --holder-receipt ... --wake-receipt ...
 --handoff ... --closure-receipt ...`; before selecting a signal target it
 requires the handoff to bind the exact holder receipt path, receipt digest,

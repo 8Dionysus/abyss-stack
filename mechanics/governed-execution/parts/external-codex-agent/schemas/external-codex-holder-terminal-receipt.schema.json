@@ -63,7 +63,90 @@
         "start_ticks": {"type": "integer", "minimum": 1},
         "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
         "window_id": {"type": "string", "pattern": "^[1-9][0-9]*$"},
+        "tty": {"type": "string", "pattern": "^/dev/(pts/[0-9]+|tty[0-9]+)$"},
+        "title": {"type": "string"},
+        "control_socket": {"$ref": "#/$defs/controlSocket"},
         "dedicated": {"const": true}
+      }
+    },
+    "binding": {"$ref": "#/$defs/terminalBinding"}
+  },
+  "$defs": {
+    "controlSocket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["address", "path", "mode"],
+      "properties": {
+        "address": {"type": "string", "pattern": "^unix:/"},
+        "path": {"type": "string", "pattern": "^/"},
+        "mode": {"type": "integer", "minimum": 0, "maximum": 511}
+      }
+    },
+    "processIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pid", "start_ticks"],
+      "properties": {
+        "pid": {"type": "integer", "minimum": 1},
+        "start_ticks": {"type": "integer", "minimum": 1}
+      }
+    },
+    "terminalBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "goal_ref",
+        "actor_ref",
+        "incarnation_ref",
+        "session_ref",
+        "runtime_state_root",
+        "closeout_route",
+        "holder",
+        "terminal",
+        "remote_control",
+        "dedicated"
+      ],
+      "properties": {
+        "schema_version": {"const": "abyss_stack_visible_terminal_binding_v1"},
+        "goal_ref": {"type": "string", "minLength": 1},
+        "actor_ref": {"type": "string", "minLength": 1},
+        "incarnation_ref": {"type": "string", "minLength": 1},
+        "session_ref": {"type": "string", "minLength": 1},
+        "runtime_state_root": {"type": "string", "pattern": "^/"},
+        "closeout_route": {"type": "string", "pattern": "^/"},
+        "holder": {"$ref": "#/$defs/processIdentity"},
+        "terminal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pid",
+            "start_ticks",
+            "window_id",
+            "tty",
+            "title",
+            "control_socket"
+          ],
+          "properties": {
+            "pid": {"type": "integer", "minimum": 1},
+            "start_ticks": {"type": "integer", "minimum": 1},
+            "window_id": {"type": "string", "pattern": "^[1-9][0-9]*$"},
+            "tty": {"type": "string", "pattern": "^/dev/(pts/[0-9]+|tty[0-9]+)$"},
+            "title": {"type": "string"},
+            "control_socket": {"$ref": "#/$defs/controlSocket"}
+          }
+        },
+        "remote_control": {"const": "socket-only"},
+        "dedicated": {"const": true},
+        "source_receipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": {"type": "string", "pattern": "^/"},
+            "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+          }
+        }
       }
     }
   }

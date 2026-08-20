@@ -325,9 +325,16 @@ require separate real-model and clean packaged-source receipts.
 The visible-incarnation tests additionally prove that a direct responsibility
 holder writes a non-replacing lifecycle receipt before `exec`, records
 post-exec argv (including shebang interpreter shape), its process parent and
-first detached Kitty window, rejects sibling Kitty children, rejects receipt
-binding for detached/non-dedicated launches, and keeps holder identity separate
-from runtime proof-actor identity. The installed `close` route is only valid
+first detached Kitty window, rejects sibling Kitty children, and keeps holder
+identity separate from runtime proof-actor identity. The canonical detached
+route allocates a unique private socket, persists the Goal/actor/session,
+process/start-tick, window, TTY, title, runtime-root, and closeout binding, and
+starts Kitty in socket-only mode. Focused observability tests prove safe
+allowlist projection from an environment-bearing Kitty payload, read-only
+status with unchanged socket permissions, PID/start-tick reuse protection,
+stale/missing state, and exact directed-input targeting; no status output
+contains environment, command line, token, or credential fields. The installed
+`close` route is only valid
 after the exact wake receipt proves handoff delivery and binds the exact holder
 receipt digest, PIDs, and reserved closure path; it rechecks PID/start-ticks,
 argv, process parent, Kitty window/dedication, reserves before signaling, and

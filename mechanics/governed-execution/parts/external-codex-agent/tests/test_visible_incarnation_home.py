@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 import shutil
+import socket
 import stat
 import subprocess
 import sys
@@ -43,6 +44,42 @@ def _realization(path: Path) -> Path:
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
     return path
+
+
+def _terminal_binding_fixture(
+    tmp_path: Path,
+) -> tuple[socket.socket, dict[str, object], dict[str, object], dict[str, object]]:
+    state_root = tmp_path / "state"
+    state_root.mkdir()
+    closeout_route = tmp_path / "closeout.sh"
+    closeout_route.write_text("#!/bin/sh\n", encoding="utf-8")
+    context = {
+        "goal_ref": "goal:test-terminal-observability",
+        "actor_ref": "actor:test-terminal-observability",
+        "incarnation_ref": "incarnation:test-terminal-observability",
+        "session_ref": "session:test-terminal-observability",
+        "runtime_state_root": str(state_root),
+        "closeout_route": str(closeout_route),
+    }
+    socket_path = tmp_path / "kitty.sock"
+    listener = socket.socket(socket.AF_UNIX)
+    listener.bind(str(socket_path))
+    os.chmod(socket_path, 0o600)
+    binding = MODULE._terminal_binding(
+        context=context,
+        control_socket=f"unix:{socket_path}",
+        terminal_title="Luna Max — terminal observability repair",
+        window_id="7",
+        tty="/dev/pts/7",
+        holder_pid=101,
+        holder_start_ticks=1001,
+        terminal_pid=202,
+        terminal_start_ticks=2002,
+    )
+    holder = binding["holder"]
+    terminal = binding["terminal"]
+    assert isinstance(holder, dict) and isinstance(terminal, dict)
+    return listener, binding, holder, terminal
 
 
 def test_prepared_home_binds_nested_default_without_rehoming_parent(tmp_path: Path) -> None:
@@ -1065,14 +1102,120 @@ def test_holder_receipt_rejects_detached_kitty_route(tmp_path: Path) -> None:
     args = MODULE.argparse.Namespace(
         holder_receipt=str(tmp_path / "holder.json"),
         terminal_title="visible-holder",
+        binding_context=None,
+        control_socket=None,
         kitty_executable="/usr/bin/kitty",
         manifest=str(tmp_path / "missing-manifest.json"),
         codex_executable=str(tmp_path / "codex"),
         codex_arguments=["exec", "--help"],
     )
 
-    with pytest.raises(MODULE.IncarnationHomeError, match="detached Kitty"):
+    with pytest.raises(MODULE.IncarnationHomeError, match="canonical visible launch"):
         MODULE.command_launch(args)
+
+
+def test_detached_launch_publishes_socket_only_binding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    executable = tmp_path / "codex"
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o700)
+    holder_path = tmp_path / "holder.json"
+    holder_path.write_text("{}", encoding="utf-8")
+    context_path = tmp_path / "context.json"
+    state_root = tmp_path / "state"
+    state_root.mkdir()
+    context_path.write_text(
+        json.dumps(
+            {
+                "goal_ref": "goal:test",
+                "actor_ref": "actor:test",
+                "incarnation_ref": "incarnation:test",
+                "session_ref": "session:test",
+                "runtime_state_root": str(state_root),
+                "closeout_route": str(tmp_path / "closeout.sh"),
+            }
+        ),
+        encoding="utf-8",
+    )
+    socket_path = tmp_path / "kitty.sock"
+    address = f"unix:{socket_path}"
+    binding = {
+        "schema_version": MODULE.TERMINAL_BINDING_SCHEMA_VERSION,
+        "goal_ref": "goal:test",
+        "actor_ref": "actor:test",
+        "incarnation_ref": "incarnation:test",
+        "session_ref": "session:test",
+        "runtime_state_root": str(state_root),
+        "closeout_route": str(tmp_path / "closeout.sh"),
+        "holder": {"pid": 101, "start_ticks": 1001},
+        "terminal": {
+            "pid": 202,
+            "start_ticks": 2002,
+            "window_id": "7",
+            "tty": "/dev/pts/7",
+            "title": "visible-holder",
+            "control_socket": {
+                "address": address,
+                "path": str(socket_path),
+                "mode": 0o600,
+            },
+        },
+        "remote_control": "socket-only",
+        "dedicated": True,
+    }
+    monkeypatch.setattr(
+        MODULE,
+        "_verify_executable_version",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_load_holder_receipt",
+        lambda _path: {"binding": binding},
+    )
+    captured: dict[str, object] = {}
+
+    def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        captured["argv"] = argv
+        captured["kwargs"] = kwargs
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+    monkeypatch.setattr(MODULE.time, "sleep", lambda _seconds: None)
+    args = MODULE.argparse.Namespace(
+        holder_receipt=str(holder_path),
+        binding_context=str(context_path),
+        control_socket=address,
+        terminal_title="visible-holder",
+        kitty_executable="/usr/bin/kitty",
+        manifest=str(manifest_path),
+        codex_executable=str(executable),
+        codex_arguments=["exec", "--json"],
+    )
+
+    assert MODULE.command_launch(args) == 0
+    argv = captured["argv"]
+    assert isinstance(argv, list)
+    assert "--listen-on" in argv
+    assert argv[argv.index("--listen-on") + 1] == address
+    assert argv[argv.index("--override") + 1] == "allow_remote_control=socket-only"
+    output = capsys.readouterr().out
+    assert "environment" not in output.casefold()
+    assert "credential" not in output.casefold()
 
 
 def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
@@ -2488,3 +2631,296 @@ def test_wake_delivery_hashes_the_parsed_holder_snapshot(
         holder_receipt_bytes=holder_bytes,
         holder_receipt_digest=holder_digest,
     )
+
+
+def test_terminal_binding_creation_records_exact_owner_and_terminal_identity(
+    tmp_path: Path,
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    try:
+        assert binding["schema_version"] == MODULE.TERMINAL_BINDING_SCHEMA_VERSION
+        assert binding["goal_ref"] == "goal:test-terminal-observability"
+        assert binding["session_ref"] == "session:test-terminal-observability"
+        assert holder == {"pid": 101, "start_ticks": 1001}
+        assert terminal["pid"] == 202
+        assert terminal["start_ticks"] == 2002
+        assert terminal["window_id"] == "7"
+        assert terminal["tty"] == "/dev/pts/7"
+        assert terminal["control_socket"]["mode"] == 0o600
+        assert "env" not in json.dumps(binding).casefold()
+        assert "credential" not in json.dumps(binding).casefold()
+    finally:
+        listener.close()
+
+
+def test_control_socket_allocation_is_unique_and_private(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+
+    first = MODULE._allocate_control_socket()
+    second = MODULE._allocate_control_socket()
+
+    assert first != second
+    socket_root = tmp_path / MODULE.CONTROL_SOCKET_ROOT_NAME
+    assert stat.S_IMODE(socket_root.stat().st_mode) == 0o700
+    assert not Path(first.removeprefix("unix:")).exists()
+    assert not Path(second.removeprefix("unix:")).exists()
+
+
+def test_control_socket_permissions_fail_closed_then_harden(
+    tmp_path: Path,
+) -> None:
+    socket_path = tmp_path / "kitty.sock"
+    listener = socket.socket(socket.AF_UNIX)
+    listener.bind(str(socket_path))
+    os.chmod(socket_path, 0o755)
+    address = f"unix:{socket_path}"
+    try:
+        with pytest.raises(MODULE.IncarnationHomeError, match="not private"):
+            MODULE._secure_control_socket(address, harden=False)
+        record = MODULE._secure_control_socket(address, harden=True)
+        assert record["mode"] == 0o600
+        assert stat.S_IMODE(socket_path.stat().st_mode) == 0o600
+    finally:
+        listener.close()
+
+
+def test_kitty_projection_omits_environment_and_commandline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, _binding, _holder, terminal = _terminal_binding_fixture(tmp_path)
+    calls: dict[str, object] = {}
+    payload = [
+        {
+            "id": 3,
+            "tabs": [
+                {
+                    "id": 4,
+                    "windows": [
+                        {
+                            "id": 7,
+                            "title": "repair token=super-secret",
+                            "cwd": "/workspace",
+                            "pid": 202,
+                            "cmdline": "codex --password=super-secret",
+                            "env": {"TOKEN": "super-secret"},
+                            "foreground_processes": [
+                                {
+                                    "pid": 303,
+                                    "cwd": "/workspace",
+                                    "cmdline": "worker --credential=secret",
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+    ]
+
+    def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls["argv"] = argv
+        calls["kwargs"] = kwargs
+        return subprocess.CompletedProcess(
+            argv, 0, stdout=json.dumps(payload), stderr="raw payload is discarded"
+        )
+
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "codex")
+    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+    try:
+        matches = MODULE._kitty_ls(
+            kitty_executable="/usr/bin/kitty",
+            control_socket=terminal["control_socket"]["address"],
+            window_id="7",
+        )
+        rendered = json.dumps(matches, sort_keys=True)
+        assert len(matches) == 1
+        assert "env" not in rendered.casefold()
+        assert "cmdline" not in rendered.casefold()
+        assert "super-secret" not in rendered
+        assert "token=<redacted>" in rendered
+        argv = calls["argv"]
+        assert isinstance(argv, list)
+        assert "--all-env-vars=no" in argv
+        assert "--output-format" in argv
+        assert "env:KITTY_WINDOW_ID=1" not in argv
+    finally:
+        listener.close()
+
+
+def test_status_is_read_only_and_writes_only_safe_projection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    binding_path = tmp_path / "binding.json"
+    status_path = tmp_path / "status.json"
+    MODULE._write_new_json(
+        binding_path,
+        {
+            "schema_version": MODULE.TERMINAL_BINDING_SCHEMA_VERSION,
+            "created_at": MODULE._utc_now(),
+            "binding": binding,
+            "holder": holder,
+            "terminal": terminal,
+        },
+        "test binding",
+    )
+    before_mode = stat.S_IMODE(
+        Path(terminal["control_socket"]["path"]).stat().st_mode
+    )
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
+    monkeypatch.setattr(MODULE, "_descends_from", lambda _pid, _ancestor: True)
+    monkeypatch.setattr(
+        MODULE,
+        "_kitty_ls",
+        lambda **_kwargs: [
+            {
+                "id": "7",
+                "title": "Luna Max",
+                "cwd": "/workspace",
+                "pid": 202,
+                "is_active": True,
+                "is_focused": False,
+                "needs_attention": False,
+                "in_alternate_screen": False,
+                "foreground_processes": [{"pid": 303, "comm": "codex"}],
+                "tab": {"id": 4, "is_active": True, "is_focused": False},
+                "os_window": {"id": 3, "is_active": True, "is_focused": False},
+            }
+        ],
+    )
+    try:
+        assert MODULE.command_status(
+            MODULE.argparse.Namespace(
+                binding=str(binding_path),
+                holder_receipt=None,
+                binding_context=None,
+                kitty_executable="/usr/bin/kitty",
+                output=str(status_path),
+            )
+        ) == 0
+        rendered = status_path.read_text(encoding="utf-8")
+        assert "env" not in rendered.casefold()
+        assert "token" not in rendered.casefold()
+        assert "credential" not in rendered.casefold()
+        assert stat.S_IMODE(
+            Path(terminal["control_socket"]["path"]).stat().st_mode
+        ) == before_mode == 0o600
+    finally:
+        listener.close()
+
+
+def test_safe_status_rejects_forbidden_field_even_if_caller_supplies_it() -> None:
+    with pytest.raises(MODULE.IncarnationHomeError, match="unsafe field"):
+        MODULE._emit_safe_json(
+            {"schema_version": "test", "environment": {"TOKEN": "secret"}},
+            label="unsafe test status",
+        )
+
+
+def test_status_rejects_pid_start_tick_reuse_without_querying_kitty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    queried = False
+
+    def forbidden_query(**_kwargs: object) -> list[dict[str, object]]:
+        nonlocal queried
+        queried = True
+        return []
+
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "drifted")
+    monkeypatch.setattr(MODULE, "_kitty_ls", forbidden_query)
+    try:
+        projection, state = MODULE._observe_terminal_binding(
+            binding=binding,
+            holder=holder,
+            terminal=terminal,
+            kitty_executable="/usr/bin/kitty",
+        )
+        assert state == "stale"
+        assert projection["observation"]["kitty_query"] == "not_attempted"
+        assert queried is False
+    finally:
+        listener.close()
+
+
+@pytest.mark.parametrize(
+    ("holder_state", "terminal_state"),
+    [("gone", "live"), ("live", "gone")],
+)
+def test_status_preserves_missing_terminal_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    holder_state: str,
+    terminal_state: str,
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    states = {holder["pid"]: holder_state, terminal["pid"]: terminal_state}
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_identity_state",
+        lambda pid, _ticks: states[pid],
+    )
+    try:
+        projection, state = MODULE._observe_terminal_binding(
+            binding=binding,
+            holder=holder,
+            terminal=terminal,
+            kitty_executable="/usr/bin/kitty",
+        )
+        assert state == "missing"
+        assert projection["observation"]["kitty_query"] == "not_available_after_exit"
+        assert projection["terminal"]["exists"] is False
+    finally:
+        listener.close()
+
+
+def test_directed_input_uses_bound_socket_and_window_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    calls: dict[str, object] = {}
+    monkeypatch.setattr(
+        MODULE,
+        "_load_terminal_binding_input",
+        lambda **_kwargs: (binding, holder, terminal, None, None),
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_observe_terminal_binding",
+        lambda **_kwargs: (
+            {"observation": {"kitty_query": "present"}},
+            "live",
+        ),
+    )
+
+    def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls["argv"] = argv
+        calls["kwargs"] = kwargs
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+    try:
+        assert MODULE.command_send_text(
+            MODULE.argparse.Namespace(
+                binding=str(tmp_path / "binding.json"),
+                holder_receipt=None,
+                binding_context=None,
+                kitty_executable="/usr/bin/kitty",
+                text="status\n",
+            )
+        ) == 0
+        argv = calls["argv"]
+        assert isinstance(argv, list)
+        assert argv[argv.index("--to") + 1] == terminal["control_socket"]["address"]
+        assert argv[argv.index("--match") + 1] == "id:7"
+        assert "send-text" in argv
+        assert "--stdin" in argv
+        assert not {"focus-window", "move-window", "close-window"}.intersection(argv)
+        assert calls["kwargs"]["input"] == "status\n"
+        assert "env" not in capsys.readouterr().out.casefold()
+    finally:
+        listener.close()
