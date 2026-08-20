@@ -1246,7 +1246,8 @@ aoa_provision_abyss_stack_mcp_effect_root() {
 
   for shared_parent in \
     "${AOA_STACK_ROOT}/Logs" \
-    "${AOA_STACK_ROOT}/Logs/mcp"; do
+    "${AOA_STACK_ROOT}/Logs/mcp" \
+    "${AOA_STACK_ROOT}/Logs/mcp/internal-effects"; do
     if [[ -e "$shared_parent" || -L "$shared_parent" ]]; then
       [[ -d "$shared_parent" && ! -L "$shared_parent" ]] || \
         aoa_die "abyss-stack MCP effect root requires non-symlink shared parents"
@@ -1255,7 +1256,6 @@ aoa_provision_abyss_stack_mcp_effect_root() {
     fi
   done
   for owned_parent in \
-    "${AOA_STACK_ROOT}/Logs/mcp/internal-effects" \
     "$abyss_stack_mcp_effect_root"; do
     if [[ -e "$owned_parent" || -L "$owned_parent" ]]; then
       [[ -d "$owned_parent" && ! -L "$owned_parent" ]] || \

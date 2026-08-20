@@ -3880,8 +3880,15 @@ esac
         shared_parent_body, owned_parent_body = effect_root_body.split(
             "  for owned_parent in \\\n", 1
         )
-        self.assertIn('${AOA_STACK_ROOT}/Logs/mcp"; do', shared_parent_body)
+        self.assertIn(
+            '${AOA_STACK_ROOT}/Logs/mcp/internal-effects"; do',
+            shared_parent_body,
+        )
         self.assertNotIn('chmod 0700 "$shared_parent"', shared_parent_body)
+        self.assertNotIn(
+            '${AOA_STACK_ROOT}/Logs/mcp/internal-effects" \\\n',
+            owned_parent_body,
+        )
         self.assertIn('chmod 0700 "$owned_parent"', owned_parent_body)
 
         template = MCP_HTTP_TEMPLATE.read_text(encoding="utf-8")
