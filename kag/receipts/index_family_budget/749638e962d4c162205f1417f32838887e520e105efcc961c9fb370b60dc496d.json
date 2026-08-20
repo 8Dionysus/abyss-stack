@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 21700622,
+  "allowed_tracked_bytes": 36296263,
+  "approved_by": "repository-owner",
+  "base_ref": "07ecd9105374b51d1db588b79119e29257cc3c55",
+  "changed_generated_bytes": 21700622,
+  "changed_generated_files": 222,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "749638e962d4c162205f1417f32838887e520e105efcc961c9fb370b60dc496d",
+  "reason": "After integrating current main commit 8744f3f74c802577e96719efa4105417102205ac into PR 399, regenerate the active portable family and budget receipt against the PR base 07ecd9105374b51d1db588b79119e29257cc3c55 used by GitHub validation.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36296263,
+  "tracked_bytes_max": 24117248
+}

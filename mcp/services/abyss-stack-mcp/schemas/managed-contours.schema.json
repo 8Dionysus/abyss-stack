@@ -77,6 +77,13 @@
           "title": "Canary Observed At",
           "type": "string"
         },
+        "canary_process_unit_name": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Canary Process Unit Name",
+          "type": "string"
+        },
         "canary_public_key_path": {
           "maxLength": 2048,
           "minLength": 1,
@@ -353,6 +360,7 @@
         "unit_exec_start_binding",
         "canary_receipt_path",
         "canary_receipt_id",
+        "canary_process_unit_name",
         "canary_observed_at",
         "canary_expires_at",
         "canary_deployment_manifest_id",
