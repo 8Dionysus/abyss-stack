@@ -132,6 +132,12 @@ Tracking starts with the community-docs baseline for this repository.
   organ still records last-known-good before current, both full 11-organ waves
   still join before publication, invalid worker counts fail closed, and one
   worker restores exact sequential scheduling.
+- Treat pre-`--copies` abyss-stack MCP runtimes as repair-required: read
+  verification now rejects a symlink-backed runtime Python, while the guarded
+  admission repair remains idempotent when its systemd unit has never been
+  loaded. Upgraded standalone hosts with automatic repair enabled rebuild the
+  stopped runtime before admission; hosts without that explicit opt-in remain
+  fail-closed and require manual provisioning.
 - Preserve an external actor's exact role, Codex thread, task, projection, and
   authority across a pre-turn ChatGPT usage-limit failure. The explicit
   `capacity_recovery` route requires the exact prior result digest, a
