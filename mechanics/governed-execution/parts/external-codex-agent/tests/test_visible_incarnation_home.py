@@ -1142,6 +1142,8 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
     )
     monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("7", True))
 
+    executable.unlink()
+    companion.unlink()
     assert MODULE._holder_terminal_identity(receipt) == (
         holder_pid,
         kitty_pid,
@@ -1149,6 +1151,157 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
         "7",
         True,
     )
+
+
+def test_live_close_uses_holder_bound_companion_after_host_removal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "codex"
+    executable_bytes = b"immutable-holder-executable"
+    executable.write_bytes(executable_bytes)
+    executable.chmod(0o700)
+    companion = tmp_path / MODULE.CODE_MODE_HOST_NAME
+    companion_bytes = b"immutable-holder-companion"
+    companion.write_bytes(companion_bytes)
+    companion.chmod(0o700)
+    holder = tmp_path / "holder.json"
+    handoff = tmp_path / "handoff.json"
+    wake = tmp_path / "wake.json"
+    closure = tmp_path / "closure.json"
+    manifest_snapshot = MODULE.canonical_bytes(
+        {
+            "schema_version": MODULE.SCHEMA_VERSION,
+            "model_slug": "gpt-5.6-luna",
+            "reasoning_effort": "max",
+            "ambient_codex_home": str(tmp_path / "ambient"),
+            "codex_home": str(tmp_path / "incarnation"),
+        }
+    )
+    holder_pid, parent_pid, kitty_pid = 101, 102, 103
+    holder_argv = ["/usr/bin/codex", "exec"]
+    kitty_argv = ["/usr/bin/kitty", "--detach", "--title", "holder"]
+    holder_payload = {
+        "schema_version": MODULE.HOLDER_RECEIPT_SCHEMA_VERSION,
+        "receipt_ref": str(holder.resolve()),
+        "created_at": "2026-08-15T00:00:00Z",
+        "lifecycle_role": "responsibility_holder",
+        "boot_id": MODULE._proc_boot_id(),
+        "holder": {
+            "pid": holder_pid,
+            "start_ticks": 11,
+            "parent_pid": parent_pid,
+            "parent_start_ticks": 12,
+            "parent_comm": "bwrap",
+            "argv": holder_argv,
+            "argv_digest": MODULE.sha256_bytes(
+                MODULE.canonical_bytes(holder_argv)
+            ),
+        },
+        "runtime": {
+            "codex_executable": str(executable),
+            "codex_executable_digest": MODULE.sha256_bytes(executable_bytes),
+            "codex_companion": {
+                "path": str(companion),
+                "digest": MODULE.sha256_bytes(companion_bytes),
+                "relation": "adjacent_immutable_package",
+                "package_relative": MODULE.CODE_MODE_HOST_NAME,
+            },
+            "incarnation_manifest": str(tmp_path / "missing-manifest"),
+            "incarnation_manifest_digest": MODULE.sha256_bytes(manifest_snapshot),
+            "incarnation_manifest_snapshot_b64": base64.b64encode(
+                manifest_snapshot
+            ).decode("ascii"),
+            "model": "gpt-5.6-luna",
+            "reasoning_effort": "max",
+            "ambient_codex_home": str(tmp_path / "ambient"),
+            "incarnation_codex_home": str(tmp_path / "incarnation"),
+        },
+        "terminal": {
+            "binding": "kitty_ancestor_at_exec",
+            "required_comm": "kitty",
+            "pid": kitty_pid,
+            "start_ticks": 13,
+            "argv": kitty_argv,
+            "window_id": "7",
+            "dedicated": True,
+        },
+    }
+    holder.write_text(json.dumps(holder_payload), encoding="utf-8")
+    handoff.write_text(
+        json.dumps(
+            {
+                "runtime": {
+                    "responsibility_holder": {
+                        "terminal_receipt": str(holder.resolve()),
+                        "terminal_receipt_sha256": MODULE.sha256_bytes(
+                            holder.read_bytes()
+                        ),
+                        "closure_receipt": str(closure.resolve()),
+                        "holder_pid": holder_pid,
+                        "terminal_pid": kitty_pid,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    wake.write_text(
+        json.dumps(
+            {
+                "schema_version": "task_local_actor_wake_receipt_v1",
+                "handoff_ref": str(handoff.resolve()),
+                "handoff_sha256": MODULE.sha256_bytes(handoff.read_bytes()),
+                "actions": {"handoff_message_sent": True},
+                "observed": {"handoff_delivery": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_start_ticks",
+        lambda pid: {holder_pid: 11, parent_pid: 12, kitty_pid: 13}[pid],
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_parent_pid",
+        lambda pid: {holder_pid: parent_pid, parent_pid: kitty_pid, kitty_pid: 1}[pid],
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_comm",
+        lambda pid: {parent_pid: "bwrap", kitty_pid: "kitty"}[pid],
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: {holder_pid: holder_argv, kitty_pid: kitty_argv}[pid],
+    )
+    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("7", True))
+    states = iter(["live", "live", "gone", "gone"])
+    monkeypatch.setattr(
+        MODULE, "_proc_identity_state", lambda _pid, _start: next(states)
+    )
+    monkeypatch.setattr(MODULE, "_send_verified_term", lambda *_args: True)
+    monkeypatch.setattr(MODULE.time, "sleep", lambda _seconds: None)
+
+    executable.unlink()
+    companion.unlink()
+    assert MODULE.command_close(
+        MODULE.argparse.Namespace(
+            handoff=str(handoff),
+            holder_receipt=str(holder),
+            wake_receipt=str(wake),
+            closure_receipt=str(closure),
+        )
+    ) == 0
+    recorded = json.loads(closure.read_text(encoding="utf-8"))
+    assert recorded["closed"] is True
+    assert recorded["outcome"] == "closed"
+    assert recorded["identity_state"] == "live"
+    assert recorded["terminal"]["signal_delivery"] == "confirmed"
+    assert recorded["terminal"]["signal_sent"] is True
 
 
 def test_close_requires_confirmed_handoff_delivery(tmp_path: Path) -> None:
@@ -1397,6 +1550,11 @@ def test_shebang_node_launcher_reopens_named_snapshot(
         if "process" in locals() and process.poll() is None:
             process.terminate()
             process.wait(timeout=5)
+        if "process" in locals():
+            if process.stdout is not None:
+                process.stdout.close()
+            if process.stderr is not None:
+                process.stderr.close()
         MODULE._close_snapshot_mount(snapshot_mount)
         MODULE._remove_named_snapshot(
             snapshot_path,
@@ -1409,6 +1567,39 @@ def test_shebang_node_launcher_reopens_named_snapshot(
     assert content == original
     assert observed_argv[:2] == ["node", str(snapshot_exec_path)]
     assert resource_line == "package-relative\n"
+
+
+def test_package_snapshot_does_not_mirror_ancestor_siblings(
+    tmp_path: Path,
+) -> None:
+    package = tmp_path / "package"
+    executable = package / "bin" / "codex"
+    executable.parent.mkdir(parents=True)
+    (package / "package.json").write_text("{}\n", encoding="utf-8")
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o700)
+    unrelated = tmp_path / "unrelated-snapshot"
+    unrelated.mkdir()
+    (unrelated / "marker").write_text("must not be retained\n", encoding="utf-8")
+    snapshot_root = tmp_path / "snapshot-root"
+    snapshot_root.mkdir()
+
+    snapshot_exec, snapshot_dir, _records, _target_dir = MODULE._mirror_package_layout(
+        executable=executable,
+        snapshot_root=snapshot_root,
+    )
+    try:
+        assert snapshot_exec.parent.is_dir()
+        assert (_target_dir / "package.json").is_file()
+        assert not any(item.is_symlink() for item in snapshot_dir.rglob("*"))
+        assert not any(
+            item.name == unrelated.name for item in snapshot_dir.rglob("*")
+        )
+    finally:
+        MODULE._remove_named_snapshot(
+            snapshot_exec,
+            snapshot_dir=snapshot_dir,
+        )
 
 
 def test_shebang_snapshot_preserves_effective_companion_execute_mode(

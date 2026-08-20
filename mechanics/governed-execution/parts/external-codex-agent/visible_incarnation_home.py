@@ -54,6 +54,7 @@ FEATURE_INLINE_LINE = re.compile(
 BOOT_ID_PATTERN = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 )
+SHA256_DIGEST_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
 class IncarnationHomeError(RuntimeError):
@@ -1131,34 +1132,55 @@ def _holder_terminal_identity(
         raise IncarnationHomeError("holder Kitty window identity has drifted")
     if terminal.get("dedicated") is not None and terminal.get("dedicated") is not dedicated:
         raise IncarnationHomeError("holder Kitty dedication proof has drifted")
-    executable = _regular_file(
-        Path(str(runtime["codex_executable"])), "holder Codex executable"
-    )
-    if sha256_bytes(executable.read_bytes()) != runtime.get("codex_executable_digest"):
-        raise IncarnationHomeError("holder Codex executable digest has drifted")
+    # Repaired receipts bind the exact payload digests before the private
+    # execution mount is entered.  The recorded host paths are provenance only
+    # after launch; reopening them here would make close depend on mutable
+    # package lifetime and could strand an otherwise valid holder.
+    manifest_snapshot = _decode_holder_manifest_snapshot(runtime)
+    executable_path = Path(str(runtime["codex_executable"]))
+    executable_digest = runtime.get("codex_executable_digest")
+    if (
+        not executable_path.is_absolute()
+        or executable_path.name != "codex"
+        or not isinstance(executable_digest, str)
+        or not SHA256_DIGEST_PATTERN.fullmatch(executable_digest)
+    ):
+        raise IncarnationHomeError("holder Codex executable binding is incomplete")
+    if manifest_snapshot is None:
+        executable = _regular_file(executable_path, "holder Codex executable")
+        if sha256_bytes(executable.read_bytes()) != executable_digest:
+            raise IncarnationHomeError("holder Codex executable digest has drifted")
     companion = runtime.get("codex_companion")
     if companion is not None:
         if not isinstance(companion, dict):
             raise IncarnationHomeError("holder Codex companion binding is incomplete")
         companion_path = companion.get("path")
         companion_digest = companion.get("digest")
-        expected_companion = executable.parent / CODE_MODE_HOST_NAME
-        expected_companion_relative = expected_companion.relative_to(
-            _package_root(executable)
-        ).as_posix()
+        expected_companion = executable_path.parent / CODE_MODE_HOST_NAME
+        companion_relative = companion.get("package_relative")
         if (
             companion_path != str(expected_companion)
             or companion.get("relation") != "adjacent_immutable_package"
-            or companion.get("package_relative") != expected_companion_relative
+            or not isinstance(companion_relative, str)
+            or not companion_relative
+            or Path(companion_relative).is_absolute()
+            or ".." in Path(companion_relative).parts
+            or Path(companion_relative).name != CODE_MODE_HOST_NAME
             or not isinstance(companion_digest, str)
+            or not SHA256_DIGEST_PATTERN.fullmatch(companion_digest)
         ):
             raise IncarnationHomeError("holder Codex companion binding has drifted")
-        companion_file = _regular_file(
-            expected_companion, "holder Codex companion"
-        )
-        if sha256_bytes(companion_file.read_bytes()) != companion_digest:
-            raise IncarnationHomeError("holder Codex companion digest has drifted")
-    manifest_snapshot = _decode_holder_manifest_snapshot(runtime)
+        if manifest_snapshot is None:
+            expected_companion_relative = expected_companion.relative_to(
+                _package_root(executable)
+            ).as_posix()
+            if companion_relative != expected_companion_relative:
+                raise IncarnationHomeError("holder Codex companion binding has drifted")
+            companion_file = _regular_file(
+                expected_companion, "holder Codex companion"
+            )
+            if sha256_bytes(companion_file.read_bytes()) != companion_digest:
+                raise IncarnationHomeError("holder Codex companion digest has drifted")
     if manifest_snapshot is None:
         # Legacy receipts predate the holder-bound snapshot.  Preserve their
         # old fail-closed behavior; repaired receipts never take this branch.
@@ -2224,7 +2246,13 @@ def _copy_package_tree(
 def _mirror_package_layout(
     *, executable: Path, snapshot_root: Path
 ) -> tuple[Path, Path, dict[Path, tuple[int, int, str, int]], Path]:
-    """Build a private package snapshot with stable ancestor coordinates."""
+    """Build a private package snapshot with stable ancestor coordinates.
+
+    Only the directory coordinates needed to reach the admitted package are
+    created.  Mirroring unrelated siblings as symlinks would retain the
+    mutable host ancestor tree inside a frozen snapshot and make cleanup
+    depend on unrelated packages and prior snapshots.
+    """
 
     snapshot_dir = Path(
         tempfile.mkdtemp(prefix="abyss-stack-codex-package-", dir=snapshot_root)
@@ -2239,14 +2267,6 @@ def _mirror_package_layout(
         if not source_parts or source_parts[0] != "/":
             raise IncarnationHomeError("shebang executable parent must be absolute")
         for component in source_parts[1:]:
-            for entry in source_dir.iterdir():
-                if entry.name == component:
-                    continue
-                os.symlink(
-                    os.fspath(entry),
-                    os.fspath(target_dir / entry.name),
-                    target_is_directory=entry.is_dir(),
-                )
             source_dir = source_dir / component
             target_dir = target_dir / component
             target_dir.mkdir(mode=0o700)
