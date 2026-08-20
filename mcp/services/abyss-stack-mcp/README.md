@@ -475,8 +475,11 @@ Guarded runtime repair has a stronger availability path. The provisioner
 starts exact fallback counterparts for the previously active readers and
 publishes their private unit manifest before admission resumes. The controller
 captures fallback-bound canaries and builds the intermediate preflight catalog
-against those still-serving processes; it does not start conflicting bootstrap
-units. Production start then performs the single bounded endpoint handoff. A
+against those still-serving processes. If repair began from a partial fleet,
+it starts bootstrap units only for the missing organs and combines their
+receipts with the disjoint fallback set; no bootstrap displaces a preserved
+endpoint. The stack fallback retains the production read Tasks surface.
+Production start then performs the single bounded endpoint handoff. A
 failure before final production admission stops any production units started by
 the controller and restores the same manifest-bound fallback fleet.
 

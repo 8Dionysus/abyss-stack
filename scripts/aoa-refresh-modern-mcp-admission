@@ -43,6 +43,9 @@ source_lock_fd=""
 runtime_lock_fd=""
 repair_fallback_loaded=0
 repair_fallback_units=()
+repair_fallback_organs=()
+repair_bootstrap_units=()
+repair_bootstrap_organs=()
 
 case "$CANARY_WORKERS" in
   ''|*[!0-9]*)
@@ -100,10 +103,10 @@ active_production_count() {
   printf '%s\n' "$count"
 }
 
-active_runtime_repair_fallback_count() {
+active_managed_unit_count() {
   local count=0
   local unit
-  for unit in "${repair_fallback_units[@]}"; do
+  for unit in "$@"; do
     if systemctl --user is-active --quiet "$unit"; then
       ((count += 1))
     fi
@@ -161,11 +164,17 @@ capture_canary_family() {
   local lkg_root=$3
   local stdout_root=$4
   local organ
+  shift 4
+  local -a selected_organs=("$@")
+
+  if ((${#selected_organs[@]} == 0)); then
+    selected_organs=("${organs[@]}")
+  fi
 
   mkdir -p "$current_root" "$lkg_root" "$stdout_root"
   chmod 0700 "$current_root" "$lkg_root" "$stdout_root"
   canary_worker_pids=()
-  for organ in "${organs[@]}"; do
+  for organ in "${selected_organs[@]}"; do
     VENV="$VENV" setsid --wait bash -euo pipefail -c "$(declare -f capture_canary_pair)
 capture_canary_pair \"\$@\"" _ \
       "$process_unit" "$current_root" "$lkg_root" "$stdout_root" "$organ" &
@@ -183,6 +192,27 @@ capture_canary_pair \"\$@\"" _ \
       return 1
     fi
   done
+}
+
+array_contains() {
+  local needle=$1
+  shift
+  local item
+
+  for item in "$@"; do
+    [[ "$item" == "$needle" ]] && return 0
+  done
+  return 1
+}
+
+bootstrap_unit_for_organ() {
+  local organ=$1
+
+  if [[ "$organ" == "abyss-stack" ]]; then
+    printf '%s\n' 'abyss-stack-mcp-read-bootstrap.service'
+  else
+    printf 'aoa-organ-mcp-read-bootstrap@%s.service\n' "$organ"
+  fi
 }
 
 publish_admission() {
@@ -260,17 +290,37 @@ close_stack_runtime_locks() {
 
 load_runtime_repair_fallback() {
   local fallback_unit
+  local organ
+  local managed_organ
 
   [[ -f "$REPAIR_FALLBACK" && ! -L "$REPAIR_FALLBACK" ]] || return 1
   [[ "$(stat -c '%a' "$REPAIR_FALLBACK")" == "600" ]] || return 1
   repair_fallback_units=()
+  repair_fallback_organs=()
+  repair_bootstrap_units=()
+  repair_bootstrap_organs=()
   while IFS= read -r fallback_unit || [[ -n "$fallback_unit" ]]; do
     [[ "$fallback_unit" == "abyss-stack-mcp-read-fallback.service" || \
        "$fallback_unit" =~ ^aoa-organ-mcp-read-fallback@[A-Za-z0-9_.-]+\.service$ ]] || \
       return 1
+    if [[ "$fallback_unit" == "abyss-stack-mcp-read-fallback.service" ]]; then
+      organ="abyss-stack"
+    else
+      organ="${fallback_unit#aoa-organ-mcp-read-fallback@}"
+      organ="${organ%.service}"
+    fi
+    array_contains "$organ" "${organs[@]}" || return 1
+    ! array_contains "$organ" "${repair_fallback_organs[@]}" || return 1
     repair_fallback_units+=("$fallback_unit")
+    repair_fallback_organs+=("$organ")
   done < "$REPAIR_FALLBACK"
   ((${#repair_fallback_units[@]})) || return 1
+  for managed_organ in "${organs[@]}"; do
+    if ! array_contains "$managed_organ" "${repair_fallback_organs[@]}"; then
+      repair_bootstrap_organs+=("$managed_organ")
+      repair_bootstrap_units+=("$(bootstrap_unit_for_organ "$managed_organ")")
+    fi
+  done
   repair_fallback_loaded=1
 }
 
@@ -294,6 +344,9 @@ complete_runtime_repair_fallback() {
   rm -f -- "$REPAIR_FALLBACK"
   repair_fallback_loaded=0
   repair_fallback_units=()
+  repair_fallback_organs=()
+  repair_bootstrap_units=()
+  repair_bootstrap_organs=()
 }
 
 rebase_expired_registry() {
@@ -410,22 +463,36 @@ deployment_manifest_id=$(jq -er .manifest_id "$DEPLOYMENT")
 minimum_expiry=$(jq -r '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted") | .currentness_expires_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601] | min // 0' "$REGISTRY")
 registry_expiry=$(jq -r '.expires_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601' "$REGISTRY")
 admitted_count=$(jq -r '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted")] | length' "$REGISTRY")
-production_identity_count=$(jq -r '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted") | .runtime_identity.process_identity | select(contains("bootstrap") | not)] | length' "$REGISTRY")
+production_identity_count=0
 deployment_identity_count=$(jq -r --arg manifest_id "$deployment_manifest_id" '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted" and .runtime_identity.deployment_manifest_digest == $manifest_id)] | length' "$REGISTRY")
 current_canary_count=0
 active_unit_count=0
 for organ in "${organs[@]}"; do
   latest_canary="$STACK/Logs/mcp/canaries/latest/${organ}.read.json"
-  if [[ -f "$latest_canary" && ! -L "$latest_canary" ]] && jq -e --arg manifest_id "$deployment_manifest_id" '
+  unit="aoa-organ-mcp-read@${organ}.service"
+  [[ "$organ" == "abyss-stack" ]] && unit="abyss-stack-mcp-read.service"
+  if jq -e --arg organ "$organ" --arg unit "$unit" '
+    [.records[]
+      | select(.organ_id == $organ)
+      | .contours[]
+      | select(.contour_id == "read" and .registry_state == "admitted")
+      | .runtime_identity.process_identity
+      | select(startswith("systemd-user:" + $unit + ":pid:"))
+    ] | length == 1
+  ' "$REGISTRY" >/dev/null; then
+    ((production_identity_count += 1))
+  fi
+  if [[ -f "$latest_canary" && ! -L "$latest_canary" ]] && jq -e \
+    --arg manifest_id "$deployment_manifest_id" \
+    --arg unit "$unit" '
     .deployment_manifest_id == $manifest_id
     and (.canary_route | endswith("/last-known-good") | not)
-    and (.process_identity | contains("bootstrap") | not)
+    and .process_unit_name == $unit
+    and (.process_identity | startswith("systemd-user:" + $unit + ":pid:"))
     and ((.expires_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) > now)
   ' "$latest_canary" >/dev/null; then
     ((current_canary_count += 1))
   fi
-  unit="aoa-organ-mcp-read@${organ}.service"
-  [[ "$organ" == "abyss-stack" ]] && unit="abyss-stack-mcp-read.service"
   if systemctl --user is-active --quiet "$unit"; then
     ((active_unit_count += 1))
   fi
@@ -470,18 +537,48 @@ if [[ "$active_unit_count" -ne 11 ]]; then
     systemctl --user reset-failed "${production_units[@]}"
   elif [[ "$repair_fallback_loaded" -eq 1 ]]; then
     restore_runtime_repair_fallback
-    [[ "$(active_runtime_repair_fallback_count)" -eq \
+    [[ "$(active_managed_unit_count "${repair_fallback_units[@]}")" -eq \
        "${#repair_fallback_units[@]}" ]] || {
       printf 'modern MCP repair fallback did not remain exact during validation\n' >&2
       exit 1
     }
+    if ((${#repair_bootstrap_units[@]})); then
+      systemctl --user reset-failed \
+        "${repair_bootstrap_units[@]}" \
+        "${production_units[@]}"
+      bootstrap_started=1
+      systemctl --user start "${repair_bootstrap_units[@]}"
+      [[ "$(active_managed_unit_count "${repair_bootstrap_units[@]}")" -eq \
+         "${#repair_bootstrap_units[@]}" ]] || {
+        printf 'modern MCP repair bootstrap did not fill the missing endpoint set\n' >&2
+        exit 1
+      }
+      [[ "$(active_managed_unit_count "${repair_fallback_units[@]}")" -eq \
+         "${#repair_fallback_units[@]}" ]] || {
+        printf 'modern MCP repair fallback was displaced before production handoff\n' >&2
+        exit 1
+      }
+    fi
     capture_canary_family \
       fallback \
       "$RUN/fallback-current" \
       "$RUN/fallback-lkg" \
-      "$RUN/fallback-stdout"
+      "$RUN/fallback-stdout" \
+      "${repair_fallback_organs[@]}"
+    if ((${#repair_bootstrap_organs[@]})); then
+      capture_canary_family \
+        bootstrap \
+        "$RUN/fallback-current" \
+        "$RUN/fallback-lkg" \
+        "$RUN/fallback-stdout" \
+        "${repair_bootstrap_organs[@]}"
+    fi
     publish_admission "$RUN/fallback-current" "$RUN/fallback-lkg" fallback
     build_preflight fallback
+    if ((${#repair_bootstrap_units[@]})); then
+      systemctl --user stop "${repair_bootstrap_units[@]}"
+      bootstrap_started=0
+    fi
   else
     systemctl --user reset-failed "${bootstrap_units[@]}" "${production_units[@]}"
     bootstrap_started=1

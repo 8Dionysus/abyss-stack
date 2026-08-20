@@ -22,6 +22,8 @@ Environment=AOA_MCP_PORT=5431
 Environment=ABYSS_STACK_MCP_REQUIRE_AUTH_MANIFEST=1
 Environment=ABYSS_STACK_MCP_AUDIT_JOURNAL_PATH=/srv/AbyssOS/abyss-stack/Logs/mcp/audit/policy-read.jsonl
 Environment=ABYSS_STACK_MCP_REQUIRE_AUDIT_JOURNAL=1
+Environment=ABYSS_STACK_MCP_TASKS_ENABLED=1
+Environment=ABYSS_STACK_MCP_TASK_ROOT=/srv/AbyssOS/abyss-stack/Logs/mcp/tasks/abyss-stack-read
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PYTHONHOME=
 Environment=PYTHONPATH=
@@ -37,7 +39,7 @@ KillMode=control-group
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/srv/AbyssOS/abyss-stack/Logs/mcp/audit/policy-read.jsonl
+ReadWritePaths=/srv/AbyssOS/abyss-stack/Logs/mcp/audit/policy-read.jsonl /srv/AbyssOS/abyss-stack/Logs/mcp/tasks/abyss-stack-read
 InaccessiblePaths=/srv/AbyssOS/abyss-stack/Logs/mcp/audit/policy-candidate.jsonl
 PrivateTmp=yes
 RestrictSUIDSGID=yes

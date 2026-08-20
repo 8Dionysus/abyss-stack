@@ -225,9 +225,10 @@ failure restores the previous runtime and every active reader, with the stack
 peer using an exact, private, read-only rollback grant. The all-user-unit
 installer creates the operation lock before reload. Unsafe lifecycle topology
 still fails closed. Successful activation keeps exact repair-fallback counterparts
-for the prior endpoint set while fallback-bound canaries and preflight run;
-only the final production start displaces them. A later admission failure
-restores that fallback. Keeper
+for the prior endpoint set while fallback-bound canaries and preflight run.
+A partial prior set is completed by bootstrap peers only for missing organs;
+the stack fallback retains read Tasks. Only the final production start
+displaces recovery peers. A later admission failure restores that fallback. Keeper
 and preflight services are ordered behind that transaction and allow finite
 publication bursts without becoming permanently failed through
 `unit-start-limit-hit`.

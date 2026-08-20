@@ -173,9 +173,11 @@ claim-free shadow state when required, rebuild an eligible catalog, hand off to
 the exact production units, and replace every bootstrap process identity with
 a production receipt. When guarded runtime repair has already activated exact
 fallback counterparts, the controller observes and admits those still-serving
-processes directly instead of stopping them for a redundant bootstrap phase;
-the only availability boundary is then the final fallback-to-production
-handoff. It cannot select units,
+processes directly. A partial fallback set is completed only by disjoint
+per-organ bootstrap peers, and the combined evidence must still satisfy the
+11-of-11 barrier; no bootstrap may displace a preserved fallback. The only
+availability boundary is then the final recovery-to-production handoff. It
+cannot select units,
 organs, contours, tools, credentials, endpoints, candidate planes, or effect
 planes at runtime. Completion also requires the managed catalog to match every
 final production receipt. Any incomplete handoff stops bootstrap and any

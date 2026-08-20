@@ -3910,6 +3910,16 @@ esac
             self.assertNotIn("abyss_stack_mcp.preflight", fallback)
             self.assertNotIn("managed-contours.json", fallback)
             self.assertNotIn("organ-registry.v2.source.json", fallback)
+        for task_contract_line in (
+            "Environment=ABYSS_STACK_MCP_TASKS_ENABLED=1",
+            "Environment=ABYSS_STACK_MCP_TASK_ROOT=/srv/AbyssOS/abyss-stack/"
+            "Logs/mcp/tasks/abyss-stack-read",
+            "ReadWritePaths=/srv/AbyssOS/abyss-stack/Logs/mcp/audit/"
+            "policy-read.jsonl /srv/AbyssOS/abyss-stack/Logs/mcp/tasks/"
+            "abyss-stack-read",
+        ):
+            self.assertIn(task_contract_line, stack_production)
+            self.assertIn(task_contract_line, stack_fallback)
 
     def test_modern_mcp_expired_recovery_is_exact_two_phase_and_fail_closed(
         self,
@@ -3953,7 +3963,26 @@ esac
         self.assertIn("    fallback \\", script)
         self.assertIn("publish_admission \"$RUN/fallback-current\"", script)
         self.assertIn("build_preflight fallback", script)
-        self.assertIn("active_runtime_repair_fallback_count", script)
+        self.assertIn("active_managed_unit_count", script)
+        self.assertIn("repair_fallback_organs=()", script)
+        self.assertIn("repair_bootstrap_organs=()", script)
+        self.assertIn("repair_bootstrap_units=()", script)
+        self.assertIn('array_contains "$organ" "${organs[@]}"', script)
+        self.assertIn(
+            'systemctl --user start "${repair_bootstrap_units[@]}"', script
+        )
+        self.assertIn(
+            '"${repair_fallback_organs[@]}"',
+            script,
+        )
+        self.assertIn(
+            '"${repair_bootstrap_organs[@]}"',
+            script,
+        )
+        self.assertIn("and .process_unit_name == $unit", script)
+        self.assertIn(
+            'startswith("systemd-user:" + $unit + ":pid:")', script
+        )
         self.assertIn(".preflight.eligible_count == 11", script)
         self.assertIn(".preflight.blocked_count == 0", script)
         self.assertIn("catalog_matches_current_canaries", script)
