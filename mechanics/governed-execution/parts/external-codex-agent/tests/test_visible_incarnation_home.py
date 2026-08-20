@@ -863,6 +863,28 @@ def test_elf_binding_rejects_executable_replacement_during_companion_read(
         MODULE._open_verified_executable(executable)
 
 
+def test_companion_binding_rejects_permission_revocation_before_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "codex"
+    executable.write_bytes(b"executable")
+    executable.chmod(0o700)
+    companion = tmp_path / MODULE.CODE_MODE_HOST_NAME
+    companion.write_bytes(b"companion")
+    companion.chmod(0o700)
+    original_read = MODULE._read_verified_regular_file
+
+    def revoke_before_open(
+        path: Path, *, label: str
+    ) -> tuple[bytes, os.stat_result]:
+        path.chmod(0o600)
+        return original_read(path, label=label)
+
+    monkeypatch.setattr(MODULE, "_read_verified_regular_file", revoke_before_open)
+    with pytest.raises(MODULE.IncarnationHomeError, match="identity changed"):
+        MODULE._open_verified_executable(executable)
+
+
 def test_atomic_json_fsyncs_publication_directory(tmp_path: Path) -> None:
     path = tmp_path / "receipt.json"
     fsync_targets: list[str] = []

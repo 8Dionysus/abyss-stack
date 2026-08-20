@@ -2066,6 +2066,8 @@ def _adjacent_code_mode_host(
     if (
         opened_info.st_dev != info.st_dev
         or opened_info.st_ino != info.st_ino
+        or stat.S_IMODE(opened_info.st_mode) != stat.S_IMODE(info.st_mode)
+        or not stat.S_IMODE(opened_info.st_mode) & 0o111
         or resolved.parent != executable.parent
         or resolved.name != CODE_MODE_HOST_NAME
     ):
