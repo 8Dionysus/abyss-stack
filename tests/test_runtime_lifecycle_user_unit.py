@@ -2499,9 +2499,9 @@ esac
             active_effect = subprocess.Popen(
                 [
                     "/usr/bin/flock",
-                    "--shared",
+                    "--exclusive",
                     "--no-fork",
-                    str(effect_request_drain_lock),
+                    str(effect_execution_lock),
                     "/usr/bin/sh",
                     "-c",
                     ': > "$1"; exec /usr/bin/sleep 10',

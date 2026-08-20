@@ -2050,6 +2050,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
   local runtime_lock_fd=""
   local source_lock_fd=""
   local effect_request_drain_lock_fd=""
+  local effect_execution_lock_fd=""
 
   case "$provision_mode" in
     manual|repair)
@@ -2069,7 +2070,11 @@ aoa_provision_abyss_stack_mcp_runtime() {
     runtime_consumers_quiesced=0
   }
 
-  aoa_release_abyss_stack_mcp_effect_request_drain() {
+  aoa_release_abyss_stack_mcp_effect_drain() {
+    if [[ -n "$effect_execution_lock_fd" ]]; then
+      exec {effect_execution_lock_fd}>&-
+      effect_execution_lock_fd=""
+    fi
     if [[ -n "$effect_request_drain_lock_fd" ]]; then
       exec {effect_request_drain_lock_fd}>&-
       effect_request_drain_lock_fd=""
@@ -2109,7 +2114,15 @@ aoa_provision_abyss_stack_mcp_runtime() {
       --exclusive \
       --timeout 130 \
       "$effect_request_drain_lock_fd"; then
-      aoa_release_abyss_stack_mcp_effect_request_drain
+      aoa_release_abyss_stack_mcp_effect_drain
+      return 1
+    fi
+    exec {effect_execution_lock_fd}<> "$abyss_stack_mcp_effect_execution_lock"
+    if ! /usr/bin/flock \
+      --exclusive \
+      --timeout 130 \
+      "$effect_execution_lock_fd"; then
+      aoa_release_abyss_stack_mcp_effect_drain
       return 1
     fi
     runtime_consumers_quiesced=1
@@ -2246,7 +2259,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
           >&2
       fi
     fi
-    aoa_release_abyss_stack_mcp_effect_request_drain
+    aoa_release_abyss_stack_mcp_effect_drain
     exit "$exit_status"
   }
 
@@ -2687,7 +2700,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
   if ! aoa_restore_abyss_stack_mcp_runtime_consumers; then
     aoa_die "failed to restore active MCP runtime consumers after repair"
   fi
-  aoa_release_abyss_stack_mcp_effect_request_drain
+  aoa_release_abyss_stack_mcp_effect_drain
   trap - EXIT HUP INT TERM
   aoa_note "provisioned abyss-stack MCP runtime for deployed source ${source_digest} and lock ${lock_digest}"
 }

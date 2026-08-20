@@ -117,7 +117,9 @@ candidate/internal-effect consumers but still rejects an exclusive provisioner.
 Only a fully built replacement may record and quiesce the exact active non-read
 consumer set. It first takes the internal-effect request gate exclusively, so
 an accepted effect completes rollback and receipt while later requests cannot
-reach a worker; only then may it stop that endpoint, upgrade the operation lock
+reach a worker. It also drains the older execution lock so the first upgrade is
+safe even when the live server predates the request gate; only then may it stop
+that endpoint, upgrade the operation lock
 to exclusive, and enumerate and
 quiesce active stack and organ readers for the final runtime-lock swap.
 Pre-quiescence failures leave every plane active; later failures restore the

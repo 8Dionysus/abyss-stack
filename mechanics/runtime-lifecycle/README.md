@@ -89,7 +89,9 @@ post-quiesce activation failure restores the previous runtime, every reader,
 and every non-read consumer that had been active. Before stopping the
 internal-effect endpoint, repair exclusively drains its private request gate;
 an already accepted worker retains the shared side until its mandatory rollback
-and receipt are complete, while later requests cannot enter execution. Before
+and receipt are complete, while later requests cannot enter execution. Repair
+then takes the pre-existing execution lock too, preserving that guarantee across
+an upgrade from a runtime that does not yet implement the request gate. Before
 read-plane quiescence, repair issues a
 private rollback grant bound to the exact measured content and recorded identity
 of the still-running runtime. Only the read contour may consume that grant after

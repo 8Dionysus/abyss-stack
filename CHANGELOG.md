@@ -22,7 +22,9 @@ Tracking starts with the community-docs baseline for this repository.
   installation, and restores the previous runtime plus every active reader if
   final activation fails. The stack peer uses an exact, private, read-only
   rollback grant. An internal-effect request drain now lets an accepted effect
-  finish its mandatory rollback and receipt before repair stops that endpoint.
+  finish its mandatory rollback and receipt before repair stops that endpoint;
+  the existing execution lock gives the same guarantee during the first upgrade
+  from a runtime that predates the request gate.
   After activation, exact repair-fallback peers preserve the prior
   endpoint set until admission commits the production handoff; a later
   admission failure restores that fallback instead of leaving the fleet down.
