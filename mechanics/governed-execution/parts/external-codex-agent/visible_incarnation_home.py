@@ -83,15 +83,22 @@ def _regular_file(path: Path, label: str) -> Path:
     return path.resolve()
 
 
+def _decode_json_snapshot(raw: bytes, label: str) -> dict[str, Any]:
+    try:
+        value = json.loads(raw)
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise IncarnationHomeError(f"cannot decode {label}") from exc
+    if not isinstance(value, dict):
+        raise IncarnationHomeError(f"{label} must be a JSON object")
+    return value
+
+
 def _load_json_snapshot(path: Path, label: str) -> tuple[dict[str, Any], bytes]:
     try:
         raw = _regular_file(path, label).read_bytes()
-        value = json.loads(raw)
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+    except OSError as exc:
         raise IncarnationHomeError(f"cannot read {label}: {path}") from exc
-    if not isinstance(value, dict):
-        raise IncarnationHomeError(f"{label} must be a JSON object")
-    return value, raw
+    return _decode_json_snapshot(raw, label), raw
 
 
 def _load_json(path: Path, label: str) -> dict[str, Any]:
@@ -1665,9 +1672,15 @@ def prepare_home(
 
 
 def _load_manifest_snapshot(
-    path: Path,
+    path: Path, *, snapshot_bytes: bytes | None = None
 ) -> tuple[dict[str, Any], bytes, str]:
-    manifest, raw = _load_json_snapshot(path, "incarnation-home manifest")
+    if snapshot_bytes is None:
+        manifest, raw = _load_json_snapshot(path, "incarnation-home manifest")
+    else:
+        raw = snapshot_bytes
+        manifest = _decode_json_snapshot(
+            raw, "incarnation-home manifest snapshot"
+        )
     if manifest.get("schema_version") != SCHEMA_VERSION:
         raise IncarnationHomeError("unsupported incarnation-home manifest")
     codex_home = _absolute_directory(Path(str(manifest.get("codex_home"))), "incarnation Codex home")
@@ -2969,8 +2982,31 @@ def command_prepare(args: argparse.Namespace) -> int:
 def command_payload_launch(args: argparse.Namespace) -> int:
     """Bind the receipt to the exact process that owns the private payload."""
 
-    manifest_path = _regular_file(Path(args.manifest), "incarnation-home manifest")
-    manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(manifest_path)
+    manifest_path = Path(args.manifest)
+    manifest_snapshot_b64 = getattr(args, "manifest_snapshot_b64", None)
+    if manifest_snapshot_b64 is None:
+        manifest_path = _regular_file(manifest_path, "incarnation-home manifest")
+        manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(
+            manifest_path
+        )
+    else:
+        if not isinstance(manifest_snapshot_b64, str) or not manifest_snapshot_b64:
+            raise IncarnationHomeError(
+                "payload launch manifest snapshot is invalid"
+            )
+        try:
+            manifest_bytes = base64.b64decode(
+                manifest_snapshot_b64.encode("ascii"), validate=True
+            )
+        except (UnicodeEncodeError, ValueError, base64.binascii.Error) as exc:
+            raise IncarnationHomeError(
+                "payload launch manifest snapshot is not valid base64"
+            ) from exc
+        if not manifest_bytes:
+            raise IncarnationHomeError("payload launch manifest snapshot is empty")
+        manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(
+            manifest_path, snapshot_bytes=manifest_bytes
+        )
     if manifest_digest != args.manifest_digest:
         raise IncarnationHomeError("payload launch manifest digest drifted")
 
@@ -3172,6 +3208,8 @@ def command_launch(args: argparse.Namespace) -> int:
                 "payload-launch",
                 "--manifest",
                 str(manifest_path),
+                "--manifest-snapshot-b64",
+                base64.b64encode(manifest_bytes).decode("ascii"),
                 "--holder-receipt",
                 str(args.holder_receipt),
                 "--codex-executable",
@@ -3265,6 +3303,7 @@ def parser() -> argparse.ArgumentParser:
     payload.add_argument("--codex-executable", required=True)
     payload.add_argument("--payload-executable", required=True)
     payload.add_argument("--manifest-digest", required=True)
+    payload.add_argument("--manifest-snapshot-b64")
     payload.add_argument("--executable-digest", required=True)
     payload.add_argument("--companion-path")
     payload.add_argument("--companion-digest")

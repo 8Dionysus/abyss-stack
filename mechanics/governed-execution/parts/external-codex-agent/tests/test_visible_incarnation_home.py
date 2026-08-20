@@ -677,6 +677,12 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert captured["payload_argv"][0] == sys.executable
     assert captured["payload_argv"][1] == str(Path(MODULE.__file__).resolve())
     assert captured["payload_argv"][2] == "payload-launch"
+    manifest_snapshot_argument_index = captured["payload_argv"].index(
+        "--manifest-snapshot-b64"
+    )
+    assert captured["payload_argv"][manifest_snapshot_argument_index + 1] == (
+        base64.b64encode(manifest_snapshot).decode("ascii")
+    )
     payload_executable_index = captured["payload_argv"].index(
         "--payload-executable"
     )
@@ -810,12 +816,14 @@ def test_payload_launch_uses_private_companion_after_host_copy_disappears(
     monkeypatch.setattr(MODULE.os, "execve", fake_exec)
     host_companion.unlink()
     (host_package / "package.json").unlink()
+    manifest_path.unlink()
     args = MODULE.argparse.Namespace(
         manifest=str(manifest_path),
         holder_receipt=str(tmp_path / "holder.json"),
         codex_executable=str(host_executable),
         payload_executable=str(payload),
         manifest_digest=MODULE.sha256_bytes(manifest_bytes),
+        manifest_snapshot_b64=base64.b64encode(manifest_bytes).decode("ascii"),
         executable_digest=MODULE.sha256_bytes(payload.read_bytes()),
         companion_path=str(host_companion),
         companion_digest=MODULE.sha256_bytes(companion_bytes),
