@@ -79,7 +79,9 @@ candidate/internal-effect consumer set, upgrades the operation lock to
 exclusive, then enumerates and briefly quiesces the active stack and organ
 readers for the atomic swap. Every direct shared-venv consumer is serialized:
 recurring maintenance and candidate units hold operation/runtime locks, while
-long-lived organ readers retain a runtime lock until that final quiescence. A
+long-lived organ readers retain a runtime lock until that final quiescence. The
+loaded Memo and Evals candidate fragments are verified against their managed
+lock-aware sources before repair may proceed. A
 dependency or build failure therefore leaves every live plane untouched; a
 post-quiesce activation failure restores the previous runtime, every reader,
 and every non-read consumer that had been active. Before quiescence, repair issues a

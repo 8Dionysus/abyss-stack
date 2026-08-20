@@ -1611,13 +1611,15 @@ esac
                 STACK_MCP_READ_FALLBACK_UNIT,
                 STACK_MCP_CANDIDATE_UNIT,
                 STACK_MCP_INTERNAL_EFFECT_UNIT,
+                MEMO_MCP_CANDIDATE_UNIT,
+                EVALS_MCP_CANDIDATE_UNIT,
             ):
                 source_path = unit_source_dir / source_unit.name
                 source_path.write_text(
                     source_unit.read_text(encoding="utf-8").replace(
                         "/srv/AbyssOS/abyss-stack",
                         str(stack_root),
-                    ),
+                    ).replace("/srv/AbyssOS", str(root)),
                     encoding="utf-8",
                 )
                 (unit_target_dir / source_unit.name).symlink_to(source_path)
@@ -1690,26 +1692,8 @@ esac
                 "load_state=loaded\n"
                 "active_state=inactive\n"
                 'fragment_path="${XDG_CONFIG_HOME}/systemd/user/${unit}"\n'
-                'contour="${unit#abyss-stack-mcp-}"\n'
-                'contour="${contour%.service}"\n'
-                'if [[ "$contour" == "internal-effect" ]]; then '
-                "contour=internal_effect; fi\n"
-                'if [[ "$contour" == "read-bootstrap" || '
-                '"$contour" == "read-fallback" ]]; then '
-                "contour=read; fi\n"
-                "exec_path=/usr/bin/flock\n"
-                'exec_start="/usr/bin/flock --shared --no-fork '
-                "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/"
-                ".source-projection.lock /usr/bin/flock --shared --no-fork "
-                "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/"
-                ".runtime-provision.lock /usr/bin/env "
-                "${AOA_CONFIGS_ROOT}/scripts/aoa-install-systemd "
-                '--launch-verified-abyss-stack-mcp=${contour}"\n'
-                'if [[ "$contour" == "candidate" || "$contour" == "internal_effect" ]]; then\n'
-                '  exec_start="/usr/bin/flock --shared --no-fork '
-                "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/"
-                '.runtime-operation.lock ${exec_start}"\n'
-                "fi\n"
+                'exec_start="$(sed -n \'s/^ExecStart=//p\' "$fragment_path")"\n'
+                'exec_path="${exec_start%% *}"\n'
                 'if [[ "${ABYSS_STACK_MCP_TEST_UNLOADED_UNIT:-}" == '
                 '"$unit" ]]; then\n'
                 "  load_state=not-found\n"
@@ -2078,6 +2062,8 @@ esac
             for active_non_read_unit in (
                 "abyss-stack-mcp-candidate.service",
                 "abyss-stack-mcp-internal-effect.service",
+                "aoa-memo-mcp-candidate.service",
+                "aoa-evals-mcp-candidate.service",
             ):
                 with self.subTest(active_non_read_unit=active_non_read_unit):
                     eligible = subprocess.run(
@@ -2564,6 +2550,27 @@ esac
                 "is not loaded with the lock-aware ExecStart",
                 stale_eligibility.stderr,
             )
+            for stale_consumer_unit in (
+                "aoa-memo-mcp-candidate.service",
+                "aoa-evals-mcp-candidate.service",
+            ):
+                with self.subTest(stale_consumer_unit=stale_consumer_unit):
+                    stale_consumer = subprocess.run(
+                        repair_eligibility_command,
+                        cwd=REPO_ROOT,
+                        env={
+                            **env,
+                            "ABYSS_STACK_MCP_TEST_STALE_UNIT": stale_consumer_unit,
+                        },
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(stale_consumer.returncode, 0)
+                    self.assertIn(
+                        "is not loaded with the lock-aware ExecStart",
+                        stale_consumer.stderr,
+                    )
 
             for unsafe_runtime_root in (
                 observation_root,

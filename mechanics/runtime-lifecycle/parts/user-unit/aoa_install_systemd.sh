@@ -1378,14 +1378,18 @@ aoa_require_abyss_stack_mcp_units_stopped() {
   local resolved_unit_fragment=""
   local expected_exec_start=""
   local unit_contour=""
+  local workspace_root=""
 
   abyss_stack_mcp_units_error=""
+  workspace_root="$(dirname -- "${AOA_STACK_ROOT%/}")"
   for unit in \
     abyss-stack-mcp-read.service \
     abyss-stack-mcp-read-bootstrap.service \
     abyss-stack-mcp-read-fallback.service \
     abyss-stack-mcp-candidate.service \
-    abyss-stack-mcp-internal-effect.service; do
+    abyss-stack-mcp-internal-effect.service \
+    aoa-memo-mcp-candidate.service \
+    aoa-evals-mcp-candidate.service; do
     unit_contour="${unit#abyss-stack-mcp-}"
     unit_contour="${unit_contour%.service}"
     if [[ "$unit_contour" == "internal-effect" ]]; then
@@ -1396,11 +1400,21 @@ aoa_require_abyss_stack_mcp_units_stopped() {
     fi
     expected_unit_source="${AOA_CONFIGS_ROOT}/systemd/user/${unit}"
     expected_unit_target="${XDG_CONFIG_HOME:-${HOME}/.config}/systemd/user/${unit}"
-    expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_source_lock} /usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} /usr/bin/env ${AOA_CONFIGS_ROOT}/scripts/aoa-install-systemd --launch-verified-abyss-stack-mcp=${unit_contour}"
-    if [[ "$unit_contour" == "candidate" || \
-          "$unit_contour" == "internal_effect" ]]; then
-      expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_operation_lock} ${expected_exec_start}"
-    fi
+    case "$unit" in
+      aoa-memo-mcp-candidate.service)
+        expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_operation_lock} /usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} ${abyss_stack_mcp_venv}/bin/python -I -B -m abyss_stack_mcp.process_launcher --executable ${workspace_root}/.codex/bin/aoa-memo-mcp-server.py"
+        ;;
+      aoa-evals-mcp-candidate.service)
+        expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_operation_lock} /usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} ${abyss_stack_mcp_venv}/bin/python -I -B -m abyss_stack_mcp.process_launcher --executable ${workspace_root}/.codex/bin/aoa-evals-mcp-server.py"
+        ;;
+      *)
+        expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_source_lock} /usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} /usr/bin/env ${AOA_CONFIGS_ROOT}/scripts/aoa-install-systemd --launch-verified-abyss-stack-mcp=${unit_contour}"
+        if [[ "$unit_contour" == "candidate" || \
+              "$unit_contour" == "internal_effect" ]]; then
+          expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_operation_lock} ${expected_exec_start}"
+        fi
+        ;;
+    esac
     if [[ ! -f "$expected_unit_source" || -L "$expected_unit_source" ]]; then
       abyss_stack_mcp_units_error="lock-aware source unit is unavailable for ${unit}; link and reload managed user units before provisioning"
       return 1
@@ -1477,7 +1491,9 @@ aoa_require_abyss_stack_mcp_units_stopped() {
         fi
         if [[ "$allow_active_repair_consumers" -eq 1 && \
               ("$unit" == "abyss-stack-mcp-candidate.service" || \
-               "$unit" == "abyss-stack-mcp-internal-effect.service") ]]; then
+               "$unit" == "abyss-stack-mcp-internal-effect.service" || \
+               "$unit" == "aoa-memo-mcp-candidate.service" || \
+               "$unit" == "aoa-evals-mcp-candidate.service") ]]; then
           continue
         fi
         abyss_stack_mcp_units_error="refusing to replace abyss-stack MCP runtime while ${unit} is ${unit_state}"

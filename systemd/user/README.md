@@ -224,7 +224,9 @@ shared-venv unit holds operation/runtime locks throughout its run. Pre-stop
 failure preserves every live plane; later failure restores the previous
 runtime, every active reader, and every recorded non-read consumer, with the
 stack peer using an exact, private, read-only rollback grant. The all-user-unit
-installer creates the operation lock before reload. Unsafe lifecycle topology
+installer creates the operation lock before reload. Repair also validates that
+the loaded Memo and Evals candidate fragments match their managed lock-aware
+sources before either can be restored. Unsafe lifecycle topology
 still fails closed. Successful activation keeps exact repair-fallback counterparts
 for the prior endpoint set while fallback-bound canaries and preflight run.
 A partial prior set is completed by bootstrap peers only for missing organs;

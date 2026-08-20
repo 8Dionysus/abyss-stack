@@ -121,7 +121,9 @@ Pre-quiescence failures leave every plane active; later failures restore the
 prior runtime, every reader, and every non-read consumer that had been active;
 the stack peer uses an exact, private, read-only rollback grant. Unsafe source,
 operation lock, runtime lock, journal, runtime path, or unit topology still
-fails closed without taking the working read fleet down.
+fails closed without taking the working read fleet down. That topology check
+also proves the loaded Memo and Evals candidate fragments use both shared locks,
+so a stale pre-reload definition cannot be restored after the swap.
 Successful activation starts exact repair-fallback counterparts for the prior active
 endpoint set. Admission removes their private fallback list only after the
 production handoff validates, and restores those peers on any later failure.
