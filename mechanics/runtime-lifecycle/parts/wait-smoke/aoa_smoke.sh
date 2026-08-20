@@ -60,7 +60,13 @@ if has_module "32-llamacpp-inference.yml"; then
 fi
 
 if has_module "31-intel-inference.yml"; then
-  aoa_probe_http "ovms" "http://127.0.0.1:8200/v2/health/live" || failures=$((failures + 1))
+  if systemctl --user is-active --quiet abyss-ovms.socket abyss-ovms-unix.socket \
+    && [[ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/abyss-stack/ovms-socket/ovms.sock" ]]; then
+    aoa_note "ok   ovms owner activation sockets ready (model remains cold until a request)"
+  else
+    aoa_note "fail ovms owner activation sockets are not ready"
+    failures=$((failures + 1))
+  fi
 fi
 
 if has_module "40-llm-gateway.yml"; then

@@ -174,6 +174,12 @@ scripts/aoa-smoke --profile substrate --profile intel-worker
 scripts/aoa-qwen-check --case exact-reply
 ```
 
+On the first Intel launch, `aoa-up` links and reloads the source-managed user
+units before opening the OVMS activation sockets. It also retires an old
+Compose-owned `ovms` container for the same Compose project before the socket
+cutover, while the digest-pinned Quadlet image is allowed to pull only when it
+is absent. No separate pre-install step is required.
+
 ## Use a preset instead of spelling the whole composition
 
 ```bash

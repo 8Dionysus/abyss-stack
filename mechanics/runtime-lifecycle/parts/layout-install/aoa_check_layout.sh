@@ -151,7 +151,6 @@ if ((ignore_secrets)); then
 else
   check_warn_file "stack env" "${AOA_STACK_ROOT}/Configs/stack.env"
   check_warn_file "langchain env" "${AOA_STACK_ROOT}/Secrets/Configs/langchain-api.env"
-  check_warn_file "ovms env" "${AOA_STACK_ROOT}/Secrets/Configs/ovms-api.env"
   check_warn_file "ovms key file" "${AOA_STACK_ROOT}/Secrets/Configs/ovms_api_key.txt"
 fi
 
@@ -164,6 +163,7 @@ check_warn_file "grafana tempo datasource" "${AOA_STACK_ROOT}/Configs/monitoring
 check_warn_file "loki config" "${AOA_STACK_ROOT}/Configs/monitoring/loki/loki.yml"
 check_warn_file "tempo config" "${AOA_STACK_ROOT}/Configs/monitoring/tempo/tempo.yml"
 check_warn_file "alloy config" "${AOA_STACK_ROOT}/Configs/monitoring/alloy/config.alloy"
+check_warn_file "ovms config" "${AOA_STACK_ROOT}/Configs/ovms/config.json"
 check_warn_file "tts voices" "${AOA_STACK_ROOT}/Configs/tts/voices.yaml"
 check_warn_file "litellm config" "${AOA_STACK_ROOT}/Services/litellm/config.yaml"
 check_dir "${AOA_STACK_ROOT}/Logs/machine-bridge/latest"

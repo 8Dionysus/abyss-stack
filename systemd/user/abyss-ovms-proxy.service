@@ -1,0 +1,18 @@
+[Unit]
+Description=Abyss idle OVMS activation proxy
+Documentation=man:systemd-socket-proxyd(8)
+BindsTo=abyss-ovms.service
+After=abyss-ovms.service
+PartOf=podman-compose-abyss.service
+
+[Service]
+Type=notify
+Sockets=abyss-ovms.socket
+Sockets=abyss-ovms-unix.socket
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd --connections-max=64 --exit-idle-time=15min 127.0.0.1:8201
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryAccounting=yes

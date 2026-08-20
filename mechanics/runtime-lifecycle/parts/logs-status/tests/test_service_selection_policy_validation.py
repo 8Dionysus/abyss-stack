@@ -30,15 +30,16 @@ def load_names(file_path: Path) -> list[str]:
 
 def compose_service_names(file_path: Path) -> set[str]:
     service_names: set[str] = set()
-    in_services = False
+    in_runtime_workloads = False
     for raw in file_path.read_text(encoding="utf-8").splitlines():
-        if raw.strip() == "services:":
-            in_services = True
+        if raw.strip() in {"services:", "x-abyss-owner-workloads:"}:
+            in_runtime_workloads = True
             continue
-        if not in_services:
+        if not in_runtime_workloads:
             continue
         if raw and not raw.startswith(" "):
-            break
+            in_runtime_workloads = False
+            continue
         match = re.match(r"^  ([A-Za-z0-9_.-]+):\s*$", raw)
         if match:
             service_names.add(match.group(1))

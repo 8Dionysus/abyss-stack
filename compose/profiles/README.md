@@ -10,7 +10,7 @@ without turning every module into the default AbyssOS substrate.
 | `substrate` | base | storage only; the source-owned default |
 | `workflows` | optional workflow automation | n8n plus its storage dependency |
 | `local-worker` | worker | canonical `llama.cpp` plus `langchain-api` path |
-| `intel-worker` | worker accelerator | canonical local worker plus reviewed OVMS embeddings seam |
+| `intel-worker` | worker accelerator | canonical local worker plus reviewed socket-activated OVMS embeddings seam |
 | `fallback-gateway` | retained fallback | Ollama plus LiteLLM control and rollback path |
 | `core` | compatibility | storage and `llama.cpp` basics for older habits |
 | `agentic` | compatibility | older name for storage plus canonical local-worker API |

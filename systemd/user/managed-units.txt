@@ -1,6 +1,10 @@
 # Source-managed user units that may be linked into ~/.config/systemd/user
 # by scripts/aoa-install-systemd --all-user-units.
 podman-compose-abyss.service
+abyss-ovms.container
+abyss-ovms.socket
+abyss-ovms-unix.socket
+abyss-ovms-proxy.service
 abyss-stack-resource-guards-apply.service
 aoa-mcp-http@.service
 aoa-organ-mcp-read@.service
