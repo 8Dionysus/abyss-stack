@@ -1927,6 +1927,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
   local bootstrap_unit_was_active=0
   local fallback_unit_was_active=0
   local read_fleet_quiesced=0
+  local runtime_swapped=0
   local runtime_activated=0
   local organ_units_output=""
   local organ_unit=""
@@ -1953,6 +1954,34 @@ aoa_provision_abyss_stack_mcp_runtime() {
           "$temp_venv" == "${abyss_stack_mcp_runtime_root}/.venv."* && \
           -d "$temp_venv" && ! -L "$temp_venv" ]]; then
       rm -rf -- "$temp_venv"
+    fi
+    if ((runtime_swapped && ! runtime_activated)) && \
+       [[ -n "$backup_venv" && \
+          "$backup_venv" == "${abyss_stack_mcp_runtime_root}/.venv.previous."* && \
+          -d "$backup_venv" && ! -L "$backup_venv" ]]; then
+      if ((${#repair_fallback_units[@]})); then
+        systemctl --user stop "${repair_fallback_units[@]}" \
+          >/dev/null 2>&1 || true
+      fi
+      if [[ -z "$runtime_lock_fd" ]]; then
+        exec {runtime_lock_fd}<> "$abyss_stack_mcp_runtime_lock"
+      fi
+      if /usr/bin/flock --exclusive --nonblock "$runtime_lock_fd" && \
+         [[ -d "$abyss_stack_mcp_venv" && \
+            ! -L "$abyss_stack_mcp_venv" ]] && \
+         rm -rf -- "$abyss_stack_mcp_venv" && \
+         mv -- "$backup_venv" "$abyss_stack_mcp_venv"; then
+        backup_venv=""
+        runtime_swapped=0
+        if [[ -f "$abyss_stack_mcp_repair_fallback" && \
+              ! -L "$abyss_stack_mcp_repair_fallback" ]]; then
+          rm -f -- "$abyss_stack_mcp_repair_fallback"
+        fi
+      else
+        printf '%s\n' \
+          'failed to restore the previous abyss-stack MCP runtime after fallback activation failure' \
+          >&2
+      fi
     fi
     if [[ -n "$backup_venv" && \
           "$backup_venv" == "${abyss_stack_mcp_runtime_root}/.venv.previous."* && \
@@ -2413,22 +2442,21 @@ aoa_provision_abyss_stack_mcp_runtime() {
     aoa_die "failed to activate the provisioned abyss-stack MCP runtime"
   fi
   temp_venv=""
-  runtime_activated=1
+  runtime_swapped=1
   if ((${#repair_fallback_units[@]})); then
-    fallback_marker_temp="$(
+    if ! fallback_marker_temp="$(
       mktemp \
         "${abyss_stack_mcp_admission_root}/.runtime-repair-fallback.XXXXXX"
-    )"
-    chmod 0600 "$fallback_marker_temp"
-    printf '%s\n' "${repair_fallback_units[@]}" > "$fallback_marker_temp"
-    mv -- "$fallback_marker_temp" "$abyss_stack_mcp_repair_fallback"
+    )"; then
+      aoa_die "failed to stage the MCP repair fallback marker"
+    fi
+    if ! chmod 0600 "$fallback_marker_temp" || \
+       ! printf '%s\n' "${repair_fallback_units[@]}" > "$fallback_marker_temp" || \
+       ! mv -- "$fallback_marker_temp" "$abyss_stack_mcp_repair_fallback"; then
+      aoa_die "failed to publish the MCP repair fallback marker"
+    fi
     fallback_marker_temp=""
   fi
-  rm -f -- "$abyss_stack_mcp_read_rollback_grant"
-  if [[ -n "$backup_venv" && -d "$backup_venv" ]]; then
-    rm -rf -- "$backup_venv"
-  fi
-  backup_venv=""
   exec {runtime_lock_fd}>&-
   runtime_lock_fd=""
   if ((${#repair_fallback_units[@]})); then
@@ -2436,7 +2464,17 @@ aoa_provision_abyss_stack_mcp_runtime() {
       >/dev/null 2>&1 || true
     systemctl --user start "${repair_fallback_units[@]}" || \
       aoa_die "failed to start the MCP repair fallback after runtime activation"
+    for organ_unit in "${repair_fallback_units[@]}"; do
+      systemctl --user is-active --quiet "$organ_unit" || \
+        aoa_die "MCP repair fallback did not become active: ${organ_unit}"
+    done
   fi
+  runtime_activated=1
+  rm -f -- "$abyss_stack_mcp_read_rollback_grant"
+  if [[ -n "$backup_venv" && -d "$backup_venv" ]]; then
+    rm -rf -- "$backup_venv"
+  fi
+  backup_venv=""
   read_fleet_quiesced=0
   trap - EXIT HUP INT TERM
   exec {source_lock_fd}>&-

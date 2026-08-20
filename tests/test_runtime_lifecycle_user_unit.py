@@ -1415,6 +1415,33 @@ esac
         self.assertIn("import abyss_stack_mcp, aoa_sdk, mcp, pydantic", installer)
         self.assertIn('version("aoa-sdk") == "0.10.2"', installer)
 
+    def test_stack_mcp_runtime_fallback_activation_is_transactional(self) -> None:
+        installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")
+        runtime_swapped = installer.index("runtime_swapped=1")
+        marker_published = installer.index(
+            'mv -- "$fallback_marker_temp" "$abyss_stack_mcp_repair_fallback"'
+        )
+        fallback_started = installer.index(
+            'systemctl --user start "${repair_fallback_units[@]}"',
+            marker_published,
+        )
+        fallback_verified = installer.index(
+            'systemctl --user is-active --quiet "$organ_unit"',
+            fallback_started,
+        )
+        runtime_activated = installer.index(
+            "runtime_activated=1",
+            fallback_verified,
+        )
+        self.assertLess(runtime_swapped, marker_published)
+        self.assertLess(marker_published, fallback_started)
+        self.assertLess(fallback_started, fallback_verified)
+        self.assertLess(fallback_verified, runtime_activated)
+        self.assertIn(
+            "if ((runtime_swapped && ! runtime_activated))",
+            installer,
+        )
+
     @unittest.skipIf(
         hasattr(os, "geteuid") and os.geteuid() == 0,
         "abyss-stack MCP runtime provisioning intentionally rejects root",
@@ -1547,6 +1574,11 @@ esac
                 '"$target_path" == */venv ]]; then\n'
                 "  exit 71\n"
                 "fi\n"
+                'if [[ "${ABYSS_STACK_MCP_TEST_FAIL_FALLBACK_MARKER:-0}" == 1 && '
+                '"$source_name" == .runtime-repair-fallback.* && '
+                '"$target_path" == */runtime-repair-fallback.units ]]; then\n'
+                "  exit 72\n"
+                "fi\n"
                 'exec /usr/bin/mv "$@"\n',
                 encoding="utf-8",
             )
@@ -1601,6 +1633,9 @@ esac
                 '-f "${ABYSS_STACK_MCP_TEST_ACTIVATE_DURING_BUILD:-/nonexistent}" && '
                 '! -f "$ABYSS_STACK_MCP_TEST_SYSTEMCTL_STATE/$unit.stopped" ]]; then\n'
                 '  is_active=1\n'
+                'elif [[ -f "$ABYSS_STACK_MCP_TEST_SYSTEMCTL_STATE/$unit.started" && '
+                '! -f "$ABYSS_STACK_MCP_TEST_SYSTEMCTL_STATE/$unit.stopped" ]]; then\n'
+                '  is_active=1\n'
                 "fi\n"
                 'if [[ "$command" == "is-active" ]]; then\n'
                 '  ((is_active))\n'
@@ -1609,6 +1644,7 @@ esac
                 'if [[ "$command" == "stop" ]]; then\n'
                 '  for item in "${args[@]:1}"; do\n'
                 '    [[ "$item" == *.service ]] || continue\n'
+                '    rm -f -- "$ABYSS_STACK_MCP_TEST_SYSTEMCTL_STATE/$item.started"\n'
                 '    : > "$ABYSS_STACK_MCP_TEST_SYSTEMCTL_STATE/$item.stopped"\n'
                 "  done\n"
                 "  exit 0\n"
@@ -1617,6 +1653,7 @@ esac
                 '  for item in "${args[@]:1}"; do\n'
                 '    [[ "$item" == *.service ]] || continue\n'
                 '    rm -f -- "$ABYSS_STACK_MCP_TEST_SYSTEMCTL_STATE/$item.stopped"\n'
+                '    : > "$ABYSS_STACK_MCP_TEST_SYSTEMCTL_STATE/$item.started"\n'
                 "  done\n"
                 "  exit 0\n"
                 "fi\n"
@@ -2143,6 +2180,69 @@ esac
                         rollback_strict.stderr,
                     )
 
+            source_file.write_text(
+                "VALUE = fallback_marker_failure\n",
+                encoding="utf-8",
+            )
+            systemctl_log.write_text("", encoding="utf-8")
+            fallback_marker_failure = subprocess.run(
+                repair_command,
+                cwd=REPO_ROOT,
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_ACTIVE_UNIT": (
+                        "abyss-stack-mcp-read.service"
+                    ),
+                    "ABYSS_STACK_MCP_TEST_ACTIVE_ORGAN_UNITS": (
+                        "aoa-organ-mcp-read@aoa-memo.service"
+                    ),
+                    "ABYSS_STACK_MCP_TEST_FAIL_FALLBACK_MARKER": "1",
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(fallback_marker_failure.returncode, 0)
+            fallback_marker_failure_events = systemctl_log.read_text(
+                encoding="utf-8"
+            ).splitlines()
+            fallback_marker_stop_index = next(
+                index
+                for index, event in enumerate(fallback_marker_failure_events)
+                if event.startswith("--user stop ")
+            )
+            self.assertIn(
+                "--user start abyss-stack-mcp-read.service",
+                fallback_marker_failure_events,
+                fallback_marker_failure.stderr,
+            )
+            fallback_marker_stack_restart_index = (
+                fallback_marker_failure_events.index(
+                    "--user start abyss-stack-mcp-read.service"
+                )
+            )
+            fallback_marker_organ_restart_index = (
+                fallback_marker_failure_events.index(
+                    "--user start aoa-organ-mcp-read@aoa-memo.service"
+                )
+            )
+            self.assertLess(
+                fallback_marker_stop_index,
+                fallback_marker_stack_restart_index,
+            )
+            self.assertLess(
+                fallback_marker_stop_index,
+                fallback_marker_organ_restart_index,
+            )
+            self.assertFalse(
+                (admission_root / "runtime-repair-fallback.units").exists()
+            )
+            self.assertEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
+            self.assertTrue(rollback_grant.is_file())
+
             unresolved_fallback = (
                 admission_root / "runtime-repair-fallback.units"
             )
@@ -2244,8 +2344,11 @@ esac
                 marker.read_text(encoding="utf-8").strip(),
                 first_identity,
             )
-            for stopped_marker in systemctl_state.glob("*.stopped"):
-                stopped_marker.unlink()
+            for unit_state_marker in (
+                *systemctl_state.glob("*.started"),
+                *systemctl_state.glob("*.stopped"),
+            ):
+                unit_state_marker.unlink()
             repair_fallback.unlink()
             source_file.write_text("VALUE = 1\n", encoding="utf-8")
             restored_baseline = subprocess.run(
