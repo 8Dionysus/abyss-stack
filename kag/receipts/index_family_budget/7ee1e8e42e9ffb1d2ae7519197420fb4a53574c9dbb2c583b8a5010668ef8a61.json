@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 18397499,
+  "allowed_tracked_bytes": 36301983,
+  "approved_by": "repository-owner",
+  "base_ref": "b40fe4a92aa42a8c2abaf52895c1934576f3bedc",
+  "changed_generated_bytes": 18397499,
+  "changed_generated_files": 185,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "7ee1e8e42e9ffb1d2ae7519197420fb4a53574c9dbb2c583b8a5010668ef8a61",
+  "reason": "PR 399 target main advanced to b40fe4a92aa42a8c2abaf52895c1934576f3bedc after main repair #406; regenerate the terminal candidate portable family and receipt against the current GitHub base.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36301983,
+  "tracked_bytes_max": 24117248
+}
