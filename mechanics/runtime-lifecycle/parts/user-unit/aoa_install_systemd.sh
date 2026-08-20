@@ -1508,6 +1508,10 @@ aoa_verify_abyss_stack_mcp_runtime() {
   fi
   [[ -d "$abyss_stack_mcp_venv" && ! -L "$abyss_stack_mcp_venv" ]] || \
     aoa_die "provisioned abyss-stack MCP runtime is unavailable"
+  [[ -f "${abyss_stack_mcp_venv}/bin/python" && \
+     ! -L "${abyss_stack_mcp_venv}/bin/python" && \
+     -x "${abyss_stack_mcp_venv}/bin/python" ]] || \
+    aoa_die "abyss-stack MCP runtime Python must be an executable regular non-symlink file"
   [[ -f "${abyss_stack_mcp_venv}/${marker}" && \
      ! -L "${abyss_stack_mcp_venv}/${marker}" ]] || \
     aoa_die "abyss-stack MCP runtime identity marker is unavailable"
@@ -1775,6 +1779,8 @@ aoa_provision_abyss_stack_mcp_runtime() {
     fi
     if [[ "$existing_identity" == "$runtime_identity" && \
           "$observed_content_digest" == "$existing_content_digest" && \
+          -f "${abyss_stack_mcp_venv}/bin/python" && \
+          ! -L "${abyss_stack_mcp_venv}/bin/python" && \
           -x "${abyss_stack_mcp_venv}/bin/python" ]] && \
        PYTHONDONTWRITEBYTECODE=1 \
          aoa_run_isolated_python \
