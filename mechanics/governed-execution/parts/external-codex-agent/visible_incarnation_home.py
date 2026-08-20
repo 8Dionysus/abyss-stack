@@ -2123,18 +2123,20 @@ def _copy_package_file(
             before.st_size,
             before.st_mtime_ns,
             before.st_ctime_ns,
+            stat.S_IMODE(before.st_mode),
         ) != (
             after.st_dev,
             after.st_ino,
             after.st_size,
             after.st_mtime_ns,
             after.st_ctime_ns,
+            stat.S_IMODE(after.st_mode),
         ):
             raise IncarnationHomeError(
                 f"package snapshot source changed while reading: {source}"
             )
         content = b"".join(chunks)
-        target_mode = 0o500 if before.st_mode & stat.S_IXUSR else 0o400
+        target_mode = 0o500 if os.access(source, os.X_OK) else 0o400
         target_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
         if hasattr(os, "O_NOFOLLOW"):
             target_flags |= os.O_NOFOLLOW

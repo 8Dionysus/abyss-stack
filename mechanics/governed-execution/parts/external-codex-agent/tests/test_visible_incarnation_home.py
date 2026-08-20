@@ -1381,6 +1381,53 @@ def test_shebang_node_launcher_reopens_named_snapshot(
     assert resource_line == "package-relative\n"
 
 
+def test_shebang_snapshot_preserves_effective_companion_execute_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    package = tmp_path / "package"
+    package.mkdir()
+    executable = package / "vendor" / "codex" / "codex"
+    executable.parent.mkdir(parents=True)
+    (package / "package.json").write_text("{}\n", encoding="utf-8")
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o700)
+    companion = executable.parent / MODULE.CODE_MODE_HOST_NAME
+    companion.write_bytes(b"group-executable-companion")
+    companion.chmod(0o450)
+    original_access = MODULE.os.access
+
+    def allow_companion_execute(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        mode: int,
+        *args: object,
+        **kwargs: object,
+    ) -> bool:
+        if Path(path) == companion and mode == MODULE.os.X_OK:
+            return True
+        return original_access(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(MODULE.os, "access", allow_companion_execute)
+    (
+        snapshot_fd,
+        _snapshot_exec_path,
+        _content,
+        _digest,
+        _snapshot_dir,
+        _snapshot_path,
+        snapshot_mount,
+    ) = MODULE._open_verified_executable(executable, snapshot_root=tmp_path)
+    try:
+        companion_relative = Path("vendor/codex") / MODULE.CODE_MODE_HOST_NAME
+        modes = {
+            relative: mode
+            for relative, _descriptor, mode in snapshot_mount["file_fds"]
+        }
+        assert modes[companion_relative] == 0o500
+    finally:
+        MODULE._close_snapshot_mount(snapshot_mount)
+        os.close(snapshot_fd)
+
+
 def test_named_snapshot_cleanup_waits_for_exact_holder_exit(tmp_path: Path) -> None:
     snapshot_path = tmp_path / ".codex.aoa-snapshot-test"
     snapshot_path.write_bytes(b"snapshot")
