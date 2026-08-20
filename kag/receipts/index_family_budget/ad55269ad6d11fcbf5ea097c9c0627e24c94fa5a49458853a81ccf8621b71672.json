@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 3852177,
+  "allowed_tracked_bytes": 36186554,
+  "approved_by": "repository-owner",
+  "base_ref": "8744f3f74c802577e96719efa4105417102205ac",
+  "changed_generated_bytes": 3852177,
+  "changed_generated_files": 39,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "ad55269ad6d11fcbf5ea097c9c0627e24c94fa5a49458853a81ccf8621b71672",
+  "reason": "Index the committed bounded runtime-repair fallback chaining guard and regression coverage.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36186554,
+  "tracked_bytes_max": 24117248
+}
