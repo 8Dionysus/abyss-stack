@@ -1986,7 +1986,11 @@ aoa_provision_abyss_stack_mcp_runtime() {
     if [[ -n "$backup_venv" && \
           "$backup_venv" == "${abyss_stack_mcp_runtime_root}/.venv.previous."* && \
           -d "$backup_venv" && ! -L "$backup_venv" ]]; then
-      if [[ ! -e "$abyss_stack_mcp_venv" && ! -L "$abyss_stack_mcp_venv" ]]; then
+      if ((runtime_swapped)); then
+        printf '%s\n' \
+          'preserving the previous MCP runtime backup because rollback did not complete' \
+          >&2
+      elif [[ ! -e "$abyss_stack_mcp_venv" && ! -L "$abyss_stack_mcp_venv" ]]; then
         mv -- "$backup_venv" "$abyss_stack_mcp_venv" || \
           printf '%s\n' \
             'failed to restore the previous abyss-stack MCP runtime during cleanup' \
@@ -2025,6 +2029,10 @@ aoa_provision_abyss_stack_mcp_runtime() {
             'failed to restore the MCP repair fallback after runtime activation' \
             >&2
         fi
+      elif ((runtime_swapped)); then
+        printf '%s\n' \
+          'not restarting the previous MCP read fleet because runtime rollback did not complete' \
+          >&2
       else
         if ((read_unit_was_active)) && \
            ! systemctl --user start abyss-stack-mcp-read.service; then

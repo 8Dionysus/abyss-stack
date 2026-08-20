@@ -100,6 +100,17 @@ active_production_count() {
   printf '%s\n' "$count"
 }
 
+active_runtime_repair_fallback_count() {
+  local count=0
+  local unit
+  for unit in "${repair_fallback_units[@]}"; do
+    if systemctl --user is-active --quiet "$unit"; then
+      ((count += 1))
+    fi
+  done
+  printf '%s\n' "$count"
+}
+
 capture_canary_pair() {
   local process_unit=$1
   local current_root=$2
@@ -436,8 +447,18 @@ if [[ "$production_admission_reusable" -eq 1 \
   exit 0
 fi
 
-mkdir -p "$RUN" "$RUN/evidence-bootstrap" "$RUN/evidence-production"
-chmod 0700 "$ROOT" "$ROOT/runs" "$RUN" "$RUN/evidence-bootstrap" "$RUN/evidence-production"
+mkdir -p \
+  "$RUN" \
+  "$RUN/evidence-bootstrap" \
+  "$RUN/evidence-fallback" \
+  "$RUN/evidence-production"
+chmod 0700 \
+  "$ROOT" \
+  "$ROOT/runs" \
+  "$RUN" \
+  "$RUN/evidence-bootstrap" \
+  "$RUN/evidence-fallback" \
+  "$RUN/evidence-production"
 
 if [[ "$registry_expiry" -le "$now_epoch" ]]; then
   rebase_expired_registry
@@ -447,6 +468,20 @@ active_unit_count=$(active_production_count)
 if [[ "$active_unit_count" -ne 11 ]]; then
   if [[ "$production_admission_reusable" -eq 1 ]]; then
     systemctl --user reset-failed "${production_units[@]}"
+  elif [[ "$repair_fallback_loaded" -eq 1 ]]; then
+    restore_runtime_repair_fallback
+    [[ "$(active_runtime_repair_fallback_count)" -eq \
+       "${#repair_fallback_units[@]}" ]] || {
+      printf 'modern MCP repair fallback did not remain exact during validation\n' >&2
+      exit 1
+    }
+    capture_canary_family \
+      fallback \
+      "$RUN/fallback-current" \
+      "$RUN/fallback-lkg" \
+      "$RUN/fallback-stdout"
+    publish_admission "$RUN/fallback-current" "$RUN/fallback-lkg" fallback
+    build_preflight fallback
   else
     systemctl --user reset-failed "${bootstrap_units[@]}" "${production_units[@]}"
     bootstrap_started=1

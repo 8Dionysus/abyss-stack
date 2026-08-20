@@ -15,6 +15,7 @@ from .canary import (
     CanaryReceipt,
     CanaryRunnerError,
     _bootstrap_unit_name,
+    _fallback_unit_name,
     _read_public_key,
     verify_canary_receipt,
 )
@@ -158,6 +159,7 @@ def build_runtime_overlay(
         allowed_process_units = {
             target.unit_name,
             _bootstrap_unit_name(target.unit_name),
+            _fallback_unit_name(target.unit_name),
         }
         if receipt.process_unit_name not in allowed_process_units:
             raise PreflightError("canary process unit conflicts with runtime target")

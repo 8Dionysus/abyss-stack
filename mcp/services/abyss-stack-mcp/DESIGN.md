@@ -171,11 +171,16 @@ exact deployment and production evidence identities, it may transiently start
 the already-defined manual read bootstrap units, reset an expired registry to
 claim-free shadow state when required, rebuild an eligible catalog, hand off to
 the exact production units, and replace every bootstrap process identity with
-a production receipt. It cannot select units,
+a production receipt. When guarded runtime repair has already activated exact
+fallback counterparts, the controller observes and admits those still-serving
+processes directly instead of stopping them for a redundant bootstrap phase;
+the only availability boundary is then the final fallback-to-production
+handoff. It cannot select units,
 organs, contours, tools, credentials, endpoints, candidate planes, or effect
 planes at runtime. Completion also requires the managed catalog to match every
 final production receipt. Any incomplete handoff stops bootstrap and any
-production fleet started by the controller, then remains fail-closed.
+production fleet started by the controller, restores the exact repair fallback
+when one exists, then remains fail-closed.
 
 Codex integration consumes this observation through the owner-composed handoff
 in `docs/CODEX_CONSUMER_HANDOFF.md`. The stack may issue canary and runtime

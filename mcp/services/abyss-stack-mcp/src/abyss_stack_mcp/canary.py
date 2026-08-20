@@ -71,7 +71,7 @@ Ed25519Signature = Annotated[
     Field(min_length=86, max_length=86, pattern=r"^[A-Za-z0-9_-]{86}$"),
 ]
 CanaryPurpose = Literal["current", "last-known-good"]
-CanaryProcessUnit = Literal["production", "bootstrap"]
+CanaryProcessUnit = Literal["production", "bootstrap", "fallback"]
 
 
 class CanaryRunnerError(ValueError):
@@ -345,6 +345,18 @@ def _bootstrap_unit_name(production_unit_name: str) -> str:
     if match is None:
         raise CanaryRunnerError("canary target has no bounded bootstrap unit identity")
     return f"aoa-organ-mcp-read-bootstrap@{match.group(1)}.service"
+
+
+def _fallback_unit_name(production_unit_name: str) -> str:
+    if production_unit_name == "abyss-stack-mcp-read.service":
+        return "abyss-stack-mcp-read-fallback.service"
+    match = re.fullmatch(
+        r"aoa-organ-mcp-read@([A-Za-z0-9_.@-]+)\.service",
+        production_unit_name,
+    )
+    if match is None:
+        raise CanaryRunnerError("canary target has no bounded fallback unit identity")
+    return f"aoa-organ-mcp-read-fallback@{match.group(1)}.service"
 
 
 def _digest(value: Any) -> str:
@@ -1317,6 +1329,10 @@ async def run_canary(
         observed_target = target.model_copy(
             update={"unit_name": _bootstrap_unit_name(target.unit_name)}
         )
+    elif process_unit == "fallback":
+        observed_target = target.model_copy(
+            update={"unit_name": _fallback_unit_name(target.unit_name)}
+        )
     credential_path = (
         _require_no_symlink_components(secret_dir, "canary secret root")
         / f"{target.service_id}-read-bearer-token"
@@ -1412,7 +1428,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--process-unit",
-        choices=("production", "bootstrap"),
+        choices=("production", "bootstrap", "fallback"),
         default="production",
     )
     return parser

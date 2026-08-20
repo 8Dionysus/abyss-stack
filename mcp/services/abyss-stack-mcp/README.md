@@ -471,8 +471,17 @@ completion. Any partial bootstrap step stops bootstrap; any incomplete
 production handoff stops the production fleet that the controller started and
 remains fail-closed.
 
-Within each bootstrap and production phase, canary pairs for independent
-organs run through a bounded dynamic worker pool. Each organ still captures
+Guarded runtime repair has a stronger availability path. The provisioner
+starts exact fallback counterparts for the previously active readers and
+publishes their private unit manifest before admission resumes. The controller
+captures fallback-bound canaries and builds the intermediate preflight catalog
+against those still-serving processes; it does not start conflicting bootstrap
+units. Production start then performs the single bounded endpoint handoff. A
+failure before final production admission stops any production units started by
+the controller and restores the same manifest-bound fallback fleet.
+
+Within each bootstrap, repair-fallback, and production phase, canary pairs for
+independent organs run through a bounded dynamic worker pool. Each organ still captures
 its last-known-good receipt before its current receipt, and admission
 publication waits for every pair to finish successfully. The default is three
 workers; `ABYSS_MCP_CANARY_WORKERS=1` restores exact sequential behavior, and
@@ -511,8 +520,8 @@ Production observation refresh uses `abyss-stack-mcp-observation.service` and
 its two-minute timer. Admission currentness uses the separate
 `abyss-mcp-modern-admission-refresh.timer`: ordinary runs only refresh exact
 production evidence, while an expired cold start or a non-reusable
-deployment-bound admission follows the bounded bootstrap-to-production
-recovery above. Runtime provisioning creates the
+deployment-bound admission follows the bounded bootstrap-to-production or
+repair-fallback-to-production recovery above. Runtime provisioning creates the
 private mode-`0700` observation
 directory but neither starts nor enables the producer. Run the oneshot once
 before starting a stack MCP plane; enable the timer only as an explicit

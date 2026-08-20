@@ -1441,6 +1441,19 @@ esac
             "if ((runtime_swapped && ! runtime_activated))",
             installer,
         )
+        self.assertIn(
+            "if ((runtime_swapped)); then\n"
+            "        printf '%s\\n' \\",
+            installer,
+        )
+        self.assertIn(
+            "preserving the previous MCP runtime backup because rollback did not complete",
+            installer,
+        )
+        self.assertIn(
+            "not restarting the previous MCP read fleet because runtime rollback did not complete",
+            installer,
+        )
 
     @unittest.skipIf(
         hasattr(os, "geteuid") and os.geteuid() == 0,
@@ -1578,6 +1591,11 @@ esac
                 '"$source_name" == .runtime-repair-fallback.* && '
                 '"$target_path" == */runtime-repair-fallback.units ]]; then\n'
                 "  exit 72\n"
+                "fi\n"
+                'if [[ "${ABYSS_STACK_MCP_TEST_FAIL_ROLLBACK:-0}" == 1 && '
+                '"$source_name" == .venv.previous.* && '
+                '"$target_path" == */venv ]]; then\n'
+                "  exit 73\n"
                 "fi\n"
                 'exec /usr/bin/mv "$@"\n',
                 encoding="utf-8",
@@ -2242,6 +2260,59 @@ esac
                 first_identity,
             )
             self.assertTrue(rollback_grant.is_file())
+
+            source_file.write_text(
+                "VALUE = rollback_failure\n",
+                encoding="utf-8",
+            )
+            systemctl_log.write_text("", encoding="utf-8")
+            rollback_failure = subprocess.run(
+                repair_command,
+                cwd=REPO_ROOT,
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_ACTIVE_UNIT": (
+                        "abyss-stack-mcp-read.service"
+                    ),
+                    "ABYSS_STACK_MCP_TEST_ACTIVE_ORGAN_UNITS": (
+                        "aoa-organ-mcp-read@aoa-memo.service"
+                    ),
+                    "ABYSS_STACK_MCP_TEST_FAIL_FALLBACK_MARKER": "1",
+                    "ABYSS_STACK_MCP_TEST_FAIL_ROLLBACK": "1",
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(rollback_failure.returncode, 0)
+            self.assertIn(
+                "preserving the previous MCP runtime backup because rollback "
+                "did not complete",
+                rollback_failure.stderr,
+            )
+            self.assertIn(
+                "not restarting the previous MCP read fleet because runtime "
+                "rollback did not complete",
+                rollback_failure.stderr,
+            )
+            rollback_failure_events = systemctl_log.read_text(
+                encoding="utf-8"
+            ).splitlines()
+            self.assertFalse(
+                any(
+                    event.startswith("--user start ")
+                    for event in rollback_failure_events
+                )
+            )
+            preserved_backups = list(runtime_root.glob(".venv.previous.*"))
+            self.assertEqual(len(preserved_backups), 1)
+            self.assertFalse(venv.exists())
+            preserved_backups[0].rename(venv)
+            for unit_state_marker in (
+                *systemctl_state.glob("*.started"),
+                *systemctl_state.glob("*.stopped"),
+            ):
+                unit_state_marker.unlink()
 
             unresolved_fallback = (
                 admission_root / "runtime-repair-fallback.units"
@@ -3879,6 +3950,10 @@ esac
         self.assertIn("    bootstrap \\", script)
         self.assertIn("publish_admission \"$RUN/bootstrap-current\"", script)
         self.assertIn("build_preflight bootstrap", script)
+        self.assertIn("    fallback \\", script)
+        self.assertIn("publish_admission \"$RUN/fallback-current\"", script)
+        self.assertIn("build_preflight fallback", script)
+        self.assertIn("active_runtime_repair_fallback_count", script)
         self.assertIn(".preflight.eligible_count == 11", script)
         self.assertIn(".preflight.blocked_count == 0", script)
         self.assertIn("catalog_matches_current_canaries", script)
@@ -3891,10 +3966,8 @@ esac
             script,
         )
         self.assertIn(
-            'if [[ "$production_admission_reusable" -eq 1 ]]; then\n'
-            '    systemctl --user reset-failed "${production_units[@]}"\n'
-            "  else\n"
-            '    systemctl --user reset-failed "${bootstrap_units[@]}"',
+            'elif [[ "$repair_fallback_loaded" -eq 1 ]]; then\n'
+            "    restore_runtime_repair_fallback",
             script,
         )
         self.assertNotIn(
@@ -3963,6 +4036,24 @@ esac
             script[repair_eligibility:repair_start],
         )
         self.assertLess(repair_reset, repair_start)
+        fallback_validation = script.index(
+            'elif [[ "$repair_fallback_loaded" -eq 1 ]]'
+        )
+        fallback_canary = script.index(
+            "      fallback \\",
+            fallback_validation,
+        )
+        fallback_preflight = script.index(
+            "build_preflight fallback",
+            fallback_canary,
+        )
+        bootstrap_start = script.index(
+            'systemctl --user start "${bootstrap_units[@]}"',
+            fallback_preflight,
+        )
+        self.assertLess(fallback_validation, fallback_canary)
+        self.assertLess(fallback_canary, fallback_preflight)
+        self.assertLess(fallback_preflight, bootstrap_start)
         self.assertIn("After=abyss-mcp-modern-admission-refresh.service", keeper)
         self.assertIn("StartLimitIntervalSec=0", keeper)
         self.assertIn(
