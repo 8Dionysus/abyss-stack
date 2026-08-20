@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 3612661,
+  "allowed_tracked_bytes": 35849361,
+  "approved_by": "repository-owner",
+  "base_ref": "f0b1364f800eb9d0ea65b2f181a424f9a422d814",
+  "changed_generated_bytes": 3612661,
+  "changed_generated_files": 39,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "69a38574a11370d909ef754192af4d8f52c3217444d0ba72a3967fc680677d3e",
+  "reason": "Refresh the owner KAG family for first-run repair idempotence and copied-runtime verification.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35849361,
+  "tracked_bytes_max": 24117248
+}

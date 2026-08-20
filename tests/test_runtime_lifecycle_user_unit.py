@@ -1645,6 +1645,25 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertTrue(all(str(service_root) not in line for line in pip_calls))
 
+            runtime_python = venv / "bin" / "python"
+            runtime_python.unlink()
+            runtime_python.symlink_to(bootstrap)
+            symlinked_runtime_python = subprocess.run(
+                verify_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(symlinked_runtime_python.returncode, 0)
+            self.assertIn(
+                "runtime Python must be an executable regular non-symlink file",
+                symlinked_runtime_python.stderr,
+            )
+            runtime_python.unlink()
+            shutil.copy2(bootstrap, runtime_python)
+
             candidate_audit_journal.unlink()
             unsafe_target = root / "unsafe-audit-target.jsonl"
             unsafe_target.touch(mode=0o600)
@@ -1835,7 +1854,6 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 import_failure.stderr,
             )
 
-            runtime_python = venv / "bin" / "python"
             runtime_python.write_text(
                 runtime_python.read_text(encoding="utf-8")
                 + "\n# simulated measured runtime corruption\n",
@@ -2954,6 +2972,11 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         )
         self.assertIn('AUTO_REPAIR_MARKER="$STACK/Secrets/Configs/', script)
         self.assertIn("automatic runtime repair is not explicitly enabled", script)
+        self.assertIn(
+            'systemctl --user reset-failed "$RUNTIME_REPAIR_SERVICE" \\\n'
+            "    >/dev/null 2>&1 || true",
+            script,
+        )
         self.assertIn("After=abyss-mcp-modern-admission-refresh.service", keeper)
         self.assertIn("StartLimitIntervalSec=0", keeper)
         self.assertIn(
