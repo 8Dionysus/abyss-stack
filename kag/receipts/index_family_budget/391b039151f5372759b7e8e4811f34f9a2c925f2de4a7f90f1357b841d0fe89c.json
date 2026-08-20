@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 6627661,
+  "allowed_tracked_bytes": 36170150,
+  "approved_by": "repository-owner",
+  "base_ref": "760e85f6bb029f89e5ef8a639a8d2bdaee460970",
+  "changed_generated_bytes": 6627661,
+  "changed_generated_files": 65,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "391b039151f5372759b7e8e4811f34f9a2c925f2de4a7f90f1357b841d0fe89c",
+  "reason": "Index the shellcheck-safe exact MCP effect-root ownership fix.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36170150,
+  "tracked_bytes_max": 24117248
+}

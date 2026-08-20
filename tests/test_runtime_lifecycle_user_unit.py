@@ -3873,6 +3873,27 @@ esac
             self.assertEqual(zshrc.stat().st_mode & 0o777, 0o640)
 
     def test_loopback_mcp_units_keep_owner_processes_and_deployed_paths(self) -> None:
+        installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")
+        effect_root_body = installer.split(
+            "aoa_provision_abyss_stack_mcp_effect_root() {", 1
+        )[1].split("\naoa_require_abyss_stack_mcp_units_stopped_for_rotation()", 1)[0]
+        shared_parent_body, owned_root_body = effect_root_body.split(
+            '  if [[ -e "$abyss_stack_mcp_effect_root" || \\\n', 1
+        )
+        self.assertIn(
+            '${AOA_STACK_ROOT}/Logs/mcp/internal-effects"; do',
+            shared_parent_body,
+        )
+        self.assertNotIn('chmod 0700 "$shared_parent"', shared_parent_body)
+        self.assertNotIn(
+            '${AOA_STACK_ROOT}/Logs/mcp/internal-effects" \\\n',
+            owned_root_body,
+        )
+        self.assertIn(
+            'chmod 0700 "$abyss_stack_mcp_effect_root"',
+            owned_root_body,
+        )
+
         template = MCP_HTTP_TEMPLATE.read_text(encoding="utf-8")
         organ_read_template = ORGAN_MCP_READ_TEMPLATE.read_text(encoding="utf-8")
         self.assertIn("RefuseManualStart=yes", template)

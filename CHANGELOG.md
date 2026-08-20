@@ -28,6 +28,10 @@ Tracking starts with the community-docs baseline for this repository.
   After activation, exact repair-fallback peers preserve the prior
   endpoint set until admission commits the production handoff; a later
   admission failure restores that fallback instead of leaving the fleet down.
+  Effect-root provisioning now treats the shared `Logs` and `Logs/mcp`
+  ancestors, including the shared `internal-effects` directory, as validated
+  inputs and changes modes only on its sandbox-owned `read-restart-pilot`
+  root, so guarded repair works under its narrow `ReadWritePaths` allowlist.
 - Make the Intel OVMS cutover safe for first launch and upgrades: link and
   reload owner units before socket activation, retire only the same-project
   legacy Compose owner, allow the digest-pinned Quadlet image to pull when
