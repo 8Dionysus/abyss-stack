@@ -1,9 +1,9 @@
 {
-  "allowed_bytes": 11022190,
+  "allowed_bytes": 11012768,
   "allowed_tracked_bytes": 36181059,
   "approved_by": "repository-owner",
-  "base_ref": "55d49bd3a726ad11bc18a2af2e11275c5f0215ad",
-  "changed_generated_bytes": 11022190,
+  "base_ref": "07ecd9105374b51d1db588b79119e29257cc3c55",
+  "changed_generated_bytes": 11012768,
   "changed_generated_files": 107,
   "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
   "default_limit_bytes": 1048576,
