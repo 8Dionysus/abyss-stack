@@ -2977,6 +2977,26 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             "    >/dev/null 2>&1 || true",
             script,
         )
+        repair_start = script.index(
+            'systemctl --user start "$RUNTIME_REPAIR_SERVICE"'
+        )
+        repair_read_stop = script.rindex(
+            'systemctl --user stop "${bootstrap_units[@]}" '
+            '"${production_units[@]}"',
+            0,
+            repair_start,
+        )
+        repair_reset = script.rindex(
+            'systemctl --user reset-failed "$RUNTIME_REPAIR_SERVICE"',
+            0,
+            repair_start,
+        )
+        self.assertLess(repair_read_stop, repair_reset)
+        self.assertLess(repair_reset, repair_start)
+        self.assertIn(
+            "modern MCP automatic runtime repair could not isolate the read fleet",
+            script,
+        )
         self.assertIn("After=abyss-mcp-modern-admission-refresh.service", keeper)
         self.assertIn("StartLimitIntervalSec=0", keeper)
         self.assertIn(

@@ -191,6 +191,13 @@ ensure_stack_runtime_ready() {
       >&2
     return 1
   }
+  systemctl --user stop "${bootstrap_units[@]}" "${production_units[@]}"
+  [[ "$(active_production_count)" -eq 0 ]] || {
+    printf '%s\n' \
+      'modern MCP automatic runtime repair could not isolate the read fleet' \
+      >&2
+    return 1
+  }
   systemctl --user reset-failed "$RUNTIME_REPAIR_SERVICE" \
     >/dev/null 2>&1 || true
   systemctl --user start "$RUNTIME_REPAIR_SERVICE"
