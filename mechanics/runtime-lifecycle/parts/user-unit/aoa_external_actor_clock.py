@@ -173,6 +173,43 @@ def _validate_evidence_path(path: Path, label: str) -> None:
         raise ClockSupervisorError(f"clock {label} parent is unavailable: {path.parent}")
 
 
+def _configuration_error_path() -> Path | None:
+    raw_error = os.environ.get("AOA_CLOCK_ERROR_LOG", "")
+    if not raw_error:
+        return None
+    error = Path(raw_error)
+    try:
+        _validate_evidence_path(error, "error")
+    except ClockSupervisorError:
+        return None
+    if error.exists() and not error.is_file():
+        return None
+    raw_status = os.environ.get("AOA_CLOCK_STATUS_FILE", "")
+    if raw_status:
+        status = Path(raw_status)
+        try:
+            if status.resolve(strict=False) == error.resolve(strict=False):
+                return None
+        except OSError:
+            return None
+    return error
+
+
+def _check_error_log(path: Path) -> None:
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(
+            path,
+            os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_CLOEXEC,
+            0o600,
+        )
+    except OSError as exc:
+        raise ClockSupervisorError(f"clock error path is not append-writable: {path}") from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
 def _write_marker(path: Path, content: str) -> None:
     descriptor: int | None = None
     try:
@@ -214,6 +251,7 @@ def _required_environment() -> tuple[str, str, Path, Path, Path, Path, float, fl
         raise ClockSupervisorError(f"clock status already exists: {status}")
     if error.exists() and not error.is_file():
         raise ClockSupervisorError(f"clock error path is not a regular file: {error}")
+    _check_error_log(error)
     ready = Path(f"{status}.holder-ready")
     captured = Path(f"{status}.holder-captured")
     for path, label in ((ready, "holder-ready"), (captured, "holder-captured")):
@@ -251,8 +289,23 @@ fi
 while [[ ! -e "$AOA_CLOCK_HOLDER_CAPTURED_FILE" ]]; do
   /usr/bin/sleep 0.05
 done
-\"$AOA_CLOCK_RUNNER\" 2> >(tee -a -- \"$AOA_CLOCK_ERROR_LOG\" >&2)
+runner_stderr_tmp=\"${AOA_CLOCK_ERROR_LOG}.runner.$$\"
+if ! ( set -o noclobber; : >\"$runner_stderr_tmp\" ); then
+  print -u2 -- \"clock runner stderr staging failed: $runner_stderr_tmp\"
+  exit 125
+fi
+\"$AOA_CLOCK_RUNNER\" 2>\"$runner_stderr_tmp\"
 runner_rc=$?
+logging_rc=0
+if ! /usr/bin/tee -a -- \"$AOA_CLOCK_ERROR_LOG\" <\"$runner_stderr_tmp\" >&2; then
+  logging_rc=125
+fi
+if ! /usr/bin/rm -f -- \"$runner_stderr_tmp\"; then
+  logging_rc=125
+fi
+if (( logging_rc != 0 )); then
+  runner_rc=125
+fi
 status_tmp=\"${AOA_CLOCK_STATUS_FILE}.$$\"
 if ! {
   printf 'schema_version=%s\\n' 'aoa_external_actor_clock_status_v1'
@@ -271,16 +324,22 @@ exit \"$runner_rc\"
 def main() -> int:
     signal.signal(signal.SIGINT, _handle_stop)
     signal.signal(signal.SIGTERM, _handle_stop)
-    (
-        runner,
-        title,
-        status_path,
-        error_path,
-        ready_path,
-        captured_path,
-        launch_timeout,
-        close_timeout,
-    ) = _required_environment()
+    try:
+        (
+            runner,
+            title,
+            status_path,
+            error_path,
+            ready_path,
+            captured_path,
+            launch_timeout,
+            close_timeout,
+        ) = _required_environment()
+    except ClockSupervisorError as exc:
+        error_path = _configuration_error_path()
+        if error_path is not None:
+            _append_error(error_path, str(exc))
+        raise
     baseline = _matching_kitties(title)
     child_environment = dict(os.environ)
     child_environment["AOA_CLOCK_STATUS_FILE"] = str(status_path)
@@ -289,6 +348,7 @@ def main() -> int:
     child_environment["AOA_CLOCK_HOLDER_READY_FILE"] = str(ready_path)
     child_environment["AOA_CLOCK_HOLDER_CAPTURED_FILE"] = str(captured_path)
 
+    launch_deadline = time.monotonic() + launch_timeout
     print(
         f"clock supervisor: dispatching detached Kitty title={title!r}",
         flush=True,
@@ -306,7 +366,17 @@ def main() -> int:
             ],
             check=False,
             env=child_environment,
+            timeout=max(POLL_SECONDS, launch_deadline - time.monotonic()),
         )
+    except subprocess.TimeoutExpired as exc:
+        _append_error(
+            error_path,
+            f"detached Kitty dispatch exceeded launch timeout {launch_timeout}: {exc}",
+        )
+        for pid, start_ticks in _matching_kitties(title).items():
+            if baseline.get(pid) != start_ticks:
+                _terminate_kitty(pid, start_ticks, close_timeout)
+        return 125
     except OSError as exc:
         _append_error(error_path, f"detached Kitty dispatch failed: {exc}")
         return 127
@@ -324,7 +394,6 @@ def main() -> int:
 
     kitty_pid: int | None = None
     kitty_start_ticks: int | None = None
-    launch_deadline = time.monotonic() + launch_timeout
     while kitty_pid is None:
         if _STOP_SIGNAL is not None:
             for pid, start_ticks in _matching_kitties(title).items():

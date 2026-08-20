@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -30,6 +32,34 @@ class ExternalActorClockTests(unittest.TestCase):
             command.index("AOA_CLOCK_HOLDER_CAPTURED_FILE"),
             command.index('"$AOA_CLOCK_RUNNER"'),
         )
+        self.assertNotIn("2> >(", command)
+        self.assertIn("runner_stderr_tmp", command)
+        self.assertIn("logging_rc=125", command)
+
+    def test_configuration_failure_is_persisted_to_error_log(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            status = root / "status"
+            error = root / "error.log"
+            environment = os.environ.copy()
+            for name in (
+                "AOA_CLOCK_RUNNER",
+                "AOA_CLOCK_TITLE",
+                "AOA_CLOCK_STATUS_FILE",
+                "AOA_CLOCK_ERROR_LOG",
+            ):
+                environment.pop(name, None)
+            environment["AOA_CLOCK_STATUS_FILE"] = str(status)
+            environment["AOA_CLOCK_ERROR_LOG"] = str(error)
+            completed = subprocess.run(
+                [sys.executable, str(MODULE_PATH)],
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 125)
+            self.assertIn("AOA_CLOCK_RUNNER must be an absolute path", error.read_text())
 
     def test_timeout_parser_rejects_non_finite_or_non_positive_values(self) -> None:
         for value in ("nan", "inf", "-inf", "0", "-1"):
