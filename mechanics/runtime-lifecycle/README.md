@@ -74,10 +74,13 @@ mutates only while all three planes are stopped, while verification only compare
 deployed source-and-lock and measured runtime identities. The guarded automatic
 repair action is deliberately different: it holds an exclusive operation lock,
 builds and verifies a replacement under shared source/runtime locks while the
-read plane remains available, then briefly quiesces only the stack read unit for
-the atomic swap. A dependency or build failure therefore leaves the active read
+read plane remains available, then enumerates and briefly quiesces the active
+stack and organ readers for the atomic swap. Every direct shared-venv consumer
+is serialized: recurring maintenance and candidate units hold operation/runtime
+locks, while long-lived organ readers retain a runtime lock until that final
+quiescence. A dependency or build failure therefore leaves the active read
 plane untouched; a post-quiesce activation failure restores the previous runtime
-and the previously active stack read unit. Before quiescence, repair issues a
+and every reader that had been active. Before quiescence, repair issues a
 private rollback grant bound to the exact measured content and recorded identity
 of the still-running runtime. Only the read contour may consume that grant after
 rollback; candidate, internal-effect, and general verification remain strict,
@@ -92,7 +95,10 @@ Managed launch acquires shared source-projection and runtime locks, repeats the
 verification under both, and retains them across `exec`; an applying MCP
 Configs sync or runtime replacement therefore requires all three stack MCP
 planes to be stopped. Candidate and internal-effect launches additionally hold
-the shared operation lock so they cannot enter during the two-phase repair.
+the shared operation lock so they cannot enter during the two-phase repair. The
+all-user-unit install route creates or validates that private operation lock
+before linking and reloading units, so an upgraded sandboxed unit never has to
+create it itself.
 Provisioning additionally creates the private stack MCP observation directory.
 The separately linked observation oneshot and timer use the provisioned venv
 to compose current runtime evidence from explicit inputs. They are not enabled

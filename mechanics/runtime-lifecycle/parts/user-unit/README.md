@@ -112,14 +112,17 @@ runtime parent chain, every existing observation/admission/orchestration/tasks/
 effect path, audit journals, and exact loaded unit topology are safe while
 allowing the current read/bootstrap processes to remain active. Repair then
 builds and verifies the replacement while the read fleet keeps its shared
-runtime locks. Only a fully built replacement may quiesce the stack
-read/bootstrap peer for the final exclusive-lock swap. Pre-quiescence failures
-leave every reader active; post-quiescence failures restore the prior runtime
-through an exact, private, read-only rollback grant and restart the stack peer
-that had been active. The repair still refuses an
+runtime locks. Only a fully built replacement may enumerate and quiesce the
+active stack and organ readers for the final exclusive-lock swap. Recurring and
+candidate shared-venv consumers hold operation/runtime locks throughout their
+run. Pre-quiescence failures leave every reader active; post-quiescence failures
+restore the prior runtime and every reader that had been active; the stack peer
+uses an exact, private, read-only rollback grant. The repair still refuses an
 independently active candidate or internal-effect plane and unsafe source,
 operation lock, runtime lock, journal, runtime path, or unit topology without
 taking the working read fleet down.
+The all-user-unit route creates or validates the private operation lock before
+linking upgraded units.
 
 The separately linked `abyss-mcp-protocol-watch.path` reacts to Codex and
 protocol-lab source changes; its hourly timer observes new upstream

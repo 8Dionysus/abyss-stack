@@ -1708,6 +1708,33 @@ aoa_verify_abyss_stack_mcp_read_rollback_grant() {
   [[ "$grant" == "${observed_content_digest}:${recorded_identity}" ]]
 }
 
+aoa_provision_abyss_stack_mcp_unit_operation_lock() {
+  if [[ -e "$abyss_stack_mcp_runtime_root" || \
+        -L "$abyss_stack_mcp_runtime_root" ]]; then
+    [[ -d "$abyss_stack_mcp_runtime_root" && \
+       ! -L "$abyss_stack_mcp_runtime_root" ]] || \
+      aoa_die "abyss-stack MCP runtime root must be a non-symlink directory"
+  else
+    install -d -m 0750 "$abyss_stack_mcp_runtime_root"
+  fi
+  if [[ -e "$abyss_stack_mcp_operation_lock" || \
+        -L "$abyss_stack_mcp_operation_lock" ]]; then
+    [[ -f "$abyss_stack_mcp_operation_lock" && \
+       ! -L "$abyss_stack_mcp_operation_lock" ]] || \
+      aoa_die "abyss-stack MCP operation lock must be a regular non-symlink file"
+  else
+    (
+      umask 077
+      set -o noclobber
+      : > "$abyss_stack_mcp_operation_lock"
+    ) 2>/dev/null || true
+    [[ -f "$abyss_stack_mcp_operation_lock" && \
+       ! -L "$abyss_stack_mcp_operation_lock" ]] || \
+      aoa_die "failed to create the abyss-stack MCP operation lock"
+  fi
+  chmod 0600 "$abyss_stack_mcp_operation_lock"
+}
+
 aoa_verify_abyss_stack_mcp_runtime() {
   local contour="${1:-all}"
   local marker=".abyss-stack-mcp-runtime-identity"
@@ -1894,6 +1921,9 @@ aoa_provision_abyss_stack_mcp_runtime() {
   local read_unit_was_active=0
   local bootstrap_unit_was_active=0
   local read_fleet_quiesced=0
+  local organ_units_output=""
+  local organ_unit=""
+  local -a active_organ_read_units=()
   local operation_lock_fd=""
   local runtime_lock_fd=""
   local source_lock_fd=""
@@ -1957,6 +1987,12 @@ aoa_provision_abyss_stack_mcp_runtime() {
           'failed to restore abyss-stack MCP bootstrap read service during repair cleanup' \
           >&2
       fi
+      for organ_unit in "${active_organ_read_units[@]}"; do
+        if ! systemctl --user start "$organ_unit"; then
+          printf 'failed to restore active MCP reader %s during repair cleanup\n' \
+            "$organ_unit" >&2
+        fi
+      done
     fi
     exit "$exit_status"
   }
@@ -2254,6 +2290,21 @@ aoa_provision_abyss_stack_mcp_runtime() {
         abyss-stack-mcp-read-bootstrap.service; then
       bootstrap_unit_was_active=1
     fi
+    organ_units_output="$(
+      systemctl --user list-units \
+        --type=service \
+        --state=active,activating,reloading \
+        --no-legend \
+        --plain \
+        'aoa-organ-mcp-read@*.service' \
+        'aoa-organ-mcp-read-bootstrap@*.service'
+    )" || aoa_die "failed to enumerate active MCP organ readers before runtime activation"
+    while read -r organ_unit _; do
+      [[ -n "$organ_unit" ]] || continue
+      [[ "$organ_unit" =~ ^aoa-organ-mcp-read(-bootstrap)?@[A-Za-z0-9_.-]+\.service$ ]] || \
+        aoa_die "unsafe active MCP organ reader unit name: ${organ_unit}"
+      active_organ_read_units+=("$organ_unit")
+    done <<< "$organ_units_output"
     if ((read_unit_was_active || bootstrap_unit_was_active)); then
       observed_content_digest="$(
         aoa_digest_abyss_stack_mcp_runtime "$abyss_stack_mcp_venv"
@@ -2282,7 +2333,8 @@ aoa_provision_abyss_stack_mcp_runtime() {
     read_fleet_quiesced=1
     if ! systemctl --user stop \
         abyss-stack-mcp-read.service \
-        abyss-stack-mcp-read-bootstrap.service; then
+        abyss-stack-mcp-read-bootstrap.service \
+        "${active_organ_read_units[@]}"; then
       aoa_die "failed to quiesce the abyss-stack MCP read plane for runtime activation"
     fi
     if ! aoa_require_abyss_stack_mcp_units_stopped; then
@@ -2612,6 +2664,7 @@ aoa_link_runtime_lifecycle_dropin() {
 
 if ((link_all_user_units)); then
   [[ -f "$unit_manifest" ]] || aoa_die "managed user-unit manifest not found: ${unit_manifest}"
+  aoa_provision_abyss_stack_mcp_unit_operation_lock
   while IFS= read -r unit_name || [[ -n "$unit_name" ]]; do
     unit_name="${unit_name%%#*}"
     unit_name="${unit_name#"${unit_name%%[![:space:]]*}"}"

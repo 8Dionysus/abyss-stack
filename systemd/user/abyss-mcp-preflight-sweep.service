@@ -4,6 +4,8 @@ Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-m
 After=abyss-mcp-modern-admission-refresh.service abyss-mcp-admission-keeper.service
 StartLimitIntervalSec=0
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-operation.lock
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/admission/managed-contours.json
 ConditionPathIsDirectory=/srv/AbyssOS/abyss-stack/Logs/mcp/preflight
 
@@ -13,7 +15,7 @@ WorkingDirectory=/srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PYTHONHOME=
 Environment=PYTHONPATH=
-ExecStart=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -I -B -m abyss_stack_mcp.preflight_sweep --catalog /srv/AbyssOS/abyss-stack/Logs/mcp/admission/managed-contours.json --output-root /srv/AbyssOS/abyss-stack/Logs/mcp/preflight
+ExecStart=/usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-operation.lock /usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -I -B -m abyss_stack_mcp.preflight_sweep --catalog /srv/AbyssOS/abyss-stack/Logs/mcp/admission/managed-contours.json --output-root /srv/AbyssOS/abyss-stack/Logs/mcp/preflight
 Nice=10
 IOSchedulingClass=idle
 CPUWeight=20

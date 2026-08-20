@@ -186,10 +186,12 @@ reviewing the guarded repair unit; disable it with the matching
 invoke runtime reprovisioning without this private host marker, and runtime
 verification includes an isolated stdlib and dependency import probe in
 addition to the measured file digest. The repair oneshot builds the replacement
-while the read service remains available and stops only the stack read/bootstrap
-pair after the build is verified. Build failure leaves the fleet untouched;
-post-stop activation failure restores the previous runtime and the previously
-active stack read peer through an exact, private, read-only rollback grant.
+while the read fleet remains available and stops the enumerated active stack and
+organ readers only after the build is verified. Other direct shared-venv jobs
+hold operation/runtime locks throughout their run. Build failure leaves the
+fleet untouched; post-stop activation failure restores the previous runtime and
+every previously active reader, with the stack peer using an exact, private,
+read-only rollback grant.
 
 The privileged support allowlist under `systemd/system/managed-units.txt` is
 installed separately:

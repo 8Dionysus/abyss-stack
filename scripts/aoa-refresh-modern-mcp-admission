@@ -6,6 +6,9 @@ VENV="$STACK/Services/abyss-stack-mcp/venv/bin"
 INSTALL_SYSTEMD="$STACK/Configs/scripts/aoa-install-systemd"
 RUNTIME_REPAIR_SERVICE="abyss-stack-mcp-runtime-repair.service"
 AUTO_REPAIR_MARKER="$STACK/Secrets/Configs/abyss-stack-mcp-runtime-auto-repair.enabled"
+OPERATION_LOCK="$STACK/Services/abyss-stack-mcp/.runtime-operation.lock"
+SOURCE_LOCK="$STACK/Services/abyss-stack-mcp/.source-projection.lock"
+RUNTIME_LOCK="$STACK/Services/abyss-stack-mcp/.runtime-provision.lock"
 REGISTRY=/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json
 DEPLOYMENT="$STACK/Logs/mcp/deployments/latest.json"
 TARGETS="$STACK/Configs/mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/runtime-targets.v1.json"
@@ -34,6 +37,9 @@ bootstrap_started=0
 production_handoff_started=0
 rebase_staging=""
 canary_worker_pids=()
+operation_lock_fd=""
+source_lock_fd=""
+runtime_lock_fd=""
 
 case "$CANARY_WORKERS" in
   ''|*[!0-9]*)
@@ -198,6 +204,24 @@ ensure_stack_runtime_ready() {
   "$INSTALL_SYSTEMD" --verify-abyss-stack-mcp-runtime=read
 }
 
+lock_stack_runtime_consumers() {
+  local lock_path
+
+  for lock_path in "$OPERATION_LOCK" "$SOURCE_LOCK" "$RUNTIME_LOCK"; do
+    [[ -f "$lock_path" && ! -L "$lock_path" ]] || {
+      printf 'modern MCP admission runtime lock is unavailable or unsafe: %s\n' \
+        "$lock_path" >&2
+      return 1
+    }
+  done
+  exec {operation_lock_fd}< "$OPERATION_LOCK"
+  /usr/bin/flock --shared "$operation_lock_fd"
+  exec {source_lock_fd}< "$SOURCE_LOCK"
+  /usr/bin/flock --shared "$source_lock_fd"
+  exec {runtime_lock_fd}< "$RUNTIME_LOCK"
+  /usr/bin/flock --shared "$runtime_lock_fd"
+}
+
 rebase_expired_registry() {
   local now_iso
   local expiry_iso
@@ -299,6 +323,7 @@ exec {refresh_lock_fd}<>"$LOCK"
 flock --exclusive "$refresh_lock_fd"
 
 ensure_stack_runtime_ready
+lock_stack_runtime_consumers
 
 now_epoch=$(date -u +%s)
 deployment_manifest_id=$(jq -er .manifest_id "$DEPLOYMENT")
