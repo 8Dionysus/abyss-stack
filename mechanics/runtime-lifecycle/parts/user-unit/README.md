@@ -78,6 +78,15 @@ Independent organ canary pairs use three workers by default during each
 bootstrap or production evidence wave. The last-known-good/current order stays
 serial within one organ, the complete wave joins before publication, and
 `ABYSS_MCP_CANARY_WORKERS=1` is the exact sequential rollback setting.
+The timer uses a five-minute recurrence rather than continuously replaying a
+failed two-phase transaction. Before bootstrap, the refresh verifies the
+measured stack runtime and may delegate a guarded exact-lock reprovision to the
+manual-only `abyss-stack-mcp-runtime-repair.service` when it has drifted. This
+automatic delegation is denied until the operator persists the reversible
+host policy with `aoa-install-systemd --enable-abyss-stack-mcp-auto-repair`;
+`--disable-abyss-stack-mcp-auto-repair` removes only that opt-in. The repair
+still refuses active stack planes and unsafe source, lock, journal, or unit
+topology.
 
 The separately linked `abyss-mcp-protocol-watch.path` reacts to Codex and
 protocol-lab source changes; its hourly timer observes new upstream
@@ -99,16 +108,13 @@ bearers are inherited only by Codex, the managed Codex binary symlink is
 unchanged, and running shells and sessions are untouched. The ToS bearer is
 staged only; this route does not create its workspace wrapper, start it, or add
 it to the owner bundle.
-The launcher treats modern MCP availability as a pre-exec dependency: it
-checks the exact eleven production units and ports, starts the bounded modern
-admission recovery oneshot when any member is absent, and refuses to exec
-Codex unless the fleet becomes complete within ten minutes. The wait is
-operator-visible from its first line, reports unit and listener counts every
-fifteen seconds, and prints the final handoff before Codex starts, so a bounded
-cold recovery is not presented as a frozen terminal. This closes the boot race
-where Codex could start before expired-admission recovery and retain failed MCP
-clients for the whole session. `AOA_MCP_READINESS_SKIP=1` is a single-process
-rollback escape hatch, not a persistent readiness policy.
+The launcher treats modern MCP availability as a recoverable dependency. It
+checks the exact eleven production units and ports and requests the bounded
+modern admission recovery oneshot when a member is absent, but never waits for
+that transaction and never refuses to exec Codex because MCP is degraded. This
+keeps the operator client available while the boot-time timer and lifecycle
+units repair MCP independently. `AOA_MCP_READINESS_SKIP=1` suppresses even the
+background request for one diagnostic launch.
 The candidate values remain separate named variables for separate Memo/Evals
 candidate registrations; inheriting them does not merge endpoint authority.
 `--remove-mcp-http-codex-client` removes only that managed Zsh block.
@@ -128,9 +134,13 @@ Their managed Python environment
 is a separate explicit action:
 `aoa-install-systemd --provision-abyss-stack-mcp-runtime`. It installs the
 artifact-hashed dependency lock, binds deployed source and lock digests into
-the runtime identity, and records a deterministic digest of every installed
-runtime file and symlink target. Reuse rehashes the environment and a missing
-or mismatched content digest forces a guarded rebuild. Generated entry-point
+the runtime identity, copies the bootstrap interpreter into the runtime, and
+records a deterministic digest of every installed runtime file and symlink
+target. A host interpreter replacement therefore does not mutate an already
+published runtime through a venv symlink. Reuse rehashes the environment and a missing
+or mismatched content digest forces a guarded rebuild. Read-only verification
+also runs isolated stdlib and installed-dependency imports, so an unusable
+host-backed Python base cannot pass on the private file digest alone. Generated entry-point
 shebangs are rewritten from the private staging root to the stable published
 venv path before this digest is recorded and before the atomic rename. Bytecode writes are
 disabled while provisioning, verifying, and running the managed units so the

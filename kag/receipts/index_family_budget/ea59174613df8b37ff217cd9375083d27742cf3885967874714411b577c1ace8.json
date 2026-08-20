@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 27976535,
+  "allowed_tracked_bytes": 35841438,
+  "approved_by": "repository-owner",
+  "base_ref": "776ee649be91db79d507563e2a3fd0b91e0f0a54",
+  "changed_generated_bytes": 27976535,
+  "changed_generated_files": 312,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "ea59174613df8b37ff217cd9375083d27742cf3885967874714411b577c1ace8",
+  "reason": "Repository-owner receipt for the official Codex MCP client migration, guarded startup repair policy projection, and existing tracked-size exceedance.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35841438,
+  "tracked_bytes_max": 24117248
+}

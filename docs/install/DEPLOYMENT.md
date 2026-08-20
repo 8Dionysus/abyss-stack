@@ -160,6 +160,7 @@ scripts/aoa-sync-configs --dry-run --item mcp --item schemas --item systemd --it
 scripts/aoa-sync-configs --item mcp --item schemas --item systemd --item scripts --item mechanics
 scripts/aoa-install-systemd --all-user-units
 scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime
+scripts/aoa-install-systemd --enable-abyss-stack-mcp-auto-repair
 scripts/aoa-install-systemd --provision-mcp-http-auth
 scripts/aoa-install-systemd --provision-organ-mcp-read-auth
 scripts/aoa-install-systemd --provision-organ-mcp-candidate-auth
@@ -260,7 +261,9 @@ the registered consumers before the subsequent sequential canary.
 The stack MCP runtime provision action builds a source-addressed virtual
 environment under `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv` from the
 already deployed package, installs its exact hash-locked dependency closure,
-verifies dependencies and imports, and records both source and lock digests.
+verifies dependencies and imports, records both source and lock digests, and
+copies the bootstrap interpreter into the published runtime so a later host
+interpreter replacement cannot mutate the measured closure through a symlink.
 It also records a deterministic digest of the installed runtime files, symlink
 targets, and bytes behind the fully resolved `bin/python` chain after rebinding
 generated entry-point shebangs from the private staging path to the stable
@@ -296,7 +299,15 @@ owner-isolated processes.
 The Codex client install adds a removable Zsh launch function that delegates
 to the deployed launcher without replacing the managed Codex executable or
 exporting the bearer into the parent shell. It affects only new interactive
-shell launches and leaves running Codex sessions unchanged.
+shell launches and leaves running Codex sessions unchanged. If the modern MCP
+fleet is incomplete, the launcher requests background admission recovery and
+starts Codex immediately; MCP lifecycle failure never blocks the operator
+client. The boot timer retries at a five-minute cadence, and the refresh may
+invoke the guarded runtime-repair oneshot before its exact bootstrap handoff
+only after the operator has persisted that host policy with
+`aoa-install-systemd --enable-abyss-stack-mcp-auto-repair`. The inverse
+`--disable-abyss-stack-mcp-auto-repair` action is the rollback and neither
+action starts, stops, or repairs a service.
 Verify parity, then canary authenticated owners one at a time before using live
 MCP responses as current evidence.
 
@@ -545,6 +556,10 @@ journals under `${AOA_STACK_ROOT}/Logs/mcp/audit`, enforces directory mode
 `0700`, file mode `0600`, regular non-symlink files, and the managed 32 MiB
 per-contour capacity. The read-only verifier requires this safe path shape; the
 server validates the complete receipt hash chain before bind.
+Every later read-only runtime verification also executes a bounded isolated
+stdlib and dependency import probe. A copied interpreter whose host-backed
+stdlib has become unusable is therefore rejected and routed to the same
+guarded rebuild instead of being accepted from its unchanged private digest.
 Generated console-script shebangs are rebound to the stable published venv
 before that digest and the atomic rename, so no launcher retains the removed
 staging path. Reuse requires the observed runtime digest to match that recorded

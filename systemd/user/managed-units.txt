@@ -22,6 +22,7 @@ abyss-mcp-admission-keeper.path
 abyss-mcp-admission-keeper.timer
 abyss-mcp-modern-admission-refresh.service
 abyss-mcp-modern-admission-refresh.timer
+abyss-stack-mcp-runtime-repair.service
 abyss-mcp-protocol-watch.service
 abyss-mcp-protocol-watch.path
 abyss-mcp-protocol-watch.timer

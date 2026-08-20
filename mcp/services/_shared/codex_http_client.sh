@@ -2,11 +2,8 @@
 set -euo pipefail
 
 stack_root="${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}"
-modern_codex_default="/srv/abyss-machine/runtimes/codex-os-abyss-mcp/0.147.0-abyss.2/bin/codex-os-abyss-mcp"
-modern_server_default="abyss_stack,abyss_machine,aoa_decisions,aoa_memo,aoa_session_memory,aoa_evals,aoa_kag,aoa_stats,aoa_4pda_connector,aoa_telegram_connector,aoa_discord_connector"
+managed_codex_default="${HOME}/.codex/packages/standalone/current/bin/codex"
 readiness_service="abyss-mcp-modern-admission-refresh.service"
-readiness_timeout_seconds=600
-readiness_progress_interval_seconds=15
 
 readiness_units=(
   abyss-stack-mcp-read.service
@@ -146,26 +143,8 @@ modern_fleet_counts() {
   printf '%s %s\n' "$active_units" "$listening_ports"
 }
 
-cancel_readiness_wait() {
-  local recovery_pid="${1:-}"
-
-  if [[ -n "$recovery_pid" ]] && kill -0 "$recovery_pid" 2>/dev/null; then
-    kill -TERM "$recovery_pid" 2>/dev/null || true
-    wait "$recovery_pid" 2>/dev/null || true
-  fi
-  printf 'OS Abyss MCP: Codex launch cancelled; fleet recovery may continue in the background.\n' >&2
-  exit 130
-}
-
-ensure_modern_fleet_ready() {
-  local active_units=0
-  local elapsed_seconds=0
-  local listening_ports=0
-  local next_report_seconds="$readiness_progress_interval_seconds"
-  local recovery_pid=""
-  local recovery_status=0
+request_modern_fleet_recovery() {
   local skip="${AOA_MCP_READINESS_SKIP:-0}"
-  local started_at=0
 
   case "${skip,,}" in
     1|true|yes|on)
@@ -175,43 +154,16 @@ ensure_modern_fleet_ready() {
   metadata_only_invocation "$@" && return 0
   modern_fleet_ready && return 0
 
-  command -v timeout >/dev/null 2>&1 || fail "timeout command is required for MCP readiness recovery"
-  printf '%s\n' \
-    "OS Abyss MCP: read fleet is unavailable; recovery started (up to 10 minutes). Codex will open after readiness." \
-    >&2
-  started_at="$SECONDS"
-  timeout --signal=TERM "${readiness_timeout_seconds}s" \
-    systemctl --user start "$readiness_service" &
-  recovery_pid="$!"
-  trap 'cancel_readiness_wait "$recovery_pid"' HUP INT TERM
-
-  while kill -0 "$recovery_pid" 2>/dev/null; do
-    sleep 1
-    elapsed_seconds=$((SECONDS - started_at))
-    if ((elapsed_seconds >= next_report_seconds)); then
-      read -r active_units listening_ports < <(modern_fleet_counts)
-      printf 'OS Abyss MCP: still recovering after %ss (%s/%s units, %s/%s listeners).\n' \
-        "$elapsed_seconds" \
-        "$active_units" "${#readiness_units[@]}" \
-        "$listening_ports" "${#readiness_ports[@]}" \
-        >&2
-      next_report_seconds=$((next_report_seconds + readiness_progress_interval_seconds))
-    fi
-  done
-
-  if wait "$recovery_pid"; then
-    recovery_status=0
+  if command -v systemctl >/dev/null 2>&1 && \
+     systemctl --user start --no-block "$readiness_service"; then
+    printf '%s\n' \
+      "OS Abyss MCP: read fleet is unavailable; background recovery requested. Starting Codex without blocking." \
+      >&2
   else
-    recovery_status="$?"
+    printf '%s\n' \
+      "OS Abyss MCP: read fleet is unavailable and background recovery could not be requested. Starting Codex without MCP readiness." \
+      >&2
   fi
-  trap - HUP INT TERM
-  ((recovery_status == 0)) || \
-    fail "modern MCP fleet recovery exited ${recovery_status}; inspect ${readiness_service}"
-  modern_fleet_ready || \
-    fail "modern MCP fleet is not ready after ${readiness_service} completed"
-  elapsed_seconds=$((SECONDS - started_at))
-  printf 'OS Abyss MCP: read fleet ready after %ss; starting Codex.\n' \
-    "$elapsed_seconds" >&2
 }
 
 load_credential \
@@ -261,8 +213,8 @@ load_credential \
 
 codex_executable="${AOA_CODEX_EXECUTABLE:-}"
 if [[ -z "$codex_executable" ]]; then
-  if [[ -x "$modern_codex_default" && ! -d "$modern_codex_default" ]]; then
-    codex_executable="$modern_codex_default"
+  if [[ -x "$managed_codex_default" && ! -d "$managed_codex_default" ]]; then
+    codex_executable="$managed_codex_default"
   else
     codex_executable="$(command -v codex || true)"
   fi
@@ -274,12 +226,8 @@ launcher_real="$(readlink -f "$0")"
 codex_real="$(readlink -f "$codex_executable")"
 [[ "$launcher_real" != "$codex_real" ]] || fail "Codex executable resolves back to this launcher"
 
-if [[ "$codex_real" == "$(readlink -f "$modern_codex_default")" ]]; then
-  export CODEX_MCP_2026_SERVERS="${CODEX_MCP_2026_SERVERS:-$modern_server_default}"
-fi
-
-ensure_modern_fleet_ready "$@"
+request_modern_fleet_recovery "$@"
 
 unset AOA_CODEX_EXECUTABLE
 unset AOA_MCP_READINESS_SKIP
-exec "$codex_executable" "$@"
+exec "$codex_executable" --enable mcp_2026_07_28 "$@"

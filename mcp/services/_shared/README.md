@@ -28,15 +28,13 @@ remain transitional compatibility only. Real credentials remain outside git
 under the deployed stack `Secrets/` tree.
 
 `codex_http_client.sh` is the matching client-side launcher for hosts that use
-authenticated loopback owners. Before an interactive or non-interactive Codex
-run that can consume MCP, it requires all eleven admitted modern read units and
-loopback listeners. A missing member synchronously starts the bounded modern
-admission recovery oneshot and waits at most ten minutes. The launcher reports
-the wait immediately, emits bounded unit/listener progress every fifteen
-seconds, and reports the final readiness handoff; Codex is executed only after
-the exact fleet is ready. Metadata-only Codex commands do not start runtime
-services, and an operator may set `AOA_MCP_READINESS_SKIP=1` for one explicit
-rollback launch. The launcher validates the compatibility credential and
+authenticated loopback owners. It checks all eleven admitted modern read units
+and loopback listeners before an MCP-consuming run. A missing member requests
+the bounded modern admission recovery oneshot without waiting and then starts
+Codex immediately. MCP degradation is visible but cannot turn the interactive
+client into a lifecycle lock. Metadata-only Codex commands do not request
+runtime recovery, and `AOA_MCP_READINESS_SKIP=1` remains an explicit diagnostic
+escape hatch. The launcher validates the compatibility credential and
 the owner-distinct Decisions, Memo, Evals, KAG, Session Memory, Stats, Abyss
 Machine, staged ToS corpus, 4PDA, Telegram, Discord, Course, StackOverflow, and
 XDA read credentials, plus the distinct Memo and Evals candidate credentials.
@@ -44,4 +42,7 @@ It places each bearer only in its named variable in the launched Codex process
 environment and then execs the installed Codex binary. It does not replace
 that binary, persist bearer values in shell configuration, merge MCP
 owner/contour boundaries, or imply that the ToS wrapper/canary admission
-already exists.
+already exists. The launcher prefers the official standalone `current` Codex
+installation and explicitly enables its `mcp_2026_07_28` feature; the bounded
+OS Abyss fork remains a protocol-lab/Tasks witness and is no longer the
+interactive client default.

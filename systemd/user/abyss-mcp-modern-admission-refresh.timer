@@ -3,7 +3,7 @@ Description=Fail-closed modern MCP admission refresh backstop
 
 [Timer]
 OnBootSec=1s
-OnUnitActiveSec=30s
+OnUnitActiveSec=5min
 AccuracySec=5s
 Persistent=true
 Unit=abyss-mcp-modern-admission-refresh.service
