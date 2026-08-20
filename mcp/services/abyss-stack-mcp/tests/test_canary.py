@@ -87,6 +87,28 @@ def test_bootstrap_unit_name_rejects_unmanaged_unit() -> None:
         canary._bootstrap_unit_name("different.service")
 
 
+@pytest.mark.parametrize(
+    ("production_unit", "fallback_unit"),
+    (
+        (
+            "aoa-organ-mcp-read@aoa-kag.service",
+            "aoa-organ-mcp-read-fallback@aoa-kag.service",
+        ),
+        ("abyss-stack-mcp-read.service", "abyss-stack-mcp-read-fallback.service"),
+    ),
+)
+def test_fallback_unit_name_is_bounded_to_managed_read_pairs(
+    production_unit: str,
+    fallback_unit: str,
+) -> None:
+    assert canary._fallback_unit_name(production_unit) == fallback_unit
+
+
+def test_fallback_unit_name_rejects_unmanaged_unit() -> None:
+    with pytest.raises(CanaryRunnerError, match="no bounded fallback"):
+        canary._fallback_unit_name("different.service")
+
+
 def canonical_digest(value: object) -> str:
     raw = json.dumps(
         value,
@@ -696,7 +718,18 @@ def test_listener_wait_rejects_non_loopback_without_connecting(
         asyncio.run(canary._wait_for_endpoint_listener("https://example.test/mcp", 2))
 
 
-def test_last_known_good_canary_uses_distinct_committed_route(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("process_unit", "observed_unit"),
+    (
+        ("bootstrap", "aoa-organ-mcp-read-bootstrap@aoa-kag.service"),
+        ("fallback", "aoa-organ-mcp-read-fallback@aoa-kag.service"),
+    ),
+)
+def test_last_known_good_canary_uses_distinct_committed_route(
+    tmp_path: Path,
+    process_unit: canary.CanaryProcessUnit,
+    observed_unit: str,
+) -> None:
     targets_path = write_json(
         tmp_path / "targets.json",
         RuntimeTargetCatalog(targets=(target(),)).model_dump(mode="json"),
@@ -719,21 +752,17 @@ def test_last_known_good_canary_uses_distinct_committed_route(tmp_path: Path) ->
         )
         return successful_probe()
 
-    bootstrap_identity = (
-        "systemd-user:aoa-organ-mcp-read-bootstrap@aoa-kag.service:pid:321:start:654"
-    )
+    recovery_identity = f"systemd-user:{observed_unit}:pid:321:start:654"
 
-    def bootstrap_process_identity_reader(
+    def recovery_process_identity_reader(
         selected_target: RuntimeTarget,
         deployment_revision: str,
         observed_at: datetime,
     ) -> str:
-        assert selected_target.unit_name == (
-            "aoa-organ-mcp-read-bootstrap@aoa-kag.service"
-        )
+        assert selected_target.unit_name == observed_unit
         assert deployment_revision == "a" * 40
         assert observed_at == NOW
-        return bootstrap_identity
+        return recovery_identity
 
     receipt, _, _, _ = asyncio.run(
         run_canary(
@@ -743,16 +772,16 @@ def test_last_known_good_canary_uses_distinct_committed_route(tmp_path: Path) ->
             output_root=tmp_path / "rollback-canary",
             deployment_manifest_path=write_deployment_manifest(tmp_path),
             purpose="last-known-good",
-            process_unit="bootstrap",
+            process_unit=process_unit,
             clock=lambda: NOW,
             probe_runner=fake_probe,
-            process_identity_reader=bootstrap_process_identity_reader,
+            process_identity_reader=recovery_process_identity_reader,
         )
     )
 
     assert receipt.canary_route.endswith("/last-known-good")
-    assert receipt.process_unit_name == ("aoa-organ-mcp-read-bootstrap@aoa-kag.service")
-    assert receipt.process_identity == bootstrap_identity
+    assert receipt.process_unit_name == observed_unit
+    assert receipt.process_identity == recovery_identity
 
 
 def test_run_canary_rejects_process_change_during_probe(tmp_path: Path) -> None:

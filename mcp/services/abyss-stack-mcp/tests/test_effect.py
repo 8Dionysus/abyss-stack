@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import fcntl
 import json
+import os
 from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -17,7 +19,11 @@ from abyss_stack_mcp.effect import (
     create_approval,
     stage_plan,
 )
-from abyss_stack_mcp.effect_server import _run_worker, build_effect_server
+from abyss_stack_mcp.effect_server import (
+    _acquire_request_drain_lock,
+    _run_worker,
+    build_effect_server,
+)
 from test_stack_mcp import DIGEST_C, NOW, application, observation, subject
 
 
@@ -332,6 +338,30 @@ def test_effect_server_exposes_only_the_exact_pilot_tool(
         "approval_id",
         "idempotency_key",
     }
+
+
+def test_request_drain_lock_waits_without_starting_an_effect_worker(
+    tmp_path: Path,
+) -> None:
+    effect_root = tmp_path / "effects"
+    effect_root.mkdir(mode=0o700)
+    drain_path = effect_root / ".request-drain.lock"
+    drain_path.touch(mode=0o600)
+    exclusive_descriptor = os.open(drain_path, os.O_RDWR | os.O_CLOEXEC)
+    fcntl.flock(exclusive_descriptor, fcntl.LOCK_EX)
+
+    async def scenario() -> None:
+        acquire = asyncio.create_task(_acquire_request_drain_lock(effect_root))
+        await asyncio.sleep(0.1)
+        assert not acquire.done()
+        fcntl.flock(exclusive_descriptor, fcntl.LOCK_UN)
+        descriptor = await asyncio.wait_for(acquire, timeout=1)
+        os.close(descriptor)
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        os.close(exclusive_descriptor)
 
 
 def test_caller_cancellation_waits_for_bounded_worker_recovery(

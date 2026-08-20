@@ -46,14 +46,20 @@ and artifact-hashed lock. It holds the source lock throughout and excludes
 candidate and internal-effect starts with an operation lock, while allowing the
 working read fleet to retain its shared runtime locks during dependency
 installation and replacement verification. Only a fully built replacement may
-briefly quiesce the stack read/bootstrap peer, acquire the exclusive runtime
-lock, and perform the atomic swap. Failure before quiescence leaves every
-reader active; failure after quiescence restores the previous venv and restarts
-whichever stack read peer was active. Before quiescence, repair writes a private
-grant bound to that runtime's exact measured content and recorded identity. Only
+enumerate and briefly quiesce the active stack and organ readers, acquire the
+exclusive runtime lock, and perform the atomic swap. Recurring maintenance and
+candidate consumers hold operation/runtime locks; long-lived organ readers hold
+the runtime lock through their process lifetime. Failure before quiescence
+leaves every reader active; failure after quiescence restores the previous venv
+and restarts every reader that had been active. Before quiescence, repair writes
+a private grant bound to that runtime's exact measured content and recorded
+identity. Only
 the read contour may use the grant to survive source-identity drift after
 rollback; candidate, internal-effect, and general verification stay strict, and
-a successful replacement removes the grant. The admission unit reserves twenty
+a successful replacement removes the grant. Exact repair-fallback counterparts for
+the previously active endpoint set remain available until admission validates
+and commits the production handoff. Any later admission failure restores that
+bounded fallback before returning. The admission unit reserves twenty
 minutes so the bounded ten-minute repair still leaves a separate admission
 budget.
 
@@ -78,7 +84,10 @@ widening the admission controller's ordinary write surface. Building the
 replacement before the final quiescence keeps a package-index or dependency
 failure from turning recoverable runtime drift into read-plane downtime. The
 operation lock keeps non-read stack planes out of the interval while running
-readers continue under their existing shared runtime locks.
+readers continue under their existing shared runtime locks. The unit-install
+route creates the private operation lock before sandboxed upgraded units become
+loadable, and every direct shared-venv consumer either holds both lifecycle
+locks or participates in the final reader quiescence.
 
 ## Consequences
 
@@ -90,8 +99,10 @@ readers continue under their existing shared runtime locks.
 - Positive: dependency retrieval, build, or pre-swap verification failure does
   not stop the working read fleet.
 - Positive: a post-quiescence activation failure atomically restores the prior
-  runtime and the previously active stack read peer through an exact,
+  runtime and every previously active reader; the stack peer uses an exact,
   read-contour-only rollback grant.
+- Positive: failure after successful activation but before admission commit
+  preserves the prior endpoint set through exact repair-fallback counterparts.
 - Positive: Codex starts even when MCP recovery fails or is still running.
 - Tradeoff: a Codex session opened during genuine MCP downtime may retain
   unavailable MCP clients until a later session, but the operator is not locked

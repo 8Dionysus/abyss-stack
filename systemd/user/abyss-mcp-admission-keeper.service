@@ -4,6 +4,8 @@ Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-m
 After=abyss-mcp-modern-admission-refresh.service
 StartLimitIntervalSec=0
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-operation.lock
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock
 ConditionPathExists=/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/deployments/latest.json
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/canaries/latest
@@ -16,7 +18,7 @@ WorkingDirectory=/srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PYTHONHOME=
 Environment=PYTHONPATH=
-ExecStart=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -I -B -m abyss_stack_mcp.admission_automation --registry /srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json --deployment-manifest /srv/AbyssOS/abyss-stack/Logs/mcp/deployments/latest.json --runtime-targets /srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/runtime-targets.v1.json --canary-root /srv/AbyssOS/abyss-stack/Logs/mcp/canaries/latest --canary-public-key /srv/AbyssOS/abyss-stack/Secrets/Configs/abyss-stack-mcp-canary-ed25519-public-key.pem --deployed-root /srv/AbyssOS/abyss-stack --output-root /srv/AbyssOS/abyss-stack/Logs/mcp/admission --keeper-inbox-root /srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox
+ExecStart=/usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-operation.lock /usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -I -B -m abyss_stack_mcp.admission_automation --registry /srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json --deployment-manifest /srv/AbyssOS/abyss-stack/Logs/mcp/deployments/latest.json --runtime-targets /srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/runtime-targets.v1.json --canary-root /srv/AbyssOS/abyss-stack/Logs/mcp/canaries/latest --canary-public-key /srv/AbyssOS/abyss-stack/Secrets/Configs/abyss-stack-mcp-canary-ed25519-public-key.pem --deployed-root /srv/AbyssOS/abyss-stack --output-root /srv/AbyssOS/abyss-stack/Logs/mcp/admission --keeper-inbox-root /srv/AbyssOS/abyss-stack/Logs/mcp/admission/keeper-inbox
 Nice=10
 IOSchedulingClass=idle
 CPUWeight=20

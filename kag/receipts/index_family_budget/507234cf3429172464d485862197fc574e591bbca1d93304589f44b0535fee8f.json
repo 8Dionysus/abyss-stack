@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 21545920,
+  "allowed_tracked_bytes": 36166749,
+  "approved_by": "repository-owner",
+  "base_ref": "0e5ee7859686a646928be7bd88d55a39c9d748ef",
+  "changed_generated_bytes": 21545920,
+  "changed_generated_files": 248,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "507234cf3429172464d485862197fc574e591bbca1d93304589f44b0535fee8f",
+  "reason": "Refresh the exact portable KAG family after the MCP repair drain was extended across the first upgrade from legacy effect workers.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36166749,
+  "tracked_bytes_max": 24117248
+}

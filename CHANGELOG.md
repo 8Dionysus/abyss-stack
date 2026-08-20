@@ -17,10 +17,17 @@ Tracking starts with the community-docs baseline for this repository.
   probe.
 - Keep the modern MCP read fleet available across recoverable runtime-repair
   failures. Guarded repair now builds and verifies the replacement before
-  quiescing the stack read peer, excludes candidate/internal-effect launches
-  with an operation lock, and restores the previous runtime and active reader
-  through an exact, private, read-only rollback grant if the final atomic
-  activation fails.
+  enumerating and quiescing active stack and organ readers, serializes every
+  direct shared-venv consumer, provisions the operation lock during unit
+  installation, and restores the previous runtime plus every active reader if
+  final activation fails. The stack peer uses an exact, private, read-only
+  rollback grant. An internal-effect request drain now lets an accepted effect
+  finish its mandatory rollback and receipt before repair stops that endpoint;
+  the existing execution lock gives the same guarantee during the first upgrade
+  from a runtime that predates the request gate.
+  After activation, exact repair-fallback peers preserve the prior
+  endpoint set until admission commits the production handoff; a later
+  admission failure restores that fallback instead of leaving the fleet down.
 - Make the Intel OVMS cutover safe for first launch and upgrades: link and
   reload owner units before socket activation, retire only the same-project
   legacy Compose owner, allow the digest-pinned Quadlet image to pull when

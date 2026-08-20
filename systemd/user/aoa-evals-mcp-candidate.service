@@ -3,6 +3,8 @@ Description=AoA evals MCP candidate-only local-port contour
 Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/aoa-evals-mcp/README.md
 PartOf=aoa-mcp-http.service
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-operation.lock
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock
 StartLimitIntervalSec=60
 StartLimitBurst=3
 
@@ -21,7 +23,7 @@ Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PYTHONHOME=
 Environment=PYTHONPATH=
 LoadCredential=aoa-evals-mcp-candidate-bearer-token:/srv/AbyssOS/abyss-stack/Secrets/Configs/aoa-evals-mcp-candidate-bearer-token
-ExecStart=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -I -B -m abyss_stack_mcp.process_launcher --executable /srv/AbyssOS/.codex/bin/aoa-evals-mcp-server.py
+ExecStart=/usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-operation.lock /usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -I -B -m abyss_stack_mcp.process_launcher --executable /srv/AbyssOS/.codex/bin/aoa-evals-mcp-server.py
 Restart=on-failure
 RestartSec=2
 TimeoutStopSec=20

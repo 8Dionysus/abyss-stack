@@ -9,11 +9,13 @@ abyss-stack-resource-guards-apply.service
 aoa-mcp-http@.service
 aoa-organ-mcp-read@.service
 aoa-organ-mcp-read-bootstrap@.service
+aoa-organ-mcp-read-fallback@.service
 aoa-memo-mcp-candidate.service
 aoa-evals-mcp-candidate.service
 aoa-mcp-http.service
 abyss-stack-mcp-read.service
 abyss-stack-mcp-read-bootstrap.service
+abyss-stack-mcp-read-fallback.service
 abyss-stack-mcp-candidate.service
 abyss-stack-mcp-internal-effect.service
 abyss-stack-mcp-observation.service

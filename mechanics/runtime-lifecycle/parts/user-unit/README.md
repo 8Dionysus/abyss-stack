@@ -112,14 +112,31 @@ runtime parent chain, every existing observation/admission/orchestration/tasks/
 effect path, audit journals, and exact loaded unit topology are safe while
 allowing the current read/bootstrap processes to remain active. Repair then
 builds and verifies the replacement while the read fleet keeps its shared
-runtime locks. Only a fully built replacement may quiesce the stack
-read/bootstrap peer for the final exclusive-lock swap. Pre-quiescence failures
-leave every reader active; post-quiescence failures restore the prior runtime
-through an exact, private, read-only rollback grant and restart the stack peer
-that had been active. The repair still refuses an
-independently active candidate or internal-effect plane and unsafe source,
-operation lock, runtime lock, journal, runtime path, or unit topology without
-taking the working read fleet down.
+runtime locks. The eligibility probe shares the operation lock with known
+candidate/internal-effect consumers but still rejects an exclusive provisioner.
+Only a fully built replacement may record and quiesce the exact active non-read
+consumer set. It first takes the internal-effect request gate exclusively, so
+an accepted effect completes rollback and receipt while later requests cannot
+reach a worker. It also drains the older execution lock so the first upgrade is
+safe even when the live server predates the request gate; only then may it stop
+that endpoint, upgrade the operation lock
+to exclusive, and enumerate and
+quiesce active stack and organ readers for the final runtime-lock swap.
+Pre-quiescence failures leave every plane active; later failures restore the
+prior runtime, every reader, and every non-read consumer that had been active;
+the stack peer uses an exact, private, read-only rollback grant. Unsafe source,
+operation lock, runtime lock, journal, runtime path, or unit topology still
+fails closed without taking the working read fleet down. That topology check
+also proves the loaded Memo/Evals candidate and recurring
+observation/admission/preflight fragments use both shared locks, so a stale
+pre-reload definition cannot run during or be restored after the swap. Loaded
+production/bootstrap/fallback organ instances likewise prove their shared
+runtime-lock templates.
+Successful activation starts exact repair-fallback counterparts for the prior active
+endpoint set. Admission removes their private fallback list only after the
+production handoff validates, and restores those peers on any later failure.
+The all-user-unit route creates or validates the private operation lock before
+linking upgraded units.
 
 The separately linked `abyss-mcp-protocol-watch.path` reacts to Codex and
 protocol-lab source changes; its hourly timer observes new upstream

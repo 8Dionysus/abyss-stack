@@ -524,15 +524,22 @@ def test_runtime_overlay_rejects_unobserved_managed_process(tmp_path: Path) -> N
         )
 
 
-def test_bootstrap_canary_builds_preflight_catalog_before_production_start(
+@pytest.mark.parametrize(
+    "recovery_unit",
+    (
+        "aoa-organ-mcp-read-bootstrap@demo.service",
+        "aoa-organ-mcp-read-fallback@demo.service",
+    ),
+)
+def test_recovery_canary_builds_preflight_catalog_before_production_start(
     tmp_path: Path,
+    recovery_unit: str,
 ) -> None:
-    bootstrap_unit = "aoa-organ-mcp-read-bootstrap@demo.service"
-    bootstrap_identity = f"systemd-user:{bootstrap_unit}:pid:777:start:888"
+    recovery_identity = f"systemd-user:{recovery_unit}:pid:777:start:888"
     binding = _fixture(
         tmp_path,
-        receipt_process_unit_name=bootstrap_unit,
-        receipt_process_identity=bootstrap_identity,
+        receipt_process_unit_name=recovery_unit,
+        receipt_process_identity=recovery_identity,
     )
     assert run_preflight(binding, checked_at=NOW).eligible_to_start
     registry = json.loads(Path(binding.registry_path).read_text(encoding="utf-8"))
@@ -559,14 +566,14 @@ def test_bootstrap_canary_builds_preflight_catalog_before_production_start(
         rollback_route="runbook://demo/rollback/read",
     )
 
-    def bootstrap_runner(command: tuple[str, ...]) -> SimpleNamespace:
-        assert bootstrap_unit in command
+    def recovery_runner(command: tuple[str, ...]) -> SimpleNamespace:
+        assert recovery_unit in command
         return SimpleNamespace(
             returncode=0,
             stdout=(
                 "LoadState=loaded\nActiveState=active\nMainPID=777\n"
                 "ExecMainStartTimestampMonotonic=888\n"
-                "FragmentPath=/tmp/demo-bootstrap.service\n"
+                "FragmentPath=/tmp/demo-recovery.service\n"
             ),
         )
 
@@ -578,13 +585,13 @@ def test_bootstrap_canary_builds_preflight_catalog_before_production_start(
         canary_public_key_path=Path(binding.canary_public_key_path),
         deployment_manifest_path=deployment_path,
         generated_at=NOW,
-        systemctl_runner=bootstrap_runner,
+        systemctl_runner=recovery_runner,
         deployment_loader=lambda path: (deployment, deployment["manifest_id"]),
     )
 
     assert skipped == ()
     assert overlay["contours"][0]["runtime_identity"]["process_identity"] == (
-        bootstrap_identity
+        recovery_identity
     )
 
 

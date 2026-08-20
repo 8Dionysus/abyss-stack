@@ -215,13 +215,25 @@ The modern admission timer starts one second after the user manager and uses a
 five-minute recurrence. A failed two-phase transaction therefore cannot thrash
 the machine every thirty seconds. Before bootstrap it verifies the stack MCP
 runtime and may invoke the opt-in guarded repair service; that service
-rebuilds only from the deployed package and hash lock. It holds a shared
-source/runtime snapshot while the read plane remains live, excludes candidate
-and internal-effect launches through a distinct operation lock, and stops only
-the stack read/bootstrap pair after the replacement passes dependency checks.
-Pre-stop failure preserves the live reader; post-stop failure restores the
-previous runtime and active read peer through an exact, private, read-only
-rollback grant. Unsafe lifecycle topology still fails closed. Keeper
+rebuilds only from the deployed package and hash lock. It stages under shared
+operation/source/runtime locks while all planes remain live. After dependency
+checks it records and stops the exact active candidate/internal-effect set,
+upgrades the operation lock to exclusive, and only then enumerates and stops
+the active stack and organ readers for the runtime swap. Every other direct
+shared-venv unit holds operation/runtime locks throughout its run. Pre-stop
+failure preserves every live plane; later failure restores the previous
+runtime, every active reader, and every recorded non-read consumer, with the
+stack peer using an exact, private, read-only rollback grant. The all-user-unit
+installer creates the operation lock before reload. Repair also validates that
+the loaded Memo/Evals candidate and recurring observation/admission/preflight
+fragments match their managed lock-aware sources before any runtime replacement.
+Representative production/bootstrap/fallback organ instances also prove the
+loaded template generation. Unsafe lifecycle topology
+still fails closed. Successful activation keeps exact repair-fallback counterparts
+for the prior endpoint set while fallback-bound canaries and preflight run.
+A partial prior set is completed by bootstrap peers only for missing organs;
+the stack fallback retains read Tasks. Only the final production start
+displaces recovery peers. A later admission failure restores that fallback. Keeper
 and preflight services are ordered behind that transaction and allow finite
 publication bursts without becoming permanently failed through
 `unit-start-limit-hit`.

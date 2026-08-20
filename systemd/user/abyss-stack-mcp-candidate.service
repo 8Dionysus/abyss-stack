@@ -3,6 +3,7 @@ Description=abyss-stack MCP non-executing candidate plane
 Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/README.md
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.source-projection.lock
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-operation.lock
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/audit/policy-candidate.jsonl
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json

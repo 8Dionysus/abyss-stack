@@ -18,6 +18,7 @@ from .canary import (
     CanaryReceipt,
     CanaryRunnerError,
     _bootstrap_unit_name,
+    _fallback_unit_name,
     _read_public_key,
     verify_canary_receipt,
 )
@@ -424,9 +425,13 @@ def run_preflight(
             checks,
             "canary-process-unit",
             receipt.process_unit_name
-            in {binding.unit_name, _bootstrap_unit_name(binding.unit_name)},
+            in {
+                binding.unit_name,
+                _bootstrap_unit_name(binding.unit_name),
+                _fallback_unit_name(binding.unit_name),
+            },
             "canary_process_unit_mismatch",
-            "production-or-bounded-bootstrap-unit",
+            "production-or-bounded-recovery-unit",
             receipt.process_unit_name,
             binding.canary_receipt_path,
         )

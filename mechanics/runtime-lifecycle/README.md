@@ -72,16 +72,33 @@ route through
 `scripts/aoa-install-systemd --verify-abyss-stack-mcp-runtime`; provisioning
 mutates only while all three planes are stopped, while verification only compares
 deployed source-and-lock and measured runtime identities. The guarded automatic
-repair action is deliberately different: it holds an exclusive operation lock,
-builds and verifies a replacement under shared source/runtime locks while the
-read plane remains available, then briefly quiesces only the stack read unit for
-the atomic swap. A dependency or build failure therefore leaves the active read
-plane untouched; a post-quiesce activation failure restores the previous runtime
-and the previously active stack read unit. Before quiescence, repair issues a
+repair action is deliberately different: it stages under shared operation,
+source, and runtime locks while the read plane and non-read consumers remain
+available. After verification it records and quiesces the exact active
+candidate/internal-effect consumer set, upgrades the operation lock to
+exclusive, then enumerates and briefly quiesces the active stack and organ
+readers for the atomic swap. Every direct shared-venv consumer is serialized:
+recurring maintenance and candidate units hold operation/runtime locks, while
+long-lived organ readers retain a runtime lock until that final quiescence. The
+loaded Memo/Evals candidate and recurring observation/admission/preflight
+fragments are verified against their managed lock-aware sources before repair
+may proceed; representative production/bootstrap/fallback organ instances also
+prove the loaded template generation. A
+dependency or build failure therefore leaves every live plane untouched; a
+post-quiesce activation failure restores the previous runtime, every reader,
+and every non-read consumer that had been active. Before stopping the
+internal-effect endpoint, repair exclusively drains its private request gate;
+an already accepted worker retains the shared side until its mandatory rollback
+and receipt are complete, while later requests cannot enter execution. Repair
+then takes the pre-existing execution lock too, preserving that guarantee across
+an upgrade from a runtime that does not yet implement the request gate. Before
+read-plane quiescence, repair issues a
 private rollback grant bound to the exact measured content and recorded identity
 of the still-running runtime. Only the read contour may consume that grant after
 rollback; candidate, internal-effect, and general verification remain strict,
-and successful replacement removes the grant.
+and successful replacement removes the grant. Exact repair-fallback counterparts for
+the prior active endpoint set then remain live until admission validates and
+commits production; a later admission failure restores that fallback.
 Provisioning also creates the separate read/candidate policy audit journals
 when absent and never truncates them. Verification checks their regular-file,
 non-symlink, private-mode, and bounded-size shape without repairing it. Manual
@@ -92,7 +109,10 @@ Managed launch acquires shared source-projection and runtime locks, repeats the
 verification under both, and retains them across `exec`; an applying MCP
 Configs sync or runtime replacement therefore requires all three stack MCP
 planes to be stopped. Candidate and internal-effect launches additionally hold
-the shared operation lock so they cannot enter during the two-phase repair.
+the shared operation lock so they cannot enter during the two-phase repair. The
+all-user-unit install route creates or validates that private operation lock
+before linking and reloading units, so an upgraded sandboxed unit never has to
+create it itself.
 Provisioning additionally creates the private stack MCP observation directory.
 The separately linked observation oneshot and timer use the provisioned venv
 to compose current runtime evidence from explicit inputs. They are not enabled

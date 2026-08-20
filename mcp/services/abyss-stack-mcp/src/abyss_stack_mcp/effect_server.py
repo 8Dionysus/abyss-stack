@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import fcntl
 import json
 import logging
 import os
@@ -18,8 +19,10 @@ from .effect import (
     DEFAULT_EFFECT_ROOT,
     DEFAULT_OBSERVATION_PATH,
     EXACT_TOOL_ID,
+    REQUEST_DRAIN_LOCK_NAME,
     EffectError,
     InternalEffectReceipt,
+    _open_private_lock,
 )
 from .server import (
     INTERNAL_EFFECT_PORT,
@@ -33,6 +36,20 @@ LOGGER = logging.getLogger(__name__)
 MAX_INPUT_BYTES = 4096
 MAX_OUTPUT_BYTES = 2 * 1024 * 1024
 WORKER_TIMEOUT_SECONDS = 120
+
+
+async def _acquire_request_drain_lock(effect_root: Path) -> int:
+    descriptor = _open_private_lock(effect_root, REQUEST_DRAIN_LOCK_NAME)
+    try:
+        while True:
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_SH | fcntl.LOCK_NB)
+                return descriptor
+            except BlockingIOError:
+                await asyncio.sleep(0.05)
+    except BaseException:
+        os.close(descriptor)
+        raise
 
 
 async def _run_worker(
@@ -167,13 +184,17 @@ def build_effect_server() -> Any:
         if len(canonical_json_bytes(arguments)) > MAX_INPUT_BYTES:
             raise EffectError("internal-effect request exceeds its size limit")
         _reject_secret_material(arguments)
-        return await _run_worker(
-            plan_id=plan_id,
-            approval_id=approval_id,
-            idempotency_key=idempotency_key,
-            effect_root=effect_root,
-            observation_path=observation_path,
-        )
+        request_lock_descriptor = await _acquire_request_drain_lock(effect_root)
+        try:
+            return await _run_worker(
+                plan_id=plan_id,
+                approval_id=approval_id,
+                idempotency_key=idempotency_key,
+                effect_root=effect_root,
+                observation_path=observation_path,
+            )
+        finally:
+            os.close(request_lock_descriptor)
 
     tools = getattr(mcp, "_tool_manager", None)
     if tools is not None and set(getattr(tools, "_tools", {})) != {EXACT_TOOL_ID}:
