@@ -1728,10 +1728,41 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             runtime_python.unlink()
             shutil.copy2(bootstrap, runtime_python)
 
+            with read_audit_journal.open("r+b") as oversized_journal:
+                oversized_journal.truncate(33_554_433)
+            oversized_repair_eligibility = subprocess.run(
+                repair_eligibility_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(oversized_repair_eligibility.returncode, 0)
+            self.assertIn(
+                "read audit journal exceeds the managed 32 MiB capacity",
+                oversized_repair_eligibility.stderr,
+            )
+            with read_audit_journal.open("r+b") as oversized_journal:
+                oversized_journal.truncate(0)
+
             candidate_audit_journal.unlink()
             unsafe_target = root / "unsafe-audit-target.jsonl"
             unsafe_target.touch(mode=0o600)
             candidate_audit_journal.symlink_to(unsafe_target)
+            unsafe_repair_eligibility = subprocess.run(
+                repair_eligibility_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(unsafe_repair_eligibility.returncode, 0)
+            self.assertIn(
+                "candidate audit journal must be a regular non-symlink file",
+                unsafe_repair_eligibility.stderr,
+            )
             unsafe_audit = subprocess.run(
                 verify_command,
                 cwd=REPO_ROOT,

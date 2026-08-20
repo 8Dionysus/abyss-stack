@@ -1440,6 +1440,7 @@ aoa_verify_abyss_stack_mcp_repair_eligibility() {
   )" ]]; then
     aoa_die "deployed abyss-stack MCP package must contain only regular files and directories"
   fi
+  aoa_verify_abyss_stack_mcp_audit_journals all
   if ! aoa_require_abyss_stack_mcp_units_stopped 1; then
     aoa_die "$abyss_stack_mcp_units_error"
   fi
