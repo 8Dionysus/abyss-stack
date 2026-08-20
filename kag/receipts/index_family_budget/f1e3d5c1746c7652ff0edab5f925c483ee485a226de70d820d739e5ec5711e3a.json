@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 5180900,
+  "allowed_tracked_bytes": 36226411,
+  "approved_by": "repository-owner",
+  "base_ref": "8744f3f74c802577e96719efa4105417102205ac",
+  "changed_generated_bytes": 5180900,
+  "changed_generated_files": 58,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "f1e3d5c1746c7652ff0edab5f925c483ee485a226de70d820d739e5ec5711e3a",
+  "reason": "Index the detached external actor clock lifecycle repair and its registered regression test on current main.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36226411,
+  "tracked_bytes_max": 24117248
+}
