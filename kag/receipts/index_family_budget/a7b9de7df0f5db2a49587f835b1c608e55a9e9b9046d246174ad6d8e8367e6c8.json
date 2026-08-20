@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 6917788,
+  "allowed_tracked_bytes": 35856600,
+  "approved_by": "repository-owner",
+  "base_ref": "c9bcf00a9bbe77989a14c97b74d33e11dcfc0c71",
+  "changed_generated_bytes": 6917788,
+  "changed_generated_files": 70,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "a7b9de7df0f5db2a49587f835b1c608e55a9e9b9046d246174ad6d8e8367e6c8",
+  "reason": "Refresh the portable KAG family for the bounded modern MCP repair eligibility gate that preserves the working read fleet when repair prerequisites are unsafe.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35856600,
+  "tracked_bytes_max": 24117248
+}

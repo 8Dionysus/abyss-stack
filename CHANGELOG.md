@@ -9,6 +9,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Keep the modern MCP read fleet available across recoverable runtime-repair
+  failures. Guarded repair now builds and verifies the replacement before
+  quiescing the stack read peer, excludes candidate/internal-effect launches
+  with an operation lock, and restores the previous runtime and active reader
+  through an exact, private, read-only rollback grant if the final atomic
+  activation fails.
 - Bind the operator-visible responsibility holder to its own non-replacing
   lifecycle receipt before direct Codex `exec`, distinct from nested proof
   actors. The installed incarnation runtime now closes only that exact
@@ -135,8 +141,12 @@ Tracking starts with the community-docs baseline for this repository.
 - Treat pre-`--copies` abyss-stack MCP runtimes as repair-required: read
   verification now rejects a symlink-backed runtime Python, while the guarded
   admission repair remains idempotent when its systemd unit has never been
-  loaded. Upgraded standalone hosts with automatic repair enabled rebuild the
-  stopped runtime before admission; hosts without that explicit opt-in remain
+  loaded. Upgraded standalone hosts with automatic repair enabled first prove
+  repair eligibility against the source, locks, bootstrap interpreter, the
+  complete repair-managed runtime parent chain, audit journals, and exact
+  loaded unit topology while the read fleet stays available. Only then do they
+  stop the exact read/bootstrap fleet, release its managed shared locks, rebuild the runtime,
+  and re-admit the read fleet; hosts without that explicit opt-in remain
   fail-closed and require manual provisioning.
 - Preserve an external actor's exact role, Codex thread, task, projection, and
   authority across a pre-turn ChatGPT usage-limit failure. The explicit

@@ -191,6 +191,7 @@ ensure_stack_runtime_ready() {
       >&2
     return 1
   }
+  "$INSTALL_SYSTEMD" --verify-abyss-stack-mcp-repair-eligibility
   systemctl --user reset-failed "$RUNTIME_REPAIR_SERVICE" \
     >/dev/null 2>&1 || true
   systemctl --user start "$RUNTIME_REPAIR_SERVICE"

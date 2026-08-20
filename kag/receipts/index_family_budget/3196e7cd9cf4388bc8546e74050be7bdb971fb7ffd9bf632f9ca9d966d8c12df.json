@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 9451828,
+  "allowed_tracked_bytes": 35879697,
+  "approved_by": "repository-owner",
+  "base_ref": "c9bcf00a9bbe77989a14c97b74d33e11dcfc0c71",
+  "changed_generated_bytes": 9451828,
+  "changed_generated_files": 104,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "3196e7cd9cf4388bc8546e74050be7bdb971fb7ffd9bf632f9ca9d966d8c12df",
+  "reason": "Refresh the owner family for the accepted MCP runtime-repair decision and generated decision graph.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35879697,
+  "tracked_bytes_max": 24117248
+}

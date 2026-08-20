@@ -71,7 +71,17 @@ route through
 `scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime` and
 `scripts/aoa-install-systemd --verify-abyss-stack-mcp-runtime`; provisioning
 mutates only while all three planes are stopped, while verification only compares
-deployed source-and-lock and measured runtime identities.
+deployed source-and-lock and measured runtime identities. The guarded automatic
+repair action is deliberately different: it holds an exclusive operation lock,
+builds and verifies a replacement under shared source/runtime locks while the
+read plane remains available, then briefly quiesces only the stack read unit for
+the atomic swap. A dependency or build failure therefore leaves the active read
+plane untouched; a post-quiesce activation failure restores the previous runtime
+and the previously active stack read unit. Before quiescence, repair issues a
+private rollback grant bound to the exact measured content and recorded identity
+of the still-running runtime. Only the read contour may consume that grant after
+rollback; candidate, internal-effect, and general verification remain strict,
+and successful replacement removes the grant.
 Provisioning also creates the separate read/candidate policy audit journals
 when absent and never truncates them. Verification checks their regular-file,
 non-symlink, private-mode, and bounded-size shape without repairing it. Manual
@@ -81,7 +91,8 @@ inaccessible.
 Managed launch acquires shared source-projection and runtime locks, repeats the
 verification under both, and retains them across `exec`; an applying MCP
 Configs sync or runtime replacement therefore requires all three stack MCP
-planes to be stopped.
+planes to be stopped. Candidate and internal-effect launches additionally hold
+the shared operation lock so they cannot enter during the two-phase repair.
 Provisioning additionally creates the private stack MCP observation directory.
 The separately linked observation oneshot and timer use the provisioned venv
 to compose current runtime evidence from explicit inputs. They are not enabled
