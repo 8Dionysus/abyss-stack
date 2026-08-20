@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import math
 import signal
 import subprocess
 import sys
@@ -138,19 +139,57 @@ def _read_status(path: Path) -> int:
     return result
 
 
-def _terminate_kitty(pid: int | None, start_ticks: int | None) -> None:
+def _terminate_kitty(
+    pid: int | None,
+    start_ticks: int | None,
+    close_timeout_seconds: float = DEFAULT_CLOSE_TIMEOUT_SECONDS,
+) -> None:
     if pid is None or start_ticks is None or not _identity_live(pid, start_ticks):
         return
     try:
         os.kill(pid, signal.SIGTERM)
     except ProcessLookupError:
         return
-    deadline = time.monotonic() + DEFAULT_CLOSE_TIMEOUT_SECONDS
+    deadline = time.monotonic() + close_timeout_seconds
     while time.monotonic() < deadline and _identity_live(pid, start_ticks):
         time.sleep(POLL_SECONDS)
 
 
-def _required_environment() -> tuple[str, str, Path, Path]:
+def _finite_timeout(name: str, default: float) -> float:
+    raw = os.environ.get(name, str(default))
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise ClockSupervisorError(f"{name} must be a finite positive number") from exc
+    if not math.isfinite(value) or value <= 0:
+        raise ClockSupervisorError(f"{name} must be a finite positive number")
+    return value
+
+
+def _validate_evidence_path(path: Path, label: str) -> None:
+    if not path.is_absolute() or path.is_symlink():
+        raise ClockSupervisorError(f"clock {label} path is unsafe: {path}")
+    if not path.parent.is_dir() or path.parent.is_symlink():
+        raise ClockSupervisorError(f"clock {label} parent is unavailable: {path.parent}")
+
+
+def _write_marker(path: Path, content: str) -> None:
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(
+            path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC,
+            0o600,
+        )
+        os.write(descriptor, content.encode("utf-8"))
+    except OSError as exc:
+        raise ClockSupervisorError(f"clock marker publication failed: {path}") from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def _required_environment() -> tuple[str, str, Path, Path, Path, Path, float, float]:
     runner = os.environ.get("AOA_CLOCK_RUNNER", "")
     title = os.environ.get("AOA_CLOCK_TITLE", "")
     if not runner or not Path(runner).is_absolute():
@@ -159,27 +198,61 @@ def _required_environment() -> tuple[str, str, Path, Path]:
         raise ClockSupervisorError(f"clock runner is not executable: {runner}")
     if not title or any(character in title for character in "\x00\r\n"):
         raise ClockSupervisorError("AOA_CLOCK_TITLE must be non-empty and single-line")
-    status = Path(
-        os.environ.get("AOA_CLOCK_STATUS_FILE", f"{runner}.systemd-status")
-    )
-    error = Path(
-        os.environ.get("AOA_CLOCK_ERROR_LOG", f"{runner}.systemd-error.log")
-    )
+    status_value = os.environ.get("AOA_CLOCK_STATUS_FILE", "")
+    error_value = os.environ.get("AOA_CLOCK_ERROR_LOG", "")
+    if not status_value or not error_value:
+        raise ClockSupervisorError(
+            "AOA_CLOCK_STATUS_FILE and AOA_CLOCK_ERROR_LOG must be explicit runtime paths"
+        )
+    status = Path(status_value)
+    error = Path(error_value)
     for path, label in ((status, "status"), (error, "error")):
-        if not path.is_absolute() or path.is_symlink():
-            raise ClockSupervisorError(f"clock {label} path is unsafe: {path}")
-        if not path.parent.is_dir() or path.parent.is_symlink():
-            raise ClockSupervisorError(f"clock {label} parent is unavailable: {path.parent}")
+        _validate_evidence_path(path, label)
+    if status.resolve(strict=False) == error.resolve(strict=False):
+        raise ClockSupervisorError("clock status and error paths must be distinct")
     if status.exists():
         raise ClockSupervisorError(f"clock status already exists: {status}")
-    return runner, title, status, error
+    if error.exists() and not error.is_file():
+        raise ClockSupervisorError(f"clock error path is not a regular file: {error}")
+    ready = Path(f"{status}.holder-ready")
+    captured = Path(f"{status}.holder-captured")
+    for path, label in ((ready, "holder-ready"), (captured, "holder-captured")):
+        _validate_evidence_path(path, label)
+        if path.exists():
+            raise ClockSupervisorError(f"clock {label} marker already exists: {path}")
+    evidence_paths = {
+        status.resolve(strict=False),
+        error.resolve(strict=False),
+        ready.resolve(strict=False),
+        captured.resolve(strict=False),
+    }
+    if len(evidence_paths) != 4:
+        raise ClockSupervisorError("clock evidence paths must be distinct")
+    launch_timeout = _finite_timeout(
+        "AOA_CLOCK_LAUNCH_TIMEOUT_SEC", DEFAULT_LAUNCH_TIMEOUT_SECONDS
+    )
+    close_timeout = _finite_timeout(
+        "AOA_CLOCK_CLOSE_TIMEOUT_SEC", DEFAULT_CLOSE_TIMEOUT_SECONDS
+    )
+    return runner, title, status, error, ready, captured, launch_timeout, close_timeout
 
 
 def _runner_command() -> str:
     return """set +e
+umask 077
+ready_tmp="${AOA_CLOCK_HOLDER_READY_FILE}.$$"
+if ! {
+  printf 'holder_pid=%s\\n' "$$"
+} >"$ready_tmp" || ! /usr/bin/mv -f -- "$ready_tmp" "$AOA_CLOCK_HOLDER_READY_FILE"; then
+  print -u2 -- "clock holder handshake publication failed: $AOA_CLOCK_HOLDER_READY_FILE"
+  /usr/bin/rm -f -- "$ready_tmp"
+  exit 125
+fi
+while [[ ! -e "$AOA_CLOCK_HOLDER_CAPTURED_FILE" ]]; do
+  /usr/bin/sleep 0.05
+done
 \"$AOA_CLOCK_RUNNER\" 2> >(tee -a -- \"$AOA_CLOCK_ERROR_LOG\" >&2)
 runner_rc=$?
-umask 077
 status_tmp=\"${AOA_CLOCK_STATUS_FILE}.$$\"
 if ! {
   printf 'schema_version=%s\\n' 'aoa_external_actor_clock_status_v1'
@@ -198,12 +271,23 @@ exit \"$runner_rc\"
 def main() -> int:
     signal.signal(signal.SIGINT, _handle_stop)
     signal.signal(signal.SIGTERM, _handle_stop)
-    runner, title, status_path, error_path = _required_environment()
+    (
+        runner,
+        title,
+        status_path,
+        error_path,
+        ready_path,
+        captured_path,
+        launch_timeout,
+        close_timeout,
+    ) = _required_environment()
     baseline = _matching_kitties(title)
     child_environment = dict(os.environ)
     child_environment["AOA_CLOCK_STATUS_FILE"] = str(status_path)
     child_environment["AOA_CLOCK_ERROR_LOG"] = str(error_path)
     child_environment["AOA_CLOCK_RUNNER"] = runner
+    child_environment["AOA_CLOCK_HOLDER_READY_FILE"] = str(ready_path)
+    child_environment["AOA_CLOCK_HOLDER_CAPTURED_FILE"] = str(captured_path)
 
     print(
         f"clock supervisor: dispatching detached Kitty title={title!r}",
@@ -229,8 +313,8 @@ def main() -> int:
     if _STOP_SIGNAL is not None:
         for pid, start_ticks in _matching_kitties(title).items():
             if baseline.get(pid) != start_ticks:
-                _terminate_kitty(pid, start_ticks)
-        return 128 + _STOP_SIGNAL
+                _terminate_kitty(pid, start_ticks, close_timeout)
+        return 0
     if dispatched.returncode != 0:
         _append_error(
             error_path,
@@ -240,21 +324,17 @@ def main() -> int:
 
     kitty_pid: int | None = None
     kitty_start_ticks: int | None = None
-    launch_deadline = time.monotonic() + float(
-        os.environ.get(
-            "AOA_CLOCK_LAUNCH_TIMEOUT_SEC", str(DEFAULT_LAUNCH_TIMEOUT_SECONDS)
-        )
-    )
+    launch_deadline = time.monotonic() + launch_timeout
     while kitty_pid is None:
         if _STOP_SIGNAL is not None:
             for pid, start_ticks in _matching_kitties(title).items():
                 if baseline.get(pid) != start_ticks:
-                    _terminate_kitty(pid, start_ticks)
+                    _terminate_kitty(pid, start_ticks, close_timeout)
             _append_error(
                 error_path,
                 f"clock supervisor stopped by signal {_STOP_SIGNAL}",
             )
-            return 128 + _STOP_SIGNAL
+            return 0
         matches = _matching_kitties(title)
         new_matches = {
             pid: start
@@ -262,7 +342,39 @@ def main() -> int:
             if baseline.get(pid) != start
         }
         if len(new_matches) == 1:
-            kitty_pid, kitty_start_ticks = next(iter(new_matches.items()))
+            candidate_pid, candidate_start_ticks = next(iter(new_matches.items()))
+            while not ready_path.exists():
+                if _STOP_SIGNAL is not None:
+                    _terminate_kitty(candidate_pid, candidate_start_ticks, close_timeout)
+                    _append_error(
+                        error_path,
+                        f"clock supervisor stopped by signal {_STOP_SIGNAL}",
+                    )
+                    return 0
+                if not _identity_live(candidate_pid, candidate_start_ticks):
+                    _append_error(
+                        error_path,
+                        "detached Kitty exited before holder handshake",
+                    )
+                    return 125
+                if time.monotonic() >= launch_deadline:
+                    _append_error(
+                        error_path,
+                        f"detached Kitty holder did not complete handshake for title {title!r}",
+                    )
+                    _terminate_kitty(candidate_pid, candidate_start_ticks, close_timeout)
+                    return 125
+                time.sleep(POLL_SECONDS)
+            try:
+                _write_marker(
+                    captured_path,
+                    f"kitty_pid={candidate_pid}\nkitty_start_ticks={candidate_start_ticks}\n",
+                )
+            except ClockSupervisorError as exc:
+                _append_error(error_path, str(exc))
+                _terminate_kitty(candidate_pid, candidate_start_ticks, close_timeout)
+                return 125
+            kitty_pid, kitty_start_ticks = candidate_pid, candidate_start_ticks
             print(
                 f"clock supervisor: detached Kitty pid={kitty_pid} "
                 f"start_ticks={kitty_start_ticks}",
@@ -276,7 +388,7 @@ def main() -> int:
                 f"{sorted(new_matches)}",
             )
             for pid, start_ticks in new_matches.items():
-                _terminate_kitty(pid, start_ticks)
+                _terminate_kitty(pid, start_ticks, close_timeout)
             return 125
         if time.monotonic() >= launch_deadline:
             _append_error(
@@ -294,8 +406,8 @@ def main() -> int:
                 error_path,
                 f"clock supervisor stopped by signal {_STOP_SIGNAL}",
             )
-            _terminate_kitty(kitty_pid, kitty_start_ticks)
-            return 128 + _STOP_SIGNAL
+            _terminate_kitty(kitty_pid, kitty_start_ticks, close_timeout)
+            return 0
         if not _identity_live(kitty_pid, kitty_start_ticks):
             _append_error(
                 error_path,
@@ -308,28 +420,24 @@ def main() -> int:
         runner_status = _read_status(status_path)
     except ClockSupervisorError as exc:
         _append_error(error_path, str(exc))
-        _terminate_kitty(kitty_pid, kitty_start_ticks)
+        _terminate_kitty(kitty_pid, kitty_start_ticks, close_timeout)
         return 125
 
-    close_deadline = time.monotonic() + float(
-        os.environ.get(
-            "AOA_CLOCK_CLOSE_TIMEOUT_SEC", str(DEFAULT_CLOSE_TIMEOUT_SECONDS)
-        )
-    )
+    close_deadline = time.monotonic() + close_timeout
     while _identity_live(kitty_pid, kitty_start_ticks):
         if _STOP_SIGNAL is not None:
             _append_error(
                 error_path,
                 f"clock supervisor stopped by signal {_STOP_SIGNAL}",
             )
-            _terminate_kitty(kitty_pid, kitty_start_ticks)
-            return 128 + _STOP_SIGNAL
+            _terminate_kitty(kitty_pid, kitty_start_ticks, close_timeout)
+            return 0
         if time.monotonic() >= close_deadline:
             _append_error(
                 error_path,
                 "detached Kitty remained live after runner status publication",
             )
-            _terminate_kitty(kitty_pid, kitty_start_ticks)
+            _terminate_kitty(kitty_pid, kitty_start_ticks, close_timeout)
             return 125
         time.sleep(POLL_SECONDS)
 

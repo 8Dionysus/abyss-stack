@@ -58,11 +58,14 @@ Use the route in [AGENTS](AGENTS.md#install-routes).
 
 `aoa-external-actor-clock@.service` is a manual one-shot route. Its environment
 file names an executable `AOA_CLOCK_RUNNER`, an exact `AOA_CLOCK_TITLE`, and
-optional status/error paths. The foreground supervisor remains the systemd
+explicit private `AOA_CLOCK_STATUS_FILE` and `AOA_CLOCK_ERROR_LOG` paths. The
+paths must be distinct and must remain outside source projections. The
+foreground supervisor remains the systemd
 main process while it launches one detached Kitty holder, records the exact
-Kitty PID and `/proc` start ticks, publishes the runner exit status atomically,
-and returns that status to systemd. A Kitty client exiting successfully is not
-treated as proof that the holder completed successfully.
+Kitty PID and `/proc` start ticks before releasing a holder handshake, publishes
+the runner exit status atomically under a private umask, and returns that status
+to systemd. Timeout values must be finite and positive. A Kitty client exiting
+successfully is not treated as proof that the holder completed successfully.
 
 The unit does not create a recurring schedule or start itself. A bounded
 deadline may be armed with a transient user timer, for example:

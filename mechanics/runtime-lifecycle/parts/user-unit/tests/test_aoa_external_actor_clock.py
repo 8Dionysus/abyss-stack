@@ -24,6 +24,20 @@ class ExternalActorClockTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(checked.returncode, 0, checked.stderr)
+        command = CLOCK._runner_command()
+        self.assertLess(command.index("umask 077"), command.index('"$AOA_CLOCK_RUNNER"'))
+        self.assertLess(
+            command.index("AOA_CLOCK_HOLDER_CAPTURED_FILE"),
+            command.index('"$AOA_CLOCK_RUNNER"'),
+        )
+
+    def test_timeout_parser_rejects_non_finite_or_non_positive_values(self) -> None:
+        for value in ("nan", "inf", "-inf", "0", "-1"):
+            with self.subTest(value=value):
+                with self.assertRaises(CLOCK.ClockSupervisorError):
+                    CLOCK._finite_timeout("AOA_CLOCK_TEST_TIMEOUT", float(value))
+
+        self.assertEqual(CLOCK._finite_timeout("AOA_CLOCK_TEST_TIMEOUT", 2.5), 2.5)
 
     def test_status_parser_requires_schema_and_returns_runner_code(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -52,8 +66,10 @@ class ExternalActorClockTests(unittest.TestCase):
         managed = repo_root / "systemd" / "user" / "managed-units.txt"
         unit_text = unit.read_text(encoding="utf-8")
         self.assertIn("Type=simple", unit_text)
+        self.assertIn("AssertPathExists=", unit_text)
         self.assertIn("ExecStart=/usr/bin/python3", unit_text)
         self.assertIn("KillMode=control-group", unit_text)
+        self.assertIn("UMask=0077", unit_text)
         self.assertIn("aoa-external-actor-clock@.service", managed.read_text(encoding="utf-8"))
 
 

@@ -1,7 +1,7 @@
 [Unit]
 Description=One-shot visible external actor clock (%i)
 Documentation=man:systemd.service
-ConditionPathExists=%h/.config/aoa/external-actor-clocks/%i.env
+AssertPathExists=%h/.config/aoa/external-actor-clocks/%i.env
 
 [Service]
 Type=simple
@@ -14,6 +14,7 @@ ExecStartPre=/usr/bin/test -x ${AOA_CLOCK_RUNNER}
 ExecStart=/usr/bin/python3 /srv/AbyssOS/abyss-stack/Configs/mechanics/runtime-lifecycle/parts/user-unit/aoa_external_actor_clock.py
 Restart=no
 KillMode=control-group
+UMask=0077
 TimeoutStartSec=infinity
 TimeoutStopSec=15s
 StandardOutput=journal

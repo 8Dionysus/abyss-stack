@@ -11,10 +11,12 @@ The `aoa_external_actor_clock.py` supervisor is the owner implementation for
 service foreground while the separately addressable Kitty holder is detached.
 The supervisor accepts exactly one newly observed detached Kitty with the
 configured title, records its PID and `/proc` start ticks, waits for an
-atomically published runner status file, and returns the runner result after
+holder handshake before releasing the runner, waits for an atomically published
+runner status file, and returns the runner result after
 the holder closes. Dispatch failures, early holder exits, ambiguous identity,
-and close timeouts are persisted to the configured error log and return a
-non-success status to systemd.
+invalid timeout/evidence configuration, ambiguous identity, and close timeouts
+are persisted to the configured error log and return a non-success status to
+systemd. A handled operator stop is a clean supervisor shutdown.
 
 This route is manual-only. Use a unique environment file, title, status path,
 and error path for a bounded delayed proof; do not turn it into a recurring
