@@ -837,6 +837,76 @@ def test_payload_launch_uses_private_companion_after_host_copy_disappears(
     assert environment["CODEX_HOME"] == str(ambient)
 
 
+def test_payload_launch_accepts_shebang_package_relative_companion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    private_package = tmp_path / "private-package"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    private_package.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    manifest_bytes = manifest_path.read_bytes()
+    host_package = tmp_path / "host-package"
+    host_executable = host_package / "vendor" / "codex" / "codex"
+    host_executable.parent.mkdir(parents=True)
+    (host_package / "package.json").write_text("{}\n", encoding="utf-8")
+    host_executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    host_executable.chmod(0o700)
+    host_companion = host_executable.parent / MODULE.CODE_MODE_HOST_NAME
+    companion_bytes = b"private-shebang-companion"
+    host_companion.write_bytes(companion_bytes)
+    host_companion.chmod(0o700)
+    (private_package / "package.json").write_text("{}\n", encoding="utf-8")
+    payload = private_package / "vendor" / "codex" / "codex"
+    payload.parent.mkdir(parents=True)
+    payload.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    payload.chmod(0o500)
+    private_companion = payload.parent / MODULE.CODE_MODE_HOST_NAME
+    private_companion.write_bytes(companion_bytes)
+    private_companion.chmod(0o500)
+    observed: dict[str, object] = {}
+
+    def fake_holder_receipt(**kwargs: object) -> dict[str, object]:
+        observed.update(kwargs)
+        return {}
+
+    def fake_exec(path: str, argv: list[str], environment: dict[str, str]) -> None:
+        observed["exec"] = (path, argv, environment)
+
+    monkeypatch.setattr(MODULE, "_holder_receipt", fake_holder_receipt)
+    monkeypatch.setattr(MODULE.os, "execve", fake_exec)
+    args = MODULE.argparse.Namespace(
+        manifest=str(manifest_path),
+        holder_receipt=str(tmp_path / "holder.json"),
+        codex_executable=str(host_executable),
+        payload_executable=str(payload),
+        manifest_digest=MODULE.sha256_bytes(manifest_bytes),
+        executable_digest=MODULE.sha256_bytes(payload.read_bytes()),
+        companion_path=str(host_companion),
+        companion_digest=MODULE.sha256_bytes(companion_bytes),
+        companion_relative=(
+            "vendor/codex/" + MODULE.CODE_MODE_HOST_NAME
+        ),
+        codex_arguments=[str(payload), "exec", "--help"],
+    )
+
+    assert MODULE.command_payload_launch(args) == 127
+    assert observed["companion_binding"] == {
+        "path": str(host_companion),
+        "digest": MODULE.sha256_bytes(companion_bytes),
+        "relation": "adjacent_immutable_package",
+        "package_relative": "vendor/codex/" + MODULE.CODE_MODE_HOST_NAME,
+    }
+
+
 def test_elf_binding_rejects_executable_replacement_during_companion_read(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -882,6 +952,32 @@ def test_companion_binding_rejects_permission_revocation_before_open(
 
     monkeypatch.setattr(MODULE, "_read_verified_regular_file", revoke_before_open)
     with pytest.raises(MODULE.IncarnationHomeError, match="identity changed"):
+        MODULE._open_verified_executable(executable)
+
+
+def test_companion_binding_rejects_effective_permission_denial(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "codex"
+    executable.write_bytes(b"executable")
+    executable.chmod(0o700)
+    companion = tmp_path / MODULE.CODE_MODE_HOST_NAME
+    companion.write_bytes(b"companion")
+    companion.chmod(0o704)
+    original_access = MODULE.os.access
+
+    def deny_companion_execute(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        mode: int,
+        *args: object,
+        **kwargs: object,
+    ) -> bool:
+        if Path(path) == companion and mode == MODULE.os.X_OK:
+            return False
+        return original_access(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(MODULE.os, "access", deny_companion_execute)
+    with pytest.raises(MODULE.IncarnationHomeError, match="current user"):
         MODULE._open_verified_executable(executable)
 
 

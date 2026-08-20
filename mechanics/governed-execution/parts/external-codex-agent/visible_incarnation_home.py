@@ -2059,6 +2059,10 @@ def _adjacent_code_mode_host(
         )
     if not stat.S_IMODE(info.st_mode) & 0o111:
         raise IncarnationHomeError(f"Codex companion is not executable: {companion}")
+    if not os.access(companion, os.X_OK):
+        raise IncarnationHomeError(
+            f"Codex companion is not executable by the current user: {companion}"
+        )
     content, opened_info = _read_verified_regular_file(
         companion, label="Codex companion"
     )
@@ -2985,11 +2989,17 @@ def command_payload_launch(args: argparse.Namespace) -> int:
         expected_package_relative = expected_host_companion.relative_to(
             _package_root(executable)
         ).as_posix()
+        private_package_root = _package_root(payload_path)
+        expected_private_relative = (
+            companion_relative_argument
+            if (private_package_root / "package.json").is_file()
+            else CODE_MODE_HOST_NAME
+        )
         if (
             str(expected_host_companion) != companion_path_argument
             or companion_relative_argument != expected_package_relative
             or private_companion_binding["package_relative"]
-            != CODE_MODE_HOST_NAME
+            != expected_private_relative
             or private_companion_binding["digest"] != companion_digest_argument
         ):
             raise IncarnationHomeError("payload companion binding drifted")
