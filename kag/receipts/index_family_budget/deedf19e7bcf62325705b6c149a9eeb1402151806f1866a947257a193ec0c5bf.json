@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 5382281,
+  "allowed_tracked_bytes": 36242354,
+  "approved_by": "repository-owner",
+  "base_ref": "b40fe4a92aa42a8c2abaf52895c1934576f3bedc",
+  "changed_generated_bytes": 5382281,
+  "changed_generated_files": 60,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "deedf19e7bcf62325705b6c149a9eeb1402151806f1866a947257a193ec0c5bf",
+  "reason": "Index the detached external actor clock lifecycle follow-up and its registered regression tests on latest main.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36242354,
+  "tracked_bytes_max": 24117248
+}
