@@ -1,5 +1,6 @@
 # Source-managed user units that may be linked into ~/.config/systemd/user
 # by scripts/aoa-install-systemd --all-user-units.
+aoa-external-actor-clock@.service
 podman-compose-abyss.service
 abyss-ovms.container
 abyss-ovms.socket

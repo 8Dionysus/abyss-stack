@@ -1,0 +1,20 @@
+[Unit]
+Description=One-shot visible external actor clock (%i)
+Documentation=man:systemd.service
+ConditionPathExists=%h/.config/aoa/external-actor-clocks/%i.env
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/aoa/external-actor-clocks/%i.env
+WorkingDirectory=%h
+ExecStartPre=/usr/bin/test -x ${AOA_CLOCK_RUNNER}
+# The supervisor remains foreground while the holder Kitty is detached.  It
+# binds one exact title/PID/start-tick, publishes runner status atomically, and
+# returns the runner result to systemd instead of trusting Kitty's client exit.
+ExecStart=/usr/bin/python3 /srv/AbyssOS/abyss-stack/Configs/mechanics/runtime-lifecycle/parts/user-unit/aoa_external_actor_clock.py
+Restart=no
+KillMode=control-group
+TimeoutStartSec=infinity
+TimeoutStopSec=15s
+StandardOutput=journal
+StandardError=journal

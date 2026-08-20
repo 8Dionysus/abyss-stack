@@ -6,6 +6,20 @@ allowlist at `systemd/user/managed-units.txt`, and `scripts/aoa-install-systemd`
 
 User units must point at runtime paths, not the source checkout.
 
+The `aoa_external_actor_clock.py` supervisor is the owner implementation for
+`systemd/user/aoa-external-actor-clock@.service`. It deliberately keeps the
+service foreground while the separately addressable Kitty holder is detached.
+The supervisor accepts exactly one newly observed detached Kitty with the
+configured title, records its PID and `/proc` start ticks, waits for an
+atomically published runner status file, and returns the runner result after
+the holder closes. Dispatch failures, early holder exits, ambiguous identity,
+and close timeouts are persisted to the configured error log and return a
+non-success status to systemd.
+
+This route is manual-only. Use a unique environment file, title, status path,
+and error path for a bounded delayed proof; do not turn it into a recurring
+timer or use a shared title that could bind another holder.
+
 The OVMS owner route uses `abyss-ovms.container` as a rootless Quadlet plus
 loopback and Unix activation sockets. The installer places the Quadlet under
 `~/.config/containers/systemd/`; the generated `abyss-ovms.service` owns the
