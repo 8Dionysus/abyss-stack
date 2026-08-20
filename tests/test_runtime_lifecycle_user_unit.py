@@ -1560,10 +1560,25 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             read_audit_journal = audit_root / "policy-read.jsonl"
             candidate_audit_journal = audit_root / "policy-candidate.jsonl"
             observation_root = stack_root / "Logs" / "mcp" / "observations"
+            observation_path = observation_root / "current.json"
             keeper_inbox_root = (
                 stack_root / "Logs" / "mcp" / "admission" / "keeper-inbox"
             )
+            admission_root = stack_root / "Logs" / "mcp" / "admission"
+            preflight_root = stack_root / "Logs" / "mcp" / "preflight"
             protocol_watch_root = stack_root / "Logs" / "mcp" / "protocol-watch"
+            orchestration_root = (
+                stack_root / "Logs" / "mcp" / "cross-organ-orchestrations"
+            )
+            tasks_root = stack_root / "Logs" / "mcp" / "tasks"
+            read_tasks_root = tasks_root / "abyss-stack-read"
+            effect_root = (
+                stack_root
+                / "Logs"
+                / "mcp"
+                / "internal-effects"
+                / "read-restart-pilot"
+            )
             first_identity = marker.read_text(encoding="utf-8").strip()
             self.assertRegex(first_identity, r"\A[0-9a-f]{64}:[0-9a-f]{64}\Z")
             first_content_digest = content_marker.read_text(encoding="utf-8").strip()
@@ -1708,6 +1723,63 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "is not loaded with the lock-aware ExecStart",
                 stale_eligibility.stderr,
             )
+
+            for unsafe_runtime_root in (
+                observation_root,
+                keeper_inbox_root,
+                admission_root,
+                preflight_root,
+                protocol_watch_root,
+                orchestration_root,
+                read_tasks_root,
+                tasks_root,
+                effect_root,
+                venv,
+            ):
+                with self.subTest(unsafe_runtime_root=unsafe_runtime_root):
+                    safe_runtime_root = unsafe_runtime_root.with_name(
+                        f"{unsafe_runtime_root.name}.safe"
+                    )
+                    unsafe_runtime_root.rename(safe_runtime_root)
+                    unsafe_runtime_root.symlink_to(
+                        safe_runtime_root,
+                        target_is_directory=True,
+                    )
+                    try:
+                        unsafe_repair_root = subprocess.run(
+                            repair_eligibility_command,
+                            cwd=REPO_ROOT,
+                            env=env,
+                            check=False,
+                            capture_output=True,
+                            text=True,
+                        )
+                        self.assertNotEqual(unsafe_repair_root.returncode, 0)
+                        self.assertIn(
+                            "non-symlink directory",
+                            unsafe_repair_root.stderr,
+                        )
+                    finally:
+                        unsafe_runtime_root.unlink()
+                        safe_runtime_root.rename(unsafe_runtime_root)
+
+            unsafe_observation_target = root / "unsafe-observation.json"
+            unsafe_observation_target.write_text("{}\n", encoding="utf-8")
+            observation_path.symlink_to(unsafe_observation_target)
+            unsafe_observation = subprocess.run(
+                repair_eligibility_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(unsafe_observation.returncode, 0)
+            self.assertIn(
+                "observation path must be a regular non-symlink file",
+                unsafe_observation.stderr,
+            )
+            observation_path.unlink()
 
             runtime_python = venv / "bin" / "python"
             runtime_python.unlink()

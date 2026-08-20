@@ -1393,6 +1393,43 @@ aoa_require_abyss_stack_mcp_units_stopped() {
   done
 }
 
+aoa_verify_abyss_stack_mcp_repair_paths() {
+  local target=""
+
+  [[ -d "$AOA_STACK_ROOT" && ! -L "$AOA_STACK_ROOT" ]] || \
+    aoa_die "abyss-stack runtime root must be a non-symlink directory"
+  for target in \
+    "${AOA_STACK_ROOT}/Logs" \
+    "${AOA_STACK_ROOT}/Logs/mcp" \
+    "${AOA_STACK_ROOT}/Logs/mcp/internal-effects" \
+    "$abyss_stack_mcp_observation_root" \
+    "$abyss_stack_mcp_admission_root" \
+    "$abyss_stack_mcp_keeper_inbox_root" \
+    "$abyss_stack_mcp_preflight_root" \
+    "$abyss_stack_mcp_protocol_watch_root" \
+    "$abyss_stack_mcp_orchestration_root" \
+    "$abyss_stack_mcp_tasks_root" \
+    "$abyss_stack_mcp_read_tasks_root" \
+    "$abyss_stack_mcp_effect_root"; do
+    if [[ -e "$target" || -L "$target" ]]; then
+      [[ -d "$target" && ! -L "$target" ]] || \
+        aoa_die "repair-managed abyss-stack MCP runtime path must be a non-symlink directory: ${target}"
+    fi
+  done
+  for target in \
+    "$abyss_stack_mcp_observation_path" \
+    "$abyss_stack_mcp_observation_overlay_path"; do
+    if [[ -e "$target" || -L "$target" ]]; then
+      [[ -f "$target" && ! -L "$target" ]] || \
+        aoa_die "repair-managed abyss-stack MCP observation path must be a regular non-symlink file: ${target}"
+    fi
+  done
+  if [[ -e "$abyss_stack_mcp_venv" || -L "$abyss_stack_mcp_venv" ]]; then
+    [[ -d "$abyss_stack_mcp_venv" && ! -L "$abyss_stack_mcp_venv" ]] || \
+      aoa_die "existing abyss-stack MCP runtime must be a non-symlink directory"
+  fi
+}
+
 aoa_verify_abyss_stack_mcp_repair_eligibility() {
   local lock_path="${abyss_stack_mcp_service_root}/requirements.lock"
   local resolved_bootstrap_python=""
@@ -1440,6 +1477,7 @@ aoa_verify_abyss_stack_mcp_repair_eligibility() {
   )" ]]; then
     aoa_die "deployed abyss-stack MCP package must contain only regular files and directories"
   fi
+  aoa_verify_abyss_stack_mcp_repair_paths
   aoa_verify_abyss_stack_mcp_audit_journals all
   if ! aoa_require_abyss_stack_mcp_units_stopped 1; then
     aoa_die "$abyss_stack_mcp_units_error"
