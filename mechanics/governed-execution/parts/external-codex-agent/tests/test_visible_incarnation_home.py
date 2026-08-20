@@ -764,6 +764,74 @@ def test_payload_launch_binds_receipt_to_payload_process(
     assert environment["CODEX_HOME"] == str(ambient)
 
 
+def test_payload_launch_uses_private_companion_after_host_copy_disappears(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    private_package = tmp_path / "private-package"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    private_package.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    manifest_bytes = manifest_path.read_bytes()
+    host_executable = tmp_path / "codex"
+    host_executable.write_bytes(b"host-codex")
+    host_executable.chmod(0o700)
+    host_companion = tmp_path / MODULE.CODE_MODE_HOST_NAME
+    companion_bytes = b"private-companion"
+    host_companion.write_bytes(companion_bytes)
+    host_companion.chmod(0o700)
+    payload = private_package / "codex"
+    payload.write_bytes(b"#!/bin/sh\nexit 0\n")
+    payload.chmod(0o500)
+    private_companion = private_package / MODULE.CODE_MODE_HOST_NAME
+    private_companion.write_bytes(companion_bytes)
+    private_companion.chmod(0o500)
+    observed: dict[str, object] = {}
+
+    def fake_holder_receipt(**kwargs: object) -> dict[str, object]:
+        observed.update(kwargs)
+        return {}
+
+    def fake_exec(path: str, argv: list[str], environment: dict[str, str]) -> None:
+        observed["exec"] = (path, argv, environment)
+
+    monkeypatch.setattr(MODULE, "_holder_receipt", fake_holder_receipt)
+    monkeypatch.setattr(MODULE.os, "execve", fake_exec)
+    host_companion.unlink()
+    args = MODULE.argparse.Namespace(
+        manifest=str(manifest_path),
+        holder_receipt=str(tmp_path / "holder.json"),
+        codex_executable=str(host_executable),
+        payload_executable=str(payload),
+        manifest_digest=MODULE.sha256_bytes(manifest_bytes),
+        executable_digest=MODULE.sha256_bytes(payload.read_bytes()),
+        companion_path=str(host_companion),
+        companion_digest=MODULE.sha256_bytes(companion_bytes),
+        companion_relative=MODULE.CODE_MODE_HOST_NAME,
+        codex_arguments=[str(payload), "exec", "--help"],
+    )
+
+    assert MODULE.command_payload_launch(args) == 127
+    assert observed["companion_binding"] == {
+        "path": str(host_companion),
+        "digest": MODULE.sha256_bytes(companion_bytes),
+        "relation": "adjacent_immutable_package",
+        "package_relative": MODULE.CODE_MODE_HOST_NAME,
+    }
+    exec_path, exec_argv, environment = observed["exec"]
+    assert exec_path == str(payload)
+    assert exec_argv == args.codex_arguments
+    assert environment["CODEX_HOME"] == str(ambient)
+
+
 def test_atomic_json_fsyncs_publication_directory(tmp_path: Path) -> None:
     path = tmp_path / "receipt.json"
     fsync_targets: list[str] = []

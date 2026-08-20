@@ -2942,9 +2942,19 @@ def command_payload_launch(args: argparse.Namespace) -> int:
         )
     companion_path_argument = getattr(args, "companion_path", None)
     companion_digest_argument = getattr(args, "companion_digest", None)
+    companion_relative_argument = getattr(args, "companion_relative", None)
     if (companion_path_argument is None) != (companion_digest_argument is None):
         raise IncarnationHomeError("payload companion binding is incomplete")
-    detected_companion = _adjacent_code_mode_host(executable)
+    if companion_path_argument is not None and not isinstance(
+        companion_relative_argument, str
+    ):
+        raise IncarnationHomeError("payload companion relative binding is incomplete")
+    # The payload executes from the private package mount.  Reopening the
+    # original host companion here would reintroduce the race that the sealed
+    # snapshot was meant to close.  The host path and relative coordinate are
+    # forwarded as provenance; only the mounted companion bytes are inspected
+    # at this boundary.
+    detected_companion = _adjacent_code_mode_host(payload_path)
     if companion_path_argument is None:
         if detected_companion is not None:
             raise IncarnationHomeError("payload companion binding is missing")
@@ -2952,12 +2962,29 @@ def command_payload_launch(args: argparse.Namespace) -> int:
     else:
         if detected_companion is None:
             raise IncarnationHomeError("payload companion disappeared before receipt")
-        companion_path, _companion_bytes, companion_binding = detected_companion
+        _private_companion_path, _companion_bytes, private_companion_binding = (
+            detected_companion
+        )
+        expected_host_companion = (
+            executable.parent / CODE_MODE_HOST_NAME
+        ).resolve(strict=False)
+        expected_package_relative = expected_host_companion.relative_to(
+            _package_root(executable)
+        ).as_posix()
         if (
-            str(companion_path) != companion_path_argument
-            or companion_binding["digest"] != companion_digest_argument
+            str(expected_host_companion) != companion_path_argument
+            or companion_relative_argument != expected_package_relative
+            or private_companion_binding["package_relative"]
+            != companion_relative_argument
+            or private_companion_binding["digest"] != companion_digest_argument
         ):
             raise IncarnationHomeError("payload companion binding drifted")
+        companion_binding = {
+            "path": companion_path_argument,
+            "digest": companion_digest_argument,
+            "relation": "adjacent_immutable_package",
+            "package_relative": companion_relative_argument,
+        }
     environment = dict(os.environ)
     environment["CODEX_HOME"] = str(manifest["ambient_codex_home"])
     if args.holder_receipt:
@@ -3098,6 +3125,8 @@ def command_launch(args: argparse.Namespace) -> int:
                         companion_binding["path"],
                         "--companion-digest",
                         companion_binding["digest"],
+                        "--companion-relative",
+                        companion_binding["package_relative"],
                     ]
                     if companion_binding is not None
                     else []
@@ -3176,6 +3205,7 @@ def parser() -> argparse.ArgumentParser:
     payload.add_argument("--executable-digest", required=True)
     payload.add_argument("--companion-path")
     payload.add_argument("--companion-digest")
+    payload.add_argument("--companion-relative")
     payload.add_argument("codex_arguments", nargs=argparse.REMAINDER)
     payload.set_defaults(handler=command_payload_launch)
     close = subcommands.add_parser("close")
