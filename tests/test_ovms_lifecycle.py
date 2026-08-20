@@ -131,6 +131,8 @@ class OvmsLifecycleTests(unittest.TestCase):
             module.reserve()
             path = module.state_path()
             self.assertTrue(path.is_file())
+            self.assertEqual(path.parent.name, "ovms-admission")
+            self.assertEqual(path.parent.parent.name, "abyss-stack")
             self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
             self.assertEqual(json.loads(path.read_text())["lease_id"], "lease-test")
             reserve_call = module.subprocess.run.call_args_list[0].args[0]

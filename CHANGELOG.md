@@ -358,6 +358,9 @@ Tracking starts with the community-docs baseline for this repository.
 - Align the `aoa-session-memory` runtime canary with its landed bounded
   `session-evidence-read` HTTP profile by probing the admitted literal-route
   planner instead of the deliberately hidden full-surface status tool.
+- Isolate the OVMS Unix socket directory from the owner admission-state
+  directory so the `langchain-api` client can recover socket replacement
+  without reading lease or release-token material.
 
 ### Added
 

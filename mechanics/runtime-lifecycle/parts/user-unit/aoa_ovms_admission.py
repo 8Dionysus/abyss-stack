@@ -29,7 +29,7 @@ def state_path() -> Path:
     if override:
         return Path(override)
     runtime_dir = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"))
-    return runtime_dir / "abyss-stack" / "ovms-admission.json"
+    return runtime_dir / "abyss-stack" / "ovms-admission" / "ovms-admission.json"
 
 
 def run_json(argv: list[str]) -> dict[str, Any]:

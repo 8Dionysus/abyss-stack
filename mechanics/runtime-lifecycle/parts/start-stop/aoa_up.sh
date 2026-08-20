@@ -83,7 +83,7 @@ if has_module "31-intel-inference.yml"; then
   "${SCRIPTS_DIR}/aoa-install-systemd" --provision-ovms-auth
   aoa_retire_legacy_ovms
   systemctl --user start abyss-ovms.socket abyss-ovms-unix.socket
-  [[ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/abyss-stack/ovms.sock" ]] \
+  [[ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/abyss-stack/ovms-socket/ovms.sock" ]] \
     || aoa_die "OVMS activation socket was not created; reinstall user units with aoa-install-systemd"
 else
   aoa_stop_ovms_units_if_active

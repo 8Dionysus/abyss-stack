@@ -513,7 +513,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertNotIn("KillMode=none", quadlet + proxy)
         self.assertIn("--exit-idle-time=15min", proxy)
         self.assertIn("ListenStream=127.0.0.1:8200", tcp_socket)
-        self.assertIn("ListenStream=%t/abyss-stack/ovms.sock", unix_socket)
+        self.assertIn("ListenStream=%t/abyss-stack/ovms-socket/ovms.sock", unix_socket)
         self.assertIn("SocketMode=0600", unix_socket)
 
     def test_ovms_up_installs_units_and_cuts_over_before_opening_sockets(self) -> None:

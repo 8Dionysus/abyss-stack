@@ -61,7 +61,7 @@ fi
 
 if has_module "31-intel-inference.yml"; then
   if systemctl --user is-active --quiet abyss-ovms.socket abyss-ovms-unix.socket \
-    && [[ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/abyss-stack/ovms.sock" ]]; then
+    && [[ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/abyss-stack/ovms-socket/ovms.sock" ]]; then
     aoa_note "ok   ovms owner activation sockets ready (model remains cold until a request)"
   else
     aoa_note "fail ovms owner activation sockets are not ready"

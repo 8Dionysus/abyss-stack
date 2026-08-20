@@ -55,11 +55,13 @@ This file maps the first migrated runtime modules to their intended services.
 - `abyss-ovms.socket` and `abyss-ovms-unix.socket` activate an idle proxy;
   `abyss-ovms.container` is the Quadlet source for the full container lifecycle
 - port `8200` remains loopback-only; `langchain-api` uses the private Unix
-  socket, and periodic monitoring must not open either activation socket
+  socket under the isolated `ovms-socket` runtime directory; admission state
+  stays in a separate `ovms-admission` directory that is not mounted into the
+  client, and periodic monitoring must not open either activation socket
 - `aoa-up` links the owner units and retires a same-project legacy Compose
-  `ovms` container before opening the sockets; the client mounts the containing
-  runtime directory read-only so socket recreation remains visible without
-  recreating `langchain-api`, while the client cannot mutate admission state
+  `ovms` container before opening the sockets; the client mounts only the
+  isolated socket directory read-only so socket recreation remains visible
+  without recreating `langchain-api`, while admission state stays unmounted
 - the client timeout is 600 seconds to cover the bounded admission wait and
   digest image pull/model-start window on a cold first request
 - OVMS, OpenVINO, and future OpenVINO GenAI lanes may host other model classes through separate reviewed profile, preset, machine-fit, or rollout changes

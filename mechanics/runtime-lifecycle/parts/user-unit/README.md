@@ -27,6 +27,12 @@ keeps the stack's delegated cgroup, explicit teardown, and non-abort stop
 contract effective even when the distribution ships a global user-service
 drop-in. Other host-local drop-ins remain untouched.
 
+The OVMS Unix activation socket lives under the private runtime directory
+`%t/abyss-stack/ovms-socket/`; admission state lives separately under
+`%t/abyss-stack/ovms-admission/`. The Intel `langchain-api` client mounts only
+the socket directory read-only, so it can reconnect after socket inode
+recreation without reading or mutating the owner admission capability.
+
 `aoa-install-systemd --preset <name>`, `--profile <name>`, and
 `--overlay <compose-file>` write a small runtime-selection drop-in next to the
 linked unit. Add `--restart-now` when the unit is already active and the new
