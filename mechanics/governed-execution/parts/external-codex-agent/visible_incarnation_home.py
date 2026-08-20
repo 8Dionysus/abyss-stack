@@ -1148,7 +1148,7 @@ def _holder_terminal_identity(
     executable_digest = runtime.get("codex_executable_digest")
     if (
         not executable_path.is_absolute()
-        or executable_path.name != "codex"
+        or executable_path.name in {"", ".", ".."}
         or not isinstance(executable_digest, str)
         or not SHA256_DIGEST_PATTERN.fullmatch(executable_digest)
     ):

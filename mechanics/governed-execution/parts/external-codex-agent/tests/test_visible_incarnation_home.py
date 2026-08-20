@@ -1078,7 +1078,7 @@ def test_holder_receipt_rejects_detached_kitty_route(tmp_path: Path) -> None:
 def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    executable = tmp_path / "codex"
+    executable = tmp_path / "codex.js"
     executable.write_bytes(b"codex-holder\n")
     executable.chmod(0o700)
     companion = tmp_path / MODULE.CODE_MODE_HOST_NAME
