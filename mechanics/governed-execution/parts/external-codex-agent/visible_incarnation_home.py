@@ -2487,6 +2487,8 @@ def _snapshot_bwrap_prefix(snapshot_mount: dict[str, Any]) -> list[str]:
         "--bind",
         "/",
         "/",
+        "--dev",
+        "/dev",
         "--tmpfs",
         os.fspath(namespace_root),
     ]
