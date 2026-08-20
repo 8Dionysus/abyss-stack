@@ -8,7 +8,7 @@ StartLimitBurst=3
 [Container]
 Image=docker.io/openvino/model_server:2026.2-gpu@sha256:fdc34725b35d79cde23cff1967f90efb40237b7cf5545a70460209056f3da733
 ContainerName=ovms
-Pull=never
+Pull=missing
 AddDevice=/dev/dri
 Volume=/srv/AbyssOS/abyss-stack/Models/ovms:/models:ro,Z
 Volume=/srv/AbyssOS/abyss-stack/Configs/ovms:/ovms-config:ro,z

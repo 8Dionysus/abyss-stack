@@ -29,6 +29,14 @@ INSTALL_SYSTEMD = (
     / "user-unit"
     / "aoa_install_systemd.sh"
 )
+AOA_UP = (
+    REPO_ROOT
+    / "mechanics"
+    / "runtime-lifecycle"
+    / "parts"
+    / "start-stop"
+    / "aoa_up.sh"
+)
 STATS_PATH_UNIT = REPO_ROOT / "systemd" / "user" / "aoa-stats-live-refresh.path"
 STATS_SERVICE_UNIT = REPO_ROOT / "systemd" / "user" / "aoa-stats-live-refresh.service"
 MCP_HTTP_TEMPLATE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http@.service"
@@ -482,6 +490,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         unix_socket = OVMS_UNIX_SOCKET.read_text(encoding="utf-8")
 
         self.assertIn("StopWhenUnneeded=yes", quadlet)
+        self.assertIn("Pull=missing", quadlet)
         self.assertIn("Notify=healthy", quadlet)
         self.assertIn("ExecStartPost=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-ovms-admission release", quadlet)
         self.assertIn("Environment=AOA_OVMS_ADMISSION_WAIT_SEC=120", quadlet)
@@ -498,6 +507,21 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertIn("ListenStream=127.0.0.1:8200", tcp_socket)
         self.assertIn("ListenStream=%t/abyss-stack/ovms.sock", unix_socket)
         self.assertIn("SocketMode=0600", unix_socket)
+
+    def test_ovms_up_installs_units_and_cuts_over_before_opening_sockets(self) -> None:
+        launcher = AOA_UP.read_text(encoding="utf-8")
+        self.assertIn(
+            '"${SCRIPTS_DIR}/aoa-install-systemd"\n'
+            '  "${SCRIPTS_DIR}/aoa-install-systemd" --provision-ovms-auth',
+            launcher,
+        )
+        self.assertIn("aoa_retire_legacy_ovms", launcher)
+        self.assertLess(
+            launcher.rindex("aoa_retire_legacy_ovms"),
+            launcher.index("systemctl --user start abyss-ovms.socket"),
+        )
+        self.assertIn("--filter \"label=${compose_label}=ovms\"", launcher)
+        self.assertIn("up -d --remove-orphans", launcher)
 
     def test_ovms_auth_provision_is_rootless_idempotent_and_detects_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

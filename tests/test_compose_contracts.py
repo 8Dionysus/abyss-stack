@@ -176,6 +176,7 @@ class ComposeContractsTests(unittest.TestCase):
         self.assertIn("ExecStartPre=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-ovms-admission reserve", quadlet)
         self.assertNotIn("EnvironmentFile=", quadlet)
         self.assertIn("Secret=abyss-ovms-api-key", quadlet)
+        self.assertIn("Pull=missing", quadlet)
         self.assertNotIn("MemoryMax=", quadlet)
         self.assertNotIn("MemoryHigh=", quadlet)
         self.assertNotIn("MemorySwapMax=", quadlet)
@@ -194,7 +195,7 @@ class ComposeContractsTests(unittest.TestCase):
             "/run/secrets/ovms_api_key",
         )
         self.assertEqual(service["environment"]["OVMS_EMBEDDINGS_TIMEOUT_S"], "180")
-        self.assertTrue(any("ovms.sock:/run/abyss-stack/ovms.sock:z" in volume for volume in service["volumes"]))
+        self.assertTrue(any("abyss-stack:/run/abyss-stack:z" in volume for volume in service["volumes"]))
         self.assertEqual(
             service["secrets"],
             [

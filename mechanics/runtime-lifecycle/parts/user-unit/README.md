@@ -12,11 +12,14 @@ loopback and Unix activation sockets. The installer places the Quadlet under
 container cgroup with `KillMode=mixed`. The proxy exits after idle, systemd
 then stops the unneeded container, and the next real connection repeats
 owner cold-load admission. No health or smoke path opens the activation socket.
-Before those sockets open, `aoa-up` calls the rootless
-`aoa-install-systemd --provision-ovms-auth` transaction. It creates the Podman
-secret from the canonical mode-`0600` owner file once, verifies exact content
-on later starts, and fails closed on drift without replacing a value used by a
-running consumer.
+Before those sockets open, `aoa-up` links and reloads the source-managed user
+units, provisions or verifies the rootless Podman secret, and retires only the
+current Compose project's legacy `ovms` container. The installer and standalone
+auth transaction keep unit linking separate from secret mutation: the canonical
+mode-`0600` owner file is created once, verified on later starts, and fails
+closed on drift without replacing a value used by a running consumer. The
+digest-pinned Quadlet image uses `Pull=missing`, so a fresh host can provision
+it on the first owner start without weakening image identity.
 
 The installer also links the source-managed
 `podman-compose-abyss.service.d/99-runtime-lifecycle.conf`. Its late ordering
