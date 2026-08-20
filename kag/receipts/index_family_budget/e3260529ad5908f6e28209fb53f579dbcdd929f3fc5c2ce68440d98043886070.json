@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 9547891,
+  "allowed_tracked_bytes": 35886336,
+  "approved_by": "repository-owner",
+  "base_ref": "c9bcf00a9bbe77989a14c97b74d33e11dcfc0c71",
+  "changed_generated_bytes": 9547891,
+  "changed_generated_files": 104,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "e3260529ad5908f6e28209fb53f579dbcdd929f3fc5c2ce68440d98043886070",
+  "reason": "Refresh the owner family for the exact read-only runtime rollback grant and its accepted recovery decision.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35886336,
+  "tracked_bytes_max": 24117248
+}
