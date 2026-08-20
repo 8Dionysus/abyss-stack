@@ -67,6 +67,7 @@ class ManagedContourBinding(StrictModel):
     unit_exec_start_binding: NonEmpty
     canary_receipt_path: NonEmpty
     canary_receipt_id: NonEmpty
+    canary_process_unit_name: NonEmpty
     canary_observed_at: datetime
     canary_expires_at: datetime
     canary_deployment_manifest_id: NonEmpty
@@ -419,6 +420,14 @@ def run_preflight(
             receipt.deployment_service_id,
             service.get("service_id"),
             "canary_deployment_service_mismatch",
+            binding.canary_receipt_path,
+        )
+        _check_equal(
+            checks,
+            "canary-process-unit-exact",
+            receipt.process_unit_name,
+            binding.canary_process_unit_name,
+            "canary_process_unit_catalog_mismatch",
             binding.canary_receipt_path,
         )
         _check_bool(

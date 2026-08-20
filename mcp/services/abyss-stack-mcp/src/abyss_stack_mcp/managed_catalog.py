@@ -46,6 +46,7 @@ class ManagedContourTopologyEntry(StrictModel):
     unit_exec_start_binding: NonEmpty
     canary_receipt_path: NonEmpty
     canary_receipt_id: NonEmpty
+    canary_process_unit_name: NonEmpty
     canary_observed_at: datetime
     canary_expires_at: datetime
     canary_deployment_manifest_id: NonEmpty
@@ -134,6 +135,7 @@ def build_managed_catalog(
                 unit_exec_start_binding=topology_entry.unit_exec_start_binding,
                 canary_receipt_path=topology_entry.canary_receipt_path,
                 canary_receipt_id=topology_entry.canary_receipt_id,
+                canary_process_unit_name=topology_entry.canary_process_unit_name,
                 canary_observed_at=topology_entry.canary_observed_at,
                 canary_expires_at=topology_entry.canary_expires_at,
                 canary_deployment_manifest_id=(
