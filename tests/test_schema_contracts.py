@@ -237,6 +237,9 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-task.schema.json"
     ),
     Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-terminal-observation.schema.json"
+    ),
+    Path(
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-workspace-manifest.schema.json"
     ),
     Path(
