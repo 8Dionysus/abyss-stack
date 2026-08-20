@@ -2748,6 +2748,10 @@ def test_semantic_variant_requires_every_execution_service() -> None:
     ]
 
 
+def test_semantic_ovms_probe_covers_socket_activated_cold_start() -> None:
+    assert semantic.OVMS_COLD_START_TIMEOUT_S == 600
+
+
 def test_granite_suite_variant_is_one_exact_independent_text_challenger() -> None:
     experiment = lab.find_experiment(lab.load_suite(), "tos-retrieval-foundation-v1")
     variant = lab.find_variant(experiment, "C")

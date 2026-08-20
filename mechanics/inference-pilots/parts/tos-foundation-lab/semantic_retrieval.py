@@ -41,6 +41,9 @@ RERANK_MODEL = "qwen3-reranker-0.6b-int8-ov"
 VECTOR_SIZE = 1024
 TOP_K = 10
 EMBED_BATCH_SIZE = 6
+# The OVMS health route is socket-activated and may include the bounded
+# admission wait plus the cold container/model startup window.
+OVMS_COLD_START_TIMEOUT_S = 600
 
 
 def _utc_now() -> str:
@@ -515,7 +518,11 @@ def execute_semantic_retrieval(
             "rag": _http_json("GET", f"{rag_url}/health", timeout=30),
             "rerank": _http_json("GET", f"{rerank_url}/health", timeout=30),
             "qdrant_collections": _http_json("GET", f"{qdrant_url}/collections", timeout=30),
-            "ovms_live": _http_json("GET", f"{ovms_url}/v2/health/live", timeout=30),
+            "ovms_live": _http_json(
+                "GET",
+                f"{ovms_url}/v2/health/live",
+                timeout=OVMS_COLD_START_TIMEOUT_S,
+            ),
         }
         if services_before["langchain"].get("embeddings_provider") != "ovms":
             raise SemanticRetrievalError("live langchain embedding provider is not OVMS")
