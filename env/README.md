@@ -13,7 +13,6 @@ This directory stores public-safe env examples only.
 
 - `env/stack.env.example` -> `${AOA_STACK_ROOT}/Configs/stack.env`
 - `env/langchain-api.env.example` -> `${AOA_STACK_ROOT}/Secrets/Configs/langchain-api.env`
-- `env/ovms-api.env.example` -> `${AOA_STACK_ROOT}/Secrets/Configs/ovms-api.env`
 - `env/tos-graph.env.example` -> `${AOA_STACK_ROOT}/Secrets/Configs/tos-graph.env`
 
 ## Canonical deployed default

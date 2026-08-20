@@ -167,9 +167,13 @@ Use it with `substrate` when the runtime should keep chat on
 ### Host-facing endpoints
 
 - `llama-cpp` -> `http://127.0.0.1:11435/health`
-- `ovms rest` -> `http://127.0.0.1:8200/v2/health/live`
-- `ovms grpc` -> `127.0.0.1:9200`
+- socket-activated OVMS embeddings -> `POST http://127.0.0.1:8200/v3/embeddings`
 - `langchain-api` -> `http://127.0.0.1:5403/health`
+
+`aoa-smoke` checks the OVMS activation sockets without opening them. A real
+embedding request starts the owner-managed container after host admission;
+idle proxy exit stops the full container again. Do not use periodic HTTP
+health checks against port `8200`, because any connection is a real wake.
 
 ### First checks
 

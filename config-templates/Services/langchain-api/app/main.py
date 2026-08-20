@@ -1,8 +1,10 @@
 import json
 import hashlib
+import http.client
 import os
 import re
 import secrets
+import socket
 import time
 import urllib.error
 import urllib.request
@@ -62,14 +64,35 @@ OLLAMA_NUM_BATCH = os.getenv("LC_OLLAMA_NUM_BATCH", "").strip()
 OLLAMA_NUM_CTX = os.getenv("LC_OLLAMA_NUM_CTX", "").strip()
 EMBEDDINGS_PROVIDER = os.getenv("EMBEDDINGS_PROVIDER", "disabled").strip().lower()
 OVMS_EMBEDDINGS_URL = os.getenv("OVMS_EMBEDDINGS_URL", "http://ovms:8000/v3/embeddings").rstrip("/")
+OVMS_EMBEDDINGS_UNIX_SOCKET = os.getenv("OVMS_EMBEDDINGS_UNIX_SOCKET", "").strip()
 OVMS_EMBEDDINGS_MODEL = os.getenv("OVMS_EMBEDDINGS_MODEL", "qwen3-embed-0.6b-int8-ov")
+OVMS_EMBEDDINGS_TIMEOUT = float(os.getenv("OVMS_EMBEDDINGS_TIMEOUT_S", "180"))
 OLLAMA_EMBEDDINGS_URL = os.getenv("OLLAMA_EMBEDDINGS_URL", "http://ollama:11434/api/embed").rstrip("/")
 OLLAMA_EMBEDDINGS_FALLBACK_URL = os.getenv(
     "OLLAMA_EMBEDDINGS_FALLBACK_URL",
     "http://ollama:11434/api/embeddings",
 ).rstrip("/")
 OLLAMA_EMBEDDINGS_MODEL = os.getenv("OLLAMA_EMBEDDINGS_MODEL", "nomic-embed-text")
-OVMS_EMBEDDINGS_API_KEY = os.getenv("OVMS_EMBEDDINGS_API_KEY", "").strip()
+
+
+def _secret_from_file_or_env(file_env: str, value_env: str) -> str:
+    secret_path = os.getenv(file_env, "").strip()
+    if secret_path:
+        path = Path(secret_path)
+        try:
+            value = path.read_text(encoding="utf-8").splitlines()[0].strip()
+        except (OSError, IndexError) as exc:
+            raise RuntimeError(f"configured_secret_file_unreadable: {file_env}") from exc
+        if not value:
+            raise RuntimeError(f"configured_secret_file_empty: {file_env}")
+        return value
+    return os.getenv(value_env, "").strip()
+
+
+OVMS_EMBEDDINGS_API_KEY = _secret_from_file_or_env(
+    "OVMS_EMBEDDINGS_API_KEY_FILE",
+    "OVMS_EMBEDDINGS_API_KEY",
+)
 FEDERATED_RUN_ENABLED = os.getenv("AOA_FEDERATED_RUN_ENABLED", "false").strip().lower() in {
     "1",
     "true",
@@ -288,6 +311,60 @@ def _http_post_json(
 
     if not isinstance(parsed, dict):
         raise RuntimeError(f"unexpected_json_type from {url}: {type(parsed).__name__}")
+    return parsed
+
+
+class _UnixHTTPConnection(http.client.HTTPConnection):
+    def __init__(self, socket_path: str, timeout: float) -> None:
+        super().__init__("localhost", timeout=timeout)
+        self.socket_path = socket_path
+
+    def connect(self) -> None:
+        connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        connection.settimeout(self.timeout)
+        connection.connect(self.socket_path)
+        self.sock = connection
+
+
+def _unix_post_json(
+    socket_path: str,
+    request_path: str,
+    payload: dict[str, Any],
+    timeout_s: float,
+    headers: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    merged_headers = {"Content-Type": "application/json"}
+    if headers:
+        merged_headers.update(headers)
+    body = json.dumps(payload).encode("utf-8")
+    connection = _UnixHTTPConnection(socket_path, timeout_s)
+    try:
+        connection.request("POST", request_path, body=body, headers=merged_headers)
+        response = connection.getresponse()
+        response_body = response.read().decode("utf-8", errors="ignore")
+        if response.status >= 400:
+            raise RuntimeError(
+                f"http_error {response.status} from unix:{request_path}: {response_body[:300]}"
+            )
+    except Exception as exc:
+        if isinstance(exc, RuntimeError):
+            raise
+        raise RuntimeError(
+            f"request_error to unix:{request_path}: {type(exc).__name__}: {exc}"
+        ) from exc
+    finally:
+        connection.close()
+
+    try:
+        parsed = json.loads(response_body) if response_body else {}
+    except Exception as exc:
+        raise RuntimeError(
+            f"invalid_json from unix:{request_path}: {response_body[:200]}"
+        ) from exc
+    if not isinstance(parsed, dict):
+        raise RuntimeError(
+            f"unexpected_json_type from unix:{request_path}: {type(parsed).__name__}"
+        )
     return parsed
 
 
@@ -748,7 +825,21 @@ def _ovms_embeddings(req: EmbeddingsReq, items: list[str]) -> dict[str, Any]:
     ovms_headers: dict[str, str] = {}
     if OVMS_EMBEDDINGS_API_KEY:
         ovms_headers["Authorization"] = f"Bearer {OVMS_EMBEDDINGS_API_KEY}"
-    data = _http_post_json(OVMS_EMBEDDINGS_URL, payload, TIMEOUT, headers=ovms_headers)
+    if OVMS_EMBEDDINGS_UNIX_SOCKET:
+        data = _unix_post_json(
+            OVMS_EMBEDDINGS_UNIX_SOCKET,
+            "/v3/embeddings",
+            payload,
+            OVMS_EMBEDDINGS_TIMEOUT,
+            headers=ovms_headers,
+        )
+    else:
+        data = _http_post_json(
+            OVMS_EMBEDDINGS_URL,
+            payload,
+            OVMS_EMBEDDINGS_TIMEOUT,
+            headers=ovms_headers,
+        )
 
     if "data" not in data:
         raise RuntimeError("unexpected_ovms_response: missing data field")
@@ -1620,6 +1711,7 @@ def health() -> dict[str, Any]:
         "service": "langchain-api",
         "embeddings_provider": EMBEDDINGS_PROVIDER,
         "ovms_auth_enabled": bool(OVMS_EMBEDDINGS_API_KEY),
+        "ovms_transport": "unix" if OVMS_EMBEDDINGS_UNIX_SOCKET else "http",
         "federated_run_enabled": FEDERATED_RUN_ENABLED,
         "langgraph_inventory_enabled": True,
         "langgraph_inventory_root": str(LANGGRAPH_INVENTORY_ROOT),

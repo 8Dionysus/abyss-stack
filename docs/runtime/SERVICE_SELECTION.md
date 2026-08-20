@@ -149,7 +149,7 @@ posture:
 | Overlay | Use With | Purpose |
 |---|---|---|
 | `compose/tuning/storage.intel-285h.resource-guard.yml` | `substrate` or presets containing it | keeps database-native budgets and soft reclaim reservations without private CPU or memory ceilings |
-| `compose/tuning/intel-worker.thin-host.yml` | `intel-worker` or presets containing it | keeps OVMS and `langchain-api` elastic while preserving soft reclaim protection and owner-native thread tuning |
+| `compose/tuning/intel-worker.thin-host.yml` | `intel-worker` or presets containing it | keeps the resident `langchain-api` facade elastic; OVMS lifecycle is owned separately by systemd socket activation |
 | `compose/tuning/federation.thin-host.yml` | `federation` | keeps advisory `route-api` soft-reserved without changing federation surfaces |
 | `compose/tuning/observability.thin-host.yml` | `observability`, `agent-observability`, `intel-observability`, full presets | keeps dashboards, PromQL, and LogQL available with shorter retention, lower cAdvisor cadence, and elastic collector services |
 | `compose/tuning/tools.thin-host.yml` | `tools`, `agent-tools`, `intel-tools`, full presets | keeps speech/browser helpers soft-reserved and owner-managed when selected |
@@ -162,10 +162,12 @@ services.
 
 OVMS is a trusted, reloadable model owner rather than an untrusted batch job.
 On the current cgroup v2 host, its former `4g` hard ceiling filled the matching
-private swap allowance while physical memory remained available. The worker
-overlay therefore keeps `mem_reservation` as best-effort reclaim protection and
-uses OVMS health, config reload, embedding parity, and rollback as its lifecycle
-boundary instead of imposing `mem_limit`.
+private swap allowance while physical memory remained available. Config reload
+was then proven to leave almost all GPU/OpenVINO shared memory resident. The
+selected route therefore uses a rootless Quadlet plus systemd socket proxy:
+host admission guards the cold start, active connections preserve the owner,
+and idle proxy exit stops the full container. No hard memory ceiling or
+resident custom controller is used.
 
 The same owner rule applies to the persistent thin-host services. Their
 overlays intentionally render `cpus: "0"` and `mem_limit: "0"` to clear

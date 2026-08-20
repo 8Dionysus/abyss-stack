@@ -1,0 +1,8 @@
+[Unit]
+Description=Abyss OVMS loopback activation socket
+PartOf=podman-compose-abyss.service
+
+[Socket]
+ListenStream=127.0.0.1:8200
+Service=abyss-ovms-proxy.service
+NoDelay=yes

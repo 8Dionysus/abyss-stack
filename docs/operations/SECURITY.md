@@ -17,6 +17,12 @@ Expected live pattern:
 - example env files in `env/`
 - real env files never committed
 
+The OVMS embeddings owner and `langchain-api` consume the single rootless
+Podman secret `abyss-ovms-api-key`, provisioned from the mode-`0600`
+`Secrets/Configs/ovms_api_key.txt` owner file. `aoa-up` verifies that the two
+copies match before opening OVMS activation sockets. Do not mirror the value
+into service env files; a missing, invalid, or drifted secret must fail closed.
+
 Transitional shadow MCP HTTP owners use the host-local
 `Secrets/Configs/aoa-mcp-http-bearer-token`. Migrated owner-bounded read
 contours use distinct `aoa-decisions-mcp-read-bearer-token`,

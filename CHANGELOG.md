@@ -15,6 +15,13 @@ Tracking starts with the community-docs baseline for this repository.
   with an operation lock, and restores the previous runtime and active reader
   through an exact, private, read-only rollback grant if the final atomic
   activation fails.
+- Make the Intel OVMS cutover safe for first launch and upgrades: link and
+  reload owner units before socket activation, retire only the same-project
+  legacy Compose owner, allow the digest-pinned Quadlet image to pull when
+  absent, and mount the socket directory read-only so `RemoveOnStop` recreation
+  reaches the running client without exposing a writable admission state; give
+  cold requests a 600-second bounded timeout and reconcile stale OVMS units when
+  Intel is deselected.
 - Bind the operator-visible responsibility holder to its own non-replacing
   lifecycle receipt before direct Codex `exec`, distinct from nested proof
   actors. The installed incarnation runtime now closes only that exact
@@ -351,6 +358,9 @@ Tracking starts with the community-docs baseline for this repository.
 - Align the `aoa-session-memory` runtime canary with its landed bounded
   `session-evidence-read` HTTP profile by probing the admitted literal-route
   planner instead of the deliberately hidden full-surface status tool.
+- Isolate the OVMS Unix socket directory from the owner admission-state
+  directory so the `langchain-api` client can recover socket replacement
+  without reading lease or release-token material.
 
 ### Added
 
@@ -650,6 +660,15 @@ Tracking starts with the community-docs baseline for this repository.
   projection instead of pulling the full detailed packet into every live/full
   machine brief. An exact missing-flag compatibility fallback keeps older host
   installs readable without masking any other owner-command failure.
+- The promoted OVMS embeddings lane is now a rootless Quadlet activated by
+  loopback and private Unix sockets. A real request performs owner admission
+  and cold start; after the idle proxy exits, systemd removes the complete
+  container cgroup. Routine smoke and monitoring no longer wake the model,
+  and no hard memory ceiling or resident custom controller was added. OVMS and
+  its client now share one read-only API-key file, with source tests and the
+  isolated canary requiring unauthenticated requests to be rejected. A bounded
+  idempotent admission wait keeps transient pressure from immediately dropping
+  a socket-activated foreground request without adding a resident waiter.
 - Routing federation health is now check-only over the admitted SDK-canonical
   materialization: ordinary sync cannot produce or repair routing bytes,
   governed execution no longer exposes a predecessor mutation target, and the

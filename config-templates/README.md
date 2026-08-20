@@ -18,6 +18,7 @@ tree through the bootstrap route in [AGENTS](AGENTS.md#bootstrap-route).
 - `Configs/agent-api/`
 - `Configs/federation/`
 - `Configs/monitoring/`
+- `Configs/ovms/`
 - `Configs/tts/`
 - `Configs/ollama/`
 - `Configs/llama-swap/`

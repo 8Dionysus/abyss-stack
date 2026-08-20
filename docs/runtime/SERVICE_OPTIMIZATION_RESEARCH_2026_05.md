@@ -14,12 +14,12 @@ not a promotion of every selected service to always-resident status.
 Later cgroup v2 evidence narrowed the May preference for container-level hard
 caps. The selected OVMS embedding lane reached its private memory and swap
 boundaries while the host still had substantial `MemAvailable`, producing
-avoidable local reclaim. Its thin-host overlay now keeps CPU/thread tuning and
-`mem_reservation` protection but leaves `memory.max` and `memory.swap.max`
-unbounded; owner health, config reload, embedding parity, and rollback remain
-the release controls. The May storage and optional-service conclusions below
-remain historical context and require their own measured canaries before any
-equivalent change.
+avoidable local reclaim. Its hard memory ceilings were removed. A later
+isolated canary also showed that config reload preserved almost all
+GPU/OpenVINO shared memory, so the embedding lane moved to rootless systemd
+socket activation with full-container idle release and cold-load admission.
+The May storage and optional-service conclusions below remain historical
+context and require their own measured canaries before any equivalent change.
 
 ## Local Evidence
 

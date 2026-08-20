@@ -6,11 +6,32 @@ allowlist at `systemd/user/managed-units.txt`, and `scripts/aoa-install-systemd`
 
 User units must point at runtime paths, not the source checkout.
 
+The OVMS owner route uses `abyss-ovms.container` as a rootless Quadlet plus
+loopback and Unix activation sockets. The installer places the Quadlet under
+`~/.config/containers/systemd/`; the generated `abyss-ovms.service` owns the
+container cgroup with `KillMode=mixed`. The proxy exits after idle, systemd
+then stops the unneeded container, and the next real connection repeats
+owner cold-load admission. No health or smoke path opens the activation socket.
+Before those sockets open, `aoa-up` links and reloads the source-managed user
+units, provisions or verifies the rootless Podman secret, and retires only the
+current Compose project's legacy `ovms` container. The installer and standalone
+auth transaction keep unit linking separate from secret mutation: the canonical
+mode-`0600` owner file is created once, verified on later starts, and fails
+closed on drift without replacing a value used by a running consumer. The
+digest-pinned Quadlet image uses `Pull=missing`, so a fresh host can provision
+it on the first owner start without weakening image identity.
+
 The installer also links the source-managed
 `podman-compose-abyss.service.d/99-runtime-lifecycle.conf`. Its late ordering
 keeps the stack's delegated cgroup, explicit teardown, and non-abort stop
 contract effective even when the distribution ships a global user-service
 drop-in. Other host-local drop-ins remain untouched.
+
+The OVMS Unix activation socket lives under the private runtime directory
+`%t/abyss-stack/ovms-socket/`; admission state lives separately under
+`%t/abyss-stack/ovms-admission/`. The Intel `langchain-api` client mounts only
+the socket directory read-only, so it can reconnect after socket inode
+recreation without reading or mutating the owner admission capability.
 
 `aoa-install-systemd --preset <name>`, `--profile <name>`, and
 `--overlay <compose-file>` write a small runtime-selection drop-in next to the

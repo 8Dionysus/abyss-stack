@@ -78,8 +78,8 @@
       "owner_profile": "intel-worker",
       "posture": "selected_now",
       "tier": "embedding_lane",
-      "resource_guard": "compose/tuning/intel-worker.thin-host.yml",
-      "decision": "keep as OpenVINO embeddings seam with soft reclaim protection and owner lifecycle, not a hard memory ceiling or Gemma 4 text serving"
+      "resource_guard": "systemd/user/abyss-ovms.container",
+      "decision": "keep as a socket-activated OpenVINO embeddings seam with owner cold-load admission and full idle process release, not a hard memory ceiling or resident Compose service"
     },
     {
       "name": "langchain-api",

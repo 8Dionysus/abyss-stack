@@ -1,31 +1,11 @@
-services:
+services: {}
+
+# The intel-worker profile selects this owner workload, but Compose does not
+# create it. Rootless systemd socket activation owns the container lifecycle.
+x-abyss-owner-workloads:
   ovms:
-    image: docker.io/openvino/model_server:2026.2-gpu@sha256:fdc34725b35d79cde23cff1967f90efb40237b7cf5545a70460209056f3da733
-    container_name: ovms
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:8200:8000"
-      - "127.0.0.1:9200:9000"
-    devices:
-      - /dev/dri:/dev/dri
-    env_file:
-      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Secrets/Configs/ovms-api.env"
-    volumes:
-      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Models/ovms:/models:Z"
-      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Secrets/Configs/ovms_api_key.txt:/run/secrets/ovms_api_key:ro,Z"
-    command:
-      - --config_path
-      - /models/config.json
-      - --port
-      - "9000"
-      - --rest_port
-      - "8000"
-      - --log_level
-      - INFO
-      - --api_key_file
-      - /run/secrets/ovms_api_key
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/v2/health/live >/dev/null"]
-      interval: 10s
-      timeout: 3s
-      retries: 20
+    container_unit: abyss-ovms.service
+    activation_sockets:
+      - abyss-ovms.socket
+      - abyss-ovms-unix.socket
+    proxy_unit: abyss-ovms-proxy.service
