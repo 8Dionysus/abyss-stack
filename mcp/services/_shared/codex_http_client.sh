@@ -2,8 +2,7 @@
 set -euo pipefail
 
 stack_root="${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}"
-modern_codex_default="/srv/abyss-machine/runtimes/codex-os-abyss-mcp/0.147.0-abyss.2/bin/codex-os-abyss-mcp"
-modern_server_default="abyss_stack,abyss_machine,aoa_decisions,aoa_memo,aoa_session_memory,aoa_evals,aoa_kag,aoa_stats,aoa_4pda_connector,aoa_telegram_connector,aoa_discord_connector"
+managed_codex_default="${HOME}/.codex/packages/standalone/current/bin/codex"
 readiness_service="abyss-mcp-modern-admission-refresh.service"
 
 readiness_units=(
@@ -214,8 +213,8 @@ load_credential \
 
 codex_executable="${AOA_CODEX_EXECUTABLE:-}"
 if [[ -z "$codex_executable" ]]; then
-  if [[ -x "$modern_codex_default" && ! -d "$modern_codex_default" ]]; then
-    codex_executable="$modern_codex_default"
+  if [[ -x "$managed_codex_default" && ! -d "$managed_codex_default" ]]; then
+    codex_executable="$managed_codex_default"
   else
     codex_executable="$(command -v codex || true)"
   fi
@@ -227,12 +226,8 @@ launcher_real="$(readlink -f "$0")"
 codex_real="$(readlink -f "$codex_executable")"
 [[ "$launcher_real" != "$codex_real" ]] || fail "Codex executable resolves back to this launcher"
 
-if [[ "$codex_real" == "$(readlink -f "$modern_codex_default")" ]]; then
-  export CODEX_MCP_2026_SERVERS="${CODEX_MCP_2026_SERVERS:-$modern_server_default}"
-fi
-
 request_modern_fleet_recovery "$@"
 
 unset AOA_CODEX_EXECUTABLE
 unset AOA_MCP_READINESS_SKIP
-exec "$codex_executable" "$@"
+exec "$codex_executable" --enable mcp_2026_07_28 "$@"

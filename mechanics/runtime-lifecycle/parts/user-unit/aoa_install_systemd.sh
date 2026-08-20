@@ -19,6 +19,8 @@ rotate_abyss_stack_mcp_auth=0
 provision_abyss_stack_mcp_runtime=0
 verify_abyss_stack_mcp_runtime=0
 launch_verified_abyss_stack_mcp=0
+enable_abyss_stack_mcp_auto_repair=0
+disable_abyss_stack_mcp_auto_repair=0
 verify_abyss_stack_mcp_runtime_contour="all"
 launch_verified_abyss_stack_mcp_contour=""
 install_mcp_http_codex_client=0
@@ -118,6 +120,12 @@ while (($#)); do
       launch_verified_abyss_stack_mcp=1
       launch_verified_abyss_stack_mcp_contour="${1#*=}"
       ;;
+    --enable-abyss-stack-mcp-auto-repair)
+      enable_abyss_stack_mcp_auto_repair=1
+      ;;
+    --disable-abyss-stack-mcp-auto-repair)
+      disable_abyss_stack_mcp_auto_repair=1
+      ;;
     --install-mcp-http-codex-client)
       install_mcp_http_codex_client=1
       ;;
@@ -179,6 +187,19 @@ fi
 aoa_validate_overlay_spec "$overlay_spec"
 if ((install_mcp_http_codex_client && remove_mcp_http_codex_client)); then
   aoa_die "cannot install and remove the MCP HTTP Codex client in one transaction"
+fi
+if ((enable_abyss_stack_mcp_auto_repair && disable_abyss_stack_mcp_auto_repair)); then
+  aoa_die "cannot enable and disable abyss-stack MCP auto-repair in one transaction"
+fi
+if (((enable_abyss_stack_mcp_auto_repair || disable_abyss_stack_mcp_auto_repair) && \
+      (provision_mcp_http_auth || provision_organ_mcp_read_auth || \
+       provision_organ_mcp_candidate_auth || provision_abyss_stack_mcp_auth || \
+       rotate_abyss_stack_mcp_auth || provision_abyss_stack_mcp_runtime || \
+       verify_abyss_stack_mcp_runtime || launch_verified_abyss_stack_mcp || \
+       install_mcp_http_codex_client || remove_mcp_http_codex_client || \
+       enable_now || restart_now || link_all_user_units || link_system_units || \
+       selection_set || overlay_set))); then
+  aoa_die "abyss-stack MCP auto-repair policy changes must be standalone actions"
 fi
 if ((rotate_abyss_stack_mcp_auth && \
       (provision_mcp_http_auth || provision_organ_mcp_read_auth || \
@@ -251,9 +272,13 @@ fi
 if ((launch_verified_abyss_stack_mcp && EUID == 0)); then
   aoa_die "verified abyss-stack MCP launch must run as the target user, not root"
 fi
+if (((enable_abyss_stack_mcp_auto_repair || disable_abyss_stack_mcp_auto_repair) && EUID == 0)); then
+  aoa_die "abyss-stack MCP auto-repair policy changes must run as the target user, not root"
+fi
 
 mcp_http_credential_name="aoa-mcp-http-bearer-token"
 mcp_http_secret_dir="${AOA_STACK_ROOT}/Secrets/Configs"
+abyss_stack_mcp_auto_repair_marker="${mcp_http_secret_dir}/abyss-stack-mcp-runtime-auto-repair.enabled"
 aoa_decisions_mcp_read_credential_name="aoa-decisions-mcp-read-bearer-token"
 aoa_memo_mcp_read_credential_name="aoa-memo-mcp-read-bearer-token"
 aoa_memo_mcp_candidate_credential_name="aoa-memo-mcp-candidate-bearer-token"
@@ -317,6 +342,51 @@ aoa_run_isolated_python() {
 
   /usr/bin/env -u PYTHONHOME -u PYTHONPATH \
     "$python_executable" -I "$@"
+}
+
+aoa_set_abyss_stack_mcp_auto_repair_policy() {
+  local requested_state="$1"
+  local marker="$abyss_stack_mcp_auto_repair_marker"
+  local temp_path=""
+
+  if [[ -e "$mcp_http_secret_dir" || -L "$mcp_http_secret_dir" ]]; then
+    [[ -d "$mcp_http_secret_dir" && ! -L "$mcp_http_secret_dir" ]] || \
+      aoa_die "MCP HTTP secret root must be a directory, not a symlink"
+  elif [[ "$requested_state" == "enabled" ]]; then
+    install -d -m 0700 "$mcp_http_secret_dir"
+  else
+    aoa_note "abyss-stack MCP automatic runtime repair is already disabled"
+    return 0
+  fi
+
+  if [[ "$requested_state" == "enabled" ]]; then
+    if [[ -e "$marker" || -L "$marker" ]]; then
+      [[ -f "$marker" && ! -L "$marker" && "$(<"$marker")" == "enabled" ]] || \
+        aoa_die "existing abyss-stack MCP auto-repair marker is unsafe or invalid"
+      chmod 0600 "$marker"
+      aoa_note "abyss-stack MCP automatic runtime repair is already enabled"
+      return 0
+    fi
+    temp_path="$(mktemp "${mcp_http_secret_dir}/.abyss-stack-mcp-auto-repair.XXXXXX")"
+    printf 'enabled\n' > "$temp_path"
+    chmod 0600 "$temp_path"
+    if ! ln -- "$temp_path" "$marker" 2>/dev/null; then
+      rm -f -- "$temp_path"
+      aoa_die "failed to atomically enable abyss-stack MCP automatic runtime repair"
+    fi
+    rm -f -- "$temp_path"
+    aoa_note "enabled abyss-stack MCP automatic runtime repair"
+    return 0
+  fi
+
+  if [[ ! -e "$marker" && ! -L "$marker" ]]; then
+    aoa_note "abyss-stack MCP automatic runtime repair is already disabled"
+    return 0
+  fi
+  [[ -f "$marker" && ! -L "$marker" && "$(<"$marker")" == "enabled" ]] || \
+    aoa_die "existing abyss-stack MCP auto-repair marker is unsafe or invalid"
+  rm -- "$marker"
+  aoa_note "disabled abyss-stack MCP automatic runtime repair"
 }
 
 aoa_validate_mcp_bearer_file() {
@@ -1384,6 +1454,12 @@ aoa_digest_abyss_stack_mcp_runtime() {
   printf '%s\n' "$digest"
 }
 
+aoa_verify_abyss_stack_mcp_runtime_imports() {
+  PYTHONDONTWRITEBYTECODE=1 \
+    aoa_run_isolated_python "${abyss_stack_mcp_venv}/bin/python" -c \
+      'import encodings, importlib.metadata, ssl; import abyss_stack_mcp, aoa_sdk, mcp, pydantic; assert importlib.metadata.version("aoa-sdk") == "0.10.2"'
+}
+
 aoa_verify_abyss_stack_mcp_runtime() {
   local contour="${1:-all}"
   local marker=".abyss-stack-mcp-runtime-identity"
@@ -1462,6 +1538,8 @@ aoa_verify_abyss_stack_mcp_runtime() {
   )" || aoa_die "failed to digest the provisioned abyss-stack MCP runtime"
   [[ "$observed_content_digest" == "$recorded_content_digest" ]] || \
     aoa_die "abyss-stack MCP runtime content digest mismatch"
+  aoa_verify_abyss_stack_mcp_runtime_imports >/dev/null || \
+    aoa_die "abyss-stack MCP runtime Python dependency/import check failed"
   exec {runtime_lock_fd}>&-
   exec {source_lock_fd}>&-
 }
@@ -1677,9 +1755,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
        PYTHONDONTWRITEBYTECODE=1 \
          aoa_run_isolated_python \
            "${abyss_stack_mcp_venv}/bin/python" -m pip check >/dev/null && \
-       PYTHONDONTWRITEBYTECODE=1 \
-         aoa_run_isolated_python "${abyss_stack_mcp_venv}/bin/python" -c \
-           'import abyss_stack_mcp, aoa_sdk, mcp, pydantic; from importlib.metadata import version; assert version("aoa-sdk") == "0.10.2"' >/dev/null; then
+       aoa_verify_abyss_stack_mcp_runtime_imports >/dev/null; then
       deployed_digest="$(
         aoa_digest_abyss_stack_mcp_package "$abyss_stack_mcp_service_root"
       )" || \
@@ -1951,13 +2027,19 @@ if ((launch_verified_abyss_stack_mcp)); then
   aoa_launch_verified_abyss_stack_mcp \
     "$launch_verified_abyss_stack_mcp_contour"
 fi
+if ((enable_abyss_stack_mcp_auto_repair)); then
+  aoa_set_abyss_stack_mcp_auto_repair_policy enabled
+fi
+if ((disable_abyss_stack_mcp_auto_repair)); then
+  aoa_set_abyss_stack_mcp_auto_repair_policy disabled
+fi
 if ((install_mcp_http_codex_client)); then
   aoa_install_mcp_http_codex_client
 fi
 if ((remove_mcp_http_codex_client)); then
   aoa_remove_mcp_http_codex_client
 fi
-if ((provision_mcp_http_auth || provision_organ_mcp_read_auth || provision_organ_mcp_candidate_auth || provision_abyss_stack_mcp_auth || rotate_abyss_stack_mcp_auth || provision_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_runtime || launch_verified_abyss_stack_mcp || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
+if ((provision_mcp_http_auth || provision_organ_mcp_read_auth || provision_organ_mcp_candidate_auth || provision_abyss_stack_mcp_auth || rotate_abyss_stack_mcp_auth || provision_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_runtime || launch_verified_abyss_stack_mcp || enable_abyss_stack_mcp_auto_repair || disable_abyss_stack_mcp_auto_repair || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
   ((!enable_now && !restart_now && !link_all_user_units && !link_system_units && !selection_set && !overlay_set)); then
   exit 0
 fi

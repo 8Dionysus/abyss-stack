@@ -2,6 +2,7 @@
 Description=Guarded repair of the measured abyss-stack MCP runtime
 Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/README.md
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/requirements.lock
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Secrets/Configs/abyss-stack-mcp-runtime-auto-repair.enabled
 ConditionPathExists=/usr/bin/python3
 
 [Service]

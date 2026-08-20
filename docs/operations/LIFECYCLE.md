@@ -169,6 +169,15 @@ records, and leaves start/restart explicit. Each plane writes only its own
 bounded hash chain. Stop the affected plane before a reviewed archival
 continuity handoff; no live or automatic rotation is part of this lifecycle.
 
+Automatic repair of that exact runtime is a separate, reversible host policy.
+Enable it explicitly with
+`scripts/aoa-install-systemd --enable-abyss-stack-mcp-auto-repair` only after
+reviewing the guarded repair unit; disable it with the matching
+`--disable-abyss-stack-mcp-auto-repair` action. The admission timer cannot
+invoke runtime reprovisioning without this private host marker, and runtime
+verification includes an isolated stdlib and dependency import probe in
+addition to the measured file digest.
+
 The privileged support allowlist under `systemd/system/managed-units.txt` is
 installed separately:
 

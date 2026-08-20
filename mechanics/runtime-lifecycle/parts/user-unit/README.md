@@ -80,10 +80,13 @@ serial within one organ, the complete wave joins before publication, and
 `ABYSS_MCP_CANARY_WORKERS=1` is the exact sequential rollback setting.
 The timer uses a five-minute recurrence rather than continuously replaying a
 failed two-phase transaction. Before bootstrap, the refresh verifies the
-measured stack runtime and delegates a guarded exact-lock reprovision to the
-manual-only `abyss-stack-mcp-runtime-repair.service` when it has drifted. That
-repair still refuses active stack planes and unsafe source, lock, journal, or
-unit topology.
+measured stack runtime and may delegate a guarded exact-lock reprovision to the
+manual-only `abyss-stack-mcp-runtime-repair.service` when it has drifted. This
+automatic delegation is denied until the operator persists the reversible
+host policy with `aoa-install-systemd --enable-abyss-stack-mcp-auto-repair`;
+`--disable-abyss-stack-mcp-auto-repair` removes only that opt-in. The repair
+still refuses active stack planes and unsafe source, lock, journal, or unit
+topology.
 
 The separately linked `abyss-mcp-protocol-watch.path` reacts to Codex and
 protocol-lab source changes; its hourly timer observes new upstream
@@ -135,7 +138,9 @@ the runtime identity, copies the bootstrap interpreter into the runtime, and
 records a deterministic digest of every installed runtime file and symlink
 target. A host interpreter replacement therefore does not mutate an already
 published runtime through a venv symlink. Reuse rehashes the environment and a missing
-or mismatched content digest forces a guarded rebuild. Generated entry-point
+or mismatched content digest forces a guarded rebuild. Read-only verification
+also runs isolated stdlib and installed-dependency imports, so an unusable
+host-backed Python base cannot pass on the private file digest alone. Generated entry-point
 shebangs are rewritten from the private staging root to the stable published
 venv path before this digest is recorded and before the atomic rename. Bytecode writes are
 disabled while provisioning, verifying, and running the managed units so the

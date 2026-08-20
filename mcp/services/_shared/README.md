@@ -42,4 +42,7 @@ It places each bearer only in its named variable in the launched Codex process
 environment and then execs the installed Codex binary. It does not replace
 that binary, persist bearer values in shell configuration, merge MCP
 owner/contour boundaries, or imply that the ToS wrapper/canary admission
-already exists.
+already exists. The launcher prefers the official standalone `current` Codex
+installation and explicitly enables its `mcp_2026_07_28` feature; the bounded
+OS Abyss fork remains a protocol-lab/Tasks witness and is no longer the
+interactive client default.

@@ -1313,6 +1313,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "  exit 0\n"
                 "fi\n"
                 'if [[ "$1" == "-c" ]]; then\n'
+                '  if [[ "${ABYSS_STACK_MCP_TEST_IMPORT_FAIL:-0}" == 1 ]]; then\n'
+                "    exit 69\n"
+                "  fi\n"
                 "  exit 0\n"
                 "fi\n"
                 "exit 64\n",
@@ -1777,6 +1780,20 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 interpreter_update.stderr,
             )
 
+            import_failure = subprocess.run(
+                verify_command,
+                cwd=REPO_ROOT,
+                env={**env, "ABYSS_STACK_MCP_TEST_IMPORT_FAIL": "1"},
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(import_failure.returncode, 0)
+            self.assertIn(
+                "runtime Python dependency/import check failed",
+                import_failure.stderr,
+            )
+
             runtime_python = venv / "bin" / "python"
             runtime_python.write_text(
                 runtime_python.read_text(encoding="utf-8")
@@ -2128,6 +2145,73 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             invalid_contour.stderr,
         )
 
+    def test_stack_mcp_auto_repair_policy_is_explicit_reversible_and_standalone(
+        self,
+    ) -> None:
+        combined = self.run_install_systemd(
+            "--enable-abyss-stack-mcp-auto-repair",
+            "--all-user-units",
+        )
+        self.assertNotEqual(combined.returncode, 0)
+        self.assertIn(
+            "auto-repair policy changes must be standalone actions",
+            combined.stderr,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CONFIGS_ROOT": str(root / "Configs"),
+                    "HOME": str(root / "home"),
+                    "XDG_CONFIG_HOME": str(root / "xdg-config"),
+                }
+            )
+            marker = (
+                stack_root
+                / "Secrets"
+                / "Configs"
+                / "abyss-stack-mcp-runtime-auto-repair.enabled"
+            )
+
+            for expected_fragment in ("enabled", "already enabled"):
+                enabled = subprocess.run(
+                    [
+                        "bash",
+                        str(INSTALL_SYSTEMD),
+                        "--enable-abyss-stack-mcp-auto-repair",
+                    ],
+                    cwd=REPO_ROOT,
+                    env=env,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(enabled.returncode, 0, enabled.stderr)
+                self.assertIn(expected_fragment, enabled.stdout)
+                self.assertEqual(marker.read_text(encoding="utf-8"), "enabled\n")
+                self.assertEqual(marker.stat().st_mode & 0o777, 0o600)
+
+            for expected_fragment in ("disabled", "already disabled"):
+                disabled = subprocess.run(
+                    [
+                        "bash",
+                        str(INSTALL_SYSTEMD),
+                        "--disable-abyss-stack-mcp-auto-repair",
+                    ],
+                    cwd=REPO_ROOT,
+                    env=env,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(disabled.returncode, 0, disabled.stderr)
+                self.assertIn(expected_fragment, disabled.stdout)
+                self.assertFalse(marker.exists())
+
     def test_mcp_http_auth_provision_creates_a_private_secret_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -2304,7 +2388,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertEqual(
                 capture_args.read_text(encoding="utf-8").splitlines(),
-                ["resume", "test-thread"],
+                ["--enable", "mcp_2026_07_28", "resume", "test-thread"],
             )
             self.assertNotIn(MCP_HTTP_AUTH_TOKEN, result.stdout + result.stderr)
 
@@ -2805,7 +2889,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         )
         self.assertNotIn("mcp-candidate.service", script)
         self.assertNotIn("mcp-internal-effect.service", script)
-        self.assertIn("TimeoutStartSec=10min", unit)
+        self.assertIn("TimeoutStartSec=20min", unit)
         self.assertNotIn(
             "ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/"
             "abyss-stack-mcp/venv",
@@ -2827,6 +2911,8 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             'systemctl --user start "$RUNTIME_REPAIR_SERVICE"',
             script,
         )
+        self.assertIn('AUTO_REPAIR_MARKER="$STACK/Secrets/Configs/', script)
+        self.assertIn("automatic runtime repair is not explicitly enabled", script)
         self.assertIn("After=abyss-mcp-modern-admission-refresh.service", keeper)
         self.assertIn("StartLimitIntervalSec=0", keeper)
         self.assertIn(
@@ -2867,6 +2953,11 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
 
         repair_unit = STACK_MCP_RUNTIME_REPAIR_UNIT.read_text(encoding="utf-8")
         self.assertIn("--provision-abyss-stack-mcp-runtime", repair_unit)
+        self.assertIn(
+            "ConditionPathExists=/srv/AbyssOS/abyss-stack/Secrets/Configs/"
+            "abyss-stack-mcp-runtime-auto-repair.enabled",
+            repair_unit,
+        )
         self.assertIn("PIP_NO_CACHE_DIR=1", repair_unit)
         self.assertIn("ProtectSystem=strict", repair_unit)
         self.assertIn(

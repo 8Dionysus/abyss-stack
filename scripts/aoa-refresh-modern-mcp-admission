@@ -5,6 +5,7 @@ STACK=/srv/AbyssOS/abyss-stack
 VENV="$STACK/Services/abyss-stack-mcp/venv/bin"
 INSTALL_SYSTEMD="$STACK/Configs/scripts/aoa-install-systemd"
 RUNTIME_REPAIR_SERVICE="abyss-stack-mcp-runtime-repair.service"
+AUTO_REPAIR_MARKER="$STACK/Secrets/Configs/abyss-stack-mcp-runtime-auto-repair.enabled"
 REGISTRY=/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json
 DEPLOYMENT="$STACK/Logs/mcp/deployments/latest.json"
 TARGETS="$STACK/Configs/mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/runtime-targets.v1.json"
@@ -183,6 +184,13 @@ ensure_stack_runtime_ready() {
   printf '%s\n' \
     'modern MCP admission detected a drifted abyss-stack runtime; requesting guarded reprovision' \
     >&2
+  [[ -f "$AUTO_REPAIR_MARKER" && ! -L "$AUTO_REPAIR_MARKER" && \
+     "$(<"$AUTO_REPAIR_MARKER")" == "enabled" ]] || {
+    printf '%s\n' \
+      'modern MCP automatic runtime repair is not explicitly enabled for this host' \
+      >&2
+    return 1
+  }
   systemctl --user reset-failed "$RUNTIME_REPAIR_SERVICE"
   systemctl --user start "$RUNTIME_REPAIR_SERVICE"
   "$INSTALL_SYSTEMD" --verify-abyss-stack-mcp-runtime=read
