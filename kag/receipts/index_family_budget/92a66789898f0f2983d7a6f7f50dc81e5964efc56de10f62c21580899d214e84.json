@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 13586491,
+  "allowed_tracked_bytes": 35872078,
+  "approved_by": "repository-owner",
+  "base_ref": "c9bcf00a9bbe77989a14c97b74d33e11dcfc0c71",
+  "changed_generated_bytes": 13586491,
+  "changed_generated_files": 137,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "92a66789898f0f2983d7a6f7f50dc81e5964efc56de10f62c21580899d214e84",
+  "reason": "Refresh the owner portable family for the mounted companion race fix.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35872078,
+  "tracked_bytes_max": 24117248
+}

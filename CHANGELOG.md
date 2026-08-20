@@ -9,6 +9,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Preserve the packaged `codex-code-mode-host` beside an ELF Codex executable
+  when the visible incarnation runtime seals and launches it. The companion
+  now shares the same digest-bound private read-only execution coordinate,
+  holder receipts record its relationship and digest, and anonymous-ELF
+  execution is covered by a regression that exercises a real adjacent-host
+  probe.
 - Keep the modern MCP read fleet available across recoverable runtime-repair
   failures. Guarded repair now builds and verifies the replacement before
   quiescing the stack read peer, excludes candidate/internal-effect launches

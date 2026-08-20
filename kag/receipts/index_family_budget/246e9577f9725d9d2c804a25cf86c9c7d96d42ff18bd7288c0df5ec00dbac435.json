@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 15023852,
+  "allowed_tracked_bytes": 36053972,
+  "approved_by": "repository-owner",
+  "base_ref": "aca727f5631ca96231180e12071b49074786a230",
+  "changed_generated_bytes": 15023852,
+  "changed_generated_files": 148,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "246e9577f9725d9d2c804a25cf86c9c7d96d42ff18bd7288c0df5ec00dbac435",
+  "reason": "Refresh the owner portable family after shebang companion execute-mode fix.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36053972,
+  "tracked_bytes_max": 24117248
+}

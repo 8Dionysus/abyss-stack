@@ -45,7 +45,12 @@ The controller:
   signal attempt before TERM and recovery never repeats an existing attempt;
   state and final receipts are atomically published with their containing
   directory fsynced before lifecycle progress, and replay of an unclosed
-  receipt remains failed. Direct ELF launch uses an inheritable sealed memfd.
+  receipt remains failed. Direct ELF launch uses an inheritable sealed memfd
+  when no adjacent Codex companion exists. If the named
+  `codex-code-mode-host` companion is present, the runtime seals both exact
+  ELF files and materializes them beside each other in one private read-only
+  package coordinate; the holder receipt records the companion digest and
+  package-relative coordinate.
   Direct shebang launch first builds a private filesystem-rooted package-layout
   mirror, then reopens every copied directory and regular file to verify its
   device/inode and bytes. Each verified regular file is copied into a sealed

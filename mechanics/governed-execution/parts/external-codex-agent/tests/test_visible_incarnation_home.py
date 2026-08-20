@@ -677,6 +677,12 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert captured["payload_argv"][0] == sys.executable
     assert captured["payload_argv"][1] == str(Path(MODULE.__file__).resolve())
     assert captured["payload_argv"][2] == "payload-launch"
+    manifest_snapshot_argument_index = captured["payload_argv"].index(
+        "--manifest-snapshot-b64"
+    )
+    assert captured["payload_argv"][manifest_snapshot_argument_index + 1] == (
+        base64.b64encode(manifest_snapshot).decode("ascii")
+    )
     payload_executable_index = captured["payload_argv"].index(
         "--payload-executable"
     )
@@ -764,6 +770,256 @@ def test_payload_launch_binds_receipt_to_payload_process(
     assert environment["CODEX_HOME"] == str(ambient)
 
 
+def test_payload_launch_uses_private_companion_after_host_copy_disappears(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    private_package = tmp_path / "private-package"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    private_package.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    manifest_bytes = manifest_path.read_bytes()
+    host_package = tmp_path / "package"
+    host_executable = host_package / "vendor" / "codex" / "codex"
+    host_executable.parent.mkdir(parents=True)
+    (host_package / "package.json").write_text("{}\n", encoding="utf-8")
+    host_executable.write_bytes(b"host-codex")
+    host_executable.chmod(0o700)
+    host_companion = host_executable.parent / MODULE.CODE_MODE_HOST_NAME
+    companion_bytes = b"private-companion"
+    host_companion.write_bytes(companion_bytes)
+    host_companion.chmod(0o700)
+    payload = private_package / "codex"
+    payload.write_bytes(b"#!/bin/sh\nexit 0\n")
+    payload.chmod(0o500)
+    private_companion = private_package / MODULE.CODE_MODE_HOST_NAME
+    private_companion.write_bytes(companion_bytes)
+    private_companion.chmod(0o500)
+    observed: dict[str, object] = {}
+
+    def fake_holder_receipt(**kwargs: object) -> dict[str, object]:
+        observed.update(kwargs)
+        return {}
+
+    def fake_exec(path: str, argv: list[str], environment: dict[str, str]) -> None:
+        observed["exec"] = (path, argv, environment)
+
+    monkeypatch.setattr(MODULE, "_holder_receipt", fake_holder_receipt)
+    monkeypatch.setattr(MODULE.os, "execve", fake_exec)
+    host_companion.unlink()
+    (host_package / "package.json").unlink()
+    manifest_path.unlink()
+    args = MODULE.argparse.Namespace(
+        manifest=str(manifest_path),
+        holder_receipt=str(tmp_path / "holder.json"),
+        codex_executable=str(host_executable),
+        payload_executable=str(payload),
+        manifest_digest=MODULE.sha256_bytes(manifest_bytes),
+        manifest_snapshot_b64=base64.b64encode(manifest_bytes).decode("ascii"),
+        executable_digest=MODULE.sha256_bytes(payload.read_bytes()),
+        companion_path=str(host_companion),
+        companion_digest=MODULE.sha256_bytes(companion_bytes),
+        companion_relative=(
+            "vendor/codex/" + MODULE.CODE_MODE_HOST_NAME
+        ),
+        codex_arguments=[str(payload), "exec", "--help"],
+    )
+
+    assert MODULE.command_payload_launch(args) == 127
+    assert observed["companion_binding"] == {
+        "path": str(host_companion),
+        "digest": MODULE.sha256_bytes(companion_bytes),
+        "relation": "adjacent_immutable_package",
+        "package_relative": "vendor/codex/" + MODULE.CODE_MODE_HOST_NAME,
+    }
+    exec_path, exec_argv, environment = observed["exec"]
+    assert exec_path == str(payload)
+    assert exec_argv == args.codex_arguments
+    assert environment["CODEX_HOME"] == str(ambient)
+
+
+def test_payload_launch_accepts_shebang_package_relative_companion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    private_package = tmp_path / "private-package"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    private_package.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    manifest_bytes = manifest_path.read_bytes()
+    host_package = tmp_path / "host-package"
+    host_executable = host_package / "vendor" / "codex" / "codex"
+    host_executable.parent.mkdir(parents=True)
+    (host_package / "package.json").write_text("{}\n", encoding="utf-8")
+    host_executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    host_executable.chmod(0o700)
+    host_companion = host_executable.parent / MODULE.CODE_MODE_HOST_NAME
+    companion_bytes = b"private-shebang-companion"
+    host_companion.write_bytes(companion_bytes)
+    host_companion.chmod(0o700)
+    (private_package / "package.json").write_text("{}\n", encoding="utf-8")
+    payload = private_package / "vendor" / "codex" / "codex"
+    payload.parent.mkdir(parents=True)
+    payload.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    payload.chmod(0o500)
+    private_companion = payload.parent / MODULE.CODE_MODE_HOST_NAME
+    private_companion.write_bytes(companion_bytes)
+    private_companion.chmod(0o500)
+    observed: dict[str, object] = {}
+
+    def fake_holder_receipt(**kwargs: object) -> dict[str, object]:
+        observed.update(kwargs)
+        return {}
+
+    def fake_exec(path: str, argv: list[str], environment: dict[str, str]) -> None:
+        observed["exec"] = (path, argv, environment)
+
+    monkeypatch.setattr(MODULE, "_holder_receipt", fake_holder_receipt)
+    monkeypatch.setattr(MODULE.os, "execve", fake_exec)
+    args = MODULE.argparse.Namespace(
+        manifest=str(manifest_path),
+        holder_receipt=str(tmp_path / "holder.json"),
+        codex_executable=str(host_executable),
+        payload_executable=str(payload),
+        manifest_digest=MODULE.sha256_bytes(manifest_bytes),
+        executable_digest=MODULE.sha256_bytes(payload.read_bytes()),
+        companion_path=str(host_companion),
+        companion_digest=MODULE.sha256_bytes(companion_bytes),
+        companion_relative=(
+            "vendor/codex/" + MODULE.CODE_MODE_HOST_NAME
+        ),
+        codex_arguments=[str(payload), "exec", "--help"],
+    )
+
+    assert MODULE.command_payload_launch(args) == 127
+    assert observed["companion_binding"] == {
+        "path": str(host_companion),
+        "digest": MODULE.sha256_bytes(companion_bytes),
+        "relation": "adjacent_immutable_package",
+        "package_relative": "vendor/codex/" + MODULE.CODE_MODE_HOST_NAME,
+    }
+
+
+def test_elf_binding_rejects_executable_replacement_during_companion_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "codex"
+    executable.write_bytes(b"original-executable")
+    executable.chmod(0o700)
+    companion = tmp_path / MODULE.CODE_MODE_HOST_NAME
+    companion.write_bytes(b"companion")
+    companion.chmod(0o700)
+    original_adjacent = MODULE._adjacent_code_mode_host
+
+    def replace_before_companion(path: Path) -> tuple[Path, bytes, dict[str, str]]:
+        replacement = path.with_name("codex-replacement")
+        replacement.write_bytes(b"replacement-executable")
+        replacement.chmod(0o700)
+        os.replace(replacement, path)
+        return original_adjacent(path)
+
+    monkeypatch.setattr(MODULE, "_adjacent_code_mode_host", replace_before_companion)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="executable changed while binding companion",
+    ):
+        MODULE._open_verified_executable(executable)
+
+
+def test_elf_binding_rechecks_absent_companion_before_anonymous_launch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "codex"
+    executable.write_bytes(b"executable")
+    executable.chmod(0o700)
+    companion = tmp_path / MODULE.CODE_MODE_HOST_NAME
+    original_adjacent = MODULE._adjacent_code_mode_host
+    calls = 0
+
+    def companion_appears(
+        path: Path,
+    ) -> tuple[Path, bytes, dict[str, str]] | None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return None
+        companion.write_bytes(b"companion")
+        companion.chmod(0o700)
+        return original_adjacent(path)
+
+    monkeypatch.setattr(MODULE, "_adjacent_code_mode_host", companion_appears)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="companion appeared while binding executable",
+    ):
+        MODULE._open_verified_executable(executable)
+    assert calls == 2
+
+
+def test_companion_binding_rejects_permission_revocation_before_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "codex"
+    executable.write_bytes(b"executable")
+    executable.chmod(0o700)
+    companion = tmp_path / MODULE.CODE_MODE_HOST_NAME
+    companion.write_bytes(b"companion")
+    companion.chmod(0o700)
+    original_read = MODULE._read_verified_regular_file
+
+    def revoke_before_open(
+        path: Path, *, label: str
+    ) -> tuple[bytes, os.stat_result]:
+        path.chmod(0o600)
+        return original_read(path, label=label)
+
+    monkeypatch.setattr(MODULE, "_read_verified_regular_file", revoke_before_open)
+    with pytest.raises(MODULE.IncarnationHomeError, match="identity changed"):
+        MODULE._open_verified_executable(executable)
+
+
+def test_companion_binding_rejects_effective_permission_denial(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "codex"
+    executable.write_bytes(b"executable")
+    executable.chmod(0o700)
+    companion = tmp_path / MODULE.CODE_MODE_HOST_NAME
+    companion.write_bytes(b"companion")
+    companion.chmod(0o704)
+    original_access = MODULE.os.access
+
+    def deny_companion_execute(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        mode: int,
+        *args: object,
+        **kwargs: object,
+    ) -> bool:
+        if Path(path) == companion and mode == MODULE.os.X_OK:
+            return False
+        return original_access(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(MODULE.os, "access", deny_companion_execute)
+    with pytest.raises(MODULE.IncarnationHomeError, match="current user"):
+        MODULE._open_verified_executable(executable)
+
+
 def test_atomic_json_fsyncs_publication_directory(tmp_path: Path) -> None:
     path = tmp_path / "receipt.json"
     fsync_targets: list[str] = []
@@ -822,9 +1078,12 @@ def test_holder_receipt_rejects_detached_kitty_route(tmp_path: Path) -> None:
 def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    executable = tmp_path / "codex"
+    executable = tmp_path / "codex.js"
     executable.write_bytes(b"codex-holder\n")
     executable.chmod(0o700)
+    companion = tmp_path / MODULE.CODE_MODE_HOST_NAME
+    companion.write_bytes(b"codex-code-mode-host\n")
+    companion.chmod(0o700)
     manifest_path = tmp_path / "incarnation-home.json"
     launch_manifest = {
         "schema_version": MODULE.SCHEMA_VERSION,
@@ -852,6 +1111,12 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
         "runtime": {
             "codex_executable": str(executable),
             "codex_executable_digest": MODULE.sha256_bytes(executable.read_bytes()),
+            "codex_companion": {
+                "path": str(companion),
+                "digest": MODULE.sha256_bytes(companion.read_bytes()),
+                "relation": "adjacent_immutable_package",
+                "package_relative": MODULE.CODE_MODE_HOST_NAME,
+            },
             "incarnation_manifest": str(manifest_path),
             "incarnation_manifest_digest": MODULE.sha256_bytes(snapshot),
             "incarnation_manifest_snapshot_b64": base64.b64encode(snapshot).decode(
@@ -885,6 +1150,8 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
     )
     monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("7", True))
 
+    executable.unlink()
+    companion.unlink()
     assert MODULE._holder_terminal_identity(receipt) == (
         holder_pid,
         kitty_pid,
@@ -892,6 +1159,157 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
         "7",
         True,
     )
+
+
+def test_live_close_uses_holder_bound_companion_after_host_removal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "codex"
+    executable_bytes = b"immutable-holder-executable"
+    executable.write_bytes(executable_bytes)
+    executable.chmod(0o700)
+    companion = tmp_path / MODULE.CODE_MODE_HOST_NAME
+    companion_bytes = b"immutable-holder-companion"
+    companion.write_bytes(companion_bytes)
+    companion.chmod(0o700)
+    holder = tmp_path / "holder.json"
+    handoff = tmp_path / "handoff.json"
+    wake = tmp_path / "wake.json"
+    closure = tmp_path / "closure.json"
+    manifest_snapshot = MODULE.canonical_bytes(
+        {
+            "schema_version": MODULE.SCHEMA_VERSION,
+            "model_slug": "gpt-5.6-luna",
+            "reasoning_effort": "max",
+            "ambient_codex_home": str(tmp_path / "ambient"),
+            "codex_home": str(tmp_path / "incarnation"),
+        }
+    )
+    holder_pid, parent_pid, kitty_pid = 101, 102, 103
+    holder_argv = ["/usr/bin/codex", "exec"]
+    kitty_argv = ["/usr/bin/kitty", "--detach", "--title", "holder"]
+    holder_payload = {
+        "schema_version": MODULE.HOLDER_RECEIPT_SCHEMA_VERSION,
+        "receipt_ref": str(holder.resolve()),
+        "created_at": "2026-08-15T00:00:00Z",
+        "lifecycle_role": "responsibility_holder",
+        "boot_id": MODULE._proc_boot_id(),
+        "holder": {
+            "pid": holder_pid,
+            "start_ticks": 11,
+            "parent_pid": parent_pid,
+            "parent_start_ticks": 12,
+            "parent_comm": "bwrap",
+            "argv": holder_argv,
+            "argv_digest": MODULE.sha256_bytes(
+                MODULE.canonical_bytes(holder_argv)
+            ),
+        },
+        "runtime": {
+            "codex_executable": str(executable),
+            "codex_executable_digest": MODULE.sha256_bytes(executable_bytes),
+            "codex_companion": {
+                "path": str(companion),
+                "digest": MODULE.sha256_bytes(companion_bytes),
+                "relation": "adjacent_immutable_package",
+                "package_relative": MODULE.CODE_MODE_HOST_NAME,
+            },
+            "incarnation_manifest": str(tmp_path / "missing-manifest"),
+            "incarnation_manifest_digest": MODULE.sha256_bytes(manifest_snapshot),
+            "incarnation_manifest_snapshot_b64": base64.b64encode(
+                manifest_snapshot
+            ).decode("ascii"),
+            "model": "gpt-5.6-luna",
+            "reasoning_effort": "max",
+            "ambient_codex_home": str(tmp_path / "ambient"),
+            "incarnation_codex_home": str(tmp_path / "incarnation"),
+        },
+        "terminal": {
+            "binding": "kitty_ancestor_at_exec",
+            "required_comm": "kitty",
+            "pid": kitty_pid,
+            "start_ticks": 13,
+            "argv": kitty_argv,
+            "window_id": "7",
+            "dedicated": True,
+        },
+    }
+    holder.write_text(json.dumps(holder_payload), encoding="utf-8")
+    handoff.write_text(
+        json.dumps(
+            {
+                "runtime": {
+                    "responsibility_holder": {
+                        "terminal_receipt": str(holder.resolve()),
+                        "terminal_receipt_sha256": MODULE.sha256_bytes(
+                            holder.read_bytes()
+                        ),
+                        "closure_receipt": str(closure.resolve()),
+                        "holder_pid": holder_pid,
+                        "terminal_pid": kitty_pid,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    wake.write_text(
+        json.dumps(
+            {
+                "schema_version": "task_local_actor_wake_receipt_v1",
+                "handoff_ref": str(handoff.resolve()),
+                "handoff_sha256": MODULE.sha256_bytes(handoff.read_bytes()),
+                "actions": {"handoff_message_sent": True},
+                "observed": {"handoff_delivery": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_start_ticks",
+        lambda pid: {holder_pid: 11, parent_pid: 12, kitty_pid: 13}[pid],
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_parent_pid",
+        lambda pid: {holder_pid: parent_pid, parent_pid: kitty_pid, kitty_pid: 1}[pid],
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_comm",
+        lambda pid: {parent_pid: "bwrap", kitty_pid: "kitty"}[pid],
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: {holder_pid: holder_argv, kitty_pid: kitty_argv}[pid],
+    )
+    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("7", True))
+    states = iter(["live", "live", "gone", "gone"])
+    monkeypatch.setattr(
+        MODULE, "_proc_identity_state", lambda _pid, _start: next(states)
+    )
+    monkeypatch.setattr(MODULE, "_send_verified_term", lambda *_args: True)
+    monkeypatch.setattr(MODULE.time, "sleep", lambda _seconds: None)
+
+    executable.unlink()
+    companion.unlink()
+    assert MODULE.command_close(
+        MODULE.argparse.Namespace(
+            handoff=str(handoff),
+            holder_receipt=str(holder),
+            wake_receipt=str(wake),
+            closure_receipt=str(closure),
+        )
+    ) == 0
+    recorded = json.loads(closure.read_text(encoding="utf-8"))
+    assert recorded["closed"] is True
+    assert recorded["outcome"] == "closed"
+    assert recorded["identity_state"] == "live"
+    assert recorded["terminal"]["signal_delivery"] == "confirmed"
+    assert recorded["terminal"]["signal_sent"] is True
 
 
 def test_close_requires_confirmed_handoff_delivery(tmp_path: Path) -> None:
@@ -963,6 +1381,109 @@ def test_shebang_snapshot_root_rejects_noexec_filesystem(
     )
     with pytest.raises(MODULE.IncarnationHomeError, match="mounted noexec"):
         MODULE._execution_snapshot_root(tmp_path)
+
+
+@pytest.mark.skipif(
+    shutil.which("cc") is None or not Path("/usr/bin/bwrap").is_file(),
+    reason="the ELF companion regression needs cc and bubblewrap",
+)
+def test_elf_companion_survives_the_immutable_execution_binding(
+    tmp_path: Path,
+) -> None:
+    package = tmp_path / "codex-package"
+    package.mkdir()
+    executable = package / "codex"
+    companion = package / MODULE.CODE_MODE_HOST_NAME
+    source = tmp_path / "codex.c"
+    source.write_text(
+        "#include <fcntl.h>\n"
+        "#include <limits.h>\n"
+        "#include <stdio.h>\n"
+        "#include <string.h>\n"
+        "#include <unistd.h>\n"
+        "int main(int argc, char **argv) {\n"
+        "  if (argc > 1 && strcmp(argv[1], \"--version\") == 0) {\n"
+        "    puts(\"codex-cli 0.147.0\"); return 0;\n"
+        "  }\n"
+        "  char path[PATH_MAX];\n"
+        "  ssize_t length = readlink(\"/proc/self/exe\", path, sizeof(path) - 1);\n"
+        "  if (length < 0 || (size_t)length >= sizeof(path) - 1) return 2;\n"
+        "  path[length] = '\\0';\n"
+        "  char *slash = strrchr(path, '/');\n"
+        "  if (slash == NULL || (size_t)(sizeof(path) - (slash - path)) < "
+        "strlen(\"/codex-code-mode-host\") + 1) return 3;\n"
+        "  strcpy(slash, \"/codex-code-mode-host\");\n"
+        "  int descriptor = open(path, O_RDONLY);\n"
+        "  if (descriptor < 0) { puts(\"code-mode-companion-missing\"); return 4; }\n"
+        "  close(descriptor); puts(\"code-mode-call-ok\"); return 0;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    subprocess.run(
+        ["/usr/bin/cc", "-O2", "-o", str(executable), str(source)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    companion.write_text("sealed-companion\n", encoding="utf-8")
+    companion.chmod(0o755)
+
+    anonymous_fd = MODULE._sealed_memfd("anonymous-codex", executable.read_bytes(), mode=0o700)
+    try:
+        anonymous = subprocess.run(
+            [f"/proc/self/fd/{anonymous_fd}", "--code-mode-probe"],
+            check=False,
+            capture_output=True,
+            text=True,
+            pass_fds=(anonymous_fd,),
+        )
+    finally:
+        os.close(anonymous_fd)
+    assert anonymous.returncode != 0
+    assert anonymous.stdout.strip() == "code-mode-companion-missing"
+
+    (
+        executable_fd,
+        executable_path,
+        content,
+        executable_digest,
+        snapshot_dir,
+        snapshot_path,
+        snapshot_mount,
+    ) = MODULE._open_verified_executable(executable, snapshot_root=tmp_path)
+    assert snapshot_dir is None
+    assert snapshot_path is None
+    assert content == executable.read_bytes()
+    assert executable_digest == MODULE.sha256_bytes(content)
+    assert snapshot_mount is not None
+    assert snapshot_mount["companion"]["path"] == str(companion.resolve())
+    assert snapshot_mount["companion"]["digest"] == MODULE.sha256_bytes(
+        companion.read_bytes()
+    )
+    snapshot_fds = tuple(
+        descriptor for _, descriptor, _ in snapshot_mount["file_fds"]
+    )
+    try:
+        repaired = subprocess.run(
+            [
+                *MODULE._snapshot_bwrap_prefix(snapshot_mount),
+                "--",
+                str(executable_path),
+                "--code-mode-probe",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            pass_fds=snapshot_fds,
+        )
+    finally:
+        MODULE._close_snapshot_mount(snapshot_mount)
+        try:
+            os.close(executable_fd)
+        except OSError:
+            pass
+    assert repaired.returncode == 0, repaired.stderr
+    assert repaired.stdout.strip() == "code-mode-call-ok"
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node is unavailable")
@@ -1037,6 +1558,11 @@ def test_shebang_node_launcher_reopens_named_snapshot(
         if "process" in locals() and process.poll() is None:
             process.terminate()
             process.wait(timeout=5)
+        if "process" in locals():
+            if process.stdout is not None:
+                process.stdout.close()
+            if process.stderr is not None:
+                process.stderr.close()
         MODULE._close_snapshot_mount(snapshot_mount)
         MODULE._remove_named_snapshot(
             snapshot_path,
@@ -1049,6 +1575,86 @@ def test_shebang_node_launcher_reopens_named_snapshot(
     assert content == original
     assert observed_argv[:2] == ["node", str(snapshot_exec_path)]
     assert resource_line == "package-relative\n"
+
+
+def test_package_snapshot_does_not_mirror_ancestor_siblings(
+    tmp_path: Path,
+) -> None:
+    package = tmp_path / "package"
+    executable = package / "bin" / "codex"
+    executable.parent.mkdir(parents=True)
+    (package / "package.json").write_text("{}\n", encoding="utf-8")
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o700)
+    unrelated = tmp_path / "unrelated-snapshot"
+    unrelated.mkdir()
+    (unrelated / "marker").write_text("must not be retained\n", encoding="utf-8")
+    snapshot_root = tmp_path / "snapshot-root"
+    snapshot_root.mkdir()
+
+    snapshot_exec, snapshot_dir, _records, _target_dir = MODULE._mirror_package_layout(
+        executable=executable,
+        snapshot_root=snapshot_root,
+    )
+    try:
+        assert snapshot_exec.parent.is_dir()
+        assert (_target_dir / "package.json").is_file()
+        assert not any(item.is_symlink() for item in snapshot_dir.rglob("*"))
+        assert not any(
+            item.name == unrelated.name for item in snapshot_dir.rglob("*")
+        )
+    finally:
+        MODULE._remove_named_snapshot(
+            snapshot_exec,
+            snapshot_dir=snapshot_dir,
+        )
+
+
+def test_shebang_snapshot_preserves_effective_companion_execute_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    package = tmp_path / "package"
+    package.mkdir()
+    executable = package / "vendor" / "codex" / "codex"
+    executable.parent.mkdir(parents=True)
+    (package / "package.json").write_text("{}\n", encoding="utf-8")
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o700)
+    companion = executable.parent / MODULE.CODE_MODE_HOST_NAME
+    companion.write_bytes(b"group-executable-companion")
+    companion.chmod(0o450)
+    original_access = MODULE.os.access
+
+    def allow_companion_execute(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        mode: int,
+        *args: object,
+        **kwargs: object,
+    ) -> bool:
+        if Path(path) == companion and mode == MODULE.os.X_OK:
+            return True
+        return original_access(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(MODULE.os, "access", allow_companion_execute)
+    (
+        snapshot_fd,
+        _snapshot_exec_path,
+        _content,
+        _digest,
+        _snapshot_dir,
+        _snapshot_path,
+        snapshot_mount,
+    ) = MODULE._open_verified_executable(executable, snapshot_root=tmp_path)
+    try:
+        companion_relative = Path("vendor/codex") / MODULE.CODE_MODE_HOST_NAME
+        modes = {
+            relative: mode
+            for relative, _descriptor, mode in snapshot_mount["file_fds"]
+        }
+        assert modes[companion_relative] == 0o500
+    finally:
+        MODULE._close_snapshot_mount(snapshot_mount)
+        os.close(snapshot_fd)
 
 
 def test_named_snapshot_cleanup_waits_for_exact_holder_exit(tmp_path: Path) -> None:

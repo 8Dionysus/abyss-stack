@@ -32,6 +32,17 @@
       "properties": {
         "codex_executable": {"type": "string", "pattern": "^/"},
         "codex_executable_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "codex_companion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "digest", "relation", "package_relative"],
+          "properties": {
+            "path": {"type": "string", "pattern": "^/"},
+            "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            "relation": {"const": "adjacent_immutable_package"},
+            "package_relative": {"type": "string", "minLength": 1}
+          }
+        },
         "incarnation_manifest": {"type": "string", "pattern": "^/"},
         "incarnation_manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
         "incarnation_manifest_snapshot_b64": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9+/]+={0,2}$"},
