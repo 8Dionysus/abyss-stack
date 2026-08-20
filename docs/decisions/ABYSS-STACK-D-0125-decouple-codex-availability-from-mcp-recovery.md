@@ -3,6 +3,7 @@
 - Decision ID: ABYSS-STACK-D-0125
 - Status: accepted
 - Date: 2026-08-19
+- Amended: 2026-08-20
 - Owner surface: `mcp/services/_shared/codex_http_client.sh`
 
 ## Index Metadata
@@ -38,13 +39,23 @@ Choose the third option. Runtime provisioning copies the bootstrap interpreter
 into the published venv and measures that private closure. Because Python's
 stdlib may still be host-backed, read-only verification also executes isolated
 stdlib and pinned dependency imports. Admission refresh verifies the stack
-runtime before bootstrap and may invoke a separate manual-only repair oneshot
-when verification fails, but only after the operator persists the reversible
-host auto-repair opt-in. The repair action rebuilds only from the deployed
-package and artifact-hashed lock, preserves all stopped-plane, unit-identity,
-source-lock, runtime-lock, journal, and non-symlink guards, and must succeed
-before admission continues. The admission unit reserves twenty minutes so the
-bounded ten-minute repair still leaves a separate admission budget.
+runtime before bootstrap and may invoke a separate opt-in repair oneshot when
+verification fails, but only after the operator persists the reversible host
+auto-repair policy. The repair action rebuilds only from the deployed package
+and artifact-hashed lock. It holds the source lock throughout and excludes
+candidate and internal-effect starts with an operation lock, while allowing the
+working read fleet to retain its shared runtime locks during dependency
+installation and replacement verification. Only a fully built replacement may
+briefly quiesce the stack read/bootstrap peer, acquire the exclusive runtime
+lock, and perform the atomic swap. Failure before quiescence leaves every
+reader active; failure after quiescence restores the previous venv and restarts
+whichever stack read peer was active. Before quiescence, repair writes a private
+grant bound to that runtime's exact measured content and recorded identity. Only
+the read contour may use the grant to survive source-identity drift after
+rollback; candidate, internal-effect, and general verification stay strict, and
+a successful replacement removes the grant. The admission unit reserves twenty
+minutes so the bounded ten-minute repair still leaves a separate admission
+budget.
 
 The boot timer remains the primary recovery owner but backs off to five-minute
 recurrence. The Codex launcher performs a cheap exact fleet check, requests the
@@ -62,8 +73,12 @@ authorize a missing or stale MCP server, while blocking Codex cannot repair
 that server and removes the operator's primary recovery surface. A copied,
 measured interpreter prevents ordinary host package replacement from mutating
 an existing runtime. A separate guarded repair unit retains the exact source,
-lock, stopped-plane, and sandbox contract without widening the admission
-controller's ordinary write surface.
+unit-identity, lock, journal, non-symlink, and sandbox contracts without
+widening the admission controller's ordinary write surface. Building the
+replacement before the final quiescence keeps a package-index or dependency
+failure from turning recoverable runtime drift into read-plane downtime. The
+operation lock keeps non-read stack planes out of the interval while running
+readers continue under their existing shared runtime locks.
 
 ## Consequences
 
@@ -72,6 +87,11 @@ controller's ordinary write surface.
   still caught by executable import verification.
 - Positive: a drifted but exactly reproducible runtime repairs before the
   bootstrap-to-production admission handoff.
+- Positive: dependency retrieval, build, or pre-swap verification failure does
+  not stop the working read fleet.
+- Positive: a post-quiescence activation failure atomically restores the prior
+  runtime and the previously active stack read peer through an exact,
+  read-contour-only rollback grant.
 - Positive: Codex starts even when MCP recovery fails or is still running.
 - Tradeoff: a Codex session opened during genuine MCP downtime may retain
   unavailable MCP clients until a later session, but the operator is not locked
@@ -90,6 +110,8 @@ controller's ordinary write surface.
 - `mechanics/runtime-lifecycle/parts/user-unit/aoa_install_systemd.sh`
 - `systemd/user/abyss-mcp-modern-admission-refresh.timer`
 - `systemd/user/abyss-stack-mcp-runtime-repair.service`
+- `systemd/user/abyss-stack-mcp-candidate.service`
+- `systemd/user/abyss-stack-mcp-internal-effect.service`
 - `tests/test_runtime_lifecycle_user_unit.py`
 
 ## Follow-up route

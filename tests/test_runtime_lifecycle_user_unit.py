@@ -1293,12 +1293,20 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "fi\n"
                 'if [[ "$1" == "-m" && "$2" == "pip" ]]; then\n'
                 '  printf \'%s\\n\' "$*" >> "$ABYSS_STACK_MCP_TEST_PIP_LOG"\n'
+                '  if [[ "${ABYSS_STACK_MCP_TEST_PIP_FAIL:-0}" == 1 && '
+                '"$*" == *"--require-hashes"* ]]; then\n'
+                '    printf \'pip-require-hashes\\n\' >> '
+                '"$ABYSS_STACK_MCP_TEST_EVENT_LOG"\n'
+                "    exit 70\n"
+                "  fi\n"
                 '  if [[ -n "${ABYSS_STACK_MCP_TEST_BLOCK_INSTALL:-}" && '
                 '"$*" == *"--require-hashes"* ]]; then\n'
                 '    : > "$ABYSS_STACK_MCP_TEST_BLOCK_INSTALL"\n'
                 "    sleep 300\n"
                 "  fi\n"
                 '  if [[ "$*" == *"--require-hashes"* ]]; then\n'
+                '    printf \'pip-require-hashes\\n\' >> '
+                '"$ABYSS_STACK_MCP_TEST_EVENT_LOG"\n'
                 '    package_root="$(dirname "$0")/../lib/python/site-packages/'
                 'test_package"\n'
                 '    mkdir -p "$package_root"\n'
@@ -1332,6 +1340,23 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             bootstrap_link.symlink_to(bootstrap)
             fake_bin = root / "bin"
             fake_bin.mkdir()
+            fake_mv = fake_bin / "mv"
+            fake_mv.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                'source_path="${@: -2:1}"\n'
+                'target_path="${@: -1}"\n'
+                'source_name="$(basename -- "$source_path")"\n'
+                'if [[ "${ABYSS_STACK_MCP_TEST_FAIL_ACTIVATION:-0}" == 1 && '
+                '"$source_name" == .venv.* && '
+                '"$source_name" != .venv.previous.* && '
+                '"$target_path" == */venv ]]; then\n'
+                "  exit 71\n"
+                "fi\n"
+                'exec /usr/bin/mv "$@"\n',
+                encoding="utf-8",
+            )
+            fake_mv.chmod(0o755)
             unit_source_dir = stack_root / "Configs" / "systemd" / "user"
             unit_source_dir.mkdir(parents=True)
             unit_target_dir = root / "xdg-config" / "systemd" / "user"
@@ -1352,13 +1377,44 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 )
                 (unit_target_dir / source_unit.name).symlink_to(source_path)
             systemctl = fake_bin / "systemctl"
+            systemctl_log = root / "runtime-events.log"
+            systemctl_state = root / "systemctl-state"
+            systemctl_state.mkdir()
             systemctl.write_text(
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
+                'printf \'%s\\n\' "$*" >> "$ABYSS_STACK_MCP_TEST_SYSTEMCTL_LOG"\n'
+                'args=("$@")\n'
+                'if [[ "${args[0]:-}" == "--user" ]]; then args=("${args[@]:1}"); fi\n'
+                'command="${args[0]:-}"\n'
                 'unit="${!#}"\n'
                 'if [[ "${ABYSS_STACK_MCP_TEST_SYSTEMCTL_FAIL:-0}" == 1 ]]; '
                 "then\n"
                 "  exit 1\n"
+                "fi\n"
+                'is_active=0\n'
+                'if [[ "${ABYSS_STACK_MCP_TEST_ACTIVE_UNIT:-}" == "$unit" && '
+                '! -f "$ABYSS_STACK_MCP_TEST_SYSTEMCTL_STATE/$unit.stopped" ]]; then\n'
+                '  is_active=1\n'
+                'elif [[ "$unit" == "abyss-stack-mcp-read.service" && '
+                '-f "${ABYSS_STACK_MCP_TEST_ACTIVATE_DURING_BUILD:-/nonexistent}" && '
+                '! -f "$ABYSS_STACK_MCP_TEST_SYSTEMCTL_STATE/$unit.stopped" ]]; then\n'
+                '  is_active=1\n'
+                "fi\n"
+                'if [[ "$command" == "is-active" ]]; then\n'
+                '  ((is_active))\n'
+                "  exit\n"
+                "fi\n"
+                'if [[ "$command" == "stop" ]]; then\n'
+                '  for item in "${args[@]:1}"; do\n'
+                '    [[ "$item" == *.service ]] || continue\n'
+                '    : > "$ABYSS_STACK_MCP_TEST_SYSTEMCTL_STATE/$item.stopped"\n'
+                "  done\n"
+                "  exit 0\n"
+                "fi\n"
+                'if [[ "$command" == "start" ]]; then\n'
+                '  rm -f -- "$ABYSS_STACK_MCP_TEST_SYSTEMCTL_STATE/$unit.stopped"\n'
+                "  exit 0\n"
                 "fi\n"
                 "load_state=loaded\n"
                 "active_state=inactive\n"
@@ -1377,6 +1433,11 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 ".runtime-provision.lock /usr/bin/env "
                 "${AOA_CONFIGS_ROOT}/scripts/aoa-install-systemd "
                 '--launch-verified-abyss-stack-mcp=${contour}"\n'
+                'if [[ "$contour" == "candidate" || "$contour" == "internal_effect" ]]; then\n'
+                '  exec_start="/usr/bin/flock --shared --no-fork '
+                "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/"
+                '.runtime-operation.lock ${exec_start}"\n'
+                "fi\n"
                 'if [[ "${ABYSS_STACK_MCP_TEST_UNLOADED_UNIT:-}" == '
                 '"$unit" ]]; then\n'
                 "  load_state=not-found\n"
@@ -1391,12 +1452,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv/bin/python "
                 '-I -B -m abyss_stack_mcp.server"\n'
                 "fi\n"
-                'if [[ "${ABYSS_STACK_MCP_TEST_ACTIVE_UNIT:-}" == '
-                '"$unit" ]]; then\n'
-                "  active_state=active\n"
-                'elif [[ "$unit" == "abyss-stack-mcp-read.service" && '
-                '-f "${ABYSS_STACK_MCP_TEST_ACTIVATE_DURING_BUILD:-'
-                '/nonexistent}" ]]; then\n'
+                'if ((is_active)); then\n'
                 "  active_state=active\n"
                 "fi\n"
                 "printf 'LoadState=%s\\n' \"$load_state\"\n"
@@ -1423,6 +1479,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                     "ABYSS_STACK_MCP_TEST_PIP_LOG": str(pip_log),
                     "ABYSS_STACK_MCP_TEST_SERVER_LOG": str(server_log),
                     "ABYSS_STACK_MCP_TEST_ENTRYPOINT_LOG": str(entrypoint_log),
+                    "ABYSS_STACK_MCP_TEST_SYSTEMCTL_LOG": str(systemctl_log),
+                    "ABYSS_STACK_MCP_TEST_SYSTEMCTL_STATE": str(systemctl_state),
+                    "ABYSS_STACK_MCP_TEST_EVENT_LOG": str(systemctl_log),
                     "HOME": str(root / "home"),
                     "XDG_CONFIG_HOME": str(root / "xdg-config"),
                     "PATH": f"{fake_bin}:{env['PATH']}",
@@ -1439,6 +1498,26 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "bash",
                 str(INSTALL_SYSTEMD),
                 "--verify-abyss-stack-mcp-runtime",
+            ]
+            read_verify_command = [
+                "bash",
+                str(INSTALL_SYSTEMD),
+                "--verify-abyss-stack-mcp-runtime=read",
+            ]
+            candidate_verify_command = [
+                "bash",
+                str(INSTALL_SYSTEMD),
+                "--verify-abyss-stack-mcp-runtime=candidate",
+            ]
+            repair_eligibility_command = [
+                "bash",
+                str(INSTALL_SYSTEMD),
+                "--verify-abyss-stack-mcp-repair-eligibility",
+            ]
+            repair_command = [
+                "bash",
+                str(INSTALL_SYSTEMD),
+                "--repair-abyss-stack-mcp-runtime",
             ]
 
             read_unit_source = unit_source_dir / "abyss-stack-mcp-read.service"
@@ -1543,10 +1622,20 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertEqual(first.returncode, 0, first.stderr)
             venv = stack_root / "Services" / "abyss-stack-mcp" / "venv"
+            runtime_root = stack_root / "Services" / "abyss-stack-mcp"
             marker = venv / ".abyss-stack-mcp-runtime-identity"
             content_marker = venv / ".abyss-stack-mcp-runtime-content-digest"
             runtime_lock = (
                 stack_root / "Services" / "abyss-stack-mcp" / ".runtime-provision.lock"
+            )
+            operation_lock = (
+                stack_root / "Services" / "abyss-stack-mcp" / ".runtime-operation.lock"
+            )
+            rollback_grant = (
+                stack_root
+                / "Services"
+                / "abyss-stack-mcp"
+                / ".read-repair-rollback-grant"
             )
             source_projection_lock = (
                 stack_root / "Services" / "abyss-stack-mcp" / ".source-projection.lock"
@@ -1555,10 +1644,25 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             read_audit_journal = audit_root / "policy-read.jsonl"
             candidate_audit_journal = audit_root / "policy-candidate.jsonl"
             observation_root = stack_root / "Logs" / "mcp" / "observations"
+            observation_path = observation_root / "current.json"
             keeper_inbox_root = (
                 stack_root / "Logs" / "mcp" / "admission" / "keeper-inbox"
             )
+            admission_root = stack_root / "Logs" / "mcp" / "admission"
+            preflight_root = stack_root / "Logs" / "mcp" / "preflight"
             protocol_watch_root = stack_root / "Logs" / "mcp" / "protocol-watch"
+            orchestration_root = (
+                stack_root / "Logs" / "mcp" / "cross-organ-orchestrations"
+            )
+            tasks_root = stack_root / "Logs" / "mcp" / "tasks"
+            read_tasks_root = tasks_root / "abyss-stack-read"
+            effect_root = (
+                stack_root
+                / "Logs"
+                / "mcp"
+                / "internal-effects"
+                / "read-restart-pilot"
+            )
             first_identity = marker.read_text(encoding="utf-8").strip()
             self.assertRegex(first_identity, r"\A[0-9a-f]{64}:[0-9a-f]{64}\Z")
             first_content_digest = content_marker.read_text(encoding="utf-8").strip()
@@ -1599,6 +1703,8 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertTrue(runtime_lock.is_file())
             self.assertEqual(runtime_lock.stat().st_mode & 0o777, 0o600)
+            self.assertTrue(operation_lock.is_file())
+            self.assertEqual(operation_lock.stat().st_mode & 0o777, 0o600)
             self.assertTrue(source_projection_lock.is_file())
             self.assertEqual(
                 source_projection_lock.stat().st_mode & 0o777,
@@ -1614,6 +1720,39 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 0o600,
             )
             self.assertNotEqual(read_audit_journal, candidate_audit_journal)
+            unsafe_grant_target = root / "unsafe-rollback-grant"
+            unsafe_grant_target.write_text("unsafe\n", encoding="utf-8")
+            rollback_grant.symlink_to(unsafe_grant_target)
+            unsafe_grant = subprocess.run(
+                repair_eligibility_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(unsafe_grant.returncode, 0)
+            self.assertIn(
+                "read rollback grant must be a regular non-symlink file",
+                unsafe_grant.stderr,
+            )
+            rollback_grant.unlink()
+            rollback_grant.write_text("unsafe\n", encoding="utf-8")
+            rollback_grant.chmod(0o644)
+            public_grant = subprocess.run(
+                repair_eligibility_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(public_grant.returncode, 0)
+            self.assertIn(
+                "read rollback grant must use mode 0600",
+                public_grant.stderr,
+            )
+            rollback_grant.unlink()
             self.assertEqual(
                 observation_root.stat().st_mode & 0o777,
                 0o700,
@@ -1645,6 +1784,278 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertTrue(all(str(service_root) not in line for line in pip_calls))
 
+            for active_read_unit in (
+                "abyss-stack-mcp-read.service",
+                "abyss-stack-mcp-read-bootstrap.service",
+            ):
+                with self.subTest(active_read_unit=active_read_unit):
+                    eligible = subprocess.run(
+                        repair_eligibility_command,
+                        cwd=REPO_ROOT,
+                        env={
+                            **env,
+                            "ABYSS_STACK_MCP_TEST_ACTIVE_UNIT": active_read_unit,
+                        },
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(eligible.returncode, 0, eligible.stderr)
+
+            for active_non_read_unit in (
+                "abyss-stack-mcp-candidate.service",
+                "abyss-stack-mcp-internal-effect.service",
+            ):
+                with self.subTest(active_non_read_unit=active_non_read_unit):
+                    ineligible = subprocess.run(
+                        repair_eligibility_command,
+                        cwd=REPO_ROOT,
+                        env={
+                            **env,
+                            "ABYSS_STACK_MCP_TEST_ACTIVE_UNIT": active_non_read_unit,
+                        },
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(ineligible.returncode, 0)
+                    self.assertIn(
+                        f"while {active_non_read_unit} is active",
+                        ineligible.stderr,
+                    )
+
+            source_file.write_text("VALUE = repair_failure\n", encoding="utf-8")
+            systemctl_log.write_text("", encoding="utf-8")
+            failed_repair = subprocess.run(
+                repair_command,
+                cwd=REPO_ROOT,
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_ACTIVE_UNIT": (
+                        "abyss-stack-mcp-read.service"
+                    ),
+                    "ABYSS_STACK_MCP_TEST_PIP_FAIL": "1",
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(failed_repair.returncode, 0)
+            self.assertIn(
+                "failed to install the deployed abyss-stack MCP hash-locked "
+                "dependency closure",
+                failed_repair.stderr,
+            )
+            failed_repair_events = systemctl_log.read_text(
+                encoding="utf-8"
+            ).splitlines()
+            self.assertIn("pip-require-hashes", failed_repair_events)
+            self.assertFalse(
+                any(event.startswith("--user stop ") for event in failed_repair_events)
+            )
+            self.assertFalse(
+                (systemctl_state / "abyss-stack-mcp-read.service.stopped").exists()
+            )
+            self.assertEqual(marker.read_text(encoding="utf-8").strip(), first_identity)
+
+            source_file.write_text("VALUE = post_stop_failure\n", encoding="utf-8")
+            systemctl_log.write_text("", encoding="utf-8")
+            post_stop_failure = subprocess.run(
+                repair_command,
+                cwd=REPO_ROOT,
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_ACTIVE_UNIT": (
+                        "abyss-stack-mcp-read.service"
+                    ),
+                    "ABYSS_STACK_MCP_TEST_FAIL_ACTIVATION": "1",
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(post_stop_failure.returncode, 0)
+            self.assertIn(
+                "failed to activate the provisioned abyss-stack MCP runtime",
+                post_stop_failure.stderr,
+            )
+            post_stop_events = systemctl_log.read_text(
+                encoding="utf-8"
+            ).splitlines()
+            post_stop_index = next(
+                index
+                for index, event in enumerate(post_stop_events)
+                if event.startswith("--user stop ")
+            )
+            restart_index = post_stop_events.index(
+                "--user start abyss-stack-mcp-read.service"
+            )
+            self.assertLess(post_stop_index, restart_index)
+            self.assertFalse(
+                (systemctl_state / "abyss-stack-mcp-read.service.stopped").exists()
+            )
+            self.assertEqual(marker.read_text(encoding="utf-8").strip(), first_identity)
+            self.assertTrue(rollback_grant.is_file())
+            self.assertFalse(rollback_grant.is_symlink())
+            self.assertEqual(rollback_grant.stat().st_mode & 0o777, 0o600)
+            self.assertRegex(
+                rollback_grant.read_text(encoding="utf-8").strip(),
+                r"\A[0-9a-f]{64}:[0-9a-f]{64}:[0-9a-f]{64}\Z",
+            )
+            rollback_read = subprocess.run(
+                read_verify_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(rollback_read.returncode, 0, rollback_read.stderr)
+            for strict_verify_command in (
+                verify_command,
+                candidate_verify_command,
+            ):
+                with self.subTest(strict_verify_command=strict_verify_command[-1]):
+                    rollback_strict = subprocess.run(
+                        strict_verify_command,
+                        cwd=REPO_ROOT,
+                        env=env,
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(rollback_strict.returncode, 0)
+                    self.assertIn(
+                        "runtime source-and-lock identity mismatch",
+                        rollback_strict.stderr,
+                    )
+
+            source_file.write_text("VALUE = repair_success\n", encoding="utf-8")
+            systemctl_log.write_text("", encoding="utf-8")
+            successful_repair = subprocess.run(
+                repair_command,
+                cwd=REPO_ROOT,
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_ACTIVE_UNIT": (
+                        "abyss-stack-mcp-read.service"
+                    ),
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                successful_repair.returncode,
+                0,
+                successful_repair.stderr,
+            )
+            successful_repair_events = systemctl_log.read_text(
+                encoding="utf-8"
+            ).splitlines()
+            build_event = successful_repair_events.index("pip-require-hashes")
+            stop_event = next(
+                index
+                for index, event in enumerate(successful_repair_events)
+                if event.startswith("--user stop ")
+            )
+            self.assertLess(build_event, stop_event)
+            self.assertFalse(rollback_grant.exists())
+            self.assertNotEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
+            for stopped_marker in systemctl_state.glob("*.stopped"):
+                stopped_marker.unlink()
+            source_file.write_text("VALUE = 1\n", encoding="utf-8")
+            restored_baseline = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(restored_baseline.returncode, 0, restored_baseline.stderr)
+            self.assertEqual(marker.read_text(encoding="utf-8").strip(), first_identity)
+
+            stale_eligibility = subprocess.run(
+                repair_eligibility_command,
+                cwd=REPO_ROOT,
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_STALE_UNIT": (
+                        "abyss-stack-mcp-read.service"
+                    ),
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(stale_eligibility.returncode, 0)
+            self.assertIn(
+                "is not loaded with the lock-aware ExecStart",
+                stale_eligibility.stderr,
+            )
+
+            for unsafe_runtime_root in (
+                observation_root,
+                keeper_inbox_root,
+                admission_root,
+                preflight_root,
+                protocol_watch_root,
+                orchestration_root,
+                read_tasks_root,
+                tasks_root,
+                effect_root,
+                venv,
+                runtime_root,
+            ):
+                with self.subTest(unsafe_runtime_root=unsafe_runtime_root):
+                    safe_runtime_root = unsafe_runtime_root.with_name(
+                        f"{unsafe_runtime_root.name}.safe"
+                    )
+                    unsafe_runtime_root.rename(safe_runtime_root)
+                    unsafe_runtime_root.symlink_to(
+                        safe_runtime_root,
+                        target_is_directory=True,
+                    )
+                    try:
+                        unsafe_repair_root = subprocess.run(
+                            repair_eligibility_command,
+                            cwd=REPO_ROOT,
+                            env=env,
+                            check=False,
+                            capture_output=True,
+                            text=True,
+                        )
+                        self.assertNotEqual(unsafe_repair_root.returncode, 0)
+                        self.assertIn(
+                            "non-symlink directory",
+                            unsafe_repair_root.stderr,
+                        )
+                    finally:
+                        unsafe_runtime_root.unlink()
+                        safe_runtime_root.rename(unsafe_runtime_root)
+
+            unsafe_observation_target = root / "unsafe-observation.json"
+            unsafe_observation_target.write_text("{}\n", encoding="utf-8")
+            observation_path.symlink_to(unsafe_observation_target)
+            unsafe_observation = subprocess.run(
+                repair_eligibility_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(unsafe_observation.returncode, 0)
+            self.assertIn(
+                "observation path must be a regular non-symlink file",
+                unsafe_observation.stderr,
+            )
+            observation_path.unlink()
+
             runtime_python = venv / "bin" / "python"
             runtime_python.unlink()
             runtime_python.symlink_to(bootstrap)
@@ -1664,10 +2075,41 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             runtime_python.unlink()
             shutil.copy2(bootstrap, runtime_python)
 
+            with read_audit_journal.open("r+b") as oversized_journal:
+                oversized_journal.truncate(33_554_433)
+            oversized_repair_eligibility = subprocess.run(
+                repair_eligibility_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(oversized_repair_eligibility.returncode, 0)
+            self.assertIn(
+                "read audit journal exceeds the managed 32 MiB capacity",
+                oversized_repair_eligibility.stderr,
+            )
+            with read_audit_journal.open("r+b") as oversized_journal:
+                oversized_journal.truncate(0)
+
             candidate_audit_journal.unlink()
             unsafe_target = root / "unsafe-audit-target.jsonl"
             unsafe_target.touch(mode=0o600)
             candidate_audit_journal.symlink_to(unsafe_target)
+            unsafe_repair_eligibility = subprocess.run(
+                repair_eligibility_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(unsafe_repair_eligibility.returncode, 0)
+            self.assertIn(
+                "candidate audit journal must be a regular non-symlink file",
+                unsafe_repair_eligibility.stderr,
+            )
             unsafe_audit = subprocess.run(
                 verify_command,
                 cwd=REPO_ROOT,
@@ -2202,6 +2644,26 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             "runtime verification contour must be all, read, candidate, or "
             "internal_effect",
             invalid_contour.stderr,
+        )
+
+        repair_eligibility = self.run_install_systemd(
+            "--verify-abyss-stack-mcp-repair-eligibility",
+            "--restart-now",
+        )
+        self.assertNotEqual(repair_eligibility.returncode, 0)
+        self.assertIn(
+            "repair eligibility verification must be a standalone read-only action",
+            repair_eligibility.stderr,
+        )
+
+        repair = self.run_install_systemd(
+            "--repair-abyss-stack-mcp-runtime",
+            "--restart-now",
+        )
+        self.assertNotEqual(repair.returncode, 0)
+        self.assertIn(
+            "runtime repair must be a standalone action",
+            repair.stderr,
         )
 
     def test_stack_mcp_auto_repair_policy_is_explicit_reversible_and_standalone(
@@ -2977,6 +3439,26 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             "    >/dev/null 2>&1 || true",
             script,
         )
+        repair_start = script.index(
+            'systemctl --user start "$RUNTIME_REPAIR_SERVICE"'
+        )
+        repair_eligibility = script.rindex(
+            '"$INSTALL_SYSTEMD" '
+            "--verify-abyss-stack-mcp-repair-eligibility",
+            0,
+            repair_start,
+        )
+        repair_reset = script.rindex(
+            'systemctl --user reset-failed "$RUNTIME_REPAIR_SERVICE"',
+            0,
+            repair_start,
+        )
+        self.assertNotIn(
+            'systemctl --user stop "${bootstrap_units[@]}" '
+            '"${production_units[@]}"',
+            script[repair_eligibility:repair_start],
+        )
+        self.assertLess(repair_reset, repair_start)
         self.assertIn("After=abyss-mcp-modern-admission-refresh.service", keeper)
         self.assertIn("StartLimitIntervalSec=0", keeper)
         self.assertIn(
@@ -3016,7 +3498,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertLess(registry_validation, handoff_complete)
 
         repair_unit = STACK_MCP_RUNTIME_REPAIR_UNIT.read_text(encoding="utf-8")
-        self.assertIn("--provision-abyss-stack-mcp-runtime", repair_unit)
+        self.assertIn("--repair-abyss-stack-mcp-runtime", repair_unit)
         self.assertIn(
             "ConditionPathExists=/srv/AbyssOS/abyss-stack/Secrets/Configs/"
             "abyss-stack-mcp-runtime-auto-repair.enabled",
@@ -3048,9 +3530,20 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             "/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd "
             "--launch-verified-abyss-stack-mcp"
         )
+        operation_lock_prefix = (
+            "ExecStart=/usr/bin/flock --shared --no-fork "
+            "/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/"
+            ".runtime-operation.lock "
+        )
         read_deployed_entrypoint = f"{deployed_entrypoint_prefix}=read"
-        candidate_deployed_entrypoint = f"{deployed_entrypoint_prefix}=candidate"
-        effect_deployed_entrypoint = f"{deployed_entrypoint_prefix}=internal_effect"
+        candidate_deployed_entrypoint = (
+            f"{operation_lock_prefix}{deployed_entrypoint_prefix.removeprefix('ExecStart=')}"
+            "=candidate"
+        )
+        effect_deployed_entrypoint = (
+            f"{operation_lock_prefix}{deployed_entrypoint_prefix.removeprefix('ExecStart=')}"
+            "=internal_effect"
+        )
         runtime_condition = (
             "ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/"
             "abyss-stack-mcp/venv/bin/python"
@@ -3186,6 +3679,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertNotIn("abyss_stack_mcp_audit_root", internal_effect_case)
         self.assertIn("abyss_stack_mcp_effect_root", internal_effect_case)
         self.assertIn(read_deployed_entrypoint, read_unit)
+        self.assertNotIn(operation_lock_prefix, read_unit)
         self.assertNotIn(candidate_deployed_entrypoint, read_unit)
         self.assertIn(candidate_deployed_entrypoint, candidate_unit)
         self.assertNotIn(read_deployed_entrypoint, candidate_unit)

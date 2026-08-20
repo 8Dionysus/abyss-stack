@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 6923403,
+  "allowed_tracked_bytes": 35862215,
+  "approved_by": "repository-owner",
+  "base_ref": "c9bcf00a9bbe77989a14c97b74d33e11dcfc0c71",
+  "changed_generated_bytes": 6923403,
+  "changed_generated_files": 70,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "09ae1558ed800a7556f21edae68c7c8d54f392c6c839270445131b7fc836791e",
+  "reason": "Refresh the portable KAG family for the comprehensive read-only guard over every filesystem surface the automatic modern MCP runtime repair may mutate after quiescing readers.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35862215,
+  "tracked_bytes_max": 24117248
+}

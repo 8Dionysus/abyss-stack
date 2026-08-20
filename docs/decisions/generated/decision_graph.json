@@ -1,9 +1,9 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 125,
-  "edge_count": 2820,
+  "edge_count": 2822,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1036,
+    "CITES_SOURCE_SURFACE": 1038,
     "DATED": 125,
     "GUARDED_BY": 387,
     "HAS_STATUS": 125,
@@ -13413,6 +13413,16 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0125",
+      "target": "source_surface:systemd/user/abyss-stack-mcp-candidate.service",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0125",
+      "target": "source_surface:systemd/user/abyss-stack-mcp-internal-effect.service",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0125",
       "target": "source_surface:systemd/user/abyss-stack-mcp-runtime-repair.service",
       "type": "CITES_SOURCE_SURFACE"
     },
@@ -14118,7 +14128,7 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1229,
+  "node_count": 1230,
   "node_type_counts": {
     "date": 40,
     "decision": 125,
@@ -14126,7 +14136,7 @@
     "mechanic_parent": 10,
     "owner_surface": 67,
     "repo": 1,
-    "source_surface": 593,
+    "source_surface": 594,
     "stack_lane": 50,
     "status": 4,
     "surface_class": 140
@@ -19681,6 +19691,11 @@
     {
       "id": "source_surface:systemd/user/abyss-stack-mcp-%2A.service",
       "label": "systemd/user/abyss-stack-mcp-*.service",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:systemd/user/abyss-stack-mcp-candidate.service",
+      "label": "systemd/user/abyss-stack-mcp-candidate.service",
       "type": "source_surface"
     },
     {

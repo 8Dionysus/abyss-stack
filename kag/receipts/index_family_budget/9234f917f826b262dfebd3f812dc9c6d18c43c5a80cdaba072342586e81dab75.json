@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 6193722,
+  "allowed_tracked_bytes": 35852772,
+  "approved_by": "repository-owner",
+  "base_ref": "c9bcf00a9bbe77989a14c97b74d33e11dcfc0c71",
+  "changed_generated_bytes": 6193722,
+  "changed_generated_files": 62,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "9234f917f826b262dfebd3f812dc9c6d18c43c5a80cdaba072342586e81dab75",
+  "reason": "Refresh the exact portable KAG family for the bounded modern MCP repair sequencing fix; existing oversized legacy shards remain unchanged except for deterministic source and anchor updates.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35852772,
+  "tracked_bytes_max": 24117248
+}

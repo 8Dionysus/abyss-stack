@@ -28,7 +28,7 @@ LoadCredential=abyss-stack-mcp-canary-ed25519-private-key.pem:/srv/AbyssOS/abyss
 LoadCredential=abyss-stack-mcp-auth-manifest.json:/srv/AbyssOS/abyss-stack/Secrets/Configs/abyss-stack-mcp-auth-manifest.json
 ExecCondition=/usr/bin/test -x /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
 ExecCondition=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --verify-abyss-stack-mcp-runtime=internal_effect
-ExecStart=/usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.source-projection.lock /usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock /usr/bin/env /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --launch-verified-abyss-stack-mcp=internal_effect
+ExecStart=/usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-operation.lock /usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.source-projection.lock /usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock /usr/bin/env /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --launch-verified-abyss-stack-mcp=internal_effect
 Restart=on-failure
 RestartSec=2
 TimeoutStopSec=140

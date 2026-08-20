@@ -9,7 +9,7 @@ ConditionPathExists=/usr/bin/python3
 Type=oneshot
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PIP_NO_CACHE_DIR=1
-ExecStart=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime
+ExecStart=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --repair-abyss-stack-mcp-runtime
 TimeoutStartSec=10min
 NoNewPrivileges=yes
 ProtectSystem=strict

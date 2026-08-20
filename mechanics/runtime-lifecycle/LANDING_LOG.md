@@ -43,3 +43,12 @@ local MCP owner while retaining package-level stdio defaults. The lifecycle is
 loopback-only, launches deployed Configs wrappers, preserves existing unit
 masks, and requires bounded source/deployed preview, parity, and per-owner
 canaries before restart. See `ABYSS-STACK-D-0077`.
+
+## 2026-08-20 - Two-phase stack MCP runtime repair
+
+Separated manual offline provisioning from guarded automatic repair. Automatic
+repair now builds and validates a replacement while the production read plane
+remains available, excludes non-read planes with an operation lock, and limits
+quiescence to the final atomic swap. Dependency failure does not stop readers;
+post-quiesce failure restores the prior runtime and active stack read peer via
+an exact, private, read-only rollback grant.

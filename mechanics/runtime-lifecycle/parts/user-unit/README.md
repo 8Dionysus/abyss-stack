@@ -81,12 +81,24 @@ serial within one organ, the complete wave joins before publication, and
 The timer uses a five-minute recurrence rather than continuously replaying a
 failed two-phase transaction. Before bootstrap, the refresh verifies the
 measured stack runtime and may delegate a guarded exact-lock reprovision to the
-manual-only `abyss-stack-mcp-runtime-repair.service` when it has drifted. This
+opt-in `abyss-stack-mcp-runtime-repair.service` when it has drifted. This
 automatic delegation is denied until the operator persists the reversible
 host policy with `aoa-install-systemd --enable-abyss-stack-mcp-auto-repair`;
 `--disable-abyss-stack-mcp-auto-repair` removes only that opt-in. The repair
-still refuses active stack planes and unsafe source, lock, journal, or unit
-topology.
+delegation first runs the standalone read-only repair-eligibility verifier. It
+proves the source package, bootstrap interpreter, shared locks, the complete
+runtime parent chain, every existing observation/admission/orchestration/tasks/
+effect path, audit journals, and exact loaded unit topology are safe while
+allowing the current read/bootstrap processes to remain active. Repair then
+builds and verifies the replacement while the read fleet keeps its shared
+runtime locks. Only a fully built replacement may quiesce the stack
+read/bootstrap peer for the final exclusive-lock swap. Pre-quiescence failures
+leave every reader active; post-quiescence failures restore the prior runtime
+through an exact, private, read-only rollback grant and restart the stack peer
+that had been active. The repair still refuses an
+independently active candidate or internal-effect plane and unsafe source,
+operation lock, runtime lock, journal, runtime path, or unit topology without
+taking the working read fleet down.
 
 The separately linked `abyss-mcp-protocol-watch.path` reacts to Codex and
 protocol-lab source changes; its hourly timer observes new upstream
