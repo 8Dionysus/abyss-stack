@@ -2520,6 +2520,18 @@ def _open_verified_executable(
             chunks.append(chunk)
         content = b"".join(chunks)
         companion_data = _adjacent_code_mode_host(executable)
+        if companion_data is not None:
+            rebound_content, rebound_info = _read_verified_regular_file(
+                executable, label="Codex executable"
+            )
+            if (
+                rebound_info.st_dev != info.st_dev
+                or rebound_info.st_ino != info.st_ino
+                or rebound_content != content
+            ):
+                raise IncarnationHomeError(
+                    "Codex executable changed while binding companion"
+                )
         if content.startswith(b"#!"):
             snapshot_path: Path | None = None
             snapshot_dir: Path | None = None

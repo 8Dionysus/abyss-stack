@@ -837,6 +837,32 @@ def test_payload_launch_uses_private_companion_after_host_copy_disappears(
     assert environment["CODEX_HOME"] == str(ambient)
 
 
+def test_elf_binding_rejects_executable_replacement_during_companion_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "codex"
+    executable.write_bytes(b"original-executable")
+    executable.chmod(0o700)
+    companion = tmp_path / MODULE.CODE_MODE_HOST_NAME
+    companion.write_bytes(b"companion")
+    companion.chmod(0o700)
+    original_adjacent = MODULE._adjacent_code_mode_host
+
+    def replace_before_companion(path: Path) -> tuple[Path, bytes, dict[str, str]]:
+        replacement = path.with_name("codex-replacement")
+        replacement.write_bytes(b"replacement-executable")
+        replacement.chmod(0o700)
+        os.replace(replacement, path)
+        return original_adjacent(path)
+
+    monkeypatch.setattr(MODULE, "_adjacent_code_mode_host", replace_before_companion)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="executable changed while binding companion",
+    ):
+        MODULE._open_verified_executable(executable)
+
+
 def test_atomic_json_fsyncs_publication_directory(tmp_path: Path) -> None:
     path = tmp_path / "receipt.json"
     fsync_targets: list[str] = []
