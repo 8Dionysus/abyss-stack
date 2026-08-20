@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 14917367,
+  "allowed_tracked_bytes": 36049606,
+  "approved_by": "repository-owner",
+  "base_ref": "aca727f5631ca96231180e12071b49074786a230",
+  "changed_generated_bytes": 14917367,
+  "changed_generated_files": 147,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "049f2b794d785aa35e77b5c2cbe01f8b75a6030f55810b5010a8af6c15aaab87",
+  "reason": "Full refresh of the owner portable family after current-main OVMS relief landing and companion provenance fix.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36049606,
+  "tracked_bytes_max": 24117248
+}
