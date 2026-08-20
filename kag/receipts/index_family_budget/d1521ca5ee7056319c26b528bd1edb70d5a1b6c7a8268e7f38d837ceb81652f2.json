@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 499727,
+  "allowed_tracked_bytes": 36091283,
+  "approved_by": "repository-owner",
+  "base_ref": "eb74d1507fb3c2380876feebcee49b1b837c3b43",
+  "changed_generated_bytes": 499727,
+  "changed_generated_files": 14,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "d1521ca5ee7056319c26b528bd1edb70d5a1b6c7a8268e7f38d837ceb81652f2",
+  "reason": "Refresh the owner portable family after the nested bwrap /dev runtime repair.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "tracked_size",
+  "tracked_bytes": 36091283,
+  "tracked_bytes_max": 24117248
+}
