@@ -15,6 +15,17 @@ from .managed_catalog import (
 from .preflight import PreflightError, _bundle_digest, _safe_json, _sha256_file
 
 
+def _organ_read_unit_exec_start_binding(deployed_root: Path) -> str:
+    runtime_root = deployed_root / "Services/abyss-stack-mcp"
+    return (
+        "ExecStart=/usr/bin/flock --shared --no-fork "
+        f"{runtime_root}/.runtime-provision.lock "
+        f"{runtime_root}/venv/bin/python -I -B -m "
+        "abyss_stack_mcp.process_launcher --executable "
+        "/srv/AbyssOS/.codex/bin/%i-mcp-server.py"
+    )
+
+
 def derive_managed_topology(
     overlay: dict[str, Any],
     deployment: dict[str, Any],
@@ -99,11 +110,8 @@ def derive_managed_topology(
                 raise PreflightError(
                     "organ unit executable conflicts with its instance template"
                 )
-            unit_exec_start_binding = (
-                "ExecStart=/srv/AbyssOS/abyss-stack/Services/"
-                "abyss-stack-mcp/venv/bin/python -I -B -m "
-                "abyss_stack_mcp.process_launcher --executable "
-                "/srv/AbyssOS/.codex/bin/%i-mcp-server.py"
+            unit_exec_start_binding = _organ_read_unit_exec_start_binding(
+                deployed_root
             )
         dependency_lock = package_root / "requirements.lock"
         entries.append(

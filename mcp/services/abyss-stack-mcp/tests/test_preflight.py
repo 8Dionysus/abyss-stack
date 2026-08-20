@@ -39,6 +39,7 @@ from abyss_stack_mcp.managed_catalog import (
     build_managed_catalog,
     publish_catalog,
 )
+from abyss_stack_mcp.managed_topology import _organ_read_unit_exec_start_binding
 from abyss_stack_mcp.keeper_specs import build_keeper_specs
 from abyss_stack_mcp.admission_automation import (
     AdmissionAutomationStatus,
@@ -52,6 +53,20 @@ from abyss_stack_mcp.system_status import build_system_status
 
 NOW = datetime(2026, 8, 8, 12, 0, tzinfo=timezone.utc)
 SIGNING_KEY = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+
+
+def test_organ_managed_topology_exec_binding_matches_runtime_unit() -> None:
+    repo_root = Path(__file__).resolve().parents[4]
+    unit = repo_root / "systemd/user/aoa-organ-mcp-read@.service"
+    exec_start_lines = tuple(
+        line
+        for line in unit.read_text(encoding="utf-8").splitlines()
+        if line.startswith("ExecStart=")
+    )
+
+    assert exec_start_lines == (
+        _organ_read_unit_exec_start_binding(Path("/srv/AbyssOS/abyss-stack")),
+    )
 
 
 def _write(path: Path, payload: str, mode: int = 0o600) -> None:
