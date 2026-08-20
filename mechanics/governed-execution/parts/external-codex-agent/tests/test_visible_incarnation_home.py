@@ -781,10 +781,13 @@ def test_payload_launch_uses_private_companion_after_host_copy_disappears(
     )
     manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
     manifest_bytes = manifest_path.read_bytes()
-    host_executable = tmp_path / "codex"
+    host_package = tmp_path / "package"
+    host_executable = host_package / "vendor" / "codex" / "codex"
+    host_executable.parent.mkdir(parents=True)
+    (host_package / "package.json").write_text("{}\n", encoding="utf-8")
     host_executable.write_bytes(b"host-codex")
     host_executable.chmod(0o700)
-    host_companion = tmp_path / MODULE.CODE_MODE_HOST_NAME
+    host_companion = host_executable.parent / MODULE.CODE_MODE_HOST_NAME
     companion_bytes = b"private-companion"
     host_companion.write_bytes(companion_bytes)
     host_companion.chmod(0o700)
@@ -815,7 +818,9 @@ def test_payload_launch_uses_private_companion_after_host_copy_disappears(
         executable_digest=MODULE.sha256_bytes(payload.read_bytes()),
         companion_path=str(host_companion),
         companion_digest=MODULE.sha256_bytes(companion_bytes),
-        companion_relative=MODULE.CODE_MODE_HOST_NAME,
+        companion_relative=(
+            "vendor/codex/" + MODULE.CODE_MODE_HOST_NAME
+        ),
         codex_arguments=[str(payload), "exec", "--help"],
     )
 
@@ -824,7 +829,7 @@ def test_payload_launch_uses_private_companion_after_host_copy_disappears(
         "path": str(host_companion),
         "digest": MODULE.sha256_bytes(companion_bytes),
         "relation": "adjacent_immutable_package",
-        "package_relative": MODULE.CODE_MODE_HOST_NAME,
+        "package_relative": "vendor/codex/" + MODULE.CODE_MODE_HOST_NAME,
     }
     exec_path, exec_argv, environment = observed["exec"]
     assert exec_path == str(payload)

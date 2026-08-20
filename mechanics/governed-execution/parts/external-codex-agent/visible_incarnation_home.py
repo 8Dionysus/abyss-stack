@@ -2975,7 +2975,7 @@ def command_payload_launch(args: argparse.Namespace) -> int:
             str(expected_host_companion) != companion_path_argument
             or companion_relative_argument != expected_package_relative
             or private_companion_binding["package_relative"]
-            != companion_relative_argument
+            != CODE_MODE_HOST_NAME
             or private_companion_binding["digest"] != companion_digest_argument
         ):
             raise IncarnationHomeError("payload companion binding drifted")
