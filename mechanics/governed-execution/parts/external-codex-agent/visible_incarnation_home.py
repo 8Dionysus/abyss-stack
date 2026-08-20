@@ -35,6 +35,7 @@ HOLDER_RECEIPT_SCHEMA_VERSION = "abyss_stack_visible_incarnation_holder_terminal
 TERMINAL_CLOSURE_SCHEMA_VERSION = "abyss_stack_visible_incarnation_terminal_closure_v1"
 CLOSURE_RESERVATION_SCHEMA_VERSION = "abyss_stack_visible_incarnation_terminal_closure_reservation_v1"
 DESCENDANT_BIN_NAME = ".codex-incarnation-bin"
+CODE_MODE_HOST_NAME = "codex-code-mode-host"
 LOCAL_NAMES = frozenset(
     {"config.toml", "cache", "log", "tmp", DESCENDANT_BIN_NAME}
 )
@@ -788,6 +789,7 @@ def _holder_receipt(
     executable_digest: str | None = None,
     manifest_bytes: bytes | None = None,
     manifest_digest: str | None = None,
+    companion_binding: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     holder_pid = os.getpid()
     holder_parent_pid = os.getppid()
@@ -837,6 +839,8 @@ def _holder_receipt(
         "ambient_codex_home": str(manifest["ambient_codex_home"]),
         "incarnation_codex_home": str(manifest["codex_home"]),
     }
+    if companion_binding is not None:
+        runtime["codex_companion"] = dict(companion_binding)
     _decode_holder_manifest_snapshot(runtime)
     receipt = {
         "schema_version": HOLDER_RECEIPT_SCHEMA_VERSION,
@@ -1132,6 +1136,28 @@ def _holder_terminal_identity(
     )
     if sha256_bytes(executable.read_bytes()) != runtime.get("codex_executable_digest"):
         raise IncarnationHomeError("holder Codex executable digest has drifted")
+    companion = runtime.get("codex_companion")
+    if companion is not None:
+        if not isinstance(companion, dict):
+            raise IncarnationHomeError("holder Codex companion binding is incomplete")
+        companion_path = companion.get("path")
+        companion_digest = companion.get("digest")
+        expected_companion = executable.parent / CODE_MODE_HOST_NAME
+        expected_companion_relative = expected_companion.relative_to(
+            _package_root(executable)
+        ).as_posix()
+        if (
+            companion_path != str(expected_companion)
+            or companion.get("relation") != "adjacent_immutable_package"
+            or companion.get("package_relative") != expected_companion_relative
+            or not isinstance(companion_digest, str)
+        ):
+            raise IncarnationHomeError("holder Codex companion binding has drifted")
+        companion_file = _regular_file(
+            expected_companion, "holder Codex companion"
+        )
+        if sha256_bytes(companion_file.read_bytes()) != companion_digest:
+            raise IncarnationHomeError("holder Codex companion digest has drifted")
     manifest_snapshot = _decode_holder_manifest_snapshot(runtime)
     if manifest_snapshot is None:
         # Legacy receipts predate the holder-bound snapshot.  Preserve their
@@ -1964,6 +1990,102 @@ def _sealed_memfd(name: str, content: bytes, *, mode: int = 0o400) -> int:
         ) from exc
 
 
+def _read_verified_regular_file(
+    source: Path, *, label: str
+) -> tuple[bytes, os.stat_result]:
+    """Read one regular file while binding its identity and bytes together."""
+
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(source, flags)
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            raise IncarnationHomeError(f"{label} is not a regular file: {source}")
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(descriptor, 1 << 20)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(descriptor)
+        identity = (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+            stat.S_IMODE(before.st_mode),
+        )
+        observed_identity = (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+            stat.S_IMODE(after.st_mode),
+        )
+        if identity != observed_identity:
+            raise IncarnationHomeError(f"{label} changed while reading: {source}")
+        return b"".join(chunks), before
+    except IncarnationHomeError:
+        raise
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} could not be read: {source}") from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def _adjacent_code_mode_host(
+    executable: Path,
+) -> tuple[Path, bytes, dict[str, str]] | None:
+    """Return the exact owner-bound companion beside a Codex executable."""
+
+    companion = executable.parent / CODE_MODE_HOST_NAME
+    try:
+        info = companion.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"Codex companion could not be inspected: {companion}"
+        ) from exc
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+        raise IncarnationHomeError(
+            f"Codex companion must be a non-symlink regular file: {companion}"
+        )
+    if not stat.S_IMODE(info.st_mode) & 0o111:
+        raise IncarnationHomeError(f"Codex companion is not executable: {companion}")
+    content, opened_info = _read_verified_regular_file(
+        companion, label="Codex companion"
+    )
+    resolved = companion.resolve(strict=True)
+    if (
+        opened_info.st_dev != info.st_dev
+        or opened_info.st_ino != info.st_ino
+        or resolved.parent != executable.parent
+        or resolved.name != CODE_MODE_HOST_NAME
+    ):
+        raise IncarnationHomeError(
+            f"Codex companion identity changed before binding: {companion}"
+        )
+    return (
+        resolved,
+        content,
+        {
+            "path": str(resolved),
+            "digest": sha256_bytes(content),
+            "relation": "adjacent_immutable_package",
+            "package_relative": resolved.relative_to(
+                _package_root(executable)
+            ).as_posix(),
+        },
+    )
+
+
 def _copy_package_file(
     source: Path,
     target: Path,
@@ -2162,6 +2284,7 @@ def _open_snapshot_mount(
     snapshot_dir: Path,
     package_root: Path,
     records: dict[Path, tuple[int, int, str, int]],
+    companion_binding: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Open every copied component and seal every regular file for bwrap."""
 
@@ -2250,12 +2373,27 @@ def _open_snapshot_mount(
             file_fds.append(
                 (path.relative_to(package_root), descriptor, expected[3])
             )
+        if companion_binding is not None:
+            companion_relative = Path(companion_binding["package_relative"])
+            if companion_relative.is_absolute() or ".." in companion_relative.parts:
+                raise IncarnationHomeError(
+                    "Codex companion escaped the executable package boundary"
+                )
+            copied_companion = package_root / companion_relative
+            expected_companion = records.get(copied_companion)
+            if expected_companion is None or expected_companion[2] != companion_binding[
+                "digest"
+            ]:
+                raise IncarnationHomeError(
+                    "Codex companion bytes were not retained in the package snapshot"
+                )
         return {
             "directory_paths": directory_paths,
             "file_fds": file_fds,
             "namespace_root": Path("/var/tmp"),
             "executable_path": Path("/var/tmp")
             / snapshot_path.relative_to(package_root),
+            "companion": companion_binding,
         }
     except BaseException:
         for _, descriptor, _ in file_fds:
@@ -2264,6 +2402,35 @@ def _open_snapshot_mount(
             except OSError:
                 pass
         raise
+
+
+def _memory_package_mount(
+    *,
+    executable: Path,
+    executable_fd: int,
+    executable_mode: int,
+    companion: Path,
+    companion_fd: int,
+    companion_mode: int,
+    companion_binding: dict[str, str],
+) -> dict[str, Any]:
+    """Build a private package coordinate from sealed ELF descriptors."""
+
+    package_relative = Path("codex-package")
+    executable_relative = package_relative / executable.name
+    companion_relative = package_relative / companion.name
+    if companion.parent != executable.parent or companion.name != CODE_MODE_HOST_NAME:
+        raise IncarnationHomeError("Codex companion is not adjacent to the executable")
+    return {
+        "directory_paths": [package_relative],
+        "file_fds": [
+            (executable_relative, executable_fd, executable_mode),
+            (companion_relative, companion_fd, companion_mode),
+        ],
+        "namespace_root": Path("/var/tmp"),
+        "executable_path": Path("/var/tmp") / executable_relative,
+        "companion": companion_binding,
+    }
 
 
 def _snapshot_bwrap_prefix(snapshot_mount: dict[str, Any]) -> list[str]:
@@ -2352,6 +2519,7 @@ def _open_verified_executable(
                 break
             chunks.append(chunk)
         content = b"".join(chunks)
+        companion_data = _adjacent_code_mode_host(executable)
         if content.startswith(b"#!"):
             snapshot_path: Path | None = None
             snapshot_dir: Path | None = None
@@ -2419,6 +2587,9 @@ def _open_verified_executable(
                     snapshot_dir=snapshot_dir,
                     package_root=snapshot_package_root,
                     records=snapshot_records,
+                    companion_binding=(
+                        companion_data[2] if companion_data is not None else None
+                    ),
                 )
                 directory_flags = os.O_RDONLY
                 if hasattr(os, "O_DIRECTORY"):
@@ -2467,6 +2638,45 @@ def _open_verified_executable(
                 raise IncarnationHomeError(
                     "Codex shebang executable could not be snapshotted in a private package mirror"
                 ) from exc
+        if companion_data is not None:
+            companion_path, companion_content, companion_binding = companion_data
+            executable_mode = 0o500
+            companion_mode = 0o500
+            executable_fd = _sealed_memfd(
+                "abyss-stack-codex-executable", content, mode=executable_mode
+            )
+            companion_fd: int | None = None
+            try:
+                companion_fd = _sealed_memfd(
+                    "abyss-stack-codex-code-mode-host",
+                    companion_content,
+                    mode=companion_mode,
+                )
+                snapshot_mount = _memory_package_mount(
+                    executable=executable,
+                    executable_fd=executable_fd,
+                    executable_mode=executable_mode,
+                    companion=companion_path,
+                    companion_fd=companion_fd,
+                    companion_mode=companion_mode,
+                    companion_binding=companion_binding,
+                )
+                os.lseek(executable_fd, 0, os.SEEK_SET)
+                os.lseek(companion_fd, 0, os.SEEK_SET)
+                return (
+                    executable_fd,
+                    snapshot_mount["executable_path"],
+                    content,
+                    sha256_bytes(content),
+                    None,
+                    None,
+                    snapshot_mount,
+                )
+            except BaseException:
+                if companion_fd is not None:
+                    os.close(companion_fd)
+                os.close(executable_fd)
+                raise
         memfd_create = getattr(os, "memfd_create", None)
         allow_sealing = getattr(os, "MFD_ALLOW_SEALING", None)
         add_seals = getattr(fcntl, "F_ADD_SEALS", None)
@@ -2730,6 +2940,24 @@ def command_payload_launch(args: argparse.Namespace) -> int:
         raise IncarnationHomeError(
             "payload launch argv is not bound to the private executable"
         )
+    companion_path_argument = getattr(args, "companion_path", None)
+    companion_digest_argument = getattr(args, "companion_digest", None)
+    if (companion_path_argument is None) != (companion_digest_argument is None):
+        raise IncarnationHomeError("payload companion binding is incomplete")
+    detected_companion = _adjacent_code_mode_host(executable)
+    if companion_path_argument is None:
+        if detected_companion is not None:
+            raise IncarnationHomeError("payload companion binding is missing")
+        companion_binding = None
+    else:
+        if detected_companion is None:
+            raise IncarnationHomeError("payload companion disappeared before receipt")
+        companion_path, _companion_bytes, companion_binding = detected_companion
+        if (
+            str(companion_path) != companion_path_argument
+            or companion_binding["digest"] != companion_digest_argument
+        ):
+            raise IncarnationHomeError("payload companion binding drifted")
     environment = dict(os.environ)
     environment["CODEX_HOME"] = str(manifest["ambient_codex_home"])
     if args.holder_receipt:
@@ -2743,6 +2971,7 @@ def command_payload_launch(args: argparse.Namespace) -> int:
             executable_digest=args.executable_digest,
             manifest_bytes=manifest_bytes,
             manifest_digest=manifest_digest,
+            companion_binding=companion_binding,
         )
     os.execve(str(payload_path), payload_argv, environment)
     return 127
@@ -2788,6 +3017,11 @@ def command_launch(args: argparse.Namespace) -> int:
     snapshot_component_fds: list[int] = []
     cleanup_started = False
     try:
+        companion_binding = (
+            executable_snapshot_mount.get("companion")
+            if executable_snapshot_mount is not None
+            else None
+        )
         if executable_snapshot_mount is None:
             _verify_executable_version(
                 executable_fd_path,
@@ -2824,11 +3058,7 @@ def command_launch(args: argparse.Namespace) -> int:
         launch_argv = exec_argv
         if executable_snapshot_mount is not None:
             launch_path = executable_snapshot_mount["executable_path"]
-            launch_argv = _inode_exec_argv(
-                executable_bytes=executable_bytes,
-                executable_fd_path=launch_path,
-                argv=argv,
-            )
+            launch_argv = [str(launch_path), *argv[1:]]
         if args.holder_receipt and executable_snapshot_mount is None:
             _holder_receipt(
                 receipt_path=Path(args.holder_receipt),
@@ -2862,6 +3092,16 @@ def command_launch(args: argparse.Namespace) -> int:
                 manifest_digest,
                 "--executable-digest",
                 executable_digest,
+                *(
+                    [
+                        "--companion-path",
+                        companion_binding["path"],
+                        "--companion-digest",
+                        companion_binding["digest"],
+                    ]
+                    if companion_binding is not None
+                    else []
+                ),
                 "--",
                 *launch_argv,
             ]
@@ -2934,6 +3174,8 @@ def parser() -> argparse.ArgumentParser:
     payload.add_argument("--payload-executable", required=True)
     payload.add_argument("--manifest-digest", required=True)
     payload.add_argument("--executable-digest", required=True)
+    payload.add_argument("--companion-path")
+    payload.add_argument("--companion-digest")
     payload.add_argument("codex_arguments", nargs=argparse.REMAINDER)
     payload.set_defaults(handler=command_payload_launch)
     close = subcommands.add_parser("close")

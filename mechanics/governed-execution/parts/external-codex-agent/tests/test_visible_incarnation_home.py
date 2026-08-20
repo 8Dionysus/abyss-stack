@@ -825,6 +825,9 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
     executable = tmp_path / "codex"
     executable.write_bytes(b"codex-holder\n")
     executable.chmod(0o700)
+    companion = tmp_path / MODULE.CODE_MODE_HOST_NAME
+    companion.write_bytes(b"codex-code-mode-host\n")
+    companion.chmod(0o700)
     manifest_path = tmp_path / "incarnation-home.json"
     launch_manifest = {
         "schema_version": MODULE.SCHEMA_VERSION,
@@ -852,6 +855,12 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
         "runtime": {
             "codex_executable": str(executable),
             "codex_executable_digest": MODULE.sha256_bytes(executable.read_bytes()),
+            "codex_companion": {
+                "path": str(companion),
+                "digest": MODULE.sha256_bytes(companion.read_bytes()),
+                "relation": "adjacent_immutable_package",
+                "package_relative": MODULE.CODE_MODE_HOST_NAME,
+            },
             "incarnation_manifest": str(manifest_path),
             "incarnation_manifest_digest": MODULE.sha256_bytes(snapshot),
             "incarnation_manifest_snapshot_b64": base64.b64encode(snapshot).decode(
@@ -963,6 +972,109 @@ def test_shebang_snapshot_root_rejects_noexec_filesystem(
     )
     with pytest.raises(MODULE.IncarnationHomeError, match="mounted noexec"):
         MODULE._execution_snapshot_root(tmp_path)
+
+
+@pytest.mark.skipif(
+    shutil.which("cc") is None or not Path("/usr/bin/bwrap").is_file(),
+    reason="the ELF companion regression needs cc and bubblewrap",
+)
+def test_elf_companion_survives_the_immutable_execution_binding(
+    tmp_path: Path,
+) -> None:
+    package = tmp_path / "codex-package"
+    package.mkdir()
+    executable = package / "codex"
+    companion = package / MODULE.CODE_MODE_HOST_NAME
+    source = tmp_path / "codex.c"
+    source.write_text(
+        "#include <fcntl.h>\n"
+        "#include <limits.h>\n"
+        "#include <stdio.h>\n"
+        "#include <string.h>\n"
+        "#include <unistd.h>\n"
+        "int main(int argc, char **argv) {\n"
+        "  if (argc > 1 && strcmp(argv[1], \"--version\") == 0) {\n"
+        "    puts(\"codex-cli 0.147.0\"); return 0;\n"
+        "  }\n"
+        "  char path[PATH_MAX];\n"
+        "  ssize_t length = readlink(\"/proc/self/exe\", path, sizeof(path) - 1);\n"
+        "  if (length < 0 || (size_t)length >= sizeof(path) - 1) return 2;\n"
+        "  path[length] = '\\0';\n"
+        "  char *slash = strrchr(path, '/');\n"
+        "  if (slash == NULL || (size_t)(sizeof(path) - (slash - path)) < "
+        "strlen(\"/codex-code-mode-host\") + 1) return 3;\n"
+        "  strcpy(slash, \"/codex-code-mode-host\");\n"
+        "  int descriptor = open(path, O_RDONLY);\n"
+        "  if (descriptor < 0) { puts(\"code-mode-companion-missing\"); return 4; }\n"
+        "  close(descriptor); puts(\"code-mode-call-ok\"); return 0;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    subprocess.run(
+        ["/usr/bin/cc", "-O2", "-o", str(executable), str(source)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    companion.write_text("sealed-companion\n", encoding="utf-8")
+    companion.chmod(0o755)
+
+    anonymous_fd = MODULE._sealed_memfd("anonymous-codex", executable.read_bytes(), mode=0o700)
+    try:
+        anonymous = subprocess.run(
+            [f"/proc/self/fd/{anonymous_fd}", "--code-mode-probe"],
+            check=False,
+            capture_output=True,
+            text=True,
+            pass_fds=(anonymous_fd,),
+        )
+    finally:
+        os.close(anonymous_fd)
+    assert anonymous.returncode != 0
+    assert anonymous.stdout.strip() == "code-mode-companion-missing"
+
+    (
+        executable_fd,
+        executable_path,
+        content,
+        executable_digest,
+        snapshot_dir,
+        snapshot_path,
+        snapshot_mount,
+    ) = MODULE._open_verified_executable(executable, snapshot_root=tmp_path)
+    assert snapshot_dir is None
+    assert snapshot_path is None
+    assert content == executable.read_bytes()
+    assert executable_digest == MODULE.sha256_bytes(content)
+    assert snapshot_mount is not None
+    assert snapshot_mount["companion"]["path"] == str(companion.resolve())
+    assert snapshot_mount["companion"]["digest"] == MODULE.sha256_bytes(
+        companion.read_bytes()
+    )
+    snapshot_fds = tuple(
+        descriptor for _, descriptor, _ in snapshot_mount["file_fds"]
+    )
+    try:
+        repaired = subprocess.run(
+            [
+                *MODULE._snapshot_bwrap_prefix(snapshot_mount),
+                "--",
+                str(executable_path),
+                "--code-mode-probe",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            pass_fds=snapshot_fds,
+        )
+    finally:
+        MODULE._close_snapshot_mount(snapshot_mount)
+        try:
+            os.close(executable_fd)
+        except OSError:
+            pass
+    assert repaired.returncode == 0, repaired.stderr
+    assert repaired.stdout.strip() == "code-mode-call-ok"
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node is unavailable")

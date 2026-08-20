@@ -153,8 +153,14 @@ publication fsyncs both the complete file and its containing directory before
 lifecycle code can proceed, so recovery sees the reservation/attempt entry
 rather than a merely cached directory update. Direct launch copies the exact
 verified executable bytes into an immutable launch snapshot: a sealed memfd for
-ELF and a filesystem-rooted private package-layout mirror for the admitted
-shebang launcher. Before shebang execution, the runtime reopens every copied
+an ELF without an adjacent Codex companion, a sealed descriptor pair for an
+ELF with the named `codex-code-mode-host` companion, and a filesystem-rooted
+private package-layout mirror for the admitted shebang launcher. For the ELF
+companion route, both regular-file identities and digests are checked and the
+two descriptors are materialized beside each other in the private read-only
+execution namespace; the holder receipt records the companion digest and
+package-relative coordinate. No host-side companion pathname is reopened by
+the running holder. Before shebang execution, the runtime reopens every copied
 directory and regular file, verifies its recorded device/inode and digest, and
 copies each verified regular file into a sealed memfd. Bubblewrap then
 materializes those sealed bytes into the matching package-relative tree in a

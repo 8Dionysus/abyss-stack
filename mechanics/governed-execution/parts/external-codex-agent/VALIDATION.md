@@ -333,4 +333,8 @@ receipt digest, PIDs, and reserved closure path; it rechecks PID/start-ticks,
 argv, process parent, Kitty window/dedication, reserves before signaling, and
 uses pidfd TERM. A live visible trial must separately prove the installed
 release, delivery, holder disappearance, final Kitty disappearance, unrelated-
-terminal preservation, and the resulting closure receipt.
+terminal preservation, and the resulting closure receipt. The companion
+regression additionally proves that an ELF launched from an anonymous memfd
+cannot discover its adjacent code-mode host, while the repaired private
+package coordinate exposes only the digest-bound companion beside the exact
+Codex ELF and permits one successful code-mode probe.

@@ -9,6 +9,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Preserve the packaged `codex-code-mode-host` beside an ELF Codex executable
+  when the visible incarnation runtime seals and launches it. The companion
+  now shares the same digest-bound private read-only execution coordinate,
+  holder receipts record its relationship and digest, and anonymous-ELF
+  execution is covered by a regression that exercises a real adjacent-host
+  probe.
 - Bind the operator-visible responsibility holder to its own non-replacing
   lifecycle receipt before direct Codex `exec`, distinct from nested proof
   actors. The installed incarnation runtime now closes only that exact
