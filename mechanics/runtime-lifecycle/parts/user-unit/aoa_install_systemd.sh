@@ -1241,7 +1241,6 @@ aoa_provision_abyss_stack_mcp_tasks_root() {
 
 aoa_provision_abyss_stack_mcp_effect_root() {
   local shared_parent=""
-  local owned_parent=""
   local lock_path=""
 
   for shared_parent in \
@@ -1255,16 +1254,15 @@ aoa_provision_abyss_stack_mcp_effect_root() {
       install -d -m 0700 "$shared_parent"
     fi
   done
-  for owned_parent in \
-    "$abyss_stack_mcp_effect_root"; do
-    if [[ -e "$owned_parent" || -L "$owned_parent" ]]; then
-      [[ -d "$owned_parent" && ! -L "$owned_parent" ]] || \
-        aoa_die "abyss-stack MCP effect root must use non-symlink directories"
-    else
-      install -d -m 0700 "$owned_parent"
-    fi
-    chmod 0700 "$owned_parent"
-  done
+  if [[ -e "$abyss_stack_mcp_effect_root" || \
+        -L "$abyss_stack_mcp_effect_root" ]]; then
+    [[ -d "$abyss_stack_mcp_effect_root" && \
+       ! -L "$abyss_stack_mcp_effect_root" ]] || \
+      aoa_die "abyss-stack MCP effect root must use a non-symlink directory"
+  else
+    install -d -m 0700 "$abyss_stack_mcp_effect_root"
+  fi
+  chmod 0700 "$abyss_stack_mcp_effect_root"
   for lock_path in \
     "$abyss_stack_mcp_effect_execution_lock" \
     "$abyss_stack_mcp_effect_request_drain_lock"; do
