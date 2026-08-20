@@ -148,7 +148,9 @@ reads, including controller-original and actor-safe copies, session-local
 `immutable:` schema expansion, prompt content withholding, all-entry
 prevalidation, and fail-closed digest mismatch before inference,
 workspace-write continuation from the exact preceding actor final tree while
-retaining the original baseline as the cumulative delta origin,
+retaining the original baseline as the cumulative content-delta origin while
+binding private-Git observation to the exact preceding actor final manifest,
+and rejecting a new private-Git drift during the resumed attempt,
 runtime-owned actor projection as the Codex target/cwd for both read-only and
 workspace-write actors, with the source checkout outside actor writes, fixed
 validation argv bound to that projection, and source-path exclusion from
@@ -255,8 +257,9 @@ inference, final actor-manifest/delta tamper refusal,
 provenance checks for all loaded `aoa_sdk` modules in the study preparer plus a
 post-compilation persisted
 path inventory, produced-artifact admission, source-evidence file/line
-validation including a source scope wider than mutation scope, reserved
-runtime final-manifest evidence with false-anchor refusal, pre-inference
+validation including a source scope wider than mutation scope, controller-issued
+stable zero-delta/private-Git runtime evidence refs, reserved runtime
+final-manifest evidence with false-anchor refusal, pre-inference
 digest-bound nested evidence closure across producer task/result/report/delta,
 same-name digest-collision disambiguation, historical source excerpts,
 validation observations, line/member/content-entry/output manifest anchors,

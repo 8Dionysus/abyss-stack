@@ -7910,7 +7910,9 @@ def test_workspace_root_source_evidence_scope_admits_only_safe_relative_paths() 
 
 def test_runtime_final_workspace_manifest_is_admitted_evidence(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _enable_specialized_test_release(monkeypatch, tmp_path)
     fixture = _fixture(
         tmp_path,
         objective_marker=(
@@ -7932,6 +7934,13 @@ def test_runtime_final_workspace_manifest_is_admitted_evidence(
     assert result["workspace_manifest_ref"]["artifact_digest"] == _digest_path(
         Path(result["workspace_manifest_ref"]["artifact_ref"])
     )
+    prompt = (
+        runtime._session_dir(fixture["session_id"]) / "attempts/001/prompt.txt"
+    ).read_text(encoding="utf-8")
+    assert "<runtime_evidence_refs>" in prompt
+    assert '"ref": "runtime:workspace-final-manifest#content_entries"' in prompt
+    assert '"ref": "runtime:workspace-final-manifest#private_git_digest"' in prompt
+    assert "never invent a label such as" in prompt
 
 
 def test_runtime_final_workspace_manifest_exact_content_path_is_admitted_evidence(

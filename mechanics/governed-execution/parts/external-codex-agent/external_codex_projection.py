@@ -1483,8 +1483,14 @@ def build_actor_delta(
     *,
     baseline_digest: str,
     current_digest: str,
+    private_git_baseline: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    if baseline.get("private_git_digest") != current.get("private_git_digest"):
+    private_git_origin = (
+        baseline if private_git_baseline is None else private_git_baseline
+    )
+    if private_git_origin.get("private_git_digest") != current.get(
+        "private_git_digest"
+    ):
         raise ProjectionError("actor private Git body changed during execution")
     return {
         "$schema": "schemas/external-codex-actor-delta.schema.json",

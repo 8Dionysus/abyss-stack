@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 126,
-  "edge_count": 2844,
+  "decision_count": 127,
+  "edge_count": 2864,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1048,
-    "DATED": 126,
-    "GUARDED_BY": 390,
-    "HAS_STATUS": 126,
-    "HAS_SURFACE_CLASS": 341,
-    "IN_STACK_LANE": 297,
-    "NEXT_DECISION": 125,
-    "OWNED_BY_SURFACE": 132,
-    "OWNS_DECISION": 126,
+    "CITES_SOURCE_SURFACE": 1053,
+    "DATED": 127,
+    "GUARDED_BY": 393,
+    "HAS_STATUS": 127,
+    "HAS_SURFACE_CLASS": 344,
+    "IN_STACK_LANE": 300,
+    "NEXT_DECISION": 126,
+    "OWNED_BY_SURFACE": 133,
+    "OWNS_DECISION": 127,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 131
+    "UNDER_MECHANIC_PARENT": 132
   },
   "edges": [
     {
@@ -13598,12 +13598,107 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0126",
+      "target": "decision:ABYSS-STACK-D-0127",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0126",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0126",
       "target": "mechanic_parent:%60mechanics/governed-execution%60",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_projection.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_projection.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "date:2026-08-20",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "guard_family:cumulative%20delta",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "guard_family:private-Git%20drift",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "guard_family:projection%20continuity",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "status:proposed",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "surface_class:actor%20projection",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "surface_class:failure%20closeout",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "surface_class:runtime%20continuity",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "stack_lane:governed%20execution",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0127",
+      "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -14235,21 +14330,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0126",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0127",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1245,
+  "node_count": 1253,
   "node_type_counts": {
     "date": 41,
-    "decision": 126,
-    "guard_family": 202,
+    "decision": 127,
+    "guard_family": 205,
     "mechanic_parent": 11,
     "owner_surface": 68,
     "repo": 1,
-    "source_surface": 600,
+    "source_surface": 602,
     "stack_lane": 51,
     "status": 4,
-    "surface_class": 141
+    "surface_class": 143
   },
   "nodes": [
     {
@@ -15718,6 +15818,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-20",
+      "id": "decision:ABYSS-STACK-D-0127",
+      "label": "ABYSS-STACK-D-0127",
+      "path": "docs/decisions/ABYSS-STACK-D-0127-bind-resume-private-git-to-accepted-actor-final.md",
+      "posture": "proposed owner-source rationale",
+      "status": "proposed",
+      "title": "ABYSS-STACK-D-0127 Bind Resume Private-Git Observation to the Accepted Actor Final",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -15905,6 +16015,11 @@
     {
       "id": "guard_family:credential%20isolation",
       "label": "credential isolation",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:cumulative%20delta",
+      "label": "cumulative delta",
       "type": "guard_family"
     },
     {
@@ -16398,6 +16513,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:private-Git%20drift",
+      "label": "private-Git drift",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:process%20containment",
       "label": "process containment",
       "type": "guard_family"
@@ -16425,6 +16545,11 @@
     {
       "id": "guard_family:projection%20containment",
       "label": "projection containment",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:projection%20continuity",
+      "label": "projection continuity",
       "type": "guard_family"
     },
     {
@@ -19019,6 +19144,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_projection.py",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/external_codex_projection.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py",
       "label": "mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py",
       "type": "source_surface"
@@ -19086,6 +19216,11 @@
     {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py",
       "label": "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_projection.py",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_projection.py",
       "type": "source_surface"
     },
     {
@@ -20639,6 +20774,11 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:failure%20closeout",
+      "label": "failure closeout",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:federated%20stats%20read%20contract",
       "label": "federated stats read contract",
       "type": "surface_class"
@@ -20936,6 +21076,11 @@
     {
       "id": "surface_class:runtime%20boundary",
       "label": "runtime boundary",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:runtime%20continuity",
+      "label": "runtime continuity",
       "type": "surface_class"
     },
     {

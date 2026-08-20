@@ -526,7 +526,12 @@ unchanged. The invocation receipt records the fixed child
 coordinate while result evidence records the controller-owned host projection.
 The descriptor is the child binding; the final pathname/device/inode comparison
 is the durable closeout binding. The
-actor-delta authority check admits an ordinary changed path only when its
+original actor manifest remains the cumulative content-delta origin across
+exact-thread resume, while a resumed attempt binds private-Git observation to
+the exact preceding actor final manifest. This preserves an accepted prior
+projection without treating it as drift; any private-Git change during the
+resumed attempt still fails closed.
+The actor-delta authority check admits an ordinary changed path only when its
 safe-relative path is inside `allowed_paths`. A created or deleted directory
 that is a strict ancestor of an allowed path is admitted only when the same
 exact actor delta also contains an actually changed descendant that passes that
@@ -845,6 +850,12 @@ workspace manifest and requires exact equality with the admission baseline for
 every initial posture before launching Codex. This second byte gate covers
 ignored and index-hidden files that HEAD and porcelain checks cannot observe.
 
+The controller publishes exact stable runtime evidence identities in the
+actor-visible prompt before inference. For a zero-delta independent review the
+model copies `runtime:workspace-final-manifest#content_entries`; for private-Git
+observation it copies `runtime:workspace-final-manifest#private_git_digest`.
+The model must not invent labels such as `#reviewer-zero-delta`; the existing
+runtime validator rejects unknown, ambiguous, or drifted anchors fail-closed.
 Any model evidence reference beginning with `source:` is semantic, not opaque
 prose. It must resolve to a regular non-symlink file inside the exact workspace
 and the task's `source_evidence_paths`; optional `#Lx-Ly` ranges must exist and

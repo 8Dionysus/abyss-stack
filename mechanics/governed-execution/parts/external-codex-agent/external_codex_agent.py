@@ -11163,6 +11163,23 @@ class ExternalCodexRuntime:
             if nested_evidence_prompt_summary is not None
             else ""
         )
+        runtime_evidence_refs = [
+            {
+                "ref": "runtime:workspace-final-manifest#content_entries",
+                "use": "exact controller evidence for a zero-delta workspace review",
+            },
+            {
+                "ref": "runtime:workspace-final-manifest#private_git_digest",
+                "use": "exact controller evidence for the private-Git observation",
+            },
+        ]
+        runtime_evidence_block = (
+            "\nExact controller-issued runtime evidence identities "
+            "(copy these refs verbatim; do not invent anchor labels):\n"
+            "<runtime_evidence_refs>\n"
+            + json.dumps(runtime_evidence_refs, ensure_ascii=False, indent=2)
+            + "\n</runtime_evidence_refs>\n"
+        )
         workspace_projection = {
             "target_workspace": str(execution_root),
             "codex_execution_root": str(execution_root),
@@ -11197,6 +11214,7 @@ Runtime-materialized immutable inputs (read these paths, not mutable aliases):
 {json.dumps(immutable_inputs, ensure_ascii=False, indent=2)}
 </immutable_inputs>
 {nested_evidence_block}
+{runtime_evidence_block}
 
 Runtime-owned actor workspace projection (the only mutable repository view):
 <workspace_projection>
@@ -11238,6 +11256,10 @@ Hard stop-lines:
   the source. Use the reserved runtime ref for claims about final workspace state; the
   controller binds it after the model exits. Emit each exact evidence ref only
   once per transition or finding; exact repetitions are semantically redundant.
+  For an independent review with no changed paths, copy the exact
+  `runtime:workspace-final-manifest#content_entries` ref from
+  `<runtime_evidence_refs>`; never invent a label such as
+  `#reviewer-zero-delta`. Unknown, ambiguous, or drifted anchors fail closed.
 - When nested_evidence_namespace_summary is present, its artifact_digest binds
   the exact read-only JSON at materialized_path and namespace_digest binds its
   canonical content. Inspect only entries needed for the claim with bounded jq
@@ -12683,6 +12705,46 @@ Runtime session identity: {state["session_id"]}
                 detected.add("unclassified_indirect_effect")
         return sorted(detected)
 
+    def _actor_private_git_baseline_for_attempt(
+        self,
+        state: Mapping[str, Any],
+        *,
+        attempt_number: int,
+        original_baseline: Mapping[str, Any],
+    ) -> Mapping[str, Any]:
+        """Return the private-Git witness for one attempt.
+
+        The original actor manifest remains the cumulative content-delta
+        origin. A resumed attempt is admitted against the exact final manifest
+        produced by its preceding attempt, so that an accepted prior
+        projection is not reclassified as private-Git drift. Any private-Git
+        change from that per-attempt witness still fails closed in
+        ``build_actor_delta``.
+        """
+
+        attempts = state.get("attempts")
+        attempt = (
+            attempts[attempt_number - 1]
+            if isinstance(attempts, list)
+            and 0 < attempt_number <= len(attempts)
+            and isinstance(attempts[attempt_number - 1], Mapping)
+            else None
+        )
+        if not isinstance(attempt, Mapping) or attempt.get("mode") != "resume":
+            return original_baseline
+        prior_final_ref = state.get("actor_final_manifest_ref")
+        if not isinstance(prior_final_ref, dict):
+            raise ExternalCodexRuntimeError(
+                "resume_projection_baseline_unavailable",
+                "resume has no exact preceding actor final manifest for "
+                "private-Git observation",
+            )
+        return _load_verified_json_ref(
+            prior_final_ref,
+            label="actor resume private-Git baseline manifest",
+            schema_path=ACTOR_MANIFEST_SCHEMA_PATH,
+        )
+
     def _failure_authority_effects(
         self,
         commands: Sequence[Mapping[str, Any]],
@@ -12785,11 +12847,17 @@ Runtime session identity: {state["session_id"]}
                     "actor baseline manifest is unavailable at finalization",
                 )
             actor_manifest_match = current_manifest == actor_manifest_baseline
+            private_git_baseline = self._actor_private_git_baseline_for_attempt(
+                state,
+                attempt_number=attempt_number,
+                original_baseline=actor_manifest_baseline,
+            )
             delta = build_actor_delta(
                 actor_manifest_baseline,
                 current_manifest,
                 baseline_digest=canonical_digest(actor_manifest_baseline),
                 current_digest=final_workspace_manifest_digest,
+                private_git_baseline=private_git_baseline,
             )
             validate_json(delta, ACTOR_DELTA_SCHEMA_PATH, label="actor delta")
             actor_delta_changes = list(delta["changes"])
@@ -13224,11 +13292,17 @@ Runtime session identity: {state["session_id"]}
                 workspace_manifest_ref = _artifact_ref(final_manifest_path)
                 actor_final_ref = workspace_manifest_ref
                 workspace_manifest_match = current_manifest == actor_baseline
+                private_git_baseline = self._actor_private_git_baseline_for_attempt(
+                    state,
+                    attempt_number=attempt_number,
+                    original_baseline=actor_baseline,
+                )
                 delta = build_actor_delta(
                     actor_baseline,
                     current_manifest,
                     baseline_digest=canonical_digest(actor_baseline),
                     current_digest=canonical_digest(current_manifest),
+                    private_git_baseline=private_git_baseline,
                 )
                 validate_json(delta, ACTOR_DELTA_SCHEMA_PATH, label="actor delta")
                 actor_delta_changes = list(delta["changes"])
