@@ -122,6 +122,10 @@ safe even when the live server predates the request gate; only then may it stop
 that endpoint, upgrade the operation lock
 to exclusive, and enumerate and
 quiesce active stack and organ readers for the final runtime-lock swap.
+Effect-root provisioning validates the shared `Logs` and `Logs/mcp` ancestors
+without changing their modes; it creates and normalizes only the
+`internal-effects/read-restart-pilot` subtree allowed by the repair unit's
+sandbox.
 Pre-quiescence failures leave every plane active; later failures restore the
 prior runtime, every reader, and every non-read consumer that had been active;
 the stack peer uses an exact, private, read-only rollback grant. Unsafe source,
