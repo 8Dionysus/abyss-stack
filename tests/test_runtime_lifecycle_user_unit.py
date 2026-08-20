@@ -1548,6 +1548,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertEqual(first.returncode, 0, first.stderr)
             venv = stack_root / "Services" / "abyss-stack-mcp" / "venv"
+            runtime_root = stack_root / "Services" / "abyss-stack-mcp"
             marker = venv / ".abyss-stack-mcp-runtime-identity"
             content_marker = venv / ".abyss-stack-mcp-runtime-content-digest"
             runtime_lock = (
@@ -1735,6 +1736,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 tasks_root,
                 effect_root,
                 venv,
+                runtime_root,
             ):
                 with self.subTest(unsafe_runtime_root=unsafe_runtime_root):
                     safe_runtime_root = unsafe_runtime_root.with_name(

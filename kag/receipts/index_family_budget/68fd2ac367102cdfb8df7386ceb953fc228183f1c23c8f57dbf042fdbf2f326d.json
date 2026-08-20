@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 6923403,
+  "allowed_tracked_bytes": 35862215,
+  "approved_by": "repository-owner",
+  "base_ref": "c9bcf00a9bbe77989a14c97b74d33e11dcfc0c71",
+  "changed_generated_bytes": 6923403,
+  "changed_generated_files": 70,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "68fd2ac367102cdfb8df7386ceb953fc228183f1c23c8f57dbf042fdbf2f326d",
+  "reason": "Refresh the portable KAG family after completing the modern MCP repair eligibility parent chain with the runtime/source-lock root itself.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 35862215,
+  "tracked_bytes_max": 24117248
+}

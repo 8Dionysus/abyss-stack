@@ -86,11 +86,11 @@ automatic delegation is denied until the operator persists the reversible
 host policy with `aoa-install-systemd --enable-abyss-stack-mcp-auto-repair`;
 `--disable-abyss-stack-mcp-auto-repair` removes only that opt-in. The repair
 delegation first runs the standalone read-only repair-eligibility verifier. It
-proves the source package, bootstrap interpreter, shared locks, every existing
-repair-managed runtime/observation/admission/orchestration/tasks/effect path,
-audit journals, and exact loaded unit topology are safe while allowing the
-current read/bootstrap processes to remain active. Only after that gate
-succeeds does admission stop the exact read and bootstrap fleet so their
+proves the source package, bootstrap interpreter, shared locks, the complete
+runtime parent chain, every existing observation/admission/orchestration/tasks/
+effect path, audit journals, and exact loaded unit topology are safe while
+allowing the current read/bootstrap processes to remain active. Only after that
+gate succeeds does admission stop the exact read and bootstrap fleet so their
 managed shared locks are released, then rebuild before admission starts the
 read fleet again. The repair still refuses an independently active candidate
 or internal-effect plane and unsafe source, lock, journal, runtime path, or unit

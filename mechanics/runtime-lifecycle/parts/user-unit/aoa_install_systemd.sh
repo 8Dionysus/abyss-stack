@@ -1402,6 +1402,8 @@ aoa_verify_abyss_stack_mcp_repair_paths() {
     "${AOA_STACK_ROOT}/Logs" \
     "${AOA_STACK_ROOT}/Logs/mcp" \
     "${AOA_STACK_ROOT}/Logs/mcp/internal-effects" \
+    "$abyss_stack_mcp_runtime_root" \
+    "$abyss_stack_mcp_source_lock_root" \
     "$abyss_stack_mcp_observation_root" \
     "$abyss_stack_mcp_admission_root" \
     "$abyss_stack_mcp_keeper_inbox_root" \

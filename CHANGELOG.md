@@ -136,10 +136,10 @@ Tracking starts with the community-docs baseline for this repository.
   verification now rejects a symlink-backed runtime Python, while the guarded
   admission repair remains idempotent when its systemd unit has never been
   loaded. Upgraded standalone hosts with automatic repair enabled first prove
-  repair eligibility against the source, locks, bootstrap interpreter, every
-  repair-managed runtime path, audit journals, and exact loaded unit topology
-  while the read fleet stays available. Only then do they stop the exact
-  read/bootstrap fleet, release its managed shared locks, rebuild the runtime,
+  repair eligibility against the source, locks, bootstrap interpreter, the
+  complete repair-managed runtime parent chain, audit journals, and exact
+  loaded unit topology while the read fleet stays available. Only then do they
+  stop the exact read/bootstrap fleet, release its managed shared locks, rebuild the runtime,
   and re-admit the read fleet; hosts without that explicit opt-in remain
   fail-closed and require manual provisioning.
 - Preserve an external actor's exact role, Codex thread, task, projection, and
