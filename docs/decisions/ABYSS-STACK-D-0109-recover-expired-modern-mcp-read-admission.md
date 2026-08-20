@@ -1,7 +1,7 @@
 # Recover Expired Modern MCP Read Admission
 
 - Decision ID: ABYSS-STACK-D-0109
-- Status: accepted
+- Status: amended
 - Date: 2026-08-10
 - Owner surface: `scripts/aoa-refresh-modern-mcp-admission`
 
@@ -78,10 +78,10 @@ canary and managed catalog family before completing. If time-current admission
 is bound to a predecessor deployment, package, canary family, or catalog, the
 controller instead rebuilds admission through the bounded bootstrap handoff;
 repeated direct production starts would only replay a mandatory fail-closed
-preflight rejection. The Codex credential launcher makes this controller a
-synchronous pre-exec dependency whenever any of the eleven units or loopback
-listeners is absent. A one-second boot timer starts the same transaction
-eagerly; the launcher closes the remaining scheduling race.
+preflight rejection. ABYSS-STACK-D-0125 amends the client coupling and runtime
+repair posture: the one-second boot timer remains the eager recovery owner,
+while Codex only requests the transaction in the background and never waits
+for it.
 
 ## Rationale
 
@@ -103,9 +103,8 @@ contains the new lifecycle effect to the same read fleet already admitted by
 - If production is unavailable and time-current admission is bound to stale
   deployment or evidence identities, recovery uses the same bounded bootstrap
   handoff and replaces those identities before production start.
-- Codex no longer starts an MCP-consuming session while the fixed fleet is
-  absent. A bounded launcher failure is reported once before Codex execution
-  instead of eleven transport failures retained for the whole session.
+- Codex reports incomplete MCP readiness and requests recovery without making
+  the operator client unavailable; ABYSS-STACK-D-0125 owns this amended rule.
 - Keeper and preflight watchers settle finite publication bursts without
   entering `unit-start-limit-hit`, and remain ordered behind the recovery
   transaction.

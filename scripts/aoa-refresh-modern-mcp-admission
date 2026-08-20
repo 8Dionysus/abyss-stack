@@ -3,6 +3,8 @@ set -euo pipefail
 
 STACK=/srv/AbyssOS/abyss-stack
 VENV="$STACK/Services/abyss-stack-mcp/venv/bin"
+INSTALL_SYSTEMD="$STACK/Configs/scripts/aoa-install-systemd"
+RUNTIME_REPAIR_SERVICE="abyss-stack-mcp-runtime-repair.service"
 REGISTRY=/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json
 DEPLOYMENT="$STACK/Logs/mcp/deployments/latest.json"
 TARGETS="$STACK/Configs/mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/runtime-targets.v1.json"
@@ -173,6 +175,19 @@ publish_admission() {
     --publish
 }
 
+ensure_stack_runtime_ready() {
+  if "$INSTALL_SYSTEMD" --verify-abyss-stack-mcp-runtime=read >/dev/null 2>&1; then
+    return 0
+  fi
+
+  printf '%s\n' \
+    'modern MCP admission detected a drifted abyss-stack runtime; requesting guarded reprovision' \
+    >&2
+  systemctl --user reset-failed "$RUNTIME_REPAIR_SERVICE"
+  systemctl --user start "$RUNTIME_REPAIR_SERVICE"
+  "$INSTALL_SYSTEMD" --verify-abyss-stack-mcp-runtime=read
+}
+
 rebase_expired_registry() {
   local now_iso
   local expiry_iso
@@ -272,6 +287,8 @@ fi
 chmod 0600 "$LOCK"
 exec {refresh_lock_fd}<>"$LOCK"
 flock --exclusive "$refresh_lock_fd"
+
+ensure_stack_runtime_ready
 
 now_epoch=$(date -u +%s)
 deployment_manifest_id=$(jq -er .manifest_id "$DEPLOYMENT")

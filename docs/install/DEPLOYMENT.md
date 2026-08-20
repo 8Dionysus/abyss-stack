@@ -260,7 +260,9 @@ the registered consumers before the subsequent sequential canary.
 The stack MCP runtime provision action builds a source-addressed virtual
 environment under `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv` from the
 already deployed package, installs its exact hash-locked dependency closure,
-verifies dependencies and imports, and records both source and lock digests.
+verifies dependencies and imports, records both source and lock digests, and
+copies the bootstrap interpreter into the published runtime so a later host
+interpreter replacement cannot mutate the measured closure through a symlink.
 It also records a deterministic digest of the installed runtime files, symlink
 targets, and bytes behind the fully resolved `bin/python` chain after rebinding
 generated entry-point shebangs from the private staging path to the stable
@@ -296,7 +298,11 @@ owner-isolated processes.
 The Codex client install adds a removable Zsh launch function that delegates
 to the deployed launcher without replacing the managed Codex executable or
 exporting the bearer into the parent shell. It affects only new interactive
-shell launches and leaves running Codex sessions unchanged.
+shell launches and leaves running Codex sessions unchanged. If the modern MCP
+fleet is incomplete, the launcher requests background admission recovery and
+starts Codex immediately; MCP lifecycle failure never blocks the operator
+client. The boot timer retries at a five-minute cadence, and the refresh may
+invoke the guarded runtime-repair oneshot before its exact bootstrap handoff.
 Verify parity, then canary authenticated owners one at a time before using live
 MCP responses as current evidence.
 

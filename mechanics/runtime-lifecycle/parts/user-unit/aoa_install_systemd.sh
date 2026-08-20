@@ -1702,7 +1702,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
 
   temp_venv="$(mktemp -d "${abyss_stack_mcp_runtime_root}/.venv.XXXXXX")"
   if ! aoa_run_isolated_python \
-    "$abyss_stack_mcp_bootstrap_python" -m venv "$temp_venv"; then
+    "$abyss_stack_mcp_bootstrap_python" -m venv --copies "$temp_venv"; then
     rm -rf -- "$temp_venv"
     aoa_die "failed to create the abyss-stack MCP runtime environment"
   fi
