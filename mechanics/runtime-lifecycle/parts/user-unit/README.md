@@ -94,7 +94,8 @@ builds and verifies the replacement while the read fleet keeps its shared
 runtime locks. Only a fully built replacement may quiesce the stack
 read/bootstrap peer for the final exclusive-lock swap. Pre-quiescence failures
 leave every reader active; post-quiescence failures restore the prior runtime
-and restart the stack peer that had been active. The repair still refuses an
+through an exact, private, read-only rollback grant and restart the stack peer
+that had been active. The repair still refuses an
 independently active candidate or internal-effect plane and unsafe source,
 operation lock, runtime lock, journal, runtime path, or unit topology without
 taking the working read fleet down.

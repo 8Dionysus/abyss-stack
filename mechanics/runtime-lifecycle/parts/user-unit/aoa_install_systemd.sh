@@ -351,6 +351,7 @@ abyss_stack_mcp_runtime_root="${AOA_STACK_ROOT}/Services/abyss-stack-mcp"
 abyss_stack_mcp_venv="${abyss_stack_mcp_runtime_root}/venv"
 abyss_stack_mcp_runtime_lock="${abyss_stack_mcp_runtime_root}/.runtime-provision.lock"
 abyss_stack_mcp_operation_lock="${abyss_stack_mcp_runtime_root}/.runtime-operation.lock"
+abyss_stack_mcp_read_rollback_grant="${abyss_stack_mcp_runtime_root}/.read-repair-rollback-grant"
 abyss_stack_mcp_audit_root="${AOA_STACK_ROOT}/Logs/mcp/audit"
 abyss_stack_mcp_read_audit_journal="${abyss_stack_mcp_audit_root}/policy-read.jsonl"
 abyss_stack_mcp_candidate_audit_journal="${abyss_stack_mcp_audit_root}/policy-candidate.jsonl"
@@ -1460,6 +1461,14 @@ aoa_verify_abyss_stack_mcp_repair_paths() {
     [[ -d "$abyss_stack_mcp_venv" && ! -L "$abyss_stack_mcp_venv" ]] || \
       aoa_die "existing abyss-stack MCP runtime must be a non-symlink directory"
   fi
+  if [[ -e "$abyss_stack_mcp_read_rollback_grant" || \
+        -L "$abyss_stack_mcp_read_rollback_grant" ]]; then
+    [[ -f "$abyss_stack_mcp_read_rollback_grant" && \
+       ! -L "$abyss_stack_mcp_read_rollback_grant" ]] || \
+      aoa_die "abyss-stack MCP read rollback grant must be a regular non-symlink file"
+    [[ "$(stat -c '%a' "$abyss_stack_mcp_read_rollback_grant")" == "600" ]] || \
+      aoa_die "abyss-stack MCP read rollback grant must use mode 0600"
+  fi
 }
 
 aoa_verify_abyss_stack_mcp_repair_eligibility() {
@@ -1624,6 +1633,21 @@ aoa_verify_abyss_stack_mcp_runtime_imports() {
       'import encodings, importlib.metadata, ssl; import abyss_stack_mcp, aoa_sdk, mcp, pydantic; assert importlib.metadata.version("aoa-sdk") == "0.10.2"'
 }
 
+aoa_verify_abyss_stack_mcp_read_rollback_grant() {
+  local recorded_identity="$1"
+  local observed_content_digest="$2"
+  local grant=""
+
+  [[ -f "$abyss_stack_mcp_read_rollback_grant" && \
+     ! -L "$abyss_stack_mcp_read_rollback_grant" ]] || return 1
+  [[ "$(stat -c '%a' "$abyss_stack_mcp_read_rollback_grant")" == "600" ]] || \
+    return 1
+  grant="$(<"$abyss_stack_mcp_read_rollback_grant")"
+  [[ "$grant" =~ ^[0-9a-f]{64}:[0-9a-f]{64}:[0-9a-f]{64}$ ]] || \
+    return 1
+  [[ "$grant" == "${observed_content_digest}:${recorded_identity}" ]]
+}
+
 aoa_verify_abyss_stack_mcp_runtime() {
   local contour="${1:-all}"
   local marker=".abyss-stack-mcp-runtime-identity"
@@ -1693,9 +1717,6 @@ aoa_verify_abyss_stack_mcp_runtime() {
   recorded_identity="$(<"${abyss_stack_mcp_venv}/${marker}")"
   [[ "$recorded_identity" =~ ^[0-9a-f]{64}:[0-9a-f]{64}$ ]] || \
     aoa_die "abyss-stack MCP runtime identity marker is invalid"
-  [[ "$recorded_identity" == "$expected_identity" ]] || \
-    aoa_die "abyss-stack MCP runtime source-and-lock identity mismatch"
-
   recorded_content_digest="$(
     <"${abyss_stack_mcp_venv}/${content_marker}"
   )"
@@ -1704,8 +1725,17 @@ aoa_verify_abyss_stack_mcp_runtime() {
   observed_content_digest="$(
     aoa_digest_abyss_stack_mcp_runtime "$abyss_stack_mcp_venv"
   )" || aoa_die "failed to digest the provisioned abyss-stack MCP runtime"
-  [[ "$observed_content_digest" == "$recorded_content_digest" ]] || \
-    aoa_die "abyss-stack MCP runtime content digest mismatch"
+  if [[ "$recorded_identity" != "$expected_identity" || \
+        "$observed_content_digest" != "$recorded_content_digest" ]]; then
+    if [[ "$contour" != "read" ]] || \
+       ! aoa_verify_abyss_stack_mcp_read_rollback_grant \
+         "$recorded_identity" "$observed_content_digest"; then
+      if [[ "$recorded_identity" != "$expected_identity" ]]; then
+        aoa_die "abyss-stack MCP runtime source-and-lock identity mismatch"
+      fi
+      aoa_die "abyss-stack MCP runtime content digest mismatch"
+    fi
+  fi
   aoa_verify_abyss_stack_mcp_runtime_imports >/dev/null || \
     aoa_die "abyss-stack MCP runtime Python dependency/import check failed"
   exec {runtime_lock_fd}>&-
@@ -1799,6 +1829,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
   local source_snapshot=""
   local temp_venv=""
   local backup_venv=""
+  local rollback_grant_temp=""
   local resolved_bootstrap_python=""
   local read_unit_was_active=0
   local bootstrap_unit_was_active=0
@@ -1835,6 +1866,11 @@ aoa_provision_abyss_stack_mcp_runtime() {
       else
         rm -rf -- "$backup_venv"
       fi
+    fi
+    if [[ -n "$rollback_grant_temp" && \
+          "$rollback_grant_temp" == \
+            "${abyss_stack_mcp_runtime_root}/.read-repair-rollback-grant."* ]]; then
+      rm -f -- "$rollback_grant_temp"
     fi
     if [[ -n "$runtime_lock_fd" ]]; then
       exec {runtime_lock_fd}>&-
@@ -1962,6 +1998,14 @@ aoa_provision_abyss_stack_mcp_runtime() {
   exec {operation_lock_fd}<> "$abyss_stack_mcp_operation_lock"
   if ! /usr/bin/flock --exclusive --nonblock "$operation_lock_fd"; then
     aoa_die "another provisioner or a managed non-read abyss-stack MCP plane holds the operation lock"
+  fi
+  if [[ -e "$abyss_stack_mcp_read_rollback_grant" || \
+        -L "$abyss_stack_mcp_read_rollback_grant" ]]; then
+    [[ -f "$abyss_stack_mcp_read_rollback_grant" && \
+       ! -L "$abyss_stack_mcp_read_rollback_grant" ]] || \
+      aoa_die "abyss-stack MCP read rollback grant must be a regular non-symlink file"
+    [[ "$(stat -c '%a' "$abyss_stack_mcp_read_rollback_grant")" == "600" ]] || \
+      aoa_die "abyss-stack MCP read rollback grant must use mode 0600"
   fi
   if [[ -e "$abyss_stack_mcp_runtime_lock" || \
         -L "$abyss_stack_mcp_runtime_lock" ]]; then
@@ -2150,6 +2194,31 @@ aoa_provision_abyss_stack_mcp_runtime() {
         abyss-stack-mcp-read-bootstrap.service; then
       bootstrap_unit_was_active=1
     fi
+    if ((read_unit_was_active || bootstrap_unit_was_active)); then
+      observed_content_digest="$(
+        aoa_digest_abyss_stack_mcp_runtime "$abyss_stack_mcp_venv"
+      )" || aoa_die "failed to capture the live abyss-stack MCP rollback runtime"
+      [[ "$existing_identity" =~ ^[0-9a-f]{64}:[0-9a-f]{64}$ ]] || \
+        aoa_die "live abyss-stack MCP rollback runtime identity is invalid"
+      [[ "$existing_content_digest" =~ ^[0-9a-f]{64}$ && \
+         "$observed_content_digest" == "$existing_content_digest" ]] || \
+        aoa_die "live abyss-stack MCP rollback runtime content is not exact"
+      PYTHONDONTWRITEBYTECODE=1 \
+        aoa_run_isolated_python \
+          "${abyss_stack_mcp_venv}/bin/python" -m pip check >/dev/null || \
+        aoa_die "live abyss-stack MCP rollback runtime failed dependency verification"
+      aoa_verify_abyss_stack_mcp_runtime_imports >/dev/null || \
+        aoa_die "live abyss-stack MCP rollback runtime failed import verification"
+      rollback_grant_temp="$(
+        mktemp \
+          "${abyss_stack_mcp_runtime_root}/.read-repair-rollback-grant.XXXXXX"
+      )"
+      chmod 0600 "$rollback_grant_temp"
+      printf '%s:%s\n' "$observed_content_digest" "$existing_identity" > \
+        "$rollback_grant_temp"
+      mv -f -- "$rollback_grant_temp" "$abyss_stack_mcp_read_rollback_grant"
+      rollback_grant_temp=""
+    fi
     read_fleet_quiesced=1
     if ! systemctl --user stop \
         abyss-stack-mcp-read.service \
@@ -2178,6 +2247,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
     aoa_die "failed to activate the provisioned abyss-stack MCP runtime"
   fi
   temp_venv=""
+  rm -f -- "$abyss_stack_mcp_read_rollback_grant"
   if [[ -n "$backup_venv" && -d "$backup_venv" ]]; then
     rm -rf -- "$backup_venv"
   fi

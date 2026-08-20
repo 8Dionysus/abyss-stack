@@ -209,8 +209,8 @@ source/runtime snapshot while the read plane remains live, excludes candidate
 and internal-effect launches through a distinct operation lock, and stops only
 the stack read/bootstrap pair after the replacement passes dependency checks.
 Pre-stop failure preserves the live reader; post-stop failure restores the
-previous runtime and active read peer. Unsafe lifecycle topology still fails
-closed. Keeper
+previous runtime and active read peer through an exact, private, read-only
+rollback grant. Unsafe lifecycle topology still fails closed. Keeper
 and preflight services are ordered behind that transaction and allow finite
 publication bursts without becoming permanently failed through
 `unit-start-limit-hit`.

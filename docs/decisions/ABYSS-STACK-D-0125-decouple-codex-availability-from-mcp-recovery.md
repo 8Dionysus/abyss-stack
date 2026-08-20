@@ -49,7 +49,11 @@ installation and replacement verification. Only a fully built replacement may
 briefly quiesce the stack read/bootstrap peer, acquire the exclusive runtime
 lock, and perform the atomic swap. Failure before quiescence leaves every
 reader active; failure after quiescence restores the previous venv and restarts
-whichever stack read peer was active. The admission unit reserves twenty
+whichever stack read peer was active. Before quiescence, repair writes a private
+grant bound to that runtime's exact measured content and recorded identity. Only
+the read contour may use the grant to survive source-identity drift after
+rollback; candidate, internal-effect, and general verification stay strict, and
+a successful replacement removes the grant. The admission unit reserves twenty
 minutes so the bounded ten-minute repair still leaves a separate admission
 budget.
 
@@ -86,7 +90,8 @@ readers continue under their existing shared runtime locks.
 - Positive: dependency retrieval, build, or pre-swap verification failure does
   not stop the working read fleet.
 - Positive: a post-quiescence activation failure atomically restores the prior
-  runtime and the previously active stack read peer.
+  runtime and the previously active stack read peer through an exact,
+  read-contour-only rollback grant.
 - Positive: Codex starts even when MCP recovery fails or is still running.
 - Tradeoff: a Codex session opened during genuine MCP downtime may retain
   unavailable MCP clients until a later session, but the operator is not locked

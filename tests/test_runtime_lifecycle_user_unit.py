@@ -1499,6 +1499,16 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 str(INSTALL_SYSTEMD),
                 "--verify-abyss-stack-mcp-runtime",
             ]
+            read_verify_command = [
+                "bash",
+                str(INSTALL_SYSTEMD),
+                "--verify-abyss-stack-mcp-runtime=read",
+            ]
+            candidate_verify_command = [
+                "bash",
+                str(INSTALL_SYSTEMD),
+                "--verify-abyss-stack-mcp-runtime=candidate",
+            ]
             repair_eligibility_command = [
                 "bash",
                 str(INSTALL_SYSTEMD),
@@ -1621,6 +1631,12 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             operation_lock = (
                 stack_root / "Services" / "abyss-stack-mcp" / ".runtime-operation.lock"
             )
+            rollback_grant = (
+                stack_root
+                / "Services"
+                / "abyss-stack-mcp"
+                / ".read-repair-rollback-grant"
+            )
             source_projection_lock = (
                 stack_root / "Services" / "abyss-stack-mcp" / ".source-projection.lock"
             )
@@ -1704,6 +1720,39 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 0o600,
             )
             self.assertNotEqual(read_audit_journal, candidate_audit_journal)
+            unsafe_grant_target = root / "unsafe-rollback-grant"
+            unsafe_grant_target.write_text("unsafe\n", encoding="utf-8")
+            rollback_grant.symlink_to(unsafe_grant_target)
+            unsafe_grant = subprocess.run(
+                repair_eligibility_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(unsafe_grant.returncode, 0)
+            self.assertIn(
+                "read rollback grant must be a regular non-symlink file",
+                unsafe_grant.stderr,
+            )
+            rollback_grant.unlink()
+            rollback_grant.write_text("unsafe\n", encoding="utf-8")
+            rollback_grant.chmod(0o644)
+            public_grant = subprocess.run(
+                repair_eligibility_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(public_grant.returncode, 0)
+            self.assertIn(
+                "read rollback grant must use mode 0600",
+                public_grant.stderr,
+            )
+            rollback_grant.unlink()
             self.assertEqual(
                 observation_root.stat().st_mode & 0o777,
                 0o700,
@@ -1846,6 +1895,40 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 (systemctl_state / "abyss-stack-mcp-read.service.stopped").exists()
             )
             self.assertEqual(marker.read_text(encoding="utf-8").strip(), first_identity)
+            self.assertTrue(rollback_grant.is_file())
+            self.assertFalse(rollback_grant.is_symlink())
+            self.assertEqual(rollback_grant.stat().st_mode & 0o777, 0o600)
+            self.assertRegex(
+                rollback_grant.read_text(encoding="utf-8").strip(),
+                r"\A[0-9a-f]{64}:[0-9a-f]{64}:[0-9a-f]{64}\Z",
+            )
+            rollback_read = subprocess.run(
+                read_verify_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(rollback_read.returncode, 0, rollback_read.stderr)
+            for strict_verify_command in (
+                verify_command,
+                candidate_verify_command,
+            ):
+                with self.subTest(strict_verify_command=strict_verify_command[-1]):
+                    rollback_strict = subprocess.run(
+                        strict_verify_command,
+                        cwd=REPO_ROOT,
+                        env=env,
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(rollback_strict.returncode, 0)
+                    self.assertIn(
+                        "runtime source-and-lock identity mismatch",
+                        rollback_strict.stderr,
+                    )
 
             source_file.write_text("VALUE = repair_success\n", encoding="utf-8")
             systemctl_log.write_text("", encoding="utf-8")
@@ -1877,6 +1960,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 if event.startswith("--user stop ")
             )
             self.assertLess(build_event, stop_event)
+            self.assertFalse(rollback_grant.exists())
             self.assertNotEqual(
                 marker.read_text(encoding="utf-8").strip(),
                 first_identity,

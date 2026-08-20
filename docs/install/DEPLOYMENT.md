@@ -294,8 +294,12 @@ read plane retains its shared runtime lock. Only a fully built replacement may
 quiesce the stack read/bootstrap pair, upgrade to the exclusive runtime lock,
 and perform the atomic swap. Failures before quiescence do not stop any reader;
 failures after quiescence restore the previous venv and restart whichever stack
-read peer had been active. The admission service later performs its normal
-fleet-wide evidence handoff and production start.
+read peer had been active. The restart is admitted only by a private, mode-0600
+rollback grant issued before quiescence and bound to the previous runtime's exact
+measured content plus recorded identity. The grant is valid only for the read
+contour; successful replacement deletes it, and candidate/internal-effect remain
+strict. The admission service later performs its normal fleet-wide evidence
+handoff and production start.
 Provisioning also creates a private observation directory. The distinct
 credential-free observation oneshot verifies the immutable deployment record,
 private registry source, committed owner-specific target catalog, and exact

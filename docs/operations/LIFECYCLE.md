@@ -180,7 +180,7 @@ addition to the measured file digest. The repair oneshot builds the replacement
 while the read service remains available and stops only the stack read/bootstrap
 pair after the build is verified. Build failure leaves the fleet untouched;
 post-stop activation failure restores the previous runtime and the previously
-active stack read peer.
+active stack read peer through an exact, private, read-only rollback grant.
 
 The privileged support allowlist under `systemd/system/managed-units.txt` is
 installed separately:

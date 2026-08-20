@@ -13,7 +13,8 @@ Tracking starts with the community-docs baseline for this repository.
   failures. Guarded repair now builds and verifies the replacement before
   quiescing the stack read peer, excludes candidate/internal-effect launches
   with an operation lock, and restores the previous runtime and active reader
-  if the final atomic activation fails.
+  through an exact, private, read-only rollback grant if the final atomic
+  activation fails.
 - Bind the operator-visible responsibility holder to its own non-replacing
   lifecycle receipt before direct Codex `exec`, distinct from nested proof
   actors. The installed incarnation runtime now closes only that exact
