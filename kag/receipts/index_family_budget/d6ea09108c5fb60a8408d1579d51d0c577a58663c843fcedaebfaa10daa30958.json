@@ -1,17 +1,17 @@
 {
-  "allowed_bytes": 1401180,
+  "allowed_bytes": 0,
   "allowed_tracked_bytes": 36286582,
   "approved_by": "repository-owner",
-  "base_ref": "e438284b3564ca226117b1f544030e3d2033b3cb",
-  "changed_generated_bytes": 1401180,
-  "changed_generated_files": 16,
+  "base_ref": "0193bfb9ef27c1dd38e9a3932836928b46306b5a",
+  "changed_generated_bytes": 0,
+  "changed_generated_files": 0,
   "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
   "default_limit_bytes": 1048576,
   "head_family_digest": "d6ea09108c5fb60a8408d1579d51d0c577a58663c843fcedaebfaa10daa30958",
-  "reason": "Additive terminal-observation schema registration and top-level object contract require a matching portable-family refresh for PR 403 base e438284b3564ca226117b1f544030e3d2033b3cb.",
+  "reason": "PR 405 is an additive follow-up on PR 399; bind the portable-family budget receipt to the exact #399 base branch tip 0193bfb9ef27c1dd38e9a3932836928b46306b5a used by this pull request.",
   "repo": "abyss-stack",
   "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
-  "scope": "generated_delta_and_tracked_size",
+  "scope": "tracked_size",
   "tracked_bytes": 36286582,
   "tracked_bytes_max": 24117248
 }
