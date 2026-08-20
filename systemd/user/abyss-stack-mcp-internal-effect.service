@@ -6,6 +6,7 @@ ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.source-pr
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-operation.lock
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/internal-effects/read-restart-pilot
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/internal-effects/read-restart-pilot/.request-drain.lock
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json
 StartLimitIntervalSec=60
 StartLimitBurst=3

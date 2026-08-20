@@ -35,7 +35,7 @@ for organ in "${organs[@]:1}"; do
 done
 
 bootstrap_started=0
-production_handoff_started=0
+production_handoff_state="inactive"
 rebase_staging=""
 canary_worker_pids=()
 operation_lock_fd=""
@@ -72,7 +72,7 @@ cleanup_canary_workers() {
 
 cleanup_recovery() {
   cleanup_canary_workers
-  if [[ "$production_handoff_started" -eq 1 ]]; then
+  if [[ "$production_handoff_state" == "started" ]]; then
     systemctl --user stop "${production_units[@]}" >/dev/null 2>&1 || true
   fi
   if [[ "$bootstrap_started" -eq 1 ]]; then
@@ -82,7 +82,8 @@ cleanup_recovery() {
     rm -f -- "$rebase_staging"
   fi
   close_stack_runtime_locks
-  if [[ -e "$REPAIR_FALLBACK" || -L "$REPAIR_FALLBACK" ]]; then
+  if [[ "$production_handoff_state" != "committed" && \
+        ( -e "$REPAIR_FALLBACK" || -L "$REPAIR_FALLBACK" ) ]]; then
     restore_runtime_repair_fallback || \
       printf '%s\n' \
         'modern MCP admission failed to preserve the runtime-repair fallback' \
@@ -597,7 +598,7 @@ if [[ "$active_unit_count" -ne 11 ]]; then
     systemctl --user stop "${bootstrap_units[@]}"
     bootstrap_started=0
   fi
-  production_handoff_started=1
+  production_handoff_state="started"
   systemctl --user start "${production_units[@]}"
   [[ "$(active_production_count)" -eq 11 ]] || {
     printf 'modern MCP production handoff did not start the exact fleet\n' >&2
@@ -615,5 +616,5 @@ build_preflight production
 
 "$VENV/aoa" organs registry-v2-validate "$REGISTRY"
 ln -sfn "runs/${RUN##*/}/report-production.json" "$ROOT/latest-report.json"
+production_handoff_state="committed"
 complete_runtime_repair_fallback
-production_handoff_started=0

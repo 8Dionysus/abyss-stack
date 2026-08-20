@@ -30,6 +30,8 @@ EXACT_UNIT_NAME = "abyss-stack-mcp-read.service"
 EXACT_TOOL_ID = "stack_execute_approved_read_restart_pilot"
 DEFAULT_EFFECT_ROOT = Path("/srv/AbyssOS/abyss-stack/Logs/mcp/internal-effects/read-restart-pilot")
 DEFAULT_OBSERVATION_PATH = Path("/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json")
+EXECUTION_LOCK_NAME = ".execute.lock"
+REQUEST_DRAIN_LOCK_NAME = ".request-drain.lock"
 MAX_ARTIFACT_BYTES = 2 * 1024 * 1024
 MAX_EFFECT_ATTEMPTS_PER_MINUTE = 1
 IDEMPOTENCY_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$")
@@ -297,6 +299,25 @@ def _safe_root(path: Path) -> Path:
     if stat.S_IMODE(absolute.stat().st_mode) & 0o077:
         raise EffectError("effect root permissions are too broad")
     return absolute
+
+
+def _open_private_lock(root: Path, name: str) -> int:
+    path = _safe_root(root) / name
+    flags = os.O_RDWR | os.O_CREAT | os.O_CLOEXEC | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags, 0o600)
+    except OSError as exc:
+        raise EffectError("effect coordination lock is unavailable") from exc
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise EffectError("effect coordination lock must be a regular file")
+        if stat.S_IMODE(metadata.st_mode) & 0o077:
+            raise EffectError("effect coordination lock permissions are too broad")
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
 
 
 def _write_private(path: Path, payload: dict[str, Any], *, replace: bool = False) -> None:
@@ -728,8 +749,7 @@ class EffectExecutor:
         approval_id: str,
         idempotency_key: str,
     ) -> tuple[InternalEffectReceipt, bool]:
-        lock_path = self.root / ".execute.lock"
-        descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_CLOEXEC, 0o600)
+        descriptor = _open_private_lock(self.root, EXECUTION_LOCK_NAME)
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX)
             try:

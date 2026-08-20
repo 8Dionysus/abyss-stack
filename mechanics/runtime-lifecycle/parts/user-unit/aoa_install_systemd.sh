@@ -375,6 +375,8 @@ abyss_stack_mcp_audit_root="${AOA_STACK_ROOT}/Logs/mcp/audit"
 abyss_stack_mcp_read_audit_journal="${abyss_stack_mcp_audit_root}/policy-read.jsonl"
 abyss_stack_mcp_candidate_audit_journal="${abyss_stack_mcp_audit_root}/policy-candidate.jsonl"
 abyss_stack_mcp_effect_root="${AOA_STACK_ROOT}/Logs/mcp/internal-effects/read-restart-pilot"
+abyss_stack_mcp_effect_execution_lock="${abyss_stack_mcp_effect_root}/.execute.lock"
+abyss_stack_mcp_effect_request_drain_lock="${abyss_stack_mcp_effect_root}/.request-drain.lock"
 abyss_stack_mcp_observation_root="${AOA_STACK_ROOT}/Logs/mcp/observations"
 abyss_stack_mcp_observation_path="${abyss_stack_mcp_observation_root}/current.json"
 abyss_stack_mcp_observation_overlay_path="${abyss_stack_mcp_observation_root}/evidence-overlay.json"
@@ -1027,6 +1029,7 @@ aoa_validate_abyss_stack_mcp_audit_journal() {
 
 aoa_verify_abyss_stack_mcp_audit_journals() {
   local contour="${1:-all}"
+  local journal_path=""
 
   case "$contour" in
     all)
@@ -1045,6 +1048,14 @@ aoa_verify_abyss_stack_mcp_audit_journals() {
          ! -L "$abyss_stack_mcp_effect_root" && \
          "$(stat -c '%a' "$abyss_stack_mcp_effect_root")" == "700" ]] || \
         aoa_die "abyss-stack MCP internal-effect root must be a mode-0700 non-symlink directory"
+      for journal_path in \
+        "$abyss_stack_mcp_effect_execution_lock" \
+        "$abyss_stack_mcp_effect_request_drain_lock"; do
+        [[ -f "$journal_path" && ! -L "$journal_path" ]] || \
+          aoa_die "abyss-stack MCP effect coordination lock must be a regular non-symlink file"
+        [[ "$(stat -c '%a' "$journal_path")" == "600" ]] || \
+          aoa_die "abyss-stack MCP effect coordination lock must use mode 0600"
+      done
       ;;
     read)
       [[ -d "$abyss_stack_mcp_audit_root" && \
@@ -1072,6 +1083,14 @@ aoa_verify_abyss_stack_mcp_audit_journals() {
         aoa_die "abyss-stack MCP internal-effect root must be a non-symlink directory"
       [[ "$(stat -c '%a' "$abyss_stack_mcp_effect_root")" == "700" ]] || \
         aoa_die "abyss-stack MCP internal-effect root must have mode 0700"
+      for journal_path in \
+        "$abyss_stack_mcp_effect_execution_lock" \
+        "$abyss_stack_mcp_effect_request_drain_lock"; do
+        [[ -f "$journal_path" && ! -L "$journal_path" ]] || \
+          aoa_die "abyss-stack MCP effect coordination lock must be a regular non-symlink file"
+        [[ "$(stat -c '%a' "$journal_path")" == "600" ]] || \
+          aoa_die "abyss-stack MCP effect coordination lock must use mode 0600"
+      done
       ;;
     *)
       aoa_die "unknown abyss-stack MCP audit contour: ${contour}"
@@ -1222,6 +1241,7 @@ aoa_provision_abyss_stack_mcp_tasks_root() {
 
 aoa_provision_abyss_stack_mcp_effect_root() {
   local parent=""
+  local lock_path=""
 
   for parent in \
     "${AOA_STACK_ROOT}/Logs" \
@@ -1235,6 +1255,23 @@ aoa_provision_abyss_stack_mcp_effect_root() {
       install -d -m 0700 "$parent"
     fi
     chmod 0700 "$parent"
+  done
+  for lock_path in \
+    "$abyss_stack_mcp_effect_execution_lock" \
+    "$abyss_stack_mcp_effect_request_drain_lock"; do
+    if [[ -e "$lock_path" || -L "$lock_path" ]]; then
+      [[ -f "$lock_path" && ! -L "$lock_path" ]] || \
+        aoa_die "abyss-stack MCP effect coordination lock must be a regular non-symlink file"
+    else
+      (
+        umask 077
+        set -o noclobber
+        : > "$lock_path"
+      ) 2>/dev/null || true
+      [[ -f "$lock_path" && ! -L "$lock_path" ]] || \
+        aoa_die "failed to create an abyss-stack MCP effect coordination lock"
+    fi
+    chmod 0600 "$lock_path"
   done
 }
 
@@ -2012,6 +2049,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
   local operation_lock_fd=""
   local runtime_lock_fd=""
   local source_lock_fd=""
+  local effect_request_drain_lock_fd=""
 
   case "$provision_mode" in
     manual|repair)
@@ -2029,6 +2067,13 @@ aoa_provision_abyss_stack_mcp_runtime() {
       systemctl --user start "$consumer_unit" || return 1
     done
     runtime_consumers_quiesced=0
+  }
+
+  aoa_release_abyss_stack_mcp_effect_request_drain() {
+    if [[ -n "$effect_request_drain_lock_fd" ]]; then
+      exec {effect_request_drain_lock_fd}>&-
+      effect_request_drain_lock_fd=""
+    fi
   }
 
   aoa_quiesce_abyss_stack_mcp_runtime_consumers() {
@@ -2054,6 +2099,19 @@ aoa_provision_abyss_stack_mcp_runtime() {
           ;;
       esac
     done
+    [[ -f "$abyss_stack_mcp_effect_request_drain_lock" && \
+       ! -L "$abyss_stack_mcp_effect_request_drain_lock" && \
+       "$(stat -c '%a' "$abyss_stack_mcp_effect_request_drain_lock")" == "600" ]] || \
+      return 1
+    exec {effect_request_drain_lock_fd}<> \
+      "$abyss_stack_mcp_effect_request_drain_lock"
+    if ! /usr/bin/flock \
+      --exclusive \
+      --timeout 130 \
+      "$effect_request_drain_lock_fd"; then
+      aoa_release_abyss_stack_mcp_effect_request_drain
+      return 1
+    fi
     runtime_consumers_quiesced=1
     systemctl --user stop "${runtime_consumer_units[@]}" || return 1
     for consumer_unit in "${runtime_consumer_units[@]}"; do
@@ -2188,6 +2246,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
           >&2
       fi
     fi
+    aoa_release_abyss_stack_mcp_effect_request_drain
     exit "$exit_status"
   }
 
@@ -2628,6 +2687,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
   if ! aoa_restore_abyss_stack_mcp_runtime_consumers; then
     aoa_die "failed to restore active MCP runtime consumers after repair"
   fi
+  aoa_release_abyss_stack_mcp_effect_request_drain
   trap - EXIT HUP INT TERM
   aoa_note "provisioned abyss-stack MCP runtime for deployed source ${source_digest} and lock ${lock_digest}"
 }
@@ -2925,6 +2985,7 @@ aoa_link_runtime_lifecycle_dropin() {
 if ((link_all_user_units)); then
   [[ -f "$unit_manifest" ]] || aoa_die "managed user-unit manifest not found: ${unit_manifest}"
   aoa_provision_abyss_stack_mcp_unit_operation_lock
+  aoa_provision_abyss_stack_mcp_effect_root
   while IFS= read -r unit_name || [[ -n "$unit_name" ]]; do
     unit_name="${unit_name%%#*}"
     unit_name="${unit_name#"${unit_name%%[![:space:]]*}"}"

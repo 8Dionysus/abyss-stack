@@ -1937,6 +1937,8 @@ esac
                 / "internal-effects"
                 / "read-restart-pilot"
             )
+            effect_execution_lock = effect_root / ".execute.lock"
+            effect_request_drain_lock = effect_root / ".request-drain.lock"
             first_identity = marker.read_text(encoding="utf-8").strip()
             self.assertRegex(first_identity, r"\A[0-9a-f]{64}:[0-9a-f]{64}\Z")
             first_content_digest = content_marker.read_text(encoding="utf-8").strip()
@@ -1979,6 +1981,13 @@ esac
             self.assertEqual(runtime_lock.stat().st_mode & 0o777, 0o600)
             self.assertTrue(operation_lock.is_file())
             self.assertEqual(operation_lock.stat().st_mode & 0o777, 0o600)
+            self.assertTrue(effect_execution_lock.is_file())
+            self.assertEqual(effect_execution_lock.stat().st_mode & 0o777, 0o600)
+            self.assertTrue(effect_request_drain_lock.is_file())
+            self.assertEqual(
+                effect_request_drain_lock.stat().st_mode & 0o777,
+                0o600,
+            )
             self.assertTrue(source_projection_lock.is_file())
             self.assertEqual(
                 source_projection_lock.stat().st_mode & 0o777,
@@ -2486,24 +2495,78 @@ esac
 
             source_file.write_text("VALUE = repair_success\n", encoding="utf-8")
             systemctl_log.write_text("", encoding="utf-8")
-            successful_repair = subprocess.run(
-                repair_command,
-                cwd=REPO_ROOT,
-                env={
-                    **env,
-                    "ABYSS_STACK_MCP_TEST_ACTIVE_UNITS": (
-                        "abyss-stack-mcp-read.service "
-                        "abyss-stack-mcp-candidate.service "
-                        "aoa-memo-mcp-candidate.service"
-                    ),
-                    "ABYSS_STACK_MCP_TEST_ACTIVE_ORGAN_UNITS": (
-                        "aoa-organ-mcp-read@aoa-memo.service"
-                    ),
-                },
-                check=False,
-                capture_output=True,
-                text=True,
+            active_effect_marker = root / "active-effect-request"
+            active_effect = subprocess.Popen(
+                [
+                    "/usr/bin/flock",
+                    "--shared",
+                    "--no-fork",
+                    str(effect_request_drain_lock),
+                    "/usr/bin/sh",
+                    "-c",
+                    ': > "$1"; exec /usr/bin/sleep 10',
+                    "_",
+                    str(active_effect_marker),
+                ]
             )
+            try:
+                deadline = time.monotonic() + 2
+                while (
+                    not active_effect_marker.exists()
+                    and active_effect.poll() is None
+                    and time.monotonic() < deadline
+                ):
+                    time.sleep(0.01)
+                self.assertTrue(active_effect_marker.exists())
+                successful_repair_process = subprocess.Popen(
+                    repair_command,
+                    cwd=REPO_ROOT,
+                    env={
+                        **env,
+                        "ABYSS_STACK_MCP_TEST_ACTIVE_UNITS": (
+                            "abyss-stack-mcp-read.service "
+                            "abyss-stack-mcp-candidate.service "
+                            "abyss-stack-mcp-internal-effect.service "
+                            "aoa-memo-mcp-candidate.service"
+                        ),
+                        "ABYSS_STACK_MCP_TEST_ACTIVE_ORGAN_UNITS": (
+                            "aoa-organ-mcp-read@aoa-memo.service"
+                        ),
+                    },
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                deadline = time.monotonic() + 5
+                while (
+                    "pip-require-hashes"
+                    not in systemctl_log.read_text(encoding="utf-8")
+                    and successful_repair_process.poll() is None
+                    and time.monotonic() < deadline
+                ):
+                    time.sleep(0.02)
+                self.assertIsNone(successful_repair_process.poll())
+                self.assertFalse(
+                    any(
+                        event.startswith("--user stop ")
+                        for event in systemctl_log.read_text(
+                            encoding="utf-8"
+                        ).splitlines()
+                    )
+                )
+                active_effect.terminate()
+                active_effect.wait(timeout=5)
+                stdout, stderr = successful_repair_process.communicate(timeout=10)
+                successful_repair = subprocess.CompletedProcess(
+                    repair_command,
+                    successful_repair_process.returncode,
+                    stdout,
+                    stderr,
+                )
+            finally:
+                if active_effect.poll() is None:
+                    active_effect.terminate()
+                    active_effect.wait(timeout=5)
             self.assertEqual(
                 successful_repair.returncode,
                 0,
@@ -2541,9 +2604,13 @@ esac
             memo_candidate_restart = successful_repair_events.index(
                 "--user start aoa-memo-mcp-candidate.service"
             )
+            effect_restart = successful_repair_events.index(
+                "--user start abyss-stack-mcp-internal-effect.service"
+            )
             self.assertLess(read_stop, fallback_start)
             self.assertLess(fallback_start, stack_candidate_restart)
             self.assertLess(fallback_start, memo_candidate_restart)
+            self.assertLess(fallback_start, effect_restart)
             repair_fallback = (
                 admission_root / "runtime-repair-fallback.units"
             )
@@ -4269,13 +4336,18 @@ esac
         cleanup_start = script.index("cleanup_recovery()")
         cleanup_end = script.index("trap cleanup_recovery EXIT")
         cleanup = script[cleanup_start:cleanup_end]
-        self.assertIn('if [[ "$production_handoff_started" -eq 1 ]]', cleanup)
+        self.assertIn(
+            'if [[ "$production_handoff_state" == "started" ]]', cleanup
+        )
         self.assertIn('systemctl --user stop "${production_units[@]}"', cleanup)
+        self.assertIn(
+            'if [[ "$production_handoff_state" != "committed"', cleanup
+        )
         close_locks = cleanup.index("close_stack_runtime_locks")
         restore_fallback = cleanup.index("restore_runtime_repair_fallback")
         self.assertLess(close_locks, restore_fallback)
 
-        handoff_start = script.index("production_handoff_started=1")
+        handoff_start = script.index('production_handoff_state="started"')
         production_start = script.index(
             'systemctl --user start "${production_units[@]}"', handoff_start
         )
@@ -4290,7 +4362,7 @@ esac
             production_catalog,
         )
         handoff_complete = script.index(
-            "production_handoff_started=0", registry_validation
+            'production_handoff_state="committed"', registry_validation
         )
         fallback_complete = script.index(
             "complete_runtime_repair_fallback", registry_validation
@@ -4299,9 +4371,8 @@ esac
         self.assertLess(production_start, final_publication)
         self.assertLess(final_publication, production_catalog)
         self.assertLess(production_catalog, registry_validation)
-        self.assertLess(registry_validation, fallback_complete)
-        self.assertLess(fallback_complete, handoff_complete)
         self.assertLess(registry_validation, handoff_complete)
+        self.assertLess(handoff_complete, fallback_complete)
 
         repair_unit = STACK_MCP_RUNTIME_REPAIR_UNIT.read_text(encoding="utf-8")
         self.assertIn("--repair-abyss-stack-mcp-runtime", repair_unit)

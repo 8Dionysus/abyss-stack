@@ -86,7 +86,11 @@ may proceed; representative production/bootstrap/fallback organ instances also
 prove the loaded template generation. A
 dependency or build failure therefore leaves every live plane untouched; a
 post-quiesce activation failure restores the previous runtime, every reader,
-and every non-read consumer that had been active. Before quiescence, repair issues a
+and every non-read consumer that had been active. Before stopping the
+internal-effect endpoint, repair exclusively drains its private request gate;
+an already accepted worker retains the shared side until its mandatory rollback
+and receipt are complete, while later requests cannot enter execution. Before
+read-plane quiescence, repair issues a
 private rollback grant bound to the exact measured content and recorded identity
 of the still-running runtime. Only the read contour may consume that grant after
 rollback; candidate, internal-effect, and general verification remain strict,

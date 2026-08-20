@@ -21,7 +21,9 @@ Tracking starts with the community-docs baseline for this repository.
   direct shared-venv consumer, provisions the operation lock during unit
   installation, and restores the previous runtime plus every active reader if
   final activation fails. The stack peer uses an exact, private, read-only
-  rollback grant. After activation, exact repair-fallback peers preserve the prior
+  rollback grant. An internal-effect request drain now lets an accepted effect
+  finish its mandatory rollback and receipt before repair stops that endpoint.
+  After activation, exact repair-fallback peers preserve the prior
   endpoint set until admission commits the production handoff; a later
   admission failure restores that fallback instead of leaving the fleet down.
 - Make the Intel OVMS cutover safe for first launch and upgrades: link and
