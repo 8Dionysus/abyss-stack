@@ -2480,7 +2480,7 @@ esac
             )
             self.assertNotEqual(blocked_by_fallback.returncode, 0)
             self.assertIn(
-                "an unresolved MCP runtime-repair fallback already exists",
+                "unresolved MCP runtime-repair fallback is not active",
                 blocked_by_fallback.stderr,
             )
             self.assertFalse(
@@ -2491,7 +2491,53 @@ esac
                     ).splitlines()
                 )
             )
+
+            systemctl_log.write_text("", encoding="utf-8")
+            resumed_fallback = subprocess.run(
+                repair_command,
+                cwd=REPO_ROOT,
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_ACTIVE_UNIT": (
+                        "abyss-stack-mcp-read-fallback.service"
+                    ),
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                resumed_fallback.returncode,
+                0,
+                resumed_fallback.stderr,
+            )
+            resumed_fallback_events = systemctl_log.read_text(
+                encoding="utf-8"
+            ).splitlines()
+            resumed_stop_index = next(
+                index
+                for index, event in enumerate(resumed_fallback_events)
+                if event.startswith("--user stop ")
+                and "abyss-stack-mcp-read-fallback.service" in event
+            )
+            resumed_start_index = resumed_fallback_events.index(
+                "--user start abyss-stack-mcp-read-fallback.service"
+            )
+            self.assertLess(resumed_stop_index, resumed_start_index)
+            self.assertEqual(
+                unresolved_fallback.read_text(encoding="utf-8").splitlines(),
+                ["abyss-stack-mcp-read-fallback.service"],
+            )
+            self.assertNotEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
             unresolved_fallback.unlink()
+            for unit_state_marker in (
+                *systemctl_state.glob("*.started"),
+                *systemctl_state.glob("*.stopped"),
+            ):
+                unit_state_marker.unlink()
 
             source_file.write_text("VALUE = repair_success\n", encoding="utf-8")
             systemctl_log.write_text("", encoding="utf-8")

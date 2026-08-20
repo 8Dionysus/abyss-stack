@@ -2044,6 +2044,11 @@ aoa_provision_abyss_stack_mcp_runtime() {
   local organ_unit=""
   local -a active_organ_read_units=()
   local -a repair_fallback_units=()
+  local unresolved_repair_fallback=0
+  local unresolved_fallback_unit=""
+  local seen_fallback_unit=""
+  local fallback_unit_matched=0
+  local -a unresolved_repair_fallback_units=()
   local -a runtime_consumer_units=(
     abyss-stack-mcp-candidate.service
     abyss-stack-mcp-internal-effect.service
@@ -2562,7 +2567,30 @@ aoa_provision_abyss_stack_mcp_runtime() {
   if [[ "$provision_mode" == "repair" ]]; then
     if [[ -e "$abyss_stack_mcp_repair_fallback" || \
           -L "$abyss_stack_mcp_repair_fallback" ]]; then
-      aoa_die "an unresolved MCP runtime-repair fallback already exists"
+      [[ -f "$abyss_stack_mcp_repair_fallback" && \
+         ! -L "$abyss_stack_mcp_repair_fallback" ]] || \
+        aoa_die "unresolved MCP runtime-repair fallback marker must be a regular non-symlink file"
+      [[ "$(stat -c '%a' "$abyss_stack_mcp_repair_fallback")" == "600" ]] || \
+        aoa_die "unresolved MCP runtime-repair fallback marker must use mode 0600"
+      while IFS= read -r unresolved_fallback_unit || \
+            [[ -n "$unresolved_fallback_unit" ]]; do
+        [[ "$unresolved_fallback_unit" == \
+             "abyss-stack-mcp-read-fallback.service" || \
+           "$unresolved_fallback_unit" =~ \
+             ^aoa-organ-mcp-read-fallback@[A-Za-z0-9_.-]+\.service$ ]] || \
+          aoa_die "unresolved MCP runtime-repair fallback marker contains an unsafe unit"
+        for seen_fallback_unit in \
+          "${unresolved_repair_fallback_units[@]}"; do
+          [[ "$seen_fallback_unit" != "$unresolved_fallback_unit" ]] || \
+            aoa_die "unresolved MCP runtime-repair fallback marker contains a duplicate unit"
+        done
+        systemctl --user is-active --quiet "$unresolved_fallback_unit" || \
+          aoa_die "unresolved MCP runtime-repair fallback is not active: ${unresolved_fallback_unit}"
+        unresolved_repair_fallback_units+=("$unresolved_fallback_unit")
+      done < "$abyss_stack_mcp_repair_fallback"
+      ((${#unresolved_repair_fallback_units[@]})) || \
+        aoa_die "unresolved MCP runtime-repair fallback marker is empty"
+      unresolved_repair_fallback=1
     fi
     if ! aoa_quiesce_abyss_stack_mcp_runtime_consumers; then
       aoa_die "failed to quiesce the shared-runtime MCP consumers for activation"
@@ -2610,6 +2638,23 @@ aoa_provision_abyss_stack_mcp_runtime() {
         abyss-stack-mcp-read-fallback.service
         "${repair_fallback_units[@]}"
       )
+    fi
+    if ((unresolved_repair_fallback)); then
+      ((${#unresolved_repair_fallback_units[@]} == \
+         ${#repair_fallback_units[@]})) || \
+        aoa_die "unresolved MCP runtime-repair fallback does not match the exact active fallback set"
+      for unresolved_fallback_unit in \
+        "${unresolved_repair_fallback_units[@]}"; do
+        fallback_unit_matched=0
+        for seen_fallback_unit in "${repair_fallback_units[@]}"; do
+          if [[ "$seen_fallback_unit" == "$unresolved_fallback_unit" ]]; then
+            fallback_unit_matched=1
+            break
+          fi
+        done
+        ((fallback_unit_matched)) || \
+          aoa_die "unresolved MCP runtime-repair fallback does not match the exact active fallback set"
+      done
     fi
     if ((read_unit_was_active || bootstrap_unit_was_active || fallback_unit_was_active)); then
       observed_content_digest="$(
