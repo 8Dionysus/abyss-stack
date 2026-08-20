@@ -5,6 +5,7 @@ import hashlib
 import importlib
 import json
 import os
+import signal
 import shutil
 import socket
 import subprocess
@@ -1292,6 +1293,11 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "fi\n"
                 'if [[ "$1" == "-m" && "$2" == "pip" ]]; then\n'
                 '  printf \'%s\\n\' "$*" >> "$ABYSS_STACK_MCP_TEST_PIP_LOG"\n'
+                '  if [[ -n "${ABYSS_STACK_MCP_TEST_BLOCK_INSTALL:-}" && '
+                '"$*" == *"--require-hashes"* ]]; then\n'
+                '    : > "$ABYSS_STACK_MCP_TEST_BLOCK_INSTALL"\n'
+                "    sleep 300\n"
+                "  fi\n"
                 '  if [[ "$*" == *"--require-hashes"* ]]; then\n'
                 '    package_root="$(dirname "$0")/../lib/python/site-packages/'
                 'test_package"\n'
@@ -1491,6 +1497,41 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                         missing_prerequisite.stderr,
                     )
                     self.assertFalse(pip_log.exists())
+
+            blocked_install_marker = root / "blocked-install"
+            blocking = subprocess.Popen(
+                command,
+                cwd=REPO_ROOT,
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_BLOCK_INSTALL": str(
+                        blocked_install_marker
+                    ),
+                },
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                start_new_session=True,
+            )
+            try:
+                deadline = time.monotonic() + 5
+                while (
+                    not blocked_install_marker.exists()
+                    and blocking.poll() is None
+                    and time.monotonic() < deadline
+                ):
+                    time.sleep(0.02)
+                self.assertTrue(blocked_install_marker.exists())
+                staging_root = stack_root / "Services" / "abyss-stack-mcp"
+                self.assertTrue(list(staging_root.glob(".venv.*")))
+                os.killpg(blocking.pid, signal.SIGTERM)
+                blocking.communicate(timeout=5)
+            finally:
+                if blocking.poll() is None:
+                    os.killpg(blocking.pid, signal.SIGKILL)
+                    blocking.communicate(timeout=5)
+            self.assertEqual(blocking.returncode, 143)
+            self.assertEqual(list(staging_root.glob(".venv.*")), [])
 
             first = subprocess.run(
                 command,

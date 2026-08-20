@@ -1631,6 +1631,30 @@ aoa_provision_abyss_stack_mcp_runtime() {
   local temp_venv=""
   local backup_venv=""
   local resolved_bootstrap_python=""
+
+  aoa_cleanup_abyss_stack_mcp_runtime_stage() {
+    local exit_status="${1:-1}"
+
+    trap - EXIT HUP INT TERM
+    if [[ -n "$temp_venv" && \
+          "$temp_venv" == "${abyss_stack_mcp_runtime_root}/.venv."* && \
+          -d "$temp_venv" && ! -L "$temp_venv" ]]; then
+      rm -rf -- "$temp_venv"
+    fi
+    if [[ -n "$backup_venv" && \
+          "$backup_venv" == "${abyss_stack_mcp_runtime_root}/.venv.previous."* && \
+          -d "$backup_venv" && ! -L "$backup_venv" ]]; then
+      if [[ ! -e "$abyss_stack_mcp_venv" && ! -L "$abyss_stack_mcp_venv" ]]; then
+        mv -- "$backup_venv" "$abyss_stack_mcp_venv" || \
+          printf '%s\n' \
+            'failed to restore the previous abyss-stack MCP runtime during cleanup' \
+            >&2
+      else
+        rm -rf -- "$backup_venv"
+      fi
+    fi
+    exit "$exit_status"
+  }
   local runtime_lock_fd=""
   local source_lock_fd=""
 
@@ -1777,6 +1801,10 @@ aoa_provision_abyss_stack_mcp_runtime() {
   fi
 
   temp_venv="$(mktemp -d "${abyss_stack_mcp_runtime_root}/.venv.XXXXXX")"
+  trap 'aoa_cleanup_abyss_stack_mcp_runtime_stage "$?"' EXIT
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
   if ! aoa_run_isolated_python \
     "$abyss_stack_mcp_bootstrap_python" -m venv --copies "$temp_venv"; then
     rm -rf -- "$temp_venv"
@@ -1888,9 +1916,12 @@ aoa_provision_abyss_stack_mcp_runtime() {
     rm -rf -- "$temp_venv"
     aoa_die "failed to activate the provisioned abyss-stack MCP runtime"
   fi
+  temp_venv=""
   if [[ -n "$backup_venv" && -d "$backup_venv" ]]; then
     rm -rf -- "$backup_venv"
   fi
+  backup_venv=""
+  trap - EXIT HUP INT TERM
   exec {runtime_lock_fd}>&-
   exec {source_lock_fd}>&-
   aoa_note "provisioned abyss-stack MCP runtime for deployed source ${source_digest} and lock ${lock_digest}"
