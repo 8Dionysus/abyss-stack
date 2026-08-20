@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 5562367,
+  "allowed_tracked_bytes": 36249967,
+  "approved_by": "repository-owner",
+  "base_ref": "b40fe4a92aa42a8c2abaf52895c1934576f3bedc",
+  "changed_generated_bytes": 5562367,
+  "changed_generated_files": 62,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "eb76c0b96536ddcbb0e80b8191a2580a948f9989719ad4b4c9a94f7bfe38fe0c",
+  "reason": "Index the detached external actor clock bounded dispatch and error evidence follow-up on latest main.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36249967,
+  "tracked_bytes_max": 24117248
+}
