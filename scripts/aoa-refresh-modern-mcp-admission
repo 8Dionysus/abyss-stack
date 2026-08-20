@@ -9,6 +9,7 @@ AUTO_REPAIR_MARKER="$STACK/Secrets/Configs/abyss-stack-mcp-runtime-auto-repair.e
 OPERATION_LOCK="$STACK/Services/abyss-stack-mcp/.runtime-operation.lock"
 SOURCE_LOCK="$STACK/Services/abyss-stack-mcp/.source-projection.lock"
 RUNTIME_LOCK="$STACK/Services/abyss-stack-mcp/.runtime-provision.lock"
+REPAIR_FALLBACK="$STACK/Logs/mcp/admission/runtime-repair-fallback.units"
 REGISTRY=/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json
 DEPLOYMENT="$STACK/Logs/mcp/deployments/latest.json"
 TARGETS="$STACK/Configs/mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/runtime-targets.v1.json"
@@ -40,6 +41,8 @@ canary_worker_pids=()
 operation_lock_fd=""
 source_lock_fd=""
 runtime_lock_fd=""
+repair_fallback_loaded=0
+repair_fallback_units=()
 
 case "$CANARY_WORKERS" in
   ''|*[!0-9]*)
@@ -74,6 +77,13 @@ cleanup_recovery() {
   fi
   if [[ -n "$rebase_staging" ]]; then
     rm -f -- "$rebase_staging"
+  fi
+  close_stack_runtime_locks
+  if [[ -e "$REPAIR_FALLBACK" || -L "$REPAIR_FALLBACK" ]]; then
+    restore_runtime_repair_fallback || \
+      printf '%s\n' \
+        'modern MCP admission failed to preserve the runtime-repair fallback' \
+        >&2
   fi
 }
 
@@ -222,6 +232,59 @@ lock_stack_runtime_consumers() {
   /usr/bin/flock --shared "$runtime_lock_fd"
 }
 
+close_stack_runtime_locks() {
+  if [[ -n "$runtime_lock_fd" ]]; then
+    exec {runtime_lock_fd}>&-
+    runtime_lock_fd=""
+  fi
+  if [[ -n "$source_lock_fd" ]]; then
+    exec {source_lock_fd}>&-
+    source_lock_fd=""
+  fi
+  if [[ -n "$operation_lock_fd" ]]; then
+    exec {operation_lock_fd}>&-
+    operation_lock_fd=""
+  fi
+}
+
+load_runtime_repair_fallback() {
+  local fallback_unit
+
+  [[ -f "$REPAIR_FALLBACK" && ! -L "$REPAIR_FALLBACK" ]] || return 1
+  [[ "$(stat -c '%a' "$REPAIR_FALLBACK")" == "600" ]] || return 1
+  repair_fallback_units=()
+  while IFS= read -r fallback_unit || [[ -n "$fallback_unit" ]]; do
+    [[ "$fallback_unit" == "abyss-stack-mcp-read-fallback.service" || \
+       "$fallback_unit" =~ ^aoa-organ-mcp-read-fallback@[A-Za-z0-9_.-]+\.service$ ]] || \
+      return 1
+    repair_fallback_units+=("$fallback_unit")
+  done < "$REPAIR_FALLBACK"
+  ((${#repair_fallback_units[@]})) || return 1
+  repair_fallback_loaded=1
+}
+
+restore_runtime_repair_fallback() {
+  if [[ "$repair_fallback_loaded" -ne 1 ]]; then
+    load_runtime_repair_fallback || return 1
+  fi
+  systemctl --user reset-failed "${repair_fallback_units[@]}" \
+    >/dev/null 2>&1 || true
+  systemctl --user start "${repair_fallback_units[@]}"
+}
+
+complete_runtime_repair_fallback() {
+  if [[ ! -e "$REPAIR_FALLBACK" && ! -L "$REPAIR_FALLBACK" ]]; then
+    return 0
+  fi
+  load_runtime_repair_fallback || {
+    printf '%s\n' 'modern MCP runtime-repair fallback marker is unsafe' >&2
+    return 1
+  }
+  rm -f -- "$REPAIR_FALLBACK"
+  repair_fallback_loaded=0
+  repair_fallback_units=()
+}
+
 rebase_expired_registry() {
   local now_iso
   local expiry_iso
@@ -324,6 +387,12 @@ flock --exclusive "$refresh_lock_fd"
 
 ensure_stack_runtime_ready
 lock_stack_runtime_consumers
+if [[ -e "$REPAIR_FALLBACK" || -L "$REPAIR_FALLBACK" ]]; then
+  load_runtime_repair_fallback || {
+    printf '%s\n' 'modern MCP runtime-repair fallback marker is unsafe' >&2
+    exit 1
+  }
+fi
 
 now_epoch=$(date -u +%s)
 deployment_manifest_id=$(jq -er .manifest_id "$DEPLOYMENT")
@@ -363,6 +432,7 @@ fi
 
 if [[ "$production_admission_reusable" -eq 1 \
       && "$active_unit_count" -eq 11 ]]; then
+  complete_runtime_repair_fallback
   exit 0
 fi
 
@@ -413,4 +483,5 @@ build_preflight production
 
 "$VENV/aoa" organs registry-v2-validate "$REGISTRY"
 ln -sfn "runs/${RUN##*/}/report-production.json" "$ROOT/latest-report.json"
+complete_runtime_repair_fallback
 production_handoff_started=0

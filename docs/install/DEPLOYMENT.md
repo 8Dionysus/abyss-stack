@@ -301,8 +301,11 @@ been active. The stack-reader restart is admitted only by a private, mode-0600
 rollback grant issued before quiescence and bound to the previous runtime's exact
 measured content plus recorded identity. The grant is valid only for the read
 contour; successful replacement deletes it, and candidate/internal-effect remain
-strict. The admission service later performs its normal fleet-wide evidence
-handoff and production start.
+strict. Successful activation starts exact repair-fallback counterparts for the
+previously active endpoint set and records a private fallback list. The
+admission service later performs its normal fleet-wide evidence handoff and
+production start, removes the list only after final validation, and restores
+the fallback on every intervening failure.
 `scripts/aoa-install-systemd --all-user-units` creates or validates the private
 operation lock before unit reload, including upgrades where runtime provisioning
 is not rerun.

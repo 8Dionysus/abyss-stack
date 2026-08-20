@@ -84,7 +84,9 @@ and every reader that had been active. Before quiescence, repair issues a
 private rollback grant bound to the exact measured content and recorded identity
 of the still-running runtime. Only the read contour may consume that grant after
 rollback; candidate, internal-effect, and general verification remain strict,
-and successful replacement removes the grant.
+and successful replacement removes the grant. Exact repair-fallback counterparts for
+the prior active endpoint set then remain live until admission validates and
+commits production; a later admission failure restores that fallback.
 Provisioning also creates the separate read/candidate policy audit journals
 when absent and never truncates them. Verification checks their regular-file,
 non-symlink, private-mode, and bounded-size shape without repairing it. Manual

@@ -121,6 +121,9 @@ uses an exact, private, read-only rollback grant. The repair still refuses an
 independently active candidate or internal-effect plane and unsafe source,
 operation lock, runtime lock, journal, runtime path, or unit topology without
 taking the working read fleet down.
+Successful activation starts exact repair-fallback counterparts for the prior active
+endpoint set. Admission removes their private fallback list only after the
+production handoff validates, and restores those peers on any later failure.
 The all-user-unit route creates or validates the private operation lock before
 linking upgraded units.
 

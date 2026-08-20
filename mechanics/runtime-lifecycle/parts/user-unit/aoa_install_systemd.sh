@@ -379,6 +379,7 @@ abyss_stack_mcp_observation_root="${AOA_STACK_ROOT}/Logs/mcp/observations"
 abyss_stack_mcp_observation_path="${abyss_stack_mcp_observation_root}/current.json"
 abyss_stack_mcp_observation_overlay_path="${abyss_stack_mcp_observation_root}/evidence-overlay.json"
 abyss_stack_mcp_admission_root="${AOA_STACK_ROOT}/Logs/mcp/admission"
+abyss_stack_mcp_repair_fallback="${abyss_stack_mcp_admission_root}/runtime-repair-fallback.units"
 abyss_stack_mcp_keeper_inbox_root="${abyss_stack_mcp_admission_root}/keeper-inbox"
 abyss_stack_mcp_preflight_root="${AOA_STACK_ROOT}/Logs/mcp/preflight"
 abyss_stack_mcp_protocol_watch_root="${AOA_STACK_ROOT}/Logs/mcp/protocol-watch"
@@ -1244,6 +1245,7 @@ aoa_require_abyss_stack_mcp_units_stopped_for_rotation() {
   for unit in \
     abyss-stack-mcp-read.service \
     abyss-stack-mcp-read-bootstrap.service \
+    abyss-stack-mcp-read-fallback.service \
     abyss-stack-mcp-candidate.service \
     abyss-stack-mcp-internal-effect.service; do
     if ! active_state="$(
@@ -1380,13 +1382,15 @@ aoa_require_abyss_stack_mcp_units_stopped() {
   for unit in \
     abyss-stack-mcp-read.service \
     abyss-stack-mcp-read-bootstrap.service \
+    abyss-stack-mcp-read-fallback.service \
     abyss-stack-mcp-candidate.service \
     abyss-stack-mcp-internal-effect.service; do
     unit_contour="${unit#abyss-stack-mcp-}"
     unit_contour="${unit_contour%.service}"
     if [[ "$unit_contour" == "internal-effect" ]]; then
       unit_contour="internal_effect"
-    elif [[ "$unit_contour" == "read-bootstrap" ]]; then
+    elif [[ "$unit_contour" == "read-bootstrap" || \
+            "$unit_contour" == "read-fallback" ]]; then
       unit_contour="read"
     fi
     expected_unit_source="${AOA_CONFIGS_ROOT}/systemd/user/${unit}"
@@ -1466,7 +1470,8 @@ aoa_require_abyss_stack_mcp_units_stopped() {
       active)
         if [[ "$allow_active_read_units" -eq 1 && \
               ("$unit" == "abyss-stack-mcp-read.service" || \
-               "$unit" == "abyss-stack-mcp-read-bootstrap.service") ]]; then
+               "$unit" == "abyss-stack-mcp-read-bootstrap.service" || \
+               "$unit" == "abyss-stack-mcp-read-fallback.service") ]]; then
           continue
         fi
         abyss_stack_mcp_units_error="refusing to replace abyss-stack MCP runtime while ${unit} is ${unit_state}"
@@ -1920,10 +1925,14 @@ aoa_provision_abyss_stack_mcp_runtime() {
   local resolved_bootstrap_python=""
   local read_unit_was_active=0
   local bootstrap_unit_was_active=0
+  local fallback_unit_was_active=0
   local read_fleet_quiesced=0
+  local runtime_activated=0
   local organ_units_output=""
   local organ_unit=""
   local -a active_organ_read_units=()
+  local -a repair_fallback_units=()
+  local fallback_marker_temp=""
   local operation_lock_fd=""
   local runtime_lock_fd=""
   local source_lock_fd=""
@@ -1962,6 +1971,11 @@ aoa_provision_abyss_stack_mcp_runtime() {
             "${abyss_stack_mcp_runtime_root}/.read-repair-rollback-grant."* ]]; then
       rm -f -- "$rollback_grant_temp"
     fi
+    if [[ -n "$fallback_marker_temp" && \
+          "$fallback_marker_temp" == \
+            "${abyss_stack_mcp_admission_root}/.runtime-repair-fallback."* ]]; then
+      rm -f -- "$fallback_marker_temp"
+    fi
     if [[ -n "$runtime_lock_fd" ]]; then
       exec {runtime_lock_fd}>&-
       runtime_lock_fd=""
@@ -1975,24 +1989,39 @@ aoa_provision_abyss_stack_mcp_runtime() {
       operation_lock_fd=""
     fi
     if ((read_fleet_quiesced)); then
-      if ((read_unit_was_active)) && \
-         ! systemctl --user start abyss-stack-mcp-read.service; then
-        printf '%s\n' \
-          'failed to restore abyss-stack MCP production read service during repair cleanup' \
-          >&2
-      fi
-      if ((bootstrap_unit_was_active)) && \
-         ! systemctl --user start abyss-stack-mcp-read-bootstrap.service; then
-        printf '%s\n' \
-          'failed to restore abyss-stack MCP bootstrap read service during repair cleanup' \
-          >&2
-      fi
-      for organ_unit in "${active_organ_read_units[@]}"; do
-        if ! systemctl --user start "$organ_unit"; then
-          printf 'failed to restore active MCP reader %s during repair cleanup\n' \
-            "$organ_unit" >&2
+      if ((runtime_activated)); then
+        if ((${#repair_fallback_units[@]})) && \
+           ! systemctl --user start "${repair_fallback_units[@]}"; then
+          printf '%s\n' \
+            'failed to restore the MCP repair fallback after runtime activation' \
+            >&2
         fi
-      done
+      else
+        if ((read_unit_was_active)) && \
+           ! systemctl --user start abyss-stack-mcp-read.service; then
+          printf '%s\n' \
+            'failed to restore abyss-stack MCP production read service during repair cleanup' \
+            >&2
+        fi
+        if ((bootstrap_unit_was_active)) && \
+           ! systemctl --user start abyss-stack-mcp-read-bootstrap.service; then
+          printf '%s\n' \
+            'failed to restore abyss-stack MCP bootstrap read service during repair cleanup' \
+            >&2
+        fi
+        if ((fallback_unit_was_active)) && \
+           ! systemctl --user start abyss-stack-mcp-read-fallback.service; then
+          printf '%s\n' \
+            'failed to restore abyss-stack MCP fallback read service during repair cleanup' \
+            >&2
+        fi
+        for organ_unit in "${active_organ_read_units[@]}"; do
+          if ! systemctl --user start "$organ_unit"; then
+            printf 'failed to restore active MCP reader %s during repair cleanup\n' \
+              "$organ_unit" >&2
+          fi
+        done
+      fi
     fi
     exit "$exit_status"
   }
@@ -2290,6 +2319,10 @@ aoa_provision_abyss_stack_mcp_runtime() {
         abyss-stack-mcp-read-bootstrap.service; then
       bootstrap_unit_was_active=1
     fi
+    if systemctl --user is-active --quiet \
+        abyss-stack-mcp-read-fallback.service; then
+      fallback_unit_was_active=1
+    fi
     organ_units_output="$(
       systemctl --user list-units \
         --type=service \
@@ -2297,15 +2330,35 @@ aoa_provision_abyss_stack_mcp_runtime() {
         --no-legend \
         --plain \
         'aoa-organ-mcp-read@*.service' \
-        'aoa-organ-mcp-read-bootstrap@*.service'
+        'aoa-organ-mcp-read-bootstrap@*.service' \
+        'aoa-organ-mcp-read-fallback@*.service'
     )" || aoa_die "failed to enumerate active MCP organ readers before runtime activation"
     while read -r organ_unit _; do
       [[ -n "$organ_unit" ]] || continue
-      [[ "$organ_unit" =~ ^aoa-organ-mcp-read(-bootstrap)?@[A-Za-z0-9_.-]+\.service$ ]] || \
+      [[ "$organ_unit" =~ ^aoa-organ-mcp-read(-(bootstrap|fallback))?@[A-Za-z0-9_.-]+\.service$ ]] || \
         aoa_die "unsafe active MCP organ reader unit name: ${organ_unit}"
       active_organ_read_units+=("$organ_unit")
+      if [[ "$organ_unit" == aoa-organ-mcp-read-fallback@* ]]; then
+        repair_fallback_units+=("$organ_unit")
+      else
+        organ_unit="${organ_unit/aoa-organ-mcp-read-bootstrap@/aoa-organ-mcp-read@}"
+        repair_fallback_units+=(
+          "${organ_unit/aoa-organ-mcp-read@/aoa-organ-mcp-read-fallback@}"
+        )
+      fi
     done <<< "$organ_units_output"
-    if ((read_unit_was_active || bootstrap_unit_was_active)); then
+    if ((read_unit_was_active || bootstrap_unit_was_active || fallback_unit_was_active)); then
+      repair_fallback_units=(
+        abyss-stack-mcp-read-fallback.service
+        "${repair_fallback_units[@]}"
+      )
+    fi
+    if ((${#repair_fallback_units[@]})) && \
+       [[ -e "$abyss_stack_mcp_repair_fallback" || \
+          -L "$abyss_stack_mcp_repair_fallback" ]]; then
+      aoa_die "an unresolved MCP runtime-repair fallback already exists"
+    fi
+    if ((read_unit_was_active || bootstrap_unit_was_active || fallback_unit_was_active)); then
       observed_content_digest="$(
         aoa_digest_abyss_stack_mcp_runtime "$abyss_stack_mcp_venv"
       )" || aoa_die "failed to capture the live abyss-stack MCP rollback runtime"
@@ -2334,6 +2387,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
     if ! systemctl --user stop \
         abyss-stack-mcp-read.service \
         abyss-stack-mcp-read-bootstrap.service \
+        abyss-stack-mcp-read-fallback.service \
         "${active_organ_read_units[@]}"; then
       aoa_die "failed to quiesce the abyss-stack MCP read plane for runtime activation"
     fi
@@ -2359,14 +2413,32 @@ aoa_provision_abyss_stack_mcp_runtime() {
     aoa_die "failed to activate the provisioned abyss-stack MCP runtime"
   fi
   temp_venv=""
+  runtime_activated=1
+  if ((${#repair_fallback_units[@]})); then
+    fallback_marker_temp="$(
+      mktemp \
+        "${abyss_stack_mcp_admission_root}/.runtime-repair-fallback.XXXXXX"
+    )"
+    chmod 0600 "$fallback_marker_temp"
+    printf '%s\n' "${repair_fallback_units[@]}" > "$fallback_marker_temp"
+    mv -- "$fallback_marker_temp" "$abyss_stack_mcp_repair_fallback"
+    fallback_marker_temp=""
+  fi
   rm -f -- "$abyss_stack_mcp_read_rollback_grant"
   if [[ -n "$backup_venv" && -d "$backup_venv" ]]; then
     rm -rf -- "$backup_venv"
   fi
   backup_venv=""
+  exec {runtime_lock_fd}>&-
+  runtime_lock_fd=""
+  if ((${#repair_fallback_units[@]})); then
+    systemctl --user reset-failed "${repair_fallback_units[@]}" \
+      >/dev/null 2>&1 || true
+    systemctl --user start "${repair_fallback_units[@]}" || \
+      aoa_die "failed to start the MCP repair fallback after runtime activation"
+  fi
   read_fleet_quiesced=0
   trap - EXIT HUP INT TERM
-  exec {runtime_lock_fd}>&-
   exec {source_lock_fd}>&-
   exec {operation_lock_fd}>&-
   aoa_note "provisioned abyss-stack MCP runtime for deployed source ${source_digest} and lock ${lock_digest}"

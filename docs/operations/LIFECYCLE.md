@@ -191,7 +191,9 @@ organ readers only after the build is verified. Other direct shared-venv jobs
 hold operation/runtime locks throughout their run. Build failure leaves the
 fleet untouched; post-stop activation failure restores the previous runtime and
 every previously active reader, with the stack peer using an exact, private,
-read-only rollback grant.
+read-only rollback grant. After successful activation, exact repair-fallback peers
+preserve the previously active endpoint set until admission commits production;
+post-repair admission failure restores those peers before returning.
 
 The privileged support allowlist under `systemd/system/managed-units.txt` is
 installed separately:

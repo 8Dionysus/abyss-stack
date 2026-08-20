@@ -56,7 +56,10 @@ a private grant bound to that runtime's exact measured content and recorded
 identity. Only
 the read contour may use the grant to survive source-identity drift after
 rollback; candidate, internal-effect, and general verification stay strict, and
-a successful replacement removes the grant. The admission unit reserves twenty
+a successful replacement removes the grant. Exact repair-fallback counterparts for
+the previously active endpoint set remain available until admission validates
+and commits the production handoff. Any later admission failure restores that
+bounded fallback before returning. The admission unit reserves twenty
 minutes so the bounded ten-minute repair still leaves a separate admission
 budget.
 
@@ -98,6 +101,8 @@ locks or participates in the final reader quiescence.
 - Positive: a post-quiescence activation failure atomically restores the prior
   runtime and every previously active reader; the stack peer uses an exact,
   read-contour-only rollback grant.
+- Positive: failure after successful activation but before admission commit
+  preserves the prior endpoint set through exact repair-fallback counterparts.
 - Positive: Codex starts even when MCP recovery fails or is still running.
 - Tradeoff: a Codex session opened during genuine MCP downtime may retain
   unavailable MCP clients until a later session, but the operator is not locked

@@ -52,6 +52,9 @@ ORGAN_MCP_READ_TEMPLATE = REPO_ROOT / "systemd" / "user" / "aoa-organ-mcp-read@.
 ORGAN_MCP_READ_BOOTSTRAP_TEMPLATE = (
     REPO_ROOT / "systemd" / "user" / "aoa-organ-mcp-read-bootstrap@.service"
 )
+ORGAN_MCP_READ_FALLBACK_TEMPLATE = (
+    REPO_ROOT / "systemd" / "user" / "aoa-organ-mcp-read-fallback@.service"
+)
 MEMO_MCP_CANDIDATE_UNIT = (
     REPO_ROOT / "systemd" / "user" / "aoa-memo-mcp-candidate.service"
 )
@@ -62,6 +65,9 @@ MCP_HTTP_BUNDLE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http.service"
 STACK_MCP_READ_UNIT = REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-read.service"
 STACK_MCP_READ_BOOTSTRAP_UNIT = (
     REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-read-bootstrap.service"
+)
+STACK_MCP_READ_FALLBACK_UNIT = (
+    REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-read-fallback.service"
 )
 STACK_MCP_CANDIDATE_UNIT = (
     REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-candidate.service"
@@ -1552,6 +1558,7 @@ esac
             for source_unit in (
                 STACK_MCP_READ_UNIT,
                 STACK_MCP_READ_BOOTSTRAP_UNIT,
+                STACK_MCP_READ_FALLBACK_UNIT,
                 STACK_MCP_CANDIDATE_UNIT,
                 STACK_MCP_INTERNAL_EFFECT_UNIT,
             ):
@@ -1620,7 +1627,8 @@ esac
                 'contour="${contour%.service}"\n'
                 'if [[ "$contour" == "internal-effect" ]]; then '
                 "contour=internal_effect; fi\n"
-                'if [[ "$contour" == "read-bootstrap" ]]; then '
+                'if [[ "$contour" == "read-bootstrap" || '
+                '"$contour" == "read-fallback" ]]; then '
                 "contour=read; fi\n"
                 "exec_path=/usr/bin/flock\n"
                 'exec_start="/usr/bin/flock --shared --no-fork '
@@ -1984,6 +1992,7 @@ esac
             for active_read_unit in (
                 "abyss-stack-mcp-read.service",
                 "abyss-stack-mcp-read-bootstrap.service",
+                "abyss-stack-mcp-read-fallback.service",
             ):
                 with self.subTest(active_read_unit=active_read_unit):
                     eligible = subprocess.run(
@@ -2134,6 +2143,47 @@ esac
                         rollback_strict.stderr,
                     )
 
+            unresolved_fallback = (
+                admission_root / "runtime-repair-fallback.units"
+            )
+            unresolved_fallback.write_text(
+                "abyss-stack-mcp-read-fallback.service\n",
+                encoding="utf-8",
+            )
+            unresolved_fallback.chmod(0o600)
+            source_file.write_text(
+                "VALUE = unresolved_fallback\n",
+                encoding="utf-8",
+            )
+            systemctl_log.write_text("", encoding="utf-8")
+            blocked_by_fallback = subprocess.run(
+                repair_command,
+                cwd=REPO_ROOT,
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_ACTIVE_UNIT": (
+                        "abyss-stack-mcp-read.service"
+                    ),
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(blocked_by_fallback.returncode, 0)
+            self.assertIn(
+                "an unresolved MCP runtime-repair fallback already exists",
+                blocked_by_fallback.stderr,
+            )
+            self.assertFalse(
+                any(
+                    event.startswith("--user stop ")
+                    for event in systemctl_log.read_text(
+                        encoding="utf-8"
+                    ).splitlines()
+                )
+            )
+            unresolved_fallback.unlink()
+
             source_file.write_text("VALUE = repair_success\n", encoding="utf-8")
             systemctl_log.write_text("", encoding="utf-8")
             successful_repair = subprocess.run(
@@ -2171,6 +2221,24 @@ esac
                 successful_repair_events[stop_event],
             )
             self.assertLess(build_event, stop_event)
+            fallback_start = successful_repair_events.index(
+                "--user start abyss-stack-mcp-read-fallback.service "
+                "aoa-organ-mcp-read-fallback@aoa-memo.service"
+            )
+            self.assertLess(stop_event, fallback_start)
+            repair_fallback = (
+                admission_root / "runtime-repair-fallback.units"
+            )
+            self.assertTrue(repair_fallback.is_file())
+            self.assertFalse(repair_fallback.is_symlink())
+            self.assertEqual(repair_fallback.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(
+                repair_fallback.read_text(encoding="utf-8").splitlines(),
+                [
+                    "abyss-stack-mcp-read-fallback.service",
+                    "aoa-organ-mcp-read-fallback@aoa-memo.service",
+                ],
+            )
             self.assertFalse(rollback_grant.exists())
             self.assertNotEqual(
                 marker.read_text(encoding="utf-8").strip(),
@@ -2178,6 +2246,7 @@ esac
             )
             for stopped_marker in systemctl_state.glob("*.stopped"):
                 stopped_marker.unlink()
+            repair_fallback.unlink()
             source_file.write_text("VALUE = 1\n", encoding="utf-8")
             restored_baseline = subprocess.run(
                 command,
@@ -3448,10 +3517,12 @@ esac
         self.assertIn("aoa-mcp-http@.service", managed_units)
         self.assertIn("aoa-organ-mcp-read@.service", managed_units)
         self.assertIn("aoa-organ-mcp-read-bootstrap@.service", managed_units)
+        self.assertIn("aoa-organ-mcp-read-fallback@.service", managed_units)
         self.assertIn("aoa-memo-mcp-candidate.service", managed_units)
         self.assertIn("aoa-evals-mcp-candidate.service", managed_units)
         self.assertIn("aoa-mcp-http.service", managed_units)
         self.assertIn("abyss-stack-mcp-read-bootstrap.service", managed_units)
+        self.assertIn("abyss-stack-mcp-read-fallback.service", managed_units)
         self.assertIn("abyss-stack-mcp-observation.service", managed_units)
         self.assertIn("abyss-stack-mcp-observation.timer", managed_units)
         self.assertIn("abyss-stack-mcp-runtime-repair.service", managed_units)
@@ -3560,8 +3631,10 @@ esac
     def test_mcp_read_bootstrap_units_are_manual_bounded_and_disjoint(self) -> None:
         organ_production = ORGAN_MCP_READ_TEMPLATE.read_text(encoding="utf-8")
         organ_bootstrap = ORGAN_MCP_READ_BOOTSTRAP_TEMPLATE.read_text(encoding="utf-8")
+        organ_fallback = ORGAN_MCP_READ_FALLBACK_TEMPLATE.read_text(encoding="utf-8")
         stack_production = STACK_MCP_READ_UNIT.read_text(encoding="utf-8")
         stack_bootstrap = STACK_MCP_READ_BOOTSTRAP_UNIT.read_text(encoding="utf-8")
+        stack_fallback = STACK_MCP_READ_FALLBACK_UNIT.read_text(encoding="utf-8")
 
         self.assertIn(
             "Conflicts=aoa-organ-mcp-read-bootstrap@%i.service",
@@ -3620,6 +3693,50 @@ esac
         self.assertIn("IPAddressDeny=any", stack_bootstrap)
         self.assertIn("IPAddressAllow=localhost", stack_bootstrap)
 
+        fallback_marker = (
+            "ConditionPathExists=/srv/AbyssOS/abyss-stack/Logs/mcp/"
+            "admission/runtime-repair-fallback.units"
+        )
+        self.assertIn(
+            "Conflicts=aoa-organ-mcp-read@%i.service "
+            "aoa-organ-mcp-read-bootstrap@%i.service",
+            organ_fallback,
+        )
+        self.assertIn(
+            "Conflicts=abyss-stack-mcp-read.service "
+            "abyss-stack-mcp-read-bootstrap.service",
+            stack_fallback,
+        )
+        for production, fallback in (
+            (organ_production, organ_fallback),
+            (stack_production, stack_fallback),
+        ):
+            production_lines = production.splitlines()
+            fallback_lines = fallback.splitlines()
+            self.assertEqual(
+                [line for line in fallback_lines if line.startswith("ExecStart=")],
+                [line for line in production_lines if line.startswith("ExecStart=")],
+            )
+            self.assertEqual(
+                [
+                    line
+                    for line in fallback_lines
+                    if line.startswith("LoadCredential=")
+                ],
+                [
+                    line
+                    for line in production_lines
+                    if line.startswith("LoadCredential=")
+                ],
+            )
+            self.assertIn(fallback_marker, fallback_lines)
+            self.assertIn("Restart=on-failure", fallback_lines)
+            self.assertNotIn("RuntimeMaxSec=30min", fallback_lines)
+            self.assertNotIn("[Install]", fallback_lines)
+            self.assertNotIn("abyss_stack_mcp.preflight", fallback)
+            self.assertNotIn("managed-contours.json", fallback)
+            self.assertNotIn("organ-registry.v2.source.json", fallback)
+
     def test_modern_mcp_expired_recovery_is_exact_two_phase_and_fail_closed(
         self,
     ) -> None:
@@ -3638,6 +3755,11 @@ esac
         self.assertIn("predecessor_digest=$(sha256sum", script)
         self.assertIn("live_digest=$(sha256sum", script)
         self.assertIn("trap cleanup_recovery EXIT", script)
+        self.assertIn(
+            'REPAIR_FALLBACK="$STACK/Logs/mcp/admission/'
+            'runtime-repair-fallback.units"',
+            script,
+        )
         self.assertIn(
             'CANARY_WORKERS="${ABYSS_MCP_CANARY_WORKERS:-3}"', script
         )
@@ -3752,6 +3874,9 @@ esac
         cleanup = script[cleanup_start:cleanup_end]
         self.assertIn('if [[ "$production_handoff_started" -eq 1 ]]', cleanup)
         self.assertIn('systemctl --user stop "${production_units[@]}"', cleanup)
+        close_locks = cleanup.index("close_stack_runtime_locks")
+        restore_fallback = cleanup.index("restore_runtime_repair_fallback")
+        self.assertLess(close_locks, restore_fallback)
 
         handoff_start = script.index("production_handoff_started=1")
         production_start = script.index(
@@ -3770,10 +3895,15 @@ esac
         handoff_complete = script.index(
             "production_handoff_started=0", registry_validation
         )
+        fallback_complete = script.index(
+            "complete_runtime_repair_fallback", registry_validation
+        )
         self.assertLess(handoff_start, production_start)
         self.assertLess(production_start, final_publication)
         self.assertLess(final_publication, production_catalog)
         self.assertLess(production_catalog, registry_validation)
+        self.assertLess(registry_validation, fallback_complete)
+        self.assertLess(fallback_complete, handoff_complete)
         self.assertLess(registry_validation, handoff_complete)
 
         repair_unit = STACK_MCP_RUNTIME_REPAIR_UNIT.read_text(encoding="utf-8")

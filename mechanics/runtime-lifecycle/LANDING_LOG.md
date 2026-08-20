@@ -53,4 +53,5 @@ quiescence to the final atomic swap. Dependency failure does not stop readers;
 all direct shared-venv consumers are lock-aware, and the final swap enumerates
 the active organ readers. Post-quiesce failure restores the prior runtime and
 every previously active reader; the stack peer uses an exact, private, read-only
-rollback grant.
+rollback grant. Successful activation keeps exact repair-fallback counterparts live
+until admission commits, and any later admission failure restores that fallback.
