@@ -18,8 +18,8 @@ Tracking starts with the community-docs baseline for this repository.
 - Make the Intel OVMS cutover safe for first launch and upgrades: link and
   reload owner units before socket activation, retire only the same-project
   legacy Compose owner, allow the digest-pinned Quadlet image to pull when
-  absent, and mount the socket directory so `RemoveOnStop` recreation reaches
-  the running client.
+  absent, and mount the socket directory read-only so `RemoveOnStop` recreation
+  reaches the running client without exposing a writable admission state.
 - Bind the operator-visible responsibility holder to its own non-replacing
   lifecycle receipt before direct Codex `exec`, distinct from nested proof
   actors. The installed incarnation runtime now closes only that exact

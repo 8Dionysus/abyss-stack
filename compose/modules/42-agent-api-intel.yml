@@ -6,7 +6,7 @@ services:
       OVMS_EMBEDDINGS_API_KEY_FILE: /run/secrets/ovms_api_key
       OVMS_EMBEDDINGS_TIMEOUT_S: "180"
     volumes:
-      - "${XDG_RUNTIME_DIR:-/run/user/${AOA_RUNTIME_UID:-1000}}/abyss-stack:/run/abyss-stack:z"
+      - "${XDG_RUNTIME_DIR:-/run/user/${AOA_RUNTIME_UID:-1000}}/abyss-stack:/run/abyss-stack:ro,z"
     secrets:
       - source: abyss-ovms-api-key
         target: /run/secrets/ovms_api_key
