@@ -1339,6 +1339,222 @@ def test_close_requires_confirmed_handoff_delivery(tmp_path: Path) -> None:
         )
 
 
+def test_non_waking_terminal_join_authorizes_exact_close(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    holder = tmp_path / "holder.json"
+    handoff = tmp_path / "handoff.json"
+    join = tmp_path / "join.json"
+    authorization = tmp_path / "authorization.json"
+    closure = tmp_path / "closure.json"
+    holder_value = {
+        "holder": {"pid": 101},
+        "terminal": {
+            "pid": 202,
+            "argv": ["/usr/bin/kitty", "--title", "canary"],
+            "required_comm": "kitty",
+            "window_id": "7",
+            "dedicated": True,
+        },
+    }
+    holder_bytes = json.dumps(holder_value, sort_keys=True).encode("utf-8")
+    holder.write_bytes(holder_bytes)
+    holder_digest = MODULE.sha256_bytes(holder_bytes)
+    handoff.write_text(
+        json.dumps(
+            {
+                "responsibility_state": "returned",
+                "terminal_status": "completed",
+                "runtime": {
+                    "responsibility_holder": {
+                        "terminal_receipt": str(holder.resolve()),
+                        "terminal_receipt_sha256": holder_digest,
+                        "closure_receipt": str(closure.resolve()),
+                        "holder_pid": 101,
+                        "terminal_pid": 202,
+                        "terminal_action": {
+                            "action": "close_exact_bound_holder",
+                            "required": True,
+                        },
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_load_holder_receipt_snapshot",
+        lambda _path: (holder_value, holder_bytes, holder_digest),
+    )
+    monkeypatch.setattr(
+        MODULE, "_holder_receipt_process_ids", lambda _receipt: (101, 11, 202, 12)
+    )
+
+    assert MODULE.command_join(
+        MODULE.argparse.Namespace(
+            handoff=str(handoff),
+            holder_receipt=str(holder),
+            join_receipt=str(join),
+            authorization=str(authorization),
+            closure_receipt=str(closure),
+        )
+    ) == 0
+    join_value = json.loads(join.read_text(encoding="utf-8"))
+    authorization_value = json.loads(authorization.read_text(encoding="utf-8"))
+    assert join_value["return"] == {
+        "status": "returned",
+        "validated": True,
+        "owner_acceptance": "separate",
+    }
+    assert authorization_value["authorization_kind"] == "join_completed"
+    MODULE._validate_closure_authorization(
+        authorization_path=authorization,
+        handoff_path=handoff,
+        holder_receipt_path=holder,
+        closure_receipt_path=closure,
+        holder_receipt=holder_value,
+        holder_receipt_bytes=holder_bytes,
+        holder_receipt_digest=holder_digest,
+    )
+
+    states = iter(["gone", "gone"])
+    monkeypatch.setattr(
+        MODULE, "_proc_identity_state", lambda _pid, _start: next(states)
+    )
+    assert MODULE.command_close(
+        MODULE.argparse.Namespace(
+            handoff=str(handoff),
+            holder_receipt=str(holder),
+            closure_authorization=str(authorization),
+            closure_receipt=str(closure),
+        )
+    ) == 0
+    closure_value = json.loads(closure.read_text(encoding="utf-8"))
+    assert closure_value["closed"] is True
+    assert closure_value["outcome"] == "already_gone"
+    assert closure_value["authorization_kind"] == "join_completed"
+    assert closure_value["join_receipt_ref"] == str(join.resolve())
+    assert closure_value["trigger"] == "join_after_validated_terminal_return"
+
+
+def test_non_waking_join_requires_return_and_exact_terminal_action(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    holder = tmp_path / "holder.json"
+    handoff = tmp_path / "handoff.json"
+    join = tmp_path / "join.json"
+    authorization = tmp_path / "authorization.json"
+    closure = tmp_path / "closure.json"
+    holder_value = {"holder": {"pid": 101}, "terminal": {"pid": 202}}
+    holder_bytes = json.dumps(holder_value).encode("utf-8")
+    holder.write_bytes(holder_bytes)
+    holder_digest = MODULE.sha256_bytes(holder_bytes)
+    handoff.write_text(
+        json.dumps(
+            {
+                "responsibility_state": "returned",
+                "terminal_status": "completed",
+                "runtime": {
+                    "responsibility_holder": {
+                        "terminal_receipt": str(holder.resolve()),
+                        "terminal_receipt_sha256": holder_digest,
+                        "closure_receipt": str(closure.resolve()),
+                        "holder_pid": 101,
+                        "terminal_pid": 202,
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    holder_digest = MODULE.sha256_bytes(holder_bytes)
+    monkeypatch.setattr(
+        MODULE,
+        "_load_holder_receipt_snapshot",
+        lambda _path: (holder_value, holder_bytes, holder_digest),
+    )
+    monkeypatch.setattr(
+        MODULE, "_holder_receipt_process_ids", lambda _receipt: (101, 11, 202, 12)
+    )
+    with pytest.raises(MODULE.IncarnationHomeError, match="exact bound-holder"):
+        MODULE.command_join(
+            MODULE.argparse.Namespace(
+                handoff=str(handoff),
+                holder_receipt=str(holder),
+                join_receipt=str(join),
+                authorization=str(authorization),
+                closure_receipt=str(closure),
+            )
+        )
+
+
+def test_closure_authorization_rejects_join_evidence_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    holder = tmp_path / "holder.json"
+    handoff = tmp_path / "handoff.json"
+    join = tmp_path / "join.json"
+    authorization = tmp_path / "authorization.json"
+    closure = tmp_path / "closure.json"
+    holder_value = {"holder": {"pid": 101}, "terminal": {"pid": 202}}
+    holder_bytes = json.dumps(holder_value, sort_keys=True).encode("utf-8")
+    holder.write_bytes(holder_bytes)
+    holder_digest = MODULE.sha256_bytes(holder_bytes)
+    handoff.write_text(
+        json.dumps(
+            {
+                "responsibility_state": "returned",
+                "terminal_status": "completed",
+                "runtime": {
+                    "responsibility_holder": {
+                        "terminal_receipt": str(holder.resolve()),
+                        "terminal_receipt_sha256": holder_digest,
+                        "closure_receipt": str(closure.resolve()),
+                        "holder_pid": 101,
+                        "terminal_pid": 202,
+                        "terminal_action": {
+                            "action": "close_exact_bound_holder",
+                            "required": True,
+                        },
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_load_holder_receipt_snapshot",
+        lambda _path: (holder_value, holder_bytes, holder_digest),
+    )
+    monkeypatch.setattr(
+        MODULE, "_holder_receipt_process_ids", lambda _receipt: (101, 11, 202, 12)
+    )
+    MODULE.command_join(
+        MODULE.argparse.Namespace(
+            handoff=str(handoff),
+            holder_receipt=str(holder),
+            join_receipt=str(join),
+            authorization=str(authorization),
+            closure_receipt=str(closure),
+        )
+    )
+    authorization_value = json.loads(authorization.read_text(encoding="utf-8"))
+    authorization_value["evidence_sha256"] = "sha256:" + "0" * 64
+    authorization.write_text(json.dumps(authorization_value), encoding="utf-8")
+    with pytest.raises(MODULE.IncarnationHomeError, match="evidence digest mismatch"):
+        MODULE._validate_closure_authorization(
+            authorization_path=authorization,
+            handoff_path=handoff,
+            holder_receipt_path=holder,
+            closure_receipt_path=closure,
+            holder_receipt=holder_value,
+            holder_receipt_bytes=holder_bytes,
+            holder_receipt_digest=holder_digest,
+        )
+
+
 def test_post_exec_argv_expands_shebang_interpreter(tmp_path: Path) -> None:
     executable = tmp_path / "codex"
     executable.write_text("#!/usr/bin/env python3 -u\n", encoding="utf-8")

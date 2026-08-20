@@ -246,3 +246,7 @@
 ## 2026-08-19
 
 - [ABYSS-STACK-D-0125 Decouple Codex Availability From MCP Recovery](../ABYSS-STACK-D-0125-decouple-codex-availability-from-mcp-recovery.md) (`docs/decisions/ABYSS-STACK-D-0125-decouple-codex-availability-from-mcp-recovery.md`)
+
+## 2026-08-20
+
+- [ABYSS-STACK-D-0126 Typed Visible Holder Closure Authorization](../ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md) (`docs/decisions/ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md`)

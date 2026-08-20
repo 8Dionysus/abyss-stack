@@ -114,6 +114,12 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         "{}\n",
         encoding="utf-8",
     )
+    for schema_name in (
+        "external-codex-holder-terminal-join.schema.json",
+        "external-codex-holder-terminal-closure-authorization.schema.json",
+        "external-codex-holder-terminal-closure.schema.json",
+    ):
+        (schemas / schema_name).write_text("{}\n", encoding="utf-8")
     package = sdk / "src/aoa_sdk"
     (package / "contracts").mkdir(parents=True)
     (package / "__init__.py").write_text("MARKER = 'exact-sdk'\n", encoding="utf-8")
@@ -735,9 +741,13 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
         assert (release_root / "sdk" / relative).is_file()
     for owner, relative in runtime_install.OWNER_CONTRACT_FILES:
         assert (release_root / "owners" / owner / relative).is_file()
-    assert (
-        release_root / "runtime/schemas/external-codex-actor-input-envelope.schema.json"
-    ).is_file()
+    for schema_name in (
+        "external-codex-actor-input-envelope.schema.json",
+        "external-codex-holder-terminal-join.schema.json",
+        "external-codex-holder-terminal-closure-authorization.schema.json",
+        "external-codex-holder-terminal-closure.schema.json",
+    ):
+        assert (release_root / "runtime/schemas" / schema_name).is_file()
     for directory in (release_root / "sdk/src").rglob("*"):
         if directory.is_dir():
             directory.chmod(0o755)

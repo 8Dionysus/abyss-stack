@@ -290,6 +290,10 @@
 - [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
 - [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
 
+## governed-execution
+
+- [ABYSS-STACK-D-0126 Typed Visible Holder Closure Authorization](../ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md) (`docs/decisions/ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md`)
+
 ## human review
 
 - [ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md`)

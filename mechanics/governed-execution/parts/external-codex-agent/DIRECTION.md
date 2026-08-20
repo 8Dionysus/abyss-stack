@@ -32,6 +32,15 @@ general-purpose host allowlist. Actor-safe UTF-8 text redaction maps literal and
 nested escaped source aliases back to exact replacement spans so unrelated
 escape bytes are preserved.
 
+The visible responsibility-holder contour now treats terminal closure as a
+runtime-owned typed authorization family rather than a wake-only side effect.
+`wake_delivered` and `join_completed` each bind one returned handoff, the exact
+holder receipt and terminal identity, and the required
+`close_exact_bound_holder` action. Join completion does not imply semantic
+re-entry, owner acceptance, master wake, or a model/role verdict; those remain
+separate evidence. A future live canary must prove both the exact holder and
+Kitty disappearance while preserving an unrelated live holder.
+
 ## Proof sequence
 
 1. Maintain source-local schema, owner-admission, binder, process, drift,

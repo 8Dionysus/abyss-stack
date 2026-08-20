@@ -34,12 +34,17 @@ The controller:
   supervisor. The receipt includes the exact launch-time incarnation manifest
   bytes as a digest-bound base64 snapshot; after launch, its pathname is
   provenance only, so profile preparation may refresh that pathname without
-  changing holder identity. The installed launcher can close that exact holder terminal only after a
-  separate wake receipt binds the holder receipt and proves delivery. The
+  changing holder identity. The installed launcher closes that exact holder
+  terminal only after typed closure authorization. Authorization may be
+  `wake_delivered` (a separate wake receipt proves delivery) or
+  `join_completed` (a non-waking join proves a returned responsibility); both
+  forms bind the exact holder receipt, handoff, closure path, PIDs, and
+  required `close_exact_bound_holder` action. The join receipt, semantic
+  re-entry, owner acceptance, and master wake remain separate claims. The
   produced handoff must bind both receipt paths under
-  `runtime.responsibility_holder`, while the wake receipt binds the SHA-256 of
-  the exact handoff bytes delivered to the master; after delivery, a host-side
-  bridge may run the closer in the same host unit. The holder receipt also
+  `runtime.responsibility_holder`, while the evidence receipt binds the SHA-256
+  of the exact handoff bytes; after delivery or join, a host-side bridge may
+  run the closer in the same host unit. The holder receipt also
   binds the kernel boot ID alongside each process start tick. The closer publishes a
   recoverable sidecar reservation before signaling. The sidecar records the
   signal attempt before TERM and recovery never repeats an existing attempt;

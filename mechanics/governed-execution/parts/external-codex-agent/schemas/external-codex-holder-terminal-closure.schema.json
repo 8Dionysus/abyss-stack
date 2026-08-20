@@ -4,12 +4,16 @@
   "title": "Visible responsibility-holder terminal closure receipt",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "handoff_ref", "holder_receipt_ref", "wake_receipt_ref", "reservation_ref", "verified_at", "holder", "terminal", "closed", "outcome", "identity_state", "route", "trigger"],
+  "required": ["schema_version", "handoff_ref", "holder_receipt_ref", "authorization_ref", "authorization_kind", "authorization_evidence_ref", "reservation_ref", "verified_at", "holder", "terminal", "closed", "outcome", "identity_state", "route", "trigger"],
   "properties": {
-    "schema_version": {"const": "abyss_stack_visible_incarnation_terminal_closure_v1"},
+    "schema_version": {"const": "abyss_stack_visible_incarnation_terminal_closure_v2"},
     "handoff_ref": {"type": "string", "pattern": "^/"},
     "holder_receipt_ref": {"type": "string", "pattern": "^/"},
+    "authorization_ref": {"type": "string", "pattern": "^/"},
+    "authorization_kind": {"enum": ["wake_delivered", "join_completed"]},
+    "authorization_evidence_ref": {"type": "string", "pattern": "^/"},
     "wake_receipt_ref": {"type": "string", "pattern": "^/"},
+    "join_receipt_ref": {"type": "string", "pattern": "^/"},
     "reservation_ref": {"type": "string", "pattern": "^/"},
     "verified_at": {"type": "string", "format": "date-time"},
     "holder": {
@@ -45,6 +49,22 @@
     "outcome": {"enum": ["closed", "already_gone", "close_unverified"]},
     "identity_state": {"enum": ["live", "already_gone", "partial_gone", "identity_drift", "close_unverified", "unverified"]},
     "route": {"const": "abyss_stack_visible_incarnation_runtime"},
-    "trigger": {"const": "wake_bridge_after_confirmed_handoff_delivery"}
-  }
+    "trigger": {"enum": ["wake_bridge_after_confirmed_handoff_delivery", "join_after_validated_terminal_return"]}
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["authorization_kind"],
+        "properties": {"authorization_kind": {"const": "wake_delivered"}}
+      },
+      "then": {"required": ["wake_receipt_ref"]}
+    },
+    {
+      "if": {
+        "required": ["authorization_kind"],
+        "properties": {"authorization_kind": {"const": "join_completed"}}
+      },
+      "then": {"required": ["join_receipt_ref"]}
+    }
+  ]
 }
