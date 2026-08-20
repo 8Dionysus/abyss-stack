@@ -526,6 +526,27 @@ aoa_compose() {
   )
 }
 
+aoa_stop_ovms_units_if_active() {
+  local unit active_state
+
+  command -v systemctl >/dev/null 2>&1 || return 0
+  for unit in \
+    abyss-ovms.socket \
+    abyss-ovms-unix.socket \
+    abyss-ovms-proxy.service \
+    abyss-ovms.service; do
+    active_state="$(
+      systemctl --user show "$unit" --property=ActiveState --value 2>/dev/null || true
+    )"
+    case "$active_state" in
+      active|activating|deactivating|failed)
+        systemctl --user stop "$unit" || \
+          aoa_die "failed to stop active OVMS unit: ${unit}"
+        ;;
+    esac
+  done
+}
+
 aoa_print_profile_summary() {
   local preset_name profile_name module_name overlay_spec
 

@@ -4,7 +4,7 @@ services:
       EMBEDDINGS_PROVIDER: ovms
       OVMS_EMBEDDINGS_UNIX_SOCKET: /run/abyss-stack/ovms.sock
       OVMS_EMBEDDINGS_API_KEY_FILE: /run/secrets/ovms_api_key
-      OVMS_EMBEDDINGS_TIMEOUT_S: "180"
+      OVMS_EMBEDDINGS_TIMEOUT_S: "600"
     volumes:
       - "${XDG_RUNTIME_DIR:-/run/user/${AOA_RUNTIME_UID:-1000}}/abyss-stack:/run/abyss-stack:ro,z"
     secrets:

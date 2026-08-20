@@ -37,6 +37,14 @@ AOA_UP = (
     / "start-stop"
     / "aoa_up.sh"
 )
+AOA_DOWN = (
+    REPO_ROOT
+    / "mechanics"
+    / "runtime-lifecycle"
+    / "parts"
+    / "start-stop"
+    / "aoa_down.sh"
+)
 STATS_PATH_UNIT = REPO_ROOT / "systemd" / "user" / "aoa-stats-live-refresh.path"
 STATS_SERVICE_UNIT = REPO_ROOT / "systemd" / "user" / "aoa-stats-live-refresh.service"
 MCP_HTTP_TEMPLATE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http@.service"
@@ -522,6 +530,14 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         )
         self.assertIn("--filter \"label=${compose_label}=ovms\"", launcher)
         self.assertIn("up -d --remove-orphans", launcher)
+        self.assertIn("aoa_stop_ovms_units_if_active", launcher)
+
+    def test_ovms_teardown_reconciles_even_when_intel_is_not_selected(self) -> None:
+        launcher = AOA_UP.read_text(encoding="utf-8")
+        teardown = AOA_DOWN.read_text(encoding="utf-8")
+        self.assertIn("else\n  aoa_stop_ovms_units_if_active", launcher)
+        self.assertIn("aoa_stop_ovms_units_if_active\naoa_compose down", teardown)
+        self.assertNotIn('if [[ "$module" == "31-intel-inference.yml" ]]', teardown)
 
     def test_ovms_auth_provision_is_rootless_idempotent_and_detects_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

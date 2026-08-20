@@ -194,7 +194,7 @@ class ComposeContractsTests(unittest.TestCase):
             service["environment"]["OVMS_EMBEDDINGS_API_KEY_FILE"],
             "/run/secrets/ovms_api_key",
         )
-        self.assertEqual(service["environment"]["OVMS_EMBEDDINGS_TIMEOUT_S"], "180")
+        self.assertEqual(service["environment"]["OVMS_EMBEDDINGS_TIMEOUT_S"], "600")
         self.assertTrue(any("abyss-stack:/run/abyss-stack:ro,z" in volume for volume in service["volumes"]))
         self.assertEqual(
             service["secrets"],

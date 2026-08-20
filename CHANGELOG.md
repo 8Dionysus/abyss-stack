@@ -19,7 +19,9 @@ Tracking starts with the community-docs baseline for this repository.
   reload owner units before socket activation, retire only the same-project
   legacy Compose owner, allow the digest-pinned Quadlet image to pull when
   absent, and mount the socket directory read-only so `RemoveOnStop` recreation
-  reaches the running client without exposing a writable admission state.
+  reaches the running client without exposing a writable admission state; give
+  cold requests a 600-second bounded timeout and reconcile stale OVMS units when
+  Intel is deselected.
 - Bind the operator-visible responsibility holder to its own non-replacing
   lifecycle receipt before direct Codex `exec`, distinct from nested proof
   actors. The installed incarnation runtime now closes only that exact
