@@ -1269,6 +1269,193 @@ def canonical_digest(value: Any) -> str:
     return sha256_bytes(raw)
 
 
+RUNTIME_PACKAGE_SUBJECT_ROLES = {
+    "bin/codex": "codex_cli_compat_entrypoint",
+    "bin/codex-code-mode-host": "codex_code_mode_host",
+    "codex-package.json": "package_manifest",
+    "codex-path/rg": "bundled_ripgrep",
+    "codex-resources/bwrap": "bundled_bubblewrap",
+}
+
+
+def validate_runtime_package_binding(
+    runtime_package: Mapping[str, Any] | None,
+    *,
+    expected_runtime_subject: Mapping[str, Any],
+    expected_runtime_version: str,
+    codex_executable: Path,
+    codex_executable_digest: str,
+) -> dict[str, str]:
+    """Admit the exact package bytes behind an owner-contour Codex launch.
+
+    The model/runtime subject digest is the owner-selected identity. The
+    artifact subjects sidecar supplies the package inventory whose bytes must
+    match that identity and the launch executable. The sidecar aggregate is
+    deliberately retained as evidence; it is not substituted for the
+    aoa-models runtime_subject digest.
+    """
+
+    def invalid(message: str) -> None:
+        raise ExternalCodexRuntimeError("runtime_package_subject_invalid", message)
+
+    if not isinstance(runtime_package, Mapping):
+        invalid("owner-contour launch has no runtime package binding")
+    package_root_value = runtime_package.get("package_root")
+    if not isinstance(package_root_value, str) or not package_root_value.startswith(
+        "/"
+    ):
+        invalid("runtime package root must be an absolute path")
+    package_root = Path(package_root_value)
+    if (
+        package_root.is_symlink()
+        or not package_root.is_dir()
+        or package_root.resolve() != package_root
+    ):
+        invalid("runtime package root must be one exact real directory")
+
+    def sidecar(name: str) -> tuple[Path, dict[str, Any]]:
+        coordinate = runtime_package.get(name)
+        if not isinstance(coordinate, Mapping):
+            invalid(f"runtime package is missing the {name} sidecar coordinate")
+        path_value = coordinate.get("path")
+        digest = coordinate.get("digest")
+        if (
+            not isinstance(path_value, str)
+            or not path_value.startswith("/")
+            or not isinstance(digest, str)
+            or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest)
+        ):
+            invalid(f"runtime package {name} sidecar coordinate is invalid")
+        path = Path(path_value)
+        if path.is_symlink() or not path.is_file() or path.resolve() != path:
+            invalid(f"runtime package {name} sidecar must be a real regular file")
+        try:
+            actual_digest = sha256_file(path)
+        except ExternalCodexRuntimeError as exc:
+            raise ExternalCodexRuntimeError(
+                "runtime_package_subject_invalid",
+                f"runtime package {name} sidecar cannot be hashed",
+            ) from exc
+        if actual_digest != digest:
+            invalid(f"runtime package {name} sidecar digest changed")
+        try:
+            value = load_json(path, label=f"runtime package {name} sidecar")
+        except ExternalCodexRuntimeError as exc:
+            raise ExternalCodexRuntimeError(
+                "runtime_package_subject_invalid",
+                f"runtime package {name} sidecar is not readable JSON",
+            ) from exc
+        return path, value
+
+    _identity_path, identity = sidecar("artifact_identity")
+    _subjects_path, subjects = sidecar("artifact_subjects")
+    expected_source = expected_runtime_subject.get("source")
+    expected_digest = expected_runtime_subject.get("digest")
+    if (
+        not isinstance(expected_source, str)
+        or not isinstance(expected_digest, str)
+        or not re.fullmatch(r"sha256:[0-9a-f]{64}", expected_digest)
+    ):
+        invalid("runtime profile has no valid content-addressed runtime subject")
+    expected_source_ref = (
+        f"codex-cli-standalone@{expected_runtime_version}#{expected_digest}"
+    )
+    consumer_contract = identity.get("consumer_contract")
+    if (
+        identity.get("schema") != "abyss_machine_artifact_identity_sidecar_v1"
+        or identity.get("artifact_class") != "runtime_or_container_artifact"
+        or identity.get("bundle_layout") != "abyss_machine_artifact_bundle_v1"
+        or identity.get("owner_repo") != "codex-cli-standalone"
+        or identity.get("source_ref") != expected_source_ref
+        or not isinstance(consumer_contract, Mapping)
+        or consumer_contract.get("stable_interface") != expected_source
+        or consumer_contract.get("registry_required") is not True
+        or consumer_contract.get("subject_store_required") is not True
+        or consumer_contract.get("admission_gate") != "fail_closed_consumer_admission"
+    ):
+        invalid("artifact identity sidecar does not bind the admitted runtime subject")
+    if (
+        subjects.get("schema") != "abyss_machine_artifact_subjects_v1"
+        or subjects.get("artifact_class") != "runtime_or_container_artifact"
+        or subjects.get("bundle_layout") != "abyss_machine_artifact_bundle_v1"
+        or subjects.get("owner_repo") != "codex-cli-standalone"
+        or subjects.get("path_basis") != "repo_relative"
+    ):
+        invalid("artifact subjects sidecar is not the exact Codex package inventory")
+    entries = subjects.get("files")
+    if not isinstance(entries, list) or len(entries) != len(RUNTIME_PACKAGE_SUBJECT_ROLES):
+        invalid("artifact subjects sidecar has an incomplete package inventory")
+    entry_by_path: dict[str, Mapping[str, Any]] = {}
+    for entry in entries:
+        if not isinstance(entry, Mapping) or not isinstance(entry.get("path"), str):
+            invalid("artifact subjects sidecar contains an invalid file entry")
+        path = str(entry["path"])
+        if path in entry_by_path:
+            invalid("artifact subjects sidecar repeats one package path")
+        entry_by_path[path] = entry
+    if set(entry_by_path) != set(RUNTIME_PACKAGE_SUBJECT_ROLES):
+        invalid("artifact subjects sidecar names a different package layout")
+    if subjects.get("aggregate_digest") != canonical_digest(entries):
+        invalid("artifact subjects aggregate digest does not match its entries")
+
+    for relative_path, expected_role in RUNTIME_PACKAGE_SUBJECT_ROLES.items():
+        entry = entry_by_path[relative_path]
+        member = package_root / relative_path
+        if (
+            member.is_symlink()
+            or not member.is_file()
+            or member.resolve() != member
+            or entry.get("role") != expected_role
+            or not isinstance(entry.get("bytes"), int)
+            or entry.get("bytes") < 0
+            or not isinstance(entry.get("sha256"), str)
+            or not isinstance(entry.get("sha256_hex"), str)
+            or entry.get("sha256") != "sha256:" + entry.get("sha256_hex", "")
+            or not re.fullmatch(r"sha256:[0-9a-f]{64}", entry.get("sha256", ""))
+        ):
+            invalid(f"runtime package member {relative_path} is not an exact entry")
+        try:
+            member_digest = sha256_file(member)
+        except ExternalCodexRuntimeError as exc:
+            raise ExternalCodexRuntimeError(
+                "runtime_package_subject_invalid",
+                f"runtime package member {relative_path} cannot be hashed",
+            ) from exc
+        if member.stat().st_size != entry["bytes"] or member_digest != entry["sha256"]:
+            invalid(f"runtime package member {relative_path} drifted")
+
+    compatibility_entrypoint = package_root / "codex"
+    if (
+        not compatibility_entrypoint.is_symlink()
+        or os.readlink(compatibility_entrypoint) != "bin/codex"
+    ):
+        invalid("runtime package compatibility entrypoint is not bin/codex")
+    package_manifest = load_json(
+        package_root / "codex-package.json", label="runtime package manifest"
+    )
+    if (
+        package_manifest.get("entrypoint") != "bin/codex"
+        or package_manifest.get("layoutVersion") != 1
+        or package_manifest.get("pathDir") != "codex-path"
+        or package_manifest.get("resourcesDir") != "codex-resources"
+        or package_manifest.get("target") != "x86_64-unknown-linux-musl"
+        or package_manifest.get("version") != expected_runtime_version
+    ):
+        invalid("runtime package manifest does not describe the admitted 0.148.0 layout")
+    if (
+        codex_executable != package_root / "bin/codex"
+        or codex_executable.is_symlink()
+        or not codex_executable.is_file()
+        or codex_executable.resolve() != codex_executable
+        or sha256_file(codex_executable) != codex_executable_digest
+    ):
+        invalid("launch executable is not the exact inventoried package entrypoint")
+    return {
+        "artifact_identity_source_ref": str(identity["source_ref"]),
+        "artifact_subjects_digest": str(subjects["aggregate_digest"]),
+    }
+
+
 def owner_object_digest(value: Mapping[str, Any], digest_field: str) -> str:
     """Recompute an owner object's semantic digest without conflating raw bytes."""
 
@@ -7889,6 +8076,27 @@ class ExternalCodexRuntime:
                 "model-fit query, projection, realization, and mandate are not one exact chain",
             )
 
+        realization_configuration = coordinates["model_realization"][2].get(
+            "configuration"
+        )
+        realization_runtime = (
+            realization_configuration.get("runtime")
+            if isinstance(realization_configuration, dict)
+            else None
+        )
+        binding_runtime_subject = binding.runtime_subject.model_dump(mode="json")
+        if (
+            not isinstance(realization_runtime, dict)
+            or realization_runtime.get("runtime_subject") != binding_runtime_subject
+            or model_fit_query.get("query", {}).get("runtime_subject")
+            != binding_runtime_subject
+            or candidates[0].get("runtime_subject") != binding_runtime_subject
+        ):
+            raise ExternalCodexRuntimeError(
+                "runtime_subject_evidence_mismatch",
+                "incarnation, realization, model-fit query, and candidate do not name one exact runtime subject",
+            )
+
         incarnation_ref = external["incarnation_binding_ref"]
         if (
             incarnation_ref["object_id"] != binding.provenance.artifact_ref
@@ -8031,6 +8239,18 @@ class ExternalCodexRuntime:
         if executable_digest != launch["codex_executable_digest"]:
             raise ExternalCodexRuntimeError(
                 "codex_executable_drift", "Codex executable digest changed"
+            )
+        if launch.get("admission_class") == "owner_contour":
+            validate_runtime_package_binding(
+                launch.get("runtime_package"),
+                expected_runtime_subject=self.profile["model_admission"][
+                    "runtime_subject"
+                ],
+                expected_runtime_version=self.profile["model_admission"][
+                    "runtime_version"
+                ],
+                codex_executable=executable,
+                codex_executable_digest=launch["codex_executable_digest"],
             )
         containment = self.profile["process_containment"]
         containment_paths = {
@@ -15817,22 +16037,23 @@ class ExternalCodexParentReentry:
                 "expected wake is not one exact escalation condition in the binding",
             )
 
-        configuration = realization.get("configuration")
-        runtime = (
-            configuration.get("runtime") if isinstance(configuration, dict) else None
-        )
-        permissions = (
-            configuration.get("permissions")
-            if isinstance(configuration, dict)
-            else None
-        )
+        try:
+            parent_model_slug, parent_effort = _validate_model_realization_admission(
+                realization,
+                self.profile["model_admission"],
+            )
+        except ExternalCodexRuntimeError as exc:
+            raise ExternalCodexRuntimeError(
+                "reentry_parent_realization_invalid",
+                f"parent realization is not the exact admitted Codex lane: {exc}",
+            ) from exc
+        configuration = realization["configuration"]
+        runtime = configuration["runtime"]
+        permissions = configuration["permissions"]
         if (
-            realization.get("kind") != "ModelRealization"
-            or not isinstance(runtime, dict)
-            or runtime.get("model_slug") != "gpt-5.6-sol"
+            parent_model_slug != "gpt-5.6-sol"
+            or parent_effort != "max"
             or runtime.get("transport") != "exec-jsonl"
-            or configuration.get("reasoning_effort") != "max"
-            or not isinstance(permissions, dict)
             or permissions.get("sandbox_mode") != "read-only"
             or permissions.get("approval_policy") != "never"
             or permissions.get("external_effects") is not False

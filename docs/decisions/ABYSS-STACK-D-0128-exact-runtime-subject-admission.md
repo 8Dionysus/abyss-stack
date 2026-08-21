@@ -40,6 +40,10 @@ exact `content_addressed_runtime_package` subject. Runtime admission retains
 the existing product/version/transport/access/lifecycle checks and additionally
 requires the realization's complete `configuration.runtime.runtime_subject`
 mapping to equal the profile's `model_admission.runtime_subject` mapping.
+An owner-contour launch must additionally carry the owner-selected package root
+and digest-bound artifact identity/subjects sidecars. Binding and preflight
+verify the sidecar identity, package manifest, executable, code-mode host,
+bundled helpers, and compatibility entrypoint against that exact subject.
 
 ## Rationale
 
@@ -55,6 +59,9 @@ source/runtime and live-evidence checks.
 - Positive: a prepared realization cannot enter the external Codex lane unless
   its exact content-addressed runtime subject is the one admitted by the
   runtime profile.
+- Positive: an owner-contour launch cannot substitute a different 0.148.0
+  package behind the admitted subject metadata; package drift is rechecked at
+  preflight.
 - Positive: missing or mismatched subject data fails before Codex preflight or
   process launch.
 - Tradeoff: the source profile and its paired fixtures now require the `0.148.0`
@@ -69,6 +76,9 @@ source/runtime and live-evidence checks.
 - `mechanics/governed-execution/parts/external-codex-agent/runtime-profile.v1.json`
 - `mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-runtime-profile.schema.json`
 - `mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py`
+- `mechanics/governed-execution/parts/external-codex-agent/bind_external_actor_launch.py`
+- `mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-launch.schema.json`
+- `mechanics/governed-execution/parts/external-codex-agent/schemas/external-actor-launch-manifest.schema.json`
 - `mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md`
 - `mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_agent.py`
 

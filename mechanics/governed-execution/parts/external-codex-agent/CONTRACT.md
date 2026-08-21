@@ -280,6 +280,12 @@ Before launch the controller verifies:
 5. the model realization names Codex CLI `0.148.0`, ChatGPT quota/login,
    `exec-jsonl`, one admitted model/effort, the exact content-addressed runtime
    subject admitted by the runtime profile, and the exact runtime tool profile;
+   an `owner_contour` launch also carries the runtime package root plus
+   digest-bound artifact identity and subjects sidecars. The controller checks
+   that inventory against the package manifest, executable, adjacent
+   `codex-code-mode-host`, bundled `rg`, and bundled `bwrap`; the subjects
+   aggregate remains evidence and does not replace the `aoa-models`
+   `runtime_subject` digest;
 6. the resolved Codex executable digest, reported version, auth status, and
    bundled live model catalog match the binding;
 7. the exact profile-bound Linux subreaper supervisor and probe executable are

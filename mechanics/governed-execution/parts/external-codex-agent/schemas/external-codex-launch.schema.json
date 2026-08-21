@@ -35,6 +35,16 @@
     },
     "codex_executable": {"type": "string", "pattern": "^/"},
     "codex_executable_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "runtime_package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package_root", "artifact_identity", "artifact_subjects"],
+      "properties": {
+        "package_root": {"type": "string", "pattern": "^/"},
+        "artifact_identity": {"$ref": "#/$defs/artifactCoordinate"},
+        "artifact_subjects": {"$ref": "#/$defs/artifactCoordinate"}
+      }
+    },
     "codex_home": {"type": "string", "pattern": "^/"},
     "environment_allowlist": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["HOME", "LANG", "LC_ALL", "PATH", "SSL_CERT_FILE", "SSL_CERT_DIR", "TERM"]}}
   },

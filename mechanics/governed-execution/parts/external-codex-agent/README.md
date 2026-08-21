@@ -401,9 +401,11 @@ usage but does not fabricate the missing interrupted-attempt tokens.
 `aoa-external-actor-bind` is the normal non-starting physical binding leaf. It
 accepts already selected owner/SDK/model/runtime artifact paths, verifies the
 runtime-profile-pinned owner schema bytes, hashes the workspace, Codex binary,
-and every coordinate, writes one immutable `owner_contour` launch, and returns
-control to `aoa-agents`. Its workspace-HEAD binding uses exact system Git under
-a fixed minimal environment, never an ambient `PATH` resolution. It does not
+and every coordinate, verifies the selected runtime package root and its
+digest-bound identity/subjects sidecars, writes one immutable `owner_contour`
+launch, and returns control to `aoa-agents`. Its workspace-HEAD binding uses
+exact system Git under a fixed minimal environment, never an ambient `PATH`
+resolution. It does not
 detect an obligation, choose a role or
 model, form the owner execution request, or start the actor. `aoa-summon` then
 forms the separate semantic request and calls `preflight`, `start`, or

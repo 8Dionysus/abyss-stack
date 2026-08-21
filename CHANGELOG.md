@@ -25,6 +25,10 @@ Tracking starts with the community-docs baseline for this repository.
   runtime profile now pins Codex CLI `0.148.0`, rejects a realization with a
   different runtime-package digest, and keeps the installed/deployed release
   outside this source-only repair.
+- Bind owner-contour launches to the exact Codex 0.148.0 package inventory and
+  recheck its identity sidecars, executable, code-mode host, and bundled
+  helpers at preflight; parent re-entry now uses the same model-realization
+  admission contract.
 - Add the manual-only `aoa-external-actor-clock@.service` delayed clock route.
   Its foreground supervisor keeps systemd ownership while a uniquely titled
   detached Kitty holder is independently observable, requires explicit private

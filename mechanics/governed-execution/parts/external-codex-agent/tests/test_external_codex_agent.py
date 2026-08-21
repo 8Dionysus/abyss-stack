@@ -932,6 +932,100 @@ else:
     path.chmod(0o755)
 
 
+def _runtime_package_fixture(tmp_path: Path, fake_codex: Path) -> dict[str, Any]:
+    package_root = (tmp_path / "runtime-package").resolve()
+    (package_root / "bin").mkdir(parents=True)
+    (package_root / "codex-path").mkdir()
+    (package_root / "codex-resources").mkdir()
+    (package_root / "bin/codex").write_bytes(fake_codex.read_bytes())
+    (package_root / "bin/codex").chmod(0o755)
+    true_bytes = Path("/usr/bin/true").read_bytes()
+    for relative_path in (
+        "bin/codex-code-mode-host",
+        "codex-path/rg",
+        "codex-resources/bwrap",
+    ):
+        member = package_root / relative_path
+        member.write_bytes(true_bytes)
+        member.chmod(0o755)
+    _write_json(
+        package_root / "codex-package.json",
+        {
+            "entrypoint": "bin/codex",
+            "layoutVersion": 1,
+            "pathDir": "codex-path",
+            "resourcesDir": "codex-resources",
+            "target": "x86_64-unknown-linux-musl",
+            "variant": "codex",
+            "version": RUNTIME_VERSION,
+        },
+    )
+    (package_root / "codex").symlink_to("bin/codex")
+    role_by_path = {
+        "bin/codex": "codex_cli_compat_entrypoint",
+        "bin/codex-code-mode-host": "codex_code_mode_host",
+        "codex-package.json": "package_manifest",
+        "codex-path/rg": "bundled_ripgrep",
+        "codex-resources/bwrap": "bundled_bubblewrap",
+    }
+    entries = [
+        {
+            "bytes": (package_root / relative_path).stat().st_size,
+            "path": relative_path,
+            "role": role,
+            "sha256": _digest_path(package_root / relative_path),
+            "sha256_hex": _digest_path(package_root / relative_path).removeprefix(
+                "sha256:"
+            ),
+        }
+        for relative_path, role in role_by_path.items()
+    ]
+    bundle_root = tmp_path / "runtime-artifact-bundle"
+    identity_path = bundle_root / "artifact.identity.json"
+    subjects_path = bundle_root / "artifact.subjects.json"
+    _write_json(
+        identity_path,
+        {
+            "artifact_class": "runtime_or_container_artifact",
+            "bundle_layout": "abyss_machine_artifact_bundle_v1",
+            "consumer_contract": {
+                "admission_gate": "fail_closed_consumer_admission",
+                "registry_required": True,
+                "stable_interface": RUNTIME_SUBJECT["source"],
+                "subject_store_required": True,
+            },
+            "owner_repo": "codex-cli-standalone",
+            "schema": "abyss_machine_artifact_identity_sidecar_v1",
+            "source_ref": (
+                f"codex-cli-standalone@{RUNTIME_VERSION}#{RUNTIME_SUBJECT['digest']}"
+            ),
+        },
+    )
+    _write_json(
+        subjects_path,
+        {
+            "aggregate_digest": RUNTIME.canonical_digest(entries),
+            "artifact_class": "runtime_or_container_artifact",
+            "bundle_layout": "abyss_machine_artifact_bundle_v1",
+            "files": entries,
+            "owner_repo": "codex-cli-standalone",
+            "path_basis": "repo_relative",
+            "schema": "abyss_machine_artifact_subjects_v1",
+        },
+    )
+    return {
+        "package_root": str(package_root),
+        "artifact_identity": {
+            "path": str(identity_path.resolve()),
+            "digest": _digest_path(identity_path),
+        },
+        "artifact_subjects": {
+            "path": str(subjects_path.resolve()),
+            "digest": _digest_path(subjects_path),
+        },
+    }
+
+
 def _fixture_codex_preflight(
     _runtime: Any,
     launch: Mapping[str, Any],
@@ -997,6 +1091,32 @@ def test_model_realization_requires_exact_runtime_subject(tmp_path: Path) -> Non
         )
 
     assert exc_info.value.code == "runtime_subject_unsupported"
+
+
+def test_owner_contour_preflight_rechecks_exact_runtime_package_inventory(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True, exact_preflight=True)
+    owner_request_path = fixture["owner_execution_request_path"]
+    assert owner_request_path is not None
+
+    preflight = fixture["runtime"].preflight(
+        fixture["launch_path"],
+        owner_request_path=owner_request_path,
+    )
+    assert preflight["admitted"] is True
+    package_host = (
+        Path(fixture["launch"]["runtime_package"]["package_root"])
+        / "bin/codex-code-mode-host"
+    )
+    package_host.write_bytes(b"runtime package drift\n")
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        fixture["runtime"].preflight(
+            fixture["launch_path"],
+            owner_request_path=owner_request_path,
+        )
+    assert exc_info.value.code == "runtime_package_subject_invalid"
 
 
 def _adapt_plan(
@@ -2189,6 +2309,14 @@ def _fixture(
         )
     fake_codex = tmp_path / "fake-codex"
     _fake_codex(fake_codex)
+    runtime_package = (
+        _runtime_package_fixture(tmp_path, fake_codex) if owner_contour else None
+    )
+    launch_codex = (
+        Path(runtime_package["package_root"]) / "bin/codex"
+        if runtime_package is not None
+        else fake_codex.resolve()
+    )
     codex_home = tmp_path / "codex-home"
     codex_home.mkdir()
     launch = {
@@ -2250,8 +2378,13 @@ def _fixture(
             "exact_baseline" if exact_baseline else "clean_required"
         ),
         "workspace_manifest_input_id": "workspace-manifest",
-        "codex_executable": str(fake_codex.resolve()),
-        "codex_executable_digest": _digest_path(fake_codex),
+        "codex_executable": str(launch_codex),
+        "codex_executable_digest": _digest_path(launch_codex),
+        **(
+            {"runtime_package": runtime_package}
+            if runtime_package is not None
+            else {}
+        ),
         "codex_home": str(codex_home),
         "environment_allowlist": ["HOME", "LANG", "PATH"],
         **(
@@ -6065,6 +6198,15 @@ def test_neutral_binder_reproduces_exact_owner_contour_launch(tmp_path: Path) ->
         "workspace_initial_posture": launch["workspace_initial_posture"],
         "workspace_manifest_input_id": launch["workspace_manifest_input_id"],
         "codex_executable": launch["codex_executable"],
+        "runtime_package": {
+            "package_root": launch["runtime_package"]["package_root"],
+            "artifact_identity": launch["runtime_package"]["artifact_identity"][
+                "path"
+            ],
+            "artifact_subjects": launch["runtime_package"]["artifact_subjects"][
+                "path"
+            ],
+        },
         "codex_home": launch["codex_home"],
         "environment_allowlist": launch["environment_allowlist"],
     }
@@ -13254,6 +13396,41 @@ def _parent_reentry_obligation(
     obligation_path = tmp_path / "parent-obligation.json"
     _write_json(obligation_path, obligation)
     return obligation_path
+
+
+def test_parent_reentry_requires_exact_admitted_runtime_subject(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_ambiguity_stop",
+        identity_suffix="parent-runtime-subject-drift",
+    )
+    obligation_path = _parent_reentry_obligation(
+        tmp_path,
+        fixture,
+        reentry_id="reentry:fixture:parent-runtime-subject-drift",
+    )
+    obligation = json.loads(obligation_path.read_text(encoding="utf-8"))
+    parent_realization_path = Path(
+        obligation["parent_model_realization_ref"]["artifact_ref"]
+    )
+    parent_realization = json.loads(parent_realization_path.read_text(encoding="utf-8"))
+    parent_realization["configuration"]["runtime"]["runtime_subject"] = {
+        **RUNTIME_SUBJECT,
+        "digest": "sha256:" + "0" * 64,
+    }
+    _write_json(parent_realization_path, parent_realization)
+    obligation["parent_model_realization_ref"]["artifact_digest"] = _digest_path(
+        parent_realization_path
+    )
+    _write_json(obligation_path, obligation)
+
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        bridge.yield_parent(obligation_path)
+    assert exc_info.value.code == "reentry_parent_realization_invalid"
 
 
 def test_parent_inference_yields_and_exact_authority_event_reenters_same_thread(
