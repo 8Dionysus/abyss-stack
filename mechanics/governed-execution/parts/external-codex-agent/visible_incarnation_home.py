@@ -1431,19 +1431,19 @@ def _kitty_ancestor(pid: int) -> tuple[int, int, list[str]]:
     raise IncarnationHomeError("visible holder has no Kitty terminal ancestor")
 
 
-def _kitty_dedication(
-    *, holder_pid: int, kitty_pid: int, terminal_argv: Sequence[str]
+def _validate_kitty_dedication_topology(
+    *,
+    holder_pid: int,
+    kitty_pid: int,
+    terminal_argv: Sequence[str],
+    window_id: str,
 ) -> tuple[str, bool]:
-    """Prove the Kitty process is the detached, single-window holder terminal."""
+    """Validate a detached, single-window Kitty topology from bound evidence."""
 
     if "--detach" not in terminal_argv:
         raise IncarnationHomeError(
             "holder Kitty terminal is not a detached dedicated process"
         )
-    environment = _proc_environ(holder_pid)
-    if environment.get("KITTY_PID") != str(kitty_pid):
-        raise IncarnationHomeError("holder Kitty window does not bind its Kitty PID")
-    window_id = environment.get("KITTY_WINDOW_ID", "")
     if not re.fullmatch(r"[1-9][0-9]*", window_id):
         raise IncarnationHomeError("holder Kitty window identity is missing")
 
@@ -1473,6 +1473,57 @@ def _kitty_dedication(
             "holder Kitty process is not dedicated to this responsibility holder"
         )
     return window_id, True
+
+
+def _kitty_dedication(
+    *, holder_pid: int, kitty_pid: int, terminal_argv: Sequence[str]
+) -> tuple[str, bool]:
+    """Bind Kitty identity from launch-time holder environment and topology."""
+
+    environment = _proc_environ(holder_pid)
+    if environment.get("KITTY_PID") != str(kitty_pid):
+        raise IncarnationHomeError("holder Kitty window does not bind its Kitty PID")
+    window_id = environment.get("KITTY_WINDOW_ID", "")
+    return _validate_kitty_dedication_topology(
+        holder_pid=holder_pid,
+        kitty_pid=kitty_pid,
+        terminal_argv=terminal_argv,
+        window_id=window_id,
+    )
+
+
+def _kitty_dedication_from_receipt(
+    *,
+    receipt: dict[str, Any],
+    holder_pid: int,
+    kitty_pid: int,
+    terminal_argv: Sequence[str],
+) -> tuple[str, bool]:
+    """Revalidate Kitty from immutable launch-time receipt fields after return.
+
+    The holder environment is intentionally not reopened here.  The launch
+    receipt already captured the environment-derived window binding and is
+    pinned by the holder receipt digest, handoff, and close authorization.
+    Current process identity, ancestry, and dedicated-child topology remain
+    live checks in ``_validate_kitty_dedication_topology``.
+    """
+
+    terminal = receipt.get("terminal")
+    if not isinstance(terminal, dict):
+        raise IncarnationHomeError("holder Kitty receipt binding is missing")
+    if terminal.get("pid") != kitty_pid:
+        raise IncarnationHomeError("holder Kitty receipt PID binding has drifted")
+    window_id = terminal.get("window_id")
+    if not isinstance(window_id, str) or not re.fullmatch(r"[1-9][0-9]*", window_id):
+        raise IncarnationHomeError("holder Kitty receipt window identity is invalid")
+    if terminal.get("dedicated") is not True:
+        raise IncarnationHomeError("holder Kitty receipt dedication proof is missing")
+    return _validate_kitty_dedication_topology(
+        holder_pid=holder_pid,
+        kitty_pid=kitty_pid,
+        terminal_argv=terminal_argv,
+        window_id=window_id,
+    )
 
 
 def _validate_legacy_holder_process_identity(
@@ -2505,6 +2556,7 @@ def _holder_terminal_identity(
         receipt,
         expected_argv=receipt["holder"]["argv"],
         argv_label="holder",
+        receipt_bound_terminal=True,
     )
     # Repaired receipts bind the exact payload digests before the private
     # execution mount is entered.  The recorded host paths are provenance only
@@ -2574,6 +2626,7 @@ def _validate_holder_process_identity(
     expected_argv: Sequence[str],
     argv_label: str,
     expected_exe_digest: str | None = None,
+    receipt_bound_terminal: bool = False,
 ) -> tuple[int, int, str, str, bool]:
     """Validate one exact holder process before or after its payload exec."""
 
@@ -2623,11 +2676,19 @@ def _validate_holder_process_identity(
         cursor = current_parent_pid
     if not terminal_found:
         raise IncarnationHomeError("holder Kitty terminal is no longer an ancestor")
-    window_id, dedicated = _kitty_dedication(
-        holder_pid=pid,
-        kitty_pid=kitty_pid,
-        terminal_argv=terminal["argv"],
-    )
+    if receipt_bound_terminal:
+        window_id, dedicated = _kitty_dedication_from_receipt(
+            receipt=receipt,
+            holder_pid=pid,
+            kitty_pid=kitty_pid,
+            terminal_argv=terminal["argv"],
+        )
+    else:
+        window_id, dedicated = _kitty_dedication(
+            holder_pid=pid,
+            kitty_pid=kitty_pid,
+            terminal_argv=terminal["argv"],
+        )
     recorded_window_id = terminal.get("window_id")
     if recorded_window_id is not None and recorded_window_id != window_id:
         raise IncarnationHomeError("holder Kitty window identity has drifted")
