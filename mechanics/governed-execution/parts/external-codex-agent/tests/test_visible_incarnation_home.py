@@ -2113,7 +2113,7 @@ def test_post_exec_argv_resolves_env_interpreter_reexec(
     executable.chmod(0o700)
     node = tmp_path / "bin" / "node"
     node.parent.mkdir()
-    node.write_text("", encoding="utf-8")
+    node.write_bytes(b"node interpreter")
     node.chmod(0o700)
 
     assert MODULE._post_exec_argv(
@@ -2121,6 +2121,60 @@ def test_post_exec_argv_resolves_env_interpreter_reexec(
         [str(executable), "exec", "--help"],
         path=str(node.parent),
     ) == ["node", str(executable), "exec", "--help"]
+
+
+def test_post_exec_resolution_recurses_through_nested_shebangs(
+    tmp_path: Path,
+) -> None:
+    final_interpreter = tmp_path / "bin" / "python3"
+    final_interpreter.parent.mkdir()
+    final_bytes = b"final interpreter\n"
+    final_interpreter.write_bytes(final_bytes)
+    final_interpreter.chmod(0o700)
+    nested_interpreter = tmp_path / "nested-interpreter"
+    nested_interpreter.write_text(f"#!{final_interpreter}\n", encoding="utf-8")
+    nested_interpreter.chmod(0o700)
+    executable = tmp_path / "codex"
+    executable.write_text(f"#!{nested_interpreter}\n", encoding="utf-8")
+    executable.chmod(0o700)
+
+    assert MODULE._post_exec_argv(
+        executable, [str(executable), "exec", "--help"]
+    ) == [
+        str(final_interpreter),
+        str(nested_interpreter),
+        str(executable),
+        "exec",
+        "--help",
+    ]
+    assert MODULE._post_exec_executable_digest(executable) == MODULE.sha256_bytes(
+        final_bytes
+    )
+
+
+def test_post_exec_resolution_recurses_through_nested_env_shebang(
+    tmp_path: Path,
+) -> None:
+    final_interpreter = tmp_path / "python3"
+    final_bytes = b"final env interpreter\n"
+    final_interpreter.write_bytes(final_bytes)
+    final_interpreter.chmod(0o700)
+    node = tmp_path / "bin" / "node"
+    node.parent.mkdir()
+    node.write_text(f"#!{final_interpreter}\n", encoding="utf-8")
+    node.chmod(0o700)
+    executable = tmp_path / "codex"
+    executable.write_text("#!/usr/bin/env node\n", encoding="utf-8")
+    executable.chmod(0o700)
+
+    assert MODULE._post_exec_argv(
+        executable,
+        [str(executable), "exec"],
+        path=str(node.parent),
+    ) == [str(final_interpreter), "node", str(executable), "exec"]
+    assert MODULE._post_exec_executable_digest(
+        executable, path=str(node.parent)
+    ) == MODULE.sha256_bytes(final_bytes)
 
 
 def test_shebang_snapshot_root_rejects_noexec_filesystem(

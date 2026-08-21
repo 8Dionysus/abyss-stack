@@ -1237,6 +1237,84 @@ def _descends_from(pid: int, ancestor_pid: int) -> bool:
     return False
 
 
+POST_EXEC_SHEBANG_LIMIT = 16
+
+
+def _post_exec_resolution(
+    executable: Path,
+    argv: Sequence[str],
+    *,
+    path: str | None = None,
+    executable_bytes: bytes | None = None,
+) -> tuple[list[str], Path, bytes]:
+    """Resolve the complete Linux shebang chain and return its final image."""
+
+    if not argv:
+        raise IncarnationHomeError("holder argv must not be empty")
+    current_executable = executable
+    current_argv = list(argv)
+    current_bytes = executable_bytes
+    visited: set[Path] = set()
+    for _ in range(POST_EXEC_SHEBANG_LIMIT):
+        try:
+            content = (
+                current_bytes
+                if current_bytes is not None
+                else current_executable.read_bytes()
+            )
+            first_line = content.splitlines(keepends=True)[0]
+        except (IndexError, OSError) as exc:
+            raise IncarnationHomeError("Codex executable could not be inspected") from exc
+        try:
+            identity = current_executable.resolve(strict=False)
+        except OSError:
+            identity = current_executable.absolute()
+        if identity in visited:
+            raise IncarnationHomeError("Codex shebang interpreter chain is cyclic")
+        visited.add(identity)
+        if not first_line.startswith(b"#!"):
+            return current_argv, current_executable, content
+        shebang = os.fsdecode(first_line[2:]).strip()
+        fields = shebang.split(maxsplit=1)
+        if not fields or not fields[0].startswith("/"):
+            raise IncarnationHomeError("Codex shebang interpreter is not absolute")
+        if fields[0] == "/usr/bin/env" and len(fields) == 2 and fields[1]:
+            env_fields = shlex.split(fields[1])
+            if env_fields and env_fields[0] in {"-S", "--split-string"}:
+                env_fields = env_fields[1:]
+            elif len(env_fields) != 1:
+                # Without env -S, Linux passes the optional shebang argument as
+                # one command-name string; do not invent an interpreter re-exec
+                # for an invalid multi-token env command.
+                env_fields = []
+            if env_fields and not env_fields[0].startswith("-"):
+                resolved = shutil.which(
+                    env_fields[0], path=path or os.environ.get("PATH")
+                )
+                if resolved is not None:
+                    # env resolves the command for lookup but preserves the
+                    # command token as argv[0] for the re-exec.  Recording the
+                    # resolved filesystem path here rejects a valid holder
+                    # whose /proc argv starts with the admitted token (for
+                    # example, "node").
+                    current_argv = [
+                        env_fields[0],
+                        *env_fields[1:],
+                        *current_argv,
+                    ]
+                    current_executable = _resolved_executable(Path(resolved))
+                    current_bytes = None
+                    continue
+        previous_argv = current_argv
+        current_argv = [fields[0]]
+        if len(fields) == 2 and fields[1]:
+            current_argv.append(fields[1])
+        current_argv.extend(previous_argv)
+        current_executable = _resolved_executable(Path(fields[0]))
+        current_bytes = None
+    raise IncarnationHomeError("Codex shebang interpreter chain is too deep")
+
+
 def _post_exec_argv(
     executable: Path,
     argv: Sequence[str],
@@ -1244,51 +1322,15 @@ def _post_exec_argv(
     path: str | None = None,
     executable_bytes: bytes | None = None,
 ) -> list[str]:
-    """Derive Linux's post-exec argv for ELF and shebang-backed commands."""
+    """Derive Linux's post-exec argv for ELF and nested shebang commands."""
 
-    if not argv:
-        raise IncarnationHomeError("holder argv must not be empty")
-    try:
-        first_line = (
-            executable_bytes if executable_bytes is not None else executable.read_bytes()
-        ).splitlines(keepends=True)[0]
-    except (IndexError, OSError) as exc:
-        raise IncarnationHomeError("Codex executable could not be inspected") from exc
-    if not first_line.startswith(b"#!"):
-        return list(argv)
-    shebang = os.fsdecode(first_line[2:]).strip()
-    fields = shebang.split(maxsplit=1)
-    if not fields or not fields[0].startswith("/"):
-        raise IncarnationHomeError("Codex shebang interpreter is not absolute")
-    if fields[0] == "/usr/bin/env" and len(fields) == 2 and fields[1]:
-        env_fields = shlex.split(fields[1])
-        if env_fields and env_fields[0] in {"-S", "--split-string"}:
-            env_fields = env_fields[1:]
-        elif len(env_fields) != 1:
-            # Without env -S, Linux passes the optional shebang argument as
-            # one command-name string; do not invent an interpreter re-exec
-            # for an invalid multi-token env command.
-            env_fields = []
-        if env_fields and not env_fields[0].startswith("-"):
-            resolved = shutil.which(env_fields[0], path=path or os.environ.get("PATH"))
-            if resolved is not None:
-                return [
-                    # env resolves the command for lookup but preserves the
-                    # command token as argv[0] for the re-exec.  Recording the
-                    # resolved filesystem path here rejects a valid holder
-                    # whose /proc argv starts with the admitted token (for
-                    # example, "node").
-                    env_fields[0],
-                    *env_fields[1:],
-                    argv[0],
-                    *argv[1:],
-                ]
-    post_exec = [fields[0]]
-    if len(fields) == 2 and fields[1]:
-        post_exec.append(fields[1])
-    post_exec.append(argv[0])
-    post_exec.extend(argv[1:])
-    return post_exec
+    post_exec_argv, _final_executable, _final_bytes = _post_exec_resolution(
+        executable,
+        argv,
+        path=path,
+        executable_bytes=executable_bytes,
+    )
+    return post_exec_argv
 
 
 def _post_exec_executable_digest(
@@ -1297,34 +1339,16 @@ def _post_exec_executable_digest(
     path: str | None = None,
     executable_bytes: bytes | None = None,
 ) -> str:
-    """Hash the executable Linux will run after resolving a shebang."""
+    """Hash the final executable Linux will run after nested shebang resolution."""
 
     try:
-        content = (
-            executable_bytes if executable_bytes is not None else executable.read_bytes()
+        _post_exec_argv_value, _final_executable, final_bytes = _post_exec_resolution(
+            executable,
+            [str(executable)],
+            path=path,
+            executable_bytes=executable_bytes,
         )
-        first_line = content.splitlines(keepends=True)[0]
-    except (IndexError, OSError) as exc:
-        raise IncarnationHomeError("Codex executable could not be inspected") from exc
-    if not first_line.startswith(b"#!"):
-        return sha256_bytes(content)
-    shebang = os.fsdecode(first_line[2:]).strip()
-    fields = shebang.split(maxsplit=1)
-    if not fields or not fields[0].startswith("/"):
-        raise IncarnationHomeError("Codex shebang interpreter is not absolute")
-    interpreter = Path(fields[0])
-    if fields[0] == "/usr/bin/env" and len(fields) == 2 and fields[1]:
-        env_fields = shlex.split(fields[1])
-        if env_fields and env_fields[0] in {"-S", "--split-string"}:
-            env_fields = env_fields[1:]
-        elif len(env_fields) != 1:
-            env_fields = []
-        if env_fields and not env_fields[0].startswith("-"):
-            resolved = shutil.which(env_fields[0], path=path or os.environ.get("PATH"))
-            if resolved is not None:
-                interpreter = Path(resolved)
-    try:
-        return sha256_bytes(_resolved_executable(interpreter).read_bytes())
+        return sha256_bytes(final_bytes)
     except (IncarnationHomeError, OSError) as exc:
         raise IncarnationHomeError(
             "Codex post-exec interpreter could not be hashed"
