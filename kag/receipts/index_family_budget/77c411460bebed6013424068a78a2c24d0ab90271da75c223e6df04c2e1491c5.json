@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 18561794,
+  "allowed_tracked_bytes": 36330623,
+  "approved_by": "repository-owner",
+  "base_ref": "b40fe4a92aa42a8c2abaf52895c1934576f3bedc",
+  "changed_generated_bytes": 18561794,
+  "changed_generated_files": 187,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "77c411460bebed6013424068a78a2c24d0ab90271da75c223e6df04c2e1491c5",
+  "reason": "Refresh the exact owner portable family after closing visible holder receipt review gaps in PR 399; preserve the measured standing tracked-size exceedance with an owner-bound generated delta receipt.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36330623,
+  "tracked_bytes_max": 24117248
+}
