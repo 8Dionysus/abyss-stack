@@ -2187,6 +2187,35 @@ def test_post_exec_resolution_recurses_through_nested_env_shebang(
     ) == MODULE.sha256_bytes(final_bytes)
 
 
+def test_post_exec_resolution_preserves_path_spelling_for_env_symlink_shebang(
+    tmp_path: Path,
+) -> None:
+    final_interpreter = tmp_path / "final-interpreter"
+    final_interpreter.write_bytes(b"final env symlink interpreter\n")
+    final_interpreter.chmod(0o700)
+    node_wrapper = tmp_path / "lib" / "node-wrapper"
+    node_wrapper.parent.mkdir()
+    node_wrapper.write_text(f"#!{final_interpreter}\n", encoding="utf-8")
+    node_wrapper.chmod(0o700)
+    node = tmp_path / "bin" / "node"
+    node.parent.mkdir()
+    node.symlink_to(node_wrapper)
+    executable = tmp_path / "codex"
+    executable.write_text("#!/usr/bin/env node\n", encoding="utf-8")
+    executable.chmod(0o700)
+
+    assert MODULE._post_exec_argv(
+        executable,
+        [str(executable), "exec"],
+        path=str(node.parent),
+    ) == [
+        str(final_interpreter),
+        str(node),
+        str(executable),
+        "exec",
+    ]
+
+
 def test_post_exec_resolution_preserves_paths_across_consecutive_env_shebangs(
     tmp_path: Path,
 ) -> None:

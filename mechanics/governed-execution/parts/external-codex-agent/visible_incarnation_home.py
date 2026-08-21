@@ -1305,7 +1305,7 @@ def _post_exec_resolution(
     current_argv = list(argv)
     current_bytes = executable_bytes
     visited: set[Path] = set()
-    current_argv0_is_resolved_path = False
+    current_argv0_path: str | None = None
     for _ in range(POST_EXEC_SHEBANG_LIMIT):
         try:
             content = (
@@ -1330,8 +1330,12 @@ def _post_exec_resolution(
         if not fields or not fields[0].startswith("/"):
             raise IncarnationHomeError("Codex shebang interpreter is not absolute")
         previous_argv = current_argv
-        if current_argv0_is_resolved_path:
-            previous_argv = [str(current_executable), *current_argv[1:]]
+        if current_argv0_path is not None:
+            # env executes the PATH result but preserves the command token as
+            # argv[0].  If that result is itself a shebang (including through
+            # a symlink), Linux inserts the exact execve spelling as argv[1];
+            # retain it while using the resolved target only for byte reads.
+            previous_argv = [current_argv0_path, *current_argv[1:]]
         if fields[0] == "/usr/bin/env" and len(fields) == 2 and fields[1]:
             env_fields = shlex.split(fields[1])
             if env_fields and env_fields[0] in {"-S", "--split-string"}:
@@ -1358,7 +1362,7 @@ def _post_exec_resolution(
                     ]
                     current_executable = _resolved_executable(Path(resolved))
                     current_bytes = None
-                    current_argv0_is_resolved_path = True
+                    current_argv0_path = resolved
                     continue
         current_argv = [fields[0]]
         if len(fields) == 2 and fields[1]:
@@ -1366,7 +1370,7 @@ def _post_exec_resolution(
         current_argv.extend(previous_argv)
         current_executable = _resolved_executable(Path(fields[0]))
         current_bytes = None
-        current_argv0_is_resolved_path = False
+        current_argv0_path = None
     raise IncarnationHomeError("Codex shebang interpreter chain is too deep")
 
 
