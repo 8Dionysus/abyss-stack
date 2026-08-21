@@ -551,7 +551,9 @@ def _safe_projection_string(value: object, label: str) -> str:
     credential_pattern = re.compile(
         r"(?i)(?<![A-Za-z0-9_-])"
         r"(?P<key_quote>['\"]?)"
-        r"(?P<key>env|environ|environment|token|tokens|secret|secrets|password|"
+        r"(?P<key>access[_-]?token|refresh[_-]?token|client[_-]?secret|"
+        r"auth[_-]?token|session[_-]?token|env|environ|environment|token|"
+        r"tokens|secret|secrets|password|"
         r"credential|credentials|auth|authorization|bearer|api[_-]?key|apikey|"
         r"cookie|cookies)"
         r"(?P=key_quote)(?![A-Za-z0-9_-])"
@@ -5191,14 +5193,13 @@ def command_launch(args: argparse.Namespace) -> int:
                                 companion_binding=companion_binding,
                             )
                             _validate_terminal_binding_shape(candidate["binding"])
-                            _holder_terminal_identity(candidate)
-                            # Only an exact, launch-admitted receipt is a safe
-                            # cleanup target.  A competing launch may publish
-                            # a valid receipt at the same path after both
-                            # callers pass the initial occupancy check; do not
-                            # terminate that winner merely because this launch
-                            # could not admit its receipt.
+                            # Keep an exact, launch-admitted receipt available
+                            # while the post-exec identity can still be a
+                            # transient helper shape.  If admission ultimately
+                            # fails, finally must be able to terminate that
+                            # exact holder rather than leaving the child live.
                             launch_candidate = candidate
+                            _holder_terminal_identity(candidate)
                             receipt = candidate
                             break
                     except IncarnationHomeError:

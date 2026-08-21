@@ -1114,12 +1114,16 @@ def test_holder_receipt_rejects_detached_kitty_route(tmp_path: Path) -> None:
         MODULE.command_launch(args)
 
 
-@pytest.mark.parametrize("reject_receipt", [False, True])
+@pytest.mark.parametrize(
+    ("reject_receipt", "reject_identity"),
+    [(False, False), (True, False), (False, True)],
+)
 def test_detached_launch_publishes_socket_only_binding(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     reject_receipt: bool,
+    reject_identity: bool,
 ) -> None:
     ambient = tmp_path / "ambient"
     runtime_root = tmp_path / "runtime"
@@ -1197,12 +1201,12 @@ def test_detached_launch_publishes_socket_only_binding(
         "_load_holder_receipt",
         lambda _path: {"binding": binding, "holder": binding["holder"]},
     )
+    termination_targets: list[dict[str, object]] = []
     if reject_receipt:
 
         def reject_visible_launch_receipt(**_kwargs: object) -> dict[str, object]:
             raise MODULE.IncarnationHomeError("receipt belongs to another launch")
 
-        termination_targets: list[dict[str, object]] = []
         monkeypatch.setattr(
             MODULE, "_validate_visible_launch_receipt", reject_visible_launch_receipt
         )
@@ -1216,6 +1220,21 @@ def test_detached_launch_publishes_socket_only_binding(
             MODULE,
             "_validate_visible_launch_receipt",
             lambda **kwargs: kwargs["receipt"],
+        )
+    if reject_identity:
+
+        def reject_holder_identity(_receipt: dict[str, object]) -> tuple[object, ...]:
+            raise MODULE.IncarnationHomeError("post-exec identity is transient")
+
+        monkeypatch.setattr(
+            MODULE,
+            "_holder_terminal_identity",
+            reject_holder_identity,
+        )
+        monkeypatch.setattr(
+            MODULE,
+            "_terminate_rejected_visible_launch",
+            lambda receipt: termination_targets.append(receipt) or True,
         )
     captured: dict[str, object] = {}
 
@@ -1238,12 +1257,15 @@ def test_detached_launch_publishes_socket_only_binding(
         codex_arguments=["exec", "--json"],
     )
 
-    if reject_receipt:
+    if reject_receipt or reject_identity:
         with pytest.raises(
             MODULE.IncarnationHomeError, match="did not publish a live terminal binding"
         ):
             MODULE.command_launch(args)
-        assert termination_targets == []
+        if reject_receipt:
+            assert termination_targets == []
+        else:
+            assert len(termination_targets) == 1
         return
 
     assert MODULE.command_launch(args) == 0
@@ -3343,6 +3365,18 @@ def test_safe_projection_redacts_quoted_and_whitespace_credentials() -> None:
     assert MODULE._safe_projection_string(
         r'{"password":"hunter\"suffix"}', "escaped json-shaped title"
     ) == '{"password":"<redacted>"}'
+    assert MODULE._safe_projection_string(
+        "access_token=hunter2", "access token title"
+    ) == "access_token=<redacted>"
+    assert MODULE._safe_projection_string(
+        "refresh-token=hunter2", "refresh token title"
+    ) == "refresh-token=<redacted>"
+    assert MODULE._safe_projection_string(
+        "client_secret=hunter2", "client secret title"
+    ) == "client_secret=<redacted>"
+    assert MODULE._safe_projection_string(
+        "auth_token=hunter2", "auth token title"
+    ) == "auth_token=<redacted>"
 
 
 def test_kitty_projection_rechecks_recorded_socket_identity(
