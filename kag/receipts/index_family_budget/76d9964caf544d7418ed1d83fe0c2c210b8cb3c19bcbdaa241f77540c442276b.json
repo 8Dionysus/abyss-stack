@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 18924313,
+  "allowed_tracked_bytes": 36336238,
+  "approved_by": "repository-owner",
+  "base_ref": "b40fe4a92aa42a8c2abaf52895c1934576f3bedc",
+  "changed_generated_bytes": 18924313,
+  "changed_generated_files": 190,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "76d9964caf544d7418ed1d83fe0c2c210b8cb3c19bcbdaa241f77540c442276b",
+  "reason": "Refresh the exact owner portable family after final visible launch safety repairs in PR 399; preserve the measured standing tracked-size exceedance with an owner-bound generated delta receipt.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36336238,
+  "tracked_bytes_max": 24117248
+}
