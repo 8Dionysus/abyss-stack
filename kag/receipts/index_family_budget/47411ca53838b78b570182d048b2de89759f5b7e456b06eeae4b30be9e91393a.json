@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 21192478,
+  "allowed_tracked_bytes": 36740332,
+  "approved_by": "repository-owner",
+  "base_ref": "3bbdfbc335e6fd29d4c7f5b871ffed617f7081be",
+  "changed_generated_bytes": 21192478,
+  "changed_generated_files": 209,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "47411ca53838b78b570182d048b2de89759f5b7e456b06eeae4b30be9e91393a",
+  "reason": "Owner-reviewed admission gates now require an owner-private parent and visible launches pass the exact redaction-safe terminal title to Kitty and holder binding; focused regression coverage closes the P1/P2 review findings without widening activation or live-proof claims.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36740332,
+  "tracked_bytes_max": 24117248
+}
