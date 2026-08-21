@@ -1279,6 +1279,9 @@ def _post_exec_resolution(
         fields = shebang.split(maxsplit=1)
         if not fields or not fields[0].startswith("/"):
             raise IncarnationHomeError("Codex shebang interpreter is not absolute")
+        previous_argv = current_argv
+        if current_argv0_is_resolved_path:
+            previous_argv = [str(current_executable), *current_argv[1:]]
         if fields[0] == "/usr/bin/env" and len(fields) == 2 and fields[1]:
             env_fields = shlex.split(fields[1])
             if env_fields and env_fields[0] in {"-S", "--split-string"}:
@@ -1301,15 +1304,12 @@ def _post_exec_resolution(
                     current_argv = [
                         env_fields[0],
                         *env_fields[1:],
-                        *current_argv,
+                        *previous_argv,
                     ]
                     current_executable = _resolved_executable(Path(resolved))
                     current_bytes = None
                     current_argv0_is_resolved_path = True
                     continue
-        previous_argv = current_argv
-        if current_argv0_is_resolved_path:
-            previous_argv = [str(current_executable), *current_argv[1:]]
         current_argv = [fields[0]]
         if len(fields) == 2 and fields[1]:
             current_argv.append(fields[1])

@@ -2177,6 +2177,40 @@ def test_post_exec_resolution_recurses_through_nested_env_shebang(
     ) == MODULE.sha256_bytes(final_bytes)
 
 
+def test_post_exec_resolution_preserves_paths_across_consecutive_env_shebangs(
+    tmp_path: Path,
+) -> None:
+    final_interpreter = tmp_path / "final-interpreter"
+    final_bytes = b"final consecutive-env interpreter\n"
+    final_interpreter.write_bytes(final_bytes)
+    final_interpreter.chmod(0o700)
+    python = tmp_path / "bin" / "python"
+    python.parent.mkdir()
+    python.write_text(f"#!{final_interpreter}\n", encoding="utf-8")
+    python.chmod(0o700)
+    node = tmp_path / "bin" / "node"
+    node.write_text("#!/usr/bin/env python\n", encoding="utf-8")
+    node.chmod(0o700)
+    executable = tmp_path / "codex"
+    executable.write_text("#!/usr/bin/env node\n", encoding="utf-8")
+    executable.chmod(0o700)
+
+    assert MODULE._post_exec_argv(
+        executable,
+        [str(executable), "exec"],
+        path=str(node.parent),
+    ) == [
+        str(final_interpreter),
+        str(python),
+        str(node),
+        str(executable),
+        "exec",
+    ]
+    assert MODULE._post_exec_executable_digest(
+        executable, path=str(node.parent)
+    ) == MODULE.sha256_bytes(final_bytes)
+
+
 def test_shebang_snapshot_root_rejects_noexec_filesystem(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
