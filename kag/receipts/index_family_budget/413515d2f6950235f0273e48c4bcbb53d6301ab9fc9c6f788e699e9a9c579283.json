@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 28306539,
+  "allowed_tracked_bytes": 36789016,
+  "approved_by": "repository-owner",
+  "base_ref": "ee372b6e3061dfb7d2c6c74de2656ffc9a584dcf",
+  "changed_generated_bytes": 28306539,
+  "changed_generated_files": 308,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "413515d2f6950235f0273e48c4bcbb53d6301ab9fc9c6f788e699e9a9c579283",
+  "reason": "Owner landing of the rebased resume-projection continuity runtime onto merged #399 current main; refresh the portable family and admit the generated budget receipt so CI sentinel and full parity bind to the exact current-main history without widening activation or live-proof claims.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36789016,
+  "tracked_bytes_max": 24117248
+}
