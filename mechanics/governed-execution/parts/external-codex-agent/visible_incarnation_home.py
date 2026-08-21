@@ -92,6 +92,16 @@ BOOT_ID_PATTERN = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 )
 SHA256_DIGEST_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
+CREDENTIAL_KEY_PATTERN = (
+    r"(?:[A-Za-z0-9]+[_-])*"
+    r"(?:access[_-]?token|refresh[_-]?token|client[_-]?secret|"
+    r"auth[_-]?token|session[_-]?token|access[_-]?key|"
+    r"secret[_-]?access[_-]?key|private[_-]?key|signing[_-]?key|"
+    r"encryption[_-]?key|env|environ|environment|token|tokens|secret|"
+    r"secrets|password|credential|credentials|auth|authorization|bearer|"
+    r"api[_-]?key|apikey|cookie|cookies|key)"
+)
+CREDENTIAL_KEY_RE = re.compile(rf"(?i)^{CREDENTIAL_KEY_PATTERN}$")
 
 
 class IncarnationHomeError(RuntimeError):
@@ -471,6 +481,18 @@ def _proc_identity_state(pid: int, start_ticks: int) -> str:
     return "live"
 
 
+def _wait_for_exact_process_exit(pid: int, start_ticks: int) -> str:
+    """Wait for one exact recorded process to leave the live state."""
+
+    state = _proc_identity_state(pid, start_ticks)
+    for _ in range(40):
+        if state != "live":
+            return state
+        time.sleep(0.25)
+        state = _proc_identity_state(pid, start_ticks)
+    return state
+
+
 def _wait_for_natural_pair_exit(
     *,
     holder_pid: int,
@@ -551,11 +573,7 @@ def _safe_projection_string(value: object, label: str) -> str:
     credential_pattern = re.compile(
         r"(?i)(?<![A-Za-z0-9_-])"
         r"(?P<key_quote>['\"]?)"
-        r"(?P<key>access[_-]?token|refresh[_-]?token|client[_-]?secret|"
-        r"auth[_-]?token|session[_-]?token|env|environ|environment|token|"
-        r"tokens|secret|secrets|password|"
-        r"credential|credentials|auth|authorization|bearer|api[_-]?key|apikey|"
-        r"cookie|cookies)"
+        rf"(?P<key>{CREDENTIAL_KEY_PATTERN})"
         r"(?P=key_quote)(?![A-Za-z0-9_-])"
         r"(?P<separator>\s*[:=]\s*)"
         r"(?P<value>\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|[^,;}\]\r\n]+)",
@@ -609,7 +627,10 @@ def _assert_safe_projection(value: object) -> None:
     if isinstance(value, dict):
         for key, nested in value.items():
             normalized_key = str(key).casefold().replace("-", "_")
-            if normalized_key in SAFE_PROJECTION_FORBIDDEN_KEYS:
+            if (
+                normalized_key in SAFE_PROJECTION_FORBIDDEN_KEYS
+                or CREDENTIAL_KEY_RE.fullmatch(str(key)) is not None
+            ):
                 raise IncarnationHomeError(
                     f"unsafe field entered terminal status projection: {key}"
                 )
@@ -1208,8 +1229,8 @@ def _validate_legacy_holder_process_identity(
         raise IncarnationHomeError("legacy holder Kitty argv identity has drifted")
 
 
-def _send_verified_term(pid: int, start_ticks: int) -> bool:
-    """Send TERM to the exact holder through a pidfd after rechecking it."""
+def _send_verified_signal(pid: int, start_ticks: int, signal_number: int) -> bool:
+    """Send one signal to an exact process identity through a pidfd."""
 
     pidfd_open = getattr(os, "pidfd_open", None)
     pidfd_send_signal = getattr(signal, "pidfd_send_signal", None)
@@ -1223,7 +1244,7 @@ def _send_verified_term(pid: int, start_ticks: int) -> bool:
         if _proc_start_ticks(pid) != start_ticks:
             raise IncarnationHomeError("holder identity changed before signaling")
         try:
-            pidfd_send_signal(pidfd, signal.SIGTERM)
+            pidfd_send_signal(pidfd, signal_number)
         except ProcessLookupError:
             return False
         return True
@@ -1231,6 +1252,18 @@ def _send_verified_term(pid: int, start_ticks: int) -> bool:
         raise IncarnationHomeError("verified holder TERM delivery failed") from exc
     finally:
         os.close(pidfd)
+
+
+def _send_verified_term(pid: int, start_ticks: int) -> bool:
+    """Send TERM to the exact holder through a pidfd after rechecking it."""
+
+    return _send_verified_signal(pid, start_ticks, signal.SIGTERM)
+
+
+def _send_verified_kill(pid: int, start_ticks: int) -> bool:
+    """Escalate to KILL only after rechecking the exact holder identity."""
+
+    return _send_verified_signal(pid, start_ticks, signal.SIGKILL)
 
 
 def _write_atomic_json(
@@ -2664,13 +2697,25 @@ def _validate_visible_launch_receipt(
 
 
 def _terminate_rejected_visible_launch(receipt: dict[str, Any]) -> bool:
-    """Stop the exact holder if parent-side launch admission fails."""
+    """Stop and confirm the exact holder if launch admission fails."""
 
     try:
         holder_pid, holder_start_ticks, _kitty_pid, _kitty_start_ticks = (
             _holder_receipt_process_ids(receipt)
         )
-        return _send_verified_term(holder_pid, holder_start_ticks)
+        state = _proc_identity_state(holder_pid, holder_start_ticks)
+        if state == "gone":
+            return True
+        if state != "live":
+            return False
+        _send_verified_term(holder_pid, holder_start_ticks)
+        state = _wait_for_exact_process_exit(holder_pid, holder_start_ticks)
+        if state == "gone":
+            return True
+        if state != "live":
+            return False
+        _send_verified_kill(holder_pid, holder_start_ticks)
+        return _wait_for_exact_process_exit(holder_pid, holder_start_ticks) == "gone"
     except IncarnationHomeError:
         return False
 
@@ -5058,6 +5103,7 @@ def command_launch(args: argparse.Namespace) -> int:
         cleanup_started = False
         launch_candidate: dict[str, Any] | None = None
         launch_accepted = False
+        rejected_cleanup_error: IncarnationHomeError | None = None
         codex_mount = executable_snapshot_mount
         try:
             if codex_mount is None:
@@ -5232,7 +5278,10 @@ def command_launch(args: argparse.Namespace) -> int:
             return 0
         finally:
             if not launch_accepted and launch_candidate is not None:
-                _terminate_rejected_visible_launch(launch_candidate)
+                if not _terminate_rejected_visible_launch(launch_candidate):
+                    rejected_cleanup_error = IncarnationHomeError(
+                        "rejected visible launch holder did not terminate"
+                    )
             if (
                 executable_snapshot_dir is not None
                 and executable_snapshot_path is not None
@@ -5253,6 +5302,8 @@ def command_launch(args: argparse.Namespace) -> int:
                 os.close(executable_fd)
             except OSError:
                 pass
+            if rejected_cleanup_error is not None:
+                raise rejected_cleanup_error
     (
         executable_fd,
         executable_fd_path,

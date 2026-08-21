@@ -2318,6 +2318,37 @@ def test_verified_term_uses_pidfd_after_identity_recheck(
     assert calls[2] == ("close", 42)
 
 
+def test_rejected_launch_escalates_and_confirms_exact_holder_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        MODULE,
+        "_holder_receipt_process_ids",
+        lambda _receipt: (101, 11, 202, 12),
+    )
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
+    calls: list[str] = []
+    monkeypatch.setattr(
+        MODULE,
+        "_send_verified_term",
+        lambda _pid, _ticks: calls.append("term") or True,
+    )
+    wait_states = iter(["live", "gone"])
+    monkeypatch.setattr(
+        MODULE,
+        "_wait_for_exact_process_exit",
+        lambda _pid, _ticks: calls.append("wait") or next(wait_states),
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_send_verified_kill",
+        lambda _pid, _ticks: calls.append("kill") or True,
+    )
+
+    assert MODULE._terminate_rejected_visible_launch({}) is True
+    assert calls == ["term", "wait", "kill", "wait"]
+
+
 def test_identity_bound_close_records_already_gone_without_reopening_manifest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -3377,6 +3408,18 @@ def test_safe_projection_redacts_quoted_and_whitespace_credentials() -> None:
     assert MODULE._safe_projection_string(
         "auth_token=hunter2", "auth token title"
     ) == "auth_token=<redacted>"
+    assert MODULE._safe_projection_string(
+        "github_token=hunter2", "github token title"
+    ) == "github_token=<redacted>"
+    assert MODULE._safe_projection_string(
+        "database_password=hunter2", "database password title"
+    ) == "database_password=<redacted>"
+    assert MODULE._safe_projection_string(
+        "AWS_SECRET_ACCESS_KEY=hunter2", "cloud secret title"
+    ) == "AWS_SECRET_ACCESS_KEY=<redacted>"
+    assert MODULE._safe_projection_string(
+        "x-api-key=hunter2", "api key title"
+    ) == "x-api-key=<redacted>"
 
 
 def test_kitty_projection_rechecks_recorded_socket_identity(
@@ -3486,6 +3529,20 @@ def test_safe_status_rejects_forbidden_field_even_if_caller_supplies_it() -> Non
         MODULE._emit_safe_json(
             {"schema_version": "test", "environment": {"TOKEN": "secret"}},
             label="unsafe test status",
+        )
+
+
+@pytest.mark.parametrize(
+    "key",
+    ["github_token", "database_password", "AWS_SECRET_ACCESS_KEY", "x-api-key"],
+)
+def test_safe_status_rejects_composite_credential_field(
+    key: str,
+) -> None:
+    with pytest.raises(MODULE.IncarnationHomeError, match="unsafe field"):
+        MODULE._emit_safe_json(
+            {"schema_version": "test", key: "secret"},
+            label="unsafe composite credential test status",
         )
 
 
