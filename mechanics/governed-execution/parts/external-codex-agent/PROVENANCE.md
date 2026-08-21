@@ -15,6 +15,12 @@ meaning into `abyss-stack`:
 | canonical result schema and session-local identity-bound derivative | `abyss-stack` | constrain the model-authored report shape and mechanically bind exact task/incarnation IDs |
 | runtime state/events/result and final workspace manifest | `abyss-stack` | record what process and thread actually ran, what bytes remained, and what it returned |
 
+For a visible responsibility holder, terminal lifecycle evidence is also
+runtime-owned. A `join_completed` or `wake_delivered` authorization binds the
+returned handoff, exact holder receipt, closure path, process identities, and
+required terminal action; it does not promote join evidence into semantic
+re-entry, owner acceptance, master wake, or a domain verdict.
+
 For every admitted posture, `abyss-stack` materializes a fresh runtime-owned
 actor projection from the admitted Git baseline after recording a source
 manifest. File traversal and copying are descriptor-relative. The projection

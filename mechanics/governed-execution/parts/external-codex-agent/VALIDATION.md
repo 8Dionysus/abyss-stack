@@ -341,6 +341,22 @@ argv, process parent, Kitty window/dedication, reserves before signaling, and
 uses pidfd TERM. A live visible trial must separately prove the installed
 release, delivery, holder disappearance, final Kitty disappearance, unrelated-
 terminal preservation, and the resulting closure receipt. The companion
+first detached Kitty window, rejects sibling Kitty children, rejects receipt
+binding for detached/non-dedicated launches, and keeps holder identity separate
+from runtime proof-actor identity. The installed `join` route proves a
+returned responsibility without wake delivery and creates typed
+`join_completed` authorization; the wake route creates the parallel
+`wake_delivered` authorization. The installed `close` route accepts either
+typed authorization (or the legacy wake receipt), binds the exact holder
+receipt digest, PIDs, required terminal action, and reserved closure path; it
+pins and rechecks the validated handoff before publishing join or wake
+authority, records authorization/evidence digests in v2 reservations, and
+replays completed v1 closure receipts only through the matching legacy wake
+route. It rechecks PID/start-ticks, argv, process parent, Kitty
+window/dedication, reserves before signaling, and uses pidfd TERM. A live visible trial must
+separately prove the installed release, the return evidence, holder
+disappearance, final Kitty disappearance, unrelated-terminal preservation,
+and the resulting closure receipt. The companion
 regression additionally proves that an ELF launched from an anonymous memfd
 cannot discover its adjacent code-mode host, while the repaired private
 package coordinate exposes only the digest-bound companion beside the exact

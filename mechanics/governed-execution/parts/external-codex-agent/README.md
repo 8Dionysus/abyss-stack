@@ -34,23 +34,39 @@ The controller:
   supervisor. The receipt includes the exact launch-time incarnation manifest
   bytes as a digest-bound base64 snapshot; after launch, its pathname is
   provenance only, so profile preparation may refresh that pathname without
-  changing holder identity. The installed launcher can close that exact holder terminal only after a
-  separate wake receipt binds the holder receipt and proves delivery. The
+  changing holder identity. The installed launcher closes that exact holder
+  terminal only after typed closure authorization. Authorization may be
+  `wake_delivered` (a separate wake receipt proves delivery) or
+  `join_completed` (a non-waking join proves a returned responsibility); both
+  forms bind the exact holder receipt, handoff, closure path, PIDs, and
+  required `close_exact_bound_holder` action. The join receipt, semantic
+  re-entry, owner acceptance, and master wake remain separate claims. The
   produced handoff must bind both receipt paths under
-  `runtime.responsibility_holder`, while the wake receipt binds the SHA-256 of
-  the exact handoff bytes delivered to the master; after delivery, a host-side
-  bridge may run the closer in the same host unit. A detached visible launch
-  is admitted only with an owner binding context and a
-  unique private Kitty control socket in socket-only mode. The owner `status`
-  command validates the bound PID/start-tick identities and queries Kitty
-  through that socket using a safe allowlist. Its output excludes raw Kitty
-  `ls` payloads, environment, command lines, tokens, and credentials;
-  compositor visibility remains explicitly unknown. `send-text` is a
-  separately invoked terminal transport, not A2A responsibility transfer. The
-  holder receipt also binds the kernel boot ID alongside each process start tick.
-  The closer publishes a
+`runtime.responsibility_holder`, while the evidence receipt binds the SHA-256
+ of the exact handoff bytes. Join and wake authorization validate a pinned
+ handoff snapshot and recheck it immediately before publishing the authority;
+ after delivery or join, a host-side bridge may
+  run the closer in the same host unit. A detached visible launch is admitted
+  only with an owner binding context and a unique private Kitty control socket
+  in socket-only mode. The owner `status` command validates the bound
+  PID/start-tick identities and queries Kitty through that socket using a safe
+  allowlist. Its output excludes raw Kitty `ls` payloads, environment, command
+  lines, tokens, and credentials; compositor visibility remains explicitly
+  unknown. `send-text` is a separately invoked terminal transport, not A2A
+  responsibility transfer. The holder receipt also binds the kernel boot ID
+  alongside each process start tick. The closer publishes a
   recoverable sidecar reservation before signaling. The sidecar records the
   signal attempt before TERM and recovery never repeats an existing attempt;
+  legacy v1 reservations remain replayable only through the legacy
+`--wake-receipt` route, while new reservations use v2. V2 reservations bind
+the authorization and wake/join evidence byte digests, and replay rejects
+either file's byte drift. Completed v1 closure receipts remain schema-valid
+and replay only through their matching legacy wake reservation. A retry after a join
+  write reuses the exact canonical join evidence before publishing missing
+  authorization, and the sidecar keeps the authorization file reference
+  distinct from its actual wake/join evidence reference; a replayed
+  authorization must bind the exact join path and digest, so a concurrent or
+  mismatched join cannot inherit another join's close authority;
   state and final receipts are atomically published with their containing
   directory fsynced before lifecycle progress, and replay of an unclosed
   receipt remains failed. Direct ELF launch uses an inheritable sealed memfd

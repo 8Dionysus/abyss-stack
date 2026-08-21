@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 27720487,
+  "allowed_tracked_bytes": 36287681,
+  "approved_by": "repository-owner",
+  "base_ref": "b40fe4a92aa42a8c2abaf52895c1934576f3bedc",
+  "changed_generated_bytes": 27720487,
+  "changed_generated_files": 308,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "2c0cc5b9b7d01a3a392f7eb0e84f480a8e76ad23f8dc71fe1fe8838267cf89f4",
+  "reason": "Refresh the portable abyss-stack owner family for the typed visible-holder terminal-lifecycle contract; record the measured derived-family budget exceedance without changing the standing KAG limit.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36287681,
+  "tracked_bytes_max": 24117248
+}

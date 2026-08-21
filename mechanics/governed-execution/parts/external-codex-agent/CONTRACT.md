@@ -108,6 +108,14 @@ Operations are:
 - `reentry-status --reentry-id <exact re-entry id>`;
 - `export-a2a-result` with exact writer/reviewer sessions, summon request, and
   output path.
+- `join --holder-receipt ... --handoff ... --join-receipt ... --authorization ...
+  --closure-receipt ...` records a validated non-waking return and creates
+  typed `join_completed` close authority;
+- `authorize-close --holder-receipt ... --wake-receipt ... --handoff ...
+  --authorization ... --closure-receipt ...` converts a newly validated wake
+  delivery into typed `wake_delivered` close authority;
+- `close --holder-receipt ... (--closure-authorization ... | --wake-receipt ...)
+  --handoff ... --closure-receipt ...` closes only the exact bound holder.
 
 The operator-visible incarnation launcher has a separate lifecycle contour for
 the responsibility holder. `launch --holder-receipt <absolute json>` remains
@@ -156,15 +164,21 @@ remains `unknown`. Status is read-only and has no desktop effect.
 `send-text` is a separate explicitly invoked operator transport targeting
 the exact bound socket and window; it is not A2A responsibility transfer.
 These terminal surfaces do not replace the governed JSONL runtime or owner
-acceptance. After a wake bridge has recorded confirmed handoff delivery, the
-installed launcher may run `close --holder-receipt ... --wake-receipt ...
---handoff ... --closure-receipt ...`; before selecting a signal target it
-requires the handoff to bind the exact holder receipt path, receipt digest,
-holder/terminal PIDs, and reserved closure path under
+acceptance. After either a wake bridge has recorded confirmed handoff delivery
+or a non-waking join has recorded a validated returned responsibility, the
+installed launcher may run `close --holder-receipt ...
+--closure-authorization ... --handoff ... --closure-receipt ...`; the legacy
+`--wake-receipt` form remains accepted for the wake route. A `join` receipt is
+not a semantic re-entry, owner acceptance, or master wake. Before selecting a
+signal target, the closer requires typed authorization and a handoff that bind
+the exact holder receipt path, receipt digest, holder/terminal PIDs, required
+`close_exact_bound_holder` action, and reserved closure path under
 `runtime.responsibility_holder`. A producer must not leave the closure path
-only under a live-proof projection. The wake receipt also carries the SHA-256
-of the exact handoff bytes delivered to the master; the closer hashes and
-parses that same snapshot before accepting delivery. It then rechecks the holder's exact
+ only under a live-proof projection. The evidence receipt carries the SHA-256
+ of the exact handoff bytes; join and wake authorization each validate one
+ pinned handoff snapshot and recheck the handoff bytes immediately before
+ publication. The closer hashes and parses that same snapshot before accepting
+ authorization. It then rechecks the holder's exact
 kernel boot ID and PID/start-ticks/argv, its process-parent identity, the recorded Kitty window,
 and the dedicated Kitty process, reserves the closure receipt before
 signaling in a recoverable, atomically published sidecar reservation. The
@@ -172,6 +186,20 @@ sidecar is locked and advanced to a durable signal-attempt state before the
 first `TERM`; each state transition is an atomic replacement under a separate
 stable lock inode, recovery rechecks the completed receipt after lock
 acquisition, and never sends a second `TERM` for an existing attempt. The
+legacy v1 reservation shape remains replayable only through the legacy
+`--wake-receipt` route; new reservations use v2. A v2 reservation also records
+the authorization and evidence byte digests, so replay fails closed if either
+bound file changes. A completed v1 closure receipt remains schema-valid and is
+replayed only with its matching legacy wake reservation and identity bindings.
+A retry after a join write but
+before authorization publication reuses and revalidates the exact canonical
+join bytes, so it can publish the missing authorization without replacing
+evidence. In the sidecar, `authorization_ref` names the typed authorization
+file while the authorization-kind-specific `wake_receipt_ref` or
+`join_receipt_ref` names the actual evidence receipt. The
+reused authorization must also bind that exact join path and digest; a
+concurrent or mismatched join receipt cannot inherit another join's close
+authority.
 final receipt is also published as one complete non-replacing file, and a
 completed `closed: false` receipt remains a failure on replay. Every atomic
 publication fsyncs both the complete file and its containing directory before
@@ -214,7 +242,9 @@ reopening or reconstructing the incarnation marker. A host-side wake route
 may own the bridge and closer in one same-user systemd unit so wake delivery,
 closure, and after-inventory remain ordered even when the visible actor is
 the terminal being closed. Ambiguous, reused, or drifted identities fail
-closed.
+closed. Join completion and wake delivery remain distinct authorization kinds
+in the closure receipt, so a non-waking holder never has to invent a wake
+receipt.
 
 Each CLI call writes one `abyss_stack_external_codex_response_v1` JSON object.
 `start` returns after the independent worker is durably recorded; later calls

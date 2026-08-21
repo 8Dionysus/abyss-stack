@@ -15,6 +15,10 @@ Tracking starts with the community-docs baseline for this repository.
   and explicit directed input through that binding; the status projection
   whitelists safe Kitty fields and never emits environment, command lines,
   tokens, or credentials.
+- Generalize visible external Codex holder closure beyond wake-delivery: a
+  validated non-waking terminal join now emits typed closure authorization, and
+  the exact bound holder remains the only process and Kitty terminal eligible
+  for lifecycle closure.
 - Preserve the packaged `codex-code-mode-host` beside an ELF Codex executable
   when the visible incarnation runtime seals and launches it. The companion
   now shares the same digest-bound private read-only execution coordinate,
