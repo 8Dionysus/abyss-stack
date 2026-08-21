@@ -491,6 +491,7 @@
 
 - [ABYSS-STACK-D-0082 Observability Bind State and Launcher Cgroup Boundary](../ABYSS-STACK-D-0082-observability-bind-state-and-launcher-cgroup-boundary.md) (`docs/decisions/ABYSS-STACK-D-0082-observability-bind-state-and-launcher-cgroup-boundary.md`)
 - [ABYSS-STACK-D-0087 Owner-Bounded MCP Access Fabric](../ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md) (`docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md`)
+- [ABYSS-STACK-D-0126 Typed Visible Holder Closure Authorization](../ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md) (`docs/decisions/ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md`)
 
 ## local evidence
 
@@ -582,6 +583,10 @@
 ## public mirror hygiene
 
 - [ABYSS-STACK-D-0041 Source Hygiene Validator Module](../ABYSS-STACK-D-0041-source-hygiene-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0041-source-hygiene-validator-module.md`)
+
+## public-contract
+
+- [ABYSS-STACK-D-0126 Typed Visible Holder Closure Authorization](../ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md) (`docs/decisions/ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md`)
 
 ## questbook
 

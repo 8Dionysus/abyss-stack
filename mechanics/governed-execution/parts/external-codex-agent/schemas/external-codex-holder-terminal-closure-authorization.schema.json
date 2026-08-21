@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-closure-authorization.schema.json",
+  "title": "Typed visible responsibility-holder terminal closure authorization",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "authorization_ref", "authorization_kind", "authorized_at", "handoff_ref", "handoff_sha256", "holder_receipt_ref", "holder_receipt_sha256", "closure_receipt_ref", "holder_pid", "terminal_pid", "return_status", "terminal_action", "evidence_ref", "evidence_sha256"],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_visible_incarnation_terminal_closure_authorization_v1"},
+    "authorization_ref": {"type": "string", "pattern": "^/"},
+    "authorization_kind": {"enum": ["wake_delivered", "join_completed"]},
+    "authorized_at": {"type": "string", "format": "date-time"},
+    "handoff_ref": {"type": "string", "pattern": "^/"},
+    "handoff_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "holder_receipt_ref": {"type": "string", "pattern": "^/"},
+    "holder_receipt_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "closure_receipt_ref": {"type": "string", "pattern": "^/"},
+    "holder_pid": {"type": "integer", "minimum": 1},
+    "terminal_pid": {"type": "integer", "minimum": 1},
+    "return_status": {"const": "returned"},
+    "terminal_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "required", "authorized"],
+      "properties": {
+        "action": {"const": "close_exact_bound_holder"},
+        "required": {"const": true},
+        "authorized": {"const": true}
+      }
+    },
+    "evidence_ref": {"type": "string", "pattern": "^/"},
+    "evidence_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "wake_receipt_ref": {"type": "string", "pattern": "^/"},
+    "join_receipt_ref": {"type": "string", "pattern": "^/"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["authorization_kind"],
+        "properties": {"authorization_kind": {"const": "wake_delivered"}}
+      },
+      "then": {"required": ["wake_receipt_ref"]}
+    },
+    {
+      "if": {
+        "required": ["authorization_kind"],
+        "properties": {"authorization_kind": {"const": "join_completed"}}
+      },
+      "then": {"required": ["join_receipt_ref"]}
+    }
+  ]
+}

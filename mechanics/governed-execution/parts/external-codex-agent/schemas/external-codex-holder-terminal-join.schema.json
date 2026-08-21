@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-join.schema.json",
+  "title": "Visible responsibility-holder terminal join receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "join_ref", "completed_at", "handoff_ref", "handoff_sha256", "holder_receipt_ref", "holder_receipt_sha256", "closure_receipt_ref", "holder_pid", "terminal_pid", "return", "terminal_action"],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_visible_incarnation_terminal_join_v1"},
+    "join_ref": {"type": "string", "pattern": "^/"},
+    "completed_at": {"type": "string", "format": "date-time"},
+    "handoff_ref": {"type": "string", "pattern": "^/"},
+    "handoff_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "holder_receipt_ref": {"type": "string", "pattern": "^/"},
+    "holder_receipt_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "closure_receipt_ref": {"type": "string", "pattern": "^/"},
+    "holder_pid": {"type": "integer", "minimum": 1},
+    "terminal_pid": {"type": "integer", "minimum": 1},
+    "return": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "validated", "owner_acceptance"],
+      "properties": {
+        "status": {"const": "returned"},
+        "validated": {"const": true},
+        "owner_acceptance": {"const": "separate"}
+      }
+    },
+    "terminal_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "required"],
+      "properties": {
+        "action": {"const": "close_exact_bound_holder"},
+        "required": {"const": true}
+      }
+    }
+  }
+}

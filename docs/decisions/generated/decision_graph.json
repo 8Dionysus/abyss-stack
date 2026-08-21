@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 125,
-  "edge_count": 2827,
+  "decision_count": 126,
+  "edge_count": 2844,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1043,
-    "DATED": 125,
-    "GUARDED_BY": 387,
-    "HAS_STATUS": 125,
-    "HAS_SURFACE_CLASS": 339,
-    "IN_STACK_LANE": 296,
-    "NEXT_DECISION": 124,
-    "OWNED_BY_SURFACE": 131,
-    "OWNS_DECISION": 125,
+    "CITES_SOURCE_SURFACE": 1048,
+    "DATED": 126,
+    "GUARDED_BY": 390,
+    "HAS_STATUS": 126,
+    "HAS_SURFACE_CLASS": 341,
+    "IN_STACK_LANE": 297,
+    "NEXT_DECISION": 125,
+    "OWNED_BY_SURFACE": 132,
+    "OWNS_DECISION": 126,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 130
+    "UNDER_MECHANIC_PARENT": 131
   },
   "edges": [
     {
@@ -13518,12 +13518,92 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0125",
+      "target": "decision:ABYSS-STACK-D-0126",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0125",
       "target": "owner_surface:mcp/services/_shared/codex_http_client.sh",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0125",
       "target": "mechanic_parent:runtime-lifecycle",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0126",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0126",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-closure-authorization.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0126",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-closure.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0126",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-join.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0126",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0126",
+      "target": "date:2026-08-20",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0126",
+      "target": "guard_family:closure%20authorization",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0126",
+      "target": "guard_family:holder%20identity",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0126",
+      "target": "guard_family:terminal%20lifecycle",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0126",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0126",
+      "target": "surface_class:lifecycle",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0126",
+      "target": "surface_class:public-contract",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0126",
+      "target": "stack_lane:governed-execution",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0126",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0126",
+      "target": "mechanic_parent:%60mechanics/governed-execution%60",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -14150,21 +14230,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0125",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0126",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1234,
+  "node_count": 1245,
   "node_type_counts": {
-    "date": 40,
-    "decision": 125,
-    "guard_family": 199,
-    "mechanic_parent": 10,
-    "owner_surface": 67,
+    "date": 41,
+    "decision": 126,
+    "guard_family": 202,
+    "mechanic_parent": 11,
+    "owner_surface": 68,
     "repo": 1,
-    "source_surface": 598,
-    "stack_lane": 50,
+    "source_surface": 600,
+    "stack_lane": 51,
     "status": 4,
-    "surface_class": 140
+    "surface_class": 141
   },
   "nodes": [
     {
@@ -14365,6 +14450,11 @@
     {
       "id": "date:2026-08-19",
       "label": "2026-08-19",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-08-20",
+      "label": "2026-08-20",
       "type": "date"
     },
     {
@@ -15618,6 +15708,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-20",
+      "id": "decision:ABYSS-STACK-D-0126",
+      "label": "ABYSS-STACK-D-0126",
+      "path": "docs/decisions/ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md",
+      "posture": "accepted runtime rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0126 Typed Visible Holder Closure Authorization",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -15745,6 +15845,11 @@
     {
       "id": "guard_family:canonical%20fallback",
       "label": "canonical fallback",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:closure%20authorization",
+      "label": "closure authorization",
       "type": "guard_family"
     },
     {
@@ -16045,6 +16150,11 @@
     {
       "id": "guard_family:handoff%20delivery",
       "label": "handoff delivery",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:holder%20identity",
+      "label": "holder identity",
       "type": "guard_family"
     },
     {
@@ -16588,6 +16698,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:terminal%20lifecycle",
+      "label": "terminal lifecycle",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:test%20topology",
       "label": "test topology",
       "type": "guard_family"
@@ -16611,6 +16726,11 @@
       "id": "guard_family:validation%20lane",
       "label": "validation lane",
       "type": "guard_family"
+    },
+    {
+      "id": "mechanic_parent:%60mechanics/governed-execution%60",
+      "label": "`mechanics/governed-execution`",
+      "type": "mechanic_parent"
     },
     {
       "id": "mechanic_parent:agon-runtime",
@@ -16825,6 +16945,11 @@
     {
       "id": "owner_surface:mechanics/governed-execution/parts/agent-os-adapter/",
       "label": "mechanics/governed-execution/parts/agent-os-adapter/",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:mechanics/governed-execution/parts/external-codex-agent",
+      "label": "mechanics/governed-execution/parts/external-codex-agent",
       "type": "owner_surface"
     },
     {
@@ -18914,8 +19039,18 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-closure-authorization.schema.json",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-closure-authorization.schema.json",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-closure.schema.json",
       "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-closure.schema.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-join.schema.json",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-join.schema.json",
       "type": "source_surface"
     },
     {
@@ -20084,6 +20219,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:governed-execution",
+      "label": "governed-execution",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:human%20review",
       "label": "human review",
       "type": "stack_lane"
@@ -20741,6 +20881,11 @@
     {
       "id": "surface_class:public%20mirror%20hygiene",
       "label": "public mirror hygiene",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:public-contract",
+      "label": "public-contract",
       "type": "surface_class"
     },
     {
