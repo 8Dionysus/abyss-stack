@@ -2997,10 +2997,21 @@ def test_supervisor_executes_verified_open_inode_after_path_replacement(
     )
     executable.chmod(0o700)
     expected_digest = _digest_path(executable)
-    original_open = SUPERVISOR._open_verified_executable
+    original_snapshot = SUPERVISOR._sealed_verified_file_snapshot
 
-    def replace_after_verified_open(path: str, digest: str) -> int:
-        descriptor = original_open(path, digest)
+    def replace_after_verified_snapshot(
+        path: str,
+        digest: str,
+        *,
+        label: str,
+        maximum_bytes: int,
+    ) -> tuple[int, os.stat_result]:
+        descriptor, observed = original_snapshot(
+            path,
+            digest,
+            label=label,
+            maximum_bytes=maximum_bytes,
+        )
         replacement = tmp_path / "replacement"
         replacement.write_text(
             "#!/usr/bin/python3\n"
@@ -3010,12 +3021,12 @@ def test_supervisor_executes_verified_open_inode_after_path_replacement(
         )
         replacement.chmod(0o700)
         replacement.replace(executable)
-        return descriptor
+        return descriptor, observed
 
     monkeypatch.setattr(
         SUPERVISOR,
-        "_open_verified_executable",
-        replace_after_verified_open,
+        "_sealed_verified_file_snapshot",
+        replace_after_verified_snapshot,
     )
 
     process, gate_write_fd = SUPERVISOR._launch_verified_command(

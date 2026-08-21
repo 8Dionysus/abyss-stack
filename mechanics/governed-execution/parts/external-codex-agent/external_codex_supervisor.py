@@ -40,6 +40,10 @@ POLL_INTERVAL_SECONDS = 0.05
 ADOPTED_REAP_INTERVAL_SECONDS = 1.0
 MAX_EXECUTABLE_BYTES = 512 * 1024 * 1024
 MAX_MASK_BYTES = 2 * 1024 * 1024
+# The admitted package contains large immutable helper binaries (notably the
+# code-mode host and ripgrep).  Keep the ordinary actor-mask bound narrow while
+# giving the profile-pinned package members their own bounded snapshot limit.
+MAX_RUNTIME_PACKAGE_MEMBER_BYTES = 128 * 1024 * 1024
 MAX_MOUNT_LAUNCHER_BYTES = 2 * 1024 * 1024
 IDENTITY_DISCOVERY_TIMEOUT_SECONDS = 5.0
 MOUNT_SETUP_TIMEOUT_SECONDS = 5.0
@@ -394,7 +398,6 @@ def _validated_private_directory_views(
                 len(Path(str(view["target"])).parts),
                 str(view["target"]),
             ),
-            reverse=True,
         )
     )
 
@@ -408,13 +411,14 @@ def _launch_verified_command(
     mount_launcher_digest: str | None = None,
     private_directory_views: tuple[dict[str, object], ...] = (),
     read_only_masks: tuple[tuple[str, str, str], ...] = (),
+    runtime_package_mask: bool = False,
     mount_setup_callback: Callable[[], None] | None = None,
     workspace_fd: int | None = None,
     workspace_coordinate: str | None = None,
 ) -> tuple[subprocess.Popen[bytes], int | None]:
     """Execute the digest-verified open file, not a later pathname lookup."""
 
-    descriptor, _ = _open_verified_file(
+    descriptor, executable_stat = _sealed_verified_file_snapshot(
         command[0],
         expected_digest,
         label="Codex executable",
@@ -474,6 +478,7 @@ def _launch_verified_command(
     )
     mask_descriptors: list[int] = []
     view_descriptors: list[int] = []
+    mount_descriptor = -1
     payload_descriptor = -1
     setup_parent_fd = -1
     setup_child_fd = -1
@@ -497,9 +502,6 @@ def _launch_verified_command(
             # the blocked endpoint therefore cannot observe EOF as success.
             "--sync-fd",
             str(gate_write_fd),
-            "--ro-bind-fd",
-            str(descriptor),
-            command[0],
         ]
         if workspace_fd is not None:
             wrapper_command.extend(
@@ -568,20 +570,67 @@ def _launch_verified_command(
                 if kind == "symlink":
                     launcher_attachment["link_target"] = entry["link_target"]
                 launcher_attachments.append(launcher_attachment)
+        command_target = Path(command[0])
+        command_view = next(
+            (
+                item
+                for item in launcher_views
+                if item["target"] == str(command_target.parent)
+            ),
+            None,
+        )
+        if runtime_package_mask and command_view is not None:
+            command_attachments = command_view["attachments"]
+            assert isinstance(command_attachments, list)
+            command_attachments[:] = [
+                item
+                for item in command_attachments
+                if item.get("name") != command_target.name
+            ]
+            command_attachments.append(
+                {
+                    "name": command_target.name,
+                    "kind": "sealed_file",
+                    "snapshot_fd": descriptor,
+                    "size": executable_stat.st_size,
+                    "digest": expected_digest,
+                    "mode": executable_stat.st_mode & 0o7777,
+                }
+            )
+        else:
+            mount_descriptor, _ = _open_verified_file(
+                command[0],
+                expected_digest,
+                label="Codex mount executable",
+                maximum_bytes=MAX_EXECUTABLE_BYTES,
+            )
+            wrapper_command.extend(
+                ("--ro-bind-fd", str(mount_descriptor), command[0])
+            )
         for source, target, digest in read_only_masks:
             if (
                 not Path(target).is_absolute()
                 or Path(target).parent not in view_targets
             ):
                 raise SupervisorError("mount mask target is not absolute")
-            verified_mask_descriptor, verified_mask_stat = _sealed_verified_file_snapshot(
-                source,
-                digest,
-                label="mount mask source",
-                maximum_bytes=MAX_MASK_BYTES,
-            )
+            if runtime_package_mask and Path(source) == Path(command[0]):
+                verified_mask_descriptor = descriptor
+                verified_mask_stat = executable_stat
+            else:
+                verified_mask_descriptor, verified_mask_stat = (
+                    _sealed_verified_file_snapshot(
+                        source,
+                        digest,
+                        label="mount mask source",
+                        maximum_bytes=(
+                            MAX_RUNTIME_PACKAGE_MEMBER_BYTES
+                            if runtime_package_mask
+                            else MAX_MASK_BYTES
+                        ),
+                    )
+                )
+                mask_descriptors.append(verified_mask_descriptor)
             mask_descriptor = verified_mask_descriptor
-            mask_descriptors.append(mask_descriptor)
             launcher_view = next(
                 item
                 for item in launcher_views
@@ -596,6 +645,7 @@ def _launch_verified_command(
                     "snapshot_fd": mask_descriptor,
                     "size": verified_mask_stat.st_size,
                     "digest": digest,
+                    "mode": verified_mask_stat.st_mode & 0o7777,
                 }
             )
         wrapper_command.extend(("--", *command))
@@ -636,6 +686,7 @@ def _launch_verified_command(
                 gate_read_fd,
                 gate_write_fd,
                 *mask_descriptors,
+                *((mount_descriptor,) if mount_descriptor >= 0 else ()),
                 *((workspace_fd,) if workspace_fd is not None else ()),
             ),
         )
@@ -663,6 +714,8 @@ def _launch_verified_command(
         raise
     finally:
         os.close(descriptor)
+        if mount_descriptor >= 0:
+            os.close(mount_descriptor)
         os.close(wrapper_descriptor)
         os.close(launcher_descriptor)
         os.close(python_descriptor)
@@ -1080,6 +1133,7 @@ def _arguments(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--mount-wrapper")
     parser.add_argument("--mount-wrapper-digest")
     parser.add_argument("--mount-launcher-digest")
+    parser.add_argument("--runtime-package-mask", action="store_true")
     parser.add_argument("--workspace-fd", type=int)
     parser.add_argument("--workspace-coordinate")
     parser.add_argument(
@@ -1124,6 +1178,10 @@ def _arguments(argv: list[str]) -> argparse.Namespace:
         )
         not in {0, 3}
         or (arguments.read_only_mask and arguments.mount_wrapper is None)
+        or (
+            arguments.runtime_package_mask
+            and (arguments.mount_wrapper is None or not arguments.read_only_mask)
+        )
         or (arguments.private_directory_view and arguments.mount_wrapper is None)
         or (
             arguments.mount_wrapper is not None
@@ -1183,6 +1241,7 @@ def main(argv: list[str] | None = None) -> int:
                 mount_launcher_digest=arguments.mount_launcher_digest,
                 private_directory_views=arguments.private_directory_views,
                 read_only_masks=tuple(tuple(item) for item in arguments.read_only_mask),
+                runtime_package_mask=arguments.runtime_package_mask,
                 workspace_fd=arguments.workspace_fd,
                 workspace_coordinate=arguments.workspace_coordinate,
             )

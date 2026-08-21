@@ -5283,16 +5283,16 @@ def _runtime_package_mask(binding: Mapping[str, Any]) -> dict[str, Any]:
             "runtime_package_subject_invalid",
             "validated runtime package has no complete immutable member binding",
         )
+    # Keep the executable out of the ordinary mask list because the supervisor
+    # installs its sealed snapshot as the package/bin private-view attachment.
+    # This avoids competing mounts at the command target while preserving the
+    # exact profile-pinned member binding.
     masks = [
         {
             "source": str(package_root / relative_path),
             "target": str(package_root / relative_path),
             "digest": str(members[relative_path]),
         }
-        # The launch executable is separately opened, hashed, and attached by
-        # the supervisor with --ro-bind-fd.  Masking the same target again
-        # would make bubblewrap reject the descriptor binding as a target race;
-        # the descriptor is the stronger lifetime binding for this member.
         for relative_path in RUNTIME_PACKAGE_SUBJECT_ROLES
         if relative_path != "bin/codex"
     ]
@@ -8645,6 +8645,8 @@ class ExternalCodexRuntime:
                     mount_launcher_digest,
                 )
             )
+            if runtime_package_mask is not None:
+                supervisor_argv.append("--runtime-package-mask")
             if workspace_fd is not None:
                 if workspace_fd < 3:
                     raise ExternalCodexRuntimeError(
@@ -16365,6 +16367,8 @@ class ExternalCodexParentReentry:
             executable_digest,
         ]
         if mount_mask is not None:
+            if runtime_package_mask is not None:
+                command_argv.append("--runtime-package-mask")
             command_argv.extend(
                 (
                     "--mount-wrapper",

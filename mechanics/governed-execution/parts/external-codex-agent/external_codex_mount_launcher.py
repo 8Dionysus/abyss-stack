@@ -189,11 +189,20 @@ def _open_view_targets(views: object) -> list[int]:
                 if attachment["kind"] == "sealed_file":
                     if (
                         set(attachment)
-                        != {"name", "kind", "snapshot_fd", "size", "digest"}
+                        != {
+                            "name",
+                            "kind",
+                            "snapshot_fd",
+                            "size",
+                            "digest",
+                            "mode",
+                        }
                         or not isinstance(attachment["snapshot_fd"], int)
                         or attachment["snapshot_fd"] < 3
                         or not isinstance(attachment["size"], int)
                         or attachment["size"] < 0
+                        or not isinstance(attachment["mode"], int)
+                        or attachment["mode"] & ~0o7777
                         or not isinstance(attachment["digest"], str)
                         or not attachment["digest"].startswith("sha256:")
                         or len(attachment["digest"]) != 71
@@ -439,6 +448,7 @@ def _attach_private_views(
                         dir_fd=mount_fd,
                     )
                     if kind == "sealed_file":
+                        os.fchmod(created_fd, int(attachment["mode"]))
                         digest = hashlib.sha256()
                         observed_bytes = 0
                         os.lseek(source_fd, 0, os.SEEK_SET)
