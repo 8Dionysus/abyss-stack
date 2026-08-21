@@ -15,6 +15,14 @@ Tracking starts with the community-docs baseline for this repository.
   status/error evidence, bounds dispatch and close, and propagates the actor's
   real return; the route never creates a recurring schedule or treats a Kitty
   exit alone as proof.
+- Generalize visible external Codex holder closure beyond wake-delivery: a
+  validated non-waking terminal join now emits typed closure authorization, and
+  the exact bound holder remains the only process and Kitty terminal eligible
+  for lifecycle closure.
+- Generalize visible external Codex holder closure beyond wake-delivery: a
+  validated non-waking terminal join now emits typed closure authorization, and
+  the exact bound holder remains the only process and Kitty terminal eligible
+  for lifecycle closure.
 - Preserve the packaged `codex-code-mode-host` beside an ELF Codex executable
   when the visible incarnation runtime seals and launches it. The companion
   now shares the same digest-bound private read-only execution coordinate,

@@ -72,6 +72,12 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-closure.schema.json"
     ),
     Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-closure-authorization.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-join.schema.json"
+    ),
+    Path(
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-receipt.schema.json"
     ),
     Path("schemas/workspace_decision_repo_source_posture.schema.json"),
