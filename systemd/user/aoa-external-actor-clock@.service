@@ -7,7 +7,6 @@ AssertPathExists=%h/.config/aoa/external-actor-clocks/%i.env
 Type=simple
 EnvironmentFile=%h/.config/aoa/external-actor-clocks/%i.env
 WorkingDirectory=%h
-ExecStartPre=/usr/bin/test -x ${AOA_CLOCK_RUNNER}
 # The supervisor remains foreground while the holder Kitty is detached.  It
 # binds one exact title/PID/start-tick, publishes runner status atomically, and
 # returns the runner result to systemd instead of trusting Kitty's client exit.

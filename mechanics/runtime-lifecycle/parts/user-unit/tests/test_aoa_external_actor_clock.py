@@ -171,6 +171,7 @@ class ExternalActorClockTests(unittest.TestCase):
         self.assertIn("Type=simple", unit_text)
         self.assertIn("AssertPathExists=", unit_text)
         self.assertIn("ExecStart=/usr/bin/python3", unit_text)
+        self.assertNotIn("ExecStartPre=", unit_text)
         self.assertIn("KillMode=control-group", unit_text)
         self.assertIn("UMask=0077", unit_text)
         self.assertIn("aoa-external-actor-clock@.service", managed.read_text(encoding="utf-8"))
