@@ -1276,6 +1276,9 @@ RUNTIME_PACKAGE_SUBJECT_ROLES = {
     "codex-path/rg": "bundled_ripgrep",
     "codex-resources/bwrap": "bundled_bubblewrap",
 }
+RUNTIME_PACKAGE_ADMISSION_CLASSES = frozenset(
+    {"owner_contour", "transport_study_fixture"}
+)
 
 
 def validate_runtime_package_binding(
@@ -8343,7 +8346,7 @@ class ExternalCodexRuntime:
             raise ExternalCodexRuntimeError(
                 "codex_executable_drift", "Codex executable digest changed"
             )
-        if launch.get("admission_class") == "owner_contour":
+        if launch.get("admission_class") in RUNTIME_PACKAGE_ADMISSION_CLASSES:
             runtime_package_binding = validate_runtime_package_binding(
                 launch.get("runtime_package"),
                 expected_runtime_subject=self.profile["model_admission"][
@@ -11891,7 +11894,7 @@ Runtime session identity: {state["session_id"]}
                 tool_entry,
                 repository_workspace=self._projection_path_from_state(state),
             )
-            if launch.get("admission_class") == "owner_contour":
+            if launch.get("admission_class") in RUNTIME_PACKAGE_ADMISSION_CLASSES:
                 runtime_package_binding = validate_runtime_package_binding(
                     launch.get("runtime_package"),
                     expected_runtime_subject=self.profile["model_admission"][

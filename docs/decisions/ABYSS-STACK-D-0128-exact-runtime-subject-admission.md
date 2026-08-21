@@ -40,8 +40,9 @@ exact `content_addressed_runtime_package` subject. Runtime admission retains
 the existing product/version/transport/access/lifecycle checks and additionally
 requires the realization's complete `configuration.runtime.runtime_subject`
 mapping to equal the profile's `model_admission.runtime_subject` mapping.
-An owner-contour launch must additionally carry the owner-selected package root
-and digest-bound artifact identity/subjects sidecars. Binding and preflight
+Every executable launch class, including bounded transport-study fixtures,
+must carry the selected package root and digest-bound artifact
+identity/subjects sidecars. Binding and preflight
 verify the sidecar identity, package manifest, executable, code-mode host,
 bundled helpers, and compatibility entrypoint against that exact subject.
 The profile separately pins the artifact-subject aggregate and every

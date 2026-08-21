@@ -424,6 +424,14 @@ same isolated projection posture as their corresponding generic read or write
 contour; the names preserve model-organ ABI and do not select a role, model,
 procedure, route, or acceptance outcome.
 
+`prepare_landing_study.py prepare-writers` is also package-bound: callers must
+provide one exact runtime package root, its digest-bound artifact identity and
+artifact subjects sidecars, and the selected `bin/codex` executable. The
+preparer validates those coordinates against the runtime profile and emits the
+same `runtime_package` binding on every transport-study writer launch. Reviewer
+preparation forwards that package and the writer's exact runtime-profile
+coordinate unchanged.
+
 `prepare_landing_study.py prepare-reviewer` is the canonical non-starting
 review preparation path for both historical transport-study writers and admitted
 owner-contour writers. It accepts an exact terminal read-only or bounded

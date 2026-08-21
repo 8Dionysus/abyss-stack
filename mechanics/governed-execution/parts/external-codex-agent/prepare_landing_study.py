@@ -84,6 +84,7 @@ from external_codex_agent import (  # noqa: E402
     build_workspace_manifest,
     load_json,
     sha256_bytes,
+    validate_runtime_package_binding,
     validate_json,
 )
 
@@ -1040,6 +1041,37 @@ def _artifact_coordinate(path: Path) -> dict[str, str]:
     return {"path": str(path.resolve()), "digest": _file_digest(path)}
 
 
+def _runtime_package_coordinates(args: argparse.Namespace) -> dict[str, Any]:
+    package_root = Path(args.runtime_package_root)
+    artifact_identity = Path(args.runtime_package_artifact_identity)
+    artifact_subjects = Path(args.runtime_package_artifact_subjects)
+    if (
+        not package_root.is_absolute()
+        or package_root.is_symlink()
+        or not package_root.is_dir()
+        or package_root.resolve() != package_root
+    ):
+        raise StudyPreparationError(
+            "runtime package root must be one exact absolute real directory"
+        )
+    coordinates: dict[str, Any] = {"package_root": str(package_root)}
+    for name, path in (
+        ("artifact_identity", artifact_identity),
+        ("artifact_subjects", artifact_subjects),
+    ):
+        if (
+            not path.is_absolute()
+            or path.is_symlink()
+            or not path.is_file()
+            or path.resolve() != path
+        ):
+            raise StudyPreparationError(
+                f"runtime package {name} must be one exact absolute real file"
+            )
+        coordinates[name] = _artifact_coordinate(path)
+    return coordinates
+
+
 def _append_unique_refs(
     values: Sequence[ProvenanceRef],
     *extra: ProvenanceRef,
@@ -1273,9 +1305,30 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
     manifest_path = Path(args.workspace_manifest).resolve()
     codex_executable = Path(args.codex_executable).resolve()
     codex_home = Path(args.codex_home).resolve()
-
+    runtime_package = _runtime_package_coordinates(args)
     if not workspace.is_dir() or not codex_executable.is_file() or not codex_home.is_dir():
         raise StudyPreparationError("workspace, Codex executable, or Codex home is unavailable")
+    runtime_profile_payload = load_json(PROFILE_PATH, label="runtime profile")
+    try:
+        validate_runtime_package_binding(
+            runtime_package,
+            expected_runtime_subject=runtime_profile_payload["model_admission"][
+                "runtime_subject"
+            ],
+            expected_runtime_package_subject=runtime_profile_payload[
+                "model_admission"
+            ]["runtime_package_subject"],
+            expected_runtime_version=runtime_profile_payload["model_admission"][
+                "runtime_version"
+            ],
+            codex_executable=codex_executable,
+            codex_executable_digest=_file_digest(codex_executable),
+        )
+    except (ExternalCodexRuntimeError, KeyError, TypeError) as exc:
+        raise StudyPreparationError(
+            "runtime package is not the exact profile-admitted Codex package"
+        ) from exc
+
     for target in (output_root, state_root):
         try:
             target.relative_to(workspace)
@@ -1998,6 +2051,7 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
             "workspace_manifest_input_id": "workspace-manifest",
             "codex_executable": str(codex_executable),
             "codex_executable_digest": _file_digest(codex_executable),
+            "runtime_package": runtime_package,
             "codex_home": str(codex_home),
             "environment_allowlist": [
                 "HOME",
@@ -2154,6 +2208,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
             "result_schema",
         )
     }
+    runtime_profile_path = coordinate_paths["runtime_profile"]
     writer_result = load_json(writer_result_path, label="writer runtime result")
     validate_json(writer_result, RESULT_SCHEMA_PATH, label="writer runtime result")
     if writer_result.get("admission_class") != writer_admission_class:
@@ -2457,9 +2512,9 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
             "reviewer realization is not the explicit read-only no-external-effect contour"
         )
     reviewer_tool_profile_id = str(reviewer_tools.get("profile_ref", ""))
-    runtime_profile_payload = load_json(PROFILE_PATH, label="runtime profile")
+    runtime_profile_payload = load_json(runtime_profile_path, label="runtime profile")
     reviewer_runtime_profile = load_abyss_stack_external_codex_runtime_profile(
-        PROFILE_PATH
+        runtime_profile_path
     )
     reviewer_tool_entries = [
         item
@@ -3225,7 +3280,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         "incarnation_binding": _artifact_coordinate(binding_path),
         "model_realization": _artifact_coordinate(reviewer_realization_path),
         "task": _artifact_coordinate(task_path),
-        "runtime_profile": _artifact_coordinate(PROFILE_PATH),
+        "runtime_profile": _artifact_coordinate(runtime_profile_path),
         "role_contract": _artifact_coordinate(reviewer_role_path),
         "result_schema": writer_launch["result_schema"],
         "workspace_path": str(workspace),
@@ -3238,6 +3293,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         },
         "codex_executable": writer_launch["codex_executable"],
         "codex_executable_digest": writer_launch["codex_executable_digest"],
+        "runtime_package": writer_launch["runtime_package"],
         "codex_home": writer_launch["codex_home"],
         "environment_allowlist": writer_launch["environment_allowlist"],
     }
@@ -3361,6 +3417,9 @@ def build_parser() -> argparse.ArgumentParser:
     writers.add_argument("--aoa-sdk-root", required=True)
     writers.add_argument("--codex-executable", required=True)
     writers.add_argument("--codex-home", required=True)
+    writers.add_argument("--runtime-package-root", required=True)
+    writers.add_argument("--runtime-package-artifact-identity", required=True)
+    writers.add_argument("--runtime-package-artifact-subjects", required=True)
 
     reviewer = subparsers.add_parser("prepare-reviewer")
     reviewer.add_argument("--writer-launch", required=True)

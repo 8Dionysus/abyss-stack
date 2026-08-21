@@ -4,7 +4,7 @@
   "title": "Exact delivery binding for one external Codex incarnation",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "launch_id", "session_id", "admission_class", "plan", "incarnation_binding", "model_realization", "task", "runtime_profile", "role_contract", "result_schema", "workspace_path", "workspace_expected_head", "workspace_initial_posture", "workspace_manifest_input_id", "codex_executable", "codex_executable_digest", "codex_home", "environment_allowlist"],
+  "required": ["schema_version", "launch_id", "session_id", "admission_class", "plan", "incarnation_binding", "model_realization", "task", "runtime_profile", "role_contract", "result_schema", "workspace_path", "workspace_expected_head", "workspace_initial_posture", "workspace_manifest_input_id", "codex_executable", "codex_executable_digest", "runtime_package", "codex_home", "environment_allowlist"],
   "properties": {
     "schema_version": {"const": "abyss_stack_external_codex_launch_v1"},
     "launch_id": {"type": "string", "minLength": 1},

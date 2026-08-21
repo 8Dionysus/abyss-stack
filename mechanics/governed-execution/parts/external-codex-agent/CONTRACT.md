@@ -280,8 +280,8 @@ Before launch the controller verifies:
 5. the model realization names Codex CLI `0.148.0`, ChatGPT quota/login,
    `exec-jsonl`, one admitted model/effort, the exact content-addressed runtime
    subject admitted by the runtime profile, and the exact runtime tool profile;
-   an `owner_contour` launch also carries the runtime package root plus
-   digest-bound artifact identity and subjects sidecars. The controller checks
+   every launch class carries the runtime package root plus digest-bound
+   artifact identity and subjects sidecars. The controller checks
    that inventory against the package manifest, executable, adjacent
    `codex-code-mode-host`, bundled `rg`, and bundled `bwrap`; the profile pins
    the subjects aggregate and every inventoried member digest. Those package
@@ -307,7 +307,8 @@ Before launch the controller verifies:
 11. the task carries the complete runtime-wide forbidden-effect set; terminal
     classification applies that same set independently of task input;
 12. `transport_study_fixture` is admitted only as bounded compatibility
-    evidence and may retain historical SDK incarnation binding v1 receipts.
+    evidence, still uses the exact runtime package admission and may retain
+    historical SDK incarnation binding v1 receipts.
     `owner_contour` additionally requires a separate exact `aoa-agents`
     `summon-request-v4`, validated against its runtime-profile-pinned owner
     bytes, plus SDK incarnation binding v2. Their obligation, mandate, exact

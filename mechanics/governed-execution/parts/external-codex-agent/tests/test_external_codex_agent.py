@@ -2088,6 +2088,24 @@ def _fixture(
         ),
         schema_version="abyss_stack_external_codex_task_v1",
     )
+    fake_codex = tmp_path / "fake-codex"
+    _fake_codex(fake_codex)
+    runtime_package = _runtime_package_fixture(tmp_path, fake_codex)
+    runtime_package_subject = (
+        runtime_package["subject"] if runtime_package is not None else None
+    )
+    if runtime_package is not None:
+        runtime_package = {
+            key: value for key, value in runtime_package.items() if key != "subject"
+        }
+    runtime_profile_path = PROFILE_PATH
+    if runtime_package_subject is not None:
+        runtime_profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+        runtime_profile["model_admission"]["runtime_package_subject"] = (
+            runtime_package_subject
+        )
+        runtime_profile_path = tmp_path / "fixture-runtime-profile.json"
+        _write_json(runtime_profile_path, runtime_profile)
     plan = _adapt_plan(
         task_ref=task_ref,
         summon_request_ref=summon_request_ref,
@@ -2123,6 +2141,21 @@ def _fixture(
         plan = plan.model_copy(
             update={
                 "scenario_binding": mixed_scenario,
+                "plan_digest": ZERO_DIGEST,
+            }
+        )
+        plan = plan.model_copy(
+            update={"plan_digest": canonical_digest(plan, exclude={"plan_digest"})}
+        )
+    if runtime_profile_path != PROFILE_PATH:
+        fixture_runtime_profile = load_abyss_stack_external_codex_runtime_profile(
+            runtime_profile_path
+        )
+        plan = plan.model_copy(
+            update={
+                "runtime_profile": fixture_runtime_profile.model_copy(
+                    update={"constraint_refs": plan.runtime_profile.constraint_refs}
+                ),
                 "plan_digest": ZERO_DIGEST,
             }
         )
@@ -2315,18 +2348,6 @@ def _fixture(
             owner_request_binding_path,
             owner_request_binding.model_dump(mode="json"),
         )
-    fake_codex = tmp_path / "fake-codex"
-    _fake_codex(fake_codex)
-    runtime_package = (
-        _runtime_package_fixture(tmp_path, fake_codex) if owner_contour else None
-    )
-    runtime_package_subject = (
-        runtime_package["subject"] if runtime_package is not None else None
-    )
-    if runtime_package is not None:
-        runtime_package = {
-            key: value for key, value in runtime_package.items() if key != "subject"
-        }
     launch_codex = (
         Path(runtime_package["package_root"]) / "bin/codex"
         if runtime_package is not None
@@ -2357,8 +2378,8 @@ def _fixture(
         },
         "task": {"path": str(task_path), "digest": _digest_path(task_path)},
         "runtime_profile": {
-            "path": str(PROFILE_PATH),
-            "digest": _digest_path(PROFILE_PATH),
+            "path": str(runtime_profile_path),
+            "digest": _digest_path(runtime_profile_path),
         },
         "role_contract": {"path": str(role_path), "digest": _digest_path(role_path)},
         "result_schema": {
@@ -2450,14 +2471,10 @@ def _fixture(
         )
         owner_execution_request_path = tmp_path / "owner-execution-request.json"
         _write_json(owner_execution_request_path, owner_execution_request)
-    runtime = RUNTIME.ExternalCodexRuntime(state_root or (tmp_path / "state"))
-    if runtime_package_subject is not None:
-        # The fixture package is intentionally synthetic.  Keep the production
-        # validator profile-pinned while giving this isolated test runtime the
-        # exact synthetic subject it just created.
-        runtime.profile["model_admission"]["runtime_package_subject"] = (
-            runtime_package_subject
-        )
+    runtime = RUNTIME.ExternalCodexRuntime(
+        state_root or (tmp_path / "state"),
+        profile_path=runtime_profile_path,
+    )
     if not exact_preflight:
         runtime._codex_preflight = MethodType(  # type: ignore[method-assign]
             _fixture_codex_preflight,
@@ -2468,6 +2485,7 @@ def _fixture(
         "launch_path": launch_path,
         "launch": launch,
         "runtime_package_subject": runtime_package_subject,
+        "runtime_profile_path": runtime_profile_path,
         "binding_path": binding_path,
         "task_path": task_path,
         "role_path": role_path,
@@ -4066,8 +4084,9 @@ def test_preflight_and_separate_process_return_structured_result(
     assert argv[argv.index("--mount-wrapper") + 1] == "/usr/bin/bwrap"
     assert "--workspace-fd" in argv
     assert argv[argv.index("--workspace-coordinate") + 1] == str(ACTOR_EXECUTION_ROOT)
-    assert "--private-directory-view" not in argv
-    assert "--read-only-mask" not in argv
+    assert "--private-directory-view" in argv
+    assert "--read-only-mask" in argv
+    assert "--runtime-package-mask" in argv
     assert "/usr/bin/unshare" not in argv
     assert "/usr/bin/setpriv" not in argv
     assert "exec" in argv
@@ -5272,7 +5291,7 @@ def test_cli_brokers_mcp_credential_outside_process_environments_and_denies_proc
             "--state-root",
             str(fixture["runtime"].state_root),
             "--profile",
-            str(PROFILE_PATH),
+            str(fixture["runtime_profile_path"]),
             "--launch",
             str(fixture["launch_path"]),
         ],
@@ -5586,7 +5605,10 @@ def test_reviewer_preparation_forwards_exact_writer_evidence_without_starting(
     retired_source = tmp_path / "retired-writer-source"
     fixture["workspace"].rename(retired_source)
     assert not fixture["workspace"].exists()
-    reviewer_runtime = RUNTIME.ExternalCodexRuntime(reviewer_state_root)
+    reviewer_runtime = RUNTIME.ExternalCodexRuntime(
+        reviewer_state_root,
+        profile_path=fixture["runtime_profile_path"],
+    )
     assert (
         reviewer_runtime.preflight(Path(preparation["launch_path"]))["admitted"] is True
     )
@@ -5803,9 +5825,7 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
     assert reviewer_launch["workspace_manifest_input_id"] == (
         "review-workspace-manifest"
     )
-    assert reviewer_launch["runtime_profile"] == PREPARER._artifact_coordinate(
-        PREPARER.PROFILE_PATH
-    )
+    assert reviewer_launch["runtime_profile"] == fixture["launch"]["runtime_profile"]
     assert (
         reviewer_binding["runtime_profile_ref"]
         == reviewer_plan["runtime_profile"]["provenance"]
@@ -5874,7 +5894,10 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
         "review-workspace-manifest",
     }.issubset(reviewer_input_ids)
 
-    reviewer_runtime = RUNTIME.ExternalCodexRuntime(runtime.state_root)
+    reviewer_runtime = RUNTIME.ExternalCodexRuntime(
+        runtime.state_root,
+        profile_path=fixture["runtime_profile_path"],
+    )
     assert reviewer_runtime.preflight(reviewer_launch_path)["admitted"] is True
     reviewer_runtime.start(reviewer_launch_path)
     reviewer_session_id = preparation["reviewer_session_id"]
@@ -6211,6 +6234,18 @@ def test_owner_contour_requires_separate_semantic_admission(tmp_path: Path) -> N
         fixture["runtime"].preflight(fixture["launch_path"])
 
     assert exc_info.value.code == "owner_contour_admission_unbound"
+
+
+def test_transport_study_requires_runtime_package(tmp_path: Path) -> None:
+    fixture = _fixture(tmp_path)
+    launch = json.loads(fixture["launch_path"].read_text(encoding="utf-8"))
+    launch.pop("runtime_package")
+    _write_json(fixture["launch_path"], launch)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        fixture["runtime"].preflight(fixture["launch_path"])
+
+    assert exc_info.value.code == "schema_validation_failed"
 
 
 @pytest.mark.skipif(
