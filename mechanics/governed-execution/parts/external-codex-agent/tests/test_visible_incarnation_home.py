@@ -4413,7 +4413,18 @@ def test_directed_input_uses_bound_socket_and_window_only(
         ),
     )
     monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_kwargs: ("7", True))
-    monkeypatch.setattr(MODULE, "_proc_argv", lambda _pid: ["/usr/bin/kitty", "--detach"])
+    expected_holder_argv = ["/usr/bin/codex", "exec"]
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: expected_holder_argv
+        if pid == holder["pid"]
+        else ["/usr/bin/kitty", "--detach"],
+    )
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
+    monkeypatch.setattr(
+        MODULE, "_proc_exe_digest", lambda _pid: holder["exe_digest"]
+    )
 
     def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         calls["argv"] = argv
@@ -4440,6 +4451,59 @@ def test_directed_input_uses_bound_socket_and_window_only(
         assert not {"focus-window", "move-window", "close-window"}.intersection(argv)
         assert calls["kwargs"]["input"] == "status\n"
         assert "env" not in capsys.readouterr().out.casefold()
+    finally:
+        listener.close()
+
+
+def test_directed_input_rechecks_bound_holder_identity_before_send(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    monkeypatch.setattr(
+        MODULE,
+        "_load_terminal_binding_input",
+        lambda **_kwargs: (binding, holder, terminal, None, None),
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_observe_terminal_binding",
+        lambda **_kwargs: (
+            {"observation": {"kitty_query": "present"}},
+            "live",
+        ),
+    )
+    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_kwargs: ("7", True))
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: ["/usr/bin/replacement-codex", "exec"]
+        if pid == holder["pid"]
+        else ["/usr/bin/kitty", "--detach"],
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_exe_digest",
+        lambda _pid: holder["exe_digest"],
+    )
+    monkeypatch.setattr(
+        MODULE.subprocess,
+        "run",
+        lambda *_args, **_kwargs: pytest.fail(
+            "directed input bypassed holder identity recheck"
+        ),
+    )
+    try:
+        with pytest.raises(MODULE.IncarnationHomeError, match="argv identity has drifted"):
+            MODULE.command_send_text(
+                MODULE.argparse.Namespace(
+                    binding=str(tmp_path / "binding.json"),
+                    holder_receipt=None,
+                    binding_context=None,
+                    kitty_executable="/usr/bin/kitty",
+                    text="status\n",
+                )
+            )
     finally:
         listener.close()
 

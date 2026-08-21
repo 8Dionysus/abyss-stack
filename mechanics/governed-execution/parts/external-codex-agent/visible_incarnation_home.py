@@ -863,6 +863,37 @@ def _load_binding_context_snapshot(raw: bytes) -> dict[str, str]:
     )
 
 
+def _revalidate_bound_holder_identity(holder: dict[str, object]) -> None:
+    """Recheck the bound holder identity at the directed-input boundary."""
+
+    holder_pid = holder.get("pid")
+    holder_start_ticks = holder.get("start_ticks")
+    if not isinstance(holder_pid, int) or not isinstance(holder_start_ticks, int):
+        raise IncarnationHomeError("directed input holder identity is invalid")
+    if _proc_identity_state(holder_pid, holder_start_ticks) != "live":
+        raise IncarnationHomeError(
+            "directed input holder process identity is no longer live"
+        )
+    holder_argv_digest = holder.get("argv_digest")
+    if not isinstance(holder_argv_digest, str) or not SHA256_DIGEST_PATTERN.fullmatch(
+        holder_argv_digest
+    ):
+        raise IncarnationHomeError("directed input holder argv identity is invalid")
+    if sha256_bytes(canonical_bytes(_proc_argv(holder_pid))) != holder_argv_digest:
+        raise IncarnationHomeError("directed input holder argv identity has drifted")
+    holder_exe_digest = holder.get("exe_digest")
+    if not isinstance(holder_exe_digest, str) or not SHA256_DIGEST_PATTERN.fullmatch(
+        holder_exe_digest
+    ):
+        raise IncarnationHomeError(
+            "directed input holder executable identity is invalid"
+        )
+    if _proc_exe_digest(holder_pid) != holder_exe_digest:
+        raise IncarnationHomeError(
+            "directed input holder executable identity has drifted"
+        )
+
+
 def _terminal_binding(
     *,
     context: dict[str, str],
@@ -3382,6 +3413,7 @@ def command_send_text(args: argparse.Namespace) -> int:
         expected_device=socket_record["device"],
         expected_inode=socket_record["inode"],
     )
+    _revalidate_bound_holder_identity(holder)
     try:
         completed = subprocess.run(
             [
