@@ -4397,7 +4397,6 @@ def command_launch(args: argparse.Namespace) -> int:
                 if holder_receipt_path.exists():
                     try:
                         candidate = _load_holder_receipt(holder_receipt_path)
-                        launch_candidate = candidate
                         if (
                             isinstance(candidate.get("binding"), dict)
                             and candidate["binding"].get("remote_control")
@@ -4419,6 +4418,13 @@ def command_launch(args: argparse.Namespace) -> int:
                             )
                             _validate_terminal_binding_shape(candidate["binding"])
                             _holder_terminal_identity(candidate)
+                            # Only an exact, launch-admitted receipt is a safe
+                            # cleanup target.  A competing launch may publish
+                            # a valid receipt at the same path after both
+                            # callers pass the initial occupancy check; do not
+                            # terminate that winner merely because this launch
+                            # could not admit its receipt.
+                            launch_candidate = candidate
                             receipt = candidate
                             break
                     except IncarnationHomeError:

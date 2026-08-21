@@ -1114,10 +1114,12 @@ def test_holder_receipt_rejects_detached_kitty_route(tmp_path: Path) -> None:
         MODULE.command_launch(args)
 
 
+@pytest.mark.parametrize("reject_receipt", [False, True])
 def test_detached_launch_publishes_socket_only_binding(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    reject_receipt: bool,
 ) -> None:
     ambient = tmp_path / "ambient"
     runtime_root = tmp_path / "runtime"
@@ -1195,11 +1197,26 @@ def test_detached_launch_publishes_socket_only_binding(
         "_load_holder_receipt",
         lambda _path: {"binding": binding, "holder": binding["holder"]},
     )
-    monkeypatch.setattr(
-        MODULE,
-        "_validate_visible_launch_receipt",
-        lambda **kwargs: kwargs["receipt"],
-    )
+    if reject_receipt:
+
+        def reject_visible_launch_receipt(**_kwargs: object) -> dict[str, object]:
+            raise MODULE.IncarnationHomeError("receipt belongs to another launch")
+
+        termination_targets: list[dict[str, object]] = []
+        monkeypatch.setattr(
+            MODULE, "_validate_visible_launch_receipt", reject_visible_launch_receipt
+        )
+        monkeypatch.setattr(
+            MODULE,
+            "_terminate_rejected_visible_launch",
+            lambda receipt: termination_targets.append(receipt) or True,
+        )
+    else:
+        monkeypatch.setattr(
+            MODULE,
+            "_validate_visible_launch_receipt",
+            lambda **kwargs: kwargs["receipt"],
+        )
     captured: dict[str, object] = {}
 
     def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
@@ -1220,6 +1237,14 @@ def test_detached_launch_publishes_socket_only_binding(
         codex_executable=str(executable),
         codex_arguments=["exec", "--json"],
     )
+
+    if reject_receipt:
+        with pytest.raises(
+            MODULE.IncarnationHomeError, match="did not publish a live terminal binding"
+        ):
+            MODULE.command_launch(args)
+        assert termination_targets == []
+        return
 
     assert MODULE.command_launch(args) == 0
     argv = captured["argv"]
