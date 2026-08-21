@@ -3422,6 +3422,13 @@ def test_safe_projection_redacts_quoted_and_whitespace_credentials() -> None:
     ) == "x-api-key=<redacted>"
 
 
+def test_socket_path_rejects_credential_shaped_text() -> None:
+    with pytest.raises(MODULE.IncarnationHomeError, match="credential-shaped"):
+        MODULE._socket_path(
+            "unix:/run/user/1000/password=hunter2/kitty.sock"
+        )
+
+
 def test_kitty_projection_rechecks_recorded_socket_identity(
     tmp_path: Path,
 ) -> None:

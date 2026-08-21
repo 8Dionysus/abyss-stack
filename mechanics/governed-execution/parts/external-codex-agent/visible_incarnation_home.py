@@ -659,6 +659,8 @@ def _socket_path(address: object, label: str = "control socket") -> Path:
         or len(str(path)) > CONTROL_SOCKET_MAX_LENGTH
     ):
         raise IncarnationHomeError(f"{label} path is not an absolute private socket")
+    if _safe_projection_string(os.fspath(path), label) != os.fspath(path):
+        raise IncarnationHomeError(f"{label} path contains credential-shaped text")
     return path
 
 
