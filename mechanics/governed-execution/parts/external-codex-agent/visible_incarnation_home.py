@@ -578,18 +578,40 @@ def _safe_projection_string(value: object, label: str) -> str:
         r"(?P<separator>\s*[:=]\s*)"
         r"(?P<value>\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|[^,;}\]\r\n]+)",
     )
+    escaped_credential_pattern = re.compile(
+        r"(?i)(?<![A-Za-z0-9_-])"
+        r"(?P<key_escape>\\+)(?P<key_quote>['\"])"
+        rf"(?P<key>{CREDENTIAL_KEY_PATTERN})"
+        r"(?P=key_escape)(?P=key_quote)(?![A-Za-z0-9_-])"
+        r"(?P<separator>\s*[:=]\s*)"
+        r"(?P<value>"
+        r"(?P<value_escape>\\+)(?P<value_quote>['\"])(?:\\.|[^\\])*?"
+        r"(?P=value_escape)(?P=value_quote)"
+        r"|[^,;}\]\r\n]+)",
+    )
 
     def redact(match: re.Match[str]) -> str:
         raw_value = match.group("value")
-        if raw_value[:1] in {'"', "'"} and raw_value[-1:] == raw_value[:1]:
+        escaped_quoted = re.fullmatch(
+            r"(\\+)(['\"])(.*?)(\\+)\2", raw_value, flags=re.DOTALL
+        )
+        if escaped_quoted is not None:
+            raw_value = (
+                f"{escaped_quoted.group(1)}{escaped_quoted.group(2)}"
+                f"<redacted>{escaped_quoted.group(4)}{escaped_quoted.group(2)}"
+            )
+        elif raw_value[:1] in {'"', "'"} and raw_value[-1:] == raw_value[:1]:
             raw_value = f"{raw_value[0]}<redacted>{raw_value[0]}"
         else:
             raw_value = "<redacted>"
         return (
+            f"{match.groupdict().get('key_escape') or ''}"
             f"{match.group('key_quote')}{match.group('key')}"
+            f"{match.groupdict().get('key_escape') or ''}"
             f"{match.group('key_quote')}{match.group('separator')}{raw_value}"
         )
 
+    value = escaped_credential_pattern.sub(redact, value)
     return credential_pattern.sub(redact, value)
 
 
@@ -843,6 +865,46 @@ def _terminal_binding(
         }
     _assert_safe_projection(binding)
     return binding
+
+
+def _validate_receipt_binding_consistency(
+    receipt: dict[str, Any], binding: dict[str, object]
+) -> None:
+    """Require the embedded binding and top-level receipt to name one target."""
+
+    holder = receipt.get("holder")
+    terminal = receipt.get("terminal")
+    binding_holder = binding.get("holder")
+    binding_terminal = binding.get("terminal")
+    if not all(
+        isinstance(value, dict)
+        for value in (holder, terminal, binding_holder, binding_terminal)
+    ):
+        raise IncarnationHomeError(
+            "embedded terminal binding cannot be cross-checked against receipt identities"
+        )
+    assert isinstance(holder, dict)
+    assert isinstance(terminal, dict)
+    assert isinstance(binding_holder, dict)
+    assert isinstance(binding_terminal, dict)
+    if binding.get("boot_id") != receipt.get("boot_id"):
+        raise IncarnationHomeError(
+            "embedded terminal binding boot identity disagrees with top-level receipt"
+        )
+    if any(
+        binding_holder.get(key) != holder.get(key)
+        for key in ("pid", "start_ticks")
+    ):
+        raise IncarnationHomeError(
+            "embedded terminal binding holder identity disagrees with top-level holder"
+        )
+    if any(
+        binding_terminal.get(key) != terminal.get(key)
+        for key in ("pid", "start_ticks", "window_id")
+    ):
+        raise IncarnationHomeError(
+            "embedded terminal binding terminal identity disagrees with top-level terminal"
+        )
 
 
 def _validate_terminal_binding_shape(binding: object) -> dict[str, object]:
@@ -2136,7 +2198,8 @@ def _load_holder_receipt_snapshot(
         raise IncarnationHomeError("holder terminal receipt is incomplete")
     _decode_holder_manifest_snapshot(runtime)
     if "binding" in receipt:
-        _validate_terminal_binding_shape(receipt["binding"])
+        binding = _validate_terminal_binding_shape(receipt["binding"])
+        _validate_receipt_binding_consistency(receipt, binding)
     return receipt, raw, sha256_bytes(raw)
 
 
@@ -2672,6 +2735,7 @@ def _validate_visible_launch_receipt(
 
     binding_value = receipt.get("binding")
     binding = _validate_terminal_binding_shape(binding_value)
+    _validate_receipt_binding_consistency(receipt, binding)
     for key, value in binding_context.items():
         if binding.get(key) != value:
             raise IncarnationHomeError(

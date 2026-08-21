@@ -3287,6 +3287,30 @@ def test_terminal_binding_creation_records_exact_owner_and_terminal_identity(
         listener.close()
 
 
+def test_receipt_binding_must_match_top_level_holder_and_terminal() -> None:
+    boot_id = MODULE._proc_boot_id()
+    binding = {
+        "boot_id": boot_id,
+        "holder": {"pid": 101, "start_ticks": 1001},
+        "terminal": {"pid": 202, "start_ticks": 2002, "window_id": "7"},
+    }
+    receipt = {
+        "boot_id": boot_id,
+        "holder": {"pid": 101, "start_ticks": 1001},
+        "terminal": {"pid": 202, "start_ticks": 2002, "window_id": "7"},
+    }
+    MODULE._validate_receipt_binding_consistency(receipt, binding)
+
+    binding["holder"]["start_ticks"] = 1002
+    with pytest.raises(MODULE.IncarnationHomeError, match="holder identity"):
+        MODULE._validate_receipt_binding_consistency(receipt, binding)
+
+    binding["holder"]["start_ticks"] = 1001
+    binding["terminal"]["window_id"] = "8"
+    with pytest.raises(MODULE.IncarnationHomeError, match="terminal identity"):
+        MODULE._validate_receipt_binding_consistency(receipt, binding)
+
+
 def test_control_socket_allocation_is_unique_and_private(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -3396,6 +3420,9 @@ def test_safe_projection_redacts_quoted_and_whitespace_credentials() -> None:
     assert MODULE._safe_projection_string(
         r'{"password":"hunter\"suffix"}', "escaped json-shaped title"
     ) == '{"password":"<redacted>"}'
+    assert MODULE._safe_projection_string(
+        r'{\"password\":\"hunter2\"}', "backslash-escaped json-shaped title"
+    ) == r'{\"password\":\"<redacted>\"}'
     assert MODULE._safe_projection_string(
         "access_token=hunter2", "access token title"
     ) == "access_token=<redacted>"
