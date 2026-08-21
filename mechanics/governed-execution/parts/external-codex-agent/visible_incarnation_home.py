@@ -910,6 +910,7 @@ def _validate_receipt_binding_consistency(
 def _validate_terminal_binding_shape(binding: object) -> dict[str, object]:
     if not isinstance(binding, dict):
         raise IncarnationHomeError("terminal binding is not an object")
+    binding = dict(binding)
     unexpected = set(binding) - {
         "schema_version",
         "boot_id",
@@ -942,7 +943,7 @@ def _validate_terminal_binding_shape(binding: object) -> dict[str, object]:
         "runtime_state_root",
         "closeout_route",
     ):
-        _binding_ref(binding.get(key), key)
+        binding[key] = _binding_ref(binding.get(key), key)
     state_root = Path(str(binding["runtime_state_root"]))
     if not state_root.is_absolute() or state_root.is_symlink():
         raise IncarnationHomeError("terminal binding runtime state root is invalid")
@@ -2886,6 +2887,18 @@ def command_send_text(args: argparse.Namespace) -> int:
     )
     if state != "live" or status["observation"]["kitty_query"] != "present":
         raise IncarnationHomeError("directed input requires a live bound terminal")
+    terminal_pid = terminal["pid"]
+    holder_pid = holder["pid"]
+    assert isinstance(terminal_pid, int) and isinstance(holder_pid, int)
+    observed_window_id, dedicated = _kitty_dedication(
+        holder_pid=holder_pid,
+        kitty_pid=terminal_pid,
+        terminal_argv=_proc_argv(terminal_pid),
+    )
+    if observed_window_id != str(terminal["window_id"]) or not dedicated:
+        raise IncarnationHomeError(
+            "directed input requires a dedicated live bound terminal"
+        )
     socket_record = terminal["control_socket"]
     assert isinstance(socket_record, dict)
     _secure_control_socket(

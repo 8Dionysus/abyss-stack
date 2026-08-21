@@ -3335,6 +3335,18 @@ def test_terminal_binding_source_receipt_is_typed_before_return(
         listener.close()
 
 
+def test_terminal_binding_validation_reconstructs_redacted_binding_refs(
+    tmp_path: Path,
+) -> None:
+    listener, binding, _holder, _terminal = _terminal_binding_fixture(tmp_path)
+    try:
+        binding["goal_ref"] = "database_password=hunter2"
+        validated = MODULE._validate_terminal_binding_shape(binding)
+        assert validated["goal_ref"] == "database_password=<redacted>"
+    finally:
+        listener.close()
+
+
 def test_control_socket_allocation_is_unique_and_private(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -3680,6 +3692,8 @@ def test_directed_input_uses_bound_socket_and_window_only(
             "live",
         ),
     )
+    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_kwargs: ("7", True))
+    monkeypatch.setattr(MODULE, "_proc_argv", lambda _pid: ["/usr/bin/kitty", "--detach"])
 
     def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         calls["argv"] = argv
@@ -3706,5 +3720,50 @@ def test_directed_input_uses_bound_socket_and_window_only(
         assert not {"focus-window", "move-window", "close-window"}.intersection(argv)
         assert calls["kwargs"]["input"] == "status\n"
         assert "env" not in capsys.readouterr().out.casefold()
+    finally:
+        listener.close()
+
+
+def test_directed_input_rechecks_kitty_dedication_before_send(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    monkeypatch.setattr(
+        MODULE,
+        "_load_terminal_binding_input",
+        lambda **_kwargs: (binding, holder, terminal, None, None),
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_observe_terminal_binding",
+        lambda **_kwargs: (
+            {"observation": {"kitty_query": "present"}},
+            "live",
+        ),
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_kitty_dedication",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            MODULE.IncarnationHomeError("holder Kitty process is not dedicated")
+        ),
+    )
+    monkeypatch.setattr(MODULE, "_proc_argv", lambda _pid: ["/usr/bin/kitty", "--detach"])
+    monkeypatch.setattr(
+        MODULE.subprocess,
+        "run",
+        lambda *_args, **_kwargs: pytest.fail("directed input bypassed dedication recheck"),
+    )
+    try:
+        with pytest.raises(MODULE.IncarnationHomeError, match="not dedicated"):
+            MODULE.command_send_text(
+                MODULE.argparse.Namespace(
+                    binding=str(tmp_path / "binding.json"),
+                    holder_receipt=None,
+                    binding_context=None,
+                    kitty_executable="/usr/bin/kitty",
+                    text="status\n",
+                )
+            )
     finally:
         listener.close()
