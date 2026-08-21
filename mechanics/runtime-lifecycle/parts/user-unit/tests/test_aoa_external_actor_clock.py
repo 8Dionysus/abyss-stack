@@ -36,6 +36,14 @@ class ExternalActorClockTests(unittest.TestCase):
         self.assertIn("runner_stderr_tmp", command)
         self.assertIn("logging_rc=125", command)
 
+    def test_error_log_is_tightened_before_use(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            error = Path(temporary) / "error.log"
+            error.write_text("old\n", encoding="utf-8")
+            error.chmod(0o644)
+            CLOCK._check_error_log(error)
+            self.assertEqual(error.stat().st_mode & 0o777, 0o600)
+
     def test_configuration_failure_is_persisted_to_error_log(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

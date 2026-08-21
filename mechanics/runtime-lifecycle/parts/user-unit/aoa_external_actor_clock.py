@@ -143,6 +143,7 @@ def _terminate_kitty(
     pid: int | None,
     start_ticks: int | None,
     close_timeout_seconds: float = DEFAULT_CLOSE_TIMEOUT_SECONDS,
+    close_deadline: float | None = None,
 ) -> None:
     if pid is None or start_ticks is None or not _identity_live(pid, start_ticks):
         return
@@ -150,7 +151,11 @@ def _terminate_kitty(
         os.kill(pid, signal.SIGTERM)
     except ProcessLookupError:
         return
-    deadline = time.monotonic() + close_timeout_seconds
+    deadline = (
+        close_deadline
+        if close_deadline is not None
+        else time.monotonic() + close_timeout_seconds
+    )
     while time.monotonic() < deadline and _identity_live(pid, start_ticks):
         time.sleep(POLL_SECONDS)
 
@@ -182,8 +187,14 @@ def _configuration_error_path() -> Path | None:
         _validate_evidence_path(error, "error")
     except ClockSupervisorError:
         return None
-    if error.exists() and not error.is_file():
-        return None
+    if error.exists():
+        if not error.is_file():
+            return None
+        try:
+            if error.stat().st_mode & 0o077:
+                return None
+        except OSError:
+            return None
     raw_status = os.environ.get("AOA_CLOCK_STATUS_FILE", "")
     if raw_status:
         status = Path(raw_status)
@@ -203,6 +214,7 @@ def _check_error_log(path: Path) -> None:
             os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_CLOEXEC,
             0o600,
         )
+        os.fchmod(descriptor, 0o600)
     except OSError as exc:
         raise ClockSupervisorError(f"clock error path is not append-writable: {path}") from exc
     finally:
@@ -499,14 +511,22 @@ def main() -> int:
                 error_path,
                 f"clock supervisor stopped by signal {_STOP_SIGNAL}",
             )
-            _terminate_kitty(kitty_pid, kitty_start_ticks, close_timeout)
+            _terminate_kitty(
+                kitty_pid,
+                kitty_start_ticks,
+                close_deadline=close_deadline,
+            )
             return 0
         if time.monotonic() >= close_deadline:
             _append_error(
                 error_path,
                 "detached Kitty remained live after runner status publication",
             )
-            _terminate_kitty(kitty_pid, kitty_start_ticks, close_timeout)
+            _terminate_kitty(
+                kitty_pid,
+                kitty_start_ticks,
+                close_deadline=close_deadline,
+            )
             return 125
         time.sleep(POLL_SECONDS)
 
