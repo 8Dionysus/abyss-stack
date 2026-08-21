@@ -12,7 +12,7 @@ Decision records own rationale; this directory contains generated graph read mod
 
 - Decisions: 128
 - Nodes: 1259
-- Edges: 2881
+- Edges: 2884
 
 ## Node Types
 
@@ -29,7 +29,7 @@ Decision records own rationale; this directory contains generated graph read mod
 
 ## Edge Types
 
-- `CITES_SOURCE_SURFACE`: 1058
+- `CITES_SOURCE_SURFACE`: 1061
 - `DATED`: 128
 - `GUARDED_BY`: 396
 - `HAS_STATUS`: 128
