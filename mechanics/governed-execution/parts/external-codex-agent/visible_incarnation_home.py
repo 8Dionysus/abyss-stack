@@ -52,6 +52,9 @@ CONTROL_SOCKET_ROOT_NAME = "aoa-external-codex"
 CONTROL_SOCKET_MODE = 0o600
 CONTROL_SOCKET_PARENT_MODE = 0o700
 CONTROL_SOCKET_MAX_LENGTH = 103
+VISIBLE_LAUNCH_GATE_SCHEMA_VERSION = "abyss_stack_visible_launch_admission_gate_v1"
+VISIBLE_LAUNCH_GATE_WAIT_SECONDS = 15.0
+VISIBLE_LAUNCH_GATE_POLL_SECONDS = 0.05
 SAFE_PROJECTION_FORBIDDEN_KEYS = frozenset(
     {
         "env",
@@ -2753,6 +2756,106 @@ def _require_unoccupied_receipt_path(path: Path) -> None:
         )
 
 
+def _validate_launch_gate_path(path: Path) -> None:
+    """Validate the stable path used for one detached launch admission."""
+
+    if not path.is_absolute() or path.is_symlink():
+        raise IncarnationHomeError(
+            f"visible launch admission gate must be an absolute non-symlink path: {path}"
+        )
+    if path.parent.is_symlink() or not path.parent.is_dir():
+        raise IncarnationHomeError(
+            f"visible launch admission gate parent must be a real directory: {path.parent}"
+        )
+
+
+def _require_unoccupied_launch_gate_path(path: Path) -> None:
+    """Validate the one-shot parent admission gate before detached launch."""
+
+    _validate_launch_gate_path(path)
+    if path.exists():
+        raise IncarnationHomeError(
+            f"visible launch admission gate is already occupied: {path}"
+        )
+
+
+def _write_visible_launch_gate(
+    *,
+    gate_path: Path,
+    holder_receipt_path: Path,
+    token: str,
+    decision: str,
+) -> None:
+    """Publish the parent decision that releases or rejects a detached payload."""
+
+    if decision not in {"admit", "reject"}:
+        raise IncarnationHomeError("visible launch admission decision is invalid")
+    if not isinstance(token, str) or not token:
+        raise IncarnationHomeError("visible launch admission token is invalid")
+    _write_new_json(
+        gate_path,
+        {
+            "schema_version": VISIBLE_LAUNCH_GATE_SCHEMA_VERSION,
+            "gate_ref": str(gate_path.resolve()),
+            "holder_receipt_ref": str(holder_receipt_path.resolve()),
+            "token": token,
+            "decision": decision,
+            "created_at": _utc_now(),
+        },
+        "visible launch admission gate",
+    )
+
+
+def _await_visible_launch_admission(
+    *,
+    gate_path: Path,
+    holder_receipt_path: Path,
+    token: str,
+) -> None:
+    """Wait for bounded parent admission before executing the private payload."""
+
+    _validate_launch_gate_path(gate_path)
+    if not holder_receipt_path.is_absolute() or holder_receipt_path.is_symlink():
+        raise IncarnationHomeError(
+            "visible launch admission holder receipt path is not bound"
+        )
+    if not isinstance(token, str) or not token:
+        raise IncarnationHomeError("visible launch admission token is invalid")
+    deadline = time.monotonic() + VISIBLE_LAUNCH_GATE_WAIT_SECONDS
+    while True:
+        if gate_path.exists() or gate_path.is_symlink():
+            gate, _gate_bytes = _load_json_snapshot(
+                gate_path, "visible launch admission gate"
+            )
+            if gate.get("schema_version") != VISIBLE_LAUNCH_GATE_SCHEMA_VERSION:
+                raise IncarnationHomeError(
+                    "visible launch admission gate schema is unsupported"
+                )
+            if gate.get("gate_ref") != str(gate_path.resolve()):
+                raise IncarnationHomeError(
+                    "visible launch admission gate path identity drifted"
+                )
+            if gate.get("holder_receipt_ref") != str(holder_receipt_path.resolve()):
+                raise IncarnationHomeError(
+                    "visible launch admission holder receipt identity drifted"
+                )
+            if gate.get("token") != token:
+                raise IncarnationHomeError("visible launch admission token drifted")
+            decision = gate.get("decision")
+            if decision == "reject":
+                raise IncarnationHomeError(
+                    "visible launch admission was rejected before payload execution"
+                )
+            if decision == "admit":
+                return
+            raise IncarnationHomeError("visible launch admission decision is invalid")
+        if time.monotonic() >= deadline:
+            raise IncarnationHomeError(
+                "visible launch admission timed out before payload execution"
+            )
+        time.sleep(VISIBLE_LAUNCH_GATE_POLL_SECONDS)
+
+
 def _validate_visible_launch_receipt(
     *,
     receipt_path: Path,
@@ -5108,6 +5211,17 @@ def command_payload_launch(args: argparse.Namespace) -> int:
         raise IncarnationHomeError(
             "payload terminal binding lacks control socket or title"
         )
+    launch_gate_argument = getattr(args, "launch_gate", None)
+    launch_gate_token = getattr(args, "launch_gate_token", None)
+    if binding_context is not None and (
+        not args.holder_receipt
+        or not isinstance(launch_gate_argument, str)
+        or not isinstance(launch_gate_token, str)
+        or not launch_gate_token
+    ):
+        raise IncarnationHomeError(
+            "canonical payload launch requires a holder receipt and admission gate"
+        )
 
     payload_path = _regular_file(
         Path(args.payload_executable), "private payload executable"
@@ -5201,6 +5315,12 @@ def command_payload_launch(args: argparse.Namespace) -> int:
             control_socket=control_socket,
             terminal_title=terminal_title,
         )
+        if binding_context is not None:
+            _await_visible_launch_admission(
+                gate_path=Path(launch_gate_argument),
+                holder_receipt_path=Path(args.holder_receipt),
+                token=launch_gate_token,
+            )
     os.execve(str(payload_path), payload_argv, environment)
     return 127
 
@@ -5240,6 +5360,11 @@ def command_launch(args: argparse.Namespace) -> int:
             )
         holder_receipt_path = Path(holder_receipt_argument)
         _require_unoccupied_receipt_path(holder_receipt_path)
+        launch_gate_path = holder_receipt_path.with_name(
+            holder_receipt_path.name + ".launch-gate.json"
+        )
+        _require_unoccupied_launch_gate_path(launch_gate_path)
+        launch_gate_token = secrets.token_hex(32)
         (
             executable_fd,
             _executable_fd_path,
@@ -5256,6 +5381,7 @@ def command_launch(args: argparse.Namespace) -> int:
         cleanup_started = False
         launch_candidate: dict[str, Any] | None = None
         launch_accepted = False
+        launch_gate_published = False
         rejected_cleanup_error: IncarnationHomeError | None = None
         codex_mount = executable_snapshot_mount
         try:
@@ -5324,6 +5450,10 @@ def command_launch(args: argparse.Namespace) -> int:
                 control_socket,
                 "--terminal-title",
                 terminal_title,
+                "--launch-gate",
+                str(launch_gate_path),
+                "--launch-gate-token",
+                launch_gate_token,
                 "--codex-executable",
                 str(executable),
                 "--payload-executable",
@@ -5427,9 +5557,30 @@ def command_launch(args: argparse.Namespace) -> int:
                 },
                 label="visible launch binding",
             )
+            _write_visible_launch_gate(
+                gate_path=launch_gate_path,
+                holder_receipt_path=holder_receipt_path,
+                token=launch_gate_token,
+                decision="admit",
+            )
+            launch_gate_published = True
             launch_accepted = True
             return 0
         finally:
+            if not launch_gate_published:
+                try:
+                    _write_visible_launch_gate(
+                        gate_path=launch_gate_path,
+                        holder_receipt_path=holder_receipt_path,
+                        token=launch_gate_token,
+                        decision="reject",
+                    )
+                    launch_gate_published = True
+                except IncarnationHomeError:
+                    # A missing reject publication is still fail-closed: the
+                    # payload has a bounded wait and cannot execute without
+                    # an explicit parent admission.
+                    pass
             if not launch_accepted and launch_candidate is not None:
                 if not _terminate_rejected_visible_launch(launch_candidate):
                     rejected_cleanup_error = IncarnationHomeError(
@@ -5650,6 +5801,8 @@ def parser() -> argparse.ArgumentParser:
     payload.add_argument("--binding-context-digest")
     payload.add_argument("--control-socket")
     payload.add_argument("--terminal-title")
+    payload.add_argument("--launch-gate")
+    payload.add_argument("--launch-gate-token")
     payload.add_argument("codex_arguments", nargs=argparse.REMAINDER)
     payload.set_defaults(handler=command_payload_launch)
     bind = subcommands.add_parser("bind")

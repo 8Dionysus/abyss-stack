@@ -807,6 +807,94 @@ def test_payload_launch_binds_receipt_to_payload_process(
     assert environment["CODEX_HOME"] == str(ambient)
 
 
+@pytest.mark.parametrize(("decision", "exec_expected"), [("admit", True), ("reject", False)])
+def test_payload_launch_requires_parent_admission_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    decision: str,
+    exec_expected: bool,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    manifest_bytes = manifest_path.read_bytes()
+    payload = tmp_path / "private-codex"
+    payload_bytes = b"#!/bin/sh\nexit 0\n"
+    payload.write_bytes(payload_bytes)
+    payload.chmod(0o500)
+    holder_path = tmp_path / "holder.json"
+    gate_path = tmp_path / "holder.json.launch-gate.json"
+    context_path = tmp_path / "context.json"
+    state_root = tmp_path / "state"
+    state_root.mkdir()
+    context_path.write_text(
+        json.dumps(
+            {
+                "goal_ref": "goal:test",
+                "actor_ref": "actor:test",
+                "incarnation_ref": "incarnation:test",
+                "session_ref": "session:test",
+                "runtime_state_root": str(state_root),
+                "closeout_route": str(tmp_path / "closeout.sh"),
+            }
+        ),
+        encoding="utf-8",
+    )
+    context_bytes = context_path.read_bytes()
+    token = "launch-gate-test-token"
+    MODULE._write_visible_launch_gate(
+        gate_path=gate_path,
+        holder_receipt_path=holder_path,
+        token=token,
+        decision=decision,
+    )
+    observed: dict[str, object] = {}
+
+    def fake_holder_receipt(**_kwargs: object) -> dict[str, object]:
+        MODULE._write_new_json(holder_path, {"published": True}, "holder receipt")
+        return {"published": True}
+
+    def fake_exec(path: str, argv: list[str], environment: dict[str, str]) -> None:
+        observed["exec"] = (path, argv, environment)
+
+    monkeypatch.setattr(MODULE, "_holder_receipt", fake_holder_receipt)
+    monkeypatch.setattr(MODULE.os, "execve", fake_exec)
+    args = MODULE.argparse.Namespace(
+        manifest=str(manifest_path),
+        holder_receipt=str(holder_path),
+        codex_executable=str(payload),
+        payload_executable=str(payload),
+        manifest_digest=MODULE.sha256_bytes(manifest_bytes),
+        executable_digest=MODULE.sha256_bytes(payload_bytes),
+        binding_context_snapshot_b64=base64.b64encode(context_bytes).decode("ascii"),
+        binding_context_digest=MODULE.sha256_bytes(context_bytes),
+        control_socket="unix:/tmp/aoa-launch-gate-test.sock",
+        terminal_title="visible-holder",
+        launch_gate=str(gate_path),
+        launch_gate_token=token,
+        codex_arguments=[str(payload), "exec", "--help"],
+    )
+
+    if exec_expected:
+        assert MODULE.command_payload_launch(args) == 127
+        assert "exec" in observed
+    else:
+        with pytest.raises(
+            MODULE.IncarnationHomeError,
+            match="admission was rejected before payload execution",
+        ):
+            MODULE.command_payload_launch(args)
+        assert "exec" not in observed
+
+
 def test_payload_launch_uses_private_companion_after_host_copy_disappears(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1115,8 +1203,9 @@ def test_holder_receipt_rejects_detached_kitty_route(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("reject_receipt", "reject_identity"),
-    [(False, False), (True, False), (False, True)],
+    ("reject_receipt", "reject_identity", "publish_receipt"),
+    [(False, False, True), (True, False, True), (False, True, True),
+     (False, False, False)],
 )
 def test_detached_launch_publishes_socket_only_binding(
     tmp_path: Path,
@@ -1124,6 +1213,7 @@ def test_detached_launch_publishes_socket_only_binding(
     capsys: pytest.CaptureFixture[str],
     reject_receipt: bool,
     reject_identity: bool,
+    publish_receipt: bool,
 ) -> None:
     ambient = tmp_path / "ambient"
     runtime_root = tmp_path / "runtime"
@@ -1239,7 +1329,8 @@ def test_detached_launch_publishes_socket_only_binding(
     captured: dict[str, object] = {}
 
     def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
-        holder_path.write_text("published", encoding="utf-8")
+        if publish_receipt:
+            holder_path.write_text("published", encoding="utf-8")
         captured["argv"] = argv
         captured["kwargs"] = kwargs
         return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
@@ -1257,23 +1348,33 @@ def test_detached_launch_publishes_socket_only_binding(
         codex_arguments=["exec", "--json"],
     )
 
-    if reject_receipt or reject_identity:
+    gate_path = holder_path.with_name(holder_path.name + ".launch-gate.json")
+    if not publish_receipt or reject_receipt or reject_identity:
         with pytest.raises(
             MODULE.IncarnationHomeError, match="did not publish a live terminal binding"
         ):
             MODULE.command_launch(args)
+        gate = json.loads(gate_path.read_text(encoding="utf-8"))
+        assert gate["decision"] == "reject"
         if reject_receipt:
             assert termination_targets == []
-        else:
+        elif reject_identity:
             assert len(termination_targets) == 1
+        else:
+            assert termination_targets == []
         return
 
     assert MODULE.command_launch(args) == 0
+    gate = json.loads(gate_path.read_text(encoding="utf-8"))
+    assert gate["decision"] == "admit"
+    assert gate["holder_receipt_ref"] == str(holder_path.resolve())
     argv = captured["argv"]
     assert isinstance(argv, list)
     assert "--listen-on" in argv
     assert argv[argv.index("--listen-on") + 1] == address
     assert argv[argv.index("--override") + 1] == "allow_remote_control=socket-only"
+    assert "--launch-gate" in argv
+    assert argv[argv.index("--launch-gate") + 1] == str(gate_path)
     output = capsys.readouterr().out
     assert "environment" not in output.casefold()
     assert "credential" not in output.casefold()
