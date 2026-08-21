@@ -425,7 +425,10 @@ if "FAKE_WRITE_OUT_OF_SCOPE" in task["objective"]:
 if "FAKE_CREATE_FIFO_OUT_OF_SCOPE" in task["objective"]:
     os.mkfifo(workspace / "unexpected.pipe")
 if "FAKE_WRITE_ALLOWED" in task["objective"]:
-    (workspace / "landing-note.md").write_text("bounded preparation\n", encoding="utf-8")
+    write_content = "bounded preparation\n"
+    if "FAKE_RESUME_WRITE_VARIANT" in task["objective"] and resume:
+        write_content = "resumed preparation\n"
+    (workspace / "landing-note.md").write_text(write_content, encoding="utf-8")
 if "FAKE_WRITE_NESTED_ALLOWED" in task["objective"]:
     (workspace / "actor-output").mkdir(exist_ok=True)
     (workspace / "actor-output" / "result.json").write_text(
@@ -11505,6 +11508,72 @@ def test_workspace_write_resume_continues_from_exact_prior_actor_tree(
     preserved_sources = [item["source_ref"] for item in closure["preserved_evidence"]]
     assert first_final_ref in preserved_sources
     assert first_delta_ref in preserved_sources
+
+
+def test_workspace_write_resume_loads_prior_manifest_before_replacement(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker=(
+            "FAKE_WRITE_ALLOWED FAKE_ARTIFACT_PRODUCED "
+            "FAKE_RESUME_WRITE_VARIANT"
+        ),
+        role_id="coder",
+        task_family="landing_preparation",
+        workspace_write=True,
+        exact_baseline=True,
+        review_required=True,
+        identity_suffix="resume-manifest-order",
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    first_terminal = _wait_terminal(runtime, fixture["session_id"])
+    first_result = runtime.result(fixture["session_id"])
+
+    assert first_terminal["status"] == "review_required"
+    assert first_result is not None
+    first_final_ref = first_result["actor_final_manifest_ref"]
+    first_final_digest = first_final_ref["artifact_digest"]
+    result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    resume_path = tmp_path / "resume-manifest-order.json"
+    _write_json(
+        resume_path,
+        {
+            "schema_version": "abyss_stack_external_codex_resume_v1",
+            "session_id": fixture["session_id"],
+            "thread_id": first_terminal["thread_id"],
+            "after_event_sequence": first_terminal["last_event_sequence"],
+            "reason": "review_followup",
+            "instruction": "Continue the exact bounded writer with the next bytes.",
+            "previous_result_digest": _digest_path(result_path),
+        },
+    )
+
+    assert runtime.resume(fixture["session_id"], resume_path)["status"] == "running"
+    second_terminal = _wait_terminal(runtime, fixture["session_id"])
+    second_result = runtime.result(fixture["session_id"])
+
+    assert second_terminal["status"] == "review_required"
+    assert second_result is not None
+    assert second_result["failure_code"] is None
+    assert second_result["actor_final_manifest_ref"]["artifact_digest"] != (
+        first_final_digest
+    )
+    assert second_result["changed_paths"] == [
+        {"path": "landing-note.md", "status": "created"}
+    ]
+    preserved_closure = (
+        runtime._session_dir(fixture["session_id"])
+        / "attempts/001/runtime-result-evidence-closure.json"
+    )
+    preserved_sources = [
+        item["source_ref"]
+        for item in json.loads(preserved_closure.read_text(encoding="utf-8"))[
+            "preserved_evidence"
+        ]
+    ]
+    assert first_final_ref in preserved_sources
 
 
 def test_resume_materializes_digest_bound_continuation_evidence(

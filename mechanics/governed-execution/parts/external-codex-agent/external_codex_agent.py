@@ -12823,6 +12823,16 @@ Runtime session identity: {state["session_id"]}
         manifest_observation_failure_code: str | None = None
         head_drift = False
         try:
+            if actor_manifest_baseline is None:
+                raise ExternalCodexRuntimeError(
+                    "legacy_projection_unavailable",
+                    "actor baseline manifest is unavailable at finalization",
+                )
+            private_git_baseline = self._actor_private_git_baseline_for_attempt(
+                state,
+                attempt_number=attempt_number,
+                original_baseline=actor_manifest_baseline,
+            )
             current_manifest = _checked_actor_manifest(
                 actor_workspace,
                 source_manifest_digest=str(
@@ -12841,17 +12851,7 @@ Runtime session identity: {state["session_id"]}
             workspace_manifest_ref = _artifact_ref(final_manifest_path)
             actor_final_manifest_ref = workspace_manifest_ref
             final_workspace_manifest_digest = canonical_digest(current_manifest)
-            if actor_manifest_baseline is None:
-                raise ExternalCodexRuntimeError(
-                    "legacy_projection_unavailable",
-                    "actor baseline manifest is unavailable at finalization",
-                )
             actor_manifest_match = current_manifest == actor_manifest_baseline
-            private_git_baseline = self._actor_private_git_baseline_for_attempt(
-                state,
-                attempt_number=attempt_number,
-                original_baseline=actor_manifest_baseline,
-            )
             delta = build_actor_delta(
                 actor_manifest_baseline,
                 current_manifest,
@@ -13280,6 +13280,11 @@ Runtime session identity: {state["session_id"]}
                     schema_path=ACTOR_MANIFEST_SCHEMA_PATH,
                 )
                 actor_workspace = self._projection_path_from_state(state)
+                private_git_baseline = self._actor_private_git_baseline_for_attempt(
+                    state,
+                    attempt_number=attempt_number,
+                    original_baseline=actor_baseline,
+                )
                 current_manifest = _checked_actor_manifest(
                     actor_workspace,
                     source_manifest_digest=str(
@@ -13292,11 +13297,6 @@ Runtime session identity: {state["session_id"]}
                 workspace_manifest_ref = _artifact_ref(final_manifest_path)
                 actor_final_ref = workspace_manifest_ref
                 workspace_manifest_match = current_manifest == actor_baseline
-                private_git_baseline = self._actor_private_git_baseline_for_attempt(
-                    state,
-                    attempt_number=attempt_number,
-                    original_baseline=actor_baseline,
-                )
                 delta = build_actor_delta(
                     actor_baseline,
                     current_manifest,
