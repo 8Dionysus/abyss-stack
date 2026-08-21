@@ -48,6 +48,11 @@ The controller:
   binds the kernel boot ID alongside each process start tick. The closer publishes a
   recoverable sidecar reservation before signaling. The sidecar records the
   signal attempt before TERM and recovery never repeats an existing attempt;
+  legacy v1 reservations remain replayable only through the legacy
+  `--wake-receipt` route, while new reservations use v2. A retry after a join
+  write reuses the exact canonical join evidence before publishing missing
+  authorization, and the sidecar keeps the authorization file reference
+  distinct from its actual wake/join evidence reference;
   state and final receipts are atomically published with their containing
   directory fsynced before lifecycle progress, and replay of an unclosed
   receipt remains failed. Direct ELF launch uses an inheritable sealed memfd

@@ -159,6 +159,13 @@ sidecar is locked and advanced to a durable signal-attempt state before the
 first `TERM`; each state transition is an atomic replacement under a separate
 stable lock inode, recovery rechecks the completed receipt after lock
 acquisition, and never sends a second `TERM` for an existing attempt. The
+legacy v1 reservation shape remains replayable only through the legacy
+`--wake-receipt` route; new reservations use v2. A retry after a join write but
+before authorization publication reuses and revalidates the exact canonical
+join bytes, so it can publish the missing authorization without replacing
+evidence. In the sidecar, `authorization_ref` names the typed authorization
+file while the authorization-kind-specific `wake_receipt_ref` or
+`join_receipt_ref` names the actual evidence receipt. The
 final receipt is also published as one complete non-replacing file, and a
 completed `closed: false` receipt remains a failure on replay. Every atomic
 publication fsyncs both the complete file and its containing directory before

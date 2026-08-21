@@ -1400,6 +1400,18 @@ def test_non_waking_terminal_join_authorizes_exact_close(
             closure_receipt=str(closure),
         )
     ) == 0
+    join_bytes = join.read_bytes()
+    authorization.unlink()
+    assert MODULE.command_join(
+        MODULE.argparse.Namespace(
+            handoff=str(handoff),
+            holder_receipt=str(holder),
+            join_receipt=str(join),
+            authorization=str(authorization),
+            closure_receipt=str(closure),
+        )
+    ) == 0
+    assert join.read_bytes() == join_bytes
     join_value = json.loads(join.read_text(encoding="utf-8"))
     authorization_value = json.loads(authorization.read_text(encoding="utf-8"))
     assert join_value["return"] == {
@@ -1436,6 +1448,11 @@ def test_non_waking_terminal_join_authorizes_exact_close(
     assert closure_value["authorization_kind"] == "join_completed"
     assert closure_value["join_receipt_ref"] == str(join.resolve())
     assert closure_value["trigger"] == "join_after_validated_terminal_return"
+    reservation_value = json.loads(
+        MODULE._closure_reservation_path(closure).read_text(encoding="utf-8")
+    )
+    assert reservation_value["authorization_ref"] == str(authorization.resolve())
+    assert reservation_value["join_receipt_ref"] == str(join.resolve())
 
 
 def test_non_waking_join_requires_return_and_exact_terminal_action(
@@ -2164,6 +2181,61 @@ def test_closure_reservation_reopens_after_interrupted_attempt(tmp_path: Path) -
             holder_receipt_path=holder,
             wake_receipt_path=wake,
             holder_pid=303,
+            terminal_pid=202,
+        )
+
+
+def test_legacy_closure_reservation_replays_only_on_legacy_wake_route(
+    tmp_path: Path,
+) -> None:
+    handoff = tmp_path / "handoff.json"
+    holder = tmp_path / "holder.json"
+    wake = tmp_path / "wake.json"
+    closure = tmp_path / "closure.json"
+    for path in (handoff, holder, wake):
+        path.write_text("{}", encoding="utf-8")
+    reservation_path = MODULE._closure_reservation_path(closure)
+    MODULE._write_new_json(
+        reservation_path,
+        {
+            "schema_version": MODULE.LEGACY_CLOSURE_RESERVATION_SCHEMA_VERSION,
+            "closure_receipt_ref": str(closure.resolve()),
+            "handoff_ref": str(handoff.resolve()),
+            "holder_receipt_ref": str(holder.resolve()),
+            "wake_receipt_ref": str(wake.resolve()),
+            "holder_pid": 101,
+            "terminal_pid": 202,
+        },
+        "terminal closure reservation",
+    )
+
+    reservation_fd, retry_path, completed = MODULE._reserve_closure_receipt(
+        closure_receipt_path=closure,
+        handoff_path=handoff,
+        holder_receipt_path=holder,
+        wake_receipt_path=wake,
+        allow_legacy_wake_reservation=True,
+        holder_pid=101,
+        terminal_pid=202,
+    )
+    try:
+        assert retry_path == reservation_path
+        assert completed is None
+    finally:
+        MODULE.fcntl.flock(reservation_fd, MODULE.fcntl.LOCK_UN)
+        os.close(reservation_fd)
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="identity mismatch"):
+        MODULE._reserve_closure_receipt(
+            closure_receipt_path=closure,
+            handoff_path=handoff,
+            holder_receipt_path=holder,
+            wake_receipt_path=wake,
+            authorization_path=tmp_path / "authorization.json",
+            authorization_kind="join_completed",
+            evidence_path=tmp_path / "join.json",
+            allow_legacy_wake_reservation=True,
+            holder_pid=101,
             terminal_pid=202,
         )
 

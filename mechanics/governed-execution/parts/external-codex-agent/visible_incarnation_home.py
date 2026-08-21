@@ -38,6 +38,9 @@ CLOSURE_AUTHORIZATION_SCHEMA_VERSION = (
 )
 TERMINAL_CLOSURE_SCHEMA_VERSION = "abyss_stack_visible_incarnation_terminal_closure_v2"
 CLOSURE_RESERVATION_SCHEMA_VERSION = "abyss_stack_visible_incarnation_terminal_closure_reservation_v2"
+LEGACY_CLOSURE_RESERVATION_SCHEMA_VERSION = (
+    "abyss_stack_visible_incarnation_terminal_closure_reservation_v1"
+)
 DESCENDANT_BIN_NAME = ".codex-incarnation-bin"
 CODE_MODE_HOST_NAME = "codex-code-mode-host"
 LOCAL_NAMES = frozenset(
@@ -700,6 +703,8 @@ def _reserve_closure_receipt(
     wake_receipt_path: Path,
     authorization_path: Path | None = None,
     authorization_kind: str = "wake_delivered",
+    evidence_path: Path | None = None,
+    allow_legacy_wake_reservation: bool = False,
     holder_pid: int,
     terminal_pid: int,
 ) -> tuple[int, Path, dict[str, Any] | None]:
@@ -738,6 +743,8 @@ def _reserve_closure_receipt(
         raise IncarnationHomeError("unsupported terminal closure authorization kind")
     if authorization_path is None:
         authorization_path = wake_receipt_path
+    if evidence_path is None:
+        evidence_path = wake_receipt_path
     expected = {
         "schema_version": CLOSURE_RESERVATION_SCHEMA_VERSION,
         "closure_receipt_ref": str(closure_receipt_path.resolve()),
@@ -750,7 +757,16 @@ def _reserve_closure_receipt(
     }
     expected[
         "wake_receipt_ref" if authorization_kind == "wake_delivered" else "join_receipt_ref"
-    ] = str(authorization_path.resolve())
+    ] = str(evidence_path.resolve())
+    legacy_expected = {
+        "schema_version": LEGACY_CLOSURE_RESERVATION_SCHEMA_VERSION,
+        "closure_receipt_ref": str(closure_receipt_path.resolve()),
+        "handoff_ref": str(handoff_path.resolve()),
+        "holder_receipt_ref": str(holder_receipt_path.resolve()),
+        "wake_receipt_ref": str(evidence_path.resolve()),
+        "holder_pid": holder_pid,
+        "terminal_pid": terminal_pid,
+    }
     lock_path = _closure_reservation_lock_path(closure_receipt_path)
     if lock_path.is_symlink():
         raise IncarnationHomeError(
@@ -773,7 +789,19 @@ def _reserve_closure_receipt(
         recorded = _load_json(
             reservation_path, "terminal closure reservation"
         )
-        if any(recorded.get(key) != value for key, value in expected.items()):
+        if recorded.get("schema_version") == LEGACY_CLOSURE_RESERVATION_SCHEMA_VERSION:
+            if (
+                not allow_legacy_wake_reservation
+                or authorization_kind != "wake_delivered"
+                or any(
+                    recorded.get(key) != value
+                    for key, value in legacy_expected.items()
+                )
+            ):
+                raise IncarnationHomeError(
+                    "terminal closure reservation identity mismatch"
+                )
+        elif any(recorded.get(key) != value for key, value in expected.items()):
             raise IncarnationHomeError("terminal closure reservation identity mismatch")
         completed: dict[str, Any] | None = None
         if closure_receipt_path.exists():
@@ -1503,7 +1531,31 @@ def command_join(args: argparse.Namespace) -> int:
             "required": True,
         },
     }
-    _write_new_json(join_receipt_path, join, "terminal join receipt")
+    if authorization_path.exists() and not join_receipt_path.exists():
+        raise IncarnationHomeError(
+            "terminal closure authorization exists without its join receipt"
+        )
+    if join_receipt_path.exists():
+        existing_join, join_bytes = _load_json_snapshot(
+            join_receipt_path, "terminal join receipt"
+        )
+        if join_bytes != canonical_bytes(existing_join) + b"\n":
+            raise IncarnationHomeError(
+                "terminal join receipt is not canonically encoded"
+            )
+        _validate_join_completion(
+            join_receipt_path=join_receipt_path,
+            handoff_path=handoff_path,
+            holder_receipt_path=holder_receipt_path,
+            closure_receipt_path=closure_receipt_path,
+            holder_receipt=holder_receipt,
+            holder_receipt_bytes=holder_receipt_bytes,
+            holder_receipt_digest=holder_receipt_digest,
+        )
+        join = existing_join
+    else:
+        _write_new_json(join_receipt_path, join, "terminal join receipt")
+        join_bytes = canonical_bytes(join) + b"\n"
     authorization = {
         "schema_version": CLOSURE_AUTHORIZATION_SCHEMA_VERSION,
         "authorization_ref": str(authorization_path.resolve()),
@@ -1523,12 +1575,31 @@ def command_join(args: argparse.Namespace) -> int:
             "authorized": True,
         },
         "evidence_ref": str(join_receipt_path.resolve()),
-        "evidence_sha256": sha256_bytes(canonical_bytes(join) + b"\n"),
+        "evidence_sha256": sha256_bytes(join_bytes),
         "join_receipt_ref": str(join_receipt_path.resolve()),
     }
-    _write_new_json(
-        authorization_path, authorization, "terminal closure authorization"
-    )
+    if authorization_path.exists():
+        existing_authorization, authorization_bytes = _load_json_snapshot(
+            authorization_path, "terminal closure authorization"
+        )
+        if authorization_bytes != canonical_bytes(existing_authorization) + b"\n":
+            raise IncarnationHomeError(
+                "terminal closure authorization is not canonically encoded"
+            )
+        _validate_closure_authorization(
+            authorization_path=authorization_path,
+            handoff_path=handoff_path,
+            holder_receipt_path=holder_receipt_path,
+            closure_receipt_path=closure_receipt_path,
+            holder_receipt=holder_receipt,
+            holder_receipt_bytes=holder_receipt_bytes,
+            holder_receipt_digest=holder_receipt_digest,
+        )
+        authorization = existing_authorization
+    else:
+        _write_new_json(
+            authorization_path, authorization, "terminal closure authorization"
+        )
     print(json.dumps({"join": join, "authorization": authorization}, sort_keys=True))
     return 0
 
@@ -1606,6 +1677,7 @@ def command_close(args: argparse.Namespace) -> int:
     )
     authorization_argument = getattr(args, "closure_authorization", None)
     wake_argument = getattr(args, "wake_receipt", None)
+    legacy_wake_route = bool(wake_argument and not authorization_argument)
     if authorization_argument:
         authorization_path = _regular_file(
             Path(authorization_argument), "terminal closure authorization"
@@ -1654,6 +1726,8 @@ def command_close(args: argparse.Namespace) -> int:
         wake_receipt_path=Path(authorization["authorization_ref"]),
         authorization_path=Path(authorization["authorization_ref"]),
         authorization_kind=str(authorization["authorization_kind"]),
+        evidence_path=Path(authorization["evidence_ref"]),
+        allow_legacy_wake_reservation=legacy_wake_route,
         holder_pid=holder_pid,
         terminal_pid=kitty_pid,
     )
