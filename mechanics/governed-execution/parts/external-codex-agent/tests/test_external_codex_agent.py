@@ -3106,6 +3106,71 @@ def test_supervisor_mount_wrapper_masks_target_before_releasing_command(
     assert target.read_text(encoding="utf-8") == "credential-marker\n"
 
 
+def test_supervisor_runtime_package_uses_private_coordinate_after_source_rename(
+    tmp_path: Path,
+) -> None:
+    fake_codex = tmp_path / "fake-codex"
+    fake_codex.write_text(
+        "#!/usr/bin/python3\n"
+        "import pathlib, sys\n"
+        "pathlib.Path(sys.argv[1]).write_text(sys.argv[0] + '\\n')\n",
+        encoding="utf-8",
+    )
+    fake_codex.chmod(0o755)
+    package = _runtime_package_fixture(tmp_path, fake_codex)
+    package_root = Path(package["package_root"])
+    binding = {
+        "package_root": str(package_root),
+        "members": package["subject"]["members"],
+    }
+    runtime_package_mask = RUNTIME._runtime_package_mask(binding)
+    source_executable = package_root / "bin/codex"
+    output = tmp_path / "observed-command-coordinate"
+    masks = tuple(
+        (
+            str(item["source"]),
+            str(item["target"]),
+            str(item["digest"]),
+        )
+        for item in runtime_package_mask["masks"]
+    )
+
+    def replace_source_package() -> None:
+        moved_root = tmp_path / "moved-runtime-package"
+        package_root.rename(moved_root)
+        (package_root / "bin").mkdir(parents=True)
+        replacement = package_root / "bin/codex"
+        replacement.write_text(
+            "#!/usr/bin/python3\n"
+            "import pathlib, sys\n"
+            "pathlib.Path(sys.argv[1]).write_text('replacement-path\\n')\n",
+            encoding="utf-8",
+        )
+        replacement.chmod(0o755)
+
+    process, gate_write_fd = SUPERVISOR._launch_verified_command(
+        [str(source_executable), str(output)],
+        _digest_path(source_executable),
+        mount_wrapper="/usr/bin/bwrap",
+        mount_wrapper_digest=_digest_path(Path("/usr/bin/bwrap")),
+        mount_launcher_digest=_digest_path(SUPERVISOR.MOUNT_LAUNCHER_PATH),
+        private_directory_views=tuple(
+            runtime_package_mask["private_directory_views"]
+        ),
+        read_only_masks=masks,
+        runtime_package_mask=True,
+        mount_setup_callback=replace_source_package,
+    )
+
+    assert gate_write_fd is not None
+    os.write(gate_write_fd, b"1")
+    os.close(gate_write_fd)
+    assert process.wait(timeout=5) == 0
+    assert output.read_text(encoding="utf-8") == (
+        str(SUPERVISOR.RUNTIME_PACKAGE_EXECUTABLE) + "\n"
+    )
+
+
 def test_supervisor_mount_mask_preserves_verified_bytes_after_source_mutation(
     tmp_path: Path,
 ) -> None:

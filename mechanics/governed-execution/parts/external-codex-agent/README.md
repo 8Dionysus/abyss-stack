@@ -432,6 +432,13 @@ same `runtime_package` binding on every transport-study writer launch. Reviewer
 preparation forwards that package and the writer's exact runtime-profile
 coordinate unchanged.
 
+At process containment, the admitted host `package_root` is verification input,
+not the execution coordinate. The supervisor materializes the complete package
+view in the private runtime-owned
+`/var/tmp/aoa-external-actor-runtime-package` tmpfs and launches `bin/codex`
+from that coordinate, so a same-UID rename or replacement of the host package
+root cannot redirect package-relative helper lookup after mount setup.
+
 `prepare_landing_study.py prepare-reviewer` is the canonical non-starting
 review preparation path for both historical transport-study writers and admitted
 owner-contour writers. It accepts an exact terminal read-only or bounded

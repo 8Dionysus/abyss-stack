@@ -287,9 +287,12 @@ Before launch the controller verifies:
    the subjects aggregate and every inventoried member digest. Those package
    coordinates remain distinct from, and do not replace, the `aoa-models`
    `runtime_subject` digest. The verified package inventory is then projected
-   as a descriptor-bound read-only private mount for the whole process;
-   `bin/codex` is separately attached from the supervisor's verified
-   executable descriptor;
+   into the runtime-owned `/var/tmp/aoa-external-actor-runtime-package`
+   coordinate as a descriptor-bound read-only private mount for the whole
+   process; the process executes `bin/codex` from that coordinate, separately
+   attached from the supervisor's verified executable descriptor. The admitted
+   host `package_root` is a verification source only and is never the live
+   package-relative execution coordinate;
 6. the resolved Codex executable digest, reported version, auth status, and
    bundled live model catalog match the binding;
 7. the exact profile-bound Linux subreaper supervisor and probe executable are

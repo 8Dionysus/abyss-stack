@@ -48,6 +48,11 @@ bundled helpers, and compatibility entrypoint against that exact subject.
 The profile separately pins the artifact-subject aggregate and every
 inventory-member digest; these package coordinates are checked independently
 of the aoa-models runtime-subject digest.
+The admitted host `package_root` is verification input only: before the launch
+gate is released, the supervisor materializes the package into the private
+runtime-owned `/var/tmp/aoa-external-actor-runtime-package` tmpfs and executes
+`bin/codex` from that coordinate. Package-relative lookup therefore does not
+depend on a live source package pathname after setup.
 
 ## Rationale
 
@@ -68,8 +73,9 @@ source/runtime and live-evidence checks.
   and member digests are rechecked at binding, preflight, and parent re-entry.
 - Positive: the admitted package inventory is held in a descriptor-bound
   read-only private mount view for the whole external Codex process lifetime;
-  the executable itself remains separately attached from its verified file
-  descriptor.
+  the view is rooted at a fresh runtime-owned coordinate rather than the
+  mutable host package root, and the executable itself remains separately
+  attached from its verified file descriptor.
 - Positive: missing or mismatched subject data fails before Codex preflight or
   process launch.
 - Tradeoff: the source profile and its paired fixtures now require the `0.148.0`

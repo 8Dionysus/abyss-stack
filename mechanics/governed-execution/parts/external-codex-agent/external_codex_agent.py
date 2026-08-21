@@ -72,6 +72,10 @@ PROFILE_PATH = PART_ROOT / "runtime-profile.v1.json"
 SUPERVISOR_PATH = PART_ROOT / "external_codex_supervisor.py"
 MOUNT_LAUNCHER_PATH = PART_ROOT / "external_codex_mount_launcher.py"
 ACTOR_EXECUTION_ROOT = Path("/tmp/aoa-external-actor-workspace")
+RUNTIME_PACKAGE_EXECUTION_ROOT = Path(
+    "/var/tmp/aoa-external-actor-runtime-package"
+)
+RUNTIME_PACKAGE_EXECUTABLE = RUNTIME_PACKAGE_EXECUTION_ROOT / "bin/codex"
 SCHEMA_ROOT = PART_ROOT / "schemas"
 LAUNCH_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-launch.schema.json"
 TASK_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-task.schema.json"
@@ -5199,34 +5203,67 @@ def _private_directory_views(
 ) -> list[dict[str, Any]]:
     """Describe namespace-private parent views for every masked coordinate."""
 
-    grouped: dict[Path, set[str]] = {}
+    grouped: dict[tuple[Path, Path], set[str]] = {}
     for mask in masks:
+        source = Path(str(mask["source"]))
         target = Path(str(mask["target"]))
-        if not target.is_absolute() or target.name in {"", ".", ".."}:
+        if (
+            not source.is_absolute()
+            or not target.is_absolute()
+            or source.name in {"", ".", ".."}
+            or target.name in {"", ".", ".."}
+        ):
             raise ExternalCodexRuntimeError(
                 "actor_git_mask_unavailable",
                 "external actor Git mask has an invalid target coordinate",
             )
-        grouped.setdefault(target.parent, set()).add(target.name)
+        source_parent = source.parent if bool(mask.get("materialized")) else target.parent
+        grouped.setdefault((source_parent, target.parent), set()).add(target.name)
     views: list[dict[str, Any]] = []
-    for parent, masked_names in sorted(
-        grouped.items(), key=lambda item: (len(item[0].parts), str(item[0]))
+    for (source_parent, target_parent), masked_names in sorted(
+        grouped.items(),
+        key=lambda item: (
+            len(item[0][0].parts),
+            str(item[0][0]),
+            str(item[0][1]),
+        ),
     ):
         try:
-            parent_stat = parent.lstat()
+            parent_stat = source_parent.lstat()
             directory_entries = tuple(
-                sorted(parent.iterdir(), key=lambda path: path.name)
+                sorted(source_parent.iterdir(), key=lambda path: path.name)
             )
         except OSError as exc:
             raise ExternalCodexRuntimeError(
                 "actor_git_mask_unavailable",
                 "cannot inspect one private Git metadata view",
             ) from exc
-        if parent.is_symlink() or not stat.S_ISDIR(parent_stat.st_mode):
+        if source_parent.is_symlink() or not stat.S_ISDIR(parent_stat.st_mode):
             raise ExternalCodexRuntimeError(
                 "actor_git_mask_unavailable",
                 "private Git metadata view parent is not a physical directory",
             )
+        materialized = any(
+            bool(mask.get("materialized"))
+            for mask in masks
+            if Path(str(mask["source"])).parent == source_parent
+            and Path(str(mask["target"])).parent == target_parent
+        )
+        if materialized:
+            view_parent_stat = parent_stat
+        else:
+            try:
+                view_parent_stat = target_parent.lstat()
+            except OSError as exc:
+                raise ExternalCodexRuntimeError(
+                    "actor_git_mask_unavailable",
+                    "cannot inspect one private Git metadata view target",
+                ) from exc
+            if target_parent.is_symlink() or not stat.S_ISDIR(view_parent_stat.st_mode):
+                raise ExternalCodexRuntimeError(
+                    "actor_git_mask_unavailable",
+                    "private Git metadata view target is not a physical directory",
+                )
         entries: list[dict[str, Any]] = []
         for source in directory_entries:
             if source.name in masked_names:
@@ -5249,7 +5286,7 @@ def _private_directory_views(
                 )
             entry = {
                 "source": str(source),
-                "target": str(parent / source.name),
+                "target": str(target_parent / source.name),
                 "kind": (
                     "directory"
                     if stat.S_ISDIR(source_stat.st_mode)
@@ -5262,13 +5299,14 @@ def _private_directory_views(
             if stat.S_ISLNK(source_stat.st_mode):
                 entry["link_target"] = os.readlink(source)
             entries.append(entry)
-        views.append(
-            {
-                "target": str(parent),
-                "identity": _private_view_identity(parent_stat),
-                "entries": entries,
-            }
-        )
+        view = {
+            "target": str(target_parent),
+            "identity": _private_view_identity(view_parent_stat),
+            "entries": entries,
+        }
+        if materialized:
+            view["materialized"] = True
+        views.append(view)
     return views
 
 
@@ -5293,8 +5331,9 @@ def _runtime_package_mask(binding: Mapping[str, Any]) -> dict[str, Any]:
     masks = [
         {
             "source": str(package_root / relative_path),
-            "target": str(package_root / relative_path),
+            "target": str(RUNTIME_PACKAGE_EXECUTION_ROOT / relative_path),
             "digest": str(members[relative_path]),
+            "materialized": True,
         }
         for relative_path in RUNTIME_PACKAGE_SUBJECT_ROLES
         if relative_path != "bin/codex"
@@ -5334,9 +5373,32 @@ def _merge_mount_masks(
                 )
             targets.add(target)
             combined.append(dict(raw_mask))
+    combined_views: list[dict[str, Any]] = []
+    view_targets: set[str] = set()
+    for mask in active:
+        raw_views = mask.get("private_directory_views")
+        if not isinstance(raw_views, list) or not raw_views:
+            raise ExternalCodexRuntimeError(
+                "actor_git_mask_unavailable",
+                "mount mask contains no exact private directory views",
+            )
+        for raw_view in raw_views:
+            if not isinstance(raw_view, Mapping):
+                raise ExternalCodexRuntimeError(
+                    "actor_git_mask_unavailable",
+                    "mount mask contains an invalid private directory view",
+                )
+            target = str(raw_view.get("target", ""))
+            if target in view_targets:
+                raise ExternalCodexRuntimeError(
+                    "actor_git_mask_unavailable",
+                    "two private mount masks target the same directory view",
+                )
+            view_targets.add(target)
+            combined_views.append(dict(raw_view))
     return {
         "masks": combined,
-        "private_directory_views": _private_directory_views(combined),
+        "private_directory_views": combined_views,
     }
 
 
@@ -8682,16 +8744,27 @@ class ExternalCodexRuntime:
                 target = Path(str(view.get("target", "")))
                 identity = view.get("identity")
                 entries = view.get("entries")
+                materialized = view.get("materialized", False)
                 if (
                     not target.is_absolute()
                     or not isinstance(identity, dict)
                     or not isinstance(entries, list)
+                    or not isinstance(materialized, bool)
                 ):
                     raise ExternalCodexRuntimeError(
                         "actor_git_mask_unavailable",
                         "external actor private mount view has an invalid shape",
                     )
-                _assert_private_view_identity(target, identity, directory=True)
+                if materialized:
+                    if runtime_package_mask is None or not target.is_relative_to(
+                        RUNTIME_PACKAGE_EXECUTION_ROOT
+                    ):
+                        raise ExternalCodexRuntimeError(
+                            "actor_git_mask_unavailable",
+                            "materialized private mount view is outside the admitted runtime package coordinate",
+                        )
+                else:
+                    _assert_private_view_identity(target, identity, directory=True)
                 view_targets.add(target)
                 supervisor_argv.extend(
                     (

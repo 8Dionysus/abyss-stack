@@ -16,6 +16,9 @@ from typing import NoReturn
 
 
 PAYLOAD_SCHEMA = "abyss_stack_external_codex_mount_launcher_v1"
+RUNTIME_PACKAGE_EXECUTION_ROOT = Path(
+    "/var/tmp/aoa-external-actor-runtime-package"
+)
 MAX_PAYLOAD_BYTES = 2 * 1024 * 1024
 SETUP_READY = b"R"
 SETUP_RELEASE = b"1"
@@ -153,15 +156,15 @@ def _open_view_targets(views: object) -> list[int]:
     descriptors: list[int] = []
     try:
         for view in views:
-            if not isinstance(view, dict) or set(view) != {
-                "target",
-                "identity",
-                "attachments",
-            }:
+            if not isinstance(view, dict) or set(view) not in (
+                {"target", "identity", "attachments"},
+                {"target", "identity", "attachments", "materialized"},
+            ):
                 raise MountLauncherError("private view target has an unsupported shape")
             target = Path(str(view["target"]))
             identity = view["identity"]
             attachments = view["attachments"]
+            materialized = view.get("materialized", False)
             if (
                 not target.is_absolute()
                 or not isinstance(identity, dict)
@@ -169,6 +172,11 @@ def _open_view_targets(views: object) -> list[int]:
                 or any(not isinstance(identity[key], int) for key in IDENTITY_FIELDS)
                 or not isinstance(attachments, list)
                 or not attachments
+                or not isinstance(materialized, bool)
+                or (
+                    materialized
+                    and not target.is_relative_to(RUNTIME_PACKAGE_EXECUTION_ROOT)
+                )
             ):
                 raise MountLauncherError("private view target identity is invalid")
             attachment_names: set[str] = set()
@@ -254,9 +262,12 @@ def _open_view_targets(views: object) -> list[int]:
                 raise MountLauncherError("cannot open one exact private view target") from exc
             descriptors.append(descriptor)
             observed = os.fstat(descriptor)
-            if not stat.S_ISDIR(observed.st_mode) or any(
-                identity[key] != getattr(observed, field)
-                for key, field in IDENTITY_FIELDS.items()
+            if not stat.S_ISDIR(observed.st_mode) or (
+                not materialized
+                and any(
+                    identity[key] != getattr(observed, field)
+                    for key, field in IDENTITY_FIELDS.items()
+                )
             ):
                 raise MountLauncherError("private view target identity changed")
         return descriptors
@@ -351,6 +362,84 @@ def _await_setup_release(setup_fd: int) -> None:
         raise MountLauncherError("mount setup handshake failed") from exc
 
 
+def _mount_private_tmpfs(libc: ctypes.CDLL, target: Path) -> None:
+    """Create the runtime-owned package parent inside this mount namespace."""
+
+    flags = os.O_PATH | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW
+    try:
+        target_fd = os.open(target, flags)
+    except OSError as exc:
+        raise MountLauncherError(
+            "cannot open the runtime package tmpfs parent"
+        ) from exc
+    filesystem_fd = mount_fd = -1
+    try:
+        filesystem_fd = _syscall(
+            libc,
+            SYS_FSOPEN,
+            ctypes.c_char_p(b"tmpfs"),
+            FSOPEN_CLOEXEC,
+        )
+        _syscall(
+            libc,
+            SYS_FSCONFIG,
+            filesystem_fd,
+            FSCONFIG_CMD_CREATE,
+            ctypes.c_void_p(0),
+            ctypes.c_void_p(0),
+            0,
+        )
+        mount_fd = _syscall(libc, SYS_FSMOUNT, filesystem_fd, FSMOUNT_CLOEXEC, 0)
+        _syscall(
+            libc,
+            SYS_MOVE_MOUNT,
+            mount_fd,
+            ctypes.c_char_p(b""),
+            target_fd,
+            ctypes.c_char_p(b""),
+            MOVE_MOUNT_F_EMPTY_PATH | MOVE_MOUNT_T_EMPTY_PATH,
+        )
+    except OSError as exc:
+        raise MountLauncherError(
+            "cannot create the runtime package tmpfs parent"
+        ) from exc
+    finally:
+        os.close(target_fd)
+        if mount_fd >= 0:
+            os.close(mount_fd)
+        if filesystem_fd >= 0:
+            os.close(filesystem_fd)
+
+
+def _prepare_materialized_views(libc: ctypes.CDLL, views: object) -> None:
+    assert isinstance(views, list)
+    materialized_targets = sorted(
+        {
+            Path(str(view["target"]))
+            for view in views
+            if isinstance(view, dict) and view.get("materialized", False)
+        },
+        key=lambda path: (len(path.parts), str(path)),
+    )
+    if not materialized_targets:
+        return
+    if any(
+        not target.is_relative_to(RUNTIME_PACKAGE_EXECUTION_ROOT)
+        for target in materialized_targets
+    ):
+        raise MountLauncherError(
+            "materialized runtime package view is outside its execution coordinate"
+        )
+    _mount_private_tmpfs(libc, RUNTIME_PACKAGE_EXECUTION_ROOT.parent)
+    for target in materialized_targets:
+        try:
+            target.mkdir(mode=0o700, parents=True, exist_ok=True)
+        except OSError as exc:
+            raise MountLauncherError(
+                "cannot create the runtime package execution coordinate"
+            ) from exc
+
+
 def _command_visible_target_descriptor(view: dict[str, object], opened_fd: int) -> int:
     """Reopen the exact command-visible target immediately before attachment."""
 
@@ -367,15 +456,22 @@ def _command_visible_target_descriptor(view: dict[str, object], opened_fd: int) 
     try:
         observed = os.fstat(descriptor)
         originally_opened = os.fstat(opened_fd)
+        materialized = bool(view.get("materialized", False))
         if (
             not stat.S_ISDIR(observed.st_mode)
-            or any(
-                identity[key] != getattr(observed, field)
-                for key, field in IDENTITY_FIELDS.items()
+            or (
+                not materialized
+                and any(
+                    identity[key] != getattr(observed, field)
+                    for key, field in IDENTITY_FIELDS.items()
+                )
             )
-            or any(
-                getattr(observed, field) != getattr(originally_opened, field)
-                for field in IDENTITY_FIELDS.values()
+            or (
+                not materialized
+                and any(
+                    getattr(observed, field) != getattr(originally_opened, field)
+                    for field in IDENTITY_FIELDS.values()
+                )
             )
         ):
             raise MountLauncherError(
@@ -640,6 +736,7 @@ def main(argv: list[str] | None = None) -> int:
         libc = ctypes.CDLL(None, use_errno=True)
         _write_user_namespace_maps(libc)
         _make_mounts_private(libc)
+        _prepare_materialized_views(libc, payload["views"])
         target_descriptors = _open_view_targets(payload["views"])
         source_descriptors = _open_attachment_sources(payload["views"])
         try:

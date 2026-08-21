@@ -51,6 +51,10 @@ MOUNT_LAUNCHER_PATH = Path(__file__).resolve().with_name(
     "external_codex_mount_launcher.py"
 )
 ACTOR_WORKSPACE_COORDINATE = Path("/tmp/aoa-external-actor-workspace")
+RUNTIME_PACKAGE_EXECUTION_ROOT = Path(
+    "/var/tmp/aoa-external-actor-runtime-package"
+)
+RUNTIME_PACKAGE_EXECUTABLE = RUNTIME_PACKAGE_EXECUTION_ROOT / "bin/codex"
 PRIVATE_VIEW_IDENTITY_FIELDS = {
     "device": "st_dev",
     "inode": "st_ino",
@@ -333,19 +337,24 @@ def _validated_private_directory_views(
             view = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise SupervisorError("private directory view is invalid JSON") from exc
-        if not isinstance(view, dict) or set(view) != {
-            "target",
-            "identity",
-            "entries",
-        }:
+        if not isinstance(view, dict) or set(view) not in (
+            {"target", "identity", "entries"},
+            {"target", "identity", "entries", "materialized"},
+        ):
             raise SupervisorError("private directory view has an unsupported shape")
         target = Path(str(view["target"]))
         entries = view["entries"]
+        materialized = view.get("materialized", False)
         if (
             not target.is_absolute()
             or target in targets
             or not isinstance(entries, list)
             or not isinstance(view["identity"], dict)
+            or not isinstance(materialized, bool)
+            or (
+                materialized
+                and not target.is_relative_to(RUNTIME_PACKAGE_EXECUTION_ROOT)
+            )
         ):
             raise SupervisorError("private directory view identity is invalid")
         targets.add(target)
@@ -521,12 +530,21 @@ def _launch_verified_command(
         launcher_views: list[dict[str, object]] = []
         for view in private_directory_views:
             view_target = Path(str(view["target"]))
+            materialized = bool(view.get("materialized", False))
+            if materialized and not view_target.is_relative_to(
+                RUNTIME_PACKAGE_EXECUTION_ROOT
+            ):
+                raise SupervisorError(
+                    "materialized runtime package view is outside its execution coordinate"
+                )
             view_targets.add(view_target)
             launcher_view = {
                 "target": str(view_target),
                 "identity": view["identity"],
                 "attachments": [],
             }
+            if materialized:
+                launcher_view["materialized"] = True
             launcher_views.append(launcher_view)
             launcher_attachments = launcher_view["attachments"]
             assert isinstance(launcher_attachments, list)
@@ -570,7 +588,21 @@ def _launch_verified_command(
                 if kind == "symlink":
                     launcher_attachment["link_target"] = entry["link_target"]
                 launcher_attachments.append(launcher_attachment)
-        command_target = Path(command[0])
+        if runtime_package_mask and not any(
+            bool(view.get("materialized", False))
+            and Path(str(view["target"])).is_relative_to(
+                RUNTIME_PACKAGE_EXECUTION_ROOT
+            )
+            for view in private_directory_views
+        ):
+            raise SupervisorError(
+                "runtime package has no materialized execution coordinate"
+            )
+        command_target = (
+            RUNTIME_PACKAGE_EXECUTABLE
+            if runtime_package_mask
+            else Path(command[0])
+        )
         command_view = next(
             (
                 item
@@ -648,7 +680,10 @@ def _launch_verified_command(
                     "mode": verified_mask_stat.st_mode & 0o7777,
                 }
             )
-        wrapper_command.extend(("--", *command))
+        launch_command = list(command)
+        if runtime_package_mask:
+            launch_command[0] = str(RUNTIME_PACKAGE_EXECUTABLE)
+        wrapper_command.extend(("--", *launch_command))
         payload_descriptor = _sealed_payload_descriptor(
             {
                 "schema_version": "abyss_stack_external_codex_mount_launcher_v1",
