@@ -44,6 +44,16 @@ class ExternalActorClockTests(unittest.TestCase):
             CLOCK._check_error_log(error)
             self.assertEqual(error.stat().st_mode & 0o777, 0o600)
 
+    def test_marker_is_published_as_a_complete_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            marker = Path(temporary) / "captured"
+            CLOCK._write_marker(marker, "kitty_pid=123\nkitty_start_ticks=456\n")
+            self.assertEqual(
+                marker.read_text(encoding="utf-8"),
+                "kitty_pid=123\nkitty_start_ticks=456\n",
+            )
+            self.assertFalse(Path(f"{marker}.{os.getpid()}.tmp").exists())
+
     def test_configuration_failure_is_persisted_to_error_log(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -230,19 +230,33 @@ def _check_error_log(path: Path) -> None:
 
 
 def _write_marker(path: Path, content: str) -> None:
+    temporary = Path(f"{path}.{os.getpid()}.tmp")
     descriptor: int | None = None
     try:
         descriptor = os.open(
-            path,
+            temporary,
             os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC,
             0o600,
         )
-        os.write(descriptor, content.encode("utf-8"))
+        payload = content.encode("utf-8")
+        offset = 0
+        while offset < len(payload):
+            offset += os.write(descriptor, payload[offset:])
+        os.fsync(descriptor)
+        os.close(descriptor)
+        descriptor = None
+        os.replace(temporary, path)
     except OSError as exc:
         raise ClockSupervisorError(f"clock marker publication failed: {path}") from exc
     finally:
         if descriptor is not None:
             os.close(descriptor)
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError as exc:
+            raise ClockSupervisorError(
+                f"clock marker temporary cleanup failed: {temporary}"
+            ) from exc
 
 
 def _required_environment() -> tuple[str, str, Path, Path, Path, Path, float, float]:
