@@ -3533,6 +3533,57 @@ def test_kitty_projection_omits_environment_and_commandline(
         listener.close()
 
 
+def test_kitty_projection_rejects_boolean_observation_ids(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, _binding, _holder, terminal = _terminal_binding_fixture(tmp_path)
+    payload = [
+        {
+            "id": True,
+            "tabs": [
+                {
+                    "id": True,
+                    "windows": [
+                        {
+                            "id": 7,
+                            "title": "Luna Max",
+                            "cwd": "/workspace",
+                            "pid": True,
+                            "foreground_processes": [
+                                {"pid": True},
+                                {"pid": 303},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+    ]
+
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "codex")
+    monkeypatch.setattr(
+        MODULE.subprocess,
+        "run",
+        lambda argv, **_kwargs: subprocess.CompletedProcess(
+            argv, 0, stdout=json.dumps(payload), stderr=""
+        ),
+    )
+    try:
+        [projection] = MODULE._kitty_ls(
+            kitty_executable="/usr/bin/kitty",
+            control_socket=terminal["control_socket"]["address"],
+            window_id="7",
+        )
+        assert projection["pid"] is None
+        assert projection["tab"]["id"] is None
+        assert projection["os_window"]["id"] is None
+        assert projection["foreground_processes"] == [
+            {"pid": 303, "comm": "codex"}
+        ]
+    finally:
+        listener.close()
+
+
 def test_safe_projection_redacts_quoted_and_whitespace_credentials() -> None:
     assert MODULE._safe_projection_string(
         '{"password":"hunter2"}', "json-shaped title"
@@ -3731,6 +3782,26 @@ def test_status_rejects_pid_start_tick_reuse_without_querying_kitty(
         assert state == "stale"
         assert projection["observation"]["kitty_query"] == "not_attempted"
         assert queried is False
+    finally:
+        listener.close()
+
+
+def test_status_preserves_observed_non_kitty_comm_on_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "zsh")
+    monkeypatch.setattr(MODULE, "_descends_from", lambda _pid, _ancestor: True)
+    try:
+        projection, state = MODULE._observe_terminal_binding(
+            binding=binding,
+            holder=holder,
+            terminal=terminal,
+            kitty_executable="/usr/bin/kitty",
+        )
+        assert state == "stale"
+        assert projection["processes"]["kitty"]["comm"] == "zsh"
     finally:
         listener.close()
 

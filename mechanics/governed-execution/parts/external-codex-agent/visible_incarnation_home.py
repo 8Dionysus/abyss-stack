@@ -1109,7 +1109,7 @@ def _kitty_ls(
                         if not isinstance(process, dict):
                             continue
                         pid = process.get("pid")
-                        if not isinstance(pid, int) or pid <= 0:
+                        if type(pid) is not int or pid <= 0:
                             continue
                         try:
                             comm = _proc_comm(pid)
@@ -1131,7 +1131,7 @@ def _kitty_ls(
                     ),
                     "cwd": _safe_projection_string(window.get("cwd", ""), "window cwd"),
                     "pid": window.get("pid")
-                    if isinstance(window.get("pid"), int)
+                    if type(window.get("pid")) is int and window.get("pid") > 0
                     else None,
                     "is_active": window.get("is_active") is True,
                     "is_focused": window.get("is_focused") is True,
@@ -1139,13 +1139,16 @@ def _kitty_ls(
                     "in_alternate_screen": window.get("in_alternate_screen") is True,
                     "foreground_processes": foreground,
                     "tab": {
-                        "id": tab.get("id") if isinstance(tab.get("id"), int) else None,
+                        "id": tab.get("id")
+                        if type(tab.get("id")) is int and tab.get("id") > 0
+                        else None,
                         "is_active": tab.get("is_active") is True,
                         "is_focused": tab.get("is_focused") is True,
                     },
                     "os_window": {
                         "id": os_window.get("id")
-                        if isinstance(os_window.get("id"), int)
+                        if type(os_window.get("id")) is int
+                        and os_window.get("id") > 0
                         else None,
                         "is_active": os_window.get("is_active") is True,
                         "is_focused": os_window.get("is_focused") is True,
@@ -2575,6 +2578,7 @@ def _observe_terminal_binding(
     assert isinstance(terminal_pid, int) and isinstance(terminal_start_ticks, int)
     holder_state = _proc_identity_state(holder_pid, holder_start_ticks)
     terminal_state = _proc_identity_state(terminal_pid, terminal_start_ticks)
+    terminal_comm = "unknown"
     identity_state = "live"
     if holder_state == "drifted" or terminal_state == "drifted":
         identity_state = "stale"
@@ -2582,7 +2586,8 @@ def _observe_terminal_binding(
         identity_state = "missing"
     elif identity_state == "live":
         try:
-            if _proc_comm(terminal_pid) != "kitty" or not _descends_from(
+            terminal_comm = _proc_comm(terminal_pid)
+            if terminal_comm != "kitty" or not _descends_from(
                 holder_pid, terminal_pid
             ):
                 identity_state = "stale"
@@ -2657,7 +2662,7 @@ def _observe_terminal_binding(
                 "pid": terminal_pid,
                 "start_ticks": terminal_start_ticks,
                 "state": terminal_state,
-                "comm": "kitty" if terminal_state == "live" else "unknown",
+                "comm": terminal_comm if terminal_state == "live" else "unknown",
             },
         },
         "terminal": {
