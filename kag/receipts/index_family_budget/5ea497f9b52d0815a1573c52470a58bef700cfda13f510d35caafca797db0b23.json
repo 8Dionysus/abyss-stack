@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 21327142,
+  "allowed_tracked_bytes": 36748145,
+  "approved_by": "repository-owner",
+  "base_ref": "3bbdfbc335e6fd29d4c7f5b871ffed617f7081be",
+  "changed_generated_bytes": 21327142,
+  "changed_generated_files": 210,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "5ea497f9b52d0815a1573c52470a58bef700cfda13f510d35caafca797db0b23",
+  "reason": "Owner-reviewed directed input now revalidates holder PID/start-ticks, bound argv digest, and executable digest immediately before Kitty send; focused regression coverage closes the P2 race without widening activation or live-proof claims.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36748145,
+  "tracked_bytes_max": 24117248
+}
