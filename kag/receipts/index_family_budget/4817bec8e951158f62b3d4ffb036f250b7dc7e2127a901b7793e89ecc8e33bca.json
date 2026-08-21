@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 21421976,
+  "allowed_tracked_bytes": 36751708,
+  "approved_by": "repository-owner",
+  "base_ref": "3bbdfbc335e6fd29d4c7f5b871ffed617f7081be",
+  "changed_generated_bytes": 21421976,
+  "changed_generated_files": 211,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "4817bec8e951158f62b3d4ffb036f250b7dc7e2127a901b7793e89ecc8e33bca",
+  "reason": "Owner-reviewed nested shebang resolution now preserves the exact PATH-resolved spelling across env-selected symlinks while canonical targets remain byte-inspection identities; focused regression closes the P2 live argv mismatch without widening activation or live-proof claims.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36751708,
+  "tracked_bytes_max": 24117248
+}
