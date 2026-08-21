@@ -140,6 +140,29 @@ def _read_status(path: Path) -> int:
     return result
 
 
+def _terminate_process(process: subprocess.Popen, deadline: float) -> None:
+    if process.poll() is not None:
+        return
+    try:
+        process.terminate()
+    except ProcessLookupError:
+        return
+    except OSError:
+        pass
+    while time.monotonic() < deadline and process.poll() is None:
+        time.sleep(POLL_SECONDS)
+    if process.poll() is not None:
+        return
+    try:
+        process.kill()
+    except ProcessLookupError:
+        return
+    except OSError:
+        return
+    while time.monotonic() < deadline and process.poll() is None:
+        time.sleep(POLL_SECONDS)
+
+
 def _terminate_kitty(
     pid: int | None,
     start_ticks: int | None,
@@ -382,34 +405,48 @@ def main() -> int:
     child_environment["AOA_CLOCK_HOLDER_CAPTURED_FILE"] = str(captured_path)
 
     launch_deadline = time.monotonic() + launch_timeout
+    dispatch_command = [
+        "/usr/bin/kitty",
+        "--detach",
+        "--title",
+        title,
+        "/usr/bin/zsh",
+        "-lc",
+        _runner_command(),
+    ]
     print(
         f"clock supervisor: dispatching detached Kitty title={title!r}",
         flush=True,
     )
     try:
-        dispatched = subprocess.run(
-            [
-                "/usr/bin/kitty",
-                "--detach",
-                "--title",
-                title,
-                "/usr/bin/zsh",
-                "-lc",
-                _runner_command(),
-            ],
-            check=False,
+        dispatch = subprocess.Popen(
+            dispatch_command,
             env=child_environment,
-            timeout=max(POLL_SECONDS, launch_deadline - time.monotonic()),
         )
-    except subprocess.TimeoutExpired as exc:
-        _append_error(
-            error_path,
-            f"detached Kitty dispatch exceeded launch timeout {launch_timeout}: {exc}",
-        )
-        for pid, start_ticks in _matching_kitties(title).items():
-            if baseline.get(pid) != start_ticks:
-                _terminate_kitty(pid, start_ticks, close_timeout)
-        return 125
+        while dispatch.poll() is None:
+            if _STOP_SIGNAL is not None:
+                stop_deadline = _stop_cleanup_deadline(close_timeout)
+                _terminate_process(dispatch, stop_deadline)
+                for pid, start_ticks in _matching_kitties(title).items():
+                    if baseline.get(pid) != start_ticks:
+                        _terminate_kitty(
+                            pid,
+                            start_ticks,
+                            close_deadline=stop_deadline,
+                        )
+                return 0
+            if time.monotonic() >= launch_deadline:
+                _terminate_process(dispatch, launch_deadline)
+                _append_error(
+                    error_path,
+                    f"detached Kitty dispatch exceeded launch timeout {launch_timeout}",
+                )
+                for pid, start_ticks in _matching_kitties(title).items():
+                    if baseline.get(pid) != start_ticks:
+                        _terminate_kitty(pid, start_ticks, close_timeout)
+                return 125
+            time.sleep(POLL_SECONDS)
+        dispatched_returncode = dispatch.returncode
     except OSError as exc:
         _append_error(error_path, f"detached Kitty dispatch failed: {exc}")
         return 127
@@ -423,12 +460,12 @@ def main() -> int:
                     close_deadline=stop_deadline,
                 )
         return 0
-    if dispatched.returncode != 0:
+    if dispatched_returncode != 0:
         _append_error(
             error_path,
-            f"detached Kitty dispatch returned {dispatched.returncode}",
+            f"detached Kitty dispatch returned {dispatched_returncode}",
         )
-        return dispatched.returncode
+        return dispatched_returncode
 
     kitty_pid: int | None = None
     kitty_start_ticks: int | None = None

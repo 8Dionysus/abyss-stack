@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -53,6 +54,57 @@ class ExternalActorClockTests(unittest.TestCase):
                 "kitty_pid=123\nkitty_start_ticks=456\n",
             )
             self.assertFalse(Path(f"{marker}.{os.getpid()}.tmp").exists())
+
+    def test_stop_interrupts_a_stalled_kitty_dispatch(self) -> None:
+        class StalledDispatch:
+            returncode: int | None = None
+
+            def __init__(self) -> None:
+                self.terminate_calls = 0
+                self.kill_calls = 0
+
+            def poll(self) -> int | None:
+                return self.returncode
+
+            def terminate(self) -> None:
+                self.terminate_calls += 1
+                self.returncode = 0
+
+            def kill(self) -> None:
+                self.kill_calls += 1
+                self.returncode = -9
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paths = (root / "status", root / "error.log")
+            dispatch = StalledDispatch()
+            previous_stop_signal = CLOCK._STOP_SIGNAL
+            CLOCK._STOP_SIGNAL = 15
+            try:
+                with (
+                    mock.patch.object(CLOCK.signal, "signal"),
+                    mock.patch.object(
+                        CLOCK,
+                        "_required_environment",
+                        return_value=(
+                            "/tmp/clock-runner",
+                            "clock-title",
+                            paths[0],
+                            paths[1],
+                            Path(f"{paths[0]}.holder-ready"),
+                            Path(f"{paths[0]}.holder-captured"),
+                            30.0,
+                            15.0,
+                        ),
+                    ),
+                    mock.patch.object(CLOCK, "_matching_kitties", return_value={}),
+                    mock.patch.object(CLOCK.subprocess, "Popen", return_value=dispatch),
+                ):
+                    self.assertEqual(CLOCK.main(), 0)
+            finally:
+                CLOCK._STOP_SIGNAL = previous_stop_signal
+            self.assertEqual(dispatch.terminate_calls, 1)
+            self.assertEqual(dispatch.kill_calls, 0)
 
     def test_configuration_failure_is_persisted_to_error_log(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
