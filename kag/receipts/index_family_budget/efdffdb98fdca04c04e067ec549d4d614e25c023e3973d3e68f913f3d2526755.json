@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 20576467,
+  "allowed_tracked_bytes": 36710995,
+  "approved_by": "repository-owner",
+  "base_ref": "3bbdfbc335e6fd29d4c7f5b871ffed617f7081be",
+  "changed_generated_bytes": 20576467,
+  "changed_generated_files": 203,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "efdffdb98fdca04c04e067ec549d4d614e25c023e3973d3e68f913f3d2526755",
+  "reason": "Owner-reviewed runtime safety repair carries holder argv and executable digests into terminal bindings, validates observed holder argv and /proc executable identity before status or directed input, and extends the active receipt schemas; accept only this measured derived-family exceedance without raising standing budgets or widening activation or live-proof claims.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36710995,
+  "tracked_bytes_max": 24117248
+}
