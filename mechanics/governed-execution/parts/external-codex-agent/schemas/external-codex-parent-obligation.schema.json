@@ -15,6 +15,7 @@
     "parent_workspace",
     "codex_executable",
     "codex_executable_digest",
+    "runtime_package",
     "codex_home",
     "return_owner",
     "expected_wake_condition_id",
@@ -40,6 +41,16 @@
     "parent_workspace": {"type": "string", "pattern": "^/"},
     "codex_executable": {"type": "string", "pattern": "^/"},
     "codex_executable_digest": {"$ref": "#/$defs/digest"},
+    "runtime_package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package_root", "artifact_identity", "artifact_subjects"],
+      "properties": {
+        "package_root": {"type": "string", "pattern": "^/"},
+        "artifact_identity": {"$ref": "#/$defs/artifactCoordinate"},
+        "artifact_subjects": {"$ref": "#/$defs/artifactCoordinate"}
+      }
+    },
     "codex_home": {"type": "string", "pattern": "^/"},
     "return_owner": {"type": "string", "minLength": 1},
     "expected_wake_condition_id": {"type": "string", "minLength": 1},
@@ -91,6 +102,15 @@
         "owner_repo": {"type": "string", "minLength": 1},
         "artifact_ref": {"type": "string", "pattern": "^/"},
         "artifact_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "artifactCoordinate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^/"},
+        "digest": {"$ref": "#/$defs/digest"}
       }
     }
   }

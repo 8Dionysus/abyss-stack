@@ -347,22 +347,40 @@ def _validated_private_directory_views(
         targets.add(target)
         entry_targets: set[Path] = set()
         for entry in entries:
-            if not isinstance(entry, dict) or set(entry) != {
-                "source",
-                "target",
-                "kind",
-                "identity",
-            }:
+            if not isinstance(entry, dict):
                 raise SupervisorError("private directory entry has an unsupported shape")
-            source = Path(str(entry["source"]))
-            entry_target = Path(str(entry["target"]))
+            kind = entry.get("kind")
+            expected_keys = (
+                {"source", "target", "kind", "identity", "link_target"}
+                if kind == "symlink"
+                else {"source", "target", "kind", "identity"}
+            )
+            source_value = entry.get("source")
+            target_value = entry.get("target")
+            identity = entry.get("identity")
             if (
-                not source.is_absolute()
-                or entry_target.parent != target
+                set(entry) != expected_keys
+                or not isinstance(source_value, str)
+                or not isinstance(target_value, str)
+                or not isinstance(identity, dict)
+                or not source_value.startswith("/")
+                or not target_value.startswith("/")
+                or kind not in {"file", "directory", "symlink"}
+                or (
+                    kind == "symlink"
+                    and (
+                        not isinstance(entry.get("link_target"), str)
+                        or not entry["link_target"]
+                    )
+                )
+            ):
+                raise SupervisorError("private directory entry identity is invalid")
+            source = Path(source_value)
+            entry_target = Path(target_value)
+            if (
+                entry_target.parent != target
                 or entry_target.name != source.name
                 or entry_target in entry_targets
-                or entry["kind"] not in {"file", "directory"}
-                or not isinstance(entry["identity"], dict)
             ):
                 raise SupervisorError("private directory entry identity is invalid")
             entry_targets.add(entry_target)
@@ -533,20 +551,23 @@ def _launch_verified_command(
                 if (
                     (kind == "directory" and not stat.S_ISDIR(entry_stat.st_mode))
                     or (kind == "file" and not stat.S_ISREG(entry_stat.st_mode))
-                    or not _private_view_identity_matches(
-                        entry_stat,
-                        entry["identity"],
+                    or (kind == "symlink" and not stat.S_ISLNK(entry_stat.st_mode))
+                    or not _private_view_identity_matches(entry_stat, entry["identity"])
+                    or (
+                        kind == "symlink"
+                        and os.readlink(source) != entry["link_target"]
                     )
                 ):
                     raise SupervisorError("private directory view entry changed")
-                launcher_attachments.append(
-                    {
-                        "name": target.name,
-                        "kind": kind,
-                        "source": str(source),
-                        "identity": entry["identity"],
-                    }
-                )
+                launcher_attachment = {
+                    "name": target.name,
+                    "kind": kind,
+                    "source": str(source),
+                    "identity": entry["identity"],
+                }
+                if kind == "symlink":
+                    launcher_attachment["link_target"] = entry["link_target"]
+                launcher_attachments.append(launcher_attachment)
         for source, target, digest in read_only_masks:
             if (
                 not Path(target).is_absolute()

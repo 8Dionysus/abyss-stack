@@ -180,7 +180,7 @@ def _open_view_targets(views: object) -> list[int]:
                     or Path(attachment["name"]).name != attachment["name"]
                     or attachment["name"] in {".", ".."}
                     or attachment.get("kind")
-                    not in {"file", "directory", "sealed_file"}
+                    not in {"file", "directory", "sealed_file", "symlink"}
                     or attachment["name"] in attachment_names
                 ):
                     raise MountLauncherError(
@@ -200,6 +200,24 @@ def _open_view_targets(views: object) -> list[int]:
                     ):
                         raise MountLauncherError(
                             "sealed private view attachment is invalid"
+                        )
+                elif attachment["kind"] == "symlink":
+                    if (
+                        set(attachment)
+                        != {"name", "kind", "source", "identity", "link_target"}
+                        or not isinstance(attachment["source"], str)
+                        or not Path(attachment["source"]).is_absolute()
+                        or not isinstance(attachment["link_target"], str)
+                        or not attachment["link_target"]
+                        or not isinstance(attachment["identity"], dict)
+                        or set(attachment["identity"]) != set(IDENTITY_FIELDS)
+                        or any(
+                            not isinstance(attachment["identity"][key], int)
+                            for key in IDENTITY_FIELDS
+                        )
+                    ):
+                        raise MountLauncherError(
+                            "private view symlink attachment identity is invalid"
                         )
                 elif (
                     set(attachment) != {"name", "kind", "source", "identity"}
@@ -302,6 +320,10 @@ def _open_attachment_sources(views: object) -> list[int]:
                     raise MountLauncherError(
                         "private view attachment identity changed"
                     )
+                if attachment["kind"] == "symlink" and os.readlink(
+                    source
+                ) != attachment["link_target"]:
+                    raise MountLauncherError("private view symlink target changed")
                 attachment["opened_source_fd"] = descriptor
         return descriptors
     except BaseException:
@@ -394,10 +416,19 @@ def _attach_private_views(
                 source_stat = os.fstat(source_fd)
                 if (
                     kind == "directory" and not stat.S_ISDIR(source_stat.st_mode)
-                ) or (kind == "file" and not stat.S_ISREG(source_stat.st_mode)):
+                ) or (kind == "file" and not stat.S_ISREG(source_stat.st_mode)) or (
+                    kind == "symlink" and not stat.S_ISLNK(source_stat.st_mode)
+                ):
                     raise MountLauncherError(
                         "private view attachment source type changed"
                     )
+                if kind == "symlink":
+                    os.symlink(
+                        str(attachment["link_target"]),
+                        name,
+                        dir_fd=mount_fd,
+                    )
+                    continue
                 if kind == "directory":
                     os.mkdir(name, mode=0o700, dir_fd=mount_fd)
                 else:

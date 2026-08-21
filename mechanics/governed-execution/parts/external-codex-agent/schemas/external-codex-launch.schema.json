@@ -55,7 +55,7 @@
         "required": ["admission_class"]
       },
       "then": {
-        "required": ["owner_execution_request_schema", "task_local_dag_schema"]
+        "required": ["owner_execution_request_schema", "task_local_dag_schema", "runtime_package"]
       },
       "else": {
         "not": {

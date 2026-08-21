@@ -283,9 +283,13 @@ Before launch the controller verifies:
    an `owner_contour` launch also carries the runtime package root plus
    digest-bound artifact identity and subjects sidecars. The controller checks
    that inventory against the package manifest, executable, adjacent
-   `codex-code-mode-host`, bundled `rg`, and bundled `bwrap`; the subjects
-   aggregate remains evidence and does not replace the `aoa-models`
-   `runtime_subject` digest;
+   `codex-code-mode-host`, bundled `rg`, and bundled `bwrap`; the profile pins
+   the subjects aggregate and every inventoried member digest. Those package
+   coordinates remain distinct from, and do not replace, the `aoa-models`
+   `runtime_subject` digest. The verified package inventory is then projected
+   as a descriptor-bound read-only private mount for the whole process;
+   `bin/codex` is separately attached from the supervisor's verified
+   executable descriptor;
 6. the resolved Codex executable digest, reported version, auth status, and
    bundled live model catalog match the binding;
 7. the exact profile-bound Linux subreaper supervisor and probe executable are
@@ -1169,8 +1173,10 @@ decision.
 Parent re-entry is a separate runtime lifecycle, not ordinary child-session
 resume. `yield-parent` validates and privately materializes the exact parent
 obligation, child task, incarnation binding, role, model realization, and SDK
-schema bytes. Before inference it persists a v2 `yielding` state with the exact
-obligation and an empty event stream. Each retry uses a new numbered yield
+schema bytes, including the parent runtime package root and its profile-pinned
+aggregate/member subject. Before inference it persists a v2 `yielding` state
+with that exact obligation and an empty event stream. Each retry uses a new
+numbered yield
 attempt directory and preserves all incomplete predecessor bytes; a still-live
 prior supervisor blocks overlap. A durable complete `inference_yielded` event
 carries the exact turn delta, so append-before-state-save recovery advances to

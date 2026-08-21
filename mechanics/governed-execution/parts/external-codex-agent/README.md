@@ -402,7 +402,8 @@ usage but does not fabricate the missing interrupted-attempt tokens.
 accepts already selected owner/SDK/model/runtime artifact paths, verifies the
 runtime-profile-pinned owner schema bytes, hashes the workspace, Codex binary,
 and every coordinate, verifies the selected runtime package root and its
-digest-bound identity/subjects sidecars, writes one immutable `owner_contour`
+profile-pinned aggregate/member subject plus digest-bound identity/subjects
+sidecars, writes one immutable `owner_contour`
 launch, and returns control to `aoa-agents`. Its workspace-HEAD binding uses
 exact system Git under a fixed minimal environment, never an ambient `PATH`
 resolution. It does not

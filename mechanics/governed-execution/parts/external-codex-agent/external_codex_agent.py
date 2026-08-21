@@ -1282,17 +1282,18 @@ def validate_runtime_package_binding(
     runtime_package: Mapping[str, Any] | None,
     *,
     expected_runtime_subject: Mapping[str, Any],
+    expected_runtime_package_subject: Mapping[str, Any],
     expected_runtime_version: str,
     codex_executable: Path,
     codex_executable_digest: str,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     """Admit the exact package bytes behind an owner-contour Codex launch.
 
     The model/runtime subject digest is the owner-selected identity. The
     artifact subjects sidecar supplies the package inventory whose bytes must
-    match that identity and the launch executable. The sidecar aggregate is
-    deliberately retained as evidence; it is not substituted for the
-    aoa-models runtime_subject digest.
+    match the profile-pinned package subject and launch executable. The
+    aoa-models runtime_subject and the profile-pinned artifact-subject digest
+    are separate coordinates: neither is silently substituted for the other.
     """
 
     def invalid(message: str) -> None:
@@ -1357,6 +1358,22 @@ def validate_runtime_package_binding(
         or not re.fullmatch(r"sha256:[0-9a-f]{64}", expected_digest)
     ):
         invalid("runtime profile has no valid content-addressed runtime subject")
+    expected_package_digest = expected_runtime_package_subject.get(
+        "artifact_subjects_digest"
+    )
+    expected_package_members = expected_runtime_package_subject.get("members")
+    if (
+        not isinstance(expected_package_digest, str)
+        or not re.fullmatch(r"sha256:[0-9a-f]{64}", expected_package_digest)
+        or not isinstance(expected_package_members, Mapping)
+        or set(expected_package_members) != set(RUNTIME_PACKAGE_SUBJECT_ROLES)
+        or any(
+            not isinstance(value, str)
+            or not re.fullmatch(r"sha256:[0-9a-f]{64}", value)
+            for value in expected_package_members.values()
+        )
+    ):
+        invalid("runtime profile has no valid package subject admission")
     expected_source_ref = (
         f"codex-cli-standalone@{expected_runtime_version}#{expected_digest}"
     )
@@ -1397,6 +1414,8 @@ def validate_runtime_package_binding(
         invalid("artifact subjects sidecar names a different package layout")
     if subjects.get("aggregate_digest") != canonical_digest(entries):
         invalid("artifact subjects aggregate digest does not match its entries")
+    if subjects.get("aggregate_digest") != expected_package_digest:
+        invalid("artifact subjects sidecar is not the profile-admitted package subject")
 
     for relative_path, expected_role in RUNTIME_PACKAGE_SUBJECT_ROLES.items():
         entry = entry_by_path[relative_path]
@@ -1423,6 +1442,10 @@ def validate_runtime_package_binding(
             ) from exc
         if member.stat().st_size != entry["bytes"] or member_digest != entry["sha256"]:
             invalid(f"runtime package member {relative_path} drifted")
+        if entry["sha256"] != expected_package_members[relative_path]:
+            invalid(
+                f"runtime package member {relative_path} differs from the profile-admitted subject"
+            )
 
     compatibility_entrypoint = package_root / "codex"
     if (
@@ -1453,6 +1476,11 @@ def validate_runtime_package_binding(
     return {
         "artifact_identity_source_ref": str(identity["source_ref"]),
         "artifact_subjects_digest": str(subjects["aggregate_digest"]),
+        "package_root": str(package_root),
+        "members": {
+            relative_path: str(entry_by_path[relative_path]["sha256"])
+            for relative_path in RUNTIME_PACKAGE_SUBJECT_ROLES
+        },
     }
 
 
@@ -5164,7 +5192,7 @@ def _assert_private_view_identity(
 
 
 def _private_directory_views(
-    masks: Sequence[Mapping[str, str]],
+    masks: Sequence[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
     """Describe namespace-private parent views for every masked coordinate."""
 
@@ -5207,23 +5235,30 @@ def _private_directory_views(
                     "actor_git_mask_unavailable",
                     "private Git metadata view entry became unavailable",
                 ) from exc
-            if source.is_symlink() or not (
-                stat.S_ISREG(source_stat.st_mode) or stat.S_ISDIR(source_stat.st_mode)
+            if not (
+                stat.S_ISREG(source_stat.st_mode)
+                or stat.S_ISDIR(source_stat.st_mode)
+                or stat.S_ISLNK(source_stat.st_mode)
             ):
                 raise ExternalCodexRuntimeError(
                     "actor_git_mask_unavailable",
                     "private Git metadata view contains an unsupported entry",
                 )
-            entries.append(
-                {
-                    "source": str(source),
-                    "target": str(parent / source.name),
-                    "kind": (
-                        "directory" if stat.S_ISDIR(source_stat.st_mode) else "file"
-                    ),
-                    "identity": _private_view_identity(source_stat),
-                }
-            )
+            entry = {
+                "source": str(source),
+                "target": str(parent / source.name),
+                "kind": (
+                    "directory"
+                    if stat.S_ISDIR(source_stat.st_mode)
+                    else "symlink"
+                    if stat.S_ISLNK(source_stat.st_mode)
+                    else "file"
+                ),
+                "identity": _private_view_identity(source_stat),
+            }
+            if stat.S_ISLNK(source_stat.st_mode):
+                entry["link_target"] = os.readlink(source)
+            entries.append(entry)
         views.append(
             {
                 "target": str(parent),
@@ -5232,6 +5267,74 @@ def _private_directory_views(
             }
         )
     return views
+
+
+def _runtime_package_mask(binding: Mapping[str, Any]) -> dict[str, Any]:
+    """Build a sealed, namespace-private view of the admitted package tree."""
+
+    package_root = Path(str(binding.get("package_root", "")))
+    members = binding.get("members")
+    if (
+        not package_root.is_absolute()
+        or not isinstance(members, Mapping)
+        or set(members) != set(RUNTIME_PACKAGE_SUBJECT_ROLES)
+    ):
+        raise ExternalCodexRuntimeError(
+            "runtime_package_subject_invalid",
+            "validated runtime package has no complete immutable member binding",
+        )
+    masks = [
+        {
+            "source": str(package_root / relative_path),
+            "target": str(package_root / relative_path),
+            "digest": str(members[relative_path]),
+        }
+        # The launch executable is separately opened, hashed, and attached by
+        # the supervisor with --ro-bind-fd.  Masking the same target again
+        # would make bubblewrap reject the descriptor binding as a target race;
+        # the descriptor is the stronger lifetime binding for this member.
+        for relative_path in RUNTIME_PACKAGE_SUBJECT_ROLES
+        if relative_path != "bin/codex"
+    ]
+    return {
+        "masks": masks,
+        "private_directory_views": _private_directory_views(masks),
+    }
+
+
+def _merge_mount_masks(
+    *masks: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    active = [mask for mask in masks if mask is not None]
+    if not active:
+        return None
+    combined: list[dict[str, Any]] = []
+    targets: set[str] = set()
+    for mask in active:
+        raw_masks = mask.get("masks")
+        if not isinstance(raw_masks, list) or not raw_masks:
+            raise ExternalCodexRuntimeError(
+                "actor_git_mask_unavailable",
+                "mount mask contains no exact read-only coordinates",
+            )
+        for raw_mask in raw_masks:
+            if not isinstance(raw_mask, Mapping):
+                raise ExternalCodexRuntimeError(
+                    "actor_git_mask_unavailable",
+                    "mount mask contains an invalid coordinate",
+                )
+            target = str(raw_mask.get("target", ""))
+            if target in targets:
+                raise ExternalCodexRuntimeError(
+                    "actor_git_mask_unavailable",
+                    "two private mount masks target the same coordinate",
+                )
+            targets.add(target)
+            combined.append(dict(raw_mask))
+    return {
+        "masks": combined,
+        "private_directory_views": _private_directory_views(combined),
+    }
 
 
 def _run_actor_masked_command(
@@ -8241,10 +8344,13 @@ class ExternalCodexRuntime:
                 "codex_executable_drift", "Codex executable digest changed"
             )
         if launch.get("admission_class") == "owner_contour":
-            validate_runtime_package_binding(
+            runtime_package_binding = validate_runtime_package_binding(
                 launch.get("runtime_package"),
                 expected_runtime_subject=self.profile["model_admission"][
                     "runtime_subject"
+                ],
+                expected_runtime_package_subject=self.profile["model_admission"][
+                    "runtime_package_subject"
                 ],
                 expected_runtime_version=self.profile["model_admission"][
                     "runtime_version"
@@ -8252,6 +8358,9 @@ class ExternalCodexRuntime:
                 codex_executable=executable,
                 codex_executable_digest=launch["codex_executable_digest"],
             )
+            runtime_package_mask = _runtime_package_mask(runtime_package_binding)
+        else:
+            runtime_package_mask = None
         containment = self.profile["process_containment"]
         containment_paths = {
             "supervisor": PART_ROOT / str(containment["supervisor_ref"]),
@@ -8314,6 +8423,9 @@ class ExternalCodexRuntime:
                     self._containment_command(
                         command,
                         executable_digest=executable_digest,
+                        runtime_package_mask=runtime_package_mask,
+                        mount_wrapper_digest=mount_wrapper_digest,
+                        mount_launcher_digest=mount_launcher_digest,
                     ),
                     30,
                 )
@@ -8368,6 +8480,9 @@ class ExternalCodexRuntime:
         containment_probe = self._containment_command(
             [str(containment_paths["probe_executable"])],
             executable_digest=sha256_file(containment_paths["probe_executable"]),
+            runtime_package_mask=runtime_package_mask,
+            mount_wrapper_digest=mount_wrapper_digest,
+            mount_launcher_digest=mount_launcher_digest,
         )
         with tempfile.TemporaryDirectory(
             prefix=".external-codex-preflight-",
@@ -8430,6 +8545,7 @@ class ExternalCodexRuntime:
                             nested_sandbox_probe,
                             executable_digest=executable_digest,
                             actor_git_mask=actor_git_mask,
+                            runtime_package_mask=runtime_package_mask,
                             mount_wrapper_digest=mount_wrapper_digest,
                             mount_launcher_digest=mount_launcher_digest,
                         ),
@@ -8474,11 +8590,13 @@ class ExternalCodexRuntime:
         executable_digest: str,
         identity_path: Path | None = None,
         actor_git_mask: Mapping[str, Any] | None = None,
+        runtime_package_mask: Mapping[str, Any] | None = None,
         mount_wrapper_digest: str | None = None,
         mount_launcher_digest: str | None = None,
         workspace_fd: int | None = None,
     ) -> list[str]:
         containment = self.profile["process_containment"]
+        mount_mask = _merge_mount_masks(actor_git_mask, runtime_package_mask)
         if containment["strategy"] != "linux_subreaper_supervisor_v1":
             raise ExternalCodexRuntimeError(
                 "process_containment_unavailable",
@@ -8503,7 +8621,7 @@ class ExternalCodexRuntime:
                     "process identity receipt path must be absolute",
                 )
             supervisor_argv.extend(("--identity-file", str(identity_path)))
-        if actor_git_mask is not None or workspace_fd is not None:
+        if mount_mask is not None or workspace_fd is not None:
             if (
                 not MOUNT_WRAPPER_PATH.is_file()
                 or MOUNT_WRAPPER_PATH.resolve() != MOUNT_WRAPPER_PATH
@@ -8541,9 +8659,9 @@ class ExternalCodexRuntime:
                         str(ACTOR_EXECUTION_ROOT),
                     )
                 )
-        if actor_git_mask is not None:
-            masks = actor_git_mask.get("masks")
-            private_directory_views = actor_git_mask.get("private_directory_views")
+        if mount_mask is not None:
+            masks = mount_mask.get("masks")
+            private_directory_views = mount_mask.get("private_directory_views")
             if (
                 not isinstance(masks, list)
                 or not masks
@@ -11771,6 +11889,24 @@ Runtime session identity: {state["session_id"]}
                 tool_entry,
                 repository_workspace=self._projection_path_from_state(state),
             )
+            if launch.get("admission_class") == "owner_contour":
+                runtime_package_binding = validate_runtime_package_binding(
+                    launch.get("runtime_package"),
+                    expected_runtime_subject=self.profile["model_admission"][
+                        "runtime_subject"
+                    ],
+                    expected_runtime_package_subject=self.profile["model_admission"][
+                        "runtime_package_subject"
+                    ],
+                    expected_runtime_version=self.profile["model_admission"][
+                        "runtime_version"
+                    ],
+                    codex_executable=Path(str(launch["codex_executable"])),
+                    codex_executable_digest=str(launch["codex_executable_digest"]),
+                )
+                runtime_package_mask = _runtime_package_mask(runtime_package_binding)
+            else:
+                runtime_package_mask = None
             admitted_mount_wrapper_digest = state["preflight"].get(
                 "mount_wrapper_digest"
             )
@@ -11967,6 +12103,7 @@ Runtime session identity: {state["session_id"]}
                 codex_command,
                 executable_digest=str(launch["codex_executable_digest"]),
                 identity_path=process_identity_path,
+                runtime_package_mask=runtime_package_mask,
                 mount_wrapper_digest=str(state["preflight"]["mount_wrapper_digest"]),
                 mount_launcher_digest=str(state["preflight"]["mount_launcher_digest"]),
                 workspace_fd=child_workspace_descriptor,
@@ -16074,6 +16211,16 @@ class ExternalCodexParentReentry:
             raise ExternalCodexRuntimeError(
                 "reentry_codex_drift", "parent Codex executable identity differs"
             )
+        validate_runtime_package_binding(
+            obligation.get("runtime_package"),
+            expected_runtime_subject=self.profile["model_admission"]["runtime_subject"],
+            expected_runtime_package_subject=self.profile["model_admission"][
+                "runtime_package_subject"
+            ],
+            expected_runtime_version=self.profile["model_admission"]["runtime_version"],
+            codex_executable=executable,
+            codex_executable_digest=str(obligation["codex_executable_digest"]),
+        )
         if (
             not workspace.is_dir()
             or workspace.is_symlink()
@@ -16198,9 +16345,12 @@ class ExternalCodexParentReentry:
         command: Sequence[str],
         identity_path: Path,
         executable_digest: str,
+        *,
+        runtime_package_mask: Mapping[str, Any] | None = None,
     ) -> list[str]:
         containment = self.profile["process_containment"]
-        return [
+        mount_mask = _merge_mount_masks(runtime_package_mask)
+        command_argv = [
             sys.executable,
             str(SUPERVISOR_PATH),
             "--parent-pid",
@@ -16213,9 +16363,37 @@ class ExternalCodexParentReentry:
             str(identity_path),
             "--executable-digest",
             executable_digest,
-            "--",
-            *command,
         ]
+        if mount_mask is not None:
+            command_argv.extend(
+                (
+                    "--mount-wrapper",
+                    str(MOUNT_WRAPPER_PATH),
+                    "--mount-wrapper-digest",
+                    sha256_file(MOUNT_WRAPPER_PATH),
+                    "--mount-launcher-digest",
+                    sha256_file(MOUNT_LAUNCHER_PATH),
+                )
+            )
+            private_directory_views = mount_mask["private_directory_views"]
+            masks = mount_mask["masks"]
+            for view in private_directory_views:
+                command_argv.extend(
+                    (
+                        "--private-directory-view",
+                        json.dumps(view, sort_keys=True, separators=(",", ":")),
+                    )
+                )
+            for mask in masks:
+                command_argv.extend(
+                    (
+                        "--read-only-mask",
+                        str(mask["source"]),
+                        str(mask["target"]),
+                        str(mask["digest"]),
+                    )
+                )
+        return [*command_argv, "--", *command]
 
     def _load_parent_turn_result(
         self,
@@ -16390,6 +16568,16 @@ class ExternalCodexParentReentry:
         output_schema = (
             PARENT_YIELD_SCHEMA_PATH if kind == "yield" else PARENT_REENTRY_SCHEMA_PATH
         )
+        runtime_package_binding = validate_runtime_package_binding(
+            obligation.get("runtime_package"),
+            expected_runtime_subject=self.profile["model_admission"]["runtime_subject"],
+            expected_runtime_package_subject=self.profile["model_admission"][
+                "runtime_package_subject"
+            ],
+            expected_runtime_version=self.profile["model_admission"]["runtime_version"],
+            codex_executable=Path(str(obligation["codex_executable"])),
+            codex_executable_digest=str(obligation["codex_executable_digest"]),
+        )
         command = self._containment_command(
             self._codex_command(
                 obligation,
@@ -16400,6 +16588,7 @@ class ExternalCodexParentReentry:
             ),
             identity_path,
             str(obligation["codex_executable_digest"]),
+            runtime_package_mask=_runtime_package_mask(runtime_package_binding),
         )
         started_at = iso_now()
         with (

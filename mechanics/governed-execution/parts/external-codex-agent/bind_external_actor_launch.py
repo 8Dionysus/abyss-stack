@@ -201,6 +201,9 @@ def bind(manifest_path: Path, output_path: Path) -> dict[str, Any]:
         validate_runtime_package_binding(
             runtime_package,
             expected_runtime_subject=profile["model_admission"]["runtime_subject"],
+            expected_runtime_package_subject=profile["model_admission"][
+                "runtime_package_subject"
+            ],
             expected_runtime_version=profile["model_admission"]["runtime_version"],
             codex_executable=codex,
             codex_executable_digest=executable_digest,

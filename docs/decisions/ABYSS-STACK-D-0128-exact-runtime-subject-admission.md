@@ -44,6 +44,9 @@ An owner-contour launch must additionally carry the owner-selected package root
 and digest-bound artifact identity/subjects sidecars. Binding and preflight
 verify the sidecar identity, package manifest, executable, code-mode host,
 bundled helpers, and compatibility entrypoint against that exact subject.
+The profile separately pins the artifact-subject aggregate and every
+inventory-member digest; these package coordinates are checked independently
+of the aoa-models runtime-subject digest.
 
 ## Rationale
 
@@ -60,8 +63,12 @@ source/runtime and live-evidence checks.
   its exact content-addressed runtime subject is the one admitted by the
   runtime profile.
 - Positive: an owner-contour launch cannot substitute a different 0.148.0
-  package behind the admitted subject metadata; package drift is rechecked at
-  preflight.
+  package behind the admitted subject metadata; the profile-pinned aggregate
+  and member digests are rechecked at binding, preflight, and parent re-entry.
+- Positive: the admitted package inventory is held in a descriptor-bound
+  read-only private mount view for the whole external Codex process lifetime;
+  the executable itself remains separately attached from its verified file
+  descriptor.
 - Positive: missing or mismatched subject data fails before Codex preflight or
   process launch.
 - Tradeoff: the source profile and its paired fixtures now require the `0.148.0`
