@@ -505,7 +505,38 @@ def main() -> int:
         }
         if len(new_matches) == 1:
             candidate_pid, candidate_start_ticks = next(iter(new_matches.items()))
-            while not ready_path.exists():
+            while True:
+                handshake_matches = _matching_kitties(title)
+                handshake_new_matches = {
+                    pid: start
+                    for pid, start in handshake_matches.items()
+                    if baseline.get(pid) != start
+                }
+                unexpected_matches = {
+                    pid: start
+                    for pid, start in handshake_new_matches.items()
+                    if (pid, start) != (candidate_pid, candidate_start_ticks)
+                }
+                if unexpected_matches:
+                    _append_error(
+                        error_path,
+                        f"multiple detached Kitty holders matched title {title!r} "
+                        f"during holder handshake: "
+                        f"{sorted(handshake_new_matches)}",
+                    )
+                    ambiguity_deadline = time.monotonic() + close_timeout
+                    for pid, start_ticks in {
+                        **handshake_new_matches,
+                        candidate_pid: candidate_start_ticks,
+                    }.items():
+                        _terminate_kitty(
+                            pid,
+                            start_ticks,
+                            close_deadline=ambiguity_deadline,
+                        )
+                    return 125
+                if ready_path.exists():
+                    break
                 if _STOP_SIGNAL is not None:
                     _terminate_kitty(
                         candidate_pid,

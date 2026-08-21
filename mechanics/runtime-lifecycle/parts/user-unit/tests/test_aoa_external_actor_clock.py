@@ -187,6 +187,55 @@ class ExternalActorClockTests(unittest.TestCase):
             self.assertEqual(dispatch.terminate_calls, 1)
             self.assertEqual(dispatch.kill_calls, 0)
 
+    def test_handshake_rejects_a_second_same_title_holder(self) -> None:
+        class CompletedDispatch:
+            returncode = 0
+
+            def poll(self) -> int:
+                return self.returncode
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            status = root / "status"
+            error = root / "error.log"
+            previous_stop_signal = CLOCK._STOP_SIGNAL
+            CLOCK._STOP_SIGNAL = None
+            try:
+                with (
+                    mock.patch.object(CLOCK.signal, "signal"),
+                    mock.patch.object(
+                        CLOCK,
+                        "_required_environment",
+                        return_value=(
+                            "/tmp/clock-runner",
+                            "clock-title",
+                            status,
+                            error,
+                            Path(f"{status}.holder-ready"),
+                            Path(f"{status}.holder-captured"),
+                            30.0,
+                            15.0,
+                        ),
+                    ),
+                    mock.patch.object(
+                        CLOCK,
+                        "_matching_kitties",
+                        side_effect=[
+                            {},
+                            {101: 100},
+                            {101: 100, 102: 200},
+                        ],
+                    ),
+                    mock.patch.object(CLOCK, "_utc_now", return_value="2026-08-20T00:00:00+00:00"),
+                    mock.patch.object(CLOCK.subprocess, "Popen", return_value=CompletedDispatch()),
+                    mock.patch.object(CLOCK, "_terminate_kitty") as terminate_kitty,
+                ):
+                    self.assertEqual(CLOCK.main(), 125)
+            finally:
+                CLOCK._STOP_SIGNAL = previous_stop_signal
+            self.assertIn("during holder handshake", error.read_text(encoding="utf-8"))
+            self.assertEqual(terminate_kitty.call_count, 2)
+
     def test_configuration_failure_is_persisted_to_error_log(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
