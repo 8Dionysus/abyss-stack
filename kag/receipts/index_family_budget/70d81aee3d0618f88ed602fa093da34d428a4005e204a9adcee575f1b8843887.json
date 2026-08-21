@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 28641161,
+  "allowed_tracked_bytes": 36877239,
+  "approved_by": "repository-owner",
+  "base_ref": "96eee4c4e87ab83edbaad8625e8296e070567fa0",
+  "changed_generated_bytes": 28641161,
+  "changed_generated_files": 322,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "70d81aee3d0618f88ed602fa093da34d428a4005e204a9adcee575f1b8843887",
+  "reason": "Refresh the owner-family after the sealed package-contour executable and immutable mount overlay repair.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36877239,
+  "tracked_bytes_max": 24117248
+}
