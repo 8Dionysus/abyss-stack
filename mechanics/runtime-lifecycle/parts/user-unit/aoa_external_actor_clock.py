@@ -220,6 +220,26 @@ def _validate_evidence_path(path: Path, label: str) -> None:
         )
 
 
+def _path_aliases_runner(path: Path) -> bool:
+    raw_runner = os.environ.get("AOA_CLOCK_RUNNER", "")
+    if not raw_runner:
+        return False
+    runner = Path(raw_runner)
+    try:
+        if path.resolve(strict=False) == runner.resolve(strict=False):
+            return True
+        if path.exists() and runner.exists():
+            path_stat = path.stat()
+            runner_stat = runner.stat()
+            return (path_stat.st_dev, path_stat.st_ino) == (
+                runner_stat.st_dev,
+                runner_stat.st_ino,
+            )
+    except OSError:
+        return True
+    return False
+
+
 def _configuration_error_path() -> Path | None:
     raw_error = os.environ.get("AOA_CLOCK_ERROR_LOG", "")
     if not raw_error:
@@ -240,6 +260,8 @@ def _configuration_error_path() -> Path | None:
                 return None
         except OSError:
             return None
+    if _path_aliases_runner(error):
+        return None
     try:
         _check_error_log(error)
     except ClockSupervisorError:
@@ -314,6 +336,8 @@ def _required_environment() -> tuple[str, str, Path, Path, Path, Path, float, fl
         _validate_evidence_path(path, label)
     if status.resolve(strict=False) == error.resolve(strict=False):
         raise ClockSupervisorError("clock status and error paths must be distinct")
+    if _path_aliases_runner(error):
+        raise ClockSupervisorError("clock error path must not alias runner")
     if status.exists():
         raise ClockSupervisorError(f"clock status already exists: {status}")
     if error.exists() and not error.is_file():

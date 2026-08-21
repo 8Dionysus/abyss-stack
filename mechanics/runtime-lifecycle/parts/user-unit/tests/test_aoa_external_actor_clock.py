@@ -121,6 +121,30 @@ class ExternalActorClockTests(unittest.TestCase):
                 ):
                     CLOCK._required_environment()
 
+    def test_error_path_cannot_alias_the_runner_inode(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            runner = root / "runner"
+            runner.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            runner.chmod(0o700)
+            error = root / "error.log"
+            error.hardlink_to(runner)
+            environment = {
+                "AOA_CLOCK_RUNNER": str(runner),
+                "AOA_CLOCK_TITLE": "clock-title",
+                "AOA_CLOCK_STATUS_FILE": str(root / "status"),
+                "AOA_CLOCK_ERROR_LOG": str(error),
+            }
+            with mock.patch.dict(os.environ, environment, clear=False):
+                with self.assertRaisesRegex(
+                    CLOCK.ClockSupervisorError,
+                    "must not alias runner",
+                ):
+                    CLOCK._required_environment()
+            self.assertEqual(runner.stat().st_mode & 0o777, 0o700)
+            self.assertIsNone(CLOCK._configuration_error_path())
+            self.assertEqual(runner.stat().st_mode & 0o777, 0o700)
+
     def test_error_log_is_tightened_before_use(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             error = Path(temporary) / "error.log"
