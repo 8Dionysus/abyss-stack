@@ -2171,7 +2171,7 @@ def test_post_exec_resolution_recurses_through_nested_env_shebang(
         executable,
         [str(executable), "exec"],
         path=str(node.parent),
-    ) == [str(final_interpreter), "node", str(executable), "exec"]
+    ) == [str(final_interpreter), str(node), str(executable), "exec"]
     assert MODULE._post_exec_executable_digest(
         executable, path=str(node.parent)
     ) == MODULE.sha256_bytes(final_bytes)
