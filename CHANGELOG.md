@@ -70,6 +70,11 @@ Tracking starts with the community-docs baseline for this repository.
   reaches the running client without exposing a writable admission state; give
   cold requests a 600-second bounded timeout and reconcile stale OVMS units when
   Intel is deselected.
+- Preserve external actor resume continuity when the accepted preceding actor
+  projection carries a private-Git digest distinct from the original launch
+  baseline. Cumulative content deltas still originate at the original manifest,
+  while each resumed attempt compares private Git with its exact preceding final
+  manifest and fails closed on new private-Git drift.
 - Bind the operator-visible responsibility holder to its own non-replacing
   lifecycle receipt before direct Codex `exec`, distinct from nested proof
   actors. The installed incarnation runtime now closes only that exact

@@ -422,6 +422,67 @@ def test_projection_delta_is_canonical_for_write_mode_symlink_and_delete(
     assert (source / "link").is_symlink()
 
 
+def test_projection_delta_accepts_reviewed_resume_private_git_and_rejects_new_drift(
+    tmp_path: Path,
+) -> None:
+    source, source_identity = _source_repo(tmp_path)
+    projection, baseline = materialize_actor_projection(
+        source,
+        tmp_path / "runtime" / "actor-workspace",
+        source_manifest=source_identity,
+        source_manifest_digest="sha256:" + "5" * 64,
+    )
+
+    index_path = projection / ".git" / "index"
+    index_path.write_bytes(index_path.read_bytes() + b"accepted resume state\n")
+    accepted_resume = build_actor_manifest(
+        projection,
+        source_manifest_digest=baseline["source_manifest_digest"],
+        source_git_head=str(baseline["source_git_head"]),
+    )
+    assert accepted_resume["private_git_digest"] != baseline["private_git_digest"]
+
+    with pytest.raises(
+        ProjectionError,
+        match="actor private Git body changed during execution",
+    ):
+        build_actor_delta(
+            baseline,
+            accepted_resume,
+            baseline_digest="sha256:" + "6" * 64,
+            current_digest="sha256:" + "7" * 64,
+        )
+
+    delta = build_actor_delta(
+        baseline,
+        accepted_resume,
+        baseline_digest="sha256:" + "6" * 64,
+        current_digest="sha256:" + "7" * 64,
+        private_git_baseline=accepted_resume,
+    )
+    assert delta["changes"] == []
+
+    (projection / ".git" / "config").write_bytes(
+        (projection / ".git" / "config").read_bytes() + b"\nunauthorized drift\n"
+    )
+    drifted = build_actor_manifest(
+        projection,
+        source_manifest_digest=baseline["source_manifest_digest"],
+        source_git_head=str(baseline["source_git_head"]),
+    )
+    with pytest.raises(
+        ProjectionError,
+        match="actor private Git body changed during execution",
+    ):
+        build_actor_delta(
+            baseline,
+            drifted,
+            baseline_digest="sha256:" + "6" * 64,
+            current_digest="sha256:" + "8" * 64,
+            private_git_baseline=accepted_resume,
+        )
+
+
 def test_projection_reproduces_dirty_git_baseline_and_real_git_validations(
     tmp_path: Path,
 ) -> None:
