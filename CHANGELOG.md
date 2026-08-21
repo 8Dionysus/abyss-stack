@@ -19,6 +19,9 @@ Tracking starts with the community-docs baseline for this repository.
   validated non-waking terminal join now emits typed closure authorization, and
   the exact bound holder remains the only process and Kitty terminal eligible
   for lifecycle closure.
+- Harden the delayed external actor clock evidence boundary by requiring
+  owner-private evidence directories and recording the actual runner PID rather
+  than the holder shell PID.
 - Generalize visible external Codex holder closure beyond wake-delivery: a
   validated non-waking terminal join now emits typed closure authorization, and
   the exact bound holder remains the only process and Kitty terminal eligible

@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import math
 import signal
+import stat
 import subprocess
 import sys
 import time
@@ -207,6 +208,16 @@ def _validate_evidence_path(path: Path, label: str) -> None:
         raise ClockSupervisorError(f"clock {label} path is unsafe: {path}")
     if not path.parent.is_dir() or path.parent.is_symlink():
         raise ClockSupervisorError(f"clock {label} parent is unavailable: {path.parent}")
+    try:
+        parent_stat = path.parent.stat()
+    except OSError as exc:
+        raise ClockSupervisorError(
+            f"clock {label} parent cannot be inspected: {path.parent}"
+        ) from exc
+    if parent_stat.st_uid != os.geteuid() or stat.S_IMODE(parent_stat.st_mode) & 0o077:
+        raise ClockSupervisorError(
+            f"clock {label} parent must be owner-private: {path.parent}"
+        )
 
 
 def _configuration_error_path() -> Path | None:
@@ -350,7 +361,9 @@ if ! ( set -o noclobber; : >\"$runner_stderr_tmp\" ); then
   print -u2 -- \"clock runner stderr staging failed: $runner_stderr_tmp\"
   exit 125
 fi
-\"$AOA_CLOCK_RUNNER\" 2>\"$runner_stderr_tmp\"
+\"$AOA_CLOCK_RUNNER\" 2>\"$runner_stderr_tmp\" &
+runner_pid=$!
+wait \"$runner_pid\"
 runner_rc=$?
 logging_rc=0
 if ! /usr/bin/tee -a -- \"$AOA_CLOCK_ERROR_LOG\" <\"$runner_stderr_tmp\" >&2; then
@@ -365,7 +378,7 @@ fi
 status_tmp=\"${AOA_CLOCK_STATUS_FILE}.$$\"
 if ! {
   printf 'schema_version=%s\\n' 'aoa_external_actor_clock_status_v1'
-  printf 'runner_pid=%s\\n' \"$$\"
+  printf 'runner_pid=%s\\n' \"$runner_pid\"
   printf 'runner_finished_at=%s\\n' \"$(/usr/bin/date --iso-8601=seconds --utc)\"
   printf 'runner_exit_status=%s\\n' \"$runner_rc\"
 } >\"$status_tmp\" || ! /usr/bin/mv -f -- \"$status_tmp\" \"$AOA_CLOCK_STATUS_FILE\"; then

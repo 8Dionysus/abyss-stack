@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 from pathlib import Path
@@ -36,6 +37,86 @@ class ExternalActorClockTests(unittest.TestCase):
         self.assertNotIn("2> >(", command)
         self.assertIn("runner_stderr_tmp", command)
         self.assertIn("logging_rc=125", command)
+        self.assertIn("runner_pid=$!", command)
+        self.assertIn('printf \'runner_pid=%s\\n\' "$runner_pid"', command)
+
+    def test_status_records_the_actual_runner_pid(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            runner = root / "runner.zsh"
+            runner.write_text(
+                "#!/usr/bin/zsh\n"
+                'print -r -- $$ > "$AOA_CLOCK_TEST_RUNNER_PID_FILE"\n',
+                encoding="utf-8",
+            )
+            runner.chmod(0o700)
+            status = root / "status"
+            error = root / "error.log"
+            ready = Path(f"{status}.holder-ready")
+            captured = Path(f"{status}.holder-captured")
+            environment = os.environ.copy()
+            environment.update(
+                {
+                    "AOA_CLOCK_RUNNER": str(runner),
+                    "AOA_CLOCK_STATUS_FILE": str(status),
+                    "AOA_CLOCK_ERROR_LOG": str(error),
+                    "AOA_CLOCK_HOLDER_READY_FILE": str(ready),
+                    "AOA_CLOCK_HOLDER_CAPTURED_FILE": str(captured),
+                    "AOA_CLOCK_TEST_RUNNER_PID_FILE": str(root / "runner.pid"),
+                }
+            )
+            process = subprocess.Popen(
+                ["/usr/bin/zsh", "-lc", CLOCK._runner_command()],
+                env=environment,
+            )
+            try:
+                self.assertTrue(
+                    self._wait_for_path(ready),
+                    "holder handshake was not published",
+                )
+                captured.write_text("kitty_pid=1\nkitty_start_ticks=2\n", encoding="utf-8")
+                self.assertEqual(process.wait(timeout=5), 0)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait()
+            values = dict(
+                line.split("=", 1)
+                for line in status.read_text(encoding="utf-8").splitlines()
+            )
+            self.assertEqual(
+                values["runner_pid"],
+                (root / "runner.pid").read_text(encoding="utf-8").strip(),
+            )
+
+    @staticmethod
+    def _wait_for_path(path: Path) -> bool:
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if path.exists():
+                return True
+            time.sleep(0.01)
+        return path.exists()
+
+    def test_evidence_paths_require_an_owner_private_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            root.chmod(0o755)
+            runner = root / "runner"
+            runner.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            runner.chmod(0o700)
+            environment = {
+                "AOA_CLOCK_RUNNER": str(runner),
+                "AOA_CLOCK_TITLE": "clock-title",
+                "AOA_CLOCK_STATUS_FILE": str(root / "status"),
+                "AOA_CLOCK_ERROR_LOG": str(root / "error.log"),
+            }
+            with mock.patch.dict(os.environ, environment, clear=False):
+                with self.assertRaisesRegex(
+                    CLOCK.ClockSupervisorError,
+                    "parent must be owner-private",
+                ):
+                    CLOCK._required_environment()
 
     def test_error_log_is_tightened_before_use(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

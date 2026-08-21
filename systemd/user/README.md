@@ -63,9 +63,11 @@ paths must be distinct and must remain outside source projections. The
 foreground supervisor remains the systemd
 main process while it launches one detached Kitty holder, records the exact
 Kitty PID and `/proc` start ticks before releasing a holder handshake, publishes
-the runner exit status atomically under a private umask, and returns that status
-to systemd. Timeout values must be finite and positive. A Kitty client exiting
-successfully is not treated as proof that the holder completed successfully.
+the actual runner PID and exit status atomically under a private umask, and
+returns that status to systemd. Every evidence path must be in an existing
+owner-private directory. Timeout values must be finite and positive. A Kitty
+client exiting successfully is not treated as proof that the holder completed
+successfully.
 
 The unit does not create a recurring schedule or start itself. A bounded
 deadline may be armed with a transient user timer, for example:
