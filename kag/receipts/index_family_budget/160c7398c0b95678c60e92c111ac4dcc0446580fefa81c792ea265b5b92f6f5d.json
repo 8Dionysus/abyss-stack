@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 20584246,
+  "allowed_tracked_bytes": 36718774,
+  "approved_by": "repository-owner",
+  "base_ref": "3bbdfbc335e6fd29d4c7f5b871ffed617f7081be",
+  "changed_generated_bytes": 20584246,
+  "changed_generated_files": 203,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "160c7398c0b95678c60e92c111ac4dcc0446580fefa81c792ea265b5b92f6f5d",
+  "reason": "Owner-reviewed runtime safety repair now binds the actual post-exec interpreter digest for shebang holders, rejects binding-only launch options without a terminal title, preserves v1 receipt compatibility while requiring repaired identity fields as a paired shape, and carries focused regression evidence; accept only this measured derived-family exceedance without raising standing budgets or widening activation or live-proof claims.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36718774,
+  "tracked_bytes_max": 24117248
+}
