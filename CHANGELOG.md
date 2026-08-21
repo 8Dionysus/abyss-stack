@@ -9,6 +9,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Add the manual-only `aoa-external-actor-clock@.service` delayed clock route.
+  Its foreground supervisor keeps systemd ownership while a uniquely titled
+  detached Kitty holder is independently observable, requires explicit private
+  status/error evidence, bounds dispatch and close, and propagates the actor's
+  real return; the route never creates a recurring schedule or treats a Kitty
+  exit alone as proof.
 - Preserve the packaged `codex-code-mode-host` beside an ELF Codex executable
   when the visible incarnation runtime seals and launches it. The companion
   now shares the same digest-bound private read-only execution coordinate,
