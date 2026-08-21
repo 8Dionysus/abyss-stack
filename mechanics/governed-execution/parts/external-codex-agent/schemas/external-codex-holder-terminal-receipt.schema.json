@@ -14,15 +14,19 @@
     "holder": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["pid", "start_ticks", "parent_pid", "parent_start_ticks", "parent_comm", "argv", "argv_digest"],
+      "required": ["pid", "start_ticks", "parent_pid", "parent_start_ticks", "parent_comm", "pre_exec_argv", "pre_exec_argv_digest", "pre_exec_exe_digest", "argv", "argv_digest", "exe_digest"],
       "properties": {
         "pid": {"type": "integer", "minimum": 1},
         "start_ticks": {"type": "integer", "minimum": 1},
         "parent_pid": {"type": "integer", "minimum": 1},
         "parent_start_ticks": {"type": "integer", "minimum": 1},
         "parent_comm": {"type": "string", "minLength": 1},
+        "pre_exec_argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "pre_exec_argv_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "pre_exec_exe_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
         "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-        "argv_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        "argv_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "exe_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
       }
     },
     "runtime": {
@@ -87,10 +91,12 @@
     "processIdentity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["pid", "start_ticks"],
+        "required": ["pid", "start_ticks", "argv_digest", "exe_digest"],
       "properties": {
         "pid": {"type": "integer", "minimum": 1},
-        "start_ticks": {"type": "integer", "minimum": 1}
+        "start_ticks": {"type": "integer", "minimum": 1},
+        "argv_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "exe_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
       }
     },
     "terminalBinding": {

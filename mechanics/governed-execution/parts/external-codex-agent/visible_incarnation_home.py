@@ -540,6 +540,19 @@ def _proc_argv(pid: int) -> list[str]:
     return [os.fsdecode(item) for item in raw.split(b"\0") if item]
 
 
+def _proc_exe_digest(pid: int) -> str:
+    digest = hashlib.sha256()
+    try:
+        with Path(f"/proc/{pid}/exe").open("rb") as stream:
+            while chunk := stream.read(1024 * 1024):
+                digest.update(chunk)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"cannot read process executable identity: {pid}"
+        ) from exc
+    return "sha256:" + digest.hexdigest()
+
+
 def _proc_environ(pid: int) -> dict[str, str]:
     try:
         raw = Path(f"/proc/{pid}/environ").read_bytes()
@@ -841,6 +854,7 @@ def _terminal_binding(
     holder_pid: int,
     holder_start_ticks: int,
     holder_argv_digest: str | None = None,
+    holder_exe_digest: str | None = None,
     terminal_pid: int,
     terminal_start_ticks: int,
     source_receipt: Path | None = None,
@@ -874,12 +888,16 @@ def _terminal_binding(
         "remote_control": "socket-only",
         "dedicated": True,
     }
+    holder_record = binding["holder"]
+    assert isinstance(holder_record, dict)
     if holder_argv_digest is not None:
         if not SHA256_DIGEST_PATTERN.fullmatch(holder_argv_digest):
             raise IncarnationHomeError("terminal binding holder argv digest is invalid")
-        holder_record = binding["holder"]
-        assert isinstance(holder_record, dict)
         holder_record["argv_digest"] = holder_argv_digest
+    if holder_exe_digest is not None:
+        if not SHA256_DIGEST_PATTERN.fullmatch(holder_exe_digest):
+            raise IncarnationHomeError("terminal binding holder executable digest is invalid")
+        holder_record["exe_digest"] = holder_exe_digest
     if source_receipt is not None:
         binding["source_receipt"] = {
             "path": _safe_source_receipt_path(source_receipt),
@@ -927,6 +945,13 @@ def _validate_receipt_binding_consistency(
     ):
         raise IncarnationHomeError(
             "embedded terminal binding holder argv identity disagrees with top-level holder"
+        )
+    if (
+        "exe_digest" in binding_holder
+        and binding_holder.get("exe_digest") != holder.get("exe_digest")
+    ):
+        raise IncarnationHomeError(
+            "embedded terminal binding holder executable identity disagrees with top-level holder"
         )
     if any(
         binding_terminal.get(key) != terminal.get(key)
@@ -993,7 +1018,7 @@ def _validate_terminal_binding_shape(binding: object) -> dict[str, object]:
     terminal = binding.get("terminal")
     if not isinstance(holder, dict) or not isinstance(terminal, dict):
         raise IncarnationHomeError("terminal binding process records are missing")
-    if set(holder) - {"pid", "start_ticks", "argv_digest"}:
+    if set(holder) - {"pid", "start_ticks", "argv_digest", "exe_digest"}:
         raise IncarnationHomeError("terminal binding holder has unexpected fields")
     if set(terminal) - {
         "pid",
@@ -1015,6 +1040,14 @@ def _validate_terminal_binding_shape(binding: object) -> dict[str, object]:
         or SHA256_DIGEST_PATTERN.fullmatch(holder_argv_digest) is None
     ):
         raise IncarnationHomeError("terminal binding holder argv identity is invalid")
+    holder_exe_digest = holder.get("exe_digest")
+    if holder_exe_digest is not None and (
+        not isinstance(holder_exe_digest, str)
+        or SHA256_DIGEST_PATTERN.fullmatch(holder_exe_digest) is None
+    ):
+        raise IncarnationHomeError(
+            "terminal binding holder executable identity is invalid"
+        )
     if not all(
         _positive_int(terminal.get(key))
         for key in ("pid", "start_ticks")
@@ -1733,6 +1766,7 @@ def _holder_receipt(
     pre_exec_argv = _proc_argv(holder_pid)
     if not pre_exec_argv:
         raise IncarnationHomeError("holder pre-exec argv is empty")
+    pre_exec_exe_digest = _proc_exe_digest(holder_pid)
     try:
         if manifest_bytes is None:
             manifest_bytes = manifest_path.read_bytes()
@@ -1792,6 +1826,7 @@ def _holder_receipt(
             holder_pid=holder_pid,
             holder_start_ticks=_proc_start_ticks(holder_pid),
             holder_argv_digest=sha256_bytes(canonical_bytes(post_exec_argv)),
+            holder_exe_digest=executable_digest,
             terminal_pid=terminal_pid,
             terminal_start_ticks=terminal_start_ticks,
         )
@@ -1816,8 +1851,10 @@ def _holder_receipt(
             "parent_comm": parent_comm,
             "pre_exec_argv": pre_exec_argv,
             "pre_exec_argv_digest": sha256_bytes(canonical_bytes(pre_exec_argv)),
+            "pre_exec_exe_digest": pre_exec_exe_digest,
             "argv": post_exec_argv,
             "argv_digest": sha256_bytes(canonical_bytes(post_exec_argv)),
+            "exe_digest": executable_digest,
         },
         "runtime": runtime,
         "terminal": terminal,
@@ -2268,15 +2305,28 @@ def _load_holder_receipt_snapshot(
         raise IncarnationHomeError("holder terminal receipt is incomplete")
     pre_exec_argv = holder.get("pre_exec_argv")
     pre_exec_argv_digest = holder.get("pre_exec_argv_digest")
-    if pre_exec_argv is not None or pre_exec_argv_digest is not None:
+    pre_exec_exe_digest = holder.get("pre_exec_exe_digest")
+    if (
+        pre_exec_argv is not None
+        or pre_exec_argv_digest is not None
+        or pre_exec_exe_digest is not None
+    ):
         if (
             not isinstance(pre_exec_argv, list)
             or not pre_exec_argv
             or not all(isinstance(item, str) for item in pre_exec_argv)
             or not isinstance(pre_exec_argv_digest, str)
             or pre_exec_argv_digest != sha256_bytes(canonical_bytes(pre_exec_argv))
+            or not isinstance(pre_exec_exe_digest, str)
+            or SHA256_DIGEST_PATTERN.fullmatch(pre_exec_exe_digest) is None
         ):
             raise IncarnationHomeError("holder pre-exec identity is invalid")
+    holder_exe_digest = holder.get("exe_digest")
+    if holder_exe_digest is not None and (
+        not isinstance(holder_exe_digest, str)
+        or SHA256_DIGEST_PATTERN.fullmatch(holder_exe_digest) is None
+    ):
+        raise IncarnationHomeError("holder executable identity is invalid")
     _decode_holder_manifest_snapshot(runtime)
     if "binding" in receipt:
         binding = _validate_terminal_binding_shape(receipt["binding"])
@@ -2395,6 +2445,7 @@ def _validate_holder_process_identity(
     *,
     expected_argv: Sequence[str],
     argv_label: str,
+    expected_exe_digest: str | None = None,
 ) -> tuple[int, int, str, str, bool]:
     """Validate one exact holder process before or after its payload exec."""
 
@@ -2415,6 +2466,14 @@ def _validate_holder_process_identity(
         raise IncarnationHomeError("holder process parent identity has drifted")
     if _proc_argv(pid) != list(expected_argv):
         raise IncarnationHomeError(f"{argv_label} argv identity has drifted")
+    if expected_exe_digest is None:
+        expected_exe_digest = holder.get("exe_digest")
+    if not isinstance(expected_exe_digest, str) or not SHA256_DIGEST_PATTERN.fullmatch(
+        expected_exe_digest
+    ):
+        raise IncarnationHomeError(f"{argv_label} executable identity is missing")
+    if _proc_exe_digest(pid) != expected_exe_digest:
+        raise IncarnationHomeError(f"{argv_label} executable identity has drifted")
     if _proc_start_ticks(kitty_pid) != kitty_start_ticks:
         raise IncarnationHomeError("holder Kitty PID was reused or has drifted")
     if _proc_comm(kitty_pid) != "kitty":
@@ -2456,12 +2515,15 @@ def _holder_pre_exec_identity(
     holder = receipt["holder"]
     recorded_argv = holder.get("pre_exec_argv")
     recorded_digest = holder.get("pre_exec_argv_digest")
+    recorded_exe_digest = holder.get("pre_exec_exe_digest")
     if (
         not isinstance(recorded_argv, list)
         or not recorded_argv
         or not all(isinstance(item, str) for item in recorded_argv)
         or not isinstance(recorded_digest, str)
         or recorded_digest != sha256_bytes(canonical_bytes(recorded_argv))
+        or not isinstance(recorded_exe_digest, str)
+        or SHA256_DIGEST_PATTERN.fullmatch(recorded_exe_digest) is None
     ):
         raise IncarnationHomeError("holder pre-exec identity is missing")
     if recorded_argv != list(expected_argv):
@@ -2470,6 +2532,7 @@ def _holder_pre_exec_identity(
         receipt,
         expected_argv=recorded_argv,
         argv_label="holder pre-exec helper",
+        expected_exe_digest=recorded_exe_digest,
     )
 
 
@@ -2636,6 +2699,7 @@ def _load_terminal_binding_input(
         holder_pid=holder_pid,
         holder_start_ticks=holder_start_ticks,
         holder_argv_digest=sha256_bytes(canonical_bytes(holder_argv)),
+        holder_exe_digest=_proc_exe_digest(holder_pid),
         terminal_pid=terminal_pid,
         terminal_start_ticks=terminal_start_ticks,
         source_receipt=holder_receipt_path,
@@ -2692,6 +2756,31 @@ def _observe_terminal_binding(
                     identity_state = "stale"
             else:
                 if sha256_bytes(canonical_bytes(observed_holder_argv)) != holder_argv_digest:
+                    identity_state = "stale"
+
+    if identity_state == "live":
+        holder_exe_digest = holder.get("exe_digest")
+        if (
+            not isinstance(holder_exe_digest, str)
+            or SHA256_DIGEST_PATTERN.fullmatch(holder_exe_digest) is None
+        ):
+            identity_state = "stale"
+        else:
+            try:
+                observed_holder_exe_digest = _proc_exe_digest(holder_pid)
+            except IncarnationHomeError:
+                holder_state = _proc_identity_state(holder_pid, holder_start_ticks)
+                terminal_state = _proc_identity_state(
+                    terminal_pid, terminal_start_ticks
+                )
+                if "drifted" in {holder_state, terminal_state}:
+                    identity_state = "stale"
+                elif "gone" in {holder_state, terminal_state}:
+                    identity_state = "missing"
+                else:
+                    identity_state = "stale"
+            else:
+                if observed_holder_exe_digest != holder_exe_digest:
                     identity_state = "stale"
 
     if identity_state == "live":

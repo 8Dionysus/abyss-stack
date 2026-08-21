@@ -25,10 +25,12 @@
     "identity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["pid", "start_ticks"],
+      "required": ["pid", "start_ticks", "argv_digest", "exe_digest"],
       "properties": {
         "pid": {"type": "integer", "minimum": 1},
-        "start_ticks": {"type": "integer", "minimum": 1}
+        "start_ticks": {"type": "integer", "minimum": 1},
+        "argv_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "exe_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
       }
     },
     "binding": {

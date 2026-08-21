@@ -76,6 +76,7 @@ def _terminal_binding_fixture(
         holder_argv_digest=MODULE.sha256_bytes(
             MODULE.canonical_bytes(["/usr/bin/codex", "exec"])
         ),
+        holder_exe_digest="sha256:" + "1" * 64,
         terminal_pid=202,
         terminal_start_ticks=2002,
     )
@@ -1461,6 +1462,7 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
     holder_pid, parent_pid, kitty_pid = 101, 102, 103
     holder_argv = ["/usr/bin/codex", "exec"]
     kitty_argv = ["/usr/bin/kitty", "--title", "holder"]
+    executable_digest = MODULE.sha256_bytes(executable.read_bytes())
     receipt = {
         "boot_id": "00000000-0000-0000-0000-000000000001",
         "holder": {
@@ -1471,10 +1473,11 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
             "parent_comm": "bwrap",
             "argv": holder_argv,
             "argv_digest": MODULE.sha256_bytes(MODULE.canonical_bytes(holder_argv)),
+            "exe_digest": executable_digest,
         },
         "runtime": {
             "codex_executable": str(executable),
-            "codex_executable_digest": MODULE.sha256_bytes(executable.read_bytes()),
+            "codex_executable_digest": executable_digest,
             "codex_companion": {
                 "path": str(companion),
                 "digest": MODULE.sha256_bytes(companion.read_bytes()),
@@ -1512,6 +1515,7 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
     monkeypatch.setattr(
         MODULE, "_proc_argv", lambda pid: {101: holder_argv, 103: kitty_argv}[pid]
     )
+    monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: executable_digest)
     monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("7", True))
 
     executable.unlink()
@@ -1565,9 +1569,10 @@ def test_live_close_uses_holder_bound_companion_after_host_removal(
             "parent_start_ticks": 12,
             "parent_comm": "bwrap",
             "argv": holder_argv,
-            "argv_digest": MODULE.sha256_bytes(
-                MODULE.canonical_bytes(holder_argv)
-            ),
+                "argv_digest": MODULE.sha256_bytes(
+                    MODULE.canonical_bytes(holder_argv)
+                ),
+                "exe_digest": MODULE.sha256_bytes(executable_bytes),
         },
         "runtime": {
             "codex_executable": str(executable),
@@ -1649,6 +1654,11 @@ def test_live_close_uses_holder_bound_companion_after_host_removal(
         MODULE,
         "_proc_argv",
         lambda pid: {holder_pid: holder_argv, kitty_pid: kitty_argv}[pid],
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_exe_digest",
+        lambda _pid: MODULE.sha256_bytes(executable_bytes),
     )
     monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("7", True))
     states = iter(["live", "live", "gone", "gone"])
@@ -3441,6 +3451,7 @@ def test_terminal_binding_creation_records_exact_owner_and_terminal_identity(
             "argv_digest": MODULE.sha256_bytes(
                 MODULE.canonical_bytes(["/usr/bin/codex", "exec"])
             ),
+            "exe_digest": "sha256:" + "1" * 64,
         }
         assert terminal["pid"] == 202
         assert terminal["start_ticks"] == 2002
@@ -3878,6 +3889,7 @@ def test_status_is_read_only_and_writes_only_safe_projection(
         if pid == holder["pid"]
         else ["kitty", "--detach"],
     )
+    monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: "sha256:" + "1" * 64)
     monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_kwargs: ("7", True))
     monkeypatch.setattr(
         MODULE,
@@ -4025,6 +4037,43 @@ def test_status_rejects_holder_exec_argv_drift_without_querying_kitty(
         listener.close()
 
 
+def test_status_rejects_holder_exec_executable_drift_without_querying_kitty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    queried = False
+
+    def forbidden_query(**_kwargs: object) -> list[dict[str, object]]:
+        nonlocal queried
+        queried = True
+        return []
+
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
+    monkeypatch.setattr(MODULE, "_descends_from", lambda _pid, _ancestor: True)
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: ["/usr/bin/codex", "exec"]
+        if pid == holder["pid"]
+        else ["kitty", "--detach"],
+    )
+    monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: "sha256:" + "2" * 64)
+    monkeypatch.setattr(MODULE, "_kitty_ls", forbidden_query)
+    try:
+        projection, state = MODULE._observe_terminal_binding(
+            binding=binding,
+            holder=holder,
+            terminal=terminal,
+            kitty_executable="/usr/bin/kitty",
+        )
+        assert state == "stale"
+        assert projection["observation"]["kitty_query"] == "not_attempted"
+        assert queried is False
+    finally:
+        listener.close()
+
+
 def test_status_preserves_observed_non_kitty_comm_on_drift(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -4039,6 +4088,7 @@ def test_status_preserves_observed_non_kitty_comm_on_drift(
         if pid == holder["pid"]
         else ["kitty", "--detach"],
     )
+    monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: "sha256:" + "1" * 64)
     try:
         projection, state = MODULE._observe_terminal_binding(
             binding=binding,
@@ -4066,6 +4116,7 @@ def test_status_rechecks_kitty_dedication_before_querying_socket(
         if pid == holder["pid"]
         else ["kitty", "--detach"],
     )
+    monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: "sha256:" + "1" * 64)
     monkeypatch.setattr(
         MODULE,
         "_kitty_dedication",
@@ -4113,6 +4164,7 @@ def test_status_reclassifies_dedication_race_after_terminal_exit(
         if pid == holder["pid"]
         else ["kitty", "--detach"],
     )
+    monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: "sha256:" + "1" * 64)
     monkeypatch.setattr(
         MODULE,
         "_kitty_dedication",
