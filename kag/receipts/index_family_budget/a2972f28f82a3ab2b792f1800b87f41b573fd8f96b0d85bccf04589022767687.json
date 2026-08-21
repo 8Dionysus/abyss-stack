@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 20118413,
+  "allowed_tracked_bytes": 36677131,
+  "approved_by": "repository-owner",
+  "base_ref": "3bbdfbc335e6fd29d4c7f5b871ffed617f7081be",
+  "changed_generated_bytes": 20118413,
+  "changed_generated_files": 199,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "a2972f28f82a3ab2b792f1800b87f41b573fd8f96b0d85bccf04589022767687",
+  "reason": "Owner-reviewed runtime safety repair adds an admission gate so canonical detached payloads cannot execute before parent receipt validation; accept only this measured derived-family exceedance without raising standing budgets or widening activation or live-proof claims.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36677131,
+  "tracked_bytes_max": 24117248
+}
