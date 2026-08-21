@@ -356,25 +356,10 @@ fi
 while [[ ! -e "$AOA_CLOCK_HOLDER_CAPTURED_FILE" ]]; do
   /usr/bin/sleep 0.05
 done
-runner_stderr_tmp=\"${AOA_CLOCK_ERROR_LOG}.runner.$$\"
-if ! ( set -o noclobber; : >\"$runner_stderr_tmp\" ); then
-  print -u2 -- \"clock runner stderr staging failed: $runner_stderr_tmp\"
-  exit 125
-fi
-\"$AOA_CLOCK_RUNNER\" 2>\"$runner_stderr_tmp\" &
+\"$AOA_CLOCK_RUNNER\" 2>>\"$AOA_CLOCK_ERROR_LOG\" &
 runner_pid=$!
 wait \"$runner_pid\"
 runner_rc=$?
-logging_rc=0
-if ! /usr/bin/tee -a -- \"$AOA_CLOCK_ERROR_LOG\" <\"$runner_stderr_tmp\" >&2; then
-  logging_rc=125
-fi
-if ! /usr/bin/rm -f -- \"$runner_stderr_tmp\"; then
-  logging_rc=125
-fi
-if (( logging_rc != 0 )); then
-  runner_rc=125
-fi
 status_tmp=\"${AOA_CLOCK_STATUS_FILE}.$$\"
 if ! {
   printf 'schema_version=%s\\n' 'aoa_external_actor_clock_status_v1'

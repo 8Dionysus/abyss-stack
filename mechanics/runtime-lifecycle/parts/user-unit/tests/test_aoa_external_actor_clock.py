@@ -35,8 +35,9 @@ class ExternalActorClockTests(unittest.TestCase):
             command.index('"$AOA_CLOCK_RUNNER"'),
         )
         self.assertNotIn("2> >(", command)
-        self.assertIn("runner_stderr_tmp", command)
-        self.assertIn("logging_rc=125", command)
+        self.assertIn('2>>"$AOA_CLOCK_ERROR_LOG"', command)
+        self.assertNotIn("runner_stderr_tmp", command)
+        self.assertNotIn("logging_rc", command)
         self.assertIn("runner_pid=$!", command)
         self.assertIn('printf \'runner_pid=%s\\n\' "$runner_pid"', command)
 
@@ -46,7 +47,8 @@ class ExternalActorClockTests(unittest.TestCase):
             runner = root / "runner.zsh"
             runner.write_text(
                 "#!/usr/bin/zsh\n"
-                'print -r -- $$ > "$AOA_CLOCK_TEST_RUNNER_PID_FILE"\n',
+                'print -r -- $$ > "$AOA_CLOCK_TEST_RUNNER_PID_FILE"\n'
+                'print -r -- clock-runner-error >&2\n',
                 encoding="utf-8",
             )
             runner.chmod(0o700)
@@ -88,6 +90,7 @@ class ExternalActorClockTests(unittest.TestCase):
                 values["runner_pid"],
                 (root / "runner.pid").read_text(encoding="utf-8").strip(),
             )
+            self.assertIn("clock-runner-error", error.read_text(encoding="utf-8"))
 
     @staticmethod
     def _wait_for_path(path: Path) -> bool:
