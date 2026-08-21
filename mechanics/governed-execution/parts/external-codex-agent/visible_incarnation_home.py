@@ -670,6 +670,19 @@ def _binding_ref(value: object, label: str) -> str:
     return _safe_projection_string(value, label)
 
 
+def _positive_int(value: object, *, minimum: int = 1) -> bool:
+    return type(value) is int and value >= minimum
+
+
+def _safe_source_receipt_path(path: Path) -> str:
+    resolved = str(path.resolve())
+    if _safe_projection_string(resolved, "source receipt path") != resolved:
+        raise IncarnationHomeError(
+            "source receipt path contains credential-shaped text"
+        )
+    return resolved
+
+
 def _socket_path(address: object, label: str = "control socket") -> Path:
     if not isinstance(address, str) or not address.startswith("unix:"):
         raise IncarnationHomeError(f"{label} must use a unix: address")
@@ -859,7 +872,7 @@ def _terminal_binding(
     }
     if source_receipt is not None:
         binding["source_receipt"] = {
-            "path": str(source_receipt.resolve()),
+            "path": _safe_source_receipt_path(source_receipt),
             "sha256": source_receipt_digest
             or sha256_bytes(source_receipt.read_bytes()),
         }
@@ -968,12 +981,12 @@ def _validate_terminal_binding_shape(binding: object) -> dict[str, object]:
     }:
         raise IncarnationHomeError("terminal binding terminal has unexpected fields")
     if not all(
-        isinstance(holder.get(key), int) and holder[key] > 0
+        _positive_int(holder.get(key))
         for key in ("pid", "start_ticks")
     ):
         raise IncarnationHomeError("terminal binding holder identity is invalid")
     if not all(
-        isinstance(terminal.get(key), int) and terminal[key] > 0
+        _positive_int(terminal.get(key))
         for key in ("pid", "start_ticks")
     ):
         raise IncarnationHomeError("terminal binding Kitty identity is invalid")
@@ -995,10 +1008,10 @@ def _validate_terminal_binding_shape(binding: object) -> dict[str, object]:
     if socket_record.get("path") != str(path):
         raise IncarnationHomeError("terminal binding socket path drifted")
     mode = socket_record.get("mode")
-    if not isinstance(mode, int) or mode & 0o077:
+    if type(mode) is not int or mode & 0o077:
         raise IncarnationHomeError("terminal binding socket mode is not private")
     if not all(
-        isinstance(socket_record.get(key), int) and socket_record[key] > 0
+        _positive_int(socket_record.get(key))
         for key in ("device", "inode")
     ):
         raise IncarnationHomeError("terminal binding socket identity is invalid")
@@ -2202,8 +2215,8 @@ def _load_holder_receipt_snapshot(
         or not isinstance(terminal, dict)
         or terminal.get("binding") != "kitty_ancestor_at_exec"
         or terminal.get("required_comm") != "kitty"
-        or not isinstance(terminal.get("pid"), int)
-        or not isinstance(terminal.get("start_ticks"), int)
+        or not _positive_int(terminal.get("pid"))
+        or not _positive_int(terminal.get("start_ticks"))
         or not isinstance(terminal.get("argv"), list)
         or not all(isinstance(item, str) for item in terminal["argv"])
         or not isinstance(terminal.get("window_id"), str)
@@ -2241,13 +2254,13 @@ def _holder_receipt_process_ids(
     kitty_pid = terminal.get("pid")
     kitty_start_ticks = terminal.get("start_ticks")
     if not all(
-        isinstance(value, int) and value > 0
+        _positive_int(value)
         for value in (pid, start_ticks, parent_pid, parent_start_ticks)
     ):
         raise IncarnationHomeError("holder process identity is invalid")
-    if not isinstance(kitty_pid, int) or kitty_pid <= 1:
+    if not _positive_int(kitty_pid, minimum=2):
         raise IncarnationHomeError("holder Kitty identity is invalid")
-    if not isinstance(kitty_start_ticks, int) or kitty_start_ticks <= 0:
+    if not _positive_int(kitty_start_ticks):
         raise IncarnationHomeError("holder Kitty identity is invalid")
     expected_argv = holder["argv"]
     if holder.get("argv_digest") != sha256_bytes(canonical_bytes(expected_argv)):
@@ -2471,11 +2484,14 @@ def _load_terminal_binding_input(
     holder_start_ticks = holder.get("start_ticks")
     if (
         not isinstance(socket_address, str)
-        or not isinstance(window_id, (str, int))
+        or (
+            not isinstance(window_id, str)
+            and type(window_id) is not int
+        )
         or not isinstance(title, str)
         or not isinstance(tty, str)
         or not all(
-            isinstance(value, int) and value > 0
+            _positive_int(value)
             for value in (
                 terminal_pid,
                 terminal_start_ticks,
@@ -2497,10 +2513,8 @@ def _load_terminal_binding_input(
     if (
         not isinstance(holder_argv, list)
         or not all(isinstance(item, str) for item in holder_argv)
-        or not isinstance(holder_parent_pid, int)
-        or holder_parent_pid <= 0
-        or not isinstance(holder_parent_start_ticks, int)
-        or holder_parent_start_ticks <= 0
+        or not _positive_int(holder_parent_pid)
+        or not _positive_int(holder_parent_start_ticks)
         or not isinstance(holder_parent_comm, str)
         or not holder_parent_comm
     ):
@@ -2672,7 +2686,7 @@ def _write_terminal_binding(
         "schema_version": TERMINAL_BINDING_SCHEMA_VERSION,
         "created_at": _utc_now(),
         "source_receipt": {
-            "path": str(source_receipt.resolve()),
+            "path": _safe_source_receipt_path(source_receipt),
             "sha256": source_digest,
         },
         "binding": binding,
@@ -5157,7 +5171,13 @@ def command_launch(args: argparse.Namespace) -> int:
     terminal_title = getattr(args, "terminal_title", None)
     holder_receipt_argument = getattr(args, "holder_receipt", None)
     binding_context_argument = getattr(args, "binding_context", None)
-    if terminal_title and (not holder_receipt_argument or not binding_context_argument):
+    if terminal_title is not None and (
+        not isinstance(terminal_title, str) or not terminal_title.strip()
+    ):
+        raise IncarnationHomeError("visible launch terminal title must not be empty")
+    if terminal_title is not None and (
+        not holder_receipt_argument or not binding_context_argument
+    ):
         raise IncarnationHomeError(
             "canonical visible launch requires --holder-receipt and --binding-context"
         )
@@ -5167,7 +5187,7 @@ def command_launch(args: argparse.Namespace) -> int:
     executable = _resolved_executable(command)
     environment = dict(os.environ)
     environment["CODEX_HOME"] = str(manifest["ambient_codex_home"])
-    if terminal_title:
+    if terminal_title is not None:
         _binding_context_value, binding_context_bytes = _load_json_snapshot(
             Path(binding_context_argument), "terminal binding context"
         )

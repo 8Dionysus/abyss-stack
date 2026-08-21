@@ -3347,6 +3347,60 @@ def test_terminal_binding_validation_reconstructs_redacted_binding_refs(
         listener.close()
 
 
+def test_terminal_binding_rejects_boolean_process_identity() -> None:
+    binding = {
+        "schema_version": MODULE.TERMINAL_BINDING_SCHEMA_VERSION,
+        "boot_id": MODULE._proc_boot_id(),
+        "goal_ref": "goal:test",
+        "actor_ref": "actor:test",
+        "incarnation_ref": "incarnation:test",
+        "session_ref": "session:test",
+        "runtime_state_root": "/tmp/runtime",
+        "closeout_route": "/tmp/closeout.sh",
+        "holder": {"pid": True, "start_ticks": 1001},
+        "terminal": {
+            "pid": 202,
+            "start_ticks": 2002,
+            "window_id": "7",
+            "tty": "/dev/pts/7",
+            "title": "visible-holder",
+            "control_socket": {
+                "address": "unix:/tmp/kitty.sock",
+                "path": "/tmp/kitty.sock",
+                "mode": 0o600,
+                "device": 1,
+                "inode": 1,
+            },
+        },
+        "remote_control": "socket-only",
+        "dedicated": True,
+    }
+    with pytest.raises(MODULE.IncarnationHomeError, match="holder identity"):
+        MODULE._validate_terminal_binding_shape(binding)
+
+
+def test_terminal_binding_rejects_credential_bearing_source_receipt_path(
+    tmp_path: Path,
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    unsafe_dir = tmp_path / "database_password=hunter2"
+    unsafe_dir.mkdir()
+    source_receipt = unsafe_dir / "holder.json"
+    source_receipt.write_text("{}", encoding="utf-8")
+    try:
+        with pytest.raises(MODULE.IncarnationHomeError, match="source receipt path"):
+            MODULE._write_terminal_binding(
+                output_path=tmp_path / "binding.json",
+                binding=binding,
+                holder=holder,
+                terminal=terminal,
+                source_receipt=source_receipt,
+                source_digest=MODULE.sha256_bytes(source_receipt.read_bytes()),
+            )
+    finally:
+        listener.close()
+
+
 def test_control_socket_allocation_is_unique_and_private(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -3767,3 +3821,8 @@ def test_directed_input_rechecks_kitty_dedication_before_send(
             )
     finally:
         listener.close()
+
+
+def test_launch_rejects_explicit_empty_terminal_title() -> None:
+    with pytest.raises(MODULE.IncarnationHomeError, match="terminal title"):
+        MODULE.command_launch(MODULE.argparse.Namespace(terminal_title=""))
