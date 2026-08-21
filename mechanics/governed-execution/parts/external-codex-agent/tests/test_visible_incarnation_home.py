@@ -1155,6 +1155,7 @@ def test_detached_launch_publishes_socket_only_binding(
     address = f"unix:{socket_path}"
     binding = {
         "schema_version": MODULE.TERMINAL_BINDING_SCHEMA_VERSION,
+        "boot_id": MODULE._proc_boot_id(),
         "goal_ref": "goal:test",
         "actor_ref": "actor:test",
         "incarnation_ref": "incarnation:test",
@@ -1172,6 +1173,8 @@ def test_detached_launch_publishes_socket_only_binding(
                 "address": address,
                 "path": str(socket_path),
                 "mode": 0o600,
+                "device": 1,
+                "inode": 1,
             },
         },
         "remote_control": "socket-only",
@@ -1179,13 +1182,19 @@ def test_detached_launch_publishes_socket_only_binding(
     }
     monkeypatch.setattr(
         MODULE,
-        "_verify_executable_version",
+        "_verify_command_version",
         lambda *_args, **_kwargs: None,
     )
     monkeypatch.setattr(
         MODULE,
+        "_holder_terminal_identity",
+        lambda _receipt: (101, 202, "kitty", "7", True),
+    )
+    monkeypatch.setattr(MODULE, "_spawn_named_snapshot_cleanup", lambda **_: None)
+    monkeypatch.setattr(
+        MODULE,
         "_load_holder_receipt",
-        lambda _path: {"binding": binding},
+        lambda _path: {"binding": binding, "holder": binding["holder"]},
     )
     captured: dict[str, object] = {}
 

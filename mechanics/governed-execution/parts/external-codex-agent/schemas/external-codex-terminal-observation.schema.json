@@ -5,17 +5,21 @@
   "type": "object",
   "oneOf": [
     {"$ref": "#/$defs/bindingDocument"},
-    {"$ref": "#/$defs/statusDocument"}
+    {"$ref": "#/$defs/statusDocument"},
+    {"$ref": "#/$defs/launchResult"},
+    {"$ref": "#/$defs/sendTextResult"}
   ],
   "$defs": {
     "socket": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["address", "path", "mode"],
+      "required": ["address", "path", "mode", "device", "inode"],
       "properties": {
         "address": {"type": "string", "pattern": "^unix:/"},
         "path": {"type": "string", "pattern": "^/"},
-        "mode": {"type": "integer", "minimum": 0, "maximum": 511}
+        "mode": {"type": "integer", "minimum": 0, "maximum": 511},
+        "device": {"type": "integer", "minimum": 1},
+        "inode": {"type": "integer", "minimum": 1}
       }
     },
     "identity": {
@@ -32,6 +36,7 @@
       "additionalProperties": false,
       "required": [
         "schema_version",
+        "boot_id",
         "goal_ref",
         "actor_ref",
         "incarnation_ref",
@@ -45,6 +50,7 @@
       ],
       "properties": {
         "schema_version": {"const": "abyss_stack_visible_terminal_binding_v1"},
+        "boot_id": {"type": "string", "format": "uuid"},
         "goal_ref": {"type": "string", "minLength": 1},
         "actor_ref": {"type": "string", "minLength": 1},
         "incarnation_ref": {"type": "string", "minLength": 1},
@@ -139,7 +145,7 @@
           "additionalProperties": false,
           "required": ["exists", "window_id", "tty", "title", "kitty"],
           "properties": {
-            "exists": {"type": "boolean"},
+            "exists": {"type": ["boolean", "null"]},
             "window_id": {"type": "string", "pattern": "^[1-9][0-9]*$"},
             "tty": {"type": "string", "pattern": "^/dev/(pts/[0-9]+|tty[0-9]+)$"},
             "title": {"type": "string"},
@@ -176,6 +182,35 @@
           }
         },
         "claim_limits": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "launchResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "launched", "binding"],
+      "properties": {
+        "schema_version": {"const": "abyss_stack_visible_terminal_binding_v1"},
+        "launched": {"const": true},
+        "binding": {"$ref": "#/$defs/binding"}
+      }
+    },
+    "sendTextResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "sent", "target", "desktop_effect"],
+      "properties": {
+        "schema_version": {"const": "abyss_stack_visible_terminal_binding_v1"},
+        "sent": {"const": true},
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["window_id", "control_socket"],
+          "properties": {
+            "window_id": {"type": "string", "pattern": "^[1-9][0-9]*$"},
+            "control_socket": {"$ref": "#/$defs/socket"}
+          }
+        },
+        "desktop_effect": {"type": "string", "minLength": 1}
       }
     },
     "processStatus": {
