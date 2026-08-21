@@ -219,7 +219,7 @@ absence of the bearer name and value from live controller, worker, supervisor,
 and Codex exec-time environments, actor `/proc` denial, attempt-local MCP bearer
 relay with the upstream credential absent from Codex,
 incremental streaming relay and active-connection termination before finalize,
-Codex 0.147 bubblewrap/private-PID selection with legacy fallback disabled,
+Codex 0.148 bubblewrap/private-PID selection with legacy fallback disabled,
 live Codex process-environment proof that the upstream bearer name and value
 are absent without claiming path-alias inference from cwd-less events,
 signature-format

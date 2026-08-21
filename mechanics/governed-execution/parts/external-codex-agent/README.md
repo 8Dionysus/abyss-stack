@@ -489,13 +489,13 @@ For MCP-bearing read roles, the installed CLI removes the real owner bearer
 from its exec-time environment during one clean re-exec, carries the exact
 bytes through a bounded sealed descriptor, and injects them only through an
 attempt-local loopback relay. For MCP-bearing roles the runtime explicitly
-enables Codex 0.147's `mcp_2026_07_28` client mode. The relay admits only an
+enables Codex 0.148's `mcp_2026_07_28` client mode. The relay admits only an
 already-modern `2026-07-28` request and preserves that exact version on the
 authenticated upstream hop; it does not relabel legacy client traffic. Codex sees
 only a random, expiring proxy path and
 no bearer environment variable; actor filesystem permissions deny `/proc`,
 while the controller retains host PID coordinates for exact lifecycle and
-cleanup receipts. The model-issued commands still run under the Codex 0.147
+cleanup receipts. The model-issued commands still run under the Codex 0.148
 bubblewrap backend with legacy Landlock fallback explicitly disabled. The
 runtime does not claim exhaustive path-alias classification from command events
 that omit effective working directory. Streaming MCP events are forwarded

@@ -277,8 +277,9 @@ Before launch the controller verifies:
    identities match across their owner objects;
 4. task correlation, continuation, and expected incarnation IDs match the
    binding without relying on filenames;
-5. the model realization names Codex CLI `0.147.0`, ChatGPT quota/login,
-   `exec-jsonl`, one admitted model/effort, and the exact runtime tool profile;
+5. the model realization names Codex CLI `0.148.0`, ChatGPT quota/login,
+   `exec-jsonl`, one admitted model/effort, the exact content-addressed runtime
+   subject admitted by the runtime profile, and the exact runtime tool profile;
 6. the resolved Codex executable digest, reported version, auth status, and
    bundled live model catalog match the binding;
 7. the exact profile-bound Linux subreaper supervisor and probe executable are
@@ -490,7 +491,7 @@ the old mount launcher into a pathname-race proof.
 
 On an unprivileged host, bubblewrap realizes this filesystem contour with a
 user namespace plus a mount namespace. It adds no outer PID or network
-namespace and no role authority. Codex 0.147 must still create its own inner
+namespace and no role authority. Codex 0.148 must still create its own inner
 bubblewrap/private-PID sandbox; failure to do so rejects the runtime contour.
 
 Semantic profiles admit only `read-only` or bounded `workspace-write` target
@@ -502,7 +503,7 @@ name and value from the runtime's exec-time environment, and carries the exact
 bytes in one bounded sealed descriptor. The runtime retains the recovered
 credential outside Codex and starts an
 attempt-local loopback proxy which injects it only while relaying to the fixed
-owner endpoint. The runtime explicitly enables Codex 0.147's
+owner endpoint. The runtime explicitly enables Codex 0.148's
 `mcp_2026_07_28` client mode for MCP-bearing roles. The proxy rejects absent,
 legacy, duplicate, or otherwise mismatched protocol-version headers and
 preserves the admitted exact `2026-07-28` version on the upstream hop; it does
@@ -576,7 +577,7 @@ Codex runs beneath a Linux supervisor that owns a separate process group but
 does not create an outer PID or network namespace. Inference adds only the
 rootless user+mount contour described above. Live proof must show that this
 still leaves Codex's own `codex-linux-sandbox`/bubblewrap namespace construction intact. The exact Codex
-0.147 invocation disables legacy Landlock fallback; for this bounded filesystem
+0.148 invocation disables legacy Landlock fallback; for this bounded filesystem
 posture that version requires bubblewrap. Model commands therefore run in its
 private PID and network namespaces, or the attempt fails rather than exposing
 the credential-bearing worker. Before it

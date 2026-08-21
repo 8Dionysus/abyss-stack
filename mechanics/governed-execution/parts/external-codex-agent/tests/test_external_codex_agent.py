@@ -41,6 +41,7 @@ from aoa_sdk.contracts.control_plane import (
 from aoa_sdk.control_plane import (
     ContinuationObligation,
     IncarnationPermissionPosture,
+    IncarnationRuntimeSubject,
     IncarnationStopCondition,
     IncarnationToolProfile,
     IncarnationUsageMetering,
@@ -70,6 +71,9 @@ PLAN_FIXTURE = (
     / "a2a-eval-only.run-plan.json"
 )
 PROFILE_PATH = PART_ROOT / "runtime-profile.v1.json"
+PROFILE = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+RUNTIME_VERSION = PROFILE["model_admission"]["runtime_version"]
+RUNTIME_SUBJECT = PROFILE["model_admission"]["runtime_subject"]
 REPORT_SCHEMA_PATH = PART_ROOT / "schemas/external-codex-report.schema.json"
 SUMMON_REQUEST_SCHEMA_PATH = (
     SDK_ROOT / "mechanics/checkpoint/parts/child-task-reentry/schemas/"
@@ -208,9 +212,10 @@ def _write_model_realization(
                 },
                 "runtime": {
                     "product": "codex-cli",
-                    "version": "0.147.0",
+                    "version": RUNTIME_VERSION,
                     "transport": "exec-jsonl",
                     "model_slug": "gpt-5.6-luna",
+                    "runtime_subject": RUNTIME_SUBJECT,
                 },
                 "reasoning_effort": "max",
                 "tools": {
@@ -280,7 +285,7 @@ from pathlib import Path
 
 args = sys.argv[1:]
 if args == ["--version"]:
-    print("codex-cli 0.147.0")
+    print("codex-cli __RUNTIME_VERSION__")
     raise SystemExit(0)
 if args[:2] == ["login", "status"]:
     print("Logged in using ChatGPT", file=sys.stderr)
@@ -921,7 +926,7 @@ if "FAKE_TOKEN_OVERRUN" in task["objective"]:
 else:
     output.write_text(json.dumps(report) + "\n", encoding="utf-8")
     emit({"type": "turn.completed", "usage": usage})
-""",
+""".replace("__RUNTIME_VERSION__", RUNTIME_VERSION),
         encoding="utf-8",
     )
     path.chmod(0o755)
@@ -961,7 +966,7 @@ def _fixture_codex_preflight(
             "codex_executable_drift", "fixture Codex executable digest changed"
         )
     return {
-        "version": "codex-cli 0.147.0",
+        "version": "codex-cli " + RUNTIME_VERSION,
         "auth_regime": "chatgpt_login",
         "model_slug": model_slug,
         "reasoning_effort": reasoning_effort,
@@ -969,6 +974,29 @@ def _fixture_codex_preflight(
         "mount_wrapper_digest": _digest_path(RUNTIME.MOUNT_WRAPPER_PATH),
         "mount_launcher_digest": _digest_path(RUNTIME.MOUNT_LAUNCHER_PATH),
     }
+
+
+def test_model_realization_requires_exact_runtime_subject(tmp_path: Path) -> None:
+    realization_path = tmp_path / "model-realization.json"
+    _write_model_realization(realization_path, workspace_write=True)
+    realization = json.loads(realization_path.read_text(encoding="utf-8"))
+
+    assert RUNTIME._validate_model_realization_admission(
+        realization,
+        PROFILE["model_admission"],
+    ) == ("gpt-5.6-luna", "max")
+
+    realization["configuration"]["runtime"]["runtime_subject"] = {
+        **RUNTIME_SUBJECT,
+        "digest": "sha256:" + "0" * 64,
+    }
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME._validate_model_realization_admission(
+            realization,
+            PROFILE["model_admission"],
+        )
+
+    assert exc_info.value.code == "runtime_subject_unsupported"
 
 
 def _adapt_plan(
@@ -1738,7 +1766,8 @@ def _fixture(
             "schema_version": "aoa_model_fit_query_v1",
             "task_family": "landing",
             "runtime_product": "codex-cli",
-            "runtime_version": "0.147.0",
+            "runtime_version": RUNTIME_VERSION,
+            "runtime_subject": RUNTIME_SUBJECT,
             "reasoning_effort": "max",
             "sandbox_mode": "workspace-write" if workspace_write else "read-only",
             "required_tools": [
@@ -1755,6 +1784,7 @@ def _fixture(
             "fit_evidence_refs": [model_fit_projection_ref.model_dump(mode="json")],
             "model_slug": "gpt-5.6-luna",
             "reasoning_effort": "max",
+            "runtime_subject": RUNTIME_SUBJECT,
             "sandbox_mode": fit_query["sandbox_mode"],
             "lifecycle_state": "declared",
             "projection_posture": "candidate",
@@ -2141,6 +2171,7 @@ def _fixture(
                 digest=fit_query_result["result_digest"],
             ),
             model_fit_projection_ref=model_fit_projection_ref,
+            runtime_subject=IncarnationRuntimeSubject(**RUNTIME_SUBJECT),
         )
     if owner_binding_v1 or not owner_contour:
         binding = build_agent_incarnation_binding(plan, **binding_kwargs)
@@ -3804,7 +3835,7 @@ def test_preflight_and_separate_process_return_structured_result(
     assert preflight["admitted"] is True
     assert preflight["model_slug"] == "gpt-5.6-luna"
     assert preflight["reasoning_effort"] == "max"
-    assert preflight["preflight"]["version"] == "codex-cli 0.147.0"
+    assert preflight["preflight"]["version"] == "codex-cli " + RUNTIME_VERSION
     assert preflight["preflight"]["auth_regime"] == "chatgpt_login"
     assert preflight["preflight"]["executable_digest"] == (
         fixture["launch"]["codex_executable_digest"]

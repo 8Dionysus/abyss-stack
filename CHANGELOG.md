@@ -15,6 +15,16 @@ Tracking starts with the community-docs baseline for this repository.
   and explicit directed input through that binding; the status projection
   whitelists safe Kitty fields and never emits environment, command lines,
   tokens, or credentials.
+- Admit the prepared external Codex lane by exact content-addressed runtime
+  subject as well as product, version, transport, and access regime. The source
+  runtime profile now pins Codex CLI `0.148.0`, rejects a realization with a
+  different runtime-package digest, and keeps the installed/deployed release
+  outside this source-only repair.
+- Admit the prepared external Codex lane by exact content-addressed runtime
+  subject as well as product, version, transport, and access regime. The source
+  runtime profile now pins Codex CLI `0.148.0`, rejects a realization with a
+  different runtime-package digest, and keeps the installed/deployed release
+  outside this source-only repair.
 - Add the manual-only `aoa-external-actor-clock@.service` delayed clock route.
   Its foreground supervisor keeps systemd ownership while a uniquely titled
   detached Kitty holder is independently observable, requires explicit private

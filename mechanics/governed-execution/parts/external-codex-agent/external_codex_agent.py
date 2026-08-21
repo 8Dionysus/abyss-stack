@@ -1115,6 +1115,61 @@ class ExternalCodexRuntimeError(RuntimeError):
         self.code = code
 
 
+def _validate_model_realization_admission(
+    realization: Mapping[str, Any],
+    model_admission: Mapping[str, Any],
+) -> tuple[str, str]:
+    """Admit one realization only against the exact configured runtime lane."""
+
+    if (
+        realization.get("kind") != "ModelRealization"
+        or realization.get("schema_version") != "aoa_model_realization_v1"
+        or not isinstance(realization.get("configuration"), dict)
+    ):
+        raise ExternalCodexRuntimeError(
+            "model_realization_invalid",
+            "aoa-models realization identity is invalid",
+        )
+    configuration = realization["configuration"]
+    runtime = configuration.get("runtime")
+    tools = configuration.get("tools")
+    permissions = configuration.get("permissions")
+    access = configuration.get("access")
+    if not all(
+        isinstance(item, dict) for item in (runtime, tools, permissions, access)
+    ):
+        raise ExternalCodexRuntimeError(
+            "model_realization_invalid",
+            "model realization configuration is incomplete",
+        )
+    model_slug = str(runtime.get("model_slug"))
+    effort = str(configuration.get("reasoning_effort"))
+    if (
+        runtime.get("product") != model_admission["runtime_product"]
+        or runtime.get("version") != model_admission["runtime_version"]
+        or runtime.get("transport") != model_admission["transport"]
+        or access.get("auth_regime") != model_admission["auth_regime"]
+        or access.get("billing_regime") != model_admission["billing_regime"]
+        or realization.get("lifecycle_state")
+        not in model_admission["allowed_lifecycle_states"]
+    ):
+        raise ExternalCodexRuntimeError(
+            "model_realization_unsupported",
+            "model realization is not the admitted Codex lane",
+        )
+    if runtime.get("runtime_subject") != model_admission["runtime_subject"]:
+        raise ExternalCodexRuntimeError(
+            "runtime_subject_unsupported",
+            "model realization is not the exact admitted content-addressed Codex runtime subject",
+        )
+    if not model_slug or not effort:
+        raise ExternalCodexRuntimeError(
+            "model_realization_unsupported",
+            "model realization must name a model and reasoning effort",
+        )
+    return model_slug, effort
+
+
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -8609,48 +8664,13 @@ class ExternalCodexRuntime:
                 immutable_inputs=immutable_inputs,
             )
 
-        if (
-            realization.get("kind") != "ModelRealization"
-            or realization.get("schema_version") != "aoa_model_realization_v1"
-            or not isinstance(realization.get("configuration"), dict)
-        ):
-            raise ExternalCodexRuntimeError(
-                "model_realization_invalid",
-                "aoa-models realization identity is invalid",
-            )
+        model_slug, effort = _validate_model_realization_admission(
+            realization,
+            self.profile["model_admission"],
+        )
         configuration = realization["configuration"]
-        runtime = configuration.get("runtime")
-        tools = configuration.get("tools")
-        permissions = configuration.get("permissions")
-        access = configuration.get("access")
-        if not all(
-            isinstance(item, dict) for item in (runtime, tools, permissions, access)
-        ):
-            raise ExternalCodexRuntimeError(
-                "model_realization_invalid",
-                "model realization configuration is incomplete",
-            )
-        model_slug = str(runtime.get("model_slug"))
-        effort = str(configuration.get("reasoning_effort"))
-        model_admission = self.profile["model_admission"]
-        if (
-            runtime.get("product") != model_admission["runtime_product"]
-            or runtime.get("version") != model_admission["runtime_version"]
-            or runtime.get("transport") != model_admission["transport"]
-            or access.get("auth_regime") != model_admission["auth_regime"]
-            or access.get("billing_regime") != model_admission["billing_regime"]
-            or realization.get("lifecycle_state")
-            not in model_admission["allowed_lifecycle_states"]
-        ):
-            raise ExternalCodexRuntimeError(
-                "model_realization_unsupported",
-                "model realization is not the admitted Codex lane",
-            )
-        if not model_slug or not effort:
-            raise ExternalCodexRuntimeError(
-                "model_realization_unsupported",
-                "model realization must name a model and reasoning effort",
-            )
+        tools = configuration["tools"]
+        permissions = configuration["permissions"]
         tool_entry = next(
             (
                 item
