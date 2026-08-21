@@ -994,7 +994,9 @@ def _validate_terminal_binding_shape(binding: object) -> dict[str, object]:
         r"[1-9][0-9]*", terminal["window_id"]
     ):
         raise IncarnationHomeError("terminal binding window identity is invalid")
-    if not isinstance(terminal.get("tty"), str) or not terminal["tty"]:
+    if not isinstance(terminal.get("tty"), str) or re.fullmatch(
+        r"/dev/(?:pts/[0-9]+|tty[0-9]+)", terminal["tty"]
+    ) is None:
         raise IncarnationHomeError("terminal binding tty is invalid")
     if not isinstance(terminal.get("title"), str):
         raise IncarnationHomeError("terminal binding title is invalid")

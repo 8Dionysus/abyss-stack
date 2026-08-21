@@ -3425,6 +3425,18 @@ def test_terminal_binding_rejects_negative_socket_mode(
         listener.close()
 
 
+def test_terminal_binding_rejects_invalid_tty(
+    tmp_path: Path,
+) -> None:
+    listener, binding, _holder, terminal = _terminal_binding_fixture(tmp_path)
+    try:
+        terminal["tty"] = "/tmp/fake"
+        with pytest.raises(MODULE.IncarnationHomeError, match="tty"):
+            MODULE._validate_terminal_binding_shape(binding)
+    finally:
+        listener.close()
+
+
 def test_control_socket_allocation_is_unique_and_private(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
