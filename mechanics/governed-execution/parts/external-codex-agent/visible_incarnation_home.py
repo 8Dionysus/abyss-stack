@@ -913,10 +913,17 @@ def _validate_receipt_binding_consistency(
         )
     if any(
         binding_terminal.get(key) != terminal.get(key)
-        for key in ("pid", "start_ticks", "window_id")
+        for key in (
+            "pid",
+            "start_ticks",
+            "window_id",
+            "tty",
+            "title",
+            "control_socket",
+        )
     ):
         raise IncarnationHomeError(
-            "embedded terminal binding terminal identity disagrees with top-level terminal"
+            "embedded terminal binding terminal identity or socket disagrees with top-level terminal"
         )
 
 

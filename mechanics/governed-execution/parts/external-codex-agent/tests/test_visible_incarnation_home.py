@@ -3292,12 +3292,38 @@ def test_receipt_binding_must_match_top_level_holder_and_terminal() -> None:
     binding = {
         "boot_id": boot_id,
         "holder": {"pid": 101, "start_ticks": 1001},
-        "terminal": {"pid": 202, "start_ticks": 2002, "window_id": "7"},
+        "terminal": {
+            "pid": 202,
+            "start_ticks": 2002,
+            "window_id": "7",
+            "tty": "/dev/pts/7",
+            "title": "visible-holder",
+            "control_socket": {
+                "address": "unix:/tmp/kitty.sock",
+                "path": "/tmp/kitty.sock",
+                "mode": 0o600,
+                "device": 1,
+                "inode": 2,
+            },
+        },
     }
     receipt = {
         "boot_id": boot_id,
         "holder": {"pid": 101, "start_ticks": 1001},
-        "terminal": {"pid": 202, "start_ticks": 2002, "window_id": "7"},
+        "terminal": {
+            "pid": 202,
+            "start_ticks": 2002,
+            "window_id": "7",
+            "tty": "/dev/pts/7",
+            "title": "visible-holder",
+            "control_socket": {
+                "address": "unix:/tmp/kitty.sock",
+                "path": "/tmp/kitty.sock",
+                "mode": 0o600,
+                "device": 1,
+                "inode": 2,
+            },
+        },
     }
     MODULE._validate_receipt_binding_consistency(receipt, binding)
 
@@ -3308,6 +3334,11 @@ def test_receipt_binding_must_match_top_level_holder_and_terminal() -> None:
     binding["holder"]["start_ticks"] = 1001
     binding["terminal"]["window_id"] = "8"
     with pytest.raises(MODULE.IncarnationHomeError, match="terminal identity"):
+        MODULE._validate_receipt_binding_consistency(receipt, binding)
+
+    binding["terminal"]["window_id"] = "7"
+    binding["terminal"]["control_socket"]["inode"] = 3
+    with pytest.raises(MODULE.IncarnationHomeError, match="socket"):
         MODULE._validate_receipt_binding_consistency(receipt, binding)
 
 
