@@ -40,6 +40,10 @@ POLL_INTERVAL_SECONDS = 0.05
 ADOPTED_REAP_INTERVAL_SECONDS = 1.0
 MAX_EXECUTABLE_BYTES = 512 * 1024 * 1024
 MAX_MASK_BYTES = 2 * 1024 * 1024
+# The admitted package contains large immutable helper binaries (notably the
+# code-mode host and ripgrep).  Keep the ordinary actor-mask bound narrow while
+# giving the profile-pinned package members their own bounded snapshot limit.
+MAX_RUNTIME_PACKAGE_MEMBER_BYTES = 128 * 1024 * 1024
 MAX_MOUNT_LAUNCHER_BYTES = 2 * 1024 * 1024
 IDENTITY_DISCOVERY_TIMEOUT_SECONDS = 5.0
 MOUNT_SETUP_TIMEOUT_SECONDS = 5.0
@@ -47,6 +51,10 @@ MOUNT_LAUNCHER_PATH = Path(__file__).resolve().with_name(
     "external_codex_mount_launcher.py"
 )
 ACTOR_WORKSPACE_COORDINATE = Path("/tmp/aoa-external-actor-workspace")
+RUNTIME_PACKAGE_EXECUTION_ROOT = Path(
+    "/var/tmp/aoa-external-actor-runtime-package"
+)
+RUNTIME_PACKAGE_EXECUTABLE = RUNTIME_PACKAGE_EXECUTION_ROOT / "bin/codex"
 PRIVATE_VIEW_IDENTITY_FIELDS = {
     "device": "st_dev",
     "inode": "st_ino",
@@ -329,40 +337,63 @@ def _validated_private_directory_views(
             view = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise SupervisorError("private directory view is invalid JSON") from exc
-        if not isinstance(view, dict) or set(view) != {
-            "target",
-            "identity",
-            "entries",
-        }:
+        if not isinstance(view, dict) or set(view) not in (
+            {"target", "identity", "entries"},
+            {"target", "identity", "entries", "materialized"},
+        ):
             raise SupervisorError("private directory view has an unsupported shape")
         target = Path(str(view["target"]))
         entries = view["entries"]
+        materialized = view.get("materialized", False)
         if (
             not target.is_absolute()
             or target in targets
             or not isinstance(entries, list)
             or not isinstance(view["identity"], dict)
+            or not isinstance(materialized, bool)
+            or (
+                materialized
+                and not target.is_relative_to(RUNTIME_PACKAGE_EXECUTION_ROOT)
+            )
         ):
             raise SupervisorError("private directory view identity is invalid")
         targets.add(target)
         entry_targets: set[Path] = set()
         for entry in entries:
-            if not isinstance(entry, dict) or set(entry) != {
-                "source",
-                "target",
-                "kind",
-                "identity",
-            }:
+            if not isinstance(entry, dict):
                 raise SupervisorError("private directory entry has an unsupported shape")
-            source = Path(str(entry["source"]))
-            entry_target = Path(str(entry["target"]))
+            kind = entry.get("kind")
+            expected_keys = (
+                {"source", "target", "kind", "identity", "link_target"}
+                if kind == "symlink"
+                else {"source", "target", "kind", "identity"}
+            )
+            source_value = entry.get("source")
+            target_value = entry.get("target")
+            identity = entry.get("identity")
             if (
-                not source.is_absolute()
-                or entry_target.parent != target
+                set(entry) != expected_keys
+                or not isinstance(source_value, str)
+                or not isinstance(target_value, str)
+                or not isinstance(identity, dict)
+                or not source_value.startswith("/")
+                or not target_value.startswith("/")
+                or kind not in {"file", "directory", "symlink"}
+                or (
+                    kind == "symlink"
+                    and (
+                        not isinstance(entry.get("link_target"), str)
+                        or not entry["link_target"]
+                    )
+                )
+            ):
+                raise SupervisorError("private directory entry identity is invalid")
+            source = Path(source_value)
+            entry_target = Path(target_value)
+            if (
+                entry_target.parent != target
                 or entry_target.name != source.name
                 or entry_target in entry_targets
-                or entry["kind"] not in {"file", "directory"}
-                or not isinstance(entry["identity"], dict)
             ):
                 raise SupervisorError("private directory entry identity is invalid")
             entry_targets.add(entry_target)
@@ -376,7 +407,6 @@ def _validated_private_directory_views(
                 len(Path(str(view["target"])).parts),
                 str(view["target"]),
             ),
-            reverse=True,
         )
     )
 
@@ -390,13 +420,14 @@ def _launch_verified_command(
     mount_launcher_digest: str | None = None,
     private_directory_views: tuple[dict[str, object], ...] = (),
     read_only_masks: tuple[tuple[str, str, str], ...] = (),
+    runtime_package_mask: bool = False,
     mount_setup_callback: Callable[[], None] | None = None,
     workspace_fd: int | None = None,
     workspace_coordinate: str | None = None,
 ) -> tuple[subprocess.Popen[bytes], int | None]:
     """Execute the digest-verified open file, not a later pathname lookup."""
 
-    descriptor, _ = _open_verified_file(
+    descriptor, executable_stat = _sealed_verified_file_snapshot(
         command[0],
         expected_digest,
         label="Codex executable",
@@ -456,6 +487,7 @@ def _launch_verified_command(
     )
     mask_descriptors: list[int] = []
     view_descriptors: list[int] = []
+    mount_descriptor = -1
     payload_descriptor = -1
     setup_parent_fd = -1
     setup_child_fd = -1
@@ -479,9 +511,6 @@ def _launch_verified_command(
             # the blocked endpoint therefore cannot observe EOF as success.
             "--sync-fd",
             str(gate_write_fd),
-            "--ro-bind-fd",
-            str(descriptor),
-            command[0],
         ]
         if workspace_fd is not None:
             wrapper_command.extend(
@@ -501,12 +530,21 @@ def _launch_verified_command(
         launcher_views: list[dict[str, object]] = []
         for view in private_directory_views:
             view_target = Path(str(view["target"]))
+            materialized = bool(view.get("materialized", False))
+            if materialized and not view_target.is_relative_to(
+                RUNTIME_PACKAGE_EXECUTION_ROOT
+            ):
+                raise SupervisorError(
+                    "materialized runtime package view is outside its execution coordinate"
+                )
             view_targets.add(view_target)
             launcher_view = {
                 "target": str(view_target),
                 "identity": view["identity"],
                 "attachments": [],
             }
+            if materialized:
+                launcher_view["materialized"] = True
             launcher_views.append(launcher_view)
             launcher_attachments = launcher_view["attachments"]
             assert isinstance(launcher_attachments, list)
@@ -533,34 +571,98 @@ def _launch_verified_command(
                 if (
                     (kind == "directory" and not stat.S_ISDIR(entry_stat.st_mode))
                     or (kind == "file" and not stat.S_ISREG(entry_stat.st_mode))
-                    or not _private_view_identity_matches(
-                        entry_stat,
-                        entry["identity"],
+                    or (kind == "symlink" and not stat.S_ISLNK(entry_stat.st_mode))
+                    or not _private_view_identity_matches(entry_stat, entry["identity"])
+                    or (
+                        kind == "symlink"
+                        and os.readlink(source) != entry["link_target"]
                     )
                 ):
                     raise SupervisorError("private directory view entry changed")
-                launcher_attachments.append(
-                    {
-                        "name": target.name,
-                        "kind": kind,
-                        "source": str(source),
-                        "identity": entry["identity"],
-                    }
-                )
+                launcher_attachment = {
+                    "name": target.name,
+                    "kind": kind,
+                    "source": str(source),
+                    "identity": entry["identity"],
+                }
+                if kind == "symlink":
+                    launcher_attachment["link_target"] = entry["link_target"]
+                launcher_attachments.append(launcher_attachment)
+        if runtime_package_mask and not any(
+            bool(view.get("materialized", False))
+            and Path(str(view["target"])).is_relative_to(
+                RUNTIME_PACKAGE_EXECUTION_ROOT
+            )
+            for view in private_directory_views
+        ):
+            raise SupervisorError(
+                "runtime package has no materialized execution coordinate"
+            )
+        command_target = (
+            RUNTIME_PACKAGE_EXECUTABLE
+            if runtime_package_mask
+            else Path(command[0])
+        )
+        command_view = next(
+            (
+                item
+                for item in launcher_views
+                if item["target"] == str(command_target.parent)
+            ),
+            None,
+        )
+        if runtime_package_mask and command_view is not None:
+            command_attachments = command_view["attachments"]
+            assert isinstance(command_attachments, list)
+            command_attachments[:] = [
+                item
+                for item in command_attachments
+                if item.get("name") != command_target.name
+            ]
+            command_attachments.append(
+                {
+                    "name": command_target.name,
+                    "kind": "sealed_file",
+                    "snapshot_fd": descriptor,
+                    "size": executable_stat.st_size,
+                    "digest": expected_digest,
+                    "mode": executable_stat.st_mode & 0o7777,
+                }
+            )
+        else:
+            mount_descriptor, _ = _open_verified_file(
+                command[0],
+                expected_digest,
+                label="Codex mount executable",
+                maximum_bytes=MAX_EXECUTABLE_BYTES,
+            )
+            wrapper_command.extend(
+                ("--ro-bind-fd", str(mount_descriptor), command[0])
+            )
         for source, target, digest in read_only_masks:
             if (
                 not Path(target).is_absolute()
                 or Path(target).parent not in view_targets
             ):
                 raise SupervisorError("mount mask target is not absolute")
-            verified_mask_descriptor, verified_mask_stat = _sealed_verified_file_snapshot(
-                source,
-                digest,
-                label="mount mask source",
-                maximum_bytes=MAX_MASK_BYTES,
-            )
+            if runtime_package_mask and Path(source) == Path(command[0]):
+                verified_mask_descriptor = descriptor
+                verified_mask_stat = executable_stat
+            else:
+                verified_mask_descriptor, verified_mask_stat = (
+                    _sealed_verified_file_snapshot(
+                        source,
+                        digest,
+                        label="mount mask source",
+                        maximum_bytes=(
+                            MAX_RUNTIME_PACKAGE_MEMBER_BYTES
+                            if runtime_package_mask
+                            else MAX_MASK_BYTES
+                        ),
+                    )
+                )
+                mask_descriptors.append(verified_mask_descriptor)
             mask_descriptor = verified_mask_descriptor
-            mask_descriptors.append(mask_descriptor)
             launcher_view = next(
                 item
                 for item in launcher_views
@@ -575,9 +677,13 @@ def _launch_verified_command(
                     "snapshot_fd": mask_descriptor,
                     "size": verified_mask_stat.st_size,
                     "digest": digest,
+                    "mode": verified_mask_stat.st_mode & 0o7777,
                 }
             )
-        wrapper_command.extend(("--", *command))
+        launch_command = list(command)
+        if runtime_package_mask:
+            launch_command[0] = str(RUNTIME_PACKAGE_EXECUTABLE)
+        wrapper_command.extend(("--", *launch_command))
         payload_descriptor = _sealed_payload_descriptor(
             {
                 "schema_version": "abyss_stack_external_codex_mount_launcher_v1",
@@ -615,6 +721,7 @@ def _launch_verified_command(
                 gate_read_fd,
                 gate_write_fd,
                 *mask_descriptors,
+                *((mount_descriptor,) if mount_descriptor >= 0 else ()),
                 *((workspace_fd,) if workspace_fd is not None else ()),
             ),
         )
@@ -642,6 +749,8 @@ def _launch_verified_command(
         raise
     finally:
         os.close(descriptor)
+        if mount_descriptor >= 0:
+            os.close(mount_descriptor)
         os.close(wrapper_descriptor)
         os.close(launcher_descriptor)
         os.close(python_descriptor)
@@ -1059,6 +1168,7 @@ def _arguments(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--mount-wrapper")
     parser.add_argument("--mount-wrapper-digest")
     parser.add_argument("--mount-launcher-digest")
+    parser.add_argument("--runtime-package-mask", action="store_true")
     parser.add_argument("--workspace-fd", type=int)
     parser.add_argument("--workspace-coordinate")
     parser.add_argument(
@@ -1103,6 +1213,10 @@ def _arguments(argv: list[str]) -> argparse.Namespace:
         )
         not in {0, 3}
         or (arguments.read_only_mask and arguments.mount_wrapper is None)
+        or (
+            arguments.runtime_package_mask
+            and (arguments.mount_wrapper is None or not arguments.read_only_mask)
+        )
         or (arguments.private_directory_view and arguments.mount_wrapper is None)
         or (
             arguments.mount_wrapper is not None
@@ -1162,6 +1276,7 @@ def main(argv: list[str] | None = None) -> int:
                 mount_launcher_digest=arguments.mount_launcher_digest,
                 private_directory_views=arguments.private_directory_views,
                 read_only_masks=tuple(tuple(item) for item in arguments.read_only_mask),
+                runtime_package_mask=arguments.runtime_package_mask,
                 workspace_fd=arguments.workspace_fd,
                 workspace_coordinate=arguments.workspace_coordinate,
             )

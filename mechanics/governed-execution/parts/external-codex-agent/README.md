@@ -401,9 +401,12 @@ usage but does not fabricate the missing interrupted-attempt tokens.
 `aoa-external-actor-bind` is the normal non-starting physical binding leaf. It
 accepts already selected owner/SDK/model/runtime artifact paths, verifies the
 runtime-profile-pinned owner schema bytes, hashes the workspace, Codex binary,
-and every coordinate, writes one immutable `owner_contour` launch, and returns
-control to `aoa-agents`. Its workspace-HEAD binding uses exact system Git under
-a fixed minimal environment, never an ambient `PATH` resolution. It does not
+and every coordinate, verifies the selected runtime package root and its
+profile-pinned aggregate/member subject plus digest-bound identity/subjects
+sidecars, writes one immutable `owner_contour`
+launch, and returns control to `aoa-agents`. Its workspace-HEAD binding uses
+exact system Git under a fixed minimal environment, never an ambient `PATH`
+resolution. It does not
 detect an obligation, choose a role or
 model, form the owner execution request, or start the actor. `aoa-summon` then
 forms the separate semantic request and calls `preflight`, `start`, or
@@ -420,6 +423,21 @@ role for bounded eval, stats, or memo canaries. All listed aliases expose the
 same isolated projection posture as their corresponding generic read or write
 contour; the names preserve model-organ ABI and do not select a role, model,
 procedure, route, or acceptance outcome.
+
+`prepare_landing_study.py prepare-writers` is also package-bound: callers must
+provide one exact runtime package root, its digest-bound artifact identity and
+artifact subjects sidecars, and the selected `bin/codex` executable. The
+preparer validates those coordinates against the runtime profile and emits the
+same `runtime_package` binding on every transport-study writer launch. Reviewer
+preparation forwards that package and the writer's exact runtime-profile
+coordinate unchanged.
+
+At process containment, the admitted host `package_root` is verification input,
+not the execution coordinate. The supervisor materializes the complete package
+view in the private runtime-owned
+`/var/tmp/aoa-external-actor-runtime-package` tmpfs and launches `bin/codex`
+from that coordinate, so a same-UID rename or replacement of the host package
+root cannot redirect package-relative helper lookup after mount setup.
 
 `prepare_landing_study.py prepare-reviewer` is the canonical non-starting
 review preparation path for both historical transport-study writers and admitted
@@ -489,13 +507,13 @@ For MCP-bearing read roles, the installed CLI removes the real owner bearer
 from its exec-time environment during one clean re-exec, carries the exact
 bytes through a bounded sealed descriptor, and injects them only through an
 attempt-local loopback relay. For MCP-bearing roles the runtime explicitly
-enables Codex 0.147's `mcp_2026_07_28` client mode. The relay admits only an
+enables Codex 0.148's `mcp_2026_07_28` client mode. The relay admits only an
 already-modern `2026-07-28` request and preserves that exact version on the
 authenticated upstream hop; it does not relabel legacy client traffic. Codex sees
 only a random, expiring proxy path and
 no bearer environment variable; actor filesystem permissions deny `/proc`,
 while the controller retains host PID coordinates for exact lifecycle and
-cleanup receipts. The model-issued commands still run under the Codex 0.147
+cleanup receipts. The model-issued commands still run under the Codex 0.148
 bubblewrap backend with legacy Landlock fallback explicitly disabled. The
 runtime does not claim exhaustive path-alias classification from command events
 that omit effective working directory. Streaming MCP events are forwarded

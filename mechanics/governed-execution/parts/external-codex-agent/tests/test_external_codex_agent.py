@@ -41,6 +41,7 @@ from aoa_sdk.contracts.control_plane import (
 from aoa_sdk.control_plane import (
     ContinuationObligation,
     IncarnationPermissionPosture,
+    IncarnationRuntimeSubject,
     IncarnationStopCondition,
     IncarnationToolProfile,
     IncarnationUsageMetering,
@@ -70,6 +71,9 @@ PLAN_FIXTURE = (
     / "a2a-eval-only.run-plan.json"
 )
 PROFILE_PATH = PART_ROOT / "runtime-profile.v1.json"
+PROFILE = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+RUNTIME_VERSION = PROFILE["model_admission"]["runtime_version"]
+RUNTIME_SUBJECT = PROFILE["model_admission"]["runtime_subject"]
 REPORT_SCHEMA_PATH = PART_ROOT / "schemas/external-codex-report.schema.json"
 SUMMON_REQUEST_SCHEMA_PATH = (
     SDK_ROOT / "mechanics/checkpoint/parts/child-task-reentry/schemas/"
@@ -208,9 +212,10 @@ def _write_model_realization(
                 },
                 "runtime": {
                     "product": "codex-cli",
-                    "version": "0.147.0",
+                    "version": RUNTIME_VERSION,
                     "transport": "exec-jsonl",
                     "model_slug": "gpt-5.6-luna",
+                    "runtime_subject": RUNTIME_SUBJECT,
                 },
                 "reasoning_effort": "max",
                 "tools": {
@@ -280,7 +285,7 @@ from pathlib import Path
 
 args = sys.argv[1:]
 if args == ["--version"]:
-    print("codex-cli 0.147.0")
+    print("codex-cli __RUNTIME_VERSION__")
     raise SystemExit(0)
 if args[:2] == ["login", "status"]:
     print("Logged in using ChatGPT", file=sys.stderr)
@@ -921,10 +926,112 @@ if "FAKE_TOKEN_OVERRUN" in task["objective"]:
 else:
     output.write_text(json.dumps(report) + "\n", encoding="utf-8")
     emit({"type": "turn.completed", "usage": usage})
-""",
+""".replace("__RUNTIME_VERSION__", RUNTIME_VERSION),
         encoding="utf-8",
     )
     path.chmod(0o755)
+
+
+def _runtime_package_fixture(tmp_path: Path, fake_codex: Path) -> dict[str, Any]:
+    package_root = (tmp_path / "runtime-package").resolve()
+    (package_root / "bin").mkdir(parents=True)
+    (package_root / "codex-path").mkdir()
+    (package_root / "codex-resources").mkdir()
+    (package_root / "bin/codex").write_bytes(fake_codex.read_bytes())
+    (package_root / "bin/codex").chmod(0o755)
+    true_bytes = Path("/usr/bin/true").read_bytes()
+    for relative_path in (
+        "bin/codex-code-mode-host",
+        "codex-path/rg",
+        "codex-resources/bwrap",
+    ):
+        member = package_root / relative_path
+        member.write_bytes(true_bytes)
+        member.chmod(0o755)
+    _write_json(
+        package_root / "codex-package.json",
+        {
+            "entrypoint": "bin/codex",
+            "layoutVersion": 1,
+            "pathDir": "codex-path",
+            "resourcesDir": "codex-resources",
+            "target": "x86_64-unknown-linux-musl",
+            "variant": "codex",
+            "version": RUNTIME_VERSION,
+        },
+    )
+    (package_root / "codex").symlink_to("bin/codex")
+    role_by_path = {
+        "bin/codex": "codex_cli_compat_entrypoint",
+        "bin/codex-code-mode-host": "codex_code_mode_host",
+        "codex-package.json": "package_manifest",
+        "codex-path/rg": "bundled_ripgrep",
+        "codex-resources/bwrap": "bundled_bubblewrap",
+    }
+    entries = [
+        {
+            "bytes": (package_root / relative_path).stat().st_size,
+            "path": relative_path,
+            "role": role,
+            "sha256": _digest_path(package_root / relative_path),
+            "sha256_hex": _digest_path(package_root / relative_path).removeprefix(
+                "sha256:"
+            ),
+        }
+        for relative_path, role in role_by_path.items()
+    ]
+    bundle_root = tmp_path / "runtime-artifact-bundle"
+    identity_path = bundle_root / "artifact.identity.json"
+    subjects_path = bundle_root / "artifact.subjects.json"
+    _write_json(
+        identity_path,
+        {
+            "artifact_class": "runtime_or_container_artifact",
+            "bundle_layout": "abyss_machine_artifact_bundle_v1",
+            "consumer_contract": {
+                "admission_gate": "fail_closed_consumer_admission",
+                "registry_required": True,
+                "stable_interface": RUNTIME_SUBJECT["source"],
+                "subject_store_required": True,
+            },
+            "owner_repo": "codex-cli-standalone",
+            "schema": "abyss_machine_artifact_identity_sidecar_v1",
+            "source_ref": (
+                f"codex-cli-standalone@{RUNTIME_VERSION}#{RUNTIME_SUBJECT['digest']}"
+            ),
+        },
+    )
+    _write_json(
+        subjects_path,
+        {
+            "aggregate_digest": RUNTIME.canonical_digest(entries),
+            "artifact_class": "runtime_or_container_artifact",
+            "bundle_layout": "abyss_machine_artifact_bundle_v1",
+            "files": entries,
+            "owner_repo": "codex-cli-standalone",
+            "path_basis": "repo_relative",
+            "schema": "abyss_machine_artifact_subjects_v1",
+        },
+    )
+    package_subject = {
+        "artifact_subjects_digest": RUNTIME.canonical_digest(entries),
+        "members": {
+            relative_path: _digest_path(package_root / relative_path)
+            for relative_path in role_by_path
+        },
+    }
+    return {
+        "package_root": str(package_root),
+        "artifact_identity": {
+            "path": str(identity_path.resolve()),
+            "digest": _digest_path(identity_path),
+        },
+        "artifact_subjects": {
+            "path": str(subjects_path.resolve()),
+            "digest": _digest_path(subjects_path),
+        },
+        "subject": package_subject,
+    }
 
 
 def _fixture_codex_preflight(
@@ -961,7 +1068,7 @@ def _fixture_codex_preflight(
             "codex_executable_drift", "fixture Codex executable digest changed"
         )
     return {
-        "version": "codex-cli 0.147.0",
+        "version": "codex-cli " + RUNTIME_VERSION,
         "auth_regime": "chatgpt_login",
         "model_slug": model_slug,
         "reasoning_effort": reasoning_effort,
@@ -969,6 +1076,55 @@ def _fixture_codex_preflight(
         "mount_wrapper_digest": _digest_path(RUNTIME.MOUNT_WRAPPER_PATH),
         "mount_launcher_digest": _digest_path(RUNTIME.MOUNT_LAUNCHER_PATH),
     }
+
+
+def test_model_realization_requires_exact_runtime_subject(tmp_path: Path) -> None:
+    realization_path = tmp_path / "model-realization.json"
+    _write_model_realization(realization_path, workspace_write=True)
+    realization = json.loads(realization_path.read_text(encoding="utf-8"))
+
+    assert RUNTIME._validate_model_realization_admission(
+        realization,
+        PROFILE["model_admission"],
+    ) == ("gpt-5.6-luna", "max")
+
+    realization["configuration"]["runtime"]["runtime_subject"] = {
+        **RUNTIME_SUBJECT,
+        "digest": "sha256:" + "0" * 64,
+    }
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME._validate_model_realization_admission(
+            realization,
+            PROFILE["model_admission"],
+        )
+
+    assert exc_info.value.code == "runtime_subject_unsupported"
+
+
+def test_owner_contour_preflight_rechecks_exact_runtime_package_inventory(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True, exact_preflight=True)
+    owner_request_path = fixture["owner_execution_request_path"]
+    assert owner_request_path is not None
+
+    preflight = fixture["runtime"].preflight(
+        fixture["launch_path"],
+        owner_request_path=owner_request_path,
+    )
+    assert preflight["admitted"] is True
+    package_host = (
+        Path(fixture["launch"]["runtime_package"]["package_root"])
+        / "bin/codex-code-mode-host"
+    )
+    package_host.write_bytes(b"runtime package drift\n")
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        fixture["runtime"].preflight(
+            fixture["launch_path"],
+            owner_request_path=owner_request_path,
+        )
+    assert exc_info.value.code == "runtime_package_subject_invalid"
 
 
 def _adapt_plan(
@@ -1738,7 +1894,8 @@ def _fixture(
             "schema_version": "aoa_model_fit_query_v1",
             "task_family": "landing",
             "runtime_product": "codex-cli",
-            "runtime_version": "0.147.0",
+            "runtime_version": RUNTIME_VERSION,
+            "runtime_subject": RUNTIME_SUBJECT,
             "reasoning_effort": "max",
             "sandbox_mode": "workspace-write" if workspace_write else "read-only",
             "required_tools": [
@@ -1755,6 +1912,7 @@ def _fixture(
             "fit_evidence_refs": [model_fit_projection_ref.model_dump(mode="json")],
             "model_slug": "gpt-5.6-luna",
             "reasoning_effort": "max",
+            "runtime_subject": RUNTIME_SUBJECT,
             "sandbox_mode": fit_query["sandbox_mode"],
             "lifecycle_state": "declared",
             "projection_posture": "candidate",
@@ -1930,6 +2088,24 @@ def _fixture(
         ),
         schema_version="abyss_stack_external_codex_task_v1",
     )
+    fake_codex = tmp_path / "fake-codex"
+    _fake_codex(fake_codex)
+    runtime_package = _runtime_package_fixture(tmp_path, fake_codex)
+    runtime_package_subject = (
+        runtime_package["subject"] if runtime_package is not None else None
+    )
+    if runtime_package is not None:
+        runtime_package = {
+            key: value for key, value in runtime_package.items() if key != "subject"
+        }
+    runtime_profile_path = PROFILE_PATH
+    if runtime_package_subject is not None:
+        runtime_profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+        runtime_profile["model_admission"]["runtime_package_subject"] = (
+            runtime_package_subject
+        )
+        runtime_profile_path = tmp_path / "fixture-runtime-profile.json"
+        _write_json(runtime_profile_path, runtime_profile)
     plan = _adapt_plan(
         task_ref=task_ref,
         summon_request_ref=summon_request_ref,
@@ -1965,6 +2141,21 @@ def _fixture(
         plan = plan.model_copy(
             update={
                 "scenario_binding": mixed_scenario,
+                "plan_digest": ZERO_DIGEST,
+            }
+        )
+        plan = plan.model_copy(
+            update={"plan_digest": canonical_digest(plan, exclude={"plan_digest"})}
+        )
+    if runtime_profile_path != PROFILE_PATH:
+        fixture_runtime_profile = load_abyss_stack_external_codex_runtime_profile(
+            runtime_profile_path
+        )
+        plan = plan.model_copy(
+            update={
+                "runtime_profile": fixture_runtime_profile.model_copy(
+                    update={"constraint_refs": plan.runtime_profile.constraint_refs}
+                ),
                 "plan_digest": ZERO_DIGEST,
             }
         )
@@ -2141,6 +2332,7 @@ def _fixture(
                 digest=fit_query_result["result_digest"],
             ),
             model_fit_projection_ref=model_fit_projection_ref,
+            runtime_subject=IncarnationRuntimeSubject(**RUNTIME_SUBJECT),
         )
     if owner_binding_v1 or not owner_contour:
         binding = build_agent_incarnation_binding(plan, **binding_kwargs)
@@ -2156,8 +2348,11 @@ def _fixture(
             owner_request_binding_path,
             owner_request_binding.model_dump(mode="json"),
         )
-    fake_codex = tmp_path / "fake-codex"
-    _fake_codex(fake_codex)
+    launch_codex = (
+        Path(runtime_package["package_root"]) / "bin/codex"
+        if runtime_package is not None
+        else fake_codex.resolve()
+    )
     codex_home = tmp_path / "codex-home"
     codex_home.mkdir()
     launch = {
@@ -2183,8 +2378,8 @@ def _fixture(
         },
         "task": {"path": str(task_path), "digest": _digest_path(task_path)},
         "runtime_profile": {
-            "path": str(PROFILE_PATH),
-            "digest": _digest_path(PROFILE_PATH),
+            "path": str(runtime_profile_path),
+            "digest": _digest_path(runtime_profile_path),
         },
         "role_contract": {"path": str(role_path), "digest": _digest_path(role_path)},
         "result_schema": {
@@ -2198,7 +2393,7 @@ def _fixture(
                     "digest": _digest_path(OWNER_EXECUTION_REQUEST_SCHEMA_PATH),
                     "owner_repo": "aoa-agents",
                     "artifact_ref": "skills/aoa-summon/references/summon-request-v4.schema.json",
-                    "source_ref": "4be21e25258128d36db80ce08b9f648495f22d0e",
+                    "source_ref": "5f3936e4bfd67ad33ea608a7d1d1b71a2092da79",
                     "schema_version": "summon-request-v4",
                 },
                 "task_local_dag_schema": {
@@ -2219,8 +2414,13 @@ def _fixture(
             "exact_baseline" if exact_baseline else "clean_required"
         ),
         "workspace_manifest_input_id": "workspace-manifest",
-        "codex_executable": str(fake_codex.resolve()),
-        "codex_executable_digest": _digest_path(fake_codex),
+        "codex_executable": str(launch_codex),
+        "codex_executable_digest": _digest_path(launch_codex),
+        **(
+            {"runtime_package": runtime_package}
+            if runtime_package is not None
+            else {}
+        ),
         "codex_home": str(codex_home),
         "environment_allowlist": ["HOME", "LANG", "PATH"],
         **(
@@ -2271,7 +2471,10 @@ def _fixture(
         )
         owner_execution_request_path = tmp_path / "owner-execution-request.json"
         _write_json(owner_execution_request_path, owner_execution_request)
-    runtime = RUNTIME.ExternalCodexRuntime(state_root or (tmp_path / "state"))
+    runtime = RUNTIME.ExternalCodexRuntime(
+        state_root or (tmp_path / "state"),
+        profile_path=runtime_profile_path,
+    )
     if not exact_preflight:
         runtime._codex_preflight = MethodType(  # type: ignore[method-assign]
             _fixture_codex_preflight,
@@ -2281,6 +2484,8 @@ def _fixture(
         "runtime": runtime,
         "launch_path": launch_path,
         "launch": launch,
+        "runtime_package_subject": runtime_package_subject,
+        "runtime_profile_path": runtime_profile_path,
         "binding_path": binding_path,
         "task_path": task_path,
         "role_path": role_path,
@@ -2810,10 +3015,21 @@ def test_supervisor_executes_verified_open_inode_after_path_replacement(
     )
     executable.chmod(0o700)
     expected_digest = _digest_path(executable)
-    original_open = SUPERVISOR._open_verified_executable
+    original_snapshot = SUPERVISOR._sealed_verified_file_snapshot
 
-    def replace_after_verified_open(path: str, digest: str) -> int:
-        descriptor = original_open(path, digest)
+    def replace_after_verified_snapshot(
+        path: str,
+        digest: str,
+        *,
+        label: str,
+        maximum_bytes: int,
+    ) -> tuple[int, os.stat_result]:
+        descriptor, observed = original_snapshot(
+            path,
+            digest,
+            label=label,
+            maximum_bytes=maximum_bytes,
+        )
         replacement = tmp_path / "replacement"
         replacement.write_text(
             "#!/usr/bin/python3\n"
@@ -2823,12 +3039,12 @@ def test_supervisor_executes_verified_open_inode_after_path_replacement(
         )
         replacement.chmod(0o700)
         replacement.replace(executable)
-        return descriptor
+        return descriptor, observed
 
     monkeypatch.setattr(
         SUPERVISOR,
-        "_open_verified_executable",
-        replace_after_verified_open,
+        "_sealed_verified_file_snapshot",
+        replace_after_verified_snapshot,
     )
 
     process, gate_write_fd = SUPERVISOR._launch_verified_command(
@@ -2888,6 +3104,71 @@ def test_supervisor_mount_wrapper_masks_target_before_releasing_command(
     assert process.wait(timeout=5) == 0
     assert output.read_text(encoding="utf-8") == sanitized.read_text(encoding="utf-8")
     assert target.read_text(encoding="utf-8") == "credential-marker\n"
+
+
+def test_supervisor_runtime_package_uses_private_coordinate_after_source_rename(
+    tmp_path: Path,
+) -> None:
+    fake_codex = tmp_path / "fake-codex"
+    fake_codex.write_text(
+        "#!/usr/bin/python3\n"
+        "import pathlib, sys\n"
+        "pathlib.Path(sys.argv[1]).write_text(sys.argv[0] + '\\n')\n",
+        encoding="utf-8",
+    )
+    fake_codex.chmod(0o755)
+    package = _runtime_package_fixture(tmp_path, fake_codex)
+    package_root = Path(package["package_root"])
+    binding = {
+        "package_root": str(package_root),
+        "members": package["subject"]["members"],
+    }
+    runtime_package_mask = RUNTIME._runtime_package_mask(binding)
+    source_executable = package_root / "bin/codex"
+    output = tmp_path / "observed-command-coordinate"
+    masks = tuple(
+        (
+            str(item["source"]),
+            str(item["target"]),
+            str(item["digest"]),
+        )
+        for item in runtime_package_mask["masks"]
+    )
+
+    def replace_source_package() -> None:
+        moved_root = tmp_path / "moved-runtime-package"
+        package_root.rename(moved_root)
+        (package_root / "bin").mkdir(parents=True)
+        replacement = package_root / "bin/codex"
+        replacement.write_text(
+            "#!/usr/bin/python3\n"
+            "import pathlib, sys\n"
+            "pathlib.Path(sys.argv[1]).write_text('replacement-path\\n')\n",
+            encoding="utf-8",
+        )
+        replacement.chmod(0o755)
+
+    process, gate_write_fd = SUPERVISOR._launch_verified_command(
+        [str(source_executable), str(output)],
+        _digest_path(source_executable),
+        mount_wrapper="/usr/bin/bwrap",
+        mount_wrapper_digest=_digest_path(Path("/usr/bin/bwrap")),
+        mount_launcher_digest=_digest_path(SUPERVISOR.MOUNT_LAUNCHER_PATH),
+        private_directory_views=tuple(
+            runtime_package_mask["private_directory_views"]
+        ),
+        read_only_masks=masks,
+        runtime_package_mask=True,
+        mount_setup_callback=replace_source_package,
+    )
+
+    assert gate_write_fd is not None
+    os.write(gate_write_fd, b"1")
+    os.close(gate_write_fd)
+    assert process.wait(timeout=5) == 0
+    assert output.read_text(encoding="utf-8") == (
+        str(SUPERVISOR.RUNTIME_PACKAGE_EXECUTABLE) + "\n"
+    )
 
 
 def test_supervisor_mount_mask_preserves_verified_bytes_after_source_mutation(
@@ -3322,6 +3603,7 @@ def test_preflight_rejects_path_replacement_after_controller_digest(
         actor_git_mask: Mapping[str, Any] | None = None,
         mount_wrapper_digest: str | None = None,
         mount_launcher_digest: str | None = None,
+        runtime_package_mask: Mapping[str, Any] | None = None,
     ) -> list[str]:
         if not replaced[0] and command[0] == fixture["launch"]["codex_executable"]:
             replacement = tmp_path / "replacement-codex"
@@ -3336,6 +3618,7 @@ def test_preflight_rejects_path_replacement_after_controller_digest(
             actor_git_mask=actor_git_mask,
             mount_wrapper_digest=mount_wrapper_digest,
             mount_launcher_digest=mount_launcher_digest,
+            runtime_package_mask=runtime_package_mask,
         )
 
     monkeypatch.setattr(runtime, "_containment_command", replace_before_supervisor_open)
@@ -3526,6 +3809,7 @@ def test_preflight_exercises_masked_nested_codex_sandbox(
         actor_git_mask: Mapping[str, Any] | None = None,
         mount_wrapper_digest: str | None = None,
         mount_launcher_digest: str | None = None,
+        runtime_package_mask: Mapping[str, Any] | None = None,
     ) -> list[str]:
         if actor_git_mask is not None:
             execution_root = Path(command[command.index("-C") + 1])
@@ -3547,6 +3831,7 @@ def test_preflight_exercises_masked_nested_codex_sandbox(
             actor_git_mask=actor_git_mask,
             mount_wrapper_digest=mount_wrapper_digest,
             mount_launcher_digest=mount_launcher_digest,
+            runtime_package_mask=runtime_package_mask,
         )
 
     monkeypatch.setattr(runtime, "_containment_command", observe_containment)
@@ -3804,7 +4089,7 @@ def test_preflight_and_separate_process_return_structured_result(
     assert preflight["admitted"] is True
     assert preflight["model_slug"] == "gpt-5.6-luna"
     assert preflight["reasoning_effort"] == "max"
-    assert preflight["preflight"]["version"] == "codex-cli 0.147.0"
+    assert preflight["preflight"]["version"] == "codex-cli " + RUNTIME_VERSION
     assert preflight["preflight"]["auth_regime"] == "chatgpt_login"
     assert preflight["preflight"]["executable_digest"] == (
         fixture["launch"]["codex_executable_digest"]
@@ -3864,8 +4149,9 @@ def test_preflight_and_separate_process_return_structured_result(
     assert argv[argv.index("--mount-wrapper") + 1] == "/usr/bin/bwrap"
     assert "--workspace-fd" in argv
     assert argv[argv.index("--workspace-coordinate") + 1] == str(ACTOR_EXECUTION_ROOT)
-    assert "--private-directory-view" not in argv
-    assert "--read-only-mask" not in argv
+    assert "--private-directory-view" in argv
+    assert "--read-only-mask" in argv
+    assert "--runtime-package-mask" in argv
     assert "/usr/bin/unshare" not in argv
     assert "/usr/bin/setpriv" not in argv
     assert "exec" in argv
@@ -5070,7 +5356,7 @@ def test_cli_brokers_mcp_credential_outside_process_environments_and_denies_proc
             "--state-root",
             str(fixture["runtime"].state_root),
             "--profile",
-            str(PROFILE_PATH),
+            str(fixture["runtime_profile_path"]),
             "--launch",
             str(fixture["launch_path"]),
         ],
@@ -5384,7 +5670,10 @@ def test_reviewer_preparation_forwards_exact_writer_evidence_without_starting(
     retired_source = tmp_path / "retired-writer-source"
     fixture["workspace"].rename(retired_source)
     assert not fixture["workspace"].exists()
-    reviewer_runtime = RUNTIME.ExternalCodexRuntime(reviewer_state_root)
+    reviewer_runtime = RUNTIME.ExternalCodexRuntime(
+        reviewer_state_root,
+        profile_path=fixture["runtime_profile_path"],
+    )
     assert (
         reviewer_runtime.preflight(Path(preparation["launch_path"]))["admitted"] is True
     )
@@ -5601,9 +5890,7 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
     assert reviewer_launch["workspace_manifest_input_id"] == (
         "review-workspace-manifest"
     )
-    assert reviewer_launch["runtime_profile"] == PREPARER._artifact_coordinate(
-        PREPARER.PROFILE_PATH
-    )
+    assert reviewer_launch["runtime_profile"] == fixture["launch"]["runtime_profile"]
     assert (
         reviewer_binding["runtime_profile_ref"]
         == reviewer_plan["runtime_profile"]["provenance"]
@@ -5672,7 +5959,10 @@ def test_repo_mutation_writer_enters_explicit_read_only_review_and_a2a_return(
         "review-workspace-manifest",
     }.issubset(reviewer_input_ids)
 
-    reviewer_runtime = RUNTIME.ExternalCodexRuntime(runtime.state_root)
+    reviewer_runtime = RUNTIME.ExternalCodexRuntime(
+        runtime.state_root,
+        profile_path=fixture["runtime_profile_path"],
+    )
     assert reviewer_runtime.preflight(reviewer_launch_path)["admitted"] is True
     reviewer_runtime.start(reviewer_launch_path)
     reviewer_session_id = preparation["reviewer_session_id"]
@@ -6011,14 +6301,40 @@ def test_owner_contour_requires_separate_semantic_admission(tmp_path: Path) -> N
     assert exc_info.value.code == "owner_contour_admission_unbound"
 
 
+def test_transport_study_requires_runtime_package(tmp_path: Path) -> None:
+    fixture = _fixture(tmp_path)
+    launch = json.loads(fixture["launch_path"].read_text(encoding="utf-8"))
+    launch.pop("runtime_package")
+    _write_json(fixture["launch_path"], launch)
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        fixture["runtime"].preflight(fixture["launch_path"])
+
+    assert exc_info.value.code == "schema_validation_failed"
+
+
 @pytest.mark.skipif(
     not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
     or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file(),
     reason="paired owner-contour proof requires aoa-agents and aoa-skills source roots",
 )
-def test_neutral_binder_reproduces_exact_owner_contour_launch(tmp_path: Path) -> None:
+def test_neutral_binder_reproduces_exact_owner_contour_launch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     fixture = _fixture(tmp_path / "fixture", owner_contour=True)
     launch = fixture["launch"]
+    profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+    profile["model_admission"]["runtime_package_subject"] = fixture[
+        "runtime_package_subject"
+    ]
+    fixture_profile_path = tmp_path / "fixture-runtime-profile.json"
+    _write_json(fixture_profile_path, profile)
+    monkeypatch.setattr(BINDER, "PROFILE_PATH", fixture_profile_path)
+    launch["runtime_profile"] = {
+        "path": str(fixture_profile_path),
+        "digest": _digest_path(fixture_profile_path),
+    }
     manifest = {
         "schema_version": "abyss_stack_external_actor_launch_manifest_v1",
         "launch_id": launch["launch_id"],
@@ -6034,6 +6350,15 @@ def test_neutral_binder_reproduces_exact_owner_contour_launch(tmp_path: Path) ->
         "workspace_initial_posture": launch["workspace_initial_posture"],
         "workspace_manifest_input_id": launch["workspace_manifest_input_id"],
         "codex_executable": launch["codex_executable"],
+        "runtime_package": {
+            "package_root": launch["runtime_package"]["package_root"],
+            "artifact_identity": launch["runtime_package"]["artifact_identity"][
+                "path"
+            ],
+            "artifact_subjects": launch["runtime_package"]["artifact_subjects"][
+                "path"
+            ],
+        },
         "codex_home": launch["codex_home"],
         "environment_allowlist": launch["environment_allowlist"],
     }
@@ -13173,6 +13498,18 @@ def _parent_reentry_obligation(
     child_realization["configuration"]["reasoning_effort"] = "max"
     parent_realization_path = tmp_path / "parent-sol-realization.json"
     _write_json(parent_realization_path, child_realization)
+    if fixture["launch"].get("runtime_package") is not None:
+        parent_package = dict(fixture["launch"]["runtime_package"])
+        parent_executable = Path(parent_package["package_root"]) / "bin/codex"
+    else:
+        generated_package = _runtime_package_fixture(
+            tmp_path / "parent-runtime-package",
+            Path(fixture["launch"]["codex_executable"]),
+        )
+        parent_package = {
+            key: value for key, value in generated_package.items() if key != "subject"
+        }
+        parent_executable = Path(parent_package["package_root"]) / "bin/codex"
     obligation = {
         "schema_version": "abyss_stack_external_codex_parent_obligation_v1",
         "reentry_id": reentry_id,
@@ -13198,8 +13535,9 @@ def _parent_reentry_obligation(
             "artifact_digest": _digest_path(fixture["binding_path"]),
         },
         "parent_workspace": str(fixture["workspace"].resolve()),
-        "codex_executable": fixture["launch"]["codex_executable"],
-        "codex_executable_digest": fixture["launch"]["codex_executable_digest"],
+        "codex_executable": str(parent_executable),
+        "codex_executable_digest": _digest_path(parent_executable),
+        "runtime_package": parent_package,
         "codex_home": fixture["launch"]["codex_home"],
         "return_owner": "fixture-target",
         "expected_wake_condition_id": "authority-needed",
@@ -13225,6 +13563,62 @@ def _parent_reentry_obligation(
     return obligation_path
 
 
+def _parent_bridge(
+    tmp_path: Path,
+    fixture: dict[str, Any],
+    obligation_path: Path,
+) -> Any:
+    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    obligation = json.loads(obligation_path.read_text(encoding="utf-8"))
+    subjects = json.loads(
+        Path(obligation["runtime_package"]["artifact_subjects"]["path"]).read_text(
+            encoding="utf-8"
+        )
+    )
+    bridge.profile["model_admission"]["runtime_package_subject"] = {
+        "artifact_subjects_digest": subjects["aggregate_digest"],
+        "members": {
+            entry["path"]: entry["sha256"] for entry in subjects["files"]
+        },
+    }
+    return bridge
+
+
+def test_parent_reentry_requires_exact_admitted_runtime_subject(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path / "child",
+        role_id="architect",
+        task_family="landing_ambiguity_stop",
+        identity_suffix="parent-runtime-subject-drift",
+    )
+    obligation_path = _parent_reentry_obligation(
+        tmp_path,
+        fixture,
+        reentry_id="reentry:fixture:parent-runtime-subject-drift",
+    )
+    obligation = json.loads(obligation_path.read_text(encoding="utf-8"))
+    parent_realization_path = Path(
+        obligation["parent_model_realization_ref"]["artifact_ref"]
+    )
+    parent_realization = json.loads(parent_realization_path.read_text(encoding="utf-8"))
+    parent_realization["configuration"]["runtime"]["runtime_subject"] = {
+        **RUNTIME_SUBJECT,
+        "digest": "sha256:" + "0" * 64,
+    }
+    _write_json(parent_realization_path, parent_realization)
+    obligation["parent_model_realization_ref"]["artifact_digest"] = _digest_path(
+        parent_realization_path
+    )
+    _write_json(obligation_path, obligation)
+
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        bridge.yield_parent(obligation_path)
+    assert exc_info.value.code == "reentry_parent_realization_invalid"
+
+
 def test_parent_inference_yields_and_exact_authority_event_reenters_same_thread(
     tmp_path: Path,
 ) -> None:
@@ -13238,7 +13632,7 @@ def test_parent_inference_yields_and_exact_authority_event_reenters_same_thread(
     obligation_path = _parent_reentry_obligation(
         tmp_path, fixture, reentry_id=reentry_id
     )
-    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
 
     yielded = bridge.yield_parent(obligation_path)["state"]
     assert yielded["status"] == "waiting"
@@ -13297,7 +13691,7 @@ def test_parent_reentry_accepts_exact_legacy_v3_owner_receipt_after_upgrade(
         fixture,
         reentry_id=reentry_id,
     )
-    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
     bridge.yield_parent(obligation_path)
     assert fixture["runtime"].run_to_terminal(
         fixture["launch_path"],
@@ -13333,7 +13727,7 @@ def test_parent_reentry_rejects_substituted_child_owner_request_identity(
         fixture,
         reentry_id=reentry_id,
     )
-    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
     bridge.yield_parent(obligation_path)
     assert fixture["runtime"].run_to_terminal(fixture["launch_path"])["status"] == (
         "authority_blocked"
@@ -13373,7 +13767,7 @@ def test_parent_turn_disables_tools_before_inference_and_isolates_home(
         reentry_id="reentry:fixture:parent-passive",
     )
     obligation = json.loads(obligation_path.read_text(encoding="utf-8"))
-    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
     _, _, realization = bridge._validate_obligation(obligation)
     scratch = tmp_path / "parent-scratch"
     scratch.mkdir()
@@ -13424,7 +13818,7 @@ def test_parent_yield_rejects_any_tool_event(tmp_path: Path) -> None:
     obligation_path = _parent_reentry_obligation(
         tmp_path, fixture, reentry_id=reentry_id
     )
-    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
 
     with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
         bridge.yield_parent(obligation_path)
@@ -13447,7 +13841,7 @@ def test_parent_reentry_recovers_admitted_snapshot_without_live_child_result(
     obligation_path = _parent_reentry_obligation(
         tmp_path, fixture, reentry_id=reentry_id
     )
-    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
     bridge.yield_parent(obligation_path)
     assert fixture["runtime"].run_to_terminal(fixture["launch_path"])["status"] == (
         "authority_blocked"
@@ -13514,7 +13908,7 @@ def test_parent_reentry_recovers_started_event_before_state_save(
     obligation_path = _parent_reentry_obligation(
         tmp_path, fixture, reentry_id=reentry_id
     )
-    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
     bridge.yield_parent(obligation_path)
     assert fixture["runtime"].run_to_terminal(fixture["launch_path"])["status"] == (
         "authority_blocked"
@@ -13571,7 +13965,7 @@ def test_parent_yield_retries_from_durable_state_without_rewriting_partial_attem
     obligation_path = _parent_reentry_obligation(
         tmp_path, fixture, reentry_id=reentry_id
     )
-    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
     original_run_parent_turn = bridge._run_parent_turn
     partial_attempt = (
         bridge._reentry_dir(reentry_id) / "turns" / "001-yield-attempt-001"
@@ -13626,7 +14020,7 @@ def test_parent_yield_recovers_completed_turn_event_without_second_inference(
     obligation_path = _parent_reentry_obligation(
         tmp_path, fixture, reentry_id=reentry_id
     )
-    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
     original_save_state = bridge._save_state
     dropped_yielded_save = False
 
@@ -13687,7 +14081,7 @@ def test_parent_reentry_resumes_after_crash_before_turn_materialization(
     obligation_path = _parent_reentry_obligation(
         tmp_path, fixture, reentry_id=reentry_id
     )
-    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
     bridge.yield_parent(obligation_path)
     assert fixture["runtime"].run_to_terminal(fixture["launch_path"])["status"] == (
         "authority_blocked"
@@ -13739,7 +14133,7 @@ def test_parent_reentry_recovers_completed_turn_artifacts_without_second_inferen
     obligation_path = _parent_reentry_obligation(
         tmp_path, fixture, reentry_id=reentry_id
     )
-    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
     bridge.yield_parent(obligation_path)
     assert fixture["runtime"].run_to_terminal(fixture["launch_path"])["status"] == (
         "authority_blocked"
@@ -13793,7 +14187,7 @@ def test_parent_admits_child_event_while_canonical_child_lock_is_held(
     obligation_path = _parent_reentry_obligation(
         tmp_path, fixture, reentry_id=reentry_id
     )
-    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
     bridge.yield_parent(obligation_path)
     assert fixture["runtime"].run_to_terminal(fixture["launch_path"])["status"] == (
         "authority_blocked"
@@ -13844,7 +14238,7 @@ def test_parent_reentry_rejects_standalone_child_result_without_runtime_state(
     obligation_path = _parent_reentry_obligation(
         tmp_path, fixture, reentry_id=reentry_id
     )
-    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
     bridge.yield_parent(obligation_path)
     assert fixture["runtime"].run_to_terminal(fixture["launch_path"])["status"] == (
         "authority_blocked"
@@ -13881,7 +14275,7 @@ def test_parent_reentry_recovers_valid_event_appended_before_state_save(
     obligation_path = _parent_reentry_obligation(
         tmp_path, fixture, reentry_id=reentry_id
     )
-    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
     waiting = bridge.yield_parent(obligation_path)["state"]
     old_digest = waiting["events_ref"]["artifact_digest"]
     bridge._append_event(
@@ -13912,7 +14306,7 @@ def test_parent_reentry_status_uses_transition_lock(
     obligation_path = _parent_reentry_obligation(
         tmp_path, fixture, reentry_id=reentry_id
     )
-    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
     bridge.yield_parent(obligation_path)
     original_lock = bridge._lock
     lock_entries = 0
@@ -13945,7 +14339,7 @@ def test_parent_reentry_recovers_completed_semantic_state_after_event_append(
     obligation_path = _parent_reentry_obligation(
         tmp_path, fixture, reentry_id=reentry_id
     )
-    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
     bridge.yield_parent(obligation_path)
     assert fixture["runtime"].run_to_terminal(fixture["launch_path"])["status"] == (
         "authority_blocked"
@@ -13982,7 +14376,7 @@ def test_non_parent_child_event_is_filtered_without_second_sol_turn(
     obligation_path = _parent_reentry_obligation(
         tmp_path, fixture, reentry_id=reentry_id
     )
-    bridge = RUNTIME.ExternalCodexParentReentry(tmp_path / "reentry-state")
+    bridge = _parent_bridge(tmp_path, fixture, obligation_path)
     bridge.yield_parent(obligation_path)
 
     child_terminal = fixture["runtime"].run_to_terminal(fixture["launch_path"])

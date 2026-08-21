@@ -277,8 +277,22 @@ Before launch the controller verifies:
    identities match across their owner objects;
 4. task correlation, continuation, and expected incarnation IDs match the
    binding without relying on filenames;
-5. the model realization names Codex CLI `0.147.0`, ChatGPT quota/login,
-   `exec-jsonl`, one admitted model/effort, and the exact runtime tool profile;
+5. the model realization names Codex CLI `0.148.0`, ChatGPT quota/login,
+   `exec-jsonl`, one admitted model/effort, the exact content-addressed runtime
+   subject admitted by the runtime profile, and the exact runtime tool profile;
+   every launch class carries the runtime package root plus digest-bound
+   artifact identity and subjects sidecars. The controller checks
+   that inventory against the package manifest, executable, adjacent
+   `codex-code-mode-host`, bundled `rg`, and bundled `bwrap`; the profile pins
+   the subjects aggregate and every inventoried member digest. Those package
+   coordinates remain distinct from, and do not replace, the `aoa-models`
+   `runtime_subject` digest. The verified package inventory is then projected
+   into the runtime-owned `/var/tmp/aoa-external-actor-runtime-package`
+   coordinate as a descriptor-bound read-only private mount for the whole
+   process; the process executes `bin/codex` from that coordinate, separately
+   attached from the supervisor's verified executable descriptor. The admitted
+   host `package_root` is a verification source only and is never the live
+   package-relative execution coordinate;
 6. the resolved Codex executable digest, reported version, auth status, and
    bundled live model catalog match the binding;
 7. the exact profile-bound Linux subreaper supervisor and probe executable are
@@ -296,7 +310,8 @@ Before launch the controller verifies:
 11. the task carries the complete runtime-wide forbidden-effect set; terminal
     classification applies that same set independently of task input;
 12. `transport_study_fixture` is admitted only as bounded compatibility
-    evidence and may retain historical SDK incarnation binding v1 receipts.
+    evidence, still uses the exact runtime package admission and may retain
+    historical SDK incarnation binding v1 receipts.
     `owner_contour` additionally requires a separate exact `aoa-agents`
     `summon-request-v4`, validated against its runtime-profile-pinned owner
     bytes, plus SDK incarnation binding v2. Their obligation, mandate, exact
@@ -490,7 +505,7 @@ the old mount launcher into a pathname-race proof.
 
 On an unprivileged host, bubblewrap realizes this filesystem contour with a
 user namespace plus a mount namespace. It adds no outer PID or network
-namespace and no role authority. Codex 0.147 must still create its own inner
+namespace and no role authority. Codex 0.148 must still create its own inner
 bubblewrap/private-PID sandbox; failure to do so rejects the runtime contour.
 
 Semantic profiles admit only `read-only` or bounded `workspace-write` target
@@ -502,7 +517,7 @@ name and value from the runtime's exec-time environment, and carries the exact
 bytes in one bounded sealed descriptor. The runtime retains the recovered
 credential outside Codex and starts an
 attempt-local loopback proxy which injects it only while relaying to the fixed
-owner endpoint. The runtime explicitly enables Codex 0.147's
+owner endpoint. The runtime explicitly enables Codex 0.148's
 `mcp_2026_07_28` client mode for MCP-bearing roles. The proxy rejects absent,
 legacy, duplicate, or otherwise mismatched protocol-version headers and
 preserves the admitted exact `2026-07-28` version on the upstream hop; it does
@@ -576,7 +591,7 @@ Codex runs beneath a Linux supervisor that owns a separate process group but
 does not create an outer PID or network namespace. Inference adds only the
 rootless user+mount contour described above. Live proof must show that this
 still leaves Codex's own `codex-linux-sandbox`/bubblewrap namespace construction intact. The exact Codex
-0.147 invocation disables legacy Landlock fallback; for this bounded filesystem
+0.148 invocation disables legacy Landlock fallback; for this bounded filesystem
 posture that version requires bubblewrap. Model commands therefore run in its
 private PID and network namespaces, or the attempt fails rather than exposing
 the credential-bearing worker. Before it
@@ -1162,8 +1177,10 @@ decision.
 Parent re-entry is a separate runtime lifecycle, not ordinary child-session
 resume. `yield-parent` validates and privately materializes the exact parent
 obligation, child task, incarnation binding, role, model realization, and SDK
-schema bytes. Before inference it persists a v2 `yielding` state with the exact
-obligation and an empty event stream. Each retry uses a new numbered yield
+schema bytes, including the parent runtime package root and its profile-pinned
+aggregate/member subject. Before inference it persists a v2 `yielding` state
+with that exact obligation and an empty event stream. Each retry uses a new
+numbered yield
 attempt directory and preserves all incomplete predecessor bytes; a still-live
 prior supervisor blocks overlap. A durable complete `inference_yielded` event
 carries the exact turn delta, so append-before-state-save recovery advances to

@@ -20,7 +20,7 @@
     "probe_executable": "/usr/bin/true"
   },
   "codex_cli": {
-    "required_version": "codex-cli 0.147.0",
+    "required_version": "codex-cli 0.148.0",
     "ignore_user_config": true,
     "ignore_exec_rules": true,
     "multi_agent_enabled": false,
@@ -32,7 +32,22 @@
     "owner_repo": "aoa-models",
     "schema_version": "aoa_model_realization_v1",
     "runtime_product": "codex-cli",
-    "runtime_version": "0.147.0",
+    "runtime_version": "0.148.0",
+    "runtime_subject": {
+      "kind": "content_addressed_runtime_package",
+      "source": "codex-cli-standalone/x86_64-unknown-linux-musl+codex-code-mode-host",
+      "digest": "sha256:35cc6b0e4e5c527569807be8017b705f410f0c6c2b7a3fa1c6a5407d65889041"
+    },
+    "runtime_package_subject": {
+      "artifact_subjects_digest": "sha256:3a3797b5d9e2e15912fcad418302250150b96002251ee87658664d844e1af91e",
+      "members": {
+        "bin/codex": "sha256:ac2cfed85fb647d61e0150b8548102b330e4799d9d81ad5d354de701edf6b074",
+        "bin/codex-code-mode-host": "sha256:0c1776efc4f7acfd308e40d31749a4f2f876f94495dd28d511d0a8646f59970e",
+        "codex-package.json": "sha256:899bb78003e6720a12b74c0b30ef257399fa28be8f9d062bafccc85baaae41eb",
+        "codex-path/rg": "sha256:e62198eb19b136b88c330af83647b5a962cb99b6b1f066758568f12de1974849",
+        "codex-resources/bwrap": "sha256:77360cb751ccedc5971391444ac86a8a33c15b04d6b4a6fe45f5d25496e62c4c"
+      }
+    },
     "transport": "exec-jsonl",
     "auth_regime": "chatgpt_login",
     "billing_regime": "chatgpt_quota",
@@ -315,7 +330,7 @@
     "owner_execution_request_schema": {
       "owner_repo": "aoa-agents",
       "artifact_ref": "skills/aoa-summon/references/summon-request-v4.schema.json",
-        "source_ref": "4be21e25258128d36db80ce08b9f648495f22d0e",
+        "source_ref": "5f3936e4bfd67ad33ea608a7d1d1b71a2092da79",
         "digest": "sha256:d74656e318b3d1353a74c357a24918275b7dcf469f788dbceb53377c7385147e",
       "schema_version": "summon-request-v4"
     },

@@ -633,6 +633,10 @@
 
 - [ABYSS-STACK-D-0041 Source Hygiene Validator Module](../ABYSS-STACK-D-0041-source-hygiene-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0041-source-hygiene-validator-module.md`)
 
+## model admission
+
+- [ABYSS-STACK-D-0128 Exact Content-Addressed Runtime Subject Admission](../ABYSS-STACK-D-0128-exact-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0128-exact-runtime-subject-admission.md`)
+
 ## model-fit evidence
 
 - [ABYSS-STACK-D-0112 Require Evidence-Complete Owner-Contour Incarnations](../ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md) (`docs/decisions/ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md`)
@@ -893,6 +897,10 @@
 
 - [ABYSS-STACK-D-0086 Receipt-Bound SDK Routing Cutover](../ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md) (`docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md`)
 
+## runtime identity
+
+- [ABYSS-STACK-D-0128 Exact Content-Addressed Runtime Subject Admission](../ABYSS-STACK-D-0128-exact-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0128-exact-runtime-subject-admission.md`)
+
 ## runtime receipts
 
 - [ABYSS-STACK-D-0076 Repo-Self KAG Runtime Projections](../ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md) (`docs/decisions/ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md`)
@@ -965,6 +973,10 @@
 ## source/deployed parity
 
 - [ABYSS-STACK-D-0077 Loopback MCP Owner Lifecycle](../ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md`)
+
+## source/runtime separation
+
+- [ABYSS-STACK-D-0128 Exact Content-Addressed Runtime Subject Admission](../ABYSS-STACK-D-0128-exact-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0128-exact-runtime-subject-admission.md`)
 
 ## stale path hygiene
 

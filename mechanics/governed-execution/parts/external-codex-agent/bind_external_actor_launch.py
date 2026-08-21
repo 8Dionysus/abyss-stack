@@ -22,6 +22,7 @@ from external_codex_agent import (  # noqa: E402
     ExternalCodexRuntimeError,
     load_json,
     sha256_bytes,
+    validate_runtime_package_binding,
     validate_json,
 )
 
@@ -165,6 +166,52 @@ def bind(manifest_path: Path, output_path: Path) -> dict[str, Any]:
     codex = _regular(Path(manifest["codex_executable"]), "Codex executable")
     if codex.resolve() != codex:
         raise LaunchBindingError("Codex executable must already be resolved")
+    runtime_package_manifest = manifest["runtime_package"]
+    runtime_package_root = _directory(
+        Path(runtime_package_manifest["package_root"]),
+        "Codex runtime package",
+    )
+    runtime_package = {
+        "package_root": str(runtime_package_root),
+        "artifact_identity": {
+            "path": str(
+                _regular(
+                    Path(runtime_package_manifest["artifact_identity"]),
+                    "runtime package artifact identity",
+                )
+            ),
+            "digest": _digest(
+                Path(runtime_package_manifest["artifact_identity"])
+            ),
+        },
+        "artifact_subjects": {
+            "path": str(
+                _regular(
+                    Path(runtime_package_manifest["artifact_subjects"]),
+                    "runtime package artifact subjects",
+                )
+            ),
+            "digest": _digest(
+                Path(runtime_package_manifest["artifact_subjects"])
+            ),
+        },
+    }
+    executable_digest = _digest(codex)
+    try:
+        validate_runtime_package_binding(
+            runtime_package,
+            expected_runtime_subject=profile["model_admission"]["runtime_subject"],
+            expected_runtime_package_subject=profile["model_admission"][
+                "runtime_package_subject"
+            ],
+            expected_runtime_version=profile["model_admission"]["runtime_version"],
+            codex_executable=codex,
+            codex_executable_digest=executable_digest,
+        )
+    except ExternalCodexRuntimeError as exc:
+        raise LaunchBindingError(
+            f"runtime package is not the exact admitted Codex subject: {exc}"
+        ) from exc
     launch = {
         "schema_version": "abyss_stack_external_codex_launch_v1",
         "launch_id": manifest["launch_id"],
@@ -177,7 +224,8 @@ def bind(manifest_path: Path, output_path: Path) -> dict[str, Any]:
         "workspace_initial_posture": manifest["workspace_initial_posture"],
         "workspace_manifest_input_id": manifest["workspace_manifest_input_id"],
         "codex_executable": str(codex),
-        "codex_executable_digest": _digest(codex),
+        "codex_executable_digest": executable_digest,
+        "runtime_package": runtime_package,
         "codex_home": str(codex_home),
         "environment_allowlist": manifest["environment_allowlist"],
     }

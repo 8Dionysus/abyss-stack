@@ -592,6 +592,7 @@
 ## public-contract
 
 - [ABYSS-STACK-D-0126 Typed Visible Holder Closure Authorization](../ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md) (`docs/decisions/ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md`)
+- [ABYSS-STACK-D-0128 Exact Content-Addressed Runtime Subject Admission](../ABYSS-STACK-D-0128-exact-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0128-exact-runtime-subject-admission.md`)
 
 ## questbook
 
@@ -697,6 +698,10 @@
 ## runtime storage
 
 - [ABYSS-STACK-D-0082 Observability Bind State and Launcher Cgroup Boundary](../ABYSS-STACK-D-0082-observability-bind-state-and-launcher-cgroup-boundary.md) (`docs/decisions/ABYSS-STACK-D-0082-observability-bind-state-and-launcher-cgroup-boundary.md`)
+
+## runtime-profile
+
+- [ABYSS-STACK-D-0128 Exact Content-Addressed Runtime Subject Admission](../ABYSS-STACK-D-0128-exact-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0128-exact-runtime-subject-admission.md`)
 
 ## runtime/storage/federation
 

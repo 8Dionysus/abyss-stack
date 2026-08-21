@@ -69,12 +69,42 @@
     "model_admission": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["owner_repo", "schema_version", "runtime_product", "runtime_version", "transport", "auth_regime", "billing_regime", "allowed_lifecycle_states", "requires_live_catalog_match"],
+      "required": ["owner_repo", "schema_version", "runtime_product", "runtime_version", "runtime_subject", "runtime_package_subject", "transport", "auth_regime", "billing_regime", "allowed_lifecycle_states", "requires_live_catalog_match"],
       "properties": {
         "owner_repo": {"const": "aoa-models"},
         "schema_version": {"const": "aoa_model_realization_v1"},
         "runtime_product": {"const": "codex-cli"},
         "runtime_version": {"type": "string", "minLength": 1},
+        "runtime_subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "source", "digest"],
+          "properties": {
+            "kind": {"const": "content_addressed_runtime_package"},
+            "source": {"type": "string", "minLength": 1},
+            "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+          }
+        },
+        "runtime_package_subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["artifact_subjects_digest", "members"],
+          "properties": {
+            "artifact_subjects_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            "members": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["bin/codex", "bin/codex-code-mode-host", "codex-package.json", "codex-path/rg", "codex-resources/bwrap"],
+              "properties": {
+                "bin/codex": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+                "bin/codex-code-mode-host": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+                "codex-package.json": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+                "codex-path/rg": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+                "codex-resources/bwrap": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+              }
+            }
+          }
+        },
         "transport": {"const": "exec-jsonl"},
         "auth_regime": {"const": "chatgpt_login"},
         "billing_regime": {"const": "chatgpt_quota"},

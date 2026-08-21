@@ -4,7 +4,7 @@
   "title": "Non-semantic input manifest for one owner-contour launch binding",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "launch_id", "session_id", "artifacts", "owner_contract_paths", "workspace_path", "workspace_initial_posture", "workspace_manifest_input_id", "codex_executable", "codex_home", "environment_allowlist"],
+  "required": ["schema_version", "launch_id", "session_id", "artifacts", "owner_contract_paths", "workspace_path", "workspace_initial_posture", "workspace_manifest_input_id", "codex_executable", "runtime_package", "codex_home", "environment_allowlist"],
   "properties": {
     "schema_version": {"const": "abyss_stack_external_actor_launch_manifest_v1"},
     "launch_id": {"type": "string", "minLength": 1},
@@ -36,6 +36,16 @@
     "workspace_initial_posture": {"enum": ["clean_required", "exact_baseline"]},
     "workspace_manifest_input_id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "maxLength": 96},
     "codex_executable": {"$ref": "#/$defs/path"},
+    "runtime_package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package_root", "artifact_identity", "artifact_subjects"],
+      "properties": {
+        "package_root": {"$ref": "#/$defs/path"},
+        "artifact_identity": {"$ref": "#/$defs/path"},
+        "artifact_subjects": {"$ref": "#/$defs/path"}
+      }
+    },
     "codex_home": {"$ref": "#/$defs/path"},
     "environment_allowlist": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["HOME", "LANG", "LC_ALL", "PATH", "SSL_CERT_FILE", "SSL_CERT_DIR", "TERM"]}}
   },

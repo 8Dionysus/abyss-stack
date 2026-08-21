@@ -4,7 +4,7 @@
   "title": "Exact delivery binding for one external Codex incarnation",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "launch_id", "session_id", "admission_class", "plan", "incarnation_binding", "model_realization", "task", "runtime_profile", "role_contract", "result_schema", "workspace_path", "workspace_expected_head", "workspace_initial_posture", "workspace_manifest_input_id", "codex_executable", "codex_executable_digest", "codex_home", "environment_allowlist"],
+  "required": ["schema_version", "launch_id", "session_id", "admission_class", "plan", "incarnation_binding", "model_realization", "task", "runtime_profile", "role_contract", "result_schema", "workspace_path", "workspace_expected_head", "workspace_initial_posture", "workspace_manifest_input_id", "codex_executable", "codex_executable_digest", "runtime_package", "codex_home", "environment_allowlist"],
   "properties": {
     "schema_version": {"const": "abyss_stack_external_codex_launch_v1"},
     "launch_id": {"type": "string", "minLength": 1},
@@ -35,6 +35,16 @@
     },
     "codex_executable": {"type": "string", "pattern": "^/"},
     "codex_executable_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "runtime_package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package_root", "artifact_identity", "artifact_subjects"],
+      "properties": {
+        "package_root": {"type": "string", "pattern": "^/"},
+        "artifact_identity": {"$ref": "#/$defs/artifactCoordinate"},
+        "artifact_subjects": {"$ref": "#/$defs/artifactCoordinate"}
+      }
+    },
     "codex_home": {"type": "string", "pattern": "^/"},
     "environment_allowlist": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["HOME", "LANG", "LC_ALL", "PATH", "SSL_CERT_FILE", "SSL_CERT_DIR", "TERM"]}}
   },
@@ -45,7 +55,7 @@
         "required": ["admission_class"]
       },
       "then": {
-        "required": ["owner_execution_request_schema", "task_local_dag_schema"]
+        "required": ["owner_execution_request_schema", "task_local_dag_schema", "runtime_package"]
       },
       "else": {
         "not": {
