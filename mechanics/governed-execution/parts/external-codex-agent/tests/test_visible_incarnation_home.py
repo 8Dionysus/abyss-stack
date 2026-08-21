@@ -1134,7 +1134,6 @@ def test_detached_launch_publishes_socket_only_binding(
     executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     executable.chmod(0o700)
     holder_path = tmp_path / "holder.json"
-    holder_path.write_text("{}", encoding="utf-8")
     context_path = tmp_path / "context.json"
     state_root = tmp_path / "state"
     state_root.mkdir()
@@ -1196,9 +1195,15 @@ def test_detached_launch_publishes_socket_only_binding(
         "_load_holder_receipt",
         lambda _path: {"binding": binding, "holder": binding["holder"]},
     )
+    monkeypatch.setattr(
+        MODULE,
+        "_validate_visible_launch_receipt",
+        lambda **kwargs: kwargs["receipt"],
+    )
     captured: dict[str, object] = {}
 
     def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        holder_path.write_text("published", encoding="utf-8")
         captured["argv"] = argv
         captured["kwargs"] = kwargs
         return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
@@ -2817,6 +2822,27 @@ def test_status_is_read_only_and_writes_only_safe_projection(
         assert stat.S_IMODE(
             Path(terminal["control_socket"]["path"]).stat().st_mode
         ) == before_mode == 0o600
+    finally:
+        listener.close()
+
+
+def test_status_sanitizes_allowed_binding_strings_before_echoing(
+    tmp_path: Path,
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    binding["goal_ref"] = "goal:credential=hunter2"
+    terminal["title"] = "password=hunter2"
+    try:
+        projection, _state = MODULE._observe_terminal_binding(
+            binding=binding,
+            holder=holder,
+            terminal=terminal,
+            kitty_executable="/usr/bin/kitty",
+        )
+        rendered = json.dumps(projection, sort_keys=True)
+        assert "hunter2" not in rendered
+        assert projection["binding"]["goal_ref"] == "goal:credential=<redacted>"
+        assert projection["terminal"]["title"] == "password=<redacted>"
     finally:
         listener.close()
 

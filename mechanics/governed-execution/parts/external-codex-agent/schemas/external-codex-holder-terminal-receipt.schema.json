@@ -75,11 +75,13 @@
     "controlSocket": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["address", "path", "mode"],
+      "required": ["address", "path", "mode", "device", "inode"],
       "properties": {
         "address": {"type": "string", "pattern": "^unix:/"},
         "path": {"type": "string", "pattern": "^/"},
-        "mode": {"type": "integer", "minimum": 0, "maximum": 511}
+        "mode": {"type": "integer", "minimum": 0, "maximum": 511},
+        "device": {"type": "integer", "minimum": 1},
+        "inode": {"type": "integer", "minimum": 1}
       }
     },
     "processIdentity": {
@@ -96,6 +98,7 @@
       "additionalProperties": false,
       "required": [
         "schema_version",
+        "boot_id",
         "goal_ref",
         "actor_ref",
         "incarnation_ref",
@@ -109,6 +112,7 @@
       ],
       "properties": {
         "schema_version": {"const": "abyss_stack_visible_terminal_binding_v1"},
+        "boot_id": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
         "goal_ref": {"type": "string", "minLength": 1},
         "actor_ref": {"type": "string", "minLength": 1},
         "incarnation_ref": {"type": "string", "minLength": 1},

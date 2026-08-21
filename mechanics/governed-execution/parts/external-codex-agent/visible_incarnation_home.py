@@ -521,6 +521,34 @@ def _safe_projection_string(value: object, label: str) -> str:
     )
 
 
+def _safe_projection_value(value: object, label: str) -> object:
+    """Sanitize every scalar in a validated owner-visible projection."""
+
+    if isinstance(value, str):
+        return _safe_projection_string(value, label)
+    if isinstance(value, dict):
+        return {
+            key: _safe_projection_value(nested, f"{label}.{key}")
+            for key, nested in value.items()
+        }
+    if isinstance(value, list):
+        return [
+            _safe_projection_value(nested, f"{label}[{index}]")
+            for index, nested in enumerate(value)
+        ]
+    return value
+
+
+def _safe_terminal_binding_projection(
+    binding: dict[str, object],
+) -> dict[str, object]:
+    projection = _safe_projection_value(binding, "terminal binding")
+    if not isinstance(projection, dict):
+        raise IncarnationHomeError("terminal binding projection is not an object")
+    _assert_safe_projection(projection)
+    return projection
+
+
 def _assert_safe_projection(value: object) -> None:
     """Defence-in-depth check for every owner-visible Kitty projection."""
 
@@ -1777,6 +1805,10 @@ def _load_terminal_binding_input(
         receipt, raw, source_digest = _load_holder_receipt_snapshot(
             holder_receipt_path, snapshot=(receipt, raw)
         )
+        if receipt["boot_id"] != _proc_boot_id():
+            raise IncarnationHomeError(
+                "holder terminal receipt kernel boot identity has drifted"
+            )
         binding_value = receipt.get("binding")
         if binding_value is not None:
             binding = _validate_terminal_binding_shape(binding_value)
@@ -1921,6 +1953,10 @@ def _observe_terminal_binding(
     elif identity_state == "missing":
         kitty_query_state = "not_available_after_exit"
 
+    safe_binding = _safe_terminal_binding_projection(binding)
+    safe_terminal = safe_binding.get("terminal")
+    if not isinstance(safe_terminal, dict):
+        raise IncarnationHomeError("terminal binding projection lacks terminal data")
     status: dict[str, object] = {
         "schema_version": TERMINAL_BINDING_SCHEMA_VERSION,
         "observation": {
@@ -1929,7 +1965,7 @@ def _observe_terminal_binding(
             "desktop_effect": "none",
             "kitty_query": kitty_query_state,
         },
-        "binding": binding,
+        "binding": safe_binding,
         "processes": {
             "holder": {
                 "pid": holder_pid,
@@ -1951,9 +1987,9 @@ def _observe_terminal_binding(
                 if kitty_query_state in {"missing", "not_available_after_exit"}
                 else None
             ),
-            "window_id": terminal["window_id"],
-            "tty": terminal["tty"],
-            "title": terminal["title"],
+            "window_id": safe_terminal["window_id"],
+            "tty": safe_terminal["tty"],
+            "title": safe_terminal["title"],
             "kitty": kitty_projection,
         },
         "compositor": {
@@ -1993,6 +2029,100 @@ def _write_terminal_binding(
     _assert_safe_projection(document)
     _write_new_json(output_path, document, "terminal binding")
     return document
+
+
+def _require_unoccupied_receipt_path(path: Path) -> None:
+    """Reject a stale or competing receipt before detached launch."""
+
+    if not path.is_absolute() or path.is_symlink():
+        raise IncarnationHomeError(
+            f"holder terminal receipt must be an absolute non-symlink path: {path}"
+        )
+    if path.exists():
+        raise IncarnationHomeError(
+            f"holder terminal receipt path is already occupied: {path}"
+        )
+    if path.parent.is_symlink() or not path.parent.is_dir():
+        raise IncarnationHomeError(
+            f"holder terminal receipt parent must be a real directory: {path.parent}"
+        )
+
+
+def _validate_visible_launch_receipt(
+    *,
+    receipt_path: Path,
+    receipt: dict[str, Any],
+    manifest_path: Path,
+    manifest: dict[str, Any],
+    manifest_bytes: bytes,
+    manifest_digest: str,
+    executable: Path,
+    executable_digest: str,
+    binding_context: dict[str, str],
+    control_socket: str,
+    terminal_title: str,
+    companion_binding: dict[str, str] | None,
+) -> dict[str, Any]:
+    """Prove that the published receipt belongs to this exact launch."""
+
+    expected_runtime: dict[str, object] = {
+        "codex_executable": str(executable),
+        "codex_executable_digest": executable_digest,
+        "incarnation_manifest": str(manifest_path.resolve()),
+        "incarnation_manifest_digest": manifest_digest,
+        "incarnation_manifest_snapshot_b64": base64.b64encode(
+            manifest_bytes
+        ).decode("ascii"),
+        "model": str(manifest["model_slug"]),
+        "reasoning_effort": str(manifest["reasoning_effort"]),
+        "ambient_codex_home": str(manifest["ambient_codex_home"]),
+        "incarnation_codex_home": str(manifest["codex_home"]),
+    }
+    if receipt.get("receipt_ref") != str(receipt_path.resolve()):
+        raise IncarnationHomeError("visible launch receipt path identity drifted")
+    runtime = receipt.get("runtime")
+    if not isinstance(runtime, dict) or any(
+        runtime.get(key) != value for key, value in expected_runtime.items()
+    ):
+        raise IncarnationHomeError(
+            "visible launch receipt runtime identity does not match this launch"
+        )
+    if companion_binding is None:
+        if "codex_companion" in runtime:
+            raise IncarnationHomeError(
+                "visible launch receipt unexpectedly contains a Codex companion"
+            )
+    elif runtime.get("codex_companion") != companion_binding:
+        raise IncarnationHomeError(
+            "visible launch receipt Codex companion identity drifted"
+        )
+
+    binding_value = receipt.get("binding")
+    binding = _validate_terminal_binding_shape(binding_value)
+    for key, value in binding_context.items():
+        if binding.get(key) != value:
+            raise IncarnationHomeError(
+                f"visible launch receipt binding context drifted: {key}"
+            )
+    terminal = binding["terminal"]
+    assert isinstance(terminal, dict)
+    socket_record = terminal["control_socket"]
+    assert isinstance(socket_record, dict)
+    if socket_record.get("address") != control_socket:
+        raise IncarnationHomeError(
+            "visible launch receipt control socket does not match this launch"
+        )
+    _secure_control_socket(
+        control_socket,
+        harden=False,
+        expected_device=socket_record["device"],
+        expected_inode=socket_record["inode"],
+    )
+    if terminal.get("title") != _safe_projection_string(
+        terminal_title, "terminal title"
+    ):
+        raise IncarnationHomeError("visible launch receipt terminal title drifted")
+    return receipt
 
 
 def _emit_safe_json(
@@ -4075,10 +4205,10 @@ def command_launch(args: argparse.Namespace) -> int:
     environment = dict(os.environ)
     environment["CODEX_HOME"] = str(manifest["ambient_codex_home"])
     if terminal_title:
-        binding_context_value, binding_context_bytes = _load_json_snapshot(
+        _binding_context_value, binding_context_bytes = _load_json_snapshot(
             Path(binding_context_argument), "terminal binding context"
         )
-        _load_binding_context_snapshot(binding_context_bytes)
+        binding_context = _load_binding_context_snapshot(binding_context_bytes)
         binding_context_digest = sha256_bytes(binding_context_bytes)
         control_socket = getattr(args, "control_socket", None) or _allocate_control_socket()
         _socket_path(control_socket)
@@ -4087,6 +4217,8 @@ def command_launch(args: argparse.Namespace) -> int:
             raise IncarnationHomeError(
                 f"control socket path is already occupied: {control_socket}"
             )
+        holder_receipt_path = Path(holder_receipt_argument)
+        _require_unoccupied_receipt_path(holder_receipt_path)
         (
             executable_fd,
             _executable_fd_path,
@@ -4211,7 +4343,6 @@ def command_launch(args: argparse.Namespace) -> int:
             )
             if completed.returncode != 0:
                 return completed.returncode
-            holder_receipt_path = Path(holder_receipt_argument)
             receipt: dict[str, Any] | None = None
             for _ in range(100):
                 if holder_receipt_path.exists():
@@ -4222,6 +4353,20 @@ def command_launch(args: argparse.Namespace) -> int:
                             and candidate["binding"].get("remote_control")
                             == "socket-only"
                         ):
+                            candidate = _validate_visible_launch_receipt(
+                                receipt_path=holder_receipt_path,
+                                receipt=candidate,
+                                manifest_path=manifest_path,
+                                manifest=manifest,
+                                manifest_bytes=manifest_bytes,
+                                manifest_digest=manifest_digest,
+                                executable=executable,
+                                executable_digest=executable_digest,
+                                binding_context=binding_context,
+                                control_socket=control_socket,
+                                terminal_title=terminal_title,
+                                companion_binding=companion_binding,
+                            )
                             _validate_terminal_binding_shape(candidate["binding"])
                             _holder_terminal_identity(candidate)
                             receipt = candidate
