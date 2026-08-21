@@ -678,6 +678,15 @@ def _assert_safe_projection(value: object) -> None:
             _assert_safe_projection(nested)
 
 
+def _safe_terminal_title(value: object) -> str:
+    """Return the exact redaction-safe title used for Kitty and the binding."""
+
+    title = _safe_projection_string(value, "terminal title")
+    if not title.strip():
+        raise IncarnationHomeError("visible launch terminal title must not be empty")
+    return title
+
+
 def _binding_ref(value: object, label: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise IncarnationHomeError(f"terminal binding {label} is missing")
@@ -716,18 +725,28 @@ def _socket_path(address: object, label: str = "control socket") -> Path:
 
 
 def _validate_socket_parent(path: Path, *, create: bool = False) -> Path:
+    return _validate_owner_private_parent(path, "control socket", create=create)
+
+
+def _validate_owner_private_parent(
+    path: Path, label: str, *, create: bool = False
+) -> Path:
+    """Require a path's parent directory to be private to this owner."""
+
     parent = path.parent
     if create and not parent.exists():
         parent.mkdir(mode=CONTROL_SOCKET_PARENT_MODE, parents=False)
     if parent.is_symlink() or not parent.is_dir():
-        raise IncarnationHomeError(f"control socket parent is not a directory: {parent}")
+        raise IncarnationHomeError(f"{label} parent is not a directory: {parent}")
     try:
         parent_stat = parent.stat()
     except OSError as exc:
-        raise IncarnationHomeError(f"control socket parent cannot be inspected: {parent}") from exc
+        raise IncarnationHomeError(
+            f"{label} parent cannot be inspected: {parent}"
+        ) from exc
     if parent_stat.st_uid != os.getuid() or stat.S_IMODE(parent_stat.st_mode) & 0o077:
         raise IncarnationHomeError(
-            f"control socket parent is not private to the owner: {parent}"
+            f"{label} parent is not private to the owner: {parent}"
         )
     return parent
 
@@ -3031,6 +3050,7 @@ def _validate_launch_gate_path(path: Path) -> None:
         raise IncarnationHomeError(
             f"visible launch admission gate parent must be a real directory: {path.parent}"
         )
+    _validate_owner_private_parent(path, "visible launch admission gate")
 
 
 def _require_unoccupied_launch_gate_path(path: Path) -> None:
@@ -3229,9 +3249,7 @@ def _validate_visible_launch_receipt(
         expected_device=socket_record["device"],
         expected_inode=socket_record["inode"],
     )
-    if terminal.get("title") != _safe_projection_string(
-        terminal_title, "terminal title"
-    ):
+    if terminal.get("title") != _safe_terminal_title(terminal_title):
         raise IncarnationHomeError("visible launch receipt terminal title drifted")
     return receipt
 
@@ -5513,6 +5531,8 @@ def command_payload_launch(args: argparse.Namespace) -> int:
         raise IncarnationHomeError(
             "payload terminal binding lacks control socket or title"
         )
+    if binding_context is not None:
+        terminal_title = _safe_terminal_title(terminal_title)
     launch_gate_argument = getattr(args, "launch_gate", None)
     launch_gate_token = getattr(args, "launch_gate_token", None)
     if binding_context is not None and (
@@ -5632,10 +5652,8 @@ def command_launch(args: argparse.Namespace) -> int:
     holder_receipt_argument = getattr(args, "holder_receipt", None)
     binding_context_argument = getattr(args, "binding_context", None)
     control_socket_argument = getattr(args, "control_socket", None)
-    if terminal_title is not None and (
-        not isinstance(terminal_title, str) or not terminal_title.strip()
-    ):
-        raise IncarnationHomeError("visible launch terminal title must not be empty")
+    if terminal_title is not None:
+        terminal_title = _safe_terminal_title(terminal_title)
     if terminal_title is None and (
         binding_context_argument is not None or control_socket_argument is not None
     ):

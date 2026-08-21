@@ -905,6 +905,15 @@ def test_payload_launch_requires_parent_admission_gate(
         assert "exec" not in observed
 
 
+def test_launch_gate_rejects_shared_parent(tmp_path: Path) -> None:
+    shared_parent = tmp_path / "shared"
+    shared_parent.mkdir()
+    shared_parent.chmod(0o777)
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="not private"):
+        MODULE._validate_launch_gate_path(shared_parent / "launch-gate.json")
+
+
 def test_payload_launch_uses_private_companion_after_host_copy_disappears(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1273,7 +1282,7 @@ def test_detached_launch_publishes_socket_only_binding(
             "start_ticks": 2002,
             "window_id": "7",
             "tty": "/dev/pts/7",
-            "title": "visible-holder",
+            "title": "visible token=<redacted>",
             "control_socket": {
                 "address": address,
                 "path": str(socket_path),
@@ -1395,7 +1404,7 @@ def test_detached_launch_publishes_socket_only_binding(
         holder_receipt=str(holder_path),
         binding_context=str(context_path),
         control_socket=address,
-        terminal_title="visible-holder",
+        terminal_title="visible token=secret",
         kitty_executable="/usr/bin/kitty",
         manifest=str(manifest_path),
         codex_executable=str(executable),
@@ -1438,6 +1447,7 @@ def test_detached_launch_publishes_socket_only_binding(
     assert isinstance(argv, list)
     assert "--listen-on" in argv
     assert argv[argv.index("--listen-on") + 1] == address
+    assert argv[argv.index("--title") + 1] == "visible token=<redacted>"
     assert argv[argv.index("--override") + 1] == "allow_remote_control=socket-only"
     assert "--launch-gate" in argv
     assert argv[argv.index("--launch-gate") + 1] == str(gate_path)
