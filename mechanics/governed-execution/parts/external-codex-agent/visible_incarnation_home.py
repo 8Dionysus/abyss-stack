@@ -2611,7 +2611,14 @@ def _observe_terminal_binding(
                 terminal_argv=_proc_argv(terminal_pid),
             )
         except IncarnationHomeError:
-            identity_state = "stale"
+            holder_state = _proc_identity_state(holder_pid, holder_start_ticks)
+            terminal_state = _proc_identity_state(terminal_pid, terminal_start_ticks)
+            if "drifted" in {holder_state, terminal_state}:
+                identity_state = "stale"
+            elif "gone" in {holder_state, terminal_state}:
+                identity_state = "missing"
+            else:
+                identity_state = "stale"
         else:
             if observed_window_id != str(terminal["window_id"]) or not dedicated:
                 identity_state = "stale"

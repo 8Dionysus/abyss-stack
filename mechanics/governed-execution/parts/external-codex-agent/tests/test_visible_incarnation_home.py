@@ -3839,6 +3839,44 @@ def test_status_rechecks_kitty_dedication_before_querying_socket(
         listener.close()
 
 
+def test_status_reclassifies_dedication_race_after_terminal_exit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    calls: dict[int, int] = {}
+
+    def identity_state(pid: int, _ticks: int) -> str:
+        calls[pid] = calls.get(pid, 0) + 1
+        if pid == terminal["pid"] and calls[pid] >= 2:
+            return "gone"
+        return "live"
+
+    monkeypatch.setattr(MODULE, "_proc_identity_state", identity_state)
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
+    monkeypatch.setattr(MODULE, "_descends_from", lambda _pid, _ancestor: True)
+    monkeypatch.setattr(MODULE, "_proc_argv", lambda _pid: ["kitty", "--detach"])
+    monkeypatch.setattr(
+        MODULE,
+        "_kitty_dedication",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            MODULE.IncarnationHomeError("terminal exited during dedication check")
+        ),
+    )
+    try:
+        projection, state = MODULE._observe_terminal_binding(
+            binding=binding,
+            holder=holder,
+            terminal=terminal,
+            kitty_executable="/usr/bin/kitty",
+        )
+        assert state == "missing"
+        assert projection["processes"]["kitty"]["state"] == "gone"
+        assert projection["observation"]["kitty_query"] == "not_available_after_exit"
+        assert projection["terminal"]["exists"] is False
+    finally:
+        listener.close()
+
+
 @pytest.mark.parametrize(
     ("holder_state", "terminal_state"),
     [("gone", "live"), ("live", "gone")],
