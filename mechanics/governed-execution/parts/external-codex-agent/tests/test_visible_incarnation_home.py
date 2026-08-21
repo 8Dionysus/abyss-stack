@@ -3311,6 +3311,30 @@ def test_receipt_binding_must_match_top_level_holder_and_terminal() -> None:
         MODULE._validate_receipt_binding_consistency(receipt, binding)
 
 
+def test_terminal_binding_source_receipt_is_typed_before_return(
+    tmp_path: Path,
+) -> None:
+    listener, binding, _holder, _terminal = _terminal_binding_fixture(tmp_path)
+    try:
+        source_receipt = tmp_path / "holder.json"
+        source_receipt.write_text("{}", encoding="utf-8")
+        binding["source_receipt"] = {
+            "path": str(source_receipt),
+            "sha256": "sha256:" + "a" * 64,
+        }
+        validated = MODULE._validate_terminal_binding_shape(binding)
+        assert validated["source_receipt"] == binding["source_receipt"]
+
+        binding["source_receipt"] = {
+            "path": {"notes": "private payload"},
+            "sha256": [],
+        }
+        with pytest.raises(MODULE.IncarnationHomeError, match="source receipt"):
+            MODULE._validate_terminal_binding_shape(binding)
+    finally:
+        listener.close()
+
+
 def test_control_socket_allocation_is_unique_and_private(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

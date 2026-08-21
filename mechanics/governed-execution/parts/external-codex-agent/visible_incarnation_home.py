@@ -1002,11 +1002,27 @@ def _validate_terminal_binding_shape(binding: object) -> dict[str, object]:
     ):
         raise IncarnationHomeError("terminal binding socket identity is invalid")
     source_receipt = binding.get("source_receipt")
-    if source_receipt is not None and (
-        not isinstance(source_receipt, dict)
-        or set(source_receipt) != {"path", "sha256"}
-    ):
-        raise IncarnationHomeError("terminal binding source receipt is invalid")
+    if source_receipt is not None:
+        if not isinstance(source_receipt, dict) or set(source_receipt) != {
+            "path",
+            "sha256",
+        }:
+            raise IncarnationHomeError("terminal binding source receipt is invalid")
+        source_receipt_path = source_receipt.get("path")
+        source_receipt_digest = source_receipt.get("sha256")
+        if (
+            not isinstance(source_receipt_path, str)
+            or not Path(source_receipt_path).is_absolute()
+            or _safe_projection_string(source_receipt_path, "source receipt path")
+            != source_receipt_path
+            or not isinstance(source_receipt_digest, str)
+            or SHA256_DIGEST_PATTERN.fullmatch(source_receipt_digest) is None
+        ):
+            raise IncarnationHomeError("terminal binding source receipt is invalid")
+        binding["source_receipt"] = {
+            "path": source_receipt_path,
+            "sha256": source_receipt_digest,
+        }
     _assert_safe_projection(binding)
     return binding
 
