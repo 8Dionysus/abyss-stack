@@ -46,8 +46,15 @@ The controller:
  of the exact handoff bytes. Join and wake authorization validate a pinned
  handoff snapshot and recheck it immediately before publishing the authority;
  after delivery or join, a host-side bridge may
-  run the closer in the same host unit. The holder receipt also
-  binds the kernel boot ID alongside each process start tick. The closer publishes a
+  run the closer in the same host unit. A detached visible launch is admitted
+  only with an owner binding context and a unique private Kitty control socket
+  in socket-only mode. The owner `status` command validates the bound
+  PID/start-tick identities and queries Kitty through that socket using a safe
+  allowlist. Its output excludes raw Kitty `ls` payloads, environment, command
+  lines, tokens, and credentials; compositor visibility remains explicitly
+  unknown. `send-text` is a separately invoked terminal transport, not A2A
+  responsibility transfer. The holder receipt also binds the kernel boot ID
+  alongside each process start tick. The closer publishes a
   recoverable sidecar reservation before signaling. The sidecar records the
   signal attempt before TERM and recovery never repeats an existing attempt;
   legacy v1 reservations remain replayable only through the legacy

@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 import shutil
+import socket
 import stat
 import subprocess
 import sys
@@ -43,6 +44,46 @@ def _realization(path: Path) -> Path:
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
     return path
+
+
+def _terminal_binding_fixture(
+    tmp_path: Path,
+) -> tuple[socket.socket, dict[str, object], dict[str, object], dict[str, object]]:
+    state_root = tmp_path / "state"
+    state_root.mkdir()
+    closeout_route = tmp_path / "closeout.sh"
+    closeout_route.write_text("#!/bin/sh\n", encoding="utf-8")
+    context = {
+        "goal_ref": "goal:test-terminal-observability",
+        "actor_ref": "actor:test-terminal-observability",
+        "incarnation_ref": "incarnation:test-terminal-observability",
+        "session_ref": "session:test-terminal-observability",
+        "runtime_state_root": str(state_root),
+        "closeout_route": str(closeout_route),
+    }
+    socket_path = tmp_path / "kitty.sock"
+    listener = socket.socket(socket.AF_UNIX)
+    listener.bind(str(socket_path))
+    os.chmod(socket_path, 0o600)
+    binding = MODULE._terminal_binding(
+        context=context,
+        control_socket=f"unix:{socket_path}",
+        terminal_title="Luna Max — terminal observability repair",
+        window_id="7",
+        tty="/dev/pts/7",
+        holder_pid=101,
+        holder_start_ticks=1001,
+        holder_argv_digest=MODULE.sha256_bytes(
+            MODULE.canonical_bytes(["/usr/bin/codex", "exec"])
+        ),
+        holder_exe_digest="sha256:" + "1" * 64,
+        terminal_pid=202,
+        terminal_start_ticks=2002,
+    )
+    holder = binding["holder"]
+    terminal = binding["terminal"]
+    assert isinstance(holder, dict) and isinstance(terminal, dict)
+    return listener, binding, holder, terminal
 
 
 def test_prepared_home_binds_nested_default_without_rehoming_parent(tmp_path: Path) -> None:
@@ -658,6 +699,12 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert receipt["holder"]["argv"] == MODULE._post_exec_argv(
         original_executable, captured["inner_argv"]
     )
+    assert receipt["holder"]["exe_digest"] == MODULE._post_exec_executable_digest(
+        executable,
+        path=os.environ.get("PATH"),
+        executable_bytes=original_content,
+    )
+    assert receipt["holder"]["exe_digest"] != MODULE.sha256_bytes(original_content)
     assert receipt["terminal"]["binding"] == "kitty_ancestor_at_exec"
     assert receipt["terminal"]["pid"] == terminal_pid
     assert receipt["terminal"]["argv"] == terminal_argv
@@ -768,6 +815,103 @@ def test_payload_launch_binds_receipt_to_payload_process(
     assert exec_path == str(payload)
     assert exec_argv == args.codex_arguments
     assert environment["CODEX_HOME"] == str(ambient)
+
+
+@pytest.mark.parametrize(("decision", "exec_expected"), [("admit", True), ("reject", False)])
+def test_payload_launch_requires_parent_admission_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    decision: str,
+    exec_expected: bool,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    manifest_bytes = manifest_path.read_bytes()
+    payload = tmp_path / "private-codex"
+    payload_bytes = b"#!/bin/sh\nexit 0\n"
+    payload.write_bytes(payload_bytes)
+    payload.chmod(0o500)
+    holder_path = tmp_path / "holder.json"
+    gate_path = tmp_path / "holder.json.launch-gate.json"
+    context_path = tmp_path / "context.json"
+    state_root = tmp_path / "state"
+    state_root.mkdir()
+    context_path.write_text(
+        json.dumps(
+            {
+                "goal_ref": "goal:test",
+                "actor_ref": "actor:test",
+                "incarnation_ref": "incarnation:test",
+                "session_ref": "session:test",
+                "runtime_state_root": str(state_root),
+                "closeout_route": str(tmp_path / "closeout.sh"),
+            }
+        ),
+        encoding="utf-8",
+    )
+    context_bytes = context_path.read_bytes()
+    token = "launch-gate-test-token"
+    MODULE._write_visible_launch_gate(
+        gate_path=gate_path,
+        holder_receipt_path=holder_path,
+        token=token,
+        decision=decision,
+    )
+    observed: dict[str, object] = {}
+
+    def fake_holder_receipt(**_kwargs: object) -> dict[str, object]:
+        MODULE._write_new_json(holder_path, {"published": True}, "holder receipt")
+        return {"published": True}
+
+    def fake_exec(path: str, argv: list[str], environment: dict[str, str]) -> None:
+        observed["exec"] = (path, argv, environment)
+
+    monkeypatch.setattr(MODULE, "_holder_receipt", fake_holder_receipt)
+    monkeypatch.setattr(MODULE.os, "execve", fake_exec)
+    args = MODULE.argparse.Namespace(
+        manifest=str(manifest_path),
+        holder_receipt=str(holder_path),
+        codex_executable=str(payload),
+        payload_executable=str(payload),
+        manifest_digest=MODULE.sha256_bytes(manifest_bytes),
+        executable_digest=MODULE.sha256_bytes(payload_bytes),
+        binding_context_snapshot_b64=base64.b64encode(context_bytes).decode("ascii"),
+        binding_context_digest=MODULE.sha256_bytes(context_bytes),
+        control_socket="unix:/tmp/aoa-launch-gate-test.sock",
+        terminal_title="visible-holder",
+        launch_gate=str(gate_path),
+        launch_gate_token=token,
+        codex_arguments=[str(payload), "exec", "--help"],
+    )
+
+    if exec_expected:
+        assert MODULE.command_payload_launch(args) == 127
+        assert "exec" in observed
+    else:
+        with pytest.raises(
+            MODULE.IncarnationHomeError,
+            match="admission was rejected before payload execution",
+        ):
+            MODULE.command_payload_launch(args)
+        assert "exec" not in observed
+
+
+def test_launch_gate_rejects_shared_parent(tmp_path: Path) -> None:
+    shared_parent = tmp_path / "shared"
+    shared_parent.mkdir()
+    shared_parent.chmod(0o777)
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="not private"):
+        MODULE._validate_launch_gate_path(shared_parent / "launch-gate.json")
 
 
 def test_payload_launch_uses_private_companion_after_host_copy_disappears(
@@ -1065,14 +1209,251 @@ def test_holder_receipt_rejects_detached_kitty_route(tmp_path: Path) -> None:
     args = MODULE.argparse.Namespace(
         holder_receipt=str(tmp_path / "holder.json"),
         terminal_title="visible-holder",
+        binding_context=None,
+        control_socket=None,
         kitty_executable="/usr/bin/kitty",
         manifest=str(tmp_path / "missing-manifest.json"),
         codex_executable=str(tmp_path / "codex"),
         codex_arguments=["exec", "--help"],
     )
 
-    with pytest.raises(MODULE.IncarnationHomeError, match="detached Kitty"):
+    with pytest.raises(MODULE.IncarnationHomeError, match="canonical visible launch"):
         MODULE.command_launch(args)
+
+
+@pytest.mark.parametrize(
+    ("reject_receipt", "reject_identity", "publish_receipt"),
+    [(False, False, True), (True, False, True), (False, True, True),
+     (False, False, False)],
+)
+def test_detached_launch_publishes_socket_only_binding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    reject_receipt: bool,
+    reject_identity: bool,
+    publish_receipt: bool,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    executable = tmp_path / "codex"
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o700)
+    holder_path = tmp_path / "holder.json"
+    context_path = tmp_path / "context.json"
+    state_root = tmp_path / "state"
+    state_root.mkdir()
+    context_path.write_text(
+        json.dumps(
+            {
+                "goal_ref": "goal:test",
+                "actor_ref": "actor:test",
+                "incarnation_ref": "incarnation:test",
+                "session_ref": "session:test",
+                "runtime_state_root": str(state_root),
+                "closeout_route": str(tmp_path / "closeout.sh"),
+            }
+        ),
+        encoding="utf-8",
+    )
+    socket_path = tmp_path / "kitty.sock"
+    address = f"unix:{socket_path}"
+    binding = {
+        "schema_version": MODULE.TERMINAL_BINDING_SCHEMA_VERSION,
+        "boot_id": MODULE._proc_boot_id(),
+        "goal_ref": "goal:test",
+        "actor_ref": "actor:test",
+        "incarnation_ref": "incarnation:test",
+        "session_ref": "session:test",
+        "runtime_state_root": str(state_root),
+        "closeout_route": str(tmp_path / "closeout.sh"),
+        "holder": {"pid": 101, "start_ticks": 1001},
+        "terminal": {
+            "pid": 202,
+            "start_ticks": 2002,
+            "window_id": "7",
+            "tty": "/dev/pts/7",
+            "title": "visible token=<redacted>",
+            "control_socket": {
+                "address": address,
+                "path": str(socket_path),
+                "mode": 0o600,
+                "device": 1,
+                "inode": 1,
+            },
+        },
+        "remote_control": "socket-only",
+        "dedicated": True,
+    }
+    events: list[str] = []
+
+    def accept_pre_exec_identity(
+        _receipt: dict[str, object], **_kwargs: object
+    ) -> tuple[object, ...]:
+        events.append("pre-exec")
+        return (101, 202, "kitty", "7", True)
+
+    def accept_post_exec_identity(
+        _receipt: dict[str, object]
+    ) -> tuple[object, ...]:
+        events.append("post-exec")
+        return (101, 202, "kitty", "7", True)
+
+    monkeypatch.setattr(
+        MODULE,
+        "_verify_command_version",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_holder_terminal_identity",
+        accept_post_exec_identity,
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_holder_pre_exec_identity",
+        accept_pre_exec_identity,
+    )
+    monkeypatch.setattr(MODULE, "_spawn_named_snapshot_cleanup", lambda **_: None)
+    monkeypatch.setattr(
+        MODULE,
+        "_load_holder_receipt",
+        lambda _path: {"binding": binding, "holder": binding["holder"]},
+    )
+    termination_targets: list[dict[str, object]] = []
+    if reject_receipt:
+
+        def reject_visible_launch_receipt(**_kwargs: object) -> dict[str, object]:
+            raise MODULE.IncarnationHomeError("receipt belongs to another launch")
+
+        monkeypatch.setattr(
+            MODULE, "_validate_visible_launch_receipt", reject_visible_launch_receipt
+        )
+        monkeypatch.setattr(
+            MODULE,
+            "_terminate_rejected_visible_launch",
+            lambda receipt: termination_targets.append(receipt) or True,
+        )
+    else:
+        monkeypatch.setattr(
+            MODULE,
+            "_validate_visible_launch_receipt",
+            lambda **kwargs: kwargs["receipt"],
+        )
+    if reject_identity:
+
+        def reject_holder_identity(_receipt: dict[str, object]) -> tuple[object, ...]:
+            events.append("post-exec")
+            raise MODULE.IncarnationHomeError("post-exec identity is transient")
+
+        monkeypatch.setattr(
+            MODULE,
+            "_holder_terminal_identity",
+            reject_holder_identity,
+        )
+        monkeypatch.setattr(
+            MODULE,
+            "_terminate_rejected_visible_launch",
+            lambda receipt: termination_targets.append(receipt) or True,
+        )
+    captured: dict[str, object] = {}
+
+    original_write_gate = MODULE._write_visible_launch_gate
+
+    def record_write_gate(**kwargs: object) -> None:
+        events.append(f"gate:{kwargs['decision']}")
+        original_write_gate(**kwargs)  # type: ignore[arg-type]
+
+    original_confirm_admission = MODULE._confirm_visible_launch_admission
+
+    def record_confirm_admission(**kwargs: object) -> None:
+        events.append("confirm")
+        original_confirm_admission(**kwargs)  # type: ignore[arg-type]
+
+    original_emit_safe_json = MODULE._emit_safe_json
+
+    def record_emit_safe_json(*args: object, **kwargs: object) -> None:
+        events.append("emit")
+        original_emit_safe_json(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(MODULE, "_write_visible_launch_gate", record_write_gate)
+    monkeypatch.setattr(
+        MODULE, "_confirm_visible_launch_admission", record_confirm_admission
+    )
+    monkeypatch.setattr(MODULE, "_emit_safe_json", record_emit_safe_json)
+
+    def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        if publish_receipt:
+            holder_path.write_text("published", encoding="utf-8")
+        captured["argv"] = argv
+        captured["kwargs"] = kwargs
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+    monkeypatch.setattr(MODULE.time, "sleep", lambda _seconds: None)
+    args = MODULE.argparse.Namespace(
+        holder_receipt=str(holder_path),
+        binding_context=str(context_path),
+        control_socket=address,
+        terminal_title="visible token=secret",
+        kitty_executable="/usr/bin/kitty",
+        manifest=str(manifest_path),
+        codex_executable=str(executable),
+        codex_arguments=["exec", "--json"],
+    )
+
+    gate_path = holder_path.with_name(holder_path.name + ".launch-gate.json")
+    if not publish_receipt or reject_receipt:
+        with pytest.raises(
+            MODULE.IncarnationHomeError, match="did not publish a live terminal binding"
+        ):
+            MODULE.command_launch(args)
+        gate = json.loads(gate_path.read_text(encoding="utf-8"))
+        assert gate["decision"] == "reject"
+        if reject_receipt:
+            assert termination_targets == []
+        elif reject_identity:
+            assert len(termination_targets) == 1
+        else:
+            assert termination_targets == []
+        return
+
+    if reject_identity:
+        with pytest.raises(
+            MODULE.IncarnationHomeError,
+            match="post-exec identity acknowledgment",
+        ):
+            MODULE.command_launch(args)
+        gate = json.loads(gate_path.read_text(encoding="utf-8"))
+        assert gate["decision"] == "admit"
+        assert len(termination_targets) == 1
+        return
+
+    assert MODULE.command_launch(args) == 0
+    gate = json.loads(gate_path.read_text(encoding="utf-8"))
+    assert gate["decision"] == "admit"
+    assert gate["holder_receipt_ref"] == str(holder_path.resolve())
+    assert events[:5] == ["pre-exec", "gate:admit", "confirm", "post-exec", "emit"]
+    argv = captured["argv"]
+    assert isinstance(argv, list)
+    assert "--listen-on" in argv
+    assert argv[argv.index("--listen-on") + 1] == address
+    assert argv[argv.index("--title") + 1] == "visible token=<redacted>"
+    assert argv[argv.index("--override") + 1] == "allow_remote_control=socket-only"
+    assert "--launch-gate" in argv
+    assert argv[argv.index("--launch-gate") + 1] == str(gate_path)
+    output = capsys.readouterr().out
+    assert "environment" not in output.casefold()
+    assert "credential" not in output.casefold()
 
 
 def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
@@ -1097,6 +1478,7 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
     holder_pid, parent_pid, kitty_pid = 101, 102, 103
     holder_argv = ["/usr/bin/codex", "exec"]
     kitty_argv = ["/usr/bin/kitty", "--title", "holder"]
+    executable_digest = MODULE.sha256_bytes(executable.read_bytes())
     receipt = {
         "boot_id": "00000000-0000-0000-0000-000000000001",
         "holder": {
@@ -1107,10 +1489,11 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
             "parent_comm": "bwrap",
             "argv": holder_argv,
             "argv_digest": MODULE.sha256_bytes(MODULE.canonical_bytes(holder_argv)),
+            "exe_digest": executable_digest,
         },
         "runtime": {
             "codex_executable": str(executable),
-            "codex_executable_digest": MODULE.sha256_bytes(executable.read_bytes()),
+            "codex_executable_digest": executable_digest,
             "codex_companion": {
                 "path": str(companion),
                 "digest": MODULE.sha256_bytes(companion.read_bytes()),
@@ -1148,10 +1531,83 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
     monkeypatch.setattr(
         MODULE, "_proc_argv", lambda pid: {101: holder_argv, 103: kitty_argv}[pid]
     )
+    monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: executable_digest)
     monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("7", True))
 
     executable.unlink()
     companion.unlink()
+    assert MODULE._holder_terminal_identity(receipt) == (
+        holder_pid,
+        kitty_pid,
+        "kitty",
+        "7",
+        True,
+    )
+
+
+def test_legacy_holder_identity_preserves_path_digest_validation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "codex"
+    executable_bytes = b"legacy-holder-executable"
+    executable.write_bytes(executable_bytes)
+    executable.chmod(0o700)
+    manifest = tmp_path / "incarnation-home.json"
+    manifest_bytes = b"legacy-incarnation-manifest"
+    manifest.write_bytes(manifest_bytes)
+    holder_pid, parent_pid, kitty_pid = 101, 102, 103
+    holder_argv = [str(executable), "exec"]
+    kitty_argv = ["/usr/bin/kitty", "--detach", "--title", "holder"]
+    boot_id = "00000000-0000-0000-0000-000000000002"
+    receipt = {
+        "boot_id": boot_id,
+        "holder": {
+            "pid": holder_pid,
+            "start_ticks": 11,
+            "parent_pid": parent_pid,
+            "parent_start_ticks": 12,
+            "parent_comm": "bwrap",
+            "argv": holder_argv,
+            "argv_digest": MODULE.sha256_bytes(MODULE.canonical_bytes(holder_argv)),
+        },
+        "runtime": {
+            "codex_executable": str(executable),
+            "codex_executable_digest": MODULE.sha256_bytes(executable_bytes),
+            "incarnation_manifest": str(manifest),
+            "incarnation_manifest_digest": MODULE.sha256_bytes(manifest_bytes),
+            "model": "gpt-5.6-luna",
+            "reasoning_effort": "max",
+            "ambient_codex_home": str(tmp_path / "ambient"),
+            "incarnation_codex_home": str(tmp_path / "incarnation"),
+        },
+        "terminal": {
+            "pid": kitty_pid,
+            "start_ticks": 13,
+            "argv": kitty_argv,
+            "window_id": "7",
+            "dedicated": True,
+        },
+    }
+    monkeypatch.setattr(MODULE, "_proc_boot_id", lambda: boot_id)
+    monkeypatch.setattr(
+        MODULE, "_proc_start_ticks", lambda pid: {101: 11, 102: 12, 103: 13}[pid]
+    )
+    monkeypatch.setattr(
+        MODULE, "_proc_parent_pid", lambda pid: {101: 102, 102: 103, 103: 1}[pid]
+    )
+    monkeypatch.setattr(
+        MODULE, "_proc_comm", lambda pid: {102: "bwrap", 103: "kitty"}[pid]
+    )
+    monkeypatch.setattr(
+        MODULE, "_proc_argv", lambda pid: {101: holder_argv, 103: kitty_argv}[pid]
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_exe_digest",
+        lambda _pid: pytest.fail("legacy identity queried repaired executable digest"),
+    )
+    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("7", True))
+
     assert MODULE._holder_terminal_identity(receipt) == (
         holder_pid,
         kitty_pid,
@@ -1201,9 +1657,10 @@ def test_live_close_uses_holder_bound_companion_after_host_removal(
             "parent_start_ticks": 12,
             "parent_comm": "bwrap",
             "argv": holder_argv,
-            "argv_digest": MODULE.sha256_bytes(
-                MODULE.canonical_bytes(holder_argv)
-            ),
+                "argv_digest": MODULE.sha256_bytes(
+                    MODULE.canonical_bytes(holder_argv)
+                ),
+                "exe_digest": MODULE.sha256_bytes(executable_bytes),
         },
         "runtime": {
             "codex_executable": str(executable),
@@ -1285,6 +1742,11 @@ def test_live_close_uses_holder_bound_companion_after_host_removal(
         MODULE,
         "_proc_argv",
         lambda pid: {holder_pid: holder_argv, kitty_pid: kitty_argv}[pid],
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_exe_digest",
+        lambda _pid: MODULE.sha256_bytes(executable_bytes),
     )
     monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("7", True))
     states = iter(["live", "live", "gone", "gone"])
@@ -1661,7 +2123,7 @@ def test_post_exec_argv_resolves_env_interpreter_reexec(
     executable.chmod(0o700)
     node = tmp_path / "bin" / "node"
     node.parent.mkdir()
-    node.write_text("", encoding="utf-8")
+    node.write_bytes(b"node interpreter")
     node.chmod(0o700)
 
     assert MODULE._post_exec_argv(
@@ -1669,6 +2131,123 @@ def test_post_exec_argv_resolves_env_interpreter_reexec(
         [str(executable), "exec", "--help"],
         path=str(node.parent),
     ) == ["node", str(executable), "exec", "--help"]
+
+
+def test_post_exec_resolution_recurses_through_nested_shebangs(
+    tmp_path: Path,
+) -> None:
+    final_interpreter = tmp_path / "bin" / "python3"
+    final_interpreter.parent.mkdir()
+    final_bytes = b"final interpreter\n"
+    final_interpreter.write_bytes(final_bytes)
+    final_interpreter.chmod(0o700)
+    nested_interpreter = tmp_path / "nested-interpreter"
+    nested_interpreter.write_text(f"#!{final_interpreter}\n", encoding="utf-8")
+    nested_interpreter.chmod(0o700)
+    executable = tmp_path / "codex"
+    executable.write_text(f"#!{nested_interpreter}\n", encoding="utf-8")
+    executable.chmod(0o700)
+
+    assert MODULE._post_exec_argv(
+        executable, [str(executable), "exec", "--help"]
+    ) == [
+        str(final_interpreter),
+        str(nested_interpreter),
+        str(executable),
+        "exec",
+        "--help",
+    ]
+    assert MODULE._post_exec_executable_digest(executable) == MODULE.sha256_bytes(
+        final_bytes
+    )
+
+
+def test_post_exec_resolution_recurses_through_nested_env_shebang(
+    tmp_path: Path,
+) -> None:
+    final_interpreter = tmp_path / "python3"
+    final_bytes = b"final env interpreter\n"
+    final_interpreter.write_bytes(final_bytes)
+    final_interpreter.chmod(0o700)
+    node = tmp_path / "bin" / "node"
+    node.parent.mkdir()
+    node.write_text(f"#!{final_interpreter}\n", encoding="utf-8")
+    node.chmod(0o700)
+    executable = tmp_path / "codex"
+    executable.write_text("#!/usr/bin/env node\n", encoding="utf-8")
+    executable.chmod(0o700)
+
+    assert MODULE._post_exec_argv(
+        executable,
+        [str(executable), "exec"],
+        path=str(node.parent),
+    ) == [str(final_interpreter), str(node), str(executable), "exec"]
+    assert MODULE._post_exec_executable_digest(
+        executable, path=str(node.parent)
+    ) == MODULE.sha256_bytes(final_bytes)
+
+
+def test_post_exec_resolution_preserves_path_spelling_for_env_symlink_shebang(
+    tmp_path: Path,
+) -> None:
+    final_interpreter = tmp_path / "final-interpreter"
+    final_interpreter.write_bytes(b"final env symlink interpreter\n")
+    final_interpreter.chmod(0o700)
+    node_wrapper = tmp_path / "lib" / "node-wrapper"
+    node_wrapper.parent.mkdir()
+    node_wrapper.write_text(f"#!{final_interpreter}\n", encoding="utf-8")
+    node_wrapper.chmod(0o700)
+    node = tmp_path / "bin" / "node"
+    node.parent.mkdir()
+    node.symlink_to(node_wrapper)
+    executable = tmp_path / "codex"
+    executable.write_text("#!/usr/bin/env node\n", encoding="utf-8")
+    executable.chmod(0o700)
+
+    assert MODULE._post_exec_argv(
+        executable,
+        [str(executable), "exec"],
+        path=str(node.parent),
+    ) == [
+        str(final_interpreter),
+        str(node),
+        str(executable),
+        "exec",
+    ]
+
+
+def test_post_exec_resolution_preserves_paths_across_consecutive_env_shebangs(
+    tmp_path: Path,
+) -> None:
+    final_interpreter = tmp_path / "final-interpreter"
+    final_bytes = b"final consecutive-env interpreter\n"
+    final_interpreter.write_bytes(final_bytes)
+    final_interpreter.chmod(0o700)
+    python = tmp_path / "bin" / "python"
+    python.parent.mkdir()
+    python.write_text(f"#!{final_interpreter}\n", encoding="utf-8")
+    python.chmod(0o700)
+    node = tmp_path / "bin" / "node"
+    node.write_text("#!/usr/bin/env python\n", encoding="utf-8")
+    node.chmod(0o700)
+    executable = tmp_path / "codex"
+    executable.write_text("#!/usr/bin/env node\n", encoding="utf-8")
+    executable.chmod(0o700)
+
+    assert MODULE._post_exec_argv(
+        executable,
+        [str(executable), "exec"],
+        path=str(node.parent),
+    ) == [
+        str(final_interpreter),
+        str(python),
+        str(node),
+        str(executable),
+        "exec",
+    ]
+    assert MODULE._post_exec_executable_digest(
+        executable, path=str(node.parent)
+    ) == MODULE.sha256_bytes(final_bytes)
 
 
 def test_shebang_snapshot_root_rejects_noexec_filesystem(
@@ -2056,6 +2635,49 @@ def test_kitty_dedication_rejects_sibling_terminal_child(
         )
 
 
+def test_legacy_holder_identity_rejects_process_argv_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    holder_argv = ["/usr/bin/codex", "exec"]
+    kitty_argv = ["/usr/bin/kitty", "--detach", "--title", "holder"]
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_start_ticks",
+        lambda pid: {101: 11, 102: 12, 103: 13}[pid],
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_parent_pid",
+        lambda pid: {101: 102, 102: 103, 103: 1}[pid],
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_comm",
+        lambda pid: {102: "bwrap", 103: "kitty"}[pid],
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: {
+            101: holder_argv,
+            103: ["/usr/bin/kitty", "--detach", "--title", "replacement"],
+        }[pid],
+    )
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="Kitty argv identity"):
+        MODULE._validate_legacy_holder_process_identity(
+            holder_pid=101,
+            holder_start_ticks=11,
+            holder_parent_pid=102,
+            holder_parent_start_ticks=12,
+            holder_parent_comm="bwrap",
+            holder_argv=holder_argv,
+            kitty_pid=103,
+            kitty_start_ticks=13,
+            kitty_argv=kitty_argv,
+        )
+
+
 def test_verified_term_uses_pidfd_after_identity_recheck(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2069,6 +2691,37 @@ def test_verified_term_uses_pidfd_after_identity_recheck(
     assert calls[0] == ("open", 7003, 0)
     assert calls[1] == ("signal", 42, MODULE.signal.SIGTERM)
     assert calls[2] == ("close", 42)
+
+
+def test_rejected_launch_escalates_and_confirms_exact_holder_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        MODULE,
+        "_holder_receipt_process_ids",
+        lambda _receipt: (101, 11, 202, 12),
+    )
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
+    calls: list[str] = []
+    monkeypatch.setattr(
+        MODULE,
+        "_send_verified_term",
+        lambda _pid, _ticks: calls.append("term") or True,
+    )
+    wait_states = iter(["live", "gone"])
+    monkeypatch.setattr(
+        MODULE,
+        "_wait_for_exact_process_exit",
+        lambda _pid, _ticks: calls.append("wait") or next(wait_states),
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_send_verified_kill",
+        lambda _pid, _ticks: calls.append("kill") or True,
+    )
+
+    assert MODULE._terminate_rejected_visible_launch({}) is True
+    assert calls == ["term", "wait", "kill", "wait"]
 
 
 def test_identity_bound_close_records_already_gone_without_reopening_manifest(
@@ -2987,3 +3640,963 @@ def test_wake_delivery_hashes_the_parsed_holder_snapshot(
         holder_receipt_bytes=holder_bytes,
         holder_receipt_digest=holder_digest,
     )
+
+
+def test_terminal_binding_creation_records_exact_owner_and_terminal_identity(
+    tmp_path: Path,
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    try:
+        assert binding["schema_version"] == MODULE.TERMINAL_BINDING_SCHEMA_VERSION
+        assert binding["goal_ref"] == "goal:test-terminal-observability"
+        assert binding["session_ref"] == "session:test-terminal-observability"
+        assert holder == {
+            "pid": 101,
+            "start_ticks": 1001,
+            "argv_digest": MODULE.sha256_bytes(
+                MODULE.canonical_bytes(["/usr/bin/codex", "exec"])
+            ),
+            "exe_digest": "sha256:" + "1" * 64,
+        }
+        assert terminal["pid"] == 202
+        assert terminal["start_ticks"] == 2002
+        assert terminal["window_id"] == "7"
+        assert terminal["tty"] == "/dev/pts/7"
+        assert terminal["control_socket"]["mode"] == 0o600
+        assert "env" not in json.dumps(binding).casefold()
+        assert "credential" not in json.dumps(binding).casefold()
+    finally:
+        listener.close()
+
+
+def test_receipt_binding_must_match_top_level_holder_and_terminal() -> None:
+    boot_id = MODULE._proc_boot_id()
+    binding = {
+        "boot_id": boot_id,
+        "holder": {"pid": 101, "start_ticks": 1001},
+        "terminal": {
+            "pid": 202,
+            "start_ticks": 2002,
+            "window_id": "7",
+            "tty": "/dev/pts/7",
+            "title": "visible-holder",
+            "control_socket": {
+                "address": "unix:/tmp/kitty.sock",
+                "path": "/tmp/kitty.sock",
+                "mode": 0o600,
+                "device": 1,
+                "inode": 2,
+            },
+        },
+    }
+    receipt = {
+        "boot_id": boot_id,
+        "holder": {"pid": 101, "start_ticks": 1001},
+        "terminal": {
+            "pid": 202,
+            "start_ticks": 2002,
+            "window_id": "7",
+            "tty": "/dev/pts/7",
+            "title": "visible-holder",
+            "control_socket": {
+                "address": "unix:/tmp/kitty.sock",
+                "path": "/tmp/kitty.sock",
+                "mode": 0o600,
+                "device": 1,
+                "inode": 2,
+            },
+        },
+    }
+    MODULE._validate_receipt_binding_consistency(receipt, binding)
+
+    binding["holder"]["start_ticks"] = 1002
+    with pytest.raises(MODULE.IncarnationHomeError, match="holder identity"):
+        MODULE._validate_receipt_binding_consistency(receipt, binding)
+
+    binding["holder"]["start_ticks"] = 1001
+    binding["terminal"]["window_id"] = "8"
+    with pytest.raises(MODULE.IncarnationHomeError, match="terminal identity"):
+        MODULE._validate_receipt_binding_consistency(receipt, binding)
+
+    binding["terminal"]["window_id"] = "7"
+    binding["terminal"]["control_socket"]["inode"] = 3
+    with pytest.raises(MODULE.IncarnationHomeError, match="socket"):
+        MODULE._validate_receipt_binding_consistency(receipt, binding)
+
+
+def test_terminal_binding_source_receipt_is_typed_before_return(
+    tmp_path: Path,
+) -> None:
+    listener, binding, _holder, _terminal = _terminal_binding_fixture(tmp_path)
+    try:
+        source_receipt = tmp_path / "holder.json"
+        source_receipt.write_text("{}", encoding="utf-8")
+        binding["source_receipt"] = {
+            "path": str(source_receipt),
+            "sha256": "sha256:" + "a" * 64,
+        }
+        validated = MODULE._validate_terminal_binding_shape(binding)
+        assert validated["source_receipt"] == binding["source_receipt"]
+
+        binding["source_receipt"] = {
+            "path": {"notes": "private payload"},
+            "sha256": [],
+        }
+        with pytest.raises(MODULE.IncarnationHomeError, match="source receipt"):
+            MODULE._validate_terminal_binding_shape(binding)
+    finally:
+        listener.close()
+
+
+def test_terminal_binding_validation_reconstructs_redacted_binding_refs(
+    tmp_path: Path,
+) -> None:
+    listener, binding, _holder, _terminal = _terminal_binding_fixture(tmp_path)
+    try:
+        binding["goal_ref"] = "database_password=hunter2"
+        validated = MODULE._validate_terminal_binding_shape(binding)
+        assert validated["goal_ref"] == "database_password=<redacted>"
+    finally:
+        listener.close()
+
+
+def test_terminal_binding_validation_reconstructs_redacted_nested_strings(
+    tmp_path: Path,
+) -> None:
+    listener, binding, _holder, terminal = _terminal_binding_fixture(tmp_path)
+    try:
+        terminal["title"] = "password=hunter2"
+        validated = MODULE._validate_terminal_binding_shape(binding)
+        assert validated["terminal"]["title"] == "password=<redacted>"
+    finally:
+        listener.close()
+
+
+def test_terminal_binding_rejects_boolean_process_identity() -> None:
+    binding = {
+        "schema_version": MODULE.TERMINAL_BINDING_SCHEMA_VERSION,
+        "boot_id": MODULE._proc_boot_id(),
+        "goal_ref": "goal:test",
+        "actor_ref": "actor:test",
+        "incarnation_ref": "incarnation:test",
+        "session_ref": "session:test",
+        "runtime_state_root": "/tmp/runtime",
+        "closeout_route": "/tmp/closeout.sh",
+        "holder": {"pid": True, "start_ticks": 1001},
+        "terminal": {
+            "pid": 202,
+            "start_ticks": 2002,
+            "window_id": "7",
+            "tty": "/dev/pts/7",
+            "title": "visible-holder",
+            "control_socket": {
+                "address": "unix:/tmp/kitty.sock",
+                "path": "/tmp/kitty.sock",
+                "mode": 0o600,
+                "device": 1,
+                "inode": 1,
+            },
+        },
+        "remote_control": "socket-only",
+        "dedicated": True,
+    }
+    with pytest.raises(MODULE.IncarnationHomeError, match="holder identity"):
+        MODULE._validate_terminal_binding_shape(binding)
+
+
+def test_terminal_binding_rejects_credential_bearing_source_receipt_path(
+    tmp_path: Path,
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    unsafe_dir = tmp_path / "database_password=hunter2"
+    unsafe_dir.mkdir()
+    source_receipt = unsafe_dir / "holder.json"
+    source_receipt.write_text("{}", encoding="utf-8")
+    try:
+        with pytest.raises(MODULE.IncarnationHomeError, match="source receipt path"):
+            MODULE._write_terminal_binding(
+                output_path=tmp_path / "binding.json",
+                binding=binding,
+                holder=holder,
+                terminal=terminal,
+                source_receipt=source_receipt,
+                source_digest=MODULE.sha256_bytes(source_receipt.read_bytes()),
+            )
+    finally:
+        listener.close()
+
+
+def test_terminal_binding_rejects_negative_socket_mode(
+    tmp_path: Path,
+) -> None:
+    listener, binding, _holder, terminal = _terminal_binding_fixture(tmp_path)
+    try:
+        terminal["control_socket"]["mode"] = -64
+        with pytest.raises(MODULE.IncarnationHomeError, match="socket mode"):
+            MODULE._validate_terminal_binding_shape(binding)
+    finally:
+        listener.close()
+
+
+def test_terminal_binding_rejects_invalid_tty(
+    tmp_path: Path,
+) -> None:
+    listener, binding, _holder, terminal = _terminal_binding_fixture(tmp_path)
+    try:
+        terminal["tty"] = "/tmp/fake"
+        with pytest.raises(MODULE.IncarnationHomeError, match="tty"):
+            MODULE._validate_terminal_binding_shape(binding)
+    finally:
+        listener.close()
+
+
+def test_control_socket_allocation_is_unique_and_private(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+
+    first = MODULE._allocate_control_socket()
+    second = MODULE._allocate_control_socket()
+
+    assert first != second
+    socket_root = tmp_path / MODULE.CONTROL_SOCKET_ROOT_NAME
+    assert stat.S_IMODE(socket_root.stat().st_mode) == 0o700
+    assert not Path(first.removeprefix("unix:")).exists()
+    assert not Path(second.removeprefix("unix:")).exists()
+
+
+def test_control_socket_permissions_fail_closed_then_harden(
+    tmp_path: Path,
+) -> None:
+    socket_path = tmp_path / "kitty.sock"
+    listener = socket.socket(socket.AF_UNIX)
+    listener.bind(str(socket_path))
+    os.chmod(socket_path, 0o755)
+    address = f"unix:{socket_path}"
+    try:
+        with pytest.raises(MODULE.IncarnationHomeError, match="not private"):
+            MODULE._secure_control_socket(address, harden=False)
+        record = MODULE._secure_control_socket(address, harden=True)
+        assert record["mode"] == 0o600
+        assert stat.S_IMODE(socket_path.stat().st_mode) == 0o600
+    finally:
+        listener.close()
+
+
+def test_kitty_projection_omits_environment_and_commandline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, _binding, _holder, terminal = _terminal_binding_fixture(tmp_path)
+    calls: dict[str, object] = {}
+    payload = [
+        {
+            "id": 3,
+            "tabs": [
+                {
+                    "id": 4,
+                    "windows": [
+                        {
+                            "id": 7,
+                            "title": "repair token=super-secret",
+                            "cwd": "/workspace",
+                            "pid": 202,
+                            "cmdline": "codex --password=super-secret",
+                            "env": {"TOKEN": "super-secret"},
+                            "foreground_processes": [
+                                {
+                                    "pid": 303,
+                                    "cwd": "/workspace",
+                                    "cmdline": "worker --credential=secret",
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+    ]
+
+    def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls["argv"] = argv
+        calls["kwargs"] = kwargs
+        return subprocess.CompletedProcess(
+            argv, 0, stdout=json.dumps(payload), stderr="raw payload is discarded"
+        )
+
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "codex")
+    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+    try:
+        matches = MODULE._kitty_ls(
+            kitty_executable="/usr/bin/kitty",
+            control_socket=terminal["control_socket"]["address"],
+            window_id="7",
+        )
+        rendered = json.dumps(matches, sort_keys=True)
+        assert len(matches) == 1
+        assert "env" not in rendered.casefold()
+        assert "cmdline" not in rendered.casefold()
+        assert "super-secret" not in rendered
+        assert "token=<redacted>" in rendered
+        argv = calls["argv"]
+        assert isinstance(argv, list)
+        assert "--all-env-vars=no" in argv
+        assert "--output-format" in argv
+        assert "env:KITTY_WINDOW_ID=1" not in argv
+    finally:
+        listener.close()
+
+
+def test_kitty_projection_rejects_boolean_observation_ids(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, _binding, _holder, terminal = _terminal_binding_fixture(tmp_path)
+    payload = [
+        {
+            "id": True,
+            "tabs": [
+                {
+                    "id": True,
+                    "windows": [
+                        {
+                            "id": 7,
+                            "title": "Luna Max",
+                            "cwd": "/workspace",
+                            "pid": True,
+                            "foreground_processes": [
+                                {"pid": True},
+                                {"pid": 303},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+    ]
+
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "codex")
+    monkeypatch.setattr(
+        MODULE.subprocess,
+        "run",
+        lambda argv, **_kwargs: subprocess.CompletedProcess(
+            argv, 0, stdout=json.dumps(payload), stderr=""
+        ),
+    )
+    try:
+        [projection] = MODULE._kitty_ls(
+            kitty_executable="/usr/bin/kitty",
+            control_socket=terminal["control_socket"]["address"],
+            window_id="7",
+        )
+        assert projection["pid"] is None
+        assert projection["tab"]["id"] is None
+        assert projection["os_window"]["id"] is None
+        assert projection["foreground_processes"] == [
+            {"pid": 303, "comm": "codex"}
+        ]
+    finally:
+        listener.close()
+
+
+def test_safe_projection_redacts_quoted_and_whitespace_credentials() -> None:
+    assert MODULE._safe_projection_string(
+        '{"password":"hunter2"}', "json-shaped title"
+    ) == '{"password":"<redacted>"}'
+    assert MODULE._safe_projection_string(
+        "password='hunter 2'", "quoted title"
+    ) == "password='<redacted>'"
+    assert MODULE._safe_projection_string(
+        "token=hunter 2", "whitespace title"
+    ) == "token=<redacted>"
+    assert MODULE._safe_projection_string(
+        r'{"password":"hunter\"suffix"}', "escaped json-shaped title"
+    ) == '{"password":"<redacted>"}'
+    assert MODULE._safe_projection_string(
+        r'{\"password\":\"hunter2\"}', "backslash-escaped json-shaped title"
+    ) == r'{\"password\":\"<redacted>\"}'
+    assert MODULE._safe_projection_string(
+        "access_token=hunter2", "access token title"
+    ) == "access_token=<redacted>"
+    assert MODULE._safe_projection_string(
+        "refresh-token=hunter2", "refresh token title"
+    ) == "refresh-token=<redacted>"
+    assert MODULE._safe_projection_string(
+        "client_secret=hunter2", "client secret title"
+    ) == "client_secret=<redacted>"
+    assert MODULE._safe_projection_string(
+        "auth_token=hunter2", "auth token title"
+    ) == "auth_token=<redacted>"
+    assert MODULE._safe_projection_string(
+        "github_token=hunter2", "github token title"
+    ) == "github_token=<redacted>"
+    assert MODULE._safe_projection_string(
+        "database_password=hunter2", "database password title"
+    ) == "database_password=<redacted>"
+    assert MODULE._safe_projection_string(
+        "AWS_SECRET_ACCESS_KEY=hunter2", "cloud secret title"
+    ) == "AWS_SECRET_ACCESS_KEY=<redacted>"
+    assert MODULE._safe_projection_string(
+        "x-api-key=hunter2", "api key title"
+    ) == "x-api-key=<redacted>"
+
+
+def test_socket_path_rejects_credential_shaped_text() -> None:
+    with pytest.raises(MODULE.IncarnationHomeError, match="credential-shaped"):
+        MODULE._socket_path(
+            "unix:/run/user/1000/password=hunter2/kitty.sock"
+        )
+
+
+def test_kitty_projection_rechecks_recorded_socket_identity(
+    tmp_path: Path,
+) -> None:
+    listener, _binding, _holder, terminal = _terminal_binding_fixture(tmp_path)
+    socket_record = terminal["control_socket"]
+    try:
+        with pytest.raises(MODULE.IncarnationHomeError, match="device identity"):
+            MODULE._kitty_ls(
+                kitty_executable="/usr/bin/kitty",
+                control_socket=socket_record["address"],
+                window_id="7",
+                expected_device=socket_record["device"] + 1,
+                expected_inode=socket_record["inode"],
+            )
+    finally:
+        listener.close()
+
+
+def test_status_is_read_only_and_writes_only_safe_projection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    binding_path = tmp_path / "binding.json"
+    status_path = tmp_path / "status.json"
+    MODULE._write_new_json(
+        binding_path,
+        {
+            "schema_version": MODULE.TERMINAL_BINDING_SCHEMA_VERSION,
+            "created_at": MODULE._utc_now(),
+            "binding": binding,
+            "holder": holder,
+            "terminal": terminal,
+        },
+        "test binding",
+    )
+    before_mode = stat.S_IMODE(
+        Path(terminal["control_socket"]["path"]).stat().st_mode
+    )
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
+    monkeypatch.setattr(MODULE, "_descends_from", lambda _pid, _ancestor: True)
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: ["/usr/bin/codex", "exec"]
+        if pid == holder["pid"]
+        else ["kitty", "--detach"],
+    )
+    monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: "sha256:" + "1" * 64)
+    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_kwargs: ("7", True))
+    monkeypatch.setattr(
+        MODULE,
+        "_kitty_ls",
+        lambda **_kwargs: [
+            {
+                "id": "7",
+                "title": "Luna Max",
+                "cwd": "/workspace",
+                "pid": 202,
+                "is_active": True,
+                "is_focused": False,
+                "needs_attention": False,
+                "in_alternate_screen": False,
+                "foreground_processes": [{"pid": 303, "comm": "codex"}],
+                "tab": {"id": 4, "is_active": True, "is_focused": False},
+                "os_window": {"id": 3, "is_active": True, "is_focused": False},
+            }
+        ],
+    )
+    try:
+        assert MODULE.command_status(
+            MODULE.argparse.Namespace(
+                binding=str(binding_path),
+                holder_receipt=None,
+                binding_context=None,
+                kitty_executable="/usr/bin/kitty",
+                output=str(status_path),
+            )
+        ) == 0
+        rendered = status_path.read_text(encoding="utf-8")
+        assert "env" not in rendered.casefold()
+        assert "token" not in rendered.casefold()
+        assert "credential" not in rendered.casefold()
+        assert stat.S_IMODE(
+            Path(terminal["control_socket"]["path"]).stat().st_mode
+        ) == before_mode == 0o600
+    finally:
+        listener.close()
+
+
+def test_status_sanitizes_allowed_binding_strings_before_echoing(
+    tmp_path: Path,
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    binding["goal_ref"] = "goal:credential=hunter2"
+    terminal["title"] = "password=hunter2"
+    try:
+        projection, _state = MODULE._observe_terminal_binding(
+            binding=binding,
+            holder=holder,
+            terminal=terminal,
+            kitty_executable="/usr/bin/kitty",
+        )
+        rendered = json.dumps(projection, sort_keys=True)
+        assert "hunter2" not in rendered
+        assert projection["binding"]["goal_ref"] == "goal:credential=<redacted>"
+        assert projection["terminal"]["title"] == "password=<redacted>"
+    finally:
+        listener.close()
+
+
+def test_safe_status_rejects_forbidden_field_even_if_caller_supplies_it() -> None:
+    with pytest.raises(MODULE.IncarnationHomeError, match="unsafe field"):
+        MODULE._emit_safe_json(
+            {"schema_version": "test", "environment": {"TOKEN": "secret"}},
+            label="unsafe test status",
+        )
+
+
+@pytest.mark.parametrize(
+    "key",
+    ["github_token", "database_password", "AWS_SECRET_ACCESS_KEY", "x-api-key"],
+)
+def test_safe_status_rejects_composite_credential_field(
+    key: str,
+) -> None:
+    with pytest.raises(MODULE.IncarnationHomeError, match="unsafe field"):
+        MODULE._emit_safe_json(
+            {"schema_version": "test", key: "secret"},
+            label="unsafe composite credential test status",
+        )
+
+
+def test_status_rejects_pid_start_tick_reuse_without_querying_kitty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    queried = False
+
+    def forbidden_query(**_kwargs: object) -> list[dict[str, object]]:
+        nonlocal queried
+        queried = True
+        return []
+
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "drifted")
+    monkeypatch.setattr(MODULE, "_kitty_ls", forbidden_query)
+    try:
+        projection, state = MODULE._observe_terminal_binding(
+            binding=binding,
+            holder=holder,
+            terminal=terminal,
+            kitty_executable="/usr/bin/kitty",
+        )
+        assert state == "stale"
+        assert projection["observation"]["kitty_query"] == "not_attempted"
+        assert queried is False
+    finally:
+        listener.close()
+
+
+def test_status_rejects_holder_exec_argv_drift_without_querying_kitty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    queried = False
+
+    def forbidden_query(**_kwargs: object) -> list[dict[str, object]]:
+        nonlocal queried
+        queried = True
+        return []
+
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
+    monkeypatch.setattr(MODULE, "_descends_from", lambda _pid, _ancestor: True)
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: ["/usr/bin/replacement-codex", "exec"]
+        if pid == holder["pid"]
+        else ["kitty", "--detach"],
+    )
+    monkeypatch.setattr(MODULE, "_kitty_ls", forbidden_query)
+    try:
+        projection, state = MODULE._observe_terminal_binding(
+            binding=binding,
+            holder=holder,
+            terminal=terminal,
+            kitty_executable="/usr/bin/kitty",
+        )
+        assert state == "stale"
+        assert projection["observation"]["kitty_query"] == "not_attempted"
+        assert queried is False
+    finally:
+        listener.close()
+
+
+def test_status_rejects_holder_exec_executable_drift_without_querying_kitty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    queried = False
+
+    def forbidden_query(**_kwargs: object) -> list[dict[str, object]]:
+        nonlocal queried
+        queried = True
+        return []
+
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
+    monkeypatch.setattr(MODULE, "_descends_from", lambda _pid, _ancestor: True)
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: ["/usr/bin/codex", "exec"]
+        if pid == holder["pid"]
+        else ["kitty", "--detach"],
+    )
+    monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: "sha256:" + "2" * 64)
+    monkeypatch.setattr(MODULE, "_kitty_ls", forbidden_query)
+    try:
+        projection, state = MODULE._observe_terminal_binding(
+            binding=binding,
+            holder=holder,
+            terminal=terminal,
+            kitty_executable="/usr/bin/kitty",
+        )
+        assert state == "stale"
+        assert projection["observation"]["kitty_query"] == "not_attempted"
+        assert queried is False
+    finally:
+        listener.close()
+
+
+def test_status_preserves_observed_non_kitty_comm_on_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "zsh")
+    monkeypatch.setattr(MODULE, "_descends_from", lambda _pid, _ancestor: True)
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: ["/usr/bin/codex", "exec"]
+        if pid == holder["pid"]
+        else ["kitty", "--detach"],
+    )
+    monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: "sha256:" + "1" * 64)
+    try:
+        projection, state = MODULE._observe_terminal_binding(
+            binding=binding,
+            holder=holder,
+            terminal=terminal,
+            kitty_executable="/usr/bin/kitty",
+        )
+        assert state == "stale"
+        assert projection["processes"]["kitty"]["comm"] == "zsh"
+    finally:
+        listener.close()
+
+
+def test_status_rechecks_kitty_dedication_before_querying_socket(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
+    monkeypatch.setattr(MODULE, "_descends_from", lambda _pid, _ancestor: True)
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: ["/usr/bin/codex", "exec"]
+        if pid == holder["pid"]
+        else ["kitty", "--detach"],
+    )
+    monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: "sha256:" + "1" * 64)
+    monkeypatch.setattr(
+        MODULE,
+        "_kitty_dedication",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            MODULE.IncarnationHomeError("holder Kitty process is not dedicated")
+        ),
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_kitty_ls",
+        lambda **_kwargs: pytest.fail("status queried Kitty after dedication drift"),
+    )
+    try:
+        projection, state = MODULE._observe_terminal_binding(
+            binding=binding,
+            holder=holder,
+            terminal=terminal,
+            kitty_executable="/usr/bin/kitty",
+        )
+        assert state == "stale"
+        assert projection["observation"]["kitty_query"] == "not_attempted"
+    finally:
+        listener.close()
+
+
+def test_status_reclassifies_dedication_race_after_terminal_exit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    calls: dict[int, int] = {}
+
+    def identity_state(pid: int, _ticks: int) -> str:
+        calls[pid] = calls.get(pid, 0) + 1
+        if pid == terminal["pid"] and calls[pid] >= 2:
+            return "gone"
+        return "live"
+
+    monkeypatch.setattr(MODULE, "_proc_identity_state", identity_state)
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
+    monkeypatch.setattr(MODULE, "_descends_from", lambda _pid, _ancestor: True)
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: ["/usr/bin/codex", "exec"]
+        if pid == holder["pid"]
+        else ["kitty", "--detach"],
+    )
+    monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: "sha256:" + "1" * 64)
+    monkeypatch.setattr(
+        MODULE,
+        "_kitty_dedication",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            MODULE.IncarnationHomeError("terminal exited during dedication check")
+        ),
+    )
+    try:
+        projection, state = MODULE._observe_terminal_binding(
+            binding=binding,
+            holder=holder,
+            terminal=terminal,
+            kitty_executable="/usr/bin/kitty",
+        )
+        assert state == "missing"
+        assert projection["processes"]["kitty"]["state"] == "gone"
+        assert projection["observation"]["kitty_query"] == "not_available_after_exit"
+        assert projection["terminal"]["exists"] is False
+    finally:
+        listener.close()
+
+
+@pytest.mark.parametrize(
+    ("holder_state", "terminal_state"),
+    [("gone", "live"), ("live", "gone")],
+)
+def test_status_preserves_missing_terminal_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    holder_state: str,
+    terminal_state: str,
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    states = {holder["pid"]: holder_state, terminal["pid"]: terminal_state}
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_identity_state",
+        lambda pid, _ticks: states[pid],
+    )
+    try:
+        projection, state = MODULE._observe_terminal_binding(
+            binding=binding,
+            holder=holder,
+            terminal=terminal,
+            kitty_executable="/usr/bin/kitty",
+        )
+        assert state == "missing"
+        assert projection["observation"]["kitty_query"] == "not_available_after_exit"
+        assert projection["terminal"]["exists"] is False
+    finally:
+        listener.close()
+
+
+def test_directed_input_uses_bound_socket_and_window_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    calls: dict[str, object] = {}
+    monkeypatch.setattr(
+        MODULE,
+        "_load_terminal_binding_input",
+        lambda **_kwargs: (binding, holder, terminal, None, None),
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_observe_terminal_binding",
+        lambda **_kwargs: (
+            {"observation": {"kitty_query": "present"}},
+            "live",
+        ),
+    )
+    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_kwargs: ("7", True))
+    expected_holder_argv = ["/usr/bin/codex", "exec"]
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: expected_holder_argv
+        if pid == holder["pid"]
+        else ["/usr/bin/kitty", "--detach"],
+    )
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
+    monkeypatch.setattr(
+        MODULE, "_proc_exe_digest", lambda _pid: holder["exe_digest"]
+    )
+
+    def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls["argv"] = argv
+        calls["kwargs"] = kwargs
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+    try:
+        assert MODULE.command_send_text(
+            MODULE.argparse.Namespace(
+                binding=str(tmp_path / "binding.json"),
+                holder_receipt=None,
+                binding_context=None,
+                kitty_executable="/usr/bin/kitty",
+                text="status\n",
+            )
+        ) == 0
+        argv = calls["argv"]
+        assert isinstance(argv, list)
+        assert argv[argv.index("--to") + 1] == terminal["control_socket"]["address"]
+        assert argv[argv.index("--match") + 1] == "id:7"
+        assert "send-text" in argv
+        assert "--stdin" in argv
+        assert not {"focus-window", "move-window", "close-window"}.intersection(argv)
+        assert calls["kwargs"]["input"] == "status\n"
+        assert "env" not in capsys.readouterr().out.casefold()
+    finally:
+        listener.close()
+
+
+def test_directed_input_rechecks_bound_holder_identity_before_send(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    monkeypatch.setattr(
+        MODULE,
+        "_load_terminal_binding_input",
+        lambda **_kwargs: (binding, holder, terminal, None, None),
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_observe_terminal_binding",
+        lambda **_kwargs: (
+            {"observation": {"kitty_query": "present"}},
+            "live",
+        ),
+    )
+    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_kwargs: ("7", True))
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: ["/usr/bin/replacement-codex", "exec"]
+        if pid == holder["pid"]
+        else ["/usr/bin/kitty", "--detach"],
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_exe_digest",
+        lambda _pid: holder["exe_digest"],
+    )
+    monkeypatch.setattr(
+        MODULE.subprocess,
+        "run",
+        lambda *_args, **_kwargs: pytest.fail(
+            "directed input bypassed holder identity recheck"
+        ),
+    )
+    try:
+        with pytest.raises(MODULE.IncarnationHomeError, match="argv identity has drifted"):
+            MODULE.command_send_text(
+                MODULE.argparse.Namespace(
+                    binding=str(tmp_path / "binding.json"),
+                    holder_receipt=None,
+                    binding_context=None,
+                    kitty_executable="/usr/bin/kitty",
+                    text="status\n",
+                )
+            )
+    finally:
+        listener.close()
+
+
+def test_directed_input_rechecks_kitty_dedication_before_send(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    monkeypatch.setattr(
+        MODULE,
+        "_load_terminal_binding_input",
+        lambda **_kwargs: (binding, holder, terminal, None, None),
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_observe_terminal_binding",
+        lambda **_kwargs: (
+            {"observation": {"kitty_query": "present"}},
+            "live",
+        ),
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_kitty_dedication",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            MODULE.IncarnationHomeError("holder Kitty process is not dedicated")
+        ),
+    )
+    monkeypatch.setattr(MODULE, "_proc_argv", lambda _pid: ["/usr/bin/kitty", "--detach"])
+    monkeypatch.setattr(
+        MODULE.subprocess,
+        "run",
+        lambda *_args, **_kwargs: pytest.fail("directed input bypassed dedication recheck"),
+    )
+    try:
+        with pytest.raises(MODULE.IncarnationHomeError, match="not dedicated"):
+            MODULE.command_send_text(
+                MODULE.argparse.Namespace(
+                    binding=str(tmp_path / "binding.json"),
+                    holder_receipt=None,
+                    binding_context=None,
+                    kitty_executable="/usr/bin/kitty",
+                    text="status\n",
+                )
+            )
+    finally:
+        listener.close()
+
+
+def test_launch_rejects_explicit_empty_terminal_title() -> None:
+    with pytest.raises(MODULE.IncarnationHomeError, match="terminal title"):
+        MODULE.command_launch(MODULE.argparse.Namespace(terminal_title=""))
+
+
+@pytest.mark.parametrize("field", ["binding_context", "control_socket"])
+def test_launch_rejects_binding_options_without_terminal_title(field: str) -> None:
+    arguments = MODULE.argparse.Namespace(
+        terminal_title=None,
+        binding_context=None,
+        control_socket=None,
+    )
+    setattr(arguments, field, "/tmp/owner-binding-option")
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="binding options require --terminal-title",
+    ):
+        MODULE.command_launch(arguments)

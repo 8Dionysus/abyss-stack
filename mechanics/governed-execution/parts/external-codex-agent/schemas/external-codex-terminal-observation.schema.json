@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-terminal-observation.schema.json",
+  "title": "Safe visible external-Codex terminal binding or observation",
+  "type": "object",
+  "oneOf": [
+    {"$ref": "#/$defs/bindingDocument"},
+    {"$ref": "#/$defs/statusDocument"},
+    {"$ref": "#/$defs/launchResult"},
+    {"$ref": "#/$defs/sendTextResult"}
+  ],
+  "$defs": {
+    "socket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["address", "path", "mode", "device", "inode"],
+      "properties": {
+        "address": {"type": "string", "pattern": "^unix:/"},
+        "path": {"type": "string", "pattern": "^/"},
+        "mode": {"type": "integer", "minimum": 0, "maximum": 448, "multipleOf": 64},
+        "device": {"type": "integer", "minimum": 1},
+        "inode": {"type": "integer", "minimum": 1}
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": ["pid", "start_ticks"],
+          "not": {
+            "anyOf": [
+              {"required": ["argv_digest"]},
+              {"required": ["exe_digest"]}
+            ]
+          }
+        },
+        {
+          "required": ["pid", "start_ticks", "argv_digest"],
+          "not": {"required": ["exe_digest"]}
+        },
+        {
+          "required": ["pid", "start_ticks", "argv_digest", "exe_digest"]
+        }
+      ],
+      "properties": {
+        "pid": {"type": "integer", "minimum": 1},
+        "start_ticks": {"type": "integer", "minimum": 1},
+        "argv_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "exe_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "boot_id",
+        "goal_ref",
+        "actor_ref",
+        "incarnation_ref",
+        "session_ref",
+        "runtime_state_root",
+        "closeout_route",
+        "holder",
+        "terminal",
+        "remote_control",
+        "dedicated"
+      ],
+      "properties": {
+        "schema_version": {"const": "abyss_stack_visible_terminal_binding_v1"},
+        "boot_id": {"type": "string", "format": "uuid"},
+        "goal_ref": {"type": "string", "minLength": 1},
+        "actor_ref": {"type": "string", "minLength": 1},
+        "incarnation_ref": {"type": "string", "minLength": 1},
+        "session_ref": {"type": "string", "minLength": 1},
+        "runtime_state_root": {"type": "string", "pattern": "^/"},
+        "closeout_route": {"type": "string", "pattern": "^/"},
+        "holder": {"$ref": "#/$defs/identity"},
+        "terminal": {"$ref": "#/$defs/bindingTerminal"},
+        "remote_control": {"const": "socket-only"},
+        "dedicated": {"const": true},
+        "source_receipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": {"type": "string", "pattern": "^/"},
+            "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+          }
+        }
+      }
+    },
+    "bindingTerminal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pid",
+        "start_ticks",
+        "window_id",
+        "tty",
+        "title",
+        "control_socket"
+      ],
+      "properties": {
+        "pid": {"type": "integer", "minimum": 1},
+        "start_ticks": {"type": "integer", "minimum": 1},
+        "window_id": {"type": "string", "pattern": "^[1-9][0-9]*$"},
+        "tty": {"type": "string", "pattern": "^/dev/(pts/[0-9]+|tty[0-9]+)$"},
+        "title": {"type": "string"},
+        "control_socket": {"$ref": "#/$defs/socket"}
+      }
+    },
+    "bindingDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "created_at", "source_receipt", "binding", "holder", "terminal"],
+      "properties": {
+        "schema_version": {"const": "abyss_stack_visible_terminal_binding_v1"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "source_receipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": {"type": "string", "pattern": "^/"},
+            "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+          }
+        },
+        "binding": {"$ref": "#/$defs/binding"},
+        "holder": {"$ref": "#/$defs/identity"},
+        "terminal": {"$ref": "#/$defs/bindingTerminal"}
+      }
+    },
+    "statusDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "observation", "binding", "processes", "terminal", "compositor", "claim_limits"],
+      "properties": {
+        "schema_version": {"const": "abyss_stack_visible_terminal_binding_v1"},
+        "observation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "mode", "desktop_effect", "kitty_query"],
+          "properties": {
+            "state": {"enum": ["live", "missing", "stale"]},
+            "mode": {"const": "read_only"},
+            "desktop_effect": {"const": "none"},
+            "kitty_query": {"enum": ["not_attempted", "not_available_after_exit", "present", "missing", "unknown"]}
+          }
+        },
+        "binding": {"$ref": "#/$defs/binding"},
+        "processes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["holder", "kitty"],
+          "properties": {
+            "holder": {"$ref": "#/$defs/processStatus"},
+            "kitty": {"$ref": "#/$defs/processStatus"}
+          }
+        },
+        "terminal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["exists", "window_id", "tty", "title", "kitty"],
+          "properties": {
+            "exists": {"type": ["boolean", "null"]},
+            "window_id": {"type": "string", "pattern": "^[1-9][0-9]*$"},
+            "tty": {"type": "string", "pattern": "^/dev/(pts/[0-9]+|tty[0-9]+)$"},
+            "title": {"type": "string"},
+            "kitty": {
+              "type": ["object", "null"],
+              "additionalProperties": false,
+              "required": ["id", "title", "cwd", "pid", "is_active", "is_focused", "needs_attention", "in_alternate_screen", "foreground_processes", "tab", "os_window"],
+              "properties": {
+                "id": {"type": "string", "pattern": "^[1-9][0-9]*$"},
+                "title": {"type": "string"},
+                "cwd": {"type": "string"},
+                "pid": {"type": ["integer", "null"], "minimum": 1},
+                "is_active": {"type": "boolean"},
+                "is_focused": {"type": "boolean"},
+                "needs_attention": {"type": "boolean"},
+                "in_alternate_screen": {"type": "boolean"},
+                "foreground_processes": {
+                  "type": "array",
+                  "items": {"$ref": "#/$defs/foregroundProcess"}
+                },
+                "tab": {"$ref": "#/$defs/focusRecord"},
+                "os_window": {"$ref": "#/$defs/focusRecord"}
+              }
+            }
+          }
+        },
+        "compositor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["visibility", "reason"],
+          "properties": {
+            "visibility": {"const": "unknown"},
+            "reason": {"type": "string"}
+          }
+        },
+        "claim_limits": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "launchResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "launched", "binding"],
+      "properties": {
+        "schema_version": {"const": "abyss_stack_visible_terminal_binding_v1"},
+        "launched": {"const": true},
+        "binding": {"$ref": "#/$defs/binding"}
+      }
+    },
+    "sendTextResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "sent", "target", "desktop_effect"],
+      "properties": {
+        "schema_version": {"const": "abyss_stack_visible_terminal_binding_v1"},
+        "sent": {"const": true},
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["window_id", "control_socket"],
+          "properties": {
+            "window_id": {"type": "string", "pattern": "^[1-9][0-9]*$"},
+            "control_socket": {"$ref": "#/$defs/socket"}
+          }
+        },
+        "desktop_effect": {"type": "string", "minLength": 1}
+      }
+    },
+    "processStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pid", "start_ticks", "state"],
+      "properties": {
+        "pid": {"type": "integer", "minimum": 1},
+        "start_ticks": {"type": "integer", "minimum": 1},
+        "state": {"enum": ["live", "gone", "drifted"]},
+        "comm": {"type": "string"}
+      }
+    },
+    "foregroundProcess": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pid", "comm"],
+      "properties": {
+        "pid": {"type": "integer", "minimum": 1},
+        "comm": {"type": "string"},
+        "cwd": {"type": "string"}
+      }
+    },
+    "focusRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "is_active", "is_focused"],
+      "properties": {
+        "id": {"type": ["integer", "null"], "minimum": 1},
+        "is_active": {"type": "boolean"},
+        "is_focused": {"type": "boolean"}
+      }
+    }
+  }
+}

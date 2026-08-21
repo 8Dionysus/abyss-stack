@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 20096824,
+  "allowed_tracked_bytes": 36655542,
+  "approved_by": "repository-owner",
+  "base_ref": "3bbdfbc335e6fd29d4c7f5b871ffed617f7081be",
+  "changed_generated_bytes": 20096824,
+  "changed_generated_files": 199,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "f0ec8915ec5e078c615e2beca2659297220f32fee1bcba65cb42c2f36aeddc56",
+  "reason": "Owner-reviewed runtime safety repair reclassifies terminal-exit races after dedication checks as missing when exact process identity is gone; accept only this measured derived-family exceedance without raising standing budgets or widening activation or live-proof claims.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36655542,
+  "tracked_bytes_max": 24117248
+}

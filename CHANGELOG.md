@@ -9,6 +9,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Give every canonical detached visible Codex holder a unique owner-private
+  Kitty socket and a persisted Goal/actor/incarnation/session, process,
+  window, TTY, runtime-root, and closeout binding. Add read-only owner status
+  and explicit directed input through that binding; the status projection
+  whitelists safe Kitty fields and never emits environment, command lines,
+  tokens, or credentials.
 - Add the manual-only `aoa-external-actor-clock@.service` delayed clock route.
   Its foreground supervisor keeps systemd ownership while a uniquely titled
   detached Kitty holder is independently observable, requires explicit private

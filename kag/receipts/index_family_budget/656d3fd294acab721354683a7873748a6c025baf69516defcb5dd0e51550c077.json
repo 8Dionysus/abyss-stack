@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 20868510,
+  "allowed_tracked_bytes": 36732491,
+  "approved_by": "repository-owner",
+  "base_ref": "3bbdfbc335e6fd29d4c7f5b871ffed617f7081be",
+  "changed_generated_bytes": 20868510,
+  "changed_generated_files": 206,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "656d3fd294acab721354683a7873748a6c025baf69516defcb5dd0e51550c077",
+  "reason": "Owner-reviewed env-selected nested shebang recursion now carries the resolved wrapper pathname into the next kernel argv expansion while preserving the env command token for env-to-ELF; focused and full visible proof remain green, with no activation or live-proof claim widening.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36732491,
+  "tracked_bytes_max": 24117248
+}

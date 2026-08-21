@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 19321062,
+  "allowed_tracked_bytes": 36491529,
+  "approved_by": "repository-owner",
+  "base_ref": "b8897091f5a9b2cebde9e226403ff7f5bf44aa55",
+  "changed_generated_bytes": 19321062,
+  "changed_generated_files": 193,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "95f2b7dcf0975b48fd98b6e452ba9ea4bef66f6c33727408c753e6f5100476a8",
+  "reason": "Refresh the exact owner portable family after integrating current main terminal closure-v2 with escaped-credential redaction, socket-mode constraints, and legacy identity hardening for PR 399.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36491529,
+  "tracked_bytes_max": 24117248
+}

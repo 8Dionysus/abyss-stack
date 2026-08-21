@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 19985922,
+  "allowed_tracked_bytes": 36646349,
+  "approved_by": "repository-owner",
+  "base_ref": "3bbdfbc335e6fd29d4c7f5b871ffed617f7081be",
+  "changed_generated_bytes": 19985922,
+  "changed_generated_files": 198,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "bc7cc04b9b8edc65793725a9e9bda2700c5723da86b16030871cecaeca6371dc",
+  "reason": "Owner-reviewed runtime safety repair closes nested bind projection, live status dedication drift, and negative socket modes; accept only this measured derived-family exceedance without raising standing budgets or widening activation or live-proof claims.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36646349,
+  "tracked_bytes_max": 24117248
+}

@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 20868204,
+  "allowed_tracked_bytes": 36732185,
+  "approved_by": "repository-owner",
+  "base_ref": "3bbdfbc335e6fd29d4c7f5b871ffed617f7081be",
+  "changed_generated_bytes": 20868204,
+  "changed_generated_files": 206,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "523d943f01f0bbf3376fa6b27cda4cefeb4e9d29a6411940dd4d75f20b612cf9",
+  "reason": "Owner-reviewed nested shebang resolution now follows supported interpreter chains to the final executable image for both argv and executable digest, with bounded cycle/depth rejection and focused regression coverage; accept only this measured derived-family exceedance without raising standing budgets or widening activation or live-proof claims.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36732185,
+  "tracked_bytes_max": 24117248
+}

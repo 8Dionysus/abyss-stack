@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 20097221,
+  "allowed_tracked_bytes": 36655939,
+  "approved_by": "repository-owner",
+  "base_ref": "3bbdfbc335e6fd29d4c7f5b871ffed617f7081be",
+  "changed_generated_bytes": 20097221,
+  "changed_generated_files": 199,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "6987092d60b37b86af718bc9782d8727dc2d103d65153f5d9f83d72bb5b41ad5",
+  "reason": "Owner-reviewed runtime safety repair cross-checks embedded and top-level terminal tty, title, and complete control-socket identity; accept only this measured derived-family exceedance without raising standing budgets or widening activation or live-proof claims.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36655939,
+  "tracked_bytes_max": 24117248
+}

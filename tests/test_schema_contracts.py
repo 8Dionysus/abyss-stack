@@ -243,6 +243,9 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-task.schema.json"
     ),
     Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-terminal-observation.schema.json"
+    ),
+    Path(
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-workspace-manifest.schema.json"
     ),
     Path(
@@ -708,6 +711,115 @@ def test_schema_example_mapping_covers_active_json_examples() -> None:
 def test_active_examples_validate_against_schema_contracts() -> None:
     for payload_path, schema_path, mode in EXAMPLE_SCHEMA_CASES:
         validate_payload(payload_path, schema_path, mode=mode)
+
+
+def test_visible_terminal_schemas_restrict_socket_modes_to_owner_bits() -> None:
+    cases = (
+        (
+            "mechanics/governed-execution/parts/external-codex-agent/schemas/"
+            "external-codex-terminal-observation.schema.json",
+            "socket",
+        ),
+        (
+            "mechanics/governed-execution/parts/external-codex-agent/schemas/"
+            "external-codex-holder-terminal-receipt.schema.json",
+            "controlSocket",
+        ),
+    )
+    for schema_path, socket_definition in cases:
+        schema = load_json(schema_path)
+        socket_schema = schema["$defs"][socket_definition]
+        mode_schema = socket_schema["properties"]["mode"]
+        assert mode_schema["maximum"] == 448
+        assert mode_schema["multipleOf"] == 64
+        validator = Draft202012Validator(socket_schema)
+        socket = {
+            "address": "unix:/tmp/kitty.sock",
+            "path": "/tmp/kitty.sock",
+            "mode": 384,
+            "device": 1,
+            "inode": 2,
+        }
+        assert validator.is_valid(socket)
+        socket["mode"] = 511
+        assert not validator.is_valid(socket)
+
+
+def test_holder_receipt_schema_accepts_legacy_and_repaired_v1_receipts() -> None:
+    schema = load_json(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/"
+        "external-codex-holder-terminal-receipt.schema.json"
+    )
+    validator = Draft202012Validator(schema)
+    digest = "sha256:" + "0" * 64
+    legacy = {
+        "schema_version": "abyss_stack_visible_incarnation_holder_terminal_v1",
+        "receipt_ref": "/tmp/holder.json",
+        "created_at": "2026-08-21T00:00:00Z",
+        "lifecycle_role": "responsibility_holder",
+        "boot_id": "00000000-0000-0000-0000-000000000000",
+        "holder": {
+            "pid": 101,
+            "start_ticks": 1001,
+            "parent_pid": 202,
+            "parent_start_ticks": 2002,
+            "parent_comm": "bwrap",
+            "argv": ["/var/tmp/codex", "exec"],
+            "argv_digest": digest,
+        },
+        "runtime": {
+            "codex_executable": "/opt/codex",
+            "codex_executable_digest": digest,
+            "incarnation_manifest": "/opt/incarnation-home.json",
+            "incarnation_manifest_digest": digest,
+            "model": "gpt-5.6-luna",
+            "reasoning_effort": "max",
+            "ambient_codex_home": "/home/dionysus/.codex",
+            "incarnation_codex_home": "/opt/codex-home",
+        },
+        "terminal": {
+            "binding": "kitty_ancestor_at_exec",
+            "required_comm": "kitty",
+            "pid": 303,
+            "start_ticks": 3003,
+            "argv": ["kitty", "--detach"],
+            "window_id": "7",
+            "dedicated": True,
+        },
+    }
+    validator.validate(legacy)
+
+    repaired = copy.deepcopy(legacy)
+    repaired["holder"].update(
+        {
+            "pre_exec_argv": ["/usr/bin/python3", "payload-launch"],
+            "pre_exec_argv_digest": digest,
+            "pre_exec_exe_digest": digest,
+            "exe_digest": digest,
+        }
+    )
+    validator.validate(repaired)
+
+
+def test_terminal_observation_schema_accepts_legacy_and_repaired_identities() -> None:
+    schema = load_json(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/"
+        "external-codex-terminal-observation.schema.json"
+    )
+    validator = Draft202012Validator(schema["$defs"]["identity"])
+    digest = "sha256:" + "0" * 64
+    validator.validate({"pid": 101, "start_ticks": 1001})
+    validator.validate(
+        {"pid": 101, "start_ticks": 1001, "argv_digest": digest}
+    )
+    validator.validate(
+        {
+            "pid": 101,
+            "start_ticks": 1001,
+            "argv_digest": digest,
+            "exe_digest": digest,
+        }
+    )
 
 
 def test_stack_mcp_schema_encodes_conditional_runtime_invariants() -> None:
