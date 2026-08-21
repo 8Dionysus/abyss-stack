@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 20989831,
+  "allowed_tracked_bytes": 36736951,
+  "approved_by": "repository-owner",
+  "base_ref": "3bbdfbc335e6fd29d4c7f5b871ffed617f7081be",
+  "changed_generated_bytes": 20989831,
+  "changed_generated_files": 207,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "62403f891a7c70185c03dc40525006acc2787a1399c1bce8f7b8a378dda3970f",
+  "reason": "Owner-reviewed consecutive env shebang recursion now carries each resolved wrapper pathname through the env branch before the next kernel expansion; direct and env nested regressions are green, with no activation or live-proof claim widening.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36736951,
+  "tracked_bytes_max": 24117248
+}
