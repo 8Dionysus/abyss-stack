@@ -521,7 +521,7 @@ def _safe_projection_string(value: object, label: str) -> str:
         r"cookie|cookies)"
         r"(?P=key_quote)(?![A-Za-z0-9_-])"
         r"(?P<separator>\s*[:=]\s*)"
-        r"(?P<value>\"[^\"]*\"|'[^']*'|[^,;}\]\r\n]+)",
+        r"(?P<value>\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|[^,;}\]\r\n]+)",
     )
 
     def redact(match: re.Match[str]) -> str:
@@ -1131,6 +1131,44 @@ def _kitty_dedication(
             "holder Kitty process is not dedicated to this responsibility holder"
         )
     return window_id, True
+
+
+def _validate_legacy_holder_process_identity(
+    *,
+    holder_pid: int,
+    holder_start_ticks: int,
+    holder_parent_pid: int,
+    holder_parent_start_ticks: int,
+    holder_parent_comm: str,
+    holder_argv: Sequence[str],
+    kitty_pid: int,
+    kitty_start_ticks: int,
+    kitty_argv: Sequence[str],
+) -> None:
+    """Prove legacy receipt identities before assigning a fresh binding boot."""
+
+    if _proc_start_ticks(holder_pid) != holder_start_ticks:
+        raise IncarnationHomeError(
+            "legacy holder PID was reused or has drifted"
+        )
+    if _proc_start_ticks(holder_parent_pid) != holder_parent_start_ticks:
+        raise IncarnationHomeError(
+            "legacy holder parent PID was reused or has drifted"
+        )
+    if _proc_parent_pid(holder_pid) != holder_parent_pid:
+        raise IncarnationHomeError("legacy holder parent identity has drifted")
+    if _proc_comm(holder_parent_pid) != holder_parent_comm:
+        raise IncarnationHomeError("legacy holder parent process has drifted")
+    if _proc_argv(holder_pid) != list(holder_argv):
+        raise IncarnationHomeError("legacy holder argv identity has drifted")
+    if _proc_start_ticks(kitty_pid) != kitty_start_ticks:
+        raise IncarnationHomeError(
+            "legacy holder Kitty PID was reused or has drifted"
+        )
+    if _proc_comm(kitty_pid) != "kitty":
+        raise IncarnationHomeError("legacy holder terminal is not Kitty")
+    if _proc_argv(kitty_pid) != list(kitty_argv):
+        raise IncarnationHomeError("legacy holder Kitty argv identity has drifted")
 
 
 def _send_verified_term(pid: int, start_ticks: int) -> bool:
@@ -1894,6 +1932,34 @@ def _load_terminal_binding_input(
         isinstance(item, str) for item in legacy_argv
     ):
         raise IncarnationHomeError("legacy holder receipt lacks terminal argv")
+    holder_argv = holder.get("argv")
+    holder_parent_pid = holder.get("parent_pid")
+    holder_parent_start_ticks = holder.get("parent_start_ticks")
+    holder_parent_comm = holder.get("parent_comm")
+    if (
+        not isinstance(holder_argv, list)
+        or not all(isinstance(item, str) for item in holder_argv)
+        or not isinstance(holder_parent_pid, int)
+        or holder_parent_pid <= 0
+        or not isinstance(holder_parent_start_ticks, int)
+        or holder_parent_start_ticks <= 0
+        or not isinstance(holder_parent_comm, str)
+        or not holder_parent_comm
+    ):
+        raise IncarnationHomeError(
+            "legacy holder receipt lacks holder process identity"
+        )
+    _validate_legacy_holder_process_identity(
+        holder_pid=holder_pid,
+        holder_start_ticks=holder_start_ticks,
+        holder_parent_pid=holder_parent_pid,
+        holder_parent_start_ticks=holder_parent_start_ticks,
+        holder_parent_comm=holder_parent_comm,
+        holder_argv=holder_argv,
+        kitty_pid=terminal_pid,
+        kitty_start_ticks=terminal_start_ticks,
+        kitty_argv=legacy_argv,
+    )
     observed_window_id, dedicated = _kitty_dedication(
         holder_pid=holder_pid,
         kitty_pid=terminal_pid,

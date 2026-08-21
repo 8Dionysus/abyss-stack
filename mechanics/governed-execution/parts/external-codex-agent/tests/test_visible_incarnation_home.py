@@ -1934,6 +1934,49 @@ def test_kitty_dedication_rejects_sibling_terminal_child(
         )
 
 
+def test_legacy_holder_identity_rejects_process_argv_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    holder_argv = ["/usr/bin/codex", "exec"]
+    kitty_argv = ["/usr/bin/kitty", "--detach", "--title", "holder"]
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_start_ticks",
+        lambda pid: {101: 11, 102: 12, 103: 13}[pid],
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_parent_pid",
+        lambda pid: {101: 102, 102: 103, 103: 1}[pid],
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_comm",
+        lambda pid: {102: "bwrap", 103: "kitty"}[pid],
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: {
+            101: holder_argv,
+            103: ["/usr/bin/kitty", "--detach", "--title", "replacement"],
+        }[pid],
+    )
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="Kitty argv identity"):
+        MODULE._validate_legacy_holder_process_identity(
+            holder_pid=101,
+            holder_start_ticks=11,
+            holder_parent_pid=102,
+            holder_parent_start_ticks=12,
+            holder_parent_comm="bwrap",
+            holder_argv=holder_argv,
+            kitty_pid=103,
+            kitty_start_ticks=13,
+            kitty_argv=kitty_argv,
+        )
+
+
 def test_verified_term_uses_pidfd_after_identity_recheck(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2798,6 +2841,9 @@ def test_safe_projection_redacts_quoted_and_whitespace_credentials() -> None:
     assert MODULE._safe_projection_string(
         "token=hunter 2", "whitespace title"
     ) == "token=<redacted>"
+    assert MODULE._safe_projection_string(
+        r'{"password":"hunter\"suffix"}', "escaped json-shaped title"
+    ) == '{"password":"<redacted>"}'
 
 
 def test_kitty_projection_rechecks_recorded_socket_identity(
