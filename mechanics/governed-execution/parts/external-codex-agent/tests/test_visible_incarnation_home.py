@@ -1275,6 +1275,20 @@ def test_detached_launch_publishes_socket_only_binding(
         "remote_control": "socket-only",
         "dedicated": True,
     }
+    events: list[str] = []
+
+    def accept_pre_exec_identity(
+        _receipt: dict[str, object], **_kwargs: object
+    ) -> tuple[object, ...]:
+        events.append("pre-exec")
+        return (101, 202, "kitty", "7", True)
+
+    def accept_post_exec_identity(
+        _receipt: dict[str, object]
+    ) -> tuple[object, ...]:
+        events.append("post-exec")
+        return (101, 202, "kitty", "7", True)
+
     monkeypatch.setattr(
         MODULE,
         "_verify_command_version",
@@ -1283,7 +1297,12 @@ def test_detached_launch_publishes_socket_only_binding(
     monkeypatch.setattr(
         MODULE,
         "_holder_terminal_identity",
-        lambda _receipt: (101, 202, "kitty", "7", True),
+        accept_post_exec_identity,
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_holder_pre_exec_identity",
+        accept_pre_exec_identity,
     )
     monkeypatch.setattr(MODULE, "_spawn_named_snapshot_cleanup", lambda **_: None)
     monkeypatch.setattr(
@@ -1314,6 +1333,7 @@ def test_detached_launch_publishes_socket_only_binding(
     if reject_identity:
 
         def reject_holder_identity(_receipt: dict[str, object]) -> tuple[object, ...]:
+            events.append("post-exec")
             raise MODULE.IncarnationHomeError("post-exec identity is transient")
 
         monkeypatch.setattr(
@@ -1327,6 +1347,30 @@ def test_detached_launch_publishes_socket_only_binding(
             lambda receipt: termination_targets.append(receipt) or True,
         )
     captured: dict[str, object] = {}
+
+    original_write_gate = MODULE._write_visible_launch_gate
+
+    def record_write_gate(**kwargs: object) -> None:
+        events.append(f"gate:{kwargs['decision']}")
+        original_write_gate(**kwargs)  # type: ignore[arg-type]
+
+    original_confirm_admission = MODULE._confirm_visible_launch_admission
+
+    def record_confirm_admission(**kwargs: object) -> None:
+        events.append("confirm")
+        original_confirm_admission(**kwargs)  # type: ignore[arg-type]
+
+    original_emit_safe_json = MODULE._emit_safe_json
+
+    def record_emit_safe_json(*args: object, **kwargs: object) -> None:
+        events.append("emit")
+        original_emit_safe_json(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(MODULE, "_write_visible_launch_gate", record_write_gate)
+    monkeypatch.setattr(
+        MODULE, "_confirm_visible_launch_admission", record_confirm_admission
+    )
+    monkeypatch.setattr(MODULE, "_emit_safe_json", record_emit_safe_json)
 
     def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         if publish_receipt:
@@ -1349,7 +1393,7 @@ def test_detached_launch_publishes_socket_only_binding(
     )
 
     gate_path = holder_path.with_name(holder_path.name + ".launch-gate.json")
-    if not publish_receipt or reject_receipt or reject_identity:
+    if not publish_receipt or reject_receipt:
         with pytest.raises(
             MODULE.IncarnationHomeError, match="did not publish a live terminal binding"
         ):
@@ -1364,10 +1408,22 @@ def test_detached_launch_publishes_socket_only_binding(
             assert termination_targets == []
         return
 
+    if reject_identity:
+        with pytest.raises(
+            MODULE.IncarnationHomeError,
+            match="post-exec identity acknowledgment",
+        ):
+            MODULE.command_launch(args)
+        gate = json.loads(gate_path.read_text(encoding="utf-8"))
+        assert gate["decision"] == "admit"
+        assert len(termination_targets) == 1
+        return
+
     assert MODULE.command_launch(args) == 0
     gate = json.loads(gate_path.read_text(encoding="utf-8"))
     assert gate["decision"] == "admit"
     assert gate["holder_receipt_ref"] == str(holder_path.resolve())
+    assert events[:5] == ["pre-exec", "gate:admit", "confirm", "post-exec", "emit"]
     argv = captured["argv"]
     assert isinstance(argv, list)
     assert "--listen-on" in argv

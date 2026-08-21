@@ -1710,6 +1710,9 @@ def _holder_receipt(
         path=os.environ.get("PATH"),
         executable_bytes=executable_bytes,
     )
+    pre_exec_argv = _proc_argv(holder_pid)
+    if not pre_exec_argv:
+        raise IncarnationHomeError("holder pre-exec argv is empty")
     try:
         if manifest_bytes is None:
             manifest_bytes = manifest_path.read_bytes()
@@ -1790,6 +1793,8 @@ def _holder_receipt(
             "parent_pid": holder_parent_pid,
             "parent_start_ticks": _proc_start_ticks(holder_parent_pid),
             "parent_comm": parent_comm,
+            "pre_exec_argv": pre_exec_argv,
+            "pre_exec_argv_digest": sha256_bytes(canonical_bytes(pre_exec_argv)),
             "argv": post_exec_argv,
             "argv_digest": sha256_bytes(canonical_bytes(post_exec_argv)),
         },
@@ -2240,6 +2245,17 @@ def _load_holder_receipt_snapshot(
         or not all(isinstance(item, str) for item in holder["argv"])
     ):
         raise IncarnationHomeError("holder terminal receipt is incomplete")
+    pre_exec_argv = holder.get("pre_exec_argv")
+    pre_exec_argv_digest = holder.get("pre_exec_argv_digest")
+    if pre_exec_argv is not None or pre_exec_argv_digest is not None:
+        if (
+            not isinstance(pre_exec_argv, list)
+            or not pre_exec_argv
+            or not all(isinstance(item, str) for item in pre_exec_argv)
+            or not isinstance(pre_exec_argv_digest, str)
+            or pre_exec_argv_digest != sha256_bytes(canonical_bytes(pre_exec_argv))
+        ):
+            raise IncarnationHomeError("holder pre-exec identity is invalid")
     _decode_holder_manifest_snapshot(runtime)
     if "binding" in receipt:
         binding = _validate_terminal_binding_shape(receipt["binding"])
@@ -2285,58 +2301,12 @@ def _holder_receipt_process_ids(
 def _holder_terminal_identity(
     receipt: dict[str, Any],
 ) -> tuple[int, int, str, str, bool]:
-    holder = receipt["holder"]
     runtime = receipt["runtime"]
-    terminal = receipt["terminal"]
-    pid, start_ticks, kitty_pid, kitty_start_ticks = _holder_receipt_process_ids(
-        receipt
+    pid, kitty_pid, kitty_comm, window_id, dedicated = _validate_holder_process_identity(
+        receipt,
+        expected_argv=receipt["holder"]["argv"],
+        argv_label="holder",
     )
-    parent_pid = holder["parent_pid"]
-    parent_start_ticks = holder["parent_start_ticks"]
-    if _proc_start_ticks(pid) != start_ticks:
-        raise IncarnationHomeError("holder PID was reused or has drifted")
-    if _proc_start_ticks(parent_pid) != parent_start_ticks:
-        raise IncarnationHomeError("holder terminal parent PID was reused or has drifted")
-    if _proc_parent_pid(pid) != parent_pid:
-        raise IncarnationHomeError("holder parent identity has changed")
-    if _proc_comm(parent_pid) != holder.get("parent_comm"):
-        raise IncarnationHomeError("holder process parent identity has drifted")
-    observed_argv = _proc_argv(pid)
-    expected_argv = holder["argv"]
-    if observed_argv != expected_argv:
-        raise IncarnationHomeError("holder argv identity has drifted")
-    if holder.get("argv_digest") != sha256_bytes(canonical_bytes(expected_argv)):
-        raise IncarnationHomeError("holder argv digest is invalid")
-    if _proc_start_ticks(kitty_pid) != kitty_start_ticks:
-        raise IncarnationHomeError("holder Kitty PID was reused or has drifted")
-    if _proc_comm(kitty_pid) != "kitty":
-        raise IncarnationHomeError("holder terminal is not Kitty")
-    if _proc_argv(kitty_pid) != terminal["argv"]:
-        raise IncarnationHomeError("holder Kitty argv identity has drifted")
-    cursor = pid
-    visited: set[int] = set()
-    terminal_found = False
-    for _ in range(64):
-        current_parent_pid = _proc_parent_pid(cursor)
-        if current_parent_pid <= 1 or current_parent_pid in visited:
-            break
-        visited.add(current_parent_pid)
-        if current_parent_pid == kitty_pid:
-            terminal_found = True
-            break
-        cursor = current_parent_pid
-    if not terminal_found:
-        raise IncarnationHomeError("holder Kitty terminal is no longer an ancestor")
-    window_id, dedicated = _kitty_dedication(
-        holder_pid=pid,
-        kitty_pid=kitty_pid,
-        terminal_argv=terminal["argv"],
-    )
-    recorded_window_id = terminal.get("window_id")
-    if recorded_window_id is not None and recorded_window_id != window_id:
-        raise IncarnationHomeError("holder Kitty window identity has drifted")
-    if terminal.get("dedicated") is not None and terminal.get("dedicated") is not dedicated:
-        raise IncarnationHomeError("holder Kitty dedication proof has drifted")
     # Repaired receipts bind the exact payload digests before the private
     # execution mount is entered.  The recorded host paths are provenance only
     # after launch; reopening them here would make close depend on mutable
@@ -2396,7 +2366,90 @@ def _holder_terminal_identity(
             "incarnation_manifest_digest"
         ):
             raise IncarnationHomeError("holder incarnation manifest digest has drifted")
+    return pid, kitty_pid, kitty_comm, window_id, dedicated
+
+
+def _validate_holder_process_identity(
+    receipt: dict[str, Any],
+    *,
+    expected_argv: Sequence[str],
+    argv_label: str,
+) -> tuple[int, int, str, str, bool]:
+    """Validate one exact holder process before or after its payload exec."""
+
+    holder = receipt["holder"]
+    terminal = receipt["terminal"]
+    pid, start_ticks, kitty_pid, kitty_start_ticks = _holder_receipt_process_ids(
+        receipt
+    )
+    parent_pid = holder["parent_pid"]
+    parent_start_ticks = holder["parent_start_ticks"]
+    if _proc_start_ticks(pid) != start_ticks:
+        raise IncarnationHomeError("holder PID was reused or has drifted")
+    if _proc_start_ticks(parent_pid) != parent_start_ticks:
+        raise IncarnationHomeError("holder terminal parent PID was reused or has drifted")
+    if _proc_parent_pid(pid) != parent_pid:
+        raise IncarnationHomeError("holder parent identity has changed")
+    if _proc_comm(parent_pid) != holder.get("parent_comm"):
+        raise IncarnationHomeError("holder process parent identity has drifted")
+    if _proc_argv(pid) != list(expected_argv):
+        raise IncarnationHomeError(f"{argv_label} argv identity has drifted")
+    if _proc_start_ticks(kitty_pid) != kitty_start_ticks:
+        raise IncarnationHomeError("holder Kitty PID was reused or has drifted")
+    if _proc_comm(kitty_pid) != "kitty":
+        raise IncarnationHomeError("holder terminal is not Kitty")
+    if _proc_argv(kitty_pid) != terminal["argv"]:
+        raise IncarnationHomeError("holder Kitty argv identity has drifted")
+    cursor = pid
+    visited: set[int] = set()
+    terminal_found = False
+    for _ in range(64):
+        current_parent_pid = _proc_parent_pid(cursor)
+        if current_parent_pid <= 1 or current_parent_pid in visited:
+            break
+        visited.add(current_parent_pid)
+        if current_parent_pid == kitty_pid:
+            terminal_found = True
+            break
+        cursor = current_parent_pid
+    if not terminal_found:
+        raise IncarnationHomeError("holder Kitty terminal is no longer an ancestor")
+    window_id, dedicated = _kitty_dedication(
+        holder_pid=pid,
+        kitty_pid=kitty_pid,
+        terminal_argv=terminal["argv"],
+    )
+    recorded_window_id = terminal.get("window_id")
+    if recorded_window_id is not None and recorded_window_id != window_id:
+        raise IncarnationHomeError("holder Kitty window identity has drifted")
+    if terminal.get("dedicated") is not None and terminal.get("dedicated") is not dedicated:
+        raise IncarnationHomeError("holder Kitty dedication proof has drifted")
     return pid, kitty_pid, _proc_comm(kitty_pid), window_id, dedicated
+
+
+def _holder_pre_exec_identity(
+    receipt: dict[str, Any], *, expected_argv: Sequence[str]
+) -> tuple[int, int, str, str, bool]:
+    """Prove the receipt still belongs to the exact payload helper pre-exec."""
+
+    holder = receipt["holder"]
+    recorded_argv = holder.get("pre_exec_argv")
+    recorded_digest = holder.get("pre_exec_argv_digest")
+    if (
+        not isinstance(recorded_argv, list)
+        or not recorded_argv
+        or not all(isinstance(item, str) for item in recorded_argv)
+        or not isinstance(recorded_digest, str)
+        or recorded_digest != sha256_bytes(canonical_bytes(recorded_argv))
+    ):
+        raise IncarnationHomeError("holder pre-exec identity is missing")
+    if recorded_argv != list(expected_argv):
+        raise IncarnationHomeError("holder pre-exec helper argv binding has drifted")
+    return _validate_holder_process_identity(
+        receipt,
+        expected_argv=recorded_argv,
+        argv_label="holder pre-exec helper",
+    )
 
 
 def _load_terminal_binding_input(
@@ -2806,6 +2859,56 @@ def _write_visible_launch_gate(
     )
 
 
+def _load_visible_launch_gate(
+    *,
+    gate_path: Path,
+    holder_receipt_path: Path,
+    token: str,
+) -> dict[str, Any]:
+    """Read back one exact parent admission decision."""
+
+    _validate_launch_gate_path(gate_path)
+    if not holder_receipt_path.is_absolute() or holder_receipt_path.is_symlink():
+        raise IncarnationHomeError(
+            "visible launch admission holder receipt path is not bound"
+        )
+    if not isinstance(token, str) or not token:
+        raise IncarnationHomeError("visible launch admission token is invalid")
+    gate, _gate_bytes = _load_json_snapshot(
+        gate_path, "visible launch admission gate"
+    )
+    if gate.get("schema_version") != VISIBLE_LAUNCH_GATE_SCHEMA_VERSION:
+        raise IncarnationHomeError("visible launch admission gate schema is unsupported")
+    if gate.get("gate_ref") != str(gate_path.resolve()):
+        raise IncarnationHomeError("visible launch admission gate path identity drifted")
+    if gate.get("holder_receipt_ref") != str(holder_receipt_path.resolve()):
+        raise IncarnationHomeError(
+            "visible launch admission holder receipt identity drifted"
+        )
+    if gate.get("token") != token:
+        raise IncarnationHomeError("visible launch admission token drifted")
+    if gate.get("decision") not in {"admit", "reject"}:
+        raise IncarnationHomeError("visible launch admission decision is invalid")
+    return gate
+
+
+def _confirm_visible_launch_admission(
+    *,
+    gate_path: Path,
+    holder_receipt_path: Path,
+    token: str,
+) -> None:
+    """Confirm that the durable parent decision is exactly ``admit``."""
+
+    gate = _load_visible_launch_gate(
+        gate_path=gate_path,
+        holder_receipt_path=holder_receipt_path,
+        token=token,
+    )
+    if gate.get("decision") != "admit":
+        raise IncarnationHomeError("visible launch admission was not confirmed")
+
+
 def _await_visible_launch_admission(
     *,
     gate_path: Path,
@@ -2824,23 +2927,11 @@ def _await_visible_launch_admission(
     deadline = time.monotonic() + VISIBLE_LAUNCH_GATE_WAIT_SECONDS
     while True:
         if gate_path.exists() or gate_path.is_symlink():
-            gate, _gate_bytes = _load_json_snapshot(
-                gate_path, "visible launch admission gate"
+            gate = _load_visible_launch_gate(
+                gate_path=gate_path,
+                holder_receipt_path=holder_receipt_path,
+                token=token,
             )
-            if gate.get("schema_version") != VISIBLE_LAUNCH_GATE_SCHEMA_VERSION:
-                raise IncarnationHomeError(
-                    "visible launch admission gate schema is unsupported"
-                )
-            if gate.get("gate_ref") != str(gate_path.resolve()):
-                raise IncarnationHomeError(
-                    "visible launch admission gate path identity drifted"
-                )
-            if gate.get("holder_receipt_ref") != str(holder_receipt_path.resolve()):
-                raise IncarnationHomeError(
-                    "visible launch admission holder receipt identity drifted"
-                )
-            if gate.get("token") != token:
-                raise IncarnationHomeError("visible launch admission token drifted")
             decision = gate.get("decision")
             if decision == "reject":
                 raise IncarnationHomeError(
@@ -5522,13 +5613,11 @@ def command_launch(args: argparse.Namespace) -> int:
                                 companion_binding=companion_binding,
                             )
                             _validate_terminal_binding_shape(candidate["binding"])
-                            # Keep an exact, launch-admitted receipt available
-                            # while the post-exec identity can still be a
-                            # transient helper shape.  If admission ultimately
-                            # fails, finally must be able to terminate that
-                            # exact holder rather than leaving the child live.
                             launch_candidate = candidate
-                            _holder_terminal_identity(candidate)
+                            _holder_pre_exec_identity(
+                                candidate,
+                                expected_argv=payload_argv,
+                            )
                             receipt = candidate
                             break
                     except IncarnationHomeError:
@@ -5539,6 +5628,30 @@ def command_launch(args: argparse.Namespace) -> int:
                     "visible launch did not publish a live terminal binding"
                 )
             binding = _validate_terminal_binding_shape(receipt["binding"])
+            _write_visible_launch_gate(
+                gate_path=launch_gate_path,
+                holder_receipt_path=holder_receipt_path,
+                token=launch_gate_token,
+                decision="admit",
+            )
+            launch_gate_published = True
+            _confirm_visible_launch_admission(
+                gate_path=launch_gate_path,
+                holder_receipt_path=holder_receipt_path,
+                token=launch_gate_token,
+            )
+            post_exec_acknowledged = False
+            for _ in range(100):
+                try:
+                    _holder_terminal_identity(receipt)
+                    post_exec_acknowledged = True
+                    break
+                except IncarnationHomeError:
+                    time.sleep(0.1)
+            if not post_exec_acknowledged:
+                raise IncarnationHomeError(
+                    "visible launch did not publish a post-exec identity acknowledgment"
+                )
             if executable_snapshot_dir is not None:
                 _spawn_named_snapshot_cleanup(
                     snapshot_path=executable_snapshot_path,
@@ -5557,13 +5670,6 @@ def command_launch(args: argparse.Namespace) -> int:
                 },
                 label="visible launch binding",
             )
-            _write_visible_launch_gate(
-                gate_path=launch_gate_path,
-                holder_receipt_path=holder_receipt_path,
-                token=launch_gate_token,
-                decision="admit",
-            )
-            launch_gate_published = True
             launch_accepted = True
             return 0
         finally:
