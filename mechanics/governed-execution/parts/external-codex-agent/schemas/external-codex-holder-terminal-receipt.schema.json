@@ -14,7 +14,22 @@
     "holder": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["pid", "start_ticks", "parent_pid", "parent_start_ticks", "parent_comm", "pre_exec_argv", "pre_exec_argv_digest", "pre_exec_exe_digest", "argv", "argv_digest", "exe_digest"],
+      "oneOf": [
+        {
+          "required": ["pid", "start_ticks", "parent_pid", "parent_start_ticks", "parent_comm", "argv", "argv_digest"],
+          "not": {
+            "anyOf": [
+              {"required": ["pre_exec_argv"]},
+              {"required": ["pre_exec_argv_digest"]},
+              {"required": ["pre_exec_exe_digest"]},
+              {"required": ["exe_digest"]}
+            ]
+          }
+        },
+        {
+          "required": ["pid", "start_ticks", "parent_pid", "parent_start_ticks", "parent_comm", "pre_exec_argv", "pre_exec_argv_digest", "pre_exec_exe_digest", "argv", "argv_digest", "exe_digest"]
+        }
+      ],
       "properties": {
         "pid": {"type": "integer", "minimum": 1},
         "start_ticks": {"type": "integer", "minimum": 1},
@@ -91,7 +106,24 @@
     "processIdentity": {
       "type": "object",
       "additionalProperties": false,
-        "required": ["pid", "start_ticks", "argv_digest", "exe_digest"],
+      "oneOf": [
+        {
+          "required": ["pid", "start_ticks"],
+          "not": {
+            "anyOf": [
+              {"required": ["argv_digest"]},
+              {"required": ["exe_digest"]}
+            ]
+          }
+        },
+        {
+          "required": ["pid", "start_ticks", "argv_digest"],
+          "not": {"required": ["exe_digest"]}
+        },
+        {
+          "required": ["pid", "start_ticks", "argv_digest", "exe_digest"]
+        }
+      ],
       "properties": {
         "pid": {"type": "integer", "minimum": 1},
         "start_ticks": {"type": "integer", "minimum": 1},

@@ -699,6 +699,12 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert receipt["holder"]["argv"] == MODULE._post_exec_argv(
         original_executable, captured["inner_argv"]
     )
+    assert receipt["holder"]["exe_digest"] == MODULE._post_exec_executable_digest(
+        executable,
+        path=os.environ.get("PATH"),
+        executable_bytes=original_content,
+    )
+    assert receipt["holder"]["exe_digest"] != MODULE.sha256_bytes(original_content)
     assert receipt["terminal"]["binding"] == "kitty_ancestor_at_exec"
     assert receipt["terminal"]["pid"] == terminal_pid
     assert receipt["terminal"]["argv"] == terminal_argv
@@ -4316,3 +4322,18 @@ def test_directed_input_rechecks_kitty_dedication_before_send(
 def test_launch_rejects_explicit_empty_terminal_title() -> None:
     with pytest.raises(MODULE.IncarnationHomeError, match="terminal title"):
         MODULE.command_launch(MODULE.argparse.Namespace(terminal_title=""))
+
+
+@pytest.mark.parametrize("field", ["binding_context", "control_socket"])
+def test_launch_rejects_binding_options_without_terminal_title(field: str) -> None:
+    arguments = MODULE.argparse.Namespace(
+        terminal_title=None,
+        binding_context=None,
+        control_socket=None,
+    )
+    setattr(arguments, field, "/tmp/owner-binding-option")
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="binding options require --terminal-title",
+    ):
+        MODULE.command_launch(arguments)

@@ -1291,6 +1291,46 @@ def _post_exec_argv(
     return post_exec
 
 
+def _post_exec_executable_digest(
+    executable: Path,
+    *,
+    path: str | None = None,
+    executable_bytes: bytes | None = None,
+) -> str:
+    """Hash the executable Linux will run after resolving a shebang."""
+
+    try:
+        content = (
+            executable_bytes if executable_bytes is not None else executable.read_bytes()
+        )
+        first_line = content.splitlines(keepends=True)[0]
+    except (IndexError, OSError) as exc:
+        raise IncarnationHomeError("Codex executable could not be inspected") from exc
+    if not first_line.startswith(b"#!"):
+        return sha256_bytes(content)
+    shebang = os.fsdecode(first_line[2:]).strip()
+    fields = shebang.split(maxsplit=1)
+    if not fields or not fields[0].startswith("/"):
+        raise IncarnationHomeError("Codex shebang interpreter is not absolute")
+    interpreter = Path(fields[0])
+    if fields[0] == "/usr/bin/env" and len(fields) == 2 and fields[1]:
+        env_fields = shlex.split(fields[1])
+        if env_fields and env_fields[0] in {"-S", "--split-string"}:
+            env_fields = env_fields[1:]
+        elif len(env_fields) != 1:
+            env_fields = []
+        if env_fields and not env_fields[0].startswith("-"):
+            resolved = shutil.which(env_fields[0], path=path or os.environ.get("PATH"))
+            if resolved is not None:
+                interpreter = Path(resolved)
+    try:
+        return sha256_bytes(_resolved_executable(interpreter).read_bytes())
+    except (IncarnationHomeError, OSError) as exc:
+        raise IncarnationHomeError(
+            "Codex post-exec interpreter could not be hashed"
+        ) from exc
+
+
 def _kitty_ancestor(pid: int) -> tuple[int, int, list[str]]:
     """Return the first exact Kitty ancestor of one visible holder."""
 
@@ -1767,6 +1807,11 @@ def _holder_receipt(
     if not pre_exec_argv:
         raise IncarnationHomeError("holder pre-exec argv is empty")
     pre_exec_exe_digest = _proc_exe_digest(holder_pid)
+    post_exec_exe_digest = _post_exec_executable_digest(
+        executable,
+        path=os.environ.get("PATH"),
+        executable_bytes=executable_bytes,
+    )
     try:
         if manifest_bytes is None:
             manifest_bytes = manifest_path.read_bytes()
@@ -1826,7 +1871,7 @@ def _holder_receipt(
             holder_pid=holder_pid,
             holder_start_ticks=_proc_start_ticks(holder_pid),
             holder_argv_digest=sha256_bytes(canonical_bytes(post_exec_argv)),
-            holder_exe_digest=executable_digest,
+            holder_exe_digest=post_exec_exe_digest,
             terminal_pid=terminal_pid,
             terminal_start_ticks=terminal_start_ticks,
         )
@@ -1854,7 +1899,7 @@ def _holder_receipt(
             "pre_exec_exe_digest": pre_exec_exe_digest,
             "argv": post_exec_argv,
             "argv_digest": sha256_bytes(canonical_bytes(post_exec_argv)),
-            "exe_digest": executable_digest,
+            "exe_digest": post_exec_exe_digest,
         },
         "runtime": runtime,
         "terminal": terminal,
@@ -5556,10 +5601,17 @@ def command_launch(args: argparse.Namespace) -> int:
     terminal_title = getattr(args, "terminal_title", None)
     holder_receipt_argument = getattr(args, "holder_receipt", None)
     binding_context_argument = getattr(args, "binding_context", None)
+    control_socket_argument = getattr(args, "control_socket", None)
     if terminal_title is not None and (
         not isinstance(terminal_title, str) or not terminal_title.strip()
     ):
         raise IncarnationHomeError("visible launch terminal title must not be empty")
+    if terminal_title is None and (
+        binding_context_argument is not None or control_socket_argument is not None
+    ):
+        raise IncarnationHomeError(
+            "visible launch binding options require --terminal-title"
+        )
     if terminal_title is not None and (
         not holder_receipt_argument or not binding_context_argument
     ):

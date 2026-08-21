@@ -745,6 +745,62 @@ def test_visible_terminal_schemas_restrict_socket_modes_to_owner_bits() -> None:
         assert not validator.is_valid(socket)
 
 
+def test_holder_receipt_schema_accepts_legacy_and_repaired_v1_receipts() -> None:
+    schema = load_json(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/"
+        "external-codex-holder-terminal-receipt.schema.json"
+    )
+    validator = Draft202012Validator(schema)
+    digest = "sha256:" + "0" * 64
+    legacy = {
+        "schema_version": "abyss_stack_visible_incarnation_holder_terminal_v1",
+        "receipt_ref": "/tmp/holder.json",
+        "created_at": "2026-08-21T00:00:00Z",
+        "lifecycle_role": "responsibility_holder",
+        "boot_id": "00000000-0000-0000-0000-000000000000",
+        "holder": {
+            "pid": 101,
+            "start_ticks": 1001,
+            "parent_pid": 202,
+            "parent_start_ticks": 2002,
+            "parent_comm": "bwrap",
+            "argv": ["/var/tmp/codex", "exec"],
+            "argv_digest": digest,
+        },
+        "runtime": {
+            "codex_executable": "/opt/codex",
+            "codex_executable_digest": digest,
+            "incarnation_manifest": "/opt/incarnation-home.json",
+            "incarnation_manifest_digest": digest,
+            "model": "gpt-5.6-luna",
+            "reasoning_effort": "max",
+            "ambient_codex_home": "/home/dionysus/.codex",
+            "incarnation_codex_home": "/opt/codex-home",
+        },
+        "terminal": {
+            "binding": "kitty_ancestor_at_exec",
+            "required_comm": "kitty",
+            "pid": 303,
+            "start_ticks": 3003,
+            "argv": ["kitty", "--detach"],
+            "window_id": "7",
+            "dedicated": True,
+        },
+    }
+    validator.validate(legacy)
+
+    repaired = copy.deepcopy(legacy)
+    repaired["holder"].update(
+        {
+            "pre_exec_argv": ["/usr/bin/python3", "payload-launch"],
+            "pre_exec_argv_digest": digest,
+            "pre_exec_exe_digest": digest,
+            "exe_digest": digest,
+        }
+    )
+    validator.validate(repaired)
+
+
 def test_stack_mcp_schema_encodes_conditional_runtime_invariants() -> None:
     schema = load_json(
         "mcp/services/abyss-stack-mcp/schemas/runtime-observation.schema.json"
