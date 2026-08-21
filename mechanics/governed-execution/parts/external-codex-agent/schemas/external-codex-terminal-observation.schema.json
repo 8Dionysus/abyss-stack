@@ -17,7 +17,7 @@
       "properties": {
         "address": {"type": "string", "pattern": "^unix:/"},
         "path": {"type": "string", "pattern": "^/"},
-        "mode": {"type": "integer", "minimum": 0, "maximum": 511},
+        "mode": {"type": "integer", "minimum": 0, "maximum": 448, "multipleOf": 64},
         "device": {"type": "integer", "minimum": 1},
         "inode": {"type": "integer", "minimum": 1}
       }

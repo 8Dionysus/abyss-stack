@@ -707,6 +707,38 @@ def test_active_examples_validate_against_schema_contracts() -> None:
         validate_payload(payload_path, schema_path, mode=mode)
 
 
+def test_visible_terminal_schemas_restrict_socket_modes_to_owner_bits() -> None:
+    cases = (
+        (
+            "mechanics/governed-execution/parts/external-codex-agent/schemas/"
+            "external-codex-terminal-observation.schema.json",
+            "socket",
+        ),
+        (
+            "mechanics/governed-execution/parts/external-codex-agent/schemas/"
+            "external-codex-holder-terminal-receipt.schema.json",
+            "controlSocket",
+        ),
+    )
+    for schema_path, socket_definition in cases:
+        schema = load_json(schema_path)
+        socket_schema = schema["$defs"][socket_definition]
+        mode_schema = socket_schema["properties"]["mode"]
+        assert mode_schema["maximum"] == 448
+        assert mode_schema["multipleOf"] == 64
+        validator = Draft202012Validator(socket_schema)
+        socket = {
+            "address": "unix:/tmp/kitty.sock",
+            "path": "/tmp/kitty.sock",
+            "mode": 384,
+            "device": 1,
+            "inode": 2,
+        }
+        assert validator.is_valid(socket)
+        socket["mode"] = 511
+        assert not validator.is_valid(socket)
+
+
 def test_stack_mcp_schema_encodes_conditional_runtime_invariants() -> None:
     schema = load_json(
         "mcp/services/abyss-stack-mcp/schemas/runtime-observation.schema.json"
