@@ -2513,12 +2513,13 @@ def _validate_holder_process_identity(
         raise IncarnationHomeError(f"{argv_label} argv identity has drifted")
     if expected_exe_digest is None:
         expected_exe_digest = holder.get("exe_digest")
-    if not isinstance(expected_exe_digest, str) or not SHA256_DIGEST_PATTERN.fullmatch(
-        expected_exe_digest
-    ):
-        raise IncarnationHomeError(f"{argv_label} executable identity is missing")
-    if _proc_exe_digest(pid) != expected_exe_digest:
-        raise IncarnationHomeError(f"{argv_label} executable identity has drifted")
+    if expected_exe_digest is not None:
+        if not isinstance(expected_exe_digest, str) or not SHA256_DIGEST_PATTERN.fullmatch(
+            expected_exe_digest
+        ):
+            raise IncarnationHomeError(f"{argv_label} executable identity is invalid")
+        if _proc_exe_digest(pid) != expected_exe_digest:
+            raise IncarnationHomeError(f"{argv_label} executable identity has drifted")
     if _proc_start_ticks(kitty_pid) != kitty_start_ticks:
         raise IncarnationHomeError("holder Kitty PID was reused or has drifted")
     if _proc_comm(kitty_pid) != "kitty":

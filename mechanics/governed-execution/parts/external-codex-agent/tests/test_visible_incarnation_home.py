@@ -1535,6 +1535,78 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
     )
 
 
+def test_legacy_holder_identity_preserves_path_digest_validation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "codex"
+    executable_bytes = b"legacy-holder-executable"
+    executable.write_bytes(executable_bytes)
+    executable.chmod(0o700)
+    manifest = tmp_path / "incarnation-home.json"
+    manifest_bytes = b"legacy-incarnation-manifest"
+    manifest.write_bytes(manifest_bytes)
+    holder_pid, parent_pid, kitty_pid = 101, 102, 103
+    holder_argv = [str(executable), "exec"]
+    kitty_argv = ["/usr/bin/kitty", "--detach", "--title", "holder"]
+    boot_id = "00000000-0000-0000-0000-000000000002"
+    receipt = {
+        "boot_id": boot_id,
+        "holder": {
+            "pid": holder_pid,
+            "start_ticks": 11,
+            "parent_pid": parent_pid,
+            "parent_start_ticks": 12,
+            "parent_comm": "bwrap",
+            "argv": holder_argv,
+            "argv_digest": MODULE.sha256_bytes(MODULE.canonical_bytes(holder_argv)),
+        },
+        "runtime": {
+            "codex_executable": str(executable),
+            "codex_executable_digest": MODULE.sha256_bytes(executable_bytes),
+            "incarnation_manifest": str(manifest),
+            "incarnation_manifest_digest": MODULE.sha256_bytes(manifest_bytes),
+            "model": "gpt-5.6-luna",
+            "reasoning_effort": "max",
+            "ambient_codex_home": str(tmp_path / "ambient"),
+            "incarnation_codex_home": str(tmp_path / "incarnation"),
+        },
+        "terminal": {
+            "pid": kitty_pid,
+            "start_ticks": 13,
+            "argv": kitty_argv,
+            "window_id": "7",
+            "dedicated": True,
+        },
+    }
+    monkeypatch.setattr(MODULE, "_proc_boot_id", lambda: boot_id)
+    monkeypatch.setattr(
+        MODULE, "_proc_start_ticks", lambda pid: {101: 11, 102: 12, 103: 13}[pid]
+    )
+    monkeypatch.setattr(
+        MODULE, "_proc_parent_pid", lambda pid: {101: 102, 102: 103, 103: 1}[pid]
+    )
+    monkeypatch.setattr(
+        MODULE, "_proc_comm", lambda pid: {102: "bwrap", 103: "kitty"}[pid]
+    )
+    monkeypatch.setattr(
+        MODULE, "_proc_argv", lambda pid: {101: holder_argv, 103: kitty_argv}[pid]
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_exe_digest",
+        lambda _pid: pytest.fail("legacy identity queried repaired executable digest"),
+    )
+    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("7", True))
+
+    assert MODULE._holder_terminal_identity(receipt) == (
+        holder_pid,
+        kitty_pid,
+        "kitty",
+        "7",
+        True,
+    )
+
+
 def test_live_close_uses_holder_bound_companion_after_host_removal(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
