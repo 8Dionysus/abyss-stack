@@ -4,6 +4,8 @@ This directory stores user-unit skeletons for the deployed runtime.
 
 ## Current units
 
+- `aoa-external-actor-clock@.service`, the manual-only delayed clock for a
+  separately addressable external actor holder
 - `podman-compose-abyss.service`
 - `abyss-ovms.container`, the rootless Quadlet source for the cold embeddings
   container
@@ -51,6 +53,34 @@ routes `.container` entries there automatically and links ordinary units into
 Then reload and enable:
 
 Use the route in [AGENTS](AGENTS.md#install-routes).
+
+### External actor clock lifecycle
+
+`aoa-external-actor-clock@.service` is a manual one-shot route. Its environment
+file names an executable `AOA_CLOCK_RUNNER`, an exact `AOA_CLOCK_TITLE`, and
+explicit private `AOA_CLOCK_STATUS_FILE` and `AOA_CLOCK_ERROR_LOG` paths. The
+paths must be distinct and must remain outside source projections. The
+foreground supervisor remains the systemd
+main process while it launches one detached Kitty holder, records the exact
+Kitty PID and `/proc` start ticks before releasing a holder handshake, publishes
+the actual runner PID and exit status atomically under a private umask, and
+returns that status to systemd. Every evidence path must be in an existing
+owner-private directory. Timeout values must be finite and positive. A Kitty
+client exiting successfully is not treated as proof that the holder completed
+successfully.
+
+The unit does not create a recurring schedule or start itself. A bounded
+deadline may be armed with a transient user timer, for example:
+
+```bash
+systemd-run --user --unit=aoa-external-actor-clock-proof \
+  --on-active=8s --timer-property=AccuracySec=1s \
+  /usr/bin/systemctl --user start --wait aoa-external-actor-clock@proof.service
+```
+
+Use a unique title and status/error paths for each proof. Stop and inspect the
+transient timer after the proof; the source unit's lifecycle evidence belongs
+to the service journal and its persisted status/error files.
 
 The checked-in unit defaults to the conservative `substrate` profile. Host-local
 drop-ins should carry richer runtime selection rather than editing the source

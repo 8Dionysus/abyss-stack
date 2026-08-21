@@ -160,6 +160,15 @@ That mode links the allowlisted unit files from
 restart, enable, disable, or mask anything. Existing drop-ins remain host-local
 and continue to carry per-machine memory or runtime-selection overrides.
 
+The allowlist also carries the manual-only
+`aoa-external-actor-clock@.service`. Its foreground supervisor owns the
+systemd lifecycle while a uniquely titled detached Kitty owns the visible
+external actor. Use a transient `systemd-run --user --on-active=<delay>` timer
+to arm one bounded clock, then inspect the service result, exact holder
+PID/start ticks, persisted status/error files, and the actor's self-contained
+handoff. The successful exit of the Kitty client alone is never a clock-return
+proof.
+
 Organ read instances use exact owner credentials; Memo and Evals additionally
 use dedicated candidate units. Provision the fourteen read bearers with
 `--provision-organ-mcp-read-auth` and the two contour-distinct candidate
