@@ -73,6 +73,9 @@ def _terminal_binding_fixture(
         tty="/dev/pts/7",
         holder_pid=101,
         holder_start_ticks=1001,
+        holder_argv_digest=MODULE.sha256_bytes(
+            MODULE.canonical_bytes(["/usr/bin/codex", "exec"])
+        ),
         terminal_pid=202,
         terminal_start_ticks=2002,
     )
@@ -3432,7 +3435,13 @@ def test_terminal_binding_creation_records_exact_owner_and_terminal_identity(
         assert binding["schema_version"] == MODULE.TERMINAL_BINDING_SCHEMA_VERSION
         assert binding["goal_ref"] == "goal:test-terminal-observability"
         assert binding["session_ref"] == "session:test-terminal-observability"
-        assert holder == {"pid": 101, "start_ticks": 1001}
+        assert holder == {
+            "pid": 101,
+            "start_ticks": 1001,
+            "argv_digest": MODULE.sha256_bytes(
+                MODULE.canonical_bytes(["/usr/bin/codex", "exec"])
+            ),
+        }
         assert terminal["pid"] == 202
         assert terminal["start_ticks"] == 2002
         assert terminal["window_id"] == "7"
@@ -3862,7 +3871,13 @@ def test_status_is_read_only_and_writes_only_safe_projection(
     monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
     monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
     monkeypatch.setattr(MODULE, "_descends_from", lambda _pid, _ancestor: True)
-    monkeypatch.setattr(MODULE, "_proc_argv", lambda _pid: ["kitty", "--detach"])
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: ["/usr/bin/codex", "exec"]
+        if pid == holder["pid"]
+        else ["kitty", "--detach"],
+    )
     monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_kwargs: ("7", True))
     monkeypatch.setattr(
         MODULE,
@@ -3974,6 +3989,42 @@ def test_status_rejects_pid_start_tick_reuse_without_querying_kitty(
         listener.close()
 
 
+def test_status_rejects_holder_exec_argv_drift_without_querying_kitty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    queried = False
+
+    def forbidden_query(**_kwargs: object) -> list[dict[str, object]]:
+        nonlocal queried
+        queried = True
+        return []
+
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
+    monkeypatch.setattr(MODULE, "_descends_from", lambda _pid, _ancestor: True)
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: ["/usr/bin/replacement-codex", "exec"]
+        if pid == holder["pid"]
+        else ["kitty", "--detach"],
+    )
+    monkeypatch.setattr(MODULE, "_kitty_ls", forbidden_query)
+    try:
+        projection, state = MODULE._observe_terminal_binding(
+            binding=binding,
+            holder=holder,
+            terminal=terminal,
+            kitty_executable="/usr/bin/kitty",
+        )
+        assert state == "stale"
+        assert projection["observation"]["kitty_query"] == "not_attempted"
+        assert queried is False
+    finally:
+        listener.close()
+
+
 def test_status_preserves_observed_non_kitty_comm_on_drift(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -3981,6 +4032,13 @@ def test_status_preserves_observed_non_kitty_comm_on_drift(
     monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
     monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "zsh")
     monkeypatch.setattr(MODULE, "_descends_from", lambda _pid, _ancestor: True)
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: ["/usr/bin/codex", "exec"]
+        if pid == holder["pid"]
+        else ["kitty", "--detach"],
+    )
     try:
         projection, state = MODULE._observe_terminal_binding(
             binding=binding,
@@ -4001,7 +4059,13 @@ def test_status_rechecks_kitty_dedication_before_querying_socket(
     monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
     monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
     monkeypatch.setattr(MODULE, "_descends_from", lambda _pid, _ancestor: True)
-    monkeypatch.setattr(MODULE, "_proc_argv", lambda _pid: ["kitty", "--detach"])
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: ["/usr/bin/codex", "exec"]
+        if pid == holder["pid"]
+        else ["kitty", "--detach"],
+    )
     monkeypatch.setattr(
         MODULE,
         "_kitty_dedication",
@@ -4042,7 +4106,13 @@ def test_status_reclassifies_dedication_race_after_terminal_exit(
     monkeypatch.setattr(MODULE, "_proc_identity_state", identity_state)
     monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
     monkeypatch.setattr(MODULE, "_descends_from", lambda _pid, _ancestor: True)
-    monkeypatch.setattr(MODULE, "_proc_argv", lambda _pid: ["kitty", "--detach"])
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_argv",
+        lambda pid: ["/usr/bin/codex", "exec"]
+        if pid == holder["pid"]
+        else ["kitty", "--detach"],
+    )
     monkeypatch.setattr(
         MODULE,
         "_kitty_dedication",

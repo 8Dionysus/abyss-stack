@@ -840,6 +840,7 @@ def _terminal_binding(
     tty: str,
     holder_pid: int,
     holder_start_ticks: int,
+    holder_argv_digest: str | None = None,
     terminal_pid: int,
     terminal_start_ticks: int,
     source_receipt: Path | None = None,
@@ -873,6 +874,12 @@ def _terminal_binding(
         "remote_control": "socket-only",
         "dedicated": True,
     }
+    if holder_argv_digest is not None:
+        if not SHA256_DIGEST_PATTERN.fullmatch(holder_argv_digest):
+            raise IncarnationHomeError("terminal binding holder argv digest is invalid")
+        holder_record = binding["holder"]
+        assert isinstance(holder_record, dict)
+        holder_record["argv_digest"] = holder_argv_digest
     if source_receipt is not None:
         binding["source_receipt"] = {
             "path": _safe_source_receipt_path(source_receipt),
@@ -913,6 +920,13 @@ def _validate_receipt_binding_consistency(
     ):
         raise IncarnationHomeError(
             "embedded terminal binding holder identity disagrees with top-level holder"
+        )
+    if (
+        "argv_digest" in binding_holder
+        and binding_holder.get("argv_digest") != holder.get("argv_digest")
+    ):
+        raise IncarnationHomeError(
+            "embedded terminal binding holder argv identity disagrees with top-level holder"
         )
     if any(
         binding_terminal.get(key) != terminal.get(key)
@@ -979,7 +993,7 @@ def _validate_terminal_binding_shape(binding: object) -> dict[str, object]:
     terminal = binding.get("terminal")
     if not isinstance(holder, dict) or not isinstance(terminal, dict):
         raise IncarnationHomeError("terminal binding process records are missing")
-    if set(holder) - {"pid", "start_ticks"}:
+    if set(holder) - {"pid", "start_ticks", "argv_digest"}:
         raise IncarnationHomeError("terminal binding holder has unexpected fields")
     if set(terminal) - {
         "pid",
@@ -995,6 +1009,12 @@ def _validate_terminal_binding_shape(binding: object) -> dict[str, object]:
         for key in ("pid", "start_ticks")
     ):
         raise IncarnationHomeError("terminal binding holder identity is invalid")
+    holder_argv_digest = holder.get("argv_digest")
+    if holder_argv_digest is not None and (
+        not isinstance(holder_argv_digest, str)
+        or SHA256_DIGEST_PATTERN.fullmatch(holder_argv_digest) is None
+    ):
+        raise IncarnationHomeError("terminal binding holder argv identity is invalid")
     if not all(
         _positive_int(terminal.get(key))
         for key in ("pid", "start_ticks")
@@ -1771,6 +1791,7 @@ def _holder_receipt(
             tty=tty,
             holder_pid=holder_pid,
             holder_start_ticks=_proc_start_ticks(holder_pid),
+            holder_argv_digest=sha256_bytes(canonical_bytes(post_exec_argv)),
             terminal_pid=terminal_pid,
             terminal_start_ticks=terminal_start_ticks,
         )
@@ -2614,6 +2635,7 @@ def _load_terminal_binding_input(
         tty=tty,
         holder_pid=holder_pid,
         holder_start_ticks=holder_start_ticks,
+        holder_argv_digest=sha256_bytes(canonical_bytes(holder_argv)),
         terminal_pid=terminal_pid,
         terminal_start_ticks=terminal_start_ticks,
         source_receipt=holder_receipt_path,
@@ -2647,7 +2669,32 @@ def _observe_terminal_binding(
         identity_state = "stale"
     elif holder_state == "gone" or terminal_state == "gone":
         identity_state = "missing"
-    elif identity_state == "live":
+    if identity_state == "live":
+        holder_argv_digest = holder.get("argv_digest")
+        if (
+            not isinstance(holder_argv_digest, str)
+            or SHA256_DIGEST_PATTERN.fullmatch(holder_argv_digest) is None
+        ):
+            identity_state = "stale"
+        else:
+            try:
+                observed_holder_argv = _proc_argv(holder_pid)
+            except IncarnationHomeError:
+                holder_state = _proc_identity_state(holder_pid, holder_start_ticks)
+                terminal_state = _proc_identity_state(
+                    terminal_pid, terminal_start_ticks
+                )
+                if "drifted" in {holder_state, terminal_state}:
+                    identity_state = "stale"
+                elif "gone" in {holder_state, terminal_state}:
+                    identity_state = "missing"
+                else:
+                    identity_state = "stale"
+            else:
+                if sha256_bytes(canonical_bytes(observed_holder_argv)) != holder_argv_digest:
+                    identity_state = "stale"
+
+    if identity_state == "live":
         try:
             terminal_comm = _proc_comm(terminal_pid)
             if terminal_comm != "kitty" or not _descends_from(
