@@ -552,6 +552,13 @@ This links every unit in `systemd/user/managed-units.txt` from
 `systemctl --user daemon-reload`. It intentionally does not start, stop,
 restart, enable, disable, or mask services.
 
+The allowlist includes the manual-only
+`aoa-external-actor-clock@.service`. Sync and install it before arming a
+delayed proof; the service supervisor stays foreground and propagates the
+runner result while the exact-title detached Kitty holder is separately
+observable. A proof must use unique status/error paths and must retain the
+service journal plus holder PID/start-tick evidence.
+
 The default install also links the OVMS Quadlet and activation units needed by
 `intel-worker`. `aoa-up` starts only the empty sockets; the first real
 embedding request starts the container after `abyss-machine` cold-load

@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 9741509,
+  "allowed_tracked_bytes": 36430323,
+  "approved_by": "repository-owner",
+  "base_ref": "b8897091f5a9b2cebde9e226403ff7f5bf44aa55",
+  "changed_generated_bytes": 9741509,
+  "changed_generated_files": 100,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "68426f909beb9997bfd70837119dd80fa4d0d76bf1c2a8bea9e646884b93d842",
+  "reason": "Owner-reviewed clock handshake ambiguity repair requires regenerated repo-local KAG family for PR #404 at source head 081000e5a; this receipt admits only the measured generated family delta and does not widen runtime authority.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36430323,
+  "tracked_bytes_max": 24117248
+}

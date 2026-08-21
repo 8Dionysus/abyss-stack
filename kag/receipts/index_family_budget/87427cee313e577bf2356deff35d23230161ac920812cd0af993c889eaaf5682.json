@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 9949808,
+  "allowed_tracked_bytes": 36437025,
+  "approved_by": "repository-owner",
+  "base_ref": "b8897091f5a9b2cebde9e226403ff7f5bf44aa55",
+  "changed_generated_bytes": 9949808,
+  "changed_generated_files": 102,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "87427cee313e577bf2356deff35d23230161ac920812cd0af993c889eaaf5682",
+  "reason": "owner-reviewed clock error runner alias repair",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36437025,
+  "tracked_bytes_max": 24117248
+}

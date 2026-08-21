@@ -15,6 +15,22 @@ Tracking starts with the community-docs baseline for this repository.
   and explicit directed input through that binding; the status projection
   whitelists safe Kitty fields and never emits environment, command lines,
   tokens, or credentials.
+- Add the manual-only `aoa-external-actor-clock@.service` delayed clock route.
+  Its foreground supervisor keeps systemd ownership while a uniquely titled
+  detached Kitty holder is independently observable, requires explicit private
+  status/error evidence, bounds dispatch and close, and propagates the actor's
+  real return; the route never creates a recurring schedule or treats a Kitty
+  exit alone as proof.
+- Generalize visible external Codex holder closure beyond wake-delivery: a
+  validated non-waking terminal join now emits typed closure authorization, and
+  the exact bound holder remains the only process and Kitty terminal eligible
+  for lifecycle closure.
+- Harden the delayed external actor clock evidence boundary by requiring
+  owner-private evidence directories and recording the actual runner PID rather
+  than the holder shell PID.
+- Keep delayed clock runners attached to the visible holder terminal and reject
+  evidence paths below writable non-sticky ancestors, so interactive actors keep
+  their PTY and untrusted local users cannot replace validated evidence trees.
 - Generalize visible external Codex holder closure beyond wake-delivery: a
   validated non-waking terminal join now emits typed closure authorization, and
   the exact bound holder remains the only process and Kitty terminal eligible
