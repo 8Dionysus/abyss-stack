@@ -198,11 +198,6 @@ def _configuration_error_path() -> Path | None:
     if error.exists():
         if not error.is_file():
             return None
-        try:
-            if error.stat().st_mode & 0o077:
-                return None
-        except OSError:
-            return None
     raw_status = os.environ.get("AOA_CLOCK_STATUS_FILE", "")
     if raw_status:
         status = Path(raw_status)
@@ -211,6 +206,10 @@ def _configuration_error_path() -> Path | None:
                 return None
         except OSError:
             return None
+    try:
+        _check_error_log(error)
+    except ClockSupervisorError:
+        return None
     return error
 
 

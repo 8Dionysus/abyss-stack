@@ -49,6 +49,8 @@ class ExternalActorClockTests(unittest.TestCase):
             root = Path(temporary)
             status = root / "status"
             error = root / "error.log"
+            error.write_text("old\n", encoding="utf-8")
+            error.chmod(0o644)
             environment = os.environ.copy()
             for name in (
                 "AOA_CLOCK_RUNNER",
@@ -67,6 +69,7 @@ class ExternalActorClockTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(completed.returncode, 125)
+            self.assertEqual(error.stat().st_mode & 0o777, 0o600)
             self.assertIn("AOA_CLOCK_RUNNER must be an absolute path", error.read_text())
 
     def test_timeout_parser_rejects_non_finite_or_non_positive_values(self) -> None:
