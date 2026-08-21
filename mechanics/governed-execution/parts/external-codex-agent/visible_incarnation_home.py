@@ -1008,7 +1008,7 @@ def _validate_terminal_binding_shape(binding: object) -> dict[str, object]:
     if socket_record.get("path") != str(path):
         raise IncarnationHomeError("terminal binding socket path drifted")
     mode = socket_record.get("mode")
-    if type(mode) is not int or mode & 0o077:
+    if type(mode) is not int or not 0 <= mode <= 0o700 or mode & 0o077:
         raise IncarnationHomeError("terminal binding socket mode is not private")
     if not all(
         _positive_int(socket_record.get(key))
@@ -1037,8 +1037,7 @@ def _validate_terminal_binding_shape(binding: object) -> dict[str, object]:
             "path": source_receipt_path,
             "sha256": source_receipt_digest,
         }
-    _assert_safe_projection(binding)
-    return binding
+    return _safe_terminal_binding_projection(binding)
 
 
 def _kitty_ls(
@@ -2598,6 +2597,19 @@ def _observe_terminal_binding(
     kitty_projection: dict[str, object] | None = None
     kitty_query_state = "not_attempted"
     if identity_state == "live":
+        try:
+            observed_window_id, dedicated = _kitty_dedication(
+                holder_pid=holder_pid,
+                kitty_pid=terminal_pid,
+                terminal_argv=_proc_argv(terminal_pid),
+            )
+        except IncarnationHomeError:
+            identity_state = "stale"
+        else:
+            if observed_window_id != str(terminal["window_id"]) or not dedicated:
+                identity_state = "stale"
+
+    if identity_state == "live":
         socket_record = terminal["control_socket"]
         assert isinstance(socket_record, dict)
         try:
@@ -2682,6 +2694,11 @@ def _write_terminal_binding(
     source_receipt: Path,
     source_digest: str,
 ) -> dict[str, object]:
+    safe_binding = _safe_terminal_binding_projection(binding)
+    safe_holder = _safe_projection_value(holder, "terminal binding holder")
+    safe_terminal = _safe_projection_value(terminal, "terminal binding terminal")
+    if not isinstance(safe_holder, dict) or not isinstance(safe_terminal, dict):
+        raise IncarnationHomeError("terminal binding process projection is invalid")
     document: dict[str, object] = {
         "schema_version": TERMINAL_BINDING_SCHEMA_VERSION,
         "created_at": _utc_now(),
@@ -2689,9 +2706,9 @@ def _write_terminal_binding(
             "path": _safe_source_receipt_path(source_receipt),
             "sha256": source_digest,
         },
-        "binding": binding,
-        "holder": holder,
-        "terminal": terminal,
+        "binding": safe_binding,
+        "holder": safe_holder,
+        "terminal": safe_terminal,
     }
     _assert_safe_projection(document)
     _write_new_json(output_path, document, "terminal binding")

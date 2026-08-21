@@ -3347,6 +3347,18 @@ def test_terminal_binding_validation_reconstructs_redacted_binding_refs(
         listener.close()
 
 
+def test_terminal_binding_validation_reconstructs_redacted_nested_strings(
+    tmp_path: Path,
+) -> None:
+    listener, binding, _holder, terminal = _terminal_binding_fixture(tmp_path)
+    try:
+        terminal["title"] = "password=hunter2"
+        validated = MODULE._validate_terminal_binding_shape(binding)
+        assert validated["terminal"]["title"] == "password=<redacted>"
+    finally:
+        listener.close()
+
+
 def test_terminal_binding_rejects_boolean_process_identity() -> None:
     binding = {
         "schema_version": MODULE.TERMINAL_BINDING_SCHEMA_VERSION,
@@ -3397,6 +3409,18 @@ def test_terminal_binding_rejects_credential_bearing_source_receipt_path(
                 source_receipt=source_receipt,
                 source_digest=MODULE.sha256_bytes(source_receipt.read_bytes()),
             )
+    finally:
+        listener.close()
+
+
+def test_terminal_binding_rejects_negative_socket_mode(
+    tmp_path: Path,
+) -> None:
+    listener, binding, _holder, terminal = _terminal_binding_fixture(tmp_path)
+    try:
+        terminal["control_socket"]["mode"] = -64
+        with pytest.raises(MODULE.IncarnationHomeError, match="socket mode"):
+            MODULE._validate_terminal_binding_shape(binding)
     finally:
         listener.close()
 
@@ -3587,6 +3611,8 @@ def test_status_is_read_only_and_writes_only_safe_projection(
     monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
     monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
     monkeypatch.setattr(MODULE, "_descends_from", lambda _pid, _ancestor: True)
+    monkeypatch.setattr(MODULE, "_proc_argv", lambda _pid: ["kitty", "--detach"])
+    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_kwargs: ("7", True))
     monkeypatch.setattr(
         MODULE,
         "_kitty_ls",
@@ -3693,6 +3719,39 @@ def test_status_rejects_pid_start_tick_reuse_without_querying_kitty(
         assert state == "stale"
         assert projection["observation"]["kitty_query"] == "not_attempted"
         assert queried is False
+    finally:
+        listener.close()
+
+
+def test_status_rechecks_kitty_dedication_before_querying_socket(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listener, binding, holder, terminal = _terminal_binding_fixture(tmp_path)
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda _pid, _ticks: "live")
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
+    monkeypatch.setattr(MODULE, "_descends_from", lambda _pid, _ancestor: True)
+    monkeypatch.setattr(MODULE, "_proc_argv", lambda _pid: ["kitty", "--detach"])
+    monkeypatch.setattr(
+        MODULE,
+        "_kitty_dedication",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            MODULE.IncarnationHomeError("holder Kitty process is not dedicated")
+        ),
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_kitty_ls",
+        lambda **_kwargs: pytest.fail("status queried Kitty after dedication drift"),
+    )
+    try:
+        projection, state = MODULE._observe_terminal_binding(
+            binding=binding,
+            holder=holder,
+            terminal=terminal,
+            kitty_executable="/usr/bin/kitty",
+        )
+        assert state == "stale"
+        assert projection["observation"]["kitty_query"] == "not_attempted"
     finally:
         listener.close()
 
