@@ -15,6 +15,7 @@ from pathlib import Path
 POLL_SECONDS = 0.1
 DEFAULT_LAUNCH_TIMEOUT_SECONDS = 30.0
 DEFAULT_CLOSE_TIMEOUT_SECONDS = 15.0
+STOP_CLEANUP_TIMEOUT_SECONDS = 10.0
 STATUS_SCHEMA = "aoa_external_actor_clock_status_v1"
 _STOP_SIGNAL: int | None = None
 
@@ -158,6 +159,13 @@ def _terminate_kitty(
     )
     while time.monotonic() < deadline and _identity_live(pid, start_ticks):
         time.sleep(POLL_SECONDS)
+
+
+def _stop_cleanup_deadline(close_timeout_seconds: float) -> float:
+    return time.monotonic() + min(
+        close_timeout_seconds,
+        STOP_CLEANUP_TIMEOUT_SECONDS,
+    )
 
 
 def _finite_timeout(name: str, default: float) -> float:
@@ -393,9 +401,14 @@ def main() -> int:
         _append_error(error_path, f"detached Kitty dispatch failed: {exc}")
         return 127
     if _STOP_SIGNAL is not None:
+        stop_deadline = _stop_cleanup_deadline(close_timeout)
         for pid, start_ticks in _matching_kitties(title).items():
             if baseline.get(pid) != start_ticks:
-                _terminate_kitty(pid, start_ticks, close_timeout)
+                _terminate_kitty(
+                    pid,
+                    start_ticks,
+                    close_deadline=stop_deadline,
+                )
         return 0
     if dispatched.returncode != 0:
         _append_error(
@@ -408,9 +421,14 @@ def main() -> int:
     kitty_start_ticks: int | None = None
     while kitty_pid is None:
         if _STOP_SIGNAL is not None:
+            stop_deadline = _stop_cleanup_deadline(close_timeout)
             for pid, start_ticks in _matching_kitties(title).items():
                 if baseline.get(pid) != start_ticks:
-                    _terminate_kitty(pid, start_ticks, close_timeout)
+                    _terminate_kitty(
+                        pid,
+                        start_ticks,
+                        close_deadline=stop_deadline,
+                    )
             _append_error(
                 error_path,
                 f"clock supervisor stopped by signal {_STOP_SIGNAL}",
@@ -426,7 +444,11 @@ def main() -> int:
             candidate_pid, candidate_start_ticks = next(iter(new_matches.items()))
             while not ready_path.exists():
                 if _STOP_SIGNAL is not None:
-                    _terminate_kitty(candidate_pid, candidate_start_ticks, close_timeout)
+                    _terminate_kitty(
+                        candidate_pid,
+                        candidate_start_ticks,
+                        close_deadline=_stop_cleanup_deadline(close_timeout),
+                    )
                     _append_error(
                         error_path,
                         f"clock supervisor stopped by signal {_STOP_SIGNAL}",
@@ -468,8 +490,13 @@ def main() -> int:
                 f"multiple detached Kitty holders matched title {title!r}: "
                 f"{sorted(new_matches)}",
             )
+            ambiguity_deadline = time.monotonic() + close_timeout
             for pid, start_ticks in new_matches.items():
-                _terminate_kitty(pid, start_ticks, close_timeout)
+                _terminate_kitty(
+                    pid,
+                    start_ticks,
+                    close_deadline=ambiguity_deadline,
+                )
             return 125
         if time.monotonic() >= launch_deadline:
             _append_error(
@@ -487,7 +514,11 @@ def main() -> int:
                 error_path,
                 f"clock supervisor stopped by signal {_STOP_SIGNAL}",
             )
-            _terminate_kitty(kitty_pid, kitty_start_ticks, close_timeout)
+            _terminate_kitty(
+                kitty_pid,
+                kitty_start_ticks,
+                close_deadline=_stop_cleanup_deadline(close_timeout),
+            )
             return 0
         if not _identity_live(kitty_pid, kitty_start_ticks):
             _append_error(
@@ -514,7 +545,7 @@ def main() -> int:
             _terminate_kitty(
                 kitty_pid,
                 kitty_start_ticks,
-                close_deadline=close_deadline,
+                close_deadline=_stop_cleanup_deadline(close_timeout),
             )
             return 0
         if time.monotonic() >= close_deadline:
