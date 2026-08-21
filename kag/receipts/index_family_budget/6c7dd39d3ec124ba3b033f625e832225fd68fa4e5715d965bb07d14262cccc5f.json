@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 19487186,
+  "allowed_tracked_bytes": 36504066,
+  "approved_by": "repository-owner",
+  "base_ref": "b8897091f5a9b2cebde9e226403ff7f5bf44aa55",
+  "changed_generated_bytes": 19487186,
+  "changed_generated_files": 195,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "6c7dd39d3ec124ba3b033f625e832225fd68fa4e5715d965bb07d14262cccc5f",
+  "reason": "Refresh the exact owner portable family after rejecting credential-shaped control socket paths in PR 399 on current main lineage.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36504066,
+  "tracked_bytes_max": 24117248
+}
