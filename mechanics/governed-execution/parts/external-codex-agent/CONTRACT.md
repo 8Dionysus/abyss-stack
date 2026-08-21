@@ -148,10 +148,12 @@ holder environment must bind `KITTY_PID` and `KITTY_WINDOW_ID`, and no sibling
  signal target, the closer requires typed authorization and a handoff that bind
  the exact holder receipt path, receipt digest, holder/terminal PIDs, required
  `close_exact_bound_holder` action, and reserved closure path under
- `runtime.responsibility_holder`. A producer must not leave the closure path
+`runtime.responsibility_holder`. A producer must not leave the closure path
  only under a live-proof projection. The evidence receipt carries the SHA-256
- of the exact handoff bytes; the closer hashes and parses that same snapshot
- before accepting authorization. It then rechecks the holder's exact
+ of the exact handoff bytes; join and wake authorization each validate one
+ pinned handoff snapshot and recheck the handoff bytes immediately before
+ publication. The closer hashes and parses that same snapshot before accepting
+ authorization. It then rechecks the holder's exact
 kernel boot ID and PID/start-ticks/argv, its process-parent identity, the recorded Kitty window,
 and the dedicated Kitty process, reserves the closure receipt before
 signaling in a recoverable, atomically published sidecar reservation. The
@@ -160,7 +162,11 @@ first `TERM`; each state transition is an atomic replacement under a separate
 stable lock inode, recovery rechecks the completed receipt after lock
 acquisition, and never sends a second `TERM` for an existing attempt. The
 legacy v1 reservation shape remains replayable only through the legacy
-`--wake-receipt` route; new reservations use v2. A retry after a join write but
+`--wake-receipt` route; new reservations use v2. A v2 reservation also records
+the authorization and evidence byte digests, so replay fails closed if either
+bound file changes. A completed v1 closure receipt remains schema-valid and is
+replayed only with its matching legacy wake reservation and identity bindings.
+A retry after a join write but
 before authorization publication reuses and revalidates the exact canonical
 join bytes, so it can publish the missing authorization without replacing
 evidence. In the sidecar, `authorization_ref` names the typed authorization

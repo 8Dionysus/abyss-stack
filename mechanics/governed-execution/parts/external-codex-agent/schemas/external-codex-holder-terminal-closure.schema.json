@@ -4,9 +4,8 @@
   "title": "Visible responsibility-holder terminal closure receipt",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "handoff_ref", "holder_receipt_ref", "authorization_ref", "authorization_kind", "authorization_evidence_ref", "reservation_ref", "verified_at", "holder", "terminal", "closed", "outcome", "identity_state", "route", "trigger"],
   "properties": {
-    "schema_version": {"const": "abyss_stack_visible_incarnation_terminal_closure_v2"},
+    "schema_version": {"enum": ["abyss_stack_visible_incarnation_terminal_closure_v1", "abyss_stack_visible_incarnation_terminal_closure_v2"]},
     "handoff_ref": {"type": "string", "pattern": "^/"},
     "holder_receipt_ref": {"type": "string", "pattern": "^/"},
     "authorization_ref": {"type": "string", "pattern": "^/"},
@@ -51,6 +50,21 @@
     "route": {"const": "abyss_stack_visible_incarnation_runtime"},
     "trigger": {"enum": ["wake_bridge_after_confirmed_handoff_delivery", "join_after_validated_terminal_return"]}
   },
+  "oneOf": [
+    {
+      "required": ["schema_version", "handoff_ref", "holder_receipt_ref", "wake_receipt_ref", "reservation_ref", "verified_at", "holder", "terminal", "closed", "outcome", "identity_state", "route", "trigger"],
+      "properties": {
+        "schema_version": {"const": "abyss_stack_visible_incarnation_terminal_closure_v1"},
+        "trigger": {"const": "wake_bridge_after_confirmed_handoff_delivery"}
+      }
+    },
+    {
+      "required": ["schema_version", "handoff_ref", "holder_receipt_ref", "authorization_ref", "authorization_kind", "authorization_evidence_ref", "reservation_ref", "verified_at", "holder", "terminal", "closed", "outcome", "identity_state", "route", "trigger"],
+      "properties": {
+        "schema_version": {"const": "abyss_stack_visible_incarnation_terminal_closure_v2"}
+      }
+    }
+  ],
   "allOf": [
     {
       "if": {

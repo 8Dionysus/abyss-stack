@@ -333,8 +333,11 @@ returned responsibility without wake delivery and creates typed
 `wake_delivered` authorization. The installed `close` route accepts either
 typed authorization (or the legacy wake receipt), binds the exact holder
 receipt digest, PIDs, required terminal action, and reserved closure path; it
-rechecks PID/start-ticks, argv, process parent, Kitty window/dedication,
-reserves before signaling, and uses pidfd TERM. A live visible trial must
+pins and rechecks the validated handoff before publishing join or wake
+authority, records authorization/evidence digests in v2 reservations, and
+replays completed v1 closure receipts only through the matching legacy wake
+route. It rechecks PID/start-ticks, argv, process parent, Kitty
+window/dedication, reserves before signaling, and uses pidfd TERM. A live visible trial must
 separately prove the installed release, the return evidence, holder
 disappearance, final Kitty disappearance, unrelated-terminal preservation,
 and the resulting closure receipt. The companion

@@ -37,6 +37,9 @@ CLOSURE_AUTHORIZATION_SCHEMA_VERSION = (
     "abyss_stack_visible_incarnation_terminal_closure_authorization_v1"
 )
 TERMINAL_CLOSURE_SCHEMA_VERSION = "abyss_stack_visible_incarnation_terminal_closure_v2"
+LEGACY_TERMINAL_CLOSURE_SCHEMA_VERSION = (
+    "abyss_stack_visible_incarnation_terminal_closure_v1"
+)
 CLOSURE_RESERVATION_SCHEMA_VERSION = "abyss_stack_visible_incarnation_terminal_closure_reservation_v2"
 LEGACY_CLOSURE_RESERVATION_SCHEMA_VERSION = (
     "abyss_stack_visible_incarnation_terminal_closure_reservation_v1"
@@ -111,6 +114,31 @@ def _load_json_snapshot(path: Path, label: str) -> tuple[dict[str, Any], bytes]:
 def _load_json(path: Path, label: str) -> dict[str, Any]:
     value, _ = _load_json_snapshot(path, label)
     return value
+
+
+def _assert_file_snapshot(path: Path, expected: bytes, label: str) -> None:
+    """Fail closed if a file changed after it was validated."""
+
+    try:
+        observed = _regular_file(path, label).read_bytes()
+    except (IncarnationHomeError, OSError) as exc:
+        raise IncarnationHomeError(f"{label} changed during validation") from exc
+    if observed != expected:
+        raise IncarnationHomeError(f"{label} changed during validation")
+
+
+def _assert_file_digest(path: Path, expected: str, label: str) -> bytes:
+    """Return the current bytes only when their digest is the expected one."""
+
+    if not SHA256_DIGEST_PATTERN.fullmatch(expected):
+        raise IncarnationHomeError(f"{label} digest is invalid")
+    try:
+        observed = _regular_file(path, label).read_bytes()
+    except (IncarnationHomeError, OSError) as exc:
+        raise IncarnationHomeError(f"{label} changed during validation") from exc
+    if sha256_bytes(observed) != expected:
+        raise IncarnationHomeError(f"{label} changed during validation")
+    return observed
 
 
 def _realization(path: Path) -> tuple[dict[str, Any], str, str, str, str]:
@@ -704,6 +732,8 @@ def _reserve_closure_receipt(
     authorization_path: Path | None = None,
     authorization_kind: str = "wake_delivered",
     evidence_path: Path | None = None,
+    authorization_digest: str | None = None,
+    evidence_digest: str | None = None,
     allow_legacy_wake_reservation: bool = False,
     holder_pid: int,
     terminal_pid: int,
@@ -758,6 +788,36 @@ def _reserve_closure_receipt(
     expected[
         "wake_receipt_ref" if authorization_kind == "wake_delivered" else "join_receipt_ref"
     ] = str(evidence_path.resolve())
+
+    def populate_v2_digests() -> None:
+        nonlocal authorization_digest, evidence_digest
+        if authorization_digest is None:
+            try:
+                authorization_digest = sha256_bytes(
+                    _regular_file(
+                        authorization_path, "terminal closure authorization"
+                    ).read_bytes()
+                )
+            except (IncarnationHomeError, OSError) as exc:
+                raise IncarnationHomeError(
+                    "terminal closure authorization could not be hashed"
+                ) from exc
+        if evidence_digest is None:
+            try:
+                evidence_digest = sha256_bytes(
+                    _regular_file(evidence_path, "terminal closure evidence").read_bytes()
+                )
+            except (IncarnationHomeError, OSError) as exc:
+                raise IncarnationHomeError(
+                    "terminal closure evidence could not be hashed"
+                ) from exc
+        if not SHA256_DIGEST_PATTERN.fullmatch(authorization_digest):
+            raise IncarnationHomeError("terminal closure authorization digest is invalid")
+        if not SHA256_DIGEST_PATTERN.fullmatch(evidence_digest):
+            raise IncarnationHomeError("terminal closure evidence digest is invalid")
+        expected["authorization_sha256"] = authorization_digest
+        expected["evidence_sha256"] = evidence_digest
+
     legacy_expected = {
         "schema_version": LEGACY_CLOSURE_RESERVATION_SCHEMA_VERSION,
         "closure_receipt_ref": str(closure_receipt_path.resolve()),
@@ -781,6 +841,7 @@ def _reserve_closure_receipt(
         os.fchmod(lock_fd, 0o600)
         fcntl.flock(lock_fd, fcntl.LOCK_EX)
         if not reservation_path.exists():
+            populate_v2_digests()
             _write_new_json(
                 reservation_path,
                 {**expected, "reserved_at": _utc_now()},
@@ -801,13 +862,76 @@ def _reserve_closure_receipt(
                 raise IncarnationHomeError(
                     "terminal closure reservation identity mismatch"
                 )
-        elif any(recorded.get(key) != value for key, value in expected.items()):
-            raise IncarnationHomeError("terminal closure reservation identity mismatch")
+        elif recorded.get("schema_version") == CLOSURE_RESERVATION_SCHEMA_VERSION:
+            populate_v2_digests()
+            if any(recorded.get(key) != value for key, value in expected.items()):
+                raise IncarnationHomeError("terminal closure reservation identity mismatch")
+        else:
+            raise IncarnationHomeError("unsupported terminal closure reservation schema")
         completed: dict[str, Any] | None = None
         if closure_receipt_path.exists():
             completed = _load_json(
                 closure_receipt_path, "terminal closure receipt"
             )
+            completed_schema = completed.get("schema_version")
+            if completed_schema == LEGACY_TERMINAL_CLOSURE_SCHEMA_VERSION:
+                if (
+                    not allow_legacy_wake_reservation
+                    or authorization_kind != "wake_delivered"
+                    or recorded.get("schema_version")
+                    != LEGACY_CLOSURE_RESERVATION_SCHEMA_VERSION
+                ):
+                    raise IncarnationHomeError(
+                        "legacy terminal closure receipt requires the legacy wake route"
+                    )
+                legacy_identity = {
+                    "handoff_ref": str(handoff_path.resolve()),
+                    "holder_receipt_ref": str(holder_receipt_path.resolve()),
+                    "wake_receipt_ref": str(evidence_path.resolve()),
+                    "reservation_ref": str(reservation_path.resolve()),
+                    "route": "abyss_stack_visible_incarnation_runtime",
+                    "trigger": "wake_bridge_after_confirmed_handoff_delivery",
+                }
+                if any(
+                    completed.get(key) != value
+                    for key, value in legacy_identity.items()
+                ):
+                    raise IncarnationHomeError(
+                        "completed legacy terminal closure identity mismatch"
+                    )
+            elif completed_schema == TERMINAL_CLOSURE_SCHEMA_VERSION:
+                completed_identity = {
+                    "handoff_ref": str(handoff_path.resolve()),
+                    "holder_receipt_ref": str(holder_receipt_path.resolve()),
+                    "authorization_ref": str(authorization_path.resolve()),
+                    "authorization_kind": authorization_kind,
+                    "authorization_evidence_ref": str(evidence_path.resolve()),
+                    "reservation_ref": str(reservation_path.resolve()),
+                    "route": "abyss_stack_visible_incarnation_runtime",
+                    "trigger": (
+                        "wake_bridge_after_confirmed_handoff_delivery"
+                        if authorization_kind == "wake_delivered"
+                        else "join_after_validated_terminal_return"
+                    ),
+                }
+                if any(
+                    completed.get(key) != value
+                    for key, value in completed_identity.items()
+                ):
+                    raise IncarnationHomeError(
+                        "completed terminal closure identity mismatch"
+                    )
+                evidence_key = (
+                    "wake_receipt_ref"
+                    if authorization_kind == "wake_delivered"
+                    else "join_receipt_ref"
+                )
+                if completed.get(evidence_key) != str(evidence_path.resolve()):
+                    raise IncarnationHomeError(
+                        "completed terminal closure evidence identity mismatch"
+                    )
+            else:
+                raise IncarnationHomeError("unsupported terminal closure receipt schema")
             if completed.get("reservation_ref") != str(reservation_path.resolve()):
                 raise IncarnationHomeError(
                     "completed terminal closure reservation identity mismatch"
@@ -819,6 +943,10 @@ def _reserve_closure_receipt(
             if completed.get("terminal", {}).get("pid") != terminal_pid:
                 raise IncarnationHomeError(
                     "completed terminal closure terminal identity mismatch"
+                )
+            if not isinstance(completed.get("closed"), bool):
+                raise IncarnationHomeError(
+                    "completed terminal closure status is invalid"
                 )
         return lock_fd, reservation_path, completed
     except BaseException:
@@ -977,8 +1105,14 @@ def _validate_wake_delivery(
     holder_receipt: dict[str, Any],
     holder_receipt_bytes: bytes | None = None,
     holder_receipt_digest: str | None = None,
+    wake_snapshot: tuple[dict[str, Any], bytes] | None = None,
+    handoff_snapshot: tuple[dict[str, Any], bytes, str] | None = None,
 ) -> dict[str, Any]:
-    wake = _load_json(wake_receipt_path, "wake receipt")
+    wake = (
+        _load_json(wake_receipt_path, "wake receipt")
+        if wake_snapshot is None
+        else wake_snapshot[0]
+    )
     if wake.get("schema_version") != "task_local_actor_wake_receipt_v1":
         raise IncarnationHomeError("unsupported wake receipt schema")
     if wake.get("handoff_ref") != str(handoff_path.resolve()):
@@ -992,13 +1126,18 @@ def _validate_wake_delivery(
         or observed.get("handoff_delivery") is not True
     ):
         raise IncarnationHomeError("wake receipt does not prove handoff delivery")
-    try:
-        handoff_file = _regular_file(handoff_path, "handoff")
-        handoff_bytes = handoff_file.read_bytes()
-        handoff_digest = sha256_bytes(handoff_bytes)
-        handoff_value = json.loads(handoff_bytes.decode("utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise IncarnationHomeError("cannot read delivered handoff snapshot") from exc
+    if handoff_snapshot is None:
+        try:
+            handoff_file = _regular_file(handoff_path, "handoff")
+            handoff_bytes = handoff_file.read_bytes()
+            handoff_digest = sha256_bytes(handoff_bytes)
+            handoff_value = json.loads(handoff_bytes.decode("utf-8"))
+        except (IncarnationHomeError, OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise IncarnationHomeError("cannot read delivered handoff snapshot") from exc
+    else:
+        handoff_value, handoff_bytes, handoff_digest = handoff_snapshot
+        if sha256_bytes(handoff_bytes) != handoff_digest:
+            raise IncarnationHomeError("delivered handoff snapshot digest is invalid")
     if wake.get("handoff_sha256") != handoff_digest:
         raise IncarnationHomeError("wake receipt handoff digest mismatch")
     if not isinstance(handoff_value, dict):
@@ -1043,16 +1182,24 @@ def _load_handoff_holder_binding(
     holder_receipt_digest: str | None,
     require_return: bool,
     require_terminal_action: bool,
+    handoff_snapshot: tuple[dict[str, Any], bytes, str] | None = None,
 ) -> tuple[dict[str, Any], bytes, str, dict[str, Any]]:
     """Load one immutable handoff and bind it to the exact holder receipt."""
 
-    try:
-        handoff_file = _regular_file(handoff_path, "handoff")
-        handoff_bytes = handoff_file.read_bytes()
-        handoff_digest = sha256_bytes(handoff_bytes)
-        handoff_value = json.loads(handoff_bytes.decode("utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise IncarnationHomeError("cannot read terminal return handoff snapshot") from exc
+    if handoff_snapshot is None:
+        try:
+            handoff_file = _regular_file(handoff_path, "handoff")
+            handoff_bytes = handoff_file.read_bytes()
+            handoff_digest = sha256_bytes(handoff_bytes)
+            handoff_value = json.loads(handoff_bytes.decode("utf-8"))
+        except (IncarnationHomeError, OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise IncarnationHomeError(
+                "cannot read terminal return handoff snapshot"
+            ) from exc
+    else:
+        handoff_value, handoff_bytes, handoff_digest = handoff_snapshot
+        if sha256_bytes(handoff_bytes) != handoff_digest:
+            raise IncarnationHomeError("terminal return handoff snapshot digest is invalid")
     if not isinstance(handoff_value, dict):
         raise IncarnationHomeError("handoff must be a JSON object")
     if require_return and handoff_value.get("responsibility_state") != "returned":
@@ -1111,6 +1258,7 @@ def _validate_join_completion(
     holder_receipt: dict[str, Any],
     holder_receipt_bytes: bytes | None = None,
     holder_receipt_digest: str | None = None,
+    handoff_snapshot: tuple[dict[str, Any], bytes, str] | None = None,
 ) -> dict[str, Any]:
     """Validate a non-waking terminal join and its required close action."""
 
@@ -1145,6 +1293,7 @@ def _validate_join_completion(
         holder_receipt_digest=holder_receipt_digest,
         require_return=True,
         require_terminal_action=True,
+        handoff_snapshot=handoff_snapshot,
     )
     if join.get("handoff_ref") != str(handoff_path.resolve()):
         raise IncarnationHomeError("terminal join handoff identity mismatch")
@@ -1178,11 +1327,15 @@ def _validate_closure_authorization(
     holder_receipt: dict[str, Any],
     holder_receipt_bytes: bytes,
     holder_receipt_digest: str,
+    authorization_snapshot: tuple[dict[str, Any], bytes] | None = None,
+    handoff_snapshot: tuple[dict[str, Any], bytes, str] | None = None,
 ) -> dict[str, Any]:
     """Validate typed wake-delivered or join-completed close authority."""
 
-    authorization = _load_json(
-        authorization_path, "terminal closure authorization"
+    authorization = (
+        _load_json(authorization_path, "terminal closure authorization")
+        if authorization_snapshot is None
+        else authorization_snapshot[0]
     )
     if authorization.get("schema_version") != CLOSURE_AUTHORIZATION_SCHEMA_VERSION:
         raise IncarnationHomeError("unsupported terminal closure authorization schema")
@@ -1211,6 +1364,7 @@ def _validate_closure_authorization(
         holder_receipt_digest=holder_receipt_digest,
         require_return=True,
         require_terminal_action=True,
+        handoff_snapshot=handoff_snapshot,
     )
     if authorization.get("handoff_sha256") != handoff_digest:
         raise IncarnationHomeError(
@@ -1258,6 +1412,7 @@ def _validate_closure_authorization(
             holder_receipt=holder_receipt,
             holder_receipt_bytes=holder_receipt_bytes,
             holder_receipt_digest=holder_receipt_digest,
+            handoff_snapshot=handoff_snapshot,
         )
     elif kind == "wake_delivered":
         if authorization.get("wake_receipt_ref") != evidence_ref:
@@ -1270,6 +1425,7 @@ def _validate_closure_authorization(
             holder_receipt=holder_receipt,
             holder_receipt_bytes=holder_receipt_bytes,
             holder_receipt_digest=holder_receipt_digest,
+            handoff_snapshot=handoff_snapshot,
         )
     else:
         raise IncarnationHomeError("unsupported terminal closure authorization kind")
@@ -1499,7 +1655,7 @@ def command_join(args: argparse.Namespace) -> int:
     holder_receipt, holder_receipt_bytes, holder_receipt_digest = (
         _load_holder_receipt_snapshot(holder_receipt_path)
     )
-    _, _, handoff_digest, _ = _load_handoff_holder_binding(
+    handoff_value, handoff_bytes, handoff_digest, _ = _load_handoff_holder_binding(
         handoff_path=handoff_path,
         holder_receipt_path=holder_receipt_path,
         closure_receipt_path=closure_receipt_path,
@@ -1509,6 +1665,7 @@ def command_join(args: argparse.Namespace) -> int:
         require_return=True,
         require_terminal_action=True,
     )
+    handoff_snapshot = (handoff_value, handoff_bytes, handoff_digest)
     holder_pid, _, terminal_pid, _ = _holder_receipt_process_ids(holder_receipt)
     join = {
         "schema_version": TERMINAL_JOIN_SCHEMA_VERSION,
@@ -1551,9 +1708,11 @@ def command_join(args: argparse.Namespace) -> int:
             holder_receipt=holder_receipt,
             holder_receipt_bytes=holder_receipt_bytes,
             holder_receipt_digest=holder_receipt_digest,
+            handoff_snapshot=handoff_snapshot,
         )
         join = existing_join
     else:
+        _assert_file_snapshot(handoff_path, handoff_bytes, "handoff")
         _write_new_json(join_receipt_path, join, "terminal join receipt")
         join_bytes = canonical_bytes(join) + b"\n"
     authorization = {
@@ -1594,6 +1753,8 @@ def command_join(args: argparse.Namespace) -> int:
             holder_receipt=holder_receipt,
             holder_receipt_bytes=holder_receipt_bytes,
             holder_receipt_digest=holder_receipt_digest,
+            authorization_snapshot=(existing_authorization, authorization_bytes),
+            handoff_snapshot=handoff_snapshot,
         )
         if (
             existing_authorization.get("authorization_kind") != "join_completed"
@@ -1609,9 +1770,11 @@ def command_join(args: argparse.Namespace) -> int:
             )
         authorization = existing_authorization
     else:
+        _assert_file_snapshot(handoff_path, handoff_bytes, "handoff")
         _write_new_json(
             authorization_path, authorization, "terminal closure authorization"
         )
+    _assert_file_snapshot(handoff_path, handoff_bytes, "handoff")
     print(json.dumps({"join": join, "authorization": authorization}, sort_keys=True))
     return 0
 
@@ -1629,7 +1792,7 @@ def command_authorize_close(args: argparse.Namespace) -> int:
     holder_receipt, holder_receipt_bytes, holder_receipt_digest = (
         _load_holder_receipt_snapshot(holder_receipt_path)
     )
-    _, _, handoff_digest, _ = _load_handoff_holder_binding(
+    handoff_value, handoff_bytes, handoff_digest, _ = _load_handoff_holder_binding(
         handoff_path=handoff_path,
         holder_receipt_path=holder_receipt_path,
         closure_receipt_path=closure_receipt_path,
@@ -1639,6 +1802,8 @@ def command_authorize_close(args: argparse.Namespace) -> int:
         require_return=True,
         require_terminal_action=True,
     )
+    handoff_snapshot = (handoff_value, handoff_bytes, handoff_digest)
+    wake_value, wake_bytes = _load_json_snapshot(wake_receipt_path, "wake receipt")
     _validate_wake_delivery(
         wake_receipt_path=wake_receipt_path,
         handoff_path=handoff_path,
@@ -1647,6 +1812,8 @@ def command_authorize_close(args: argparse.Namespace) -> int:
         holder_receipt=holder_receipt,
         holder_receipt_bytes=holder_receipt_bytes,
         holder_receipt_digest=holder_receipt_digest,
+        wake_snapshot=(wake_value, wake_bytes),
+        handoff_snapshot=handoff_snapshot,
     )
     holder_pid, _, terminal_pid, _ = _holder_receipt_process_ids(holder_receipt)
     authorization = {
@@ -1668,9 +1835,10 @@ def command_authorize_close(args: argparse.Namespace) -> int:
             "authorized": True,
         },
         "evidence_ref": str(wake_receipt_path.resolve()),
-        "evidence_sha256": sha256_bytes(wake_receipt_path.read_bytes()),
+        "evidence_sha256": sha256_bytes(wake_bytes),
         "wake_receipt_ref": str(wake_receipt_path.resolve()),
     }
+    _assert_file_snapshot(handoff_path, handoff_bytes, "handoff")
     _write_new_json(
         authorization_path, authorization, "terminal closure authorization"
     )
@@ -1694,6 +1862,9 @@ def command_close(args: argparse.Namespace) -> int:
         authorization_path = _regular_file(
             Path(authorization_argument), "terminal closure authorization"
         )
+        authorization_value, authorization_bytes = _load_json_snapshot(
+            authorization_path, "terminal closure authorization"
+        )
         authorization = _validate_closure_authorization(
             authorization_path=authorization_path,
             handoff_path=handoff_path,
@@ -1702,9 +1873,11 @@ def command_close(args: argparse.Namespace) -> int:
             holder_receipt=receipt,
             holder_receipt_bytes=holder_receipt_bytes,
             holder_receipt_digest=holder_receipt_digest,
+            authorization_snapshot=(authorization_value, authorization_bytes),
         )
     elif wake_argument:
         wake_path = _regular_file(Path(wake_argument), "wake receipt")
+        wake_value, wake_bytes = _load_json_snapshot(wake_path, "wake receipt")
         _validate_wake_delivery(
             wake_receipt_path=wake_path,
             handoff_path=handoff_path,
@@ -1713,13 +1886,15 @@ def command_close(args: argparse.Namespace) -> int:
             holder_receipt=receipt,
             holder_receipt_bytes=holder_receipt_bytes,
             holder_receipt_digest=holder_receipt_digest,
+            wake_snapshot=(wake_value, wake_bytes),
         )
         authorization = {
             "authorization_ref": str(wake_path.resolve()),
             "authorization_kind": "wake_delivered",
             "evidence_ref": str(wake_path.resolve()),
-            "evidence_sha256": sha256_bytes(wake_path.read_bytes()),
+            "evidence_sha256": sha256_bytes(wake_bytes),
         }
+        authorization_bytes = wake_bytes
     else:
         raise IncarnationHomeError(
             "terminal close requires closure authorization or wake receipt"
@@ -1731,6 +1906,18 @@ def command_close(args: argparse.Namespace) -> int:
     kitty_comm = receipt["terminal"].get("required_comm", "kitty")
     kitty_window_id = receipt["terminal"].get("window_id")
     kitty_dedicated = receipt["terminal"].get("dedicated")
+    if authorization_argument:
+        _assert_file_snapshot(
+            authorization_path,
+            authorization_bytes,
+            "terminal closure authorization",
+        )
+    evidence_digest = str(authorization["evidence_sha256"])
+    _assert_file_digest(
+        Path(str(authorization["evidence_ref"])),
+        evidence_digest,
+        "terminal closure evidence",
+    )
     reservation_fd, reservation_path, completed = _reserve_closure_receipt(
         closure_receipt_path=closure_receipt_path,
         handoff_path=handoff_path,
@@ -1739,6 +1926,8 @@ def command_close(args: argparse.Namespace) -> int:
         authorization_path=Path(authorization["authorization_ref"]),
         authorization_kind=str(authorization["authorization_kind"]),
         evidence_path=Path(authorization["evidence_ref"]),
+        authorization_digest=sha256_bytes(authorization_bytes),
+        evidence_digest=evidence_digest,
         allow_legacy_wake_reservation=legacy_wake_route,
         holder_pid=holder_pid,
         terminal_pid=kitty_pid,

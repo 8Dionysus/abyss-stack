@@ -2311,6 +2311,128 @@ def test_legacy_closure_reservation_replays_only_on_legacy_wake_route(
         )
 
 
+def test_completed_legacy_v1_closure_replays_with_legacy_wake_reservation(
+    tmp_path: Path,
+) -> None:
+    handoff = tmp_path / "handoff.json"
+    holder = tmp_path / "holder.json"
+    wake = tmp_path / "wake.json"
+    closure = tmp_path / "closure.json"
+    for path in (handoff, holder, wake):
+        path.write_text("{}", encoding="utf-8")
+    reservation_path = MODULE._closure_reservation_path(closure)
+    MODULE._write_new_json(
+        reservation_path,
+        {
+            "schema_version": MODULE.LEGACY_CLOSURE_RESERVATION_SCHEMA_VERSION,
+            "closure_receipt_ref": str(closure.resolve()),
+            "handoff_ref": str(handoff.resolve()),
+            "holder_receipt_ref": str(holder.resolve()),
+            "wake_receipt_ref": str(wake.resolve()),
+            "holder_pid": 101,
+            "terminal_pid": 202,
+        },
+        "terminal closure reservation",
+    )
+    MODULE._write_new_json(
+        closure,
+        {
+            "schema_version": MODULE.LEGACY_TERMINAL_CLOSURE_SCHEMA_VERSION,
+            "handoff_ref": str(handoff.resolve()),
+            "holder_receipt_ref": str(holder.resolve()),
+            "wake_receipt_ref": str(wake.resolve()),
+            "reservation_ref": str(reservation_path.resolve()),
+            "verified_at": "2026-08-20T00:00:00Z",
+            "holder": {"pid": 101, "start_ticks": 11, "gone": True},
+            "terminal": {
+                "pid": 202,
+                "start_ticks": 12,
+                "comm": "kitty",
+                "argv": ["/usr/bin/kitty"],
+                "signal": "TERM",
+                "signal_target": "holder_process",
+                "signal_attempted": False,
+                "signal_delivery": "not_attempted",
+                "signal_sent": False,
+                "gone": True,
+            },
+            "closed": True,
+            "outcome": "already_gone",
+            "identity_state": "already_gone",
+            "route": "abyss_stack_visible_incarnation_runtime",
+            "trigger": "wake_bridge_after_confirmed_handoff_delivery",
+        },
+        "terminal closure receipt",
+    )
+
+    reservation_fd, retry_path, completed = MODULE._reserve_closure_receipt(
+        closure_receipt_path=closure,
+        handoff_path=handoff,
+        holder_receipt_path=holder,
+        wake_receipt_path=wake,
+        allow_legacy_wake_reservation=True,
+        holder_pid=101,
+        terminal_pid=202,
+    )
+    try:
+        assert retry_path == reservation_path
+        assert completed is not None
+        assert completed["schema_version"] == MODULE.LEGACY_TERMINAL_CLOSURE_SCHEMA_VERSION
+    finally:
+        MODULE.fcntl.flock(reservation_fd, MODULE.fcntl.LOCK_UN)
+        os.close(reservation_fd)
+
+
+def test_v2_closure_reservation_rejects_authorization_or_evidence_byte_drift(
+    tmp_path: Path,
+) -> None:
+    handoff = tmp_path / "handoff.json"
+    holder = tmp_path / "holder.json"
+    authorization = tmp_path / "authorization.json"
+    evidence = tmp_path / "join.json"
+    closure = tmp_path / "closure.json"
+    for path in (handoff, holder, authorization, evidence):
+        path.write_text("{}", encoding="utf-8")
+
+    reservation_fd, reservation_path, completed = MODULE._reserve_closure_receipt(
+        closure_receipt_path=closure,
+        handoff_path=handoff,
+        holder_receipt_path=holder,
+        wake_receipt_path=evidence,
+        authorization_path=authorization,
+        authorization_kind="join_completed",
+        evidence_path=evidence,
+        holder_pid=101,
+        terminal_pid=202,
+    )
+    assert completed is None
+    try:
+        reservation = MODULE._load_json(
+            reservation_path, "terminal closure reservation"
+        )
+        assert reservation["authorization_sha256"] == MODULE.sha256_bytes(
+            authorization.read_bytes()
+        )
+        assert reservation["evidence_sha256"] == MODULE.sha256_bytes(evidence.read_bytes())
+    finally:
+        MODULE.fcntl.flock(reservation_fd, MODULE.fcntl.LOCK_UN)
+        os.close(reservation_fd)
+
+    authorization.write_text('{"changed":true}', encoding="utf-8")
+    with pytest.raises(MODULE.IncarnationHomeError, match="identity mismatch"):
+        MODULE._reserve_closure_receipt(
+            closure_receipt_path=closure,
+            handoff_path=handoff,
+            holder_receipt_path=holder,
+            wake_receipt_path=evidence,
+            authorization_path=authorization,
+            authorization_kind="join_completed",
+            evidence_path=evidence,
+            holder_pid=101,
+            terminal_pid=202,
+        )
+
+
 def test_closure_reservation_rechecks_completed_receipt_after_lock(
     tmp_path: Path,
 ) -> None:
@@ -2335,7 +2457,16 @@ def test_closure_reservation_rechecks_completed_receipt_after_lock(
     closure.write_text(
         json.dumps(
             {
+                "schema_version": MODULE.TERMINAL_CLOSURE_SCHEMA_VERSION,
+                "handoff_ref": str(handoff.resolve()),
+                "holder_receipt_ref": str(holder.resolve()),
+                "authorization_ref": str(wake.resolve()),
+                "authorization_kind": "wake_delivered",
+                "authorization_evidence_ref": str(wake.resolve()),
                 "reservation_ref": str(reservation_path.resolve()),
+                "wake_receipt_ref": str(wake.resolve()),
+                "route": "abyss_stack_visible_incarnation_runtime",
+                "trigger": "wake_bridge_after_confirmed_handoff_delivery",
                 "holder": {"pid": 101},
                 "terminal": {"pid": 202},
                 "closed": True,
@@ -2385,7 +2516,16 @@ def test_completed_unclosed_receipt_preserves_failure_status(
     closure.write_text(
         json.dumps(
             {
+                "schema_version": MODULE.TERMINAL_CLOSURE_SCHEMA_VERSION,
+                "handoff_ref": str(handoff.resolve()),
+                "holder_receipt_ref": str(holder.resolve()),
+                "authorization_ref": str(wake.resolve()),
+                "authorization_kind": "wake_delivered",
+                "authorization_evidence_ref": str(wake.resolve()),
                 "reservation_ref": str(reservation_path.resolve()),
+                "wake_receipt_ref": str(wake.resolve()),
+                "route": "abyss_stack_visible_incarnation_runtime",
+                "trigger": "wake_bridge_after_confirmed_handoff_delivery",
                 "holder": {"pid": 101},
                 "terminal": {"pid": 202},
                 "closed": False,

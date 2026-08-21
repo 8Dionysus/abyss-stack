@@ -55,8 +55,11 @@ and PID-neutral.
 
 - Positive: both wake-delivering and non-waking holders have one exact,
   reusable lifecycle close route with separate evidence and negative tests.
-- Tradeoff: closure schemas and receipts move to v2 and old wake receipts need
-  the compatibility `close --wake-receipt` route or a new authorization.
+- Positive: join and wake publication pins and rechecks one handoff snapshot,
+  while v2 reservations bind authorization/evidence bytes for fail-closed
+  replay.
+- Tradeoff: new closure receipts and reservations use v2; the active closure
+  schema and legacy wake route retain validated replay of completed v1 receipts.
 - Follow-up: a host canary must prove installed release use, exact holder and
   Kitty disappearance, and preservation of an unrelated live holder.
 

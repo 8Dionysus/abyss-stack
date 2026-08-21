@@ -42,14 +42,19 @@ The controller:
   required `close_exact_bound_holder` action. The join receipt, semantic
   re-entry, owner acceptance, and master wake remain separate claims. The
   produced handoff must bind both receipt paths under
-  `runtime.responsibility_holder`, while the evidence receipt binds the SHA-256
-  of the exact handoff bytes; after delivery or join, a host-side bridge may
+`runtime.responsibility_holder`, while the evidence receipt binds the SHA-256
+ of the exact handoff bytes. Join and wake authorization validate a pinned
+ handoff snapshot and recheck it immediately before publishing the authority;
+ after delivery or join, a host-side bridge may
   run the closer in the same host unit. The holder receipt also
   binds the kernel boot ID alongside each process start tick. The closer publishes a
   recoverable sidecar reservation before signaling. The sidecar records the
   signal attempt before TERM and recovery never repeats an existing attempt;
   legacy v1 reservations remain replayable only through the legacy
-  `--wake-receipt` route, while new reservations use v2. A retry after a join
+`--wake-receipt` route, while new reservations use v2. V2 reservations bind
+the authorization and wake/join evidence byte digests, and replay rejects
+either file's byte drift. Completed v1 closure receipts remain schema-valid
+and replay only through their matching legacy wake reservation. A retry after a join
   write reuses the exact canonical join evidence before publishing missing
   authorization, and the sidecar keeps the authorization file reference
   distinct from its actual wake/join evidence reference; a replayed
