@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 20677024,
+  "allowed_tracked_bytes": 36723354,
+  "approved_by": "repository-owner",
+  "base_ref": "3bbdfbc335e6fd29d4c7f5b871ffed617f7081be",
+  "changed_generated_bytes": 20677024,
+  "changed_generated_files": 204,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "011fbc400ff3e0e74cb87fefee569739509b848610c029b8d43b5add5bef25bf",
+  "reason": "Owner-reviewed runtime safety repair preserves operational close for legacy holder v1 receipts without executable digest while retaining prior argv, process, Kitty, and path-digest checks; repaired receipts keep exact /proc executable validation. Accept only this measured derived-family exceedance without raising standing budgets or widening activation or live-proof claims.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36723354,
+  "tracked_bytes_max": 24117248
+}
