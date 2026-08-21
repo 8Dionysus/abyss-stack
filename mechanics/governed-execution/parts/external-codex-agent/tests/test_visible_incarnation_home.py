@@ -2763,6 +2763,36 @@ def test_kitty_projection_omits_environment_and_commandline(
         listener.close()
 
 
+def test_safe_projection_redacts_quoted_and_whitespace_credentials() -> None:
+    assert MODULE._safe_projection_string(
+        '{"password":"hunter2"}', "json-shaped title"
+    ) == '{"password":"<redacted>"}'
+    assert MODULE._safe_projection_string(
+        "password='hunter 2'", "quoted title"
+    ) == "password='<redacted>'"
+    assert MODULE._safe_projection_string(
+        "token=hunter 2", "whitespace title"
+    ) == "token=<redacted>"
+
+
+def test_kitty_projection_rechecks_recorded_socket_identity(
+    tmp_path: Path,
+) -> None:
+    listener, _binding, _holder, terminal = _terminal_binding_fixture(tmp_path)
+    socket_record = terminal["control_socket"]
+    try:
+        with pytest.raises(MODULE.IncarnationHomeError, match="device identity"):
+            MODULE._kitty_ls(
+                kitty_executable="/usr/bin/kitty",
+                control_socket=socket_record["address"],
+                window_id="7",
+                expected_device=socket_record["device"] + 1,
+                expected_inode=socket_record["inode"],
+            )
+    finally:
+        listener.close()
+
+
 def test_status_is_read_only_and_writes_only_safe_projection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

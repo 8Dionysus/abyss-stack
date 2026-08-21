@@ -512,13 +512,30 @@ def _safe_projection_string(value: object, label: str) -> str:
         raise IncarnationHomeError(f"safe status field is not text: {label}")
     if "\x00" in value:
         raise IncarnationHomeError(f"safe status field contains NUL: {label}")
-    return re.sub(
-        r"(?i)(env|environ|environment|token|tokens|secret|secrets|password|"
+
+    credential_pattern = re.compile(
+        r"(?i)(?<![A-Za-z0-9_-])"
+        r"(?P<key_quote>['\"]?)"
+        r"(?P<key>env|environ|environment|token|tokens|secret|secrets|password|"
         r"credential|credentials|auth|authorization|bearer|api[_-]?key|apikey|"
-        r"cookie|cookies)(\s*[:=]\s*)([^\s,;]+)",
-        r"\1\2<redacted>",
-        value,
+        r"cookie|cookies)"
+        r"(?P=key_quote)(?![A-Za-z0-9_-])"
+        r"(?P<separator>\s*[:=]\s*)"
+        r"(?P<value>\"[^\"]*\"|'[^']*'|[^,;}\]\r\n]+)",
     )
+
+    def redact(match: re.Match[str]) -> str:
+        raw_value = match.group("value")
+        if raw_value[:1] in {'"', "'"} and raw_value[-1:] == raw_value[:1]:
+            raw_value = f"{raw_value[0]}<redacted>{raw_value[0]}"
+        else:
+            raw_value = "<redacted>"
+        return (
+            f"{match.group('key_quote')}{match.group('key')}"
+            f"{match.group('key_quote')}{match.group('separator')}{raw_value}"
+        )
+
+    return credential_pattern.sub(redact, value)
 
 
 def _safe_projection_value(value: object, label: str) -> object:
@@ -873,11 +890,21 @@ def _validate_terminal_binding_shape(binding: object) -> dict[str, object]:
 
 
 def _kitty_ls(
-    *, kitty_executable: str, control_socket: str, window_id: str
+    *,
+    kitty_executable: str,
+    control_socket: str,
+    window_id: str,
+    expected_device: int | None = None,
+    expected_inode: int | None = None,
 ) -> list[dict[str, object]]:
     """Query Kitty while never returning its raw, environment-bearing payload."""
 
-    _secure_control_socket(control_socket, harden=False)
+    _secure_control_socket(
+        control_socket,
+        harden=False,
+        expected_device=expected_device,
+        expected_inode=expected_inode,
+    )
     try:
         completed = subprocess.run(
             [
@@ -1940,6 +1967,8 @@ def _observe_terminal_binding(
                 kitty_executable=kitty_executable,
                 control_socket=str(socket_record["address"]),
                 window_id=str(terminal["window_id"]),
+                expected_device=socket_record["device"],
+                expected_inode=socket_record["inode"],
             )
         except IncarnationHomeError:
             kitty_query_state = "unknown"
@@ -2125,6 +2154,18 @@ def _validate_visible_launch_receipt(
     return receipt
 
 
+def _terminate_rejected_visible_launch(receipt: dict[str, Any]) -> bool:
+    """Stop the exact holder if parent-side launch admission fails."""
+
+    try:
+        holder_pid, holder_start_ticks, _kitty_pid, _kitty_start_ticks = (
+            _holder_receipt_process_ids(receipt)
+        )
+        return _send_verified_term(holder_pid, holder_start_ticks)
+    except IncarnationHomeError:
+        return False
+
+
 def _emit_safe_json(
     value: dict[str, object], *, output_path: Path | None = None, label: str
 ) -> None:
@@ -2211,6 +2252,12 @@ def command_send_text(args: argparse.Namespace) -> int:
         raise IncarnationHomeError("directed input requires a live bound terminal")
     socket_record = terminal["control_socket"]
     assert isinstance(socket_record, dict)
+    _secure_control_socket(
+        str(socket_record["address"]),
+        harden=False,
+        expected_device=socket_record["device"],
+        expected_inode=socket_record["inode"],
+    )
     try:
         completed = subprocess.run(
             [
@@ -4233,6 +4280,8 @@ def command_launch(args: argparse.Namespace) -> int:
         )
         launcher_fd: int | None = None
         cleanup_started = False
+        launch_candidate: dict[str, Any] | None = None
+        launch_accepted = False
         codex_mount = executable_snapshot_mount
         try:
             if codex_mount is None:
@@ -4348,6 +4397,7 @@ def command_launch(args: argparse.Namespace) -> int:
                 if holder_receipt_path.exists():
                     try:
                         candidate = _load_holder_receipt(holder_receipt_path)
+                        launch_candidate = candidate
                         if (
                             isinstance(candidate.get("binding"), dict)
                             and candidate["binding"].get("remote_control")
@@ -4397,8 +4447,11 @@ def command_launch(args: argparse.Namespace) -> int:
                 },
                 label="visible launch binding",
             )
+            launch_accepted = True
             return 0
         finally:
+            if not launch_accepted and launch_candidate is not None:
+                _terminate_rejected_visible_launch(launch_candidate)
             if (
                 executable_snapshot_dir is not None
                 and executable_snapshot_path is not None
