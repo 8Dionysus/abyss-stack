@@ -180,7 +180,10 @@ the exact holder receipt path, receipt digest, holder/terminal PIDs, required
  publication. The closer hashes and parses that same snapshot before accepting
  authorization. It then rechecks the holder's exact
 kernel boot ID and PID/start-ticks/argv, its process-parent identity, the recorded Kitty window,
-and the dedicated Kitty process, reserves the closure receipt before
+and the dedicated Kitty process. After return, that Kitty proof uses the
+receipt-bound launch-time window and dedication fields plus live ancestry and
+child-topology checks; it does not reopen the holder's ephemeral environment.
+The closer reserves the closure receipt before
 signaling in a recoverable, atomically published sidecar reservation. The
 sidecar is locked and advanced to a durable signal-attempt state before the
 first `TERM`; each state transition is an atomic replacement under a separate
@@ -201,7 +204,9 @@ reused authorization must also bind that exact join path and digest; a
 concurrent or mismatched join receipt cannot inherit another join's close
 authority.
 final receipt is also published as one complete non-replacing file, and a
-completed `closed: false` receipt remains a failure on replay. Every atomic
+completed `closed: false` receipt remains a failure on replay. A recovery retry
+uses a newly bound closure target and preserves the prior failed receipt bytes.
+Every atomic
 publication fsyncs both the complete file and its containing directory before
 lifecycle code can proceed, so recovery sees the reservation/attempt entry
 rather than a merely cached directory update. Direct launch copies the exact

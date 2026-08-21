@@ -69,7 +69,9 @@ and replay only through their matching legacy wake reservation. A retry after a 
   mismatched join cannot inherit another join's close authority;
   state and final receipts are atomically published with their containing
   directory fsynced before lifecycle progress, and replay of an unclosed
-  receipt remains failed. Direct ELF launch uses an inheritable sealed memfd
+  receipt remains failed. A recovery retry uses a newly bound closure target
+  and preserves the prior failed receipt bytes. Direct ELF launch uses an
+  inheritable sealed memfd
   when no adjacent Codex companion exists. If the named
   `codex-code-mode-host` companion is present, the runtime seals both exact
   ELF files and materializes them beside each other in one private read-only

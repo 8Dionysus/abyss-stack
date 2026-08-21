@@ -1532,7 +1532,14 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
         MODULE, "_proc_argv", lambda pid: {101: holder_argv, 103: kitty_argv}[pid]
     )
     monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: executable_digest)
-    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("7", True))
+    monkeypatch.setattr(
+        MODULE, "_kitty_dedication_from_receipt", lambda **_: ("7", True)
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_environ",
+        lambda _pid: pytest.fail("post-return identity reopened holder environment"),
+    )
 
     executable.unlink()
     companion.unlink()
@@ -1606,7 +1613,9 @@ def test_legacy_holder_identity_preserves_path_digest_validation(
         "_proc_exe_digest",
         lambda _pid: pytest.fail("legacy identity queried repaired executable digest"),
     )
-    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("7", True))
+    monkeypatch.setattr(
+        MODULE, "_kitty_dedication_from_receipt", lambda **_: ("7", True)
+    )
 
     assert MODULE._holder_terminal_identity(receipt) == (
         holder_pid,
@@ -1748,7 +1757,9 @@ def test_live_close_uses_holder_bound_companion_after_host_removal(
         "_proc_exe_digest",
         lambda _pid: MODULE.sha256_bytes(executable_bytes),
     )
-    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("7", True))
+    monkeypatch.setattr(
+        MODULE, "_kitty_dedication_from_receipt", lambda **_: ("7", True)
+    )
     states = iter(["live", "live", "gone", "gone"])
     monkeypatch.setattr(
         MODULE, "_proc_identity_state", lambda _pid, _start: next(states)
@@ -3216,6 +3227,134 @@ def test_completed_unclosed_receipt_preserves_failure_status(
                 closure_receipt=str(closure),
             )
         )
+
+
+def test_new_closure_target_retries_after_preserved_unclosed_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    old_handoff = tmp_path / "old-handoff.json"
+    retry_handoff = tmp_path / "retry-handoff.json"
+    holder = tmp_path / "holder.json"
+    old_wake = tmp_path / "old-wake.json"
+    retry_wake = tmp_path / "retry-wake.json"
+    old_closure = tmp_path / "old-closure.json"
+    retry_closure = tmp_path / "retry-closure.json"
+    for path in (old_handoff, holder, old_wake):
+        path.write_text("{}", encoding="utf-8")
+
+    reservation_fd, old_reservation, completed = MODULE._reserve_closure_receipt(
+        closure_receipt_path=old_closure,
+        handoff_path=old_handoff,
+        holder_receipt_path=holder,
+        wake_receipt_path=old_wake,
+        holder_pid=101,
+        terminal_pid=202,
+    )
+    assert completed is None
+    MODULE.fcntl.flock(reservation_fd, MODULE.fcntl.LOCK_UN)
+    os.close(reservation_fd)
+    failed = {
+        "schema_version": MODULE.TERMINAL_CLOSURE_SCHEMA_VERSION,
+        "handoff_ref": str(old_handoff.resolve()),
+        "holder_receipt_ref": str(holder.resolve()),
+        "authorization_ref": str(old_wake.resolve()),
+        "authorization_kind": "wake_delivered",
+        "authorization_evidence_ref": str(old_wake.resolve()),
+        "reservation_ref": str(old_reservation.resolve()),
+        "wake_receipt_ref": str(old_wake.resolve()),
+        "route": "abyss_stack_visible_incarnation_runtime",
+        "trigger": "wake_bridge_after_confirmed_handoff_delivery",
+        "holder": {"pid": 101},
+        "terminal": {"pid": 202},
+        "closed": False,
+    }
+    old_closure.write_bytes(MODULE.canonical_bytes(failed) + b"\n")
+    preserved_bytes = old_closure.read_bytes()
+
+    retry_handoff.write_bytes(
+        MODULE.canonical_bytes(
+            {
+                "responsibility_state": "returned",
+                "terminal_status": "completed",
+                "runtime": {
+                    "responsibility_holder": {
+                        "terminal_receipt": str(holder.resolve()),
+                        "terminal_receipt_sha256": MODULE.sha256_bytes(
+                            holder.read_bytes()
+                        ),
+                        "closure_receipt": str(retry_closure.resolve()),
+                        "holder_pid": 101,
+                        "terminal_pid": 202,
+                        "terminal_action": {
+                            "action": "close_exact_bound_holder",
+                            "required": True,
+                        },
+                    }
+                },
+            }
+        )
+        + b"\n"
+    )
+    retry_wake.write_bytes(
+        MODULE.canonical_bytes(
+            {
+                "schema_version": "task_local_actor_wake_receipt_v1",
+                "handoff_ref": str(retry_handoff.resolve()),
+                "handoff_sha256": MODULE.sha256_bytes(retry_handoff.read_bytes()),
+                "actions": {"handoff_message_sent": True},
+                "observed": {"handoff_delivery": True},
+            }
+        )
+        + b"\n"
+    )
+
+    monkeypatch.setattr(
+        MODULE,
+        "_load_holder_receipt_snapshot",
+        lambda _path: (
+            {
+                "holder": {"pid": 101},
+                "terminal": {
+                    "pid": 202,
+                    "argv": ["/usr/bin/kitty", "--detach"],
+                    "required_comm": "kitty",
+                    "window_id": "7",
+                    "dedicated": True,
+                },
+            },
+            b"{}",
+            MODULE.sha256_bytes(b"{}"),
+        ),
+    )
+    monkeypatch.setattr(
+        MODULE, "_holder_receipt_process_ids", lambda _receipt: (101, 11, 202, 12)
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_holder_terminal_identity",
+        lambda _receipt: (101, 202, "kitty", "7", True),
+    )
+    states = iter(["live", "live", "gone", "gone"])
+    monkeypatch.setattr(
+        MODULE, "_proc_identity_state", lambda _pid, _start: next(states)
+    )
+    monkeypatch.setattr(MODULE, "_send_verified_term", lambda *_args: True)
+    monkeypatch.setattr(MODULE.time, "sleep", lambda _seconds: None)
+
+    assert MODULE.command_close(
+        MODULE.argparse.Namespace(
+            handoff=str(retry_handoff),
+            holder_receipt=str(holder),
+            wake_receipt=str(retry_wake),
+            closure_receipt=str(retry_closure),
+        )
+    ) == 0
+    recorded = json.loads(retry_closure.read_text(encoding="utf-8"))
+    assert recorded["closed"] is True
+    assert recorded["reservation_ref"] == str(
+        MODULE._closure_reservation_path(retry_closure).resolve()
+    )
+    assert old_closure.read_bytes() == preserved_bytes
 
 
 def test_interrupted_signal_attempt_is_not_retried(
