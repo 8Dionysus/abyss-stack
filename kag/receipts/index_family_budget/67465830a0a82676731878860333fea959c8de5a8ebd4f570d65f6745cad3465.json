@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 9092995,
+  "allowed_tracked_bytes": 36412718,
+  "approved_by": "repository-owner",
+  "base_ref": "b8897091f5a9b2cebde9e226403ff7f5bf44aa55",
+  "changed_generated_bytes": 9092995,
+  "changed_generated_files": 94,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "67465830a0a82676731878860333fea959c8de5a8ebd4f570d65f6745cad3465",
+  "reason": "Reindex the clock lifecycle repair on latest main with generalized holder closure.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36412718,
+  "tracked_bytes_max": 24117248
+}
