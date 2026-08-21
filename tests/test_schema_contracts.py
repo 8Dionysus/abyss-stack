@@ -801,6 +801,27 @@ def test_holder_receipt_schema_accepts_legacy_and_repaired_v1_receipts() -> None
     validator.validate(repaired)
 
 
+def test_terminal_observation_schema_accepts_legacy_and_repaired_identities() -> None:
+    schema = load_json(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/"
+        "external-codex-terminal-observation.schema.json"
+    )
+    validator = Draft202012Validator(schema["$defs"]["identity"])
+    digest = "sha256:" + "0" * 64
+    validator.validate({"pid": 101, "start_ticks": 1001})
+    validator.validate(
+        {"pid": 101, "start_ticks": 1001, "argv_digest": digest}
+    )
+    validator.validate(
+        {
+            "pid": 101,
+            "start_ticks": 1001,
+            "argv_digest": digest,
+            "exe_digest": digest,
+        }
+    )
+
+
 def test_stack_mcp_schema_encodes_conditional_runtime_invariants() -> None:
     schema = load_json(
         "mcp/services/abyss-stack-mcp/schemas/runtime-observation.schema.json"

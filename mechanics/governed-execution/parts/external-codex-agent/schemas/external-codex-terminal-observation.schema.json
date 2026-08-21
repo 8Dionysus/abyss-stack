@@ -25,7 +25,24 @@
     "identity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["pid", "start_ticks", "argv_digest", "exe_digest"],
+      "oneOf": [
+        {
+          "required": ["pid", "start_ticks"],
+          "not": {
+            "anyOf": [
+              {"required": ["argv_digest"]},
+              {"required": ["exe_digest"]}
+            ]
+          }
+        },
+        {
+          "required": ["pid", "start_ticks", "argv_digest"],
+          "not": {"required": ["exe_digest"]}
+        },
+        {
+          "required": ["pid", "start_ticks", "argv_digest", "exe_digest"]
+        }
+      ],
       "properties": {
         "pid": {"type": "integer", "minimum": 1},
         "start_ticks": {"type": "integer", "minimum": 1},
