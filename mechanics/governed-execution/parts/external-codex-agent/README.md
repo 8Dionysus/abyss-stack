@@ -52,7 +52,9 @@ The controller:
   `--wake-receipt` route, while new reservations use v2. A retry after a join
   write reuses the exact canonical join evidence before publishing missing
   authorization, and the sidecar keeps the authorization file reference
-  distinct from its actual wake/join evidence reference;
+  distinct from its actual wake/join evidence reference; a replayed
+  authorization must bind the exact join path and digest, so a concurrent or
+  mismatched join cannot inherit another join's close authority;
   state and final receipts are atomically published with their containing
   directory fsynced before lifecycle progress, and replay of an unclosed
   receipt remains failed. Direct ELF launch uses an inheritable sealed memfd

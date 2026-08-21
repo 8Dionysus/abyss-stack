@@ -1506,6 +1506,77 @@ def test_non_waking_join_requires_return_and_exact_terminal_action(
         )
 
 
+def test_non_waking_join_rejects_authorization_for_different_join_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    holder = tmp_path / "holder.json"
+    handoff = tmp_path / "handoff.json"
+    join = tmp_path / "join.json"
+    other_join = tmp_path / "other-join.json"
+    authorization = tmp_path / "authorization.json"
+    closure = tmp_path / "closure.json"
+    holder_value = {"holder": {"pid": 101}, "terminal": {"pid": 202}}
+    holder_bytes = json.dumps(holder_value, sort_keys=True).encode("utf-8")
+    holder.write_bytes(holder_bytes)
+    holder_digest = MODULE.sha256_bytes(holder_bytes)
+    handoff.write_text(
+        json.dumps(
+            {
+                "responsibility_state": "returned",
+                "terminal_status": "completed",
+                "runtime": {
+                    "responsibility_holder": {
+                        "terminal_receipt": str(holder.resolve()),
+                        "terminal_receipt_sha256": holder_digest,
+                        "closure_receipt": str(closure.resolve()),
+                        "holder_pid": 101,
+                        "terminal_pid": 202,
+                        "terminal_action": {
+                            "action": "close_exact_bound_holder",
+                            "required": True,
+                        },
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_load_holder_receipt_snapshot",
+        lambda _path: (holder_value, holder_bytes, holder_digest),
+    )
+    monkeypatch.setattr(
+        MODULE, "_holder_receipt_process_ids", lambda _receipt: (101, 11, 202, 12)
+    )
+
+    MODULE.command_join(
+        MODULE.argparse.Namespace(
+            handoff=str(handoff),
+            holder_receipt=str(holder),
+            join_receipt=str(join),
+            authorization=str(authorization),
+            closure_receipt=str(closure),
+        )
+    )
+    other_join_value = json.loads(join.read_text(encoding="utf-8"))
+    other_join_value["join_ref"] = str(other_join.resolve())
+    MODULE._write_new_json(
+        other_join, other_join_value, "terminal join receipt"
+    )
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="exact join receipt"):
+        MODULE.command_join(
+            MODULE.argparse.Namespace(
+                handoff=str(handoff),
+                holder_receipt=str(holder),
+                join_receipt=str(other_join),
+                authorization=str(authorization),
+                closure_receipt=str(closure),
+            )
+        )
+
+
 def test_closure_authorization_rejects_join_evidence_drift(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

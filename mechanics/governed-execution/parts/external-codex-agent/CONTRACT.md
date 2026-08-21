@@ -166,6 +166,9 @@ join bytes, so it can publish the missing authorization without replacing
 evidence. In the sidecar, `authorization_ref` names the typed authorization
 file while the authorization-kind-specific `wake_receipt_ref` or
 `join_receipt_ref` names the actual evidence receipt. The
+reused authorization must also bind that exact join path and digest; a
+concurrent or mismatched join receipt cannot inherit another join's close
+authority.
 final receipt is also published as one complete non-replacing file, and a
 completed `closed: false` receipt remains a failure on replay. Every atomic
 publication fsyncs both the complete file and its containing directory before

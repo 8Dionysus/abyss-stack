@@ -1595,6 +1595,18 @@ def command_join(args: argparse.Namespace) -> int:
             holder_receipt_bytes=holder_receipt_bytes,
             holder_receipt_digest=holder_receipt_digest,
         )
+        if (
+            existing_authorization.get("authorization_kind") != "join_completed"
+            or existing_authorization.get("evidence_ref")
+            != str(join_receipt_path.resolve())
+            or existing_authorization.get("join_receipt_ref")
+            != str(join_receipt_path.resolve())
+            or existing_authorization.get("evidence_sha256")
+            != sha256_bytes(join_bytes)
+        ):
+            raise IncarnationHomeError(
+                "terminal closure authorization does not bind the exact join receipt"
+            )
         authorization = existing_authorization
     else:
         _write_new_json(
