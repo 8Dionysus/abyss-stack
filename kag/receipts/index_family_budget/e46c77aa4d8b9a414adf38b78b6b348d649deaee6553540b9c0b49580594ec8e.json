@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 27764368,
+  "allowed_tracked_bytes": 36330964,
+  "approved_by": "repository-owner",
+  "base_ref": "b40fe4a92aa42a8c2abaf52895c1934576f3bedc",
+  "changed_generated_bytes": 27764368,
+  "changed_generated_files": 308,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "e46c77aa4d8b9a414adf38b78b6b348d649deaee6553540b9c0b49580594ec8e",
+  "reason": "Refresh the owner KAG family for terminal lifecycle replay race hardening at a5edf8ee3.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 36330964,
+  "tracked_bytes_max": 24117248
+}
