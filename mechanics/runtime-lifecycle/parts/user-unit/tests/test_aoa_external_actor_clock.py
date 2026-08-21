@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -34,6 +35,8 @@ class ExternalActorClockTests(unittest.TestCase):
             command.index("AOA_CLOCK_HOLDER_CAPTURED_FILE"),
             command.index('"$AOA_CLOCK_RUNNER"'),
         )
+        self.assertIn('"$AOA_CLOCK_RUNNER" </dev/tty', command)
+        self.assertIn("clock holder terminal is unavailable", command)
         self.assertNotIn("2> >(", command)
         self.assertIn('2>>"$AOA_CLOCK_ERROR_LOG"', command)
         self.assertNotIn("runner_stderr_tmp", command)
@@ -67,9 +70,22 @@ class ExternalActorClockTests(unittest.TestCase):
                     "AOA_CLOCK_TEST_RUNNER_PID_FILE": str(root / "runner.pid"),
                 }
             )
+            interactive_command = (
+                "/usr/bin/zsh -lc " + shlex.quote(CLOCK._runner_command())
+            )
             process = subprocess.Popen(
-                ["/usr/bin/zsh", "-lc", CLOCK._runner_command()],
+                [
+                    "/usr/bin/script",
+                    "--quiet",
+                    "--flush",
+                    "--return",
+                    "--command",
+                    interactive_command,
+                    "/dev/null",
+                ],
                 env=environment,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
             try:
                 self.assertTrue(
@@ -118,6 +134,29 @@ class ExternalActorClockTests(unittest.TestCase):
                 with self.assertRaisesRegex(
                     CLOCK.ClockSupervisorError,
                     "parent must be owner-private",
+                ):
+                    CLOCK._required_environment()
+
+    def test_evidence_paths_reject_a_writable_non_sticky_ancestor(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            root.chmod(0o777)
+            private = root / "private"
+            private.mkdir()
+            private.chmod(0o700)
+            runner = private / "runner"
+            runner.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            runner.chmod(0o700)
+            environment = {
+                "AOA_CLOCK_RUNNER": str(runner),
+                "AOA_CLOCK_TITLE": "clock-title",
+                "AOA_CLOCK_STATUS_FILE": str(private / "status"),
+                "AOA_CLOCK_ERROR_LOG": str(private / "error.log"),
+            }
+            with mock.patch.dict(os.environ, environment, clear=False):
+                with self.assertRaisesRegex(
+                    CLOCK.ClockSupervisorError,
+                    "ancestor must not be writable by other users",
                 ):
                     CLOCK._required_environment()
 

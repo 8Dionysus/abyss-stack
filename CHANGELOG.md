@@ -22,6 +22,9 @@ Tracking starts with the community-docs baseline for this repository.
 - Harden the delayed external actor clock evidence boundary by requiring
   owner-private evidence directories and recording the actual runner PID rather
   than the holder shell PID.
+- Keep delayed clock runners attached to the visible holder terminal and reject
+  evidence paths below writable non-sticky ancestors, so interactive actors keep
+  their PTY and untrusted local users cannot replace validated evidence trees.
 - Generalize visible external Codex holder closure beyond wake-delivery: a
   validated non-waking terminal join now emits typed closure authorization, and
   the exact bound holder remains the only process and Kitty terminal eligible

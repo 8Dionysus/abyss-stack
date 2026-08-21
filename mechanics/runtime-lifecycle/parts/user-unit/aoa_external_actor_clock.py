@@ -206,18 +206,39 @@ def _finite_timeout(name: str, default: float) -> float:
 def _validate_evidence_path(path: Path, label: str) -> None:
     if not path.is_absolute() or path.is_symlink():
         raise ClockSupervisorError(f"clock {label} path is unsafe: {path}")
-    if not path.parent.is_dir() or path.parent.is_symlink():
-        raise ClockSupervisorError(f"clock {label} parent is unavailable: {path.parent}")
+    parent = Path(os.path.abspath(path.parent))
     try:
-        parent_stat = path.parent.stat()
+        parent_stat = parent.lstat()
     except OSError as exc:
         raise ClockSupervisorError(
             f"clock {label} parent cannot be inspected: {path.parent}"
         ) from exc
-    if parent_stat.st_uid != os.geteuid() or stat.S_IMODE(parent_stat.st_mode) & 0o077:
-        raise ClockSupervisorError(
-            f"clock {label} parent must be owner-private: {path.parent}"
-        )
+    if stat.S_ISLNK(parent_stat.st_mode) or not stat.S_ISDIR(parent_stat.st_mode):
+        raise ClockSupervisorError(f"clock {label} parent is unavailable: {path.parent}")
+
+    current = parent
+    while True:
+        try:
+            current_stat = current.lstat()
+        except OSError as exc:
+            raise ClockSupervisorError(
+                f"clock {label} ancestor cannot be inspected: {current}"
+            ) from exc
+        if stat.S_ISLNK(current_stat.st_mode) or not stat.S_ISDIR(current_stat.st_mode):
+            raise ClockSupervisorError(f"clock {label} ancestor is unsafe: {current}")
+        mode = stat.S_IMODE(current_stat.st_mode)
+        if current == parent:
+            if current_stat.st_uid != os.geteuid() or mode & 0o077:
+                raise ClockSupervisorError(
+                    f"clock {label} parent must be owner-private: {path.parent}"
+                )
+        elif mode & (stat.S_IWGRP | stat.S_IWOTH) and not mode & stat.S_ISVTX:
+            raise ClockSupervisorError(
+                f"clock {label} ancestor must not be writable by other users: {current}"
+            )
+        if current == Path("/"):
+            break
+        current = current.parent
 
 
 def _path_aliases_runner(path: Path) -> bool:
@@ -380,7 +401,11 @@ fi
 while [[ ! -e "$AOA_CLOCK_HOLDER_CAPTURED_FILE" ]]; do
   /usr/bin/sleep 0.05
 done
-\"$AOA_CLOCK_RUNNER\" 2>>\"$AOA_CLOCK_ERROR_LOG\" &
+if ! : </dev/tty; then
+  print -u2 -- "clock holder terminal is unavailable: /dev/tty"
+  exit 125
+fi
+\"$AOA_CLOCK_RUNNER\" </dev/tty 2>>\"$AOA_CLOCK_ERROR_LOG\" &
 runner_pid=$!
 wait \"$runner_pid\"
 runner_rc=$?

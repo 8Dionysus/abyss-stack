@@ -19,8 +19,11 @@ are persisted to the configured error log and return a non-success status to
 systemd. A handled operator stop is a clean supervisor shutdown.
 
 Every status, error, handshake, and capture path must be in an existing
-owner-private directory; this prevents another local user from replacing the
-predictable evidence files between validation and publication.
+owner-private directory whose non-sticky ancestors are not writable by group or
+other users; this prevents another local user from replacing the predictable
+evidence files between validation and publication. The holder opens the
+configured runner's stdin from its visible /dev/tty; a holder without a
+terminal fails closed instead of silently giving an interactive actor /dev/null.
 
 This route is manual-only. Use a unique environment file, title, status path,
 and error path for a bounded delayed proof; do not turn it into a recurring
