@@ -34,6 +34,8 @@ RETURN_RECEIPT_SCHEMA_VERSION = "abyss_stack_external_codex_return_receipt_v1"
 RETURN_RESPONSE_SCHEMA_VERSION = "abyss_stack_external_codex_return_response_v1"
 DETACHED_SCHEMA_VERSION = "abyss_stack_external_codex_return_detached_v1"
 RETURN_ATTEMPT_SCHEMA_VERSION = "abyss_stack_external_codex_return_attempt_v1"
+PAUSE_OWNER_SCHEMA_VERSION = "abyss_stack_external_codex_pause_owner_v1"
+PAUSE_RECEIPT_SCHEMA_VERSION = "abyss_stack_external_codex_pause_receipt_v1"
 WEBSOCKET_ACCEPT_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 APP_SERVER_DISCOVERY_PROBE_TIMEOUT_SECONDS = 1.0
@@ -117,9 +119,11 @@ def _nonempty_string(value: object, label: str) -> str:
     return value
 
 
-def _owner_projection(owner: dict[str, Any]) -> dict[str, str]:
+def _owner_projection(
+    owner: dict[str, Any], *, label: str = "return owner"
+) -> dict[str, str]:
     return {
-        key: _nonempty_string(owner.get(key), f"return owner {key}")
+        key: _nonempty_string(owner.get(key), f"{label} {key}")
         for key in (
             "owner_id",
             "owner_repo",
@@ -147,17 +151,19 @@ def _transport_endpoint_candidates(owner: dict[str, Any]) -> list[str]:
     return candidates
 
 
-def _canonical_transport_binding(owner: dict[str, Any]) -> dict[str, object]:
+def _canonical_transport_binding(
+    owner: dict[str, Any], *, label: str = "return owner"
+) -> dict[str, object]:
     """Collapse every accepted endpoint spelling to the effective binding."""
 
     candidates = _transport_endpoint_candidates(owner)
     if len(set(candidates)) > 1:
         raise ExternalCodexReturnError(
-            "return owner transport endpoint aliases do not agree"
+            f"{label} transport endpoint aliases do not agree"
         )
     return {
         "posture": _nonempty_string(
-            owner.get("transport_posture"), "return owner transport_posture"
+            owner.get("transport_posture"), f"{label} transport_posture"
         ),
         "endpoint": candidates[0] if candidates else None,
     }
@@ -172,8 +178,13 @@ def _owner_binding_projection(owner: dict[str, Any]) -> dict[str, object]:
     }
 
 
-def validate_return_owner(owner: dict[str, Any]) -> dict[str, Any]:
-    """Validate owner binding data without selecting any owner identity."""
+def _validate_owner_binding(
+    owner: dict[str, Any],
+    *,
+    accepted_schema_versions: set[str],
+    label: str,
+) -> dict[str, Any]:
+    """Validate one owner-selected Goal/thread transport binding."""
 
     allowed_keys = {
         "schema_version",
@@ -191,34 +202,59 @@ def validate_return_owner(owner: dict[str, Any]) -> dict[str, Any]:
     unknown_keys = set(owner) - allowed_keys
     if unknown_keys:
         raise ExternalCodexReturnError(
-            "return owner contains undeclared fields: "
+            f"{label} contains undeclared fields: "
             + ", ".join(sorted(str(key) for key in unknown_keys))
         )
     schema = owner.get("schema_version")
-    if schema not in {RETURN_OWNER_SCHEMA_VERSION, LEGACY_RETURN_OWNER_SCHEMA_VERSION}:
-        raise ExternalCodexReturnError("unsupported return-owner schema")
-    projected = _owner_projection(owner)
+    if schema not in accepted_schema_versions:
+        raise ExternalCodexReturnError(f"unsupported {label} schema")
+    projected = _owner_projection(owner, label=label)
     if projected["runtime"] != "codex":
-        raise ExternalCodexReturnError("this return transport requires runtime=codex")
+        raise ExternalCodexReturnError(
+            f"this {label} transport requires runtime=codex"
+        )
     if "transport_endpoint" in owner:
-        _nonempty_string(owner["transport_endpoint"], "return owner transport_endpoint")
+        _nonempty_string(owner["transport_endpoint"], f"{label} transport_endpoint")
     if "app_server_socket" in owner:
-        _nonempty_string(owner["app_server_socket"], "return owner app_server_socket")
+        _nonempty_string(owner["app_server_socket"], f"{label} app_server_socket")
     transport = owner.get("transport")
     if transport is not None:
         if not isinstance(transport, dict):
-            raise ExternalCodexReturnError("return owner transport must be an object")
+            raise ExternalCodexReturnError(f"{label} transport must be an object")
         unknown_transport_keys = set(transport) - {"endpoint", "socket", "address"}
         if unknown_transport_keys:
             raise ExternalCodexReturnError(
-                "return owner transport contains undeclared fields: "
+                f"{label} transport contains undeclared fields: "
                 + ", ".join(sorted(str(key) for key in unknown_transport_keys))
             )
         for key in ("endpoint", "socket", "address"):
             if key in transport:
-                _nonempty_string(transport[key], f"return owner transport.{key}")
-    _canonical_transport_binding({**owner, **projected})
+                _nonempty_string(transport[key], f"{label} transport.{key}")
+    _canonical_transport_binding({**owner, **projected}, label=label)
     return {**owner, **projected}
+
+
+def validate_return_owner(owner: dict[str, Any]) -> dict[str, Any]:
+    """Validate return owner binding data without selecting any owner identity."""
+
+    return _validate_owner_binding(
+        owner,
+        accepted_schema_versions={
+            RETURN_OWNER_SCHEMA_VERSION,
+            LEGACY_RETURN_OWNER_SCHEMA_VERSION,
+        },
+        label="return owner",
+    )
+
+
+def validate_pause_owner(owner: dict[str, Any]) -> dict[str, Any]:
+    """Validate a separate owner-selected Goal pause binding."""
+
+    return _validate_owner_binding(
+        owner,
+        accepted_schema_versions={PAUSE_OWNER_SCHEMA_VERSION},
+        label="pause owner",
+    )
 
 
 def _endpoint_from_owner(owner: dict[str, Any]) -> str | None:
@@ -805,6 +841,96 @@ def deliver_handoff(
     }
 
 
+def pause_goal(
+    owner: dict[str, Any],
+    owner_path: Path,
+    endpoint: Path,
+    *,
+    owner_bytes: bytes | None = None,
+    rpc_factory: Callable[[Path], Any] = UnixWebSocketRpc,
+) -> dict[str, Any]:
+    """Pause one active owner-bound Goal through the Codex app-server API.
+
+    This is deliberately separate from ``deliver_handoff``: it changes only
+    Goal lifecycle state and emits no wake message, turn, holder close, or
+    acceptance claim.
+    """
+
+    if owner_bytes is None:
+        owner_bytes = owner_path.read_bytes()
+    with rpc_factory(endpoint) as rpc:
+        initialize = rpc.call(
+            "initialize",
+            {
+                "clientInfo": {
+                    "name": "abyss_stack_external_codex_pause",
+                    "title": "Abyss external Codex Goal pause",
+                    "version": "1",
+                },
+                "capabilities": {"experimentalApi": True},
+            },
+        )
+        rpc.notify("initialized")
+        goal_get_response = rpc.call(
+            "thread/goal/get",
+            {"threadId": owner["thread_id"]},
+        )
+        goal_before = _goal_object(goal_get_response, "thread/goal/get")
+        goal_identity_source = _validate_goal_binding(goal_before, owner)
+        goal_before_status = _string_at(goal_before, ("status",))
+        if goal_before_status != "active":
+            raise ExternalCodexReturnError(
+                "Codex app-server Goal is not pausable from active state: "
+                f"{goal_before_status!r}"
+            )
+        goal_response = rpc.call(
+            "thread/goal/set",
+            {"threadId": owner["thread_id"], "status": "paused"},
+        )
+        goal = _goal_object(goal_response, "thread/goal/set")
+        goal_identity_source = _validate_goal_binding(goal, owner)
+        goal_status = _string_at(goal, ("status",))
+        if goal_status != "paused":
+            raise ExternalCodexReturnError(
+                "Codex app-server did not confirm a paused Goal: "
+                f"{goal_status!r}"
+            )
+    return {
+        "schema_version": PAUSE_RECEIPT_SCHEMA_VERSION,
+        "generated_at": _utc_now(),
+        "owner_ref": str(owner_path.resolve()),
+        "owner_sha256": _sha256_bytes(owner_bytes),
+        "owner": _owner_projection(owner),
+        "transport": {
+            "kind": "codex_app_server_websocket_unix",
+            "endpoint": str(endpoint),
+        },
+        "goal_status": goal_status,
+        "goal_binding": {
+            "goal_id": owner["goal_id"],
+            "thread_id": owner["thread_id"],
+            "before_status": goal_before_status,
+            "transition": "active_to_paused",
+            "identity_source": goal_identity_source,
+        },
+        "lifecycle_method": "thread/goal/set",
+        "lifecycle": {
+            "accepted": True,
+            "initialize": _safe_response_summary(initialize),
+            "goal_get": _safe_response_summary(goal_get_response),
+            "goal": _safe_response_summary(goal_response),
+            "goal_response_sha256": _sha256_bytes(
+                _canonical_bytes(goal_response)
+            ),
+        },
+        "actions": {"goal_lifecycle_set": True},
+        "observed": {"goal_lifecycle": "paused", "goal_status": "paused"},
+        "paused": True,
+        "owner_acceptance": "separate",
+        "semantic_acceptance": "separate",
+    }
+
+
 def _write_new_json(path: Path, value: dict[str, Any], label: str) -> None:
     try:
         VISIBLE._write_new_json(path, value, label)
@@ -1386,6 +1512,159 @@ def _load_authorized_return_receipt(
     return evidence_path, receipt
 
 
+def _pause_binding(
+    *, owner_path: Path, owner_digest: str, pause_path: Path
+) -> dict[str, str]:
+    return {
+        "owner_ref": str(owner_path.resolve()),
+        "owner_sha256": owner_digest,
+        "pause_receipt_ref": str(pause_path.resolve()),
+    }
+
+
+@contextlib.contextmanager
+def _pause_attempt_lock(anchor_path: Path) -> Any:
+    """Serialize one pause receipt and its single lifecycle mutation."""
+
+    lock_path = anchor_path.with_name(anchor_path.name + ".pause-attempt.lock")
+    _validate_output_path(lock_path, "Goal pause attempt lock")
+    flags = os.O_RDWR | os.O_CREAT
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(lock_path, flags, 0o600)
+    except OSError as exc:
+        raise ExternalCodexReturnError(
+            f"cannot open Goal pause attempt lock: {lock_path}"
+        ) from exc
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        yield
+    except OSError as exc:
+        raise ExternalCodexReturnError(
+            f"Goal pause attempt lock failed: {lock_path}"
+        ) from exc
+    finally:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(descriptor)
+
+
+def _pause_reservation(
+    path: Path, *, binding: dict[str, str]
+) -> dict[str, Any]:
+    if path.exists():
+        value, raw = _load_json_file(path, "canonical Goal pause receipt")
+        if raw != _canonical_bytes(value) + b"\n":
+            raise ExternalCodexReturnError(
+                "canonical Goal pause receipt is not canonically encoded"
+            )
+        if value.get("schema_version") != PAUSE_RECEIPT_SCHEMA_VERSION:
+            raise ExternalCodexReturnError(
+                "canonical Goal pause receipt schema mismatch"
+            )
+        if value.get("state") != "reserved":
+            raise ExternalCodexReturnError(
+                "canonical Goal pause receipt exists but is not a completed receipt"
+            )
+        for key, expected in binding.items():
+            if value.get(key) != expected:
+                raise ExternalCodexReturnError(
+                    f"canonical Goal pause receipt reservation {key} mismatch"
+                )
+        return value
+    reservation = {
+        "schema_version": PAUSE_RECEIPT_SCHEMA_VERSION,
+        "state": "reserved",
+        "reserved_at": _utc_now(),
+        **binding,
+    }
+    _write_new_json(path, reservation, "canonical Goal pause receipt reservation")
+    return reservation
+
+
+def _validate_pause_receipt(
+    receipt: dict[str, Any],
+    *,
+    owner: dict[str, Any],
+    owner_path: Path,
+) -> dict[str, Any]:
+    if receipt.get("schema_version") != PAUSE_RECEIPT_SCHEMA_VERSION:
+        raise ExternalCodexReturnError("canonical Goal pause receipt schema mismatch")
+    if receipt.get("paused") is not True:
+        raise ExternalCodexReturnError(
+            "canonical Goal pause receipt does not prove a pause"
+        )
+    if receipt.get("owner_ref") != str(owner_path.resolve()):
+        raise ExternalCodexReturnError(
+            "canonical Goal pause receipt owner identity mismatch"
+        )
+    if receipt.get("owner") != _owner_projection(owner):
+        raise ExternalCodexReturnError(
+            "canonical Goal pause receipt owner binding mismatch"
+        )
+    if receipt.get("goal_status") != "paused":
+        raise ExternalCodexReturnError(
+            "canonical Goal pause receipt Goal is not paused"
+        )
+    goal_binding = receipt.get("goal_binding")
+    if (
+        not isinstance(goal_binding, dict)
+        or goal_binding.get("goal_id") != owner["goal_id"]
+        or goal_binding.get("thread_id") != owner["thread_id"]
+        or goal_binding.get("before_status") != "active"
+        or goal_binding.get("transition") != "active_to_paused"
+    ):
+        raise ExternalCodexReturnError(
+            "canonical Goal pause receipt Goal binding is incomplete"
+        )
+    lifecycle = receipt.get("lifecycle")
+    actions = receipt.get("actions")
+    observed = receipt.get("observed")
+    if (
+        receipt.get("lifecycle_method") != "thread/goal/set"
+        or not isinstance(lifecycle, dict)
+        or lifecycle.get("accepted") is not True
+        or not isinstance(actions, dict)
+        or actions.get("goal_lifecycle_set") is not True
+        or not isinstance(observed, dict)
+        or observed.get("goal_lifecycle") != "paused"
+        or observed.get("goal_status") != "paused"
+        or receipt.get("owner_acceptance") != "separate"
+        or receipt.get("semantic_acceptance") != "separate"
+    ):
+        raise ExternalCodexReturnError(
+            "canonical Goal pause receipt lacks lifecycle evidence"
+        )
+    return receipt
+
+
+def _load_existing_pause_receipt(
+    path: Path,
+    *,
+    owner: dict[str, Any],
+    owner_path: Path,
+    owner_digest: str,
+) -> dict[str, Any]:
+    value, raw = _load_json_file(path, "canonical Goal pause receipt")
+    if raw != _canonical_bytes(value) + b"\n":
+        raise ExternalCodexReturnError(
+            "canonical Goal pause receipt is not canonically encoded"
+        )
+    if value.get("owner_sha256") != owner_digest:
+        raise ExternalCodexReturnError(
+            "canonical Goal pause receipt owner digest mismatch"
+        )
+    return _validate_pause_receipt(
+        value,
+        owner=owner,
+        owner_path=owner_path,
+    )
+
+
 def _call_visible(handler: Callable[[argparse.Namespace], int], args: argparse.Namespace) -> None:
     output = io.StringIO()
     try:
@@ -1395,6 +1674,79 @@ def _call_visible(handler: Callable[[argparse.Namespace], int], args: argparse.N
         raise ExternalCodexReturnError(str(exc)) from exc
     if result != 0:
         raise ExternalCodexReturnError(f"visible lifecycle command failed: {handler.__name__}")
+
+
+def _run_pause_bound(
+    *,
+    owner_path: Path,
+    owner_bytes: bytes,
+    owner_digest: str,
+    owner: dict[str, Any],
+    pause_path: Path,
+) -> dict[str, Any]:
+    binding = _pause_binding(
+        owner_path=owner_path,
+        owner_digest=owner_digest,
+        pause_path=pause_path,
+    )
+    if pause_path.exists():
+        existing, _existing_raw = _load_json_file(
+            pause_path, "canonical Goal pause receipt"
+        )
+        if existing.get("state") == "reserved":
+            _pause_reservation(pause_path, binding=binding)
+        else:
+            return _load_existing_pause_receipt(
+                pause_path,
+                owner=owner,
+                owner_path=owner_path,
+                owner_digest=owner_digest,
+            )
+    else:
+        _pause_reservation(pause_path, binding=binding)
+
+    VISIBLE._assert_file_snapshot(owner_path, owner_bytes, "pause owner")
+    endpoint, resolution = discover_app_server_socket(owner)
+    receipt = pause_goal(
+        owner,
+        owner_path,
+        endpoint,
+        owner_bytes=owner_bytes,
+    )
+    receipt["transport"]["resolution"] = resolution
+    receipt.update(binding)
+    _replace_json(pause_path, receipt, "canonical Goal pause receipt")
+    VISIBLE._assert_file_snapshot(owner_path, owner_bytes, "pause owner")
+    return _load_existing_pause_receipt(
+        pause_path,
+        owner=owner,
+        owner_path=owner_path,
+        owner_digest=owner_digest,
+    )
+
+
+def run_pause(args: argparse.Namespace) -> dict[str, Any]:
+    """Run the bounded active-to-paused Goal lifecycle action."""
+
+    owner_path = _regular_file(Path(args.pause_owner), "pause owner")
+    owner_value, owner_bytes = _load_json_file(owner_path, "pause owner")
+    owner_digest = _sha256_bytes(owner_bytes)
+    owner = validate_pause_owner(owner_value)
+    pause_path = _validate_output_path(
+        Path(args.pause_receipt), "canonical Goal pause receipt"
+    )
+    if pause_path.resolve() == owner_path.resolve():
+        raise ExternalCodexReturnError(
+            "canonical Goal pause receipt must be distinct from pause owner"
+        )
+    with _pause_attempt_lock(pause_path):
+        return _run_pause_bound(
+            owner_path=owner_path,
+            owner_bytes=owner_bytes,
+            owner_digest=owner_digest,
+            owner=owner,
+            pause_path=pause_path,
+        )
 
 
 def run_return(args: argparse.Namespace) -> dict[str, Any]:
@@ -1730,6 +2082,12 @@ def command_return(args: argparse.Namespace) -> int:
         return _command_return_detached(args, lock)
 
 
+def command_pause(args: argparse.Namespace) -> int:
+    response = run_pause(args)
+    print(json.dumps(response, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
 def _command_return_detached(
     args: argparse.Namespace, lock: _ReturnAttemptLock
 ) -> int:
@@ -1944,11 +2302,18 @@ def _command_return_detached(
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(
         description=(
-            "Deliver an explicit external Codex handoff to its supplied Goal/session "
-            "and close only its supplied visible holder."
+            "Run an explicit external Codex Goal lifecycle action or deliver a "
+            "handoff and close only its supplied visible holder."
         )
     )
     subcommands = root.add_subparsers(dest="command", required=True)
+    pause_parser = subcommands.add_parser(
+        "pause",
+        help="pause the exact active Goal without waking or closing a holder",
+    )
+    pause_parser.add_argument("--pause-owner", required=True)
+    pause_parser.add_argument("--pause-receipt", required=True)
+    pause_parser.set_defaults(handler=command_pause)
     return_parser = subcommands.add_parser(
         "return",
         help="deliver the handoff, authorize typed close, and close the exact holder",
