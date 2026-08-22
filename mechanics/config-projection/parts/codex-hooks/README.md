@@ -34,23 +34,27 @@ duplicate handlers, and merges matching event groups in fragment order.
 Metadata is removed from the native output.
 
 The stack-owned `abyss-stack:agent-tool-routing:v1` fragment adds the current
-Codex `PreToolUse` command adapter for the `collaboration*` tool namespace. The
-adapter recognizes the Codex wire names, reads at most the configured context
-limit plus one byte from an explicitly supplied typed context file
-(`AOA_AGENT_TOOL_ROUTING_CONTEXT_FILE`), verifies its safe attempt identity
-against the current event, and asks
+Codex `PreToolUse` command adapter for the canonical `spawn_agent`, flattened
+v1/v2 names, and observed compatibility aliases. The composed command binds an
+explicit typed context directory and `aoa-sdk` source root; the adapter uses the
+hook event's `cwd` as the workspace coordinate. It reads at most the configured
+context limit plus one byte from that directory
+(`AOA_AGENT_TOOL_ROUTING_CONTEXT_DIR`), selects the file keyed by the current
+event's safe session/turn/tool-use/tool-name identity, verifies the context's
+identity against that event, and asks
 `aoa-sdk.ControlPlaneAPI.pre_tool_route()` for the typed next-owner posture.
 It reflects that posture as a native allow or deny. `aoa-agents` remains the
 owner of responsibility classification and role-first meaning; this adapter
 does not choose a role, model, runtime, workspace, or actor and never copies
 opaque `tool_input` into its output.
 
-Each valid context file's directory entry is claimed by an atomic rename before
-the file is read, then the claimed path is immediately unlinked after
-validation and before the SDK route. This makes the classification single-use
-for one collaboration attempt without retaining its Goal/holder metadata, and
-allows a producer to atomically refresh the configured path for a later
-attempt. When
+The producer writes one exact file per attempt under the directory, named
+`attempt-<sha256(canonical safe attempt identity)>.json`. The adapter claims
+only that event-keyed directory entry by atomic rename before reading it, then
+immediately unlinks the claimed path after validation and before the SDK route.
+This makes the classification single-use for one agent-tool attempt without
+retaining its Goal/holder metadata; a different concurrent attempt has a
+different key and cannot consume it. When
 `AOA_SDK_SOURCE_ROOT` is supplied, the adapter checks both the package presence
 and the source location of the imported SDK modules. The fragment gives the
 adapter a ten-second native Codex timeout, while the adapter emits a deny after

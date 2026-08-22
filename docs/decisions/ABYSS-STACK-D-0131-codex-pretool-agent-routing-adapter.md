@@ -32,23 +32,27 @@ holder references required by the SDK contract.
 
 ## Decision
 
-Add a command-only `PreToolUse` fragment for the known Codex
-`collaboration*` tool namespace. The adapter reads the event identity and
+Add a command-only `PreToolUse` fragment for Codex's canonical `spawn_agent`,
+v1 namespace-flattened names, v2 unnamespaced names, and observed installed
+binary compatibility aliases. The composed command binds the selected
+context directory and `aoa-sdk` source root explicitly; the adapter uses the
+hook event's `cwd` as its workspace coordinate. It reads the event identity and
 opaque-tool presence, reads at most the context limit plus one byte, verifies
 the context's safe session/turn/tool-use/tool-name identity against the current
 event, obtains the current Goal/holder and route state only from an exact
-externally supplied context file, constructs
+externally supplied attempt-keyed context directory, constructs
 `aoa_agent_tool_routing_intent_v1`, and calls `aoa-sdk.ControlPlaneAPI`.
 
 The adapter denies unresolved and independent routes with actionable
 `aoa-agents-skills` role-first direction. It permits the built-in local
 compatibility path only for a typed `not_independent` SDK posture. Missing or
-malformed context, unknown collaboration names, and unsupported SDK postures
-fail closed. The adapter atomically claims the configured context directory
-entry before reading it, reads the claimed inode, and immediately unlinks that
-claimed path after validation and before the SDK call. A classification cannot
-be reused for a later or different collaboration attempt, while an atomic
-producer refresh at the configured path survives for that later attempt.
+malformed context, unknown agent-tool names, and unsupported SDK postures fail
+closed. The adapter derives an SHA-256 key from the safe session/turn/tool-use/
+tool-name coordinates, atomically claims only that context directory entry
+before reading it, reads the claimed inode, and immediately unlinks that claimed
+path after validation and before the SDK call. A classification cannot be
+reused for a later or different collaboration attempt, and a concurrent attempt
+has a different key rather than competing for one fixed file.
 Successful calls retain no context metadata. When an explicit SDK source root
 is supplied, the adapter verifies both package presence and imported module
 provenance. Its inner route timeout emits a deny before the longer native hook

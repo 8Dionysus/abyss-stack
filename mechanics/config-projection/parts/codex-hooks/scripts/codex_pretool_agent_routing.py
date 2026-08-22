@@ -23,15 +23,32 @@ import uuid
 CONTEXT_SCHEMA_VERSION = "aoa_codex_pretool_agent_routing_context_v2"
 CODEX_PRE_TOOL_EVENT = "PreToolUse"
 CODEX_AGENT_TOOL_NAMESPACE = "collaboration"
+CONTEXT_DIRECTORY_ENV = "AOA_AGENT_TOOL_ROUTING_CONTEXT_DIR"
+CONTEXT_FILE_PREFIX = "attempt-"
+ATTEMPT_IDENTITY_FIELDS = ("session_id", "turn_id", "tool_use_id", "tool_name")
 MAX_EVENT_BYTES = 1024 * 1024
 MAX_CONTEXT_BYTES = 256 * 1024
 INTERNAL_TIMEOUT_SECONDS = 5.0
 
-# These are Codex 0.148.0's collaboration tool names as observed in the
-# PreToolUse wire contract.  The namespace check below fails closed for a new
-# collaboration name instead of treating it as an unrelated tool.
+# These are Codex 0.148.0's hook-facing agent-tool names. ``spawn_agent`` is
+# special-cased by Codex even when the underlying tool is namespaced; the
+# remaining v1 names are flattened and v2 names are already unnamespaced.
+# ``collaboration*`` values are retained as compatibility identities observed
+# in the installed 0.148.0 binary. The matcher and this set stay explicit so
+# a new or misspelled name cannot silently become an unrelated tool.
 CODEX_AGENT_TOOL_NAMES = frozenset(
     {
+        "spawn_agent",
+        "Agent",
+        "multi_agent_v1send_input",
+        "multi_agent_v1resume_agent",
+        "multi_agent_v1wait_agent",
+        "multi_agent_v1close_agent",
+        "send_message",
+        "followup_task",
+        "wait_agent",
+        "list_agents",
+        "interrupt_agent",
         "collaborationspawn_agent",
         "collaborationsend_message",
         "collaborationwait_agent",
@@ -114,7 +131,9 @@ def _tool_class(tool_name: Any) -> str:
         return "malformed"
     if tool_name in CODEX_AGENT_TOOL_NAMES:
         return "agent"
-    if tool_name.startswith(CODEX_AGENT_TOOL_NAMESPACE):
+    if tool_name.startswith(CODEX_AGENT_TOOL_NAMESPACE) or tool_name.startswith(
+        "multi_agent_"
+    ):
         return "unknown-agent"
     return "other"
 
@@ -169,18 +188,50 @@ def _load_sdk(environ: Mapping[str, str]) -> tuple[Any, Any, Any, Any, Any]:
     )
 
 
-def _claim_context(environ: Mapping[str, str]) -> dict[str, Any]:
-    path_value = environ.get("AOA_AGENT_TOOL_ROUTING_CONTEXT_FILE")
-    if not path_value:
-        raise AdapterError("typed Goal/current-holder route context is unavailable")
-    path = Path(path_value)
-    if not path.is_absolute() or path.is_symlink() or not path.is_file():
-        raise AdapterError("typed route context is not a regular absolute file")
+def _attempt_identity_coordinates(
+    source: Mapping[str, Any],
+    *,
+    label_prefix: str = "",
+) -> dict[str, str]:
+    return {
+        label: _required_string(
+            source.get(label),
+            f"{label_prefix}{label}",
+        )
+        for label in ATTEMPT_IDENTITY_FIELDS
+    }
 
-    # Claim the directory entry before reading it.  A producer may atomically
-    # replace the configured path while this hook is starting; rename then
-    # reads exactly the inode that was claimed, leaving a fresh replacement at
-    # the configured path for a later attempt.
+
+def _attempt_identity_digest(event: Mapping[str, Any]) -> str:
+    coordinates = _attempt_identity_coordinates(event)
+    encoded = json.dumps(
+        coordinates,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _claim_context(
+    environ: Mapping[str, str],
+    event: Mapping[str, Any],
+) -> dict[str, Any]:
+    directory_value = environ.get(CONTEXT_DIRECTORY_ENV)
+    if not directory_value:
+        raise AdapterError("typed Goal/current-holder route context is unavailable")
+    directory = Path(directory_value)
+    if not directory.is_absolute() or directory.is_symlink() or not directory.is_dir():
+        raise AdapterError("typed route context directory is unavailable")
+    path = directory / (
+        f"{CONTEXT_FILE_PREFIX}{_attempt_identity_digest(event)}.json"
+    )
+    if path.is_symlink() or not path.is_file():
+        raise AdapterError("typed route context for this tool call is unavailable")
+
+    # Claim only the event-keyed directory entry before reading it.  A producer
+    # may refresh a later attempt concurrently, but a different event has a
+    # different key and cannot have its context consumed by this call.
     claimed_path = path.with_name(f"{path.name}.consumed.{uuid.uuid4().hex}")
     try:
         path.rename(claimed_path)
@@ -216,17 +267,12 @@ def _verify_attempt_binding(
     context: Mapping[str, Any],
 ) -> None:
     attempt = context.get("attempt")
-    if not isinstance(attempt, dict) or set(attempt) != {
-        "session_id",
-        "turn_id",
-        "tool_use_id",
-        "tool_name",
-    }:
+    if not isinstance(attempt, dict) or set(attempt) != set(ATTEMPT_IDENTITY_FIELDS):
         raise AdapterError("typed route context attempt identity is not exact")
-    for label in ("session_id", "turn_id", "tool_use_id", "tool_name"):
-        expected = _required_string(attempt.get(label), f"context {label}")
-        actual = _required_string(event.get(label), label)
-        if expected != actual:
+    expected = _attempt_identity_coordinates(attempt, label_prefix="context ")
+    actual = _attempt_identity_coordinates(event)
+    for label in ATTEMPT_IDENTITY_FIELDS:
+        if expected[label] != actual[label]:
             raise AdapterError(
                 f"typed route context does not bind to this tool call ({label})"
             )
@@ -301,12 +347,12 @@ def route_agent_tool_event(
         return _deny("Codex PreToolUse event identity is invalid; call blocked safely.")
     if classification == "unknown-agent":
         return _deny(
-            "Unknown Codex collaboration tool identity; the adapter cannot prove "
+            "Unknown Codex agent-tool identity; the adapter cannot prove "
             "the wire contract and blocked the call safely."
         )
 
     try:
-        context = _claim_context(environment)
+        context = _claim_context(environment, event)
         _verify_attempt_binding(event, context)
         (
             control_plane_api,

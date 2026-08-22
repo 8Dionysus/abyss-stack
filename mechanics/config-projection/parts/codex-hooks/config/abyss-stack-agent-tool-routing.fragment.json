@@ -3,20 +3,22 @@
   "fragment_id": "abyss-stack:agent-tool-routing:v1",
   "owner": "abyss-stack",
   "mode": "pretool-agent-routing",
-  "description": "Reflect SDK-owned responsibility routing before Codex collaboration tools execute",
+  "description": "Reflect SDK-owned responsibility routing before Codex agent tools execute",
   "bindings": [
-    "AOA_CODEX_AGENT_ROUTING_HOOK"
+    "AOA_CODEX_AGENT_ROUTING_HOOK",
+    "AOA_CODEX_AGENT_ROUTING_CONTEXT_DIR",
+    "AOA_CODEX_AGENT_ROUTING_SDK_SOURCE_ROOT"
   ],
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "^collaboration.*$",
+        "matcher": "^(?:Agent|spawn_agent|multi_agent_v1(?:send_input|resume_agent|wait_agent|close_agent)|send_message|followup_task|wait_agent|list_agents|interrupt_agent|collaboration(?:spawn_agent|send_message|wait_agent|close_agent|resume_agent|list_agents|followup_task|interrupt_agent|send_input))$",
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/python3 \"{{AOA_CODEX_AGENT_ROUTING_HOOK}}\"",
+            "command": "/usr/bin/env AOA_AGENT_TOOL_ROUTING_CONTEXT_DIR=\"{{AOA_CODEX_AGENT_ROUTING_CONTEXT_DIR}}\" AOA_SDK_SOURCE_ROOT=\"{{AOA_CODEX_AGENT_ROUTING_SDK_SOURCE_ROOT}}\" /usr/bin/python3 \"{{AOA_CODEX_AGENT_ROUTING_HOOK}}\"",
             "timeout": 10,
-            "statusMessage": "Routing Codex collaboration tool through AoA"
+            "statusMessage": "Routing Codex agent tool through AoA"
           }
         ]
       }

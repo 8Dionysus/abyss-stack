@@ -20,15 +20,18 @@ Focused tests cover:
 - content-minimized receipts with no raw source or binding path;
 - read-only exact-output comparison.
 - exact Codex `PreToolUse` agent-tool recognition and SDK routing;
+- canonical `spawn_agent`, flattened v1/v2 identities, observed compatibility
+  aliases, and unknown-name fail-closed matcher coverage;
 - unresolved/independent denial with role-first direction;
 - typed `not_independent` local compatibility and unrelated-tool pass-through;
-- bounded oversized-context reads, exact safe attempt binding, claim-before-read
-  single-use typed context consumption, producer refresh safety, and selected
-  SDK-root verification;
+- bounded oversized-context reads, exact safe attempt-key binding,
+  claim-before-read single-use typed context consumption, concurrent producer
+  isolation, and selected SDK-root verification;
 - inner timeout denial before the longer native hook timeout;
 - malformed or missing context fail-closed behavior without invented identity;
 - composition of the stack-owned adapter fragment without dropping existing
-  native hook handlers.
+  native hook handlers, with explicit context-directory and SDK-source
+  bindings.
 
 These checks establish composition mechanics only. They do not establish Codex
 trust, live hook invocation, owner-hook health, skill selection, memory use,

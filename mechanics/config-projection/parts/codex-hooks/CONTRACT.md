@@ -31,20 +31,24 @@ and unused supplied bindings fail closed. Native configs must already be fully
 resolved.
 
 The stack-owned agent-routing fragment is a Codex-wire projection, not a
-responsibility owner. Its `PreToolUse` matcher covers the known
-`collaboration*` namespace and invokes the adapter with the bound source path.
-The adapter must receive an exact typed context file through
-`AOA_AGENT_TOOL_ROUTING_CONTEXT_FILE`; it does not invent Goal or current-holder
-identity from a missing payload and does not copy opaque Codex `tool_input` into
-the hook response. The exact typed context also carries the safe identity of
-the intended attempt (`session_id`, `turn_id`, `tool_use_id`, and `tool_name`);
-the adapter rejects a context whose identity does not equal the current event.
-It reads at most the configured context limit plus one byte before rejecting an
-oversized file. The configured directory entry is atomically claimed before the
-adapter reads it, and the claimed path is immediately unlinked after validation
-and before the SDK call. A stale or cross-call classification therefore cannot
-be reused for a later collaboration attempt, while an atomic producer refresh
-at the configured path remains available for that later attempt.
+responsibility owner. Its `PreToolUse` matcher covers the canonical
+`spawn_agent`, v1 namespace-flattened names, v2 unnamespaced names, and the
+observed installed-binary compatibility aliases. It invokes the adapter with
+explicit safe bindings for the context directory and selected `aoa-sdk` source
+root. The workspace remains the current hook event's `cwd`; the adapter does
+not select a workspace. The adapter must receive an exact typed context
+directory through `AOA_AGENT_TOOL_ROUTING_CONTEXT_DIR`; it does not invent Goal
+or current-holder identity from a missing payload and does not copy opaque Codex
+`tool_input` into the hook response. The producer stores each context as
+`attempt-<sha256(canonical safe attempt identity)>.json`, where the identity is
+the current `session_id`, `turn_id`, `tool_use_id`, and `tool_name`. The adapter
+selects only that event-keyed file and rejects a context whose identity does not
+equal the current event. It reads at most the configured context limit plus one
+byte before rejecting an oversized file. The selected directory entry is
+atomically claimed before the adapter reads it, and the claimed path is
+immediately unlinked after validation and before the SDK call. A stale or
+cross-call classification therefore cannot be reused for a later agent-tool
+attempt, and a different concurrent attempt cannot consume the selected file.
 If `AOA_SDK_SOURCE_ROOT` is supplied, the adapter requires its
 `src/aoa_sdk` package and verifies that the imported SDK modules remain beneath
 that source root. It presents the typed intent to `aoa-sdk`, reflects only the

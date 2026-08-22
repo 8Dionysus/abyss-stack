@@ -196,7 +196,11 @@ def test_stack_agent_fragment_preserves_existing_native_handlers(
 
     output, fragments, binding_digests = COMPOSITOR.compose(
         [AGENT_FRAGMENT_PATH, native_path],
-        {"AOA_CODEX_AGENT_ROUTING_HOOK": str(AGENT_ADAPTER_PATH)},
+        {
+            "AOA_CODEX_AGENT_ROUTING_HOOK": str(AGENT_ADAPTER_PATH),
+            "AOA_CODEX_AGENT_ROUTING_CONTEXT_DIR": str(tmp_path / "contexts"),
+            "AOA_CODEX_AGENT_ROUTING_SDK_SOURCE_ROOT": str(tmp_path / "aoa-sdk"),
+        },
     )
 
     assert list(output["hooks"]) == [
@@ -207,13 +211,24 @@ def test_stack_agent_fragment_preserves_existing_native_handlers(
     ]
     assert output["hooks"]["PreToolUse"] == [
         {
-            "matcher": "^collaboration.*$",
+            "matcher": (
+                "^(?:Agent|spawn_agent|multi_agent_v1(?:send_input|resume_agent|wait_agent|"
+                "close_agent)|send_message|followup_task|wait_agent|list_agents|"
+                "interrupt_agent|collaboration(?:spawn_agent|send_message|wait_agent|"
+                "close_agent|resume_agent|list_agents|followup_task|interrupt_agent|"
+                "send_input))$"
+            ),
             "hooks": [
                 {
                     "type": "command",
-                    "command": f'/usr/bin/python3 "{AGENT_ADAPTER_PATH}"',
+                    "command": (
+                        "/usr/bin/env "
+                        f'AOA_AGENT_TOOL_ROUTING_CONTEXT_DIR="{tmp_path / "contexts"}" '
+                        f'AOA_SDK_SOURCE_ROOT="{tmp_path / "aoa-sdk"}" '
+                        f'/usr/bin/python3 "{AGENT_ADAPTER_PATH}"'
+                    ),
                     "timeout": 10,
-                    "statusMessage": "Routing Codex collaboration tool through AoA",
+                    "statusMessage": "Routing Codex agent tool through AoA",
                 }
             ],
         }
@@ -228,7 +243,11 @@ def test_stack_agent_fragment_preserves_existing_native_handlers(
     assert fragment["owner"] == "abyss-stack"
     assert fragments[0]["fragment_id"] == "abyss-stack:agent-tool-routing:v1"
     assert fragments[1]["owner"] == "external-native"
-    assert set(binding_digests) == {"AOA_CODEX_AGENT_ROUTING_HOOK"}
+    assert set(binding_digests) == {
+        "AOA_CODEX_AGENT_ROUTING_HOOK",
+        "AOA_CODEX_AGENT_ROUTING_CONTEXT_DIR",
+        "AOA_CODEX_AGENT_ROUTING_SDK_SOURCE_ROOT",
+    }
 
 
 def test_exact_duplicate_handler_is_rejected(tmp_path: Path) -> None:

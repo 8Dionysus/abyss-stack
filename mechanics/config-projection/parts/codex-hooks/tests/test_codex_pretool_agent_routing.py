@@ -47,7 +47,7 @@ def context(boundary_state: str = "unresolved") -> dict[str, object]:
             "session_id": "session-fixture",
             "turn_id": "turn-fixture",
             "tool_use_id": "call-fixture",
-            "tool_name": "collaborationspawn_agent",
+            "tool_name": "spawn_agent",
         },
         "goal_ref": _ref("goal:fixture", "codex-goal", "goal-v1"),
         "current_holder_ref": _ref(
@@ -63,7 +63,7 @@ def context(boundary_state: str = "unresolved") -> dict[str, object]:
     }
 
 
-def event(tool_name: str = "collaborationspawn_agent") -> dict[str, object]:
+def event(tool_name: str = "spawn_agent") -> dict[str, object]:
     return {
         "cwd": str(Path.cwd()),
         "hook_event_name": "PreToolUse",
@@ -78,19 +78,40 @@ def event(tool_name: str = "collaborationspawn_agent") -> dict[str, object]:
     }
 
 
-def environment(tmp_path: Path, context_path: Path) -> dict[str, str]:
+def context_directory(tmp_path: Path) -> Path:
+    directory = tmp_path / "routing-contexts"
+    directory.mkdir(exist_ok=True)
+    return directory
+
+
+def context_file_path(
+    tmp_path: Path,
+    event_value: dict[str, object] | None = None,
+) -> Path:
+    current_event = event() if event_value is None else event_value
+    return context_directory(tmp_path) / (
+        f"{ADAPTER.CONTEXT_FILE_PREFIX}"
+        f"{ADAPTER._attempt_identity_digest(current_event)}.json"
+    )
+
+
+def environment(tmp_path: Path) -> dict[str, str]:
     import aoa_sdk
 
     sdk_root = Path(aoa_sdk.__file__).resolve().parents[2]
     return {
-        "AOA_AGENT_TOOL_ROUTING_CONTEXT_FILE": str(context_path),
+        ADAPTER.CONTEXT_DIRECTORY_ENV: str(context_directory(tmp_path)),
         "AOA_AGENT_TOOL_ROUTING_WORKSPACE_ROOT": str(tmp_path),
         "AOA_SDK_SOURCE_ROOT": str(sdk_root),
     }
 
 
-def write_context(tmp_path: Path, payload: dict[str, object]) -> Path:
-    path = tmp_path / "routing-context.json"
+def write_context(
+    tmp_path: Path,
+    payload: dict[str, object],
+    event_value: dict[str, object] | None = None,
+) -> Path:
+    path = context_file_path(tmp_path, event_value)
     path.write_text(json.dumps(payload), encoding="utf-8")
     return path
 
@@ -100,7 +121,7 @@ def test_exact_codex_agent_tool_routes_to_sdk_before_execution(tmp_path: Path) -
 
     output = ADAPTER.handle_event(
         event(),
-        environ=environment(tmp_path, context_path),
+        environ=environment(tmp_path),
     )
 
     hook_output = output["hookSpecificOutput"]
@@ -115,7 +136,7 @@ def test_independent_result_blocks_with_role_first_direction(tmp_path: Path) -> 
 
     output = ADAPTER.handle_event(
         event(),
-        environ=environment(tmp_path, context_path),
+        environ=environment(tmp_path),
     )
 
     reason = output["hookSpecificOutput"]["permissionDecisionReason"]
@@ -131,24 +152,24 @@ def test_typed_not_independent_allows_only_sdk_compatibility_posture(
 
     assert ADAPTER.handle_event(
         event(),
-        environ=environment(tmp_path, context_path),
+        environ=environment(tmp_path),
     ) == {}
 
-    assert not list(tmp_path.glob("routing-context.json.consumed.*"))
+    assert not list(context_directory(tmp_path).glob("*.consumed.*"))
 
     reused = ADAPTER.handle_event(
         event(),
-        environ=environment(tmp_path, context_path),
+        environ=environment(tmp_path),
     )
     assert reused["hookSpecificOutput"]["permissionDecision"] == "deny"
-    assert "regular absolute file" in reused["hookSpecificOutput"][
+    assert "for this tool call is unavailable" in reused["hookSpecificOutput"][
         "permissionDecisionReason"
     ]
 
     context_path.write_text(json.dumps(context("not_independent")), encoding="utf-8")
     assert ADAPTER.handle_event(
         event(),
-        environ=environment(tmp_path, context_path),
+        environ=environment(tmp_path),
     ) == {}
 
 
@@ -175,7 +196,7 @@ def test_context_is_claimed_before_reading_when_producer_refreshes_path(
     monkeypatch.setattr(ADAPTER, "_read_json_file", read_claimed_path)
     output = ADAPTER.handle_event(
         event(),
-        environ=environment(tmp_path, context_path),
+        environ=environment(tmp_path),
     )
 
     reason = output["hookSpecificOutput"]["permissionDecisionReason"]
@@ -183,7 +204,7 @@ def test_context_is_claimed_before_reading_when_producer_refreshes_path(
     assert json.loads(context_path.read_text(encoding="utf-8"))["boundary_state"] == (
         "independent"
     )
-    assert not list(tmp_path.glob("routing-context.json.consumed.*"))
+    assert not list(context_directory(tmp_path).glob("*.consumed.*"))
 
 
 def test_context_authorization_must_bind_to_the_winning_tool_call(
@@ -197,7 +218,7 @@ def test_context_authorization_must_bind_to_the_winning_tool_call(
 
     output = ADAPTER.handle_event(
         event(),
-        environ=environment(tmp_path, context_path),
+        environ=environment(tmp_path),
     )
 
     reason = output["hookSpecificOutput"]["permissionDecisionReason"]
@@ -206,19 +227,38 @@ def test_context_authorization_must_bind_to_the_winning_tool_call(
     assert "different-call" not in json.dumps(output)
 
 
+def test_context_claim_is_keyed_to_the_current_tool_call(tmp_path: Path) -> None:
+    other_event = event("collaborationsend_message")
+    other_payload = context("not_independent")
+    other_attempt = other_payload["attempt"]
+    assert isinstance(other_attempt, dict)
+    other_attempt["tool_name"] = "collaborationsend_message"
+    other_path = write_context(tmp_path, other_payload, other_event)
+
+    output = ADAPTER.handle_event(
+        event(),
+        environ=environment(tmp_path),
+    )
+
+    reason = output["hookSpecificOutput"]["permissionDecisionReason"]
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "for this tool call is unavailable" in reason
+    assert other_path.is_file()
+
+
 def test_oversized_context_fails_closed_after_bounded_read(tmp_path: Path) -> None:
-    context_path = tmp_path / "routing-context.json"
+    context_path = context_file_path(tmp_path)
     context_path.write_bytes(b"{" + b"x" * ADAPTER.MAX_CONTEXT_BYTES)
 
     output = ADAPTER.handle_event(
         event(),
-        environ=environment(tmp_path, context_path),
+        environ=environment(tmp_path),
     )
 
     reason = output["hookSpecificOutput"]["permissionDecisionReason"]
     assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
     assert "typed route context is too large" in reason
-    assert not list(tmp_path.glob("routing-context.json.consumed.*"))
+    assert not list(context_directory(tmp_path).glob("*.consumed.*"))
 
 
 def test_selected_sdk_root_must_contain_the_imported_package(
@@ -231,7 +271,7 @@ def test_selected_sdk_root_must_contain_the_imported_package(
     output = ADAPTER.handle_event(
         event(),
         environ={
-            **environment(tmp_path, context_path),
+            **environment(tmp_path),
             "AOA_SDK_SOURCE_ROOT": str(invalid_sdk_root),
         },
     )
@@ -266,12 +306,40 @@ def test_missing_context_fails_closed_without_inventing_identity(
     assert "turn-fixture" not in json.dumps(output)
 
 
-def test_unknown_collaboration_tool_does_not_bypass_the_adapter() -> None:
+def test_unknown_agent_tool_does_not_bypass_the_adapter() -> None:
     output = ADAPTER.handle_event(event("collaboration_future_tool"), environ={})
     assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
-    assert "Unknown Codex collaboration tool identity" in output["hookSpecificOutput"][
+    assert "Unknown Codex agent-tool identity" in output["hookSpecificOutput"][
         "permissionDecisionReason"
     ]
+
+
+def test_canonical_and_flattened_codex_agent_names_are_agent_tools() -> None:
+    expected = {
+        "spawn_agent",
+        "Agent",
+        "multi_agent_v1send_input",
+        "multi_agent_v1resume_agent",
+        "multi_agent_v1wait_agent",
+        "multi_agent_v1close_agent",
+        "send_message",
+        "followup_task",
+        "wait_agent",
+        "list_agents",
+        "interrupt_agent",
+        "collaborationspawn_agent",
+        "collaborationsend_message",
+        "collaborationwait_agent",
+        "collaborationclose_agent",
+        "collaborationresume_agent",
+        "collaborationlist_agents",
+        "collaborationfollowup_task",
+        "collaborationinterrupt_agent",
+        "collaborationsend_input",
+    }
+    assert expected == set(ADAPTER.CODEX_AGENT_TOOL_NAMES)
+    assert all(ADAPTER._tool_class(name) == "agent" for name in expected)
+    assert ADAPTER._tool_class("multi_agent_v2future_tool") == "unknown-agent"
 
 
 def test_context_schema_and_fragment_are_source_valid() -> None:
@@ -280,8 +348,18 @@ def test_context_schema_and_fragment_are_source_valid() -> None:
     Draft202012Validator(context_schema).validate(context())
 
     fragment = json.loads(FRAGMENT_PATH.read_text(encoding="utf-8"))
-    assert fragment["hooks"]["PreToolUse"][0]["matcher"] == "^collaboration.*$"
-    assert fragment["bindings"] == ["AOA_CODEX_AGENT_ROUTING_HOOK"]
+    assert fragment["hooks"]["PreToolUse"][0]["matcher"] == (
+        "^(?:Agent|spawn_agent|multi_agent_v1(?:send_input|resume_agent|wait_agent|"
+        "close_agent)|send_message|followup_task|wait_agent|list_agents|"
+        "interrupt_agent|collaboration(?:spawn_agent|send_message|wait_agent|"
+        "close_agent|resume_agent|list_agents|followup_task|interrupt_agent|"
+        "send_input))$"
+    )
+    assert fragment["bindings"] == [
+        "AOA_CODEX_AGENT_ROUTING_HOOK",
+        "AOA_CODEX_AGENT_ROUTING_CONTEXT_DIR",
+        "AOA_CODEX_AGENT_ROUTING_SDK_SOURCE_ROOT",
+    ]
 
 
 def test_reusable_source_has_no_task_or_model_identity_constants() -> None:
