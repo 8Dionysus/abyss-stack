@@ -14,10 +14,14 @@ fragments into one native `hooks.json` candidate.
 - `schemas/codex-hooks-composition-receipt.schema.json`
 - `schemas/codex-pretool-agent-routing-context.schema.json`
 - `scripts/render_codex_hooks.py`
+- `scripts/install_codex_hooks.py`
 - `scripts/codex_pretool_agent_routing.py`
+- `scripts/codex_pretool_agent_routing_context.py`
 - `config/abyss-stack-agent-tool-routing.fragment.json`
+- `config/abyss-stack-agent-tool-routing-context.fragment.json`
 - `tests/test_render_codex_hooks.py`
 - `tests/test_codex_pretool_agent_routing.py`
+- `tests/test_codex_pretool_agent_routing_context.py`
 
 ## Function
 
@@ -33,14 +37,22 @@ safe absolute-path bindings, rejects unresolved placeholders and exact
 duplicate handlers, and merges matching event groups in fragment order.
 Metadata is removed from the native output.
 
-The stack-owned `abyss-stack:agent-tool-routing:v1` fragment adds the current
-Codex `PreToolUse` command adapter for the canonical `spawn_agent`, known
+The stack-owned `abyss-stack:agent-tool-routing-context-relay:v1` fragment runs
+immediately before the adapter for the canonical `spawn_agent`, known
 unnamespaced v2 names, and the `multi_agent_`/`collaboration` namespaces. The
-namespace matcher deliberately sends future names to the adapter's unknown
-agent-tool denial branch. The composed command binds an explicit typed context
-directory and `aoa-sdk` source root; the adapter uses the hook event's `cwd` as
-the workspace coordinate. It reads at most the configured context limit plus
-one byte from that directory
+fragment matcher remains broad so future namespace members reach the adapter's
+unknown-agent denial, but the relay writes context only for the current
+recognized names; an unknown member therefore leaves no unclaimable entry.
+The relay reads a session-owned typed base from the inherited
+`AOA_AGENT_TOOL_ROUTING_CONTEXT_BASE` path and copies only the current safe
+attempt coordinates into the event-keyed context directory. It never chooses
+or interprets Goal, holder, role, model, runtime, or classification meaning.
+The `abyss-stack:agent-tool-routing:v1` fragment then adds the current Codex
+`PreToolUse` command adapter. The namespace matcher deliberately sends future
+names to the adapter's unknown agent-tool denial branch. The composed commands
+bind an explicit typed context directory and `aoa-sdk` source root; the adapter
+uses the hook event's `cwd` as the workspace coordinate. It reads at most the
+configured context limit plus one byte from that directory
 (`AOA_AGENT_TOOL_ROUTING_CONTEXT_DIR`), selects the file keyed by the current
 event's safe session/turn/tool-use/tool-name identity, verifies the context's
 identity against that event, and asks
@@ -66,21 +78,39 @@ an unblocked hook timeout.
 Missing or malformed typed context fails closed for a recognized collaboration
 tool without inventing Goal or holder identity. A classified
 `not_independent` result is the only posture that permits the Codex-local
-compatibility path. The context schema and its producer remain outside this
-neutral compositor.
+compatibility path. The context schema and its typed base producer remain
+outside this neutral compositor. The relay is only a stack-owned wire
+transport for a base published by the session/owner route.
+
+`install_codex_hooks.py` is the explicit operator install route. It requires a
+clean exact `abyss-stack` commit, materializes the hook scripts and fragments
+under an immutable content-addressed release below the deployed
+`.codex-home/agent-tool-routing/` root, and composes the supplied native hook
+fragment with relay then adapter through the renderer. It records source,
+release, composition, target, and rollback digests without embedding the
+session base or any Goal/task identity in the active command. The release is
+reused only after its manifest closure, immutable file/directory modes, and
+file digests verify. Target, native input, active receipt, composition receipt,
+and per-install receipt must be distinct paths; each receipt receives a unique
+operation coordinate. Release files and directories are fsynced before the
+release rename, and receipt directory entries are fsynced after atomic
+replacement.
 
 Read-only rendering is the default. `--check-output` compares an existing
 projection without changing it. `--write` is an explicit atomic install route:
 it writes mode `0600`, preserves an existing target in a private backup
 directory, emits a content-minimized composition receipt, and rolls the target
-back if receipt creation fails.
+back if receipt creation fails. Materialized release files are finalized
+without write permission after verification, so a later same-user edit is
+reported as release drift rather than silently changing active hook code.
 
 ## Boundary
 
-This part owns configuration composition, exact source digests, atomic
-projection, backup, and rollback. It does not own hook meaning, event policy,
-memory semantics, session evidence, skill selection, Codex trust, live hook
-health, or benefit. The adapter's wire projection is stack-owned, while the SDK
+This part owns configuration composition, exact source/release digests, atomic
+projection, backup, rollback, and the context relay's safe event-coordinate
+transport. It does not own the typed base, hook meaning, event policy, memory
+semantics, session evidence, skill selection, Codex trust, live hook health, or
+benefit. The adapter and relay are stack-owned wire projections, while the SDK
 route decision and owner classification remain outside this part's authority.
 
 `aoa-memo` and `aoa-session-memory` remain independently usable owner

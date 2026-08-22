@@ -13,6 +13,8 @@ Current posture:
 - keep deployed `Configs` as a projection target, not source truth
 - compose independently owned Codex hook fragments without moving their
   semantics or standalone lifecycle into the stack
+- keep the Codex agent-routing relay and adapter on immutable runtime release
+  paths; accept typed context only from the session/owner environment
 - issue an MCP deployment receipt only from a clean exact source revision and
   exact source/deployed byte parity; keep later runtime and owner evidence
   outside the config projection claim

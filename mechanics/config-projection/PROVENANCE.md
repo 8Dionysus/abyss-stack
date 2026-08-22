@@ -32,8 +32,10 @@ reinterpret them.
 - [parts/codex-hooks/README.md](parts/codex-hooks/README.md) composes native
   and owner-envelope hook definitions while preserving independent
   `aoa-memo` and `aoa-session-memory` ownership. Its stack-owned Codex-wire
-  agent-routing adapter reflects the `aoa-sdk` route while leaving
-  responsibility classification with `aoa-agents`.
+  context relay and agent-routing adapter reflect the `aoa-sdk` route while
+  leaving the typed base and responsibility classification with their stronger
+  session/owner routes. Its installer keeps the active command on an immutable
+  runtime release rather than a source worktree.
 - [docs/README.md](docs/README.md) keeps package docs as route surfaces rather
   than a second source tree.
 - [../federation-seams/README.md](../federation-seams/README.md) owns sibling

@@ -7,6 +7,8 @@
 - keep bootstrap, sync, and render implementation bodies under package parts
 - keep multi-owner Codex hook composition neutral, source-first, and
   independently reversible
+- keep durable Codex hook installs content-addressed and separate from
+  session-owned typed context publication
 - keep parity validation source-first and synthetic unless live mode is
   explicitly requested
 

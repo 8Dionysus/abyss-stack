@@ -20,6 +20,9 @@ Focused tests cover:
 - content-minimized receipts with no raw source or binding path;
 - read-only exact-output comparison.
 - exact Codex `PreToolUse` agent-tool recognition and SDK routing;
+- session-owned base relay copies only safe attempt coordinates and writes
+  one event-keyed context atomically; unknown namespace members leave no
+  unclaimable context;
 - canonical `spawn_agent`, flattened v1/v2 identities, observed compatibility
   aliases, and unknown-name fail-closed matcher coverage;
 - unresolved/independent denial with role-first direction;
@@ -32,9 +35,17 @@ Focused tests cover:
 - composition of the stack-owned adapter fragment without dropping existing
   native hook handlers, with explicit context-directory and SDK-source
   bindings.
+- clean-source content-addressed release materialization, manifest closure,
+  immutable committed-blob source identity, stale-release rejection, active
+  state preflight, native/output distinct-path alias rejection, unique receipt
+  reservation, read-only release finalization, durable release-tree and
+  receipt-directory sync, prior composition-receipt restoration, and installer
+  rollback when its active receipt cannot be written.
 
 These checks establish composition mechanics only. They do not establish Codex
 trust, live hook invocation, owner-hook health, skill selection, memory use,
 outcome, or benefit. A fresh-session live exercise is required to separate
 installed source, Codex trust, hook execution, tool block/allow, and any later
-owner classification or actor launch.
+owner classification or actor launch. The relay tests additionally establish
+only transport from an externally supplied typed base; they do not prove that a
+session owner published a truthful base.

@@ -247,29 +247,59 @@
     {
       "family": "config-projection-codex-hooks-agent-routing-adapter",
       "paths": [
-        "mechanics/config-projection/parts/codex-hooks/scripts/codex_pretool_agent_routing.py"
+        "mechanics/config-projection/parts/codex-hooks/scripts/codex_pretool_agent_routing.py",
+        "mechanics/config-projection/parts/codex-hooks/scripts/codex_pretool_agent_routing_context.py"
       ],
-      "organ_lane": "mechanic/package-local Codex wire adapter",
+      "organ_lane": "mechanic/package-local Codex wire relay and adapter",
       "owner_surface": "mechanics/config-projection/parts/codex-hooks/README.md",
       "source_truth": [
         "mechanics/config-projection/parts/codex-hooks/CONTRACT.md",
         "mechanics/config-projection/parts/codex-hooks/config/abyss-stack-agent-tool-routing.fragment.json",
+        "mechanics/config-projection/parts/codex-hooks/config/abyss-stack-agent-tool-routing-context.fragment.json",
         "mechanics/config-projection/parts/codex-hooks/schemas/codex-pretool-agent-routing-context.schema.json",
         "aoa-sdk typed pre-tool routing contract"
       ],
       "reads": [
         "bounded Codex PreToolUse JSON event on stdin",
-        "explicit typed Goal/current-holder route context file",
+        "session-owned typed base and explicit event-keyed route context file",
         "selected aoa-sdk source root and workspace"
       ],
       "writes": [
         "native Codex allow or deny JSON on stdout",
-        "temporary single-use context claim file, unlinked after the atomic claim"
+        "one event-keyed context relay file plus temporary single-use claim file, both mode-0600"
       ],
       "side_effects": "read-only route decision for unrelated tools; recognized collaboration tools atomically claim and immediately unlink the exact supplied typed context before the SDK call",
       "validation_lane": "mechanics-part-local/tests/release",
       "ci_inclusion": "focused mechanic test plus source-fast test-inventory and release pytest lanes",
       "test_target": "mechanics/config-projection/parts/codex-hooks/tests/test_codex_pretool_agent_routing.py",
+      "disposition": "add"
+    },
+    {
+      "family": "config-projection-codex-hooks-durable-installer",
+      "paths": [
+        "mechanics/config-projection/parts/codex-hooks/scripts/install_codex_hooks.py"
+      ],
+      "organ_lane": "mechanic/package-local durable Codex install",
+      "owner_surface": "mechanics/config-projection/parts/codex-hooks/README.md",
+      "source_truth": [
+        "mechanics/config-projection/parts/codex-hooks/CONTRACT.md",
+        "mechanics/config-projection/parts/codex-hooks/README.md",
+        "docs/runtime/PATHS.md",
+        "docs/runtime/STORAGE_LAYOUT.md"
+      ],
+      "reads": [
+        "one clean exact abyss-stack Git checkout",
+        "operator-preserved native hook fragment",
+        "exact aoa-sdk source root"
+      ],
+      "writes": [
+        "content-addressed hook release and manifest",
+        "atomic Codex hooks target, private backup, composition receipt, and install receipt"
+      ],
+      "side_effects": "explicit operator install only; refuses dirty source, symlinked inputs, and incomplete release closure; restores the prior target if the active install receipt fails",
+      "validation_lane": "mechanics-part-local/tests/release",
+      "ci_inclusion": "focused mechanic install tests plus source-fast and release pytest lanes",
+      "test_target": "mechanics/config-projection/parts/codex-hooks/tests/test_codex_hooks_install.py",
       "disposition": "add"
     },
     {

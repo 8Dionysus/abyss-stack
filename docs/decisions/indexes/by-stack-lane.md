@@ -314,6 +314,7 @@
 
 - [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
 - [ABYSS-STACK-D-0131 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md`)
+- [ABYSS-STACK-D-0132 Durable Codex Hook Install Profile](../ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md) (`docs/decisions/ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md`)
 
 ## operator command
 
@@ -388,6 +389,7 @@
 - [ABYSS-STACK-D-0127 Bind Resume Private-Git Observation to the Accepted Actor Final](../ABYSS-STACK-D-0127-bind-resume-private-git-to-accepted-actor-final.md) (`docs/decisions/ABYSS-STACK-D-0127-bind-resume-private-git-to-accepted-actor-final.md`)
 - [ABYSS-STACK-D-0129 Canonical External Actor Return Leaf](../ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md) (`docs/decisions/ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md`)
 - [ABYSS-STACK-D-0131 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md`)
+- [ABYSS-STACK-D-0132 Durable Codex Hook Install Profile](../ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md) (`docs/decisions/ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md`)
 
 ## runtime access plane
 
@@ -428,6 +430,7 @@
 - [ABYSS-STACK-D-0113 Carry Owner-Contour Writers Through Independent A2A Review](../ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md) (`docs/decisions/ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md`)
 - [ABYSS-STACK-D-0118 Admit Role-First Owner Reviewers to A2A Return](../ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md) (`docs/decisions/ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md`)
 - [ABYSS-STACK-D-0131 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md`)
+- [ABYSS-STACK-D-0132 Durable Codex Hook Install Profile](../ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md) (`docs/decisions/ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md`)
 
 ## source validation
 

@@ -334,6 +334,27 @@ action starts, stops, or repairs a service.
 Verify parity, then canary authenticated owners one at a time before using live
 MCP responses as current evidence.
 
+### Durable Codex agent-tool hook install
+
+The source-owned Codex routing adapter is not installed by copying a worktree
+path into `~/.codex/hooks.json`. After landing and syncing the source-managed
+`mechanics/` tree, invoke the package-local installer with a clean exact source
+checkout, an operator-preserved native hook fragment, the deployed runtime
+install root, the stable context directory, and the exact `aoa-sdk` source root.
+It materializes a content-addressed release under
+`${AOA_STACK_ROOT}/.codex-home/agent-tool-routing/releases/` and composes the
+native fragment, stack transport relay, and adapter atomically. The session
+owner must publish the current typed base through
+`AOA_AGENT_TOOL_ROUTING_CONTEXT_BASE`; the active hook never encodes a Goal,
+holder, task root, role, or proof directory. The install receipt proves source
+identity, read-only release closure, composition, and rollback data only. The
+installer rejects aliases among the native input, active target, and audit
+paths, persists a new release tree before activation, and gives each install
+receipt an exclusive operation coordinate whose directory entry is persisted.
+Codex trust,
+fresh-session hook execution, SDK routing, `aoa-agents` classification, actor
+launch, and Goal acceptance remain separate checks.
+
 After syncing repo-managed surfaces, run:
 
 ```bash

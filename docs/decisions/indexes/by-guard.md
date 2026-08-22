@@ -220,6 +220,10 @@
 
 - [ABYSS-STACK-D-0076 Repo-Self KAG Runtime Projections](../ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md) (`docs/decisions/ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md`)
 
+## atomic hook composition
+
+- [ABYSS-STACK-D-0132 Durable Codex Hook Install Profile](../ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md) (`docs/decisions/ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md`)
+
 ## atomic projection
 
 - [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
@@ -318,6 +322,10 @@
 ## content minimization
 
 - [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
+
+## content-addressed release
+
+- [ABYSS-STACK-D-0132 Durable Codex Hook Install Profile](../ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md) (`docs/decisions/ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md`)
 
 ## contour isolation
 
@@ -983,6 +991,10 @@
 ## source freshness
 
 - [ABYSS-STACK-D-0067 Decision Surface Coverage Registry](../ABYSS-STACK-D-0067-decision-surface-coverage-registry.md) (`docs/decisions/ABYSS-STACK-D-0067-decision-surface-coverage-registry.md`)
+
+## source identity
+
+- [ABYSS-STACK-D-0132 Durable Codex Hook Install Profile](../ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md) (`docs/decisions/ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md`)
 
 ## source topology
 

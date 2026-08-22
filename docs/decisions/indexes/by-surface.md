@@ -212,6 +212,7 @@
 
 - [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
 - [ABYSS-STACK-D-0131 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md`)
+- [ABYSS-STACK-D-0132 Durable Codex Hook Install Profile](../ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md) (`docs/decisions/ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md`)
 
 ## Codex plane
 
@@ -326,6 +327,7 @@
 
 - [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
 - [ABYSS-STACK-D-0131 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md`)
+- [ABYSS-STACK-D-0132 Durable Codex Hook Install Profile](../ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md) (`docs/decisions/ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md`)
 
 ## connector adapter
 
@@ -624,6 +626,10 @@
 
 - [ABYSS-STACK-D-0104 Bind KAG Owner Coverage to the Admitted Bundle](../ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md) (`docs/decisions/ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md`)
 
+## rollback
+
+- [ABYSS-STACK-D-0132 Durable Codex Hook Install Profile](../ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md) (`docs/decisions/ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md`)
+
 ## root orchestrator
 
 - [ABYSS-STACK-D-0063 Root Validator Wrapper Tail Removal](../ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md) (`docs/decisions/ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md`)
@@ -677,6 +683,10 @@
 ## runtime graph projection
 
 - [ABYSS-STACK-D-0073 ToS Philosophy Graph Access Plane](../ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md`)
+
+## runtime install
+
+- [ABYSS-STACK-D-0132 Durable Codex Hook Install Profile](../ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md) (`docs/decisions/ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md`)
 
 ## runtime lifecycle
 

@@ -56,6 +56,10 @@ Expected live structure under `/srv/AbyssOS/abyss-stack`:
     platform-adaptations/
     runtime-benchmarks/
   .codex-home/
+    agent-tool-routing/
+      releases/
+      receipts/
+      contexts/
 ```
 
 ## Meaning of the main directories
@@ -93,7 +97,11 @@ selected through the current state map. Their `*.last-good.*` coordinates keep
 one previous mutually consistent generation for bounded rollback; they are
 runtime state, not a second source of truth.
 - `Logs/` — logs and generated runtime artifacts, including stack-side `abyss-machine` bridge records under `Logs/machine-bridge/`, diagnostic spine sessions, diagnosis companions, reviewed diagnosis refs, repair handoffs, and `last_good` anchors under `Logs/diagnostics/`, local private host-facts captures under `Logs/host-facts/`, memo export candidates under `Logs/memo-exports/`, eval export candidates under `Logs/eval-exports/`, RPG runtime copies under `Logs/rpg/`, ToS graph helper artifacts under `Logs/tos-graph/`, platform-adaptation records under `Logs/platform-adaptations/`, and runtime benchmark artifacts under `Logs/runtime-benchmarks/`
-- `.codex-home/` — isolated agent or codex-style runtime home
+- `.codex-home/` — isolated agent or codex-style runtime home. The
+  `agent-tool-routing/` child contains immutable hook releases, install and
+  composition receipts, rollback backups, and short-lived event-keyed context
+  entries. Its typed base is session/owner supplied and must not be copied into
+  source or treated as stack-owned Goal/role meaning.
 
 ## Heavy-data caution
 
