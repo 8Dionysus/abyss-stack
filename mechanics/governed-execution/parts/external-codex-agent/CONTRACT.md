@@ -124,8 +124,13 @@ Operations are:
   `abyss_stack_external_codex_pause_receipt_v1`. The receipt is reserved before
   the app-server mutation and binds the owner bytes, Goal/thread identities,
   `active_to_paused` transition, transport response digest, and separate
-  owner/semantic-acceptance markers. It does not read or start a turn, deliver
-  a handoff, authorize or close a holder, or claim semantic acceptance.
+owner/semantic-acceptance markers. It does not read or start a turn, deliver
+a handoff, authorize or close a holder, or claim semantic acceptance. The
+reservation also stores the exact active precondition before the mutation. If
+the mutation response or receipt publication is lost, a retry observes the
+same bound Goal with read-only `thread/goal/get` and emits an
+`ambiguous_post_mutation` recovery receipt without repeating
+`thread/goal/set`; a reservation without the active precondition fails closed.
 - `aoa-external-codex-return return --return-owner ... --handoff ...
   --holder-receipt ... --return-receipt ... --authorization ...
   --closure-receipt ...` is the canonical Codex return leaf. It validates the

@@ -42,9 +42,12 @@ The focused external-return tests also cover the separate Goal pause contour:
 an exact active owner-bound Goal is transitioned through `thread/goal/set` to
 `paused`, the returned identity and status are required before the receipt is
 published, non-active Goals are refused without a lifecycle mutation, and a
-completed pause receipt replays without a second app-server call. The fixture
-asserts that pause does not use turn delivery, terminal input, process
-identity, holder closure, or wake evidence.
+completed pause receipt replays without a second app-server call. It also
+forces receipt publication failure after the lifecycle mutation and verifies
+that a reserved active precondition is reconciled through a read-only Goal
+read without a second `thread/goal/set`. The fixture asserts that pause does
+not use turn delivery, terminal input, process identity, holder closure, or
+wake evidence.
 
 The deterministic suite separates transport sentinels from unrelated semantic
 cases without exposing a runtime bypass. Fixtures selecting

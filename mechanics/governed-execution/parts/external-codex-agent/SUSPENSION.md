@@ -59,7 +59,11 @@ input, inspect or signal PIDs, use GDB, start or steer a turn, deliver a wake,
 or close any holder. A receipt proves only the runtime lifecycle transition;
 wake delivery, holder closure, semantic re-entry, and owner acceptance require
 their own later evidence. If the pause receipt is absent or the Goal state is
-not exactly bound, stop and route the state to the runtime owner.
+not exactly bound, stop and route the state to the runtime owner. A reserved
+pause keeps the active precondition before mutation. If a retry observes the
+exact Goal already paused, it may publish an `ambiguous_post_mutation`
+recovery receipt from a read-only `thread/goal/get` without issuing a second
+lifecycle set; a reserved pause without that precondition fails closed.
 
 For a parent continuation, inspect only its exact state root and re-entry ID:
 

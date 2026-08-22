@@ -56,6 +56,10 @@ human acceptance.
   acceptance remain separately reviewable claims.
 - Tradeoff: Codex app-server is the only transport in this slice; another
   runtime needs its own owner-specific adapter.
+- Recovery: the receipt reservation records the active precondition before the
+  lifecycle mutation. If the mutation response or receipt publication is lost,
+  a retry can reconcile the exact paused Goal through a read-only
+  `thread/goal/get` and never repeats `thread/goal/set`.
 - Unchanged: no actor is stopped or restarted by pause, and no model, role,
   eval, sibling-owner, host exposure, secret, or service authority is added.
 
