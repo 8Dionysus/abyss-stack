@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Add the installed, owner-bound `aoa-external-codex-return pause` leaf for a
+  supported Codex Goal `active` to `paused` lifecycle transition. It records a
+  separate receipt and keeps pause, wake delivery, holder closure, semantic
+  re-entry, and owner acceptance as distinct evidence.
 - Run the bounded runtime-config artifact bundle guard before the complete
   release pytest suite, preserving every required check while returning cheap
   artifact failures before an expensive validation restart.

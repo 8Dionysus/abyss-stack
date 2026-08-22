@@ -35,6 +35,14 @@ def owner(*, goal: str, thread: str, endpoint: str | None = None) -> dict[str, o
     return value
 
 
+def pause_owner(
+    *, goal: str, thread: str, endpoint: str | None = None
+) -> dict[str, object]:
+    value = owner(goal=goal, thread=thread, endpoint=endpoint)
+    value["schema_version"] = MODULE.PAUSE_OWNER_SCHEMA_VERSION
+    return value
+
+
 class FakeRpc:
     def __init__(
         self,
@@ -46,6 +54,7 @@ class FakeRpc:
         thread_id: str = "thread-dynamic-1",
         bounded_turns: bool = False,
         fallback_active_turn: str | None = None,
+        goal_set_status: str = "active",
     ) -> None:
         self.endpoint = endpoint
         self.active_turn = active_turn
@@ -54,6 +63,7 @@ class FakeRpc:
         self.thread_id = thread_id
         self.bounded_turns = bounded_turns
         self.fallback_active_turn = fallback_active_turn
+        self.goal_set_status = goal_set_status
         self.calls: list[tuple[str, dict[str, object] | None]] = []
 
     def __enter__(self) -> "FakeRpc":
@@ -80,7 +90,7 @@ class FakeRpc:
             return {
                 "goal": {
                     "threadId": self.thread_id,
-                    "status": "active",
+                    "status": self.goal_set_status,
                 }
             }
         if method == "thread/read":
@@ -197,6 +207,151 @@ def test_delivery_uses_bounded_thread_read_for_large_idle_history(
     assert receipt["delivery_method"] == "turn/start"
     assert any(method == "turn/start" for method, _params in fake.calls)
     assert any(method == "thread/turns/list" for method, _params in fake.calls)
+
+
+def test_pause_goal_proves_exact_active_to_paused_transition(
+    tmp_path: Path,
+) -> None:
+    owner_path = tmp_path / "pause-owner.json"
+    owner_value = pause_owner(
+        goal="goal-pause",
+        thread="thread-pause",
+        endpoint="unix:/run/user/1000/example.sock",
+    )
+    owner_path.write_text(
+        json.dumps(owner_value, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    endpoint = tmp_path / "app-server.sock"
+    fake = FakeRpc(
+        endpoint,
+        active_turn=None,
+        goal_status="active",
+        goal_set_status="paused",
+        thread_id="thread-pause",
+    )
+
+    receipt = MODULE.pause_goal(
+        MODULE.validate_pause_owner(owner_value),
+        owner_path,
+        endpoint,
+        rpc_factory=lambda path: fake,
+    )
+
+    assert receipt["schema_version"] == MODULE.PAUSE_RECEIPT_SCHEMA_VERSION
+    assert receipt["goal_status"] == "paused"
+    assert receipt["goal_binding"]["transition"] == "active_to_paused"
+    assert receipt["actions"] == {"goal_lifecycle_set": True}
+    assert receipt["observed"] == {
+        "goal_lifecycle": "paused",
+        "goal_status": "paused",
+    }
+    assert receipt["owner_acceptance"] == "separate"
+    assert receipt["semantic_acceptance"] == "separate"
+    assert [method for method, _params in fake.calls] == [
+        "initialize",
+        "initialized",
+        "thread/goal/get",
+        "thread/goal/set",
+    ]
+
+
+@pytest.mark.parametrize("goal_status", ["paused", "blocked", "complete"])
+def test_pause_goal_refuses_non_active_goal_without_mutation(
+    tmp_path: Path,
+    goal_status: str,
+) -> None:
+    owner_path = tmp_path / "pause-owner.json"
+    owner_value = pause_owner(
+        goal="goal-pause-refuse",
+        thread="thread-pause-refuse",
+        endpoint="unix:/run/user/1000/example.sock",
+    )
+    owner_path.write_text(
+        json.dumps(owner_value, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    fake = FakeRpc(
+        tmp_path / "app-server.sock",
+        active_turn=None,
+        goal_status=goal_status,
+        thread_id="thread-pause-refuse",
+    )
+
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="not pausable from active state",
+    ):
+        MODULE.pause_goal(
+            MODULE.validate_pause_owner(owner_value),
+            owner_path,
+            fake.endpoint,
+            rpc_factory=lambda path: fake,
+        )
+
+    assert not any(method == "thread/goal/set" for method, _params in fake.calls)
+
+
+def test_run_pause_reserves_and_replays_without_second_transport_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner_path = tmp_path / "pause-owner.json"
+    owner_value = pause_owner(
+        goal="goal-pause-replay",
+        thread="thread-pause-replay",
+        endpoint="unix:/run/user/1000/example.sock",
+    )
+    owner_path.write_text(
+        json.dumps(owner_value, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    pause_path = tmp_path / "pause-receipt.json"
+    endpoint = tmp_path / "app-server.sock"
+    fake = FakeRpc(
+        endpoint,
+        active_turn=None,
+        goal_status="active",
+        goal_set_status="paused",
+        thread_id="thread-pause-replay",
+    )
+
+    monkeypatch.setattr(
+        MODULE,
+        "discover_app_server_socket",
+        lambda _owner: (endpoint, "explicit-endpoint"),
+    )
+    pause_impl = MODULE.pause_goal
+
+    def pause_once(
+        owner_value: dict[str, object],
+        owner_file: Path,
+        target: Path,
+        *,
+        owner_bytes: bytes,
+    ) -> dict[str, object]:
+        return pause_impl(
+            owner_value,
+            owner_file,
+            target,
+            owner_bytes=owner_bytes,
+            rpc_factory=lambda _path: fake,
+        )
+
+    monkeypatch.setattr(MODULE, "pause_goal", pause_once)
+    args = SimpleNamespace(
+        pause_owner=str(owner_path),
+        pause_receipt=str(pause_path),
+    )
+    first = MODULE.run_pause(args)
+    assert first["goal_binding"]["transition"] == "active_to_paused"
+    assert first["pause_receipt_ref"] == str(pause_path.resolve())
+    assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
+
+    monkeypatch.setattr(
+        MODULE,
+        "pause_goal",
+        lambda *_args, **_kwargs: pytest.fail("pause transport replayed"),
+    )
+    second = MODULE.run_pause(args)
+    assert second == first
 
 
 def test_delivery_steers_active_turn_from_bounded_turn_page(

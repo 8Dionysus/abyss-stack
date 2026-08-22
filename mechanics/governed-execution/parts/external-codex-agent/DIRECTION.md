@@ -48,6 +48,13 @@ persists delivery evidence, and then composes the existing authorization and
 exact close primitives. This remains runtime transport evidence: acceptance,
 semantic re-entry, and owner meaning stay with their owners.
 
+The same installed adapter now exposes a separate owner-selected Goal pause
+action. After responsibility has moved to the external holder, it can verify
+the exact active Goal/thread binding and use the supported app-server lifecycle
+method to produce an `active_to_paused` receipt without TTY, PID, GDB, keystroke,
+turn, wake, or holder-close transport. The pause receipt is runtime evidence;
+it does not grant the runtime owner acceptance or semantic authority.
+
 ## Proof sequence
 
 1. Maintain source-local schema, owner-admission, binder, process, drift,

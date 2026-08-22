@@ -110,6 +110,11 @@ and replay only through their matching legacy wake reservation. A retry after a 
   active Goal through bounded turn views without treating omitted history as
   idle, and composes typed authorization with exact holder closure. It does not
   claim owner acceptance or semantic re-entry;
+- exposes the separate `aoa-external-codex-return pause` lifecycle action. It
+  receives a pause-owner binding, performs only the supported Codex app-server
+  Goal transition from `active` to `paused`, and records a distinct pause
+  receipt. Pause, wake delivery, holder closure, semantic re-entry, and owner
+  acceptance remain separate events and claims;
 - requires every task to preserve the complete runtime-wide forbidden-effect
   set, while terminal classification independently applies that set instead of
   trusting a caller-supplied subset;
