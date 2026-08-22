@@ -9,6 +9,9 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Bound the Codex agent-routing adapter's wait for an event-keyed relay
+  context when matching `PreToolUse` groups run concurrently, while retaining
+  fail-closed behavior when the context remains unavailable.
 - Add a durable content-addressed Codex PreToolUse hook install route with a
   session-owned typed-context relay and explicit native-hook rollback receipt.
 - Run the bounded runtime-config artifact bundle guard before the complete
