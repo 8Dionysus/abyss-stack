@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import base64
 import contextlib
+import fcntl
 import hashlib
 import importlib.util
 import io
@@ -555,14 +556,9 @@ def _validate_turn_delivery(method: str, response: dict[str, Any]) -> dict[str, 
             )
         turn_id = _string_at(turn, ("id",))
         status = turn.get("status")
-        if turn_id is None or status not in {
-            "completed",
-            "interrupted",
-            "failed",
-            "inProgress",
-        }:
+        if turn_id is None or status not in {"completed", "inProgress"}:
             raise ExternalCodexReturnError(
-                "Codex app-server turn/start returned an invalid Turn"
+                "Codex app-server turn/start did not prove an accepted Turn"
             )
         return {"turn_id": turn_id, "status": str(status)}
     if method == "turn/steer":
@@ -741,6 +737,42 @@ def _validate_output_path(path: Path, label: str) -> Path:
             f"{label} must be a regular file or an unused path: {path}"
         )
     return path
+
+
+@contextlib.contextmanager
+def _detached_retry_lock(path: Path) -> Any:
+    """Serialize stale-retry reservation and child launch for one receipt chain."""
+
+    _validate_output_path(path, "detached return receipt")
+    lock_path = path.with_name(path.name + ".lock")
+    if lock_path.is_symlink():
+        raise ExternalCodexReturnError(
+            f"detached return retry lock may not be a symlink: {lock_path}"
+        )
+    lock_fd: int | None = None
+    try:
+        flags = os.O_CREAT | os.O_RDWR
+        if hasattr(os, "O_CLOEXEC"):
+            flags |= os.O_CLOEXEC
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        lock_fd = os.open(lock_path, flags, 0o600)
+        os.fchmod(lock_fd, 0o600)
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+    except OSError as exc:
+        if lock_fd is not None:
+            os.close(lock_fd)
+        raise ExternalCodexReturnError(
+            f"cannot acquire detached return retry lock: {lock_path}"
+        ) from exc
+    try:
+        yield lock_fd
+    finally:
+        if lock_fd is not None:
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            finally:
+                os.close(lock_fd)
 
 
 def _validate_distinct_output_paths(paths: Sequence[tuple[Path, str]]) -> None:
@@ -1368,6 +1400,14 @@ def command_return(args: argparse.Namespace) -> int:
         response = run_return(args)
         print(json.dumps(response, ensure_ascii=False, sort_keys=True))
         return 0
+    detached_path = Path(
+        args.detached_receipt or (str(args.return_receipt) + ".detached.json")
+    )
+    with _detached_retry_lock(detached_path) as lock_fd:
+        return _command_return_detached(args, lock_fd)
+
+
+def _command_return_detached(args: argparse.Namespace, lock_fd: int) -> int:
     inputs = _load_return_inputs(args)
     detached_path, result_path, log_path = _detached_paths(args)
     _validate_output_path(detached_path, "detached return receipt")
@@ -1530,6 +1570,7 @@ def command_return(args: argparse.Namespace) -> int:
     ready_read, ready_write = os.pipe()
     child_pid = os.fork()
     if child_pid == 0:
+        os.close(lock_fd)
         os.close(ready_write)
         _run_detached_child(
             launch_args,

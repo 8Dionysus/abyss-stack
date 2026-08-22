@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import fcntl
 import importlib.util
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -463,6 +465,29 @@ def test_turn_delivery_requires_protocol_response_shape() -> None:
         MODULE._validate_turn_delivery("turn/start", {})
     with pytest.raises(MODULE.ExternalCodexReturnError, match="did not return turnId"):
         MODULE._validate_turn_delivery("turn/steer", {})
+
+
+@pytest.mark.parametrize("status", ["failed", "interrupted"])
+def test_turn_delivery_rejects_terminal_failure_status(status: str) -> None:
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="accepted Turn"):
+        MODULE._validate_turn_delivery(
+            "turn/start",
+            {"turn": {"id": "turn-failed", "status": status, "items": []}},
+        )
+
+
+def test_detached_retry_lock_is_stable_and_exclusive(tmp_path: Path) -> None:
+    detached_path = tmp_path / "detached.json"
+    lock_path = detached_path.with_name(detached_path.name + ".lock")
+    with MODULE._detached_retry_lock(detached_path):
+        assert lock_path.is_file()
+        flags = os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
+        competing_fd = os.open(lock_path, flags)
+        try:
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(competing_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        finally:
+            os.close(competing_fd)
 
 
 def test_goal_binding_accepts_protocol_thread_only_identity() -> None:

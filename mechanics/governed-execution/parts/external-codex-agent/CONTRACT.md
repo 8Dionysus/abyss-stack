@@ -133,7 +133,10 @@ Operations are:
   operation in a new session, binds durable receipts to the owner/handoff/
   holder/output identities, follows an already-published retry receipt instead
   of launching a duplicate child, and recovers a fully bound reserved retry
-  whose child receipt was not yet published. A legacy task-local owner binding
+  whose child receipt was not yet published. A stable receipt-chain lock
+  serializes stale-retry allocation through publication of the running child
+  receipt, so concurrent recovery cannot launch competing children. A legacy
+  task-local owner binding
   is accepted only
   as an input migration; no Goal, thread, rollout, PR, disposition, or
   task-root coordinate is selected by source.
