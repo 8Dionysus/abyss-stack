@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 import hashlib
+import inspect
 import json
 import os
 from pathlib import Path
@@ -200,10 +201,30 @@ def select_pytest_temp_parent() -> Path | None:
             continue
         candidate = Path(raw).expanduser()
         try:
-            if candidate.is_dir():
-                return candidate
+            if not candidate.is_dir():
+                continue
         except OSError:
             continue
+        try:
+            probe = Path(
+                tempfile.mkdtemp(
+                    prefix=PYTEST_TEMP_PREFIX,
+                    dir=str(candidate),
+                )
+            )
+        except OSError:
+            continue
+        try:
+            probe_mode = os.lstat(probe).st_mode
+            if stat.S_ISLNK(probe_mode):
+                probe.unlink()
+                return candidate
+            if not stat.S_ISDIR(probe_mode):
+                continue
+            probe.rmdir()
+        except OSError:
+            continue
+        return candidate
     return None
 
 
@@ -251,8 +272,9 @@ def _namespace_exists(namespace: Path) -> bool:
 
 def _remove_owned_namespace(namespace: Path) -> None:
     root = namespace.absolute()
+    cleanup_errors: list[BaseException] = []
 
-    def onerror(function: Any, path: str, _exc_info: object) -> None:
+    def onexc(_function: Any, path: str, error: BaseException) -> None:
         candidate = Path(path).absolute()
         try:
             candidate.relative_to(root)
@@ -276,9 +298,29 @@ def _remove_owned_namespace(namespace: Path) -> None:
             if stat.S_ISDIR(mode):
                 writable_bits |= stat.S_IXUSR
             os.chmod(writable_candidate, mode | writable_bits)
-        function(path)
+        cleanup_errors.append(error)
 
-    shutil.rmtree(namespace, onerror=onerror)
+    try:
+        supports_onexc = "onexc" in inspect.signature(shutil.rmtree).parameters
+    except (TypeError, ValueError):
+        supports_onexc = False
+    if supports_onexc:
+        shutil.rmtree(namespace, onexc=onexc)
+    else:
+        def onerror(function: Any, path: str, exc_info: object) -> None:
+            error = (
+                exc_info[1]
+                if isinstance(exc_info, tuple)
+                and len(exc_info) > 1
+                and isinstance(exc_info[1], BaseException)
+                else OSError(f"pytest cleanup failed for {path}")
+            )
+            onexc(function, path, error)
+
+        shutil.rmtree(namespace, onerror=onerror)
+
+    if cleanup_errors:
+        raise cleanup_errors[0]
 
 
 def _cleanup_diagnostic_path(namespace: Path) -> Path:

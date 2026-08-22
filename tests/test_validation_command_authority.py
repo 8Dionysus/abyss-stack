@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import getpass
 import json
+import os
 from pathlib import Path
 import re
 from types import SimpleNamespace
@@ -264,12 +265,40 @@ def test_pytest_temp_parent_follows_upstream_runtime_environment(
     monkeypatch.setenv("PYTEST_DEBUG_TEMPROOT", str(debug_root))
     monkeypatch.setenv("TMPDIR", str(runtime_root))
     assert run_pytest_lane.select_pytest_temp_parent() == debug_root
+    assert not list(debug_root.iterdir())
 
     monkeypatch.setenv(
         "PYTEST_DEBUG_TEMPROOT",
         str(tmp_path / "missing-debug-root"),
     )
     assert run_pytest_lane.select_pytest_temp_parent() == runtime_root
+    assert not list(runtime_root.iterdir())
+
+
+def test_pytest_temp_parent_skips_existing_unusable_candidate(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    unusable = tmp_path / "unusable"
+    fallback = tmp_path / "fallback"
+    unusable.mkdir()
+    fallback.mkdir()
+    real_mkdtemp = run_pytest_lane.tempfile.mkdtemp
+
+    def fake_mkdtemp(*, prefix, dir=None):
+        if dir == str(unusable):
+            raise PermissionError("simulated unusable configured parent")
+        return real_mkdtemp(prefix=prefix, dir=dir)
+
+    monkeypatch.setattr(run_pytest_lane.tempfile, "mkdtemp", fake_mkdtemp)
+    monkeypatch.setenv(run_pytest_lane.PYTEST_TEMP_ROOT_ENV, str(unusable))
+    monkeypatch.setenv(run_pytest_lane.PYTEST_TEMP_PARENT_ENV, str(fallback))
+
+    assert run_pytest_lane.select_pytest_temp_parent() == fallback
+    with run_pytest_lane.owned_pytest_temp_namespace() as namespace:
+        assert namespace.parent == fallback
+    assert not list(unusable.iterdir())
+    assert not list(fallback.iterdir())
 
 
 def test_pytest_invocation_namespaces_are_unique_and_cleaned(tmp_path: Path) -> None:
@@ -338,6 +367,71 @@ def test_pytest_temp_cleanup_handles_readonly_owned_paths(tmp_path: Path) -> Non
 
     assert result.ok is True
     assert not namespace.exists()
+
+
+@pytest.mark.parametrize("callback_api", ("onexc", "onerror"))
+def test_pytest_temp_cleanup_handles_os_open_error_callback_without_replaying_it(
+    monkeypatch,
+    tmp_path: Path,
+    callback_api: str,
+) -> None:
+    namespace = tmp_path / "owned-namespace"
+    namespace.mkdir()
+    (namespace / "manifest.json").write_text("{}\n", encoding="utf-8")
+    original_rmtree = run_pytest_lane.shutil.rmtree
+    observed_functions: list[object] = []
+    calls = 0
+
+    def fake_onexc_rmtree(path, *, onexc):
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            original_rmtree(path)
+            return
+        error = PermissionError("simulated os.open failure")
+        observed_functions.append(os.open)
+        onexc(os.open, str(path), error)
+
+    def fake_onerror_rmtree(path, *, onerror):
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            original_rmtree(path)
+            return
+        error = PermissionError("simulated os.open failure")
+        observed_functions.append(os.open)
+        onerror(os.open, str(path), (type(error), error, None))
+
+    monkeypatch.setattr(
+        run_pytest_lane.shutil,
+        "rmtree",
+        fake_onexc_rmtree if callback_api == "onexc" else fake_onerror_rmtree,
+    )
+    monkeypatch.setattr(run_pytest_lane, "PYTEST_TEMP_CLEANUP_RETRY_DELAY_SECONDS", 0)
+
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(namespace)
+
+    assert observed_functions == [os.open]
+    assert result.ok is True
+    assert result.attempts == 2
+    assert calls == 2
+    assert not namespace.exists()
+
+
+def test_pytest_temp_cleanup_does_not_follow_owned_symlinks(tmp_path: Path) -> None:
+    namespace = tmp_path / "owned-namespace"
+    outside = tmp_path / "outside"
+    namespace.mkdir()
+    outside.mkdir()
+    marker = outside / "keep.txt"
+    marker.write_text("no-loss\n", encoding="utf-8")
+    (namespace / "external").symlink_to(outside, target_is_directory=True)
+
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(namespace)
+
+    assert result.ok is True
+    assert not namespace.exists()
+    assert marker.read_text(encoding="utf-8") == "no-loss\n"
 
 
 def test_pytest_lane_returns_visible_failure_when_cleanup_is_unrecoverable(
