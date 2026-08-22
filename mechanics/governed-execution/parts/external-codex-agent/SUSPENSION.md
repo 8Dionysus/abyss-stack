@@ -54,7 +54,9 @@ aoa-external-codex-return pause \
 The pause owner must bind the exact Goal and thread. The leaf reads the current
 Goal first, refuses anything other than `active`, calls the supported
 `thread/goal/set` API with `paused`, and records
-`abyss_stack_external_codex_pause_receipt_v1`. It does not inject terminal
+`abyss_stack_external_codex_pause_receipt_v1`. Its pre-mutation durable file
+uses the separate `abyss_stack_external_codex_pause_reservation_v1` schema;
+it does not claim to be a completed receipt. It does not inject terminal
 input, inspect or signal PIDs, use GDB, start or steer a turn, deliver a wake,
 or close any holder. A receipt proves only the runtime lifecycle transition;
  wake delivery, holder closure, semantic re-entry, and owner acceptance require

@@ -52,7 +52,10 @@ an exact active owner-bound Goal is transitioned through `thread/goal/set` to
   a paused observation without the marker fails closed, and incomplete or
   copied completed receipts fail closed. The fixture asserts that pause does
   not use turn delivery, terminal input, process identity, holder closure, or
-  wake evidence.
+  wake evidence. The reservation fixture validates the initial, prepared,
+  pre-send, and post-send reservation states against the separate
+  `abyss_stack_external_codex_pause_reservation_v1` schema, while completed
+  evidence remains validated by the pause-receipt schema.
 
 The deterministic suite separates transport sentinels from unrelated semantic
 cases without exposing a runtime bypass. Fixtures selecting

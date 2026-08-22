@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/external-codex-pause-reservation.schema.json",
+  "title": "Abyss external Codex Goal pause reservation",
+  "type": "object",
+  "$defs": {
+    "precondition": {
+      "type": "object",
+      "required": ["goal_status", "goal_get", "goal_response_sha256"],
+      "properties": {
+        "goal_status": {"const": "active"},
+        "goal_get": {"type": "object"},
+        "goal_response_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "transport": {
+      "type": "object",
+      "required": ["kind", "endpoint"],
+      "properties": {
+        "kind": {"const": "codex_app_server_websocket_unix"},
+        "endpoint": {"type": "string", "minLength": 1}
+      }
+    },
+    "mutation_identity": {
+      "type": "object",
+      "required": [
+        "attempt_id",
+        "method",
+        "request_id",
+        "params",
+        "params_sha256",
+        "request_sha256"
+      ],
+      "properties": {
+        "attempt_id": {"type": "string", "minLength": 1},
+        "method": {"const": "thread/goal/set"},
+        "request_id": {"type": "integer", "minimum": 1},
+        "params": {
+          "type": "object",
+          "required": ["threadId", "status"],
+          "properties": {
+            "threadId": {"type": "string", "minLength": 1},
+            "status": {"const": "paused"}
+          }
+        },
+        "params_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "request_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "mutation_reserved": {
+      "allOf": [
+        {"$ref": "#/$defs/mutation_identity"},
+        {
+          "required": ["reserved_at"],
+          "properties": {"reserved_at": {"type": "string", "minLength": 1}}
+        }
+      ]
+    },
+    "mutation_dispatched": {
+      "allOf": [
+        {"$ref": "#/$defs/mutation_identity"},
+        {
+          "required": ["issued_at"],
+          "properties": {"issued_at": {"type": "string", "minLength": 1}}
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "state",
+    "reserved_at",
+    "attempt_id",
+    "owner_ref",
+    "owner_sha256",
+    "pause_receipt_ref"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "abyss_stack_external_codex_pause_reservation_v1"
+    },
+    "state": {"const": "reserved"},
+    "reserved_at": {"type": "string", "minLength": 1},
+    "attempt_id": {"type": "string", "minLength": 1},
+    "owner_ref": {"type": "string", "pattern": "^/"},
+    "owner_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "pause_receipt_ref": {"type": "string", "pattern": "^/"},
+    "prepared_at": {"type": "string", "minLength": 1},
+    "precondition": {"$ref": "#/$defs/precondition"},
+    "transport": {"$ref": "#/$defs/transport"},
+    "mutation_reserved": {"$ref": "#/$defs/mutation_reserved"},
+    "mutation_dispatched": {"$ref": "#/$defs/mutation_dispatched"}
+  },
+  "allOf": [
+    {
+      "if": {"required": ["precondition"]},
+      "then": {"required": ["prepared_at", "transport"]}
+    },
+    {
+      "if": {"required": ["mutation_reserved"]},
+      "then": {
+        "required": ["prepared_at", "precondition", "transport"],
+        "not": {"required": ["mutation_dispatched"]}
+      }
+    },
+    {
+      "if": {"required": ["mutation_dispatched"]},
+      "then": {
+        "required": ["prepared_at", "precondition", "transport"],
+        "not": {"required": ["mutation_reserved"]}
+      }
+    }
+  ]
+}

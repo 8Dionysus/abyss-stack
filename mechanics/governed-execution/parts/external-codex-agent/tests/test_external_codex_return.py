@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from jsonschema import validate
 
 
 PART = Path(__file__).resolve().parents[1]
@@ -316,6 +317,65 @@ def test_pause_goal_refuses_non_active_goal_without_mutation(
         )
 
     assert not any(method == "thread/goal/set" for method, _params in fake.calls)
+
+
+def test_pause_reservation_matches_its_public_schema(
+    tmp_path: Path,
+) -> None:
+    schema = json.loads(
+        (
+            PART / "schemas/external-codex-pause-reservation.schema.json"
+        ).read_text(encoding="utf-8")
+    )
+    pause_path = tmp_path / "pause-receipt.json"
+    binding = {
+        "owner_ref": str((tmp_path / "pause-owner.json").resolve()),
+        "owner_sha256": "sha256:" + "0" * 64,
+        "pause_receipt_ref": str(pause_path.resolve()),
+    }
+    reservation = MODULE._pause_reservation(pause_path, binding=binding)
+    validate(instance=reservation, schema=schema)
+
+    precondition = MODULE._pause_precondition(
+        {"goal": {"threadId": "thread-pause-schema", "status": "active"}}
+    )
+    prepared = {
+        **reservation,
+        "prepared_at": "2026-08-22T00:00:00Z",
+        "precondition": precondition,
+        "transport": {
+            "kind": "codex_app_server_websocket_unix",
+            "endpoint": str(tmp_path / "app-server.sock"),
+        },
+    }
+    validate(instance=prepared, schema=schema)
+
+    params = {"threadId": "thread-pause-schema", "status": "paused"}
+    payload = {"jsonrpc": "2.0", "id": 1, "method": "thread/goal/set", "params": params}
+    reserved_marker = MODULE._pause_mutation_marker(
+        attempt_id=reservation["attempt_id"],
+        method="thread/goal/set",
+        params=params,
+        request_id=1,
+        payload=payload,
+        timestamp_key="reserved_at",
+    )
+    validate(
+        instance={**prepared, "mutation_reserved": reserved_marker},
+        schema=schema,
+    )
+    dispatched_marker = MODULE._pause_mutation_marker(
+        attempt_id=reservation["attempt_id"],
+        method="thread/goal/set",
+        params=params,
+        request_id=1,
+        payload=payload,
+        timestamp_key="issued_at",
+    )
+    validate(
+        instance={**prepared, "mutation_dispatched": dispatched_marker},
+        schema=schema,
+    )
 
 
 def test_run_pause_reserves_and_replays_without_second_transport_mutation(

@@ -129,7 +129,10 @@ a handoff, authorize or close a holder, or claim semantic acceptance. The
   reservation also stores the exact active precondition and an exact mutation
   reservation before the WebSocket request is sent, then records a separate
   durable dispatch marker only after the request frame has been issued by that
-  attempt. If the mutation response, dispatch-marker publication, or receipt
+  attempt. These in-flight files use the separate
+  `abyss_stack_external_codex_pause_reservation_v1` contract; the completed
+  `abyss_stack_external_codex_pause_receipt_v1` schema is published only after
+  the paused Goal evidence is complete. If the mutation response, dispatch-marker publication, or receipt
   publication is lost, a retry observes the same bound Goal with read-only `thread/goal/get`
   and emits an `ambiguous_post_mutation` recovery receipt without repeating
   `thread/goal/set`, but only when the matching dispatch marker is present. A

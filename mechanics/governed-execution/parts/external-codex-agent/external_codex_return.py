@@ -35,6 +35,7 @@ RETURN_RESPONSE_SCHEMA_VERSION = "abyss_stack_external_codex_return_response_v1"
 DETACHED_SCHEMA_VERSION = "abyss_stack_external_codex_return_detached_v1"
 RETURN_ATTEMPT_SCHEMA_VERSION = "abyss_stack_external_codex_return_attempt_v1"
 PAUSE_OWNER_SCHEMA_VERSION = "abyss_stack_external_codex_pause_owner_v1"
+PAUSE_RESERVATION_SCHEMA_VERSION = "abyss_stack_external_codex_pause_reservation_v1"
 PAUSE_RECEIPT_SCHEMA_VERSION = "abyss_stack_external_codex_pause_receipt_v1"
 WEBSOCKET_ACCEPT_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 DEFAULT_TIMEOUT_SECONDS = 10.0
@@ -1932,9 +1933,9 @@ def _pause_reservation(
             raise ExternalCodexReturnError(
                 "canonical Goal pause receipt is not canonically encoded"
             )
-        if value.get("schema_version") != PAUSE_RECEIPT_SCHEMA_VERSION:
+        if value.get("schema_version") != PAUSE_RESERVATION_SCHEMA_VERSION:
             raise ExternalCodexReturnError(
-                "canonical Goal pause receipt schema mismatch"
+                "canonical Goal pause reservation schema mismatch"
             )
         if value.get("state") != "reserved":
             raise ExternalCodexReturnError(
@@ -1947,7 +1948,7 @@ def _pause_reservation(
                 )
         return value
     reservation = {
-        "schema_version": PAUSE_RECEIPT_SCHEMA_VERSION,
+        "schema_version": PAUSE_RESERVATION_SCHEMA_VERSION,
         "state": "reserved",
         "reserved_at": _utc_now(),
         "attempt_id": secrets.token_hex(16),
