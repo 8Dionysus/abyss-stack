@@ -730,7 +730,8 @@ def deliver_handoff(
                 "thread/turns/list",
                 {
                     "threadId": owner["thread_id"],
-                    "numTurns": 1,
+                    "limit": 1,
+                    "itemsView": "notLoaded",
                 },
             )
             active_turn = _active_turn_id(thread_turns_list_response.get("data"))

@@ -97,7 +97,11 @@ class FakeRpc:
                 turns = [{"id": self.active_turn, "status": "inProgress", "items": []}]
             return {"thread": {"id": self.thread_id, "turns": turns}}
         if method == "thread/turns/list":
-            if params != {"threadId": self.thread_id, "numTurns": 1}:
+            if params != {
+                "threadId": self.thread_id,
+                "limit": 1,
+                "itemsView": "notLoaded",
+            }:
                 raise AssertionError(params)
             turns = []
             if self.fallback_active_turn is not None:
