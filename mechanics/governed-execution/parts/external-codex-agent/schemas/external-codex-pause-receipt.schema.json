@@ -184,10 +184,19 @@
         "goal_response_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
         "precondition": {
           "type": "object",
-          "required": ["goal_status", "goal_get", "goal_response_sha256"],
+          "required": [
+            "goal_status",
+            "goal_get",
+            "goal_get_summary_sha256",
+            "goal_response_sha256"
+          ],
           "properties": {
             "goal_status": {"const": "active"},
             "goal_get": {"type": "object"},
+            "goal_get_summary_sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
             "goal_response_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
           }
         },

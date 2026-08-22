@@ -915,9 +915,13 @@ def deliver_handoff(
 def _pause_precondition(goal_get_response: dict[str, Any]) -> dict[str, Any]:
     """Capture the active observation before the one allowed lifecycle set."""
 
+    goal_get_summary = _safe_response_summary(goal_get_response)
     return {
         "goal_status": "active",
-        "goal_get": _safe_response_summary(goal_get_response),
+        "goal_get": goal_get_summary,
+        "goal_get_summary_sha256": _sha256_bytes(
+            _canonical_bytes(goal_get_summary)
+        ),
         "goal_response_sha256": _sha256_bytes(
             _canonical_bytes(goal_get_response)
         ),
@@ -947,7 +951,10 @@ def _validated_pause_precondition(reservation: dict[str, Any]) -> dict[str, Any]
     if (
         precondition.get("goal_status") != "active"
         or not isinstance(precondition.get("goal_get"), dict)
+        or not _is_sha256_digest(precondition.get("goal_get_summary_sha256"))
         or not isinstance(precondition.get("goal_response_sha256"), str)
+        or precondition.get("goal_get_summary_sha256")
+        != _sha256_bytes(_canonical_bytes(precondition.get("goal_get")))
     ):
         raise ExternalCodexReturnError(
             "reserved Goal pause has an invalid active precondition"
@@ -2291,6 +2298,7 @@ def _validate_pause_receipt(
         raise ExternalCodexReturnError(
             "canonical Goal pause receipt lacks lifecycle evidence"
         )
+    _validated_pause_precondition({"precondition": precondition})
     if recovery is not None:
         if (
             not isinstance(recovery, dict)

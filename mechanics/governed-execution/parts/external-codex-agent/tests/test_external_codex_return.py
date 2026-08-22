@@ -556,6 +556,24 @@ def test_pause_reservation_matches_its_public_schema(
     )
 
 
+def test_pause_precondition_rejects_tampered_stored_goal_summary() -> None:
+    precondition = MODULE._pause_precondition(
+        {"goal": {"threadId": "thread-summary", "status": "active"}}
+    )
+    tampered = {
+        "precondition": {
+            **precondition,
+            "goal_get": {"keys": ["goal"], "goal": {"status": "paused"}},
+        }
+    }
+
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="invalid active precondition",
+    ):
+        MODULE._validated_pause_precondition(tampered)
+
+
 def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
