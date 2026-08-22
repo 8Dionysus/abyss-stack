@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 import signal
 import sys
+import time
 from typing import Any, Mapping
 import uuid
 
@@ -28,6 +29,8 @@ CONTEXT_FILE_PREFIX = "attempt-"
 ATTEMPT_IDENTITY_FIELDS = ("session_id", "turn_id", "tool_use_id", "tool_name")
 MAX_EVENT_BYTES = 1024 * 1024
 MAX_CONTEXT_BYTES = 256 * 1024
+CONTEXT_WAIT_SECONDS = 2.0
+CONTEXT_POLL_SECONDS = 0.01
 INTERNAL_TIMEOUT_SECONDS = 5.0
 
 # These are Codex 0.148.0's hook-facing agent-tool names. ``spawn_agent`` is
@@ -226,8 +229,22 @@ def _claim_context(
     path = directory / (
         f"{CONTEXT_FILE_PREFIX}{_attempt_identity_digest(event)}.json"
     )
-    if path.is_symlink() or not path.is_file():
-        raise AdapterError("typed route context for this tool call is unavailable")
+    deadline = time.monotonic() + CONTEXT_WAIT_SECONDS
+    while True:
+        if path.is_symlink():
+            raise AdapterError("typed route context for this tool call is unavailable")
+        if path.is_file():
+            # Check again after observing the file.  The relay and adapter
+            # groups can be descheduled independently, so a file may appear
+            # while this process is asleep after the bounded wait expired.
+            if time.monotonic() >= deadline:
+                raise AdapterError(
+                    "typed route context for this tool call is unavailable"
+                )
+            break
+        if time.monotonic() >= deadline:
+            raise AdapterError("typed route context for this tool call is unavailable")
+        time.sleep(CONTEXT_POLL_SECONDS)
 
     # Claim only the event-keyed directory entry before reading it.  A producer
     # may refresh a later attempt concurrently, but a different event has a

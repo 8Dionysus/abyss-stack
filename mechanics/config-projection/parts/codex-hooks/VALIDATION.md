@@ -29,7 +29,8 @@ Focused tests cover:
 - typed `not_independent` local compatibility and unrelated-tool pass-through;
 - bounded oversized-context reads, exact safe attempt-key binding,
   claim-before-read single-use typed context consumption, concurrent producer
-  isolation, and selected SDK-root verification;
+  isolation, bounded relay/adapter concurrency waiting, and selected SDK-root
+  verification;
 - inner timeout denial before the longer native hook timeout;
 - malformed or missing context fail-closed behavior without invented identity;
 - composition of the stack-owned adapter fragment without dropping existing
