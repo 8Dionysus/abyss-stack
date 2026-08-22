@@ -22,6 +22,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import uuid
 from typing import Any
 
 
@@ -305,8 +306,21 @@ def verify_release(release_root: Path) -> dict[str, Any]:
     rows_by_path = {Path(row["path"]): row for row in manifest["files"]}
     for relative, row in rows_by_path.items():
         path = _require_regular_file(release_root / relative, f"release file {relative}")
-        if path.stat().st_size != row["size"] or sha256_file(path) != row["sha256"]:
+        metadata = path.stat()
+        expected_mode = 0o555 if path.suffix == ".py" else 0o444
+        if (
+            metadata.st_size != row["size"]
+            or sha256_file(path) != row["sha256"]
+            or stat.S_IMODE(metadata.st_mode) != expected_mode
+        ):
             raise InstallError(f"release file drift: {relative}")
+    for relative in actual_directories | {Path(".")}:
+        metadata = (release_root / relative).stat()
+        if stat.S_IMODE(metadata.st_mode) != 0o555:
+            raise InstallError(f"release directory permissions drift: {relative}")
+    manifest_metadata = (release_root / "release-manifest.json").stat()
+    if stat.S_IMODE(manifest_metadata.st_mode) != 0o444:
+        raise InstallError("release manifest permissions drift")
     return manifest
 
 
@@ -318,6 +332,8 @@ def materialize_release(
     manifest = build_manifest(source_root, source_commit)
     releases_root = _ensure_directory(install_root / "releases", "release root")
     release_root = releases_root / str(manifest["release_id"])
+    if release_root.is_symlink():
+        raise InstallError("release coordinate must not be a symbolic link")
     if release_root.exists():
         existing_manifest = verify_release(release_root)
         if existing_manifest != manifest:
@@ -333,17 +349,25 @@ def materialize_release(
             target = staging / relative_text
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(source_bytes)
-            os.chmod(target, 0o755 if relative_text in PYTHON_RELEASE_FILES else 0o644)
+            os.chmod(target, 0o555 if relative_text in PYTHON_RELEASE_FILES else 0o444)
         manifest_path = staging / "release-manifest.json"
         manifest_path.write_bytes(rendered_bytes(manifest))
-        os.chmod(manifest_path, 0o644)
+        os.chmod(manifest_path, 0o444)
+        _finalize_release_permissions(staging)
         verify_release(staging.resolve())
-        os.chmod(staging, 0o700)
         os.replace(staging, release_root)
-        for directory, _, _ in os.walk(release_root, topdown=False):
-            os.chmod(directory, 0o700)
     finally:
         if staging.exists():
+            for path in sorted(
+                staging.rglob("*"),
+                key=lambda item: len(item.parts),
+                reverse=True,
+            ):
+                if path.is_dir() and not path.is_symlink():
+                    os.chmod(path, 0o700)
+                elif path.is_file() and not path.is_symlink():
+                    os.chmod(path, 0o600)
+            os.chmod(staging, 0o700)
             shutil.rmtree(staging)
     return release_root, manifest, True
 
@@ -383,6 +407,76 @@ def _restore_file(
             pass
         return
     _atomic_write(path, previous_bytes, mode=previous_mode or 0o600)
+
+
+def _path_identity(path: Path) -> Path:
+    try:
+        return path.resolve(strict=False)
+    except OSError as exc:
+        raise InstallError(f"cannot resolve installation path: {path}") from exc
+
+
+def _assert_distinct_paths(paths: dict[str, Path]) -> None:
+    identities: dict[Path, str] = {}
+    for label, path in paths.items():
+        identity = _path_identity(path)
+        previous = identities.get(identity)
+        if previous is not None:
+            raise InstallError(
+                f"installation paths must be distinct: {previous} and {label}"
+            )
+        identities[identity] = label
+    existing = [(label, path) for label, path in paths.items() if path.exists()]
+    for index, (left_label, left) in enumerate(existing):
+        if not left.is_file():
+            continue
+        for right_label, right in existing[index + 1 :]:
+            if not right.is_file():
+                continue
+            try:
+                same_file = os.path.samefile(left, right)
+            except OSError:
+                same_file = False
+            if same_file:
+                raise InstallError(
+                    f"installation paths must be distinct: {left_label} and {right_label}"
+                )
+
+
+def _reserve_install_receipt(receipt_dir: Path, release_id: str) -> Path:
+    for _ in range(16):
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+        path = receipt_dir / f"{timestamp}-{uuid.uuid4().hex}-{release_id}.json"
+        try:
+            descriptor = os.open(
+                path,
+                os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                0o600,
+            )
+        except FileExistsError:
+            continue
+        else:
+            os.close(descriptor)
+            return path
+    raise InstallError("could not reserve a unique install receipt path")
+
+
+def _finalize_release_permissions(release_root: Path) -> None:
+    for path in sorted(
+        release_root.rglob("*"),
+        key=lambda item: len(item.parts),
+        reverse=True,
+    ):
+        relative = path.relative_to(release_root)
+        if path.is_symlink():
+            raise InstallError(f"release contains a symbolic link: {relative}")
+        if path.is_dir():
+            os.chmod(path, 0o555)
+        elif path.is_file():
+            os.chmod(path, 0o555 if path.suffix == ".py" else 0o444)
+        else:
+            raise InstallError(f"release contains an unsupported entry: {relative}")
+    os.chmod(release_root, 0o555)
 
 
 def install(
@@ -471,7 +565,17 @@ def install(
         bindings,
     )
     _ensure_directory(backup_directory, "hook backup directory")
+    receipt_dir = _ensure_directory(install_root / "receipts", "install receipt directory")
+    receipt_path = _reserve_install_receipt(receipt_dir, str(manifest["release_id"]))
     try:
+        _assert_distinct_paths(
+            {
+                "Codex hooks target": target,
+                "active install receipt": active_path,
+                "composition receipt": composition_receipt,
+                "install receipt": receipt_path,
+            }
+        )
         composition = renderer.install_composition(
             output=output,
             fragments=fragments,
@@ -481,11 +585,12 @@ def install(
             backup_dir=backup_directory,
         )
     except Exception:
+        try:
+            receipt_path.unlink()
+        except FileNotFoundError:
+            pass
         raise
 
-    receipt_dir = _ensure_directory(install_root / "receipts", "install receipt directory")
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    receipt_path = receipt_dir / f"{timestamp}-{manifest['release_id']}.json"
     active = {
         "schema_version": INSTALL_SCHEMA_VERSION,
         "operation": "install",
@@ -545,6 +650,10 @@ def install(
             previous_composition_bytes,
             previous_composition_mode,
         )
+        try:
+            receipt_path.unlink()
+        except FileNotFoundError:
+            pass
         raise
     return {
         "active": active,

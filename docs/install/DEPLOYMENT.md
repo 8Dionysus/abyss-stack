@@ -347,7 +347,9 @@ native fragment, stack transport relay, and adapter atomically. The session
 owner must publish the current typed base through
 `AOA_AGENT_TOOL_ROUTING_CONTEXT_BASE`; the active hook never encodes a Goal,
 holder, task root, role, or proof directory. The install receipt proves source
-identity, release closure, composition, and rollback data only. Codex trust,
+identity, read-only release closure, composition, and rollback data only. The
+installer rejects aliases among active and audit paths and gives each install
+receipt an exclusive operation coordinate. Codex trust,
 fresh-session hook execution, SDK routing, `aoa-agents` classification, actor
 launch, and Goal acceptance remain separate checks.
 

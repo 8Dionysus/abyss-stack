@@ -96,6 +96,7 @@ def _install(tmp_path: Path) -> tuple[dict, dict[str, Path], Path]:
         "install_root": install_root,
         "composition": composition,
         "native": native,
+        "sdk": sdk_root,
     }, source_root
 
 
@@ -115,6 +116,52 @@ def test_install_materializes_verified_release_and_stable_commands(tmp_path: Pat
     assert stat.S_IMODE(paths["target"].stat().st_mode) == 0o600
     assert active["composition"]["handler_count"] == 3
     assert Path(result["install_receipt"]).is_file()
+
+
+def test_install_rejects_aliases_before_composition(tmp_path: Path) -> None:
+    source_root = _git_source(tmp_path)
+    sdk_root = tmp_path / "sdk"
+    (sdk_root / "src/aoa_sdk").mkdir(parents=True)
+    native = tmp_path / "native.json"
+    _native_fragment(native)
+    install_root = tmp_path / "runtime"
+    install_root.mkdir()
+
+    with pytest.raises(INSTALLER.InstallError, match="installation paths must be distinct"):
+        INSTALLER.install(
+            source_root=source_root,
+            install_root=install_root,
+            native_fragment=native,
+            target=install_root / "active.json",
+            context_directory=install_root / "contexts",
+            sdk_source_root=sdk_root,
+            composition_receipt=install_root / "composition.json",
+            backup_directory=install_root / "backups",
+        )
+
+
+def test_install_receipts_are_unique_and_release_is_read_only(tmp_path: Path) -> None:
+    result, paths, source_root = _install(tmp_path)
+    release_root = Path(result["release_root"])
+    assert stat.S_IMODE(release_root.stat().st_mode) == 0o555
+    for path in release_root.rglob("*"):
+        assert not path.is_symlink()
+        assert stat.S_IMODE(path.stat().st_mode) == (
+            0o555 if path.is_dir() or path.suffix == ".py" else 0o444
+        )
+
+    second = INSTALLER.install(
+        source_root=source_root,
+        install_root=paths["install_root"],
+        native_fragment=paths["native"],
+        target=paths["target"],
+        context_directory=paths["install_root"] / "contexts",
+        sdk_source_root=paths["sdk"],
+        composition_receipt=paths["composition"],
+        backup_directory=paths["install_root"] / "backups",
+    )
+    assert second["install_receipt"] != result["install_receipt"]
+    assert Path(second["install_receipt"]).is_file()
 
 
 def test_install_reads_allowlisted_files_from_committed_blobs(tmp_path: Path) -> None:
@@ -205,7 +252,9 @@ def test_install_rejects_mismatched_existing_release_manifest(tmp_path: Path) ->
     digest = INSTALLER.sha256_bytes(INSTALLER.canonical_bytes(identity))
     manifest["release_digest"] = digest
     manifest["release_id"] = digest.replace("sha256:", "sha256-")
+    manifest_path.chmod(0o644)
     manifest_path.write_bytes(INSTALLER.rendered_bytes(manifest))
+    manifest_path.chmod(0o444)
 
     with pytest.raises(INSTALLER.InstallError, match="does not match the current committed manifest"):
         INSTALLER.install(

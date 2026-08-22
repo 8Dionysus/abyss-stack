@@ -35,7 +35,9 @@ The durable installer additionally requires one clean exact source checkout,
 one native fragment path, one `aoa-sdk` source root, an install root, a context
 directory, and explicit renderer receipt/backup paths. It copies only the
 allowlisted hook source files into a content-addressed release and refuses a
-dirty or symlinked source/release input.
+dirty or symlinked source/release input. The release is finalized read-only;
+target, active receipt, composition receipt, and each per-install receipt are
+distinct path identities, and receipt creation uses exclusive reservation.
 
 Owner-envelope bindings are complete and exact: declared names must equal
 placeholders found in command strings, each declared name must be supplied,
@@ -95,6 +97,10 @@ existing target must be a regular non-symlink file and is copied byte-for-byte
 to a private mode-`0600` backup before replacement. The new native output is
 atomically replaced and mode-`0600`. If the receipt cannot be written, the
 previous target is restored atomically, or a newly created target is removed.
+The installer rejects aliases among the target, active receipt, composition
+receipt, and per-install receipt before composition. It also restores the
+previous composition receipt and removes the reserved per-install receipt when
+a later receipt write fails.
 
 This source contract does not itself authorize writing `~/.codex/hooks.json`.
 Exact Codex trust remains a separate operator-visible gate. The installer does

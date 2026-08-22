@@ -89,13 +89,18 @@ under an immutable content-addressed release below the deployed
 fragment with relay then adapter through the renderer. It records source,
 release, composition, target, and rollback digests without embedding the
 session base or any Goal/task identity in the active command. The release is
-reused only after its manifest closure and file digests verify.
+reused only after its manifest closure, immutable file/directory modes, and
+file digests verify. Target, active receipt, composition receipt, and the
+per-install receipt must be distinct paths; each receipt receives a unique
+operation coordinate.
 
 Read-only rendering is the default. `--check-output` compares an existing
 projection without changing it. `--write` is an explicit atomic install route:
 it writes mode `0600`, preserves an existing target in a private backup
 directory, emits a content-minimized composition receipt, and rolls the target
-back if receipt creation fails.
+back if receipt creation fails. Materialized release files are finalized
+without write permission after verification, so a later same-user edit is
+reported as release drift rather than silently changing active hook code.
 
 ## Boundary
 
