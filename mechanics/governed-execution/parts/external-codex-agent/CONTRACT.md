@@ -122,8 +122,10 @@ Operations are:
   supplied complete owner binding and immutable handoff, reads the exact Goal
   identity first, refuses terminal or blocked Goals, activates only a paused
   Goal, reads a bounded `thread/read` view with `includeTurns=false`, uses any
-  returned abbreviated active-turn evidence to steer or starts a new turn when
-  no active turn is reported, validates the
+  returned abbreviated active-turn evidence to steer, and otherwise reads the
+  supported bounded first page of `thread/turns/list` before starting a new
+  turn. It never interprets omitted history as proof that a concurrent turn is
+  absent. It validates the
   method-specific accepted-turn response, and reserves the output receipt
   before any app-server mutation. The handoff owner must match the
   complete canonical transport binding, and existing authorization/closure

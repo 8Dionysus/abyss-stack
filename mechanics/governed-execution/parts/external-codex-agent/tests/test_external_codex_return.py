@@ -45,6 +45,7 @@ class FakeRpc:
         goal_id: str = "goal-dynamic-1",
         thread_id: str = "thread-dynamic-1",
         bounded_turns: bool = False,
+        fallback_active_turn: str | None = None,
     ) -> None:
         self.endpoint = endpoint
         self.active_turn = active_turn
@@ -52,6 +53,7 @@ class FakeRpc:
         self.goal_id = goal_id
         self.thread_id = thread_id
         self.bounded_turns = bounded_turns
+        self.fallback_active_turn = fallback_active_turn
         self.calls: list[tuple[str, dict[str, object] | None]] = []
 
     def __enter__(self) -> "FakeRpc":
@@ -94,6 +96,19 @@ class FakeRpc:
             else:
                 turns = [{"id": self.active_turn, "status": "inProgress", "items": []}]
             return {"thread": {"id": self.thread_id, "turns": turns}}
+        if method == "thread/turns/list":
+            if params != {"threadId": self.thread_id, "numTurns": 1}:
+                raise AssertionError(params)
+            turns = []
+            if self.fallback_active_turn is not None:
+                turns.append(
+                    {
+                        "id": self.fallback_active_turn,
+                        "status": "inProgress",
+                        "items": [],
+                    }
+                )
+            return {"data": turns, "nextCursor": "", "backwardsCursor": ""}
         if method == "turn/start":
             return {"turn": {"id": "new-turn", "status": "inProgress", "items": []}}
         if method == "turn/steer":
@@ -177,6 +192,42 @@ def test_delivery_uses_bounded_thread_read_for_large_idle_history(
 
     assert receipt["delivery_method"] == "turn/start"
     assert any(method == "turn/start" for method, _params in fake.calls)
+    assert any(method == "thread/turns/list" for method, _params in fake.calls)
+
+
+def test_delivery_steers_active_turn_from_bounded_turn_page(
+    tmp_path: Path,
+) -> None:
+    owner_path = tmp_path / "owner.json"
+    owner_value = owner(
+        goal="goal-page",
+        thread="thread-page",
+        endpoint="unix:/run/user/1000/example.sock",
+    )
+    owner_path.write_text(json.dumps(owner_value, sort_keys=True) + "\n", encoding="utf-8")
+    handoff = tmp_path / "handoff.json"
+    handoff.write_text('{"responsibility_state":"returned"}\n', encoding="utf-8")
+    endpoint = tmp_path / "app-server.sock"
+    fake = FakeRpc(
+        endpoint,
+        active_turn=None,
+        thread_id="thread-page",
+        bounded_turns=True,
+        fallback_active_turn="turn-from-page",
+    )
+
+    receipt = MODULE.deliver_handoff(
+        MODULE.validate_return_owner(owner_value),
+        owner_path,
+        handoff,
+        endpoint,
+        rpc_factory=lambda path: fake,
+    )
+
+    assert receipt["delivery_method"] == "turn/steer"
+    assert receipt["active_turn_id"] == "turn-from-page"
+    steer_calls = [params for method, params in fake.calls if method == "turn/steer"]
+    assert steer_calls[0]["expectedTurnId"] == "turn-from-page"
 
 
 def test_discovery_skips_stale_socket_candidate(

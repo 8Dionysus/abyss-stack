@@ -37,6 +37,7 @@ RETURN_ATTEMPT_SCHEMA_VERSION = "abyss_stack_external_codex_return_attempt_v1"
 WEBSOCKET_ACCEPT_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 APP_SERVER_DISCOVERY_PROBE_TIMEOUT_SECONDS = 1.0
+APP_SERVER_TURN_LOOKUP_TIMEOUT_SECONDS = 30.0
 MAX_HANDSHAKE_BYTES = 64 * 1024
 MAX_FRAME_BYTES = 16 * 1024 * 1024
 
@@ -329,6 +330,13 @@ class UnixWebSocketRpc:
         self.socket: socket.socket | None = None
         self._buffer = b""
         self._counter = 0
+
+    def set_timeout(self, timeout: float) -> None:
+        """Extend a connected read timeout for one bounded history lookup."""
+
+        self.timeout = timeout
+        if self.socket is not None:
+            self.socket.settimeout(timeout)
 
     def __enter__(self) -> "UnixWebSocketRpc":
         connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -713,6 +721,19 @@ def deliver_handoff(
             )
         turns = thread.get("turns")
         active_turn = _active_turn_id(turns)
+        thread_turns_list_response: dict[str, Any] | None = None
+        if active_turn is None:
+            set_timeout = getattr(rpc, "set_timeout", None)
+            if callable(set_timeout):
+                set_timeout(APP_SERVER_TURN_LOOKUP_TIMEOUT_SECONDS)
+            thread_turns_list_response = rpc.call(
+                "thread/turns/list",
+                {
+                    "threadId": owner["thread_id"],
+                    "numTurns": 1,
+                },
+            )
+            active_turn = _active_turn_id(thread_turns_list_response.get("data"))
         input_value = [{"type": "text", "text": message}]
         if active_turn is not None:
             method = "turn/steer"
@@ -766,6 +787,11 @@ def deliver_handoff(
             "goal": _safe_response_summary(goal_response),
             "thread_read": _safe_response_summary(thread_read_response),
             "turns": _safe_response_summary(turns),
+            "thread_turns_list": (
+                _safe_response_summary(thread_turns_list_response)
+                if thread_turns_list_response is not None
+                else {"used": False}
+            ),
             "turn": _safe_response_summary(turn_response),
             "goal_response_sha256": _sha256_bytes(_canonical_bytes(goal_response)),
             "turn_response_sha256": _sha256_bytes(_canonical_bytes(turn_response)),
