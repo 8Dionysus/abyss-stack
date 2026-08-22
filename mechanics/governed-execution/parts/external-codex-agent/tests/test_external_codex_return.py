@@ -8,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from jsonschema import validate
+from jsonschema import ValidationError, validate
 
 
 PART = Path(__file__).resolve().parents[1]
@@ -298,6 +298,17 @@ def test_pause_goal_proves_exact_active_to_paused_transition(
             ).read_text(encoding="utf-8")
         ),
     )
+    invalid_owner_receipt = json.loads(json.dumps(receipt))
+    del invalid_owner_receipt["owner"]["owner_id"]
+    with pytest.raises(ValidationError):
+        validate(
+            instance=invalid_owner_receipt,
+            schema=json.loads(
+                (
+                    PART / "schemas/external-codex-pause-receipt.schema.json"
+                ).read_text(encoding="utf-8")
+            ),
+        )
     assert [method for method, _params in fake.calls] == [
         "initialize",
         "initialized",

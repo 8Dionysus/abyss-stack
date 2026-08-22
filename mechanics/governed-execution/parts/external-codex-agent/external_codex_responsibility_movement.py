@@ -164,7 +164,14 @@ def validate_observation(value: Mapping[str, Any]) -> dict[str, Any]:
         raise ResponsibilityMovementError(
             "expected_to_states must contain a state different from current_state"
         )
+    evidence_ids: set[str] = set()
     for index, evidence in enumerate(candidate["evidence"]):
+        evidence_id = evidence["evidence_id"]
+        if evidence_id in evidence_ids:
+            raise ResponsibilityMovementError(
+                f"evidence[{index}] reuses duplicate evidence_id {evidence_id!r}"
+            )
+        evidence_ids.add(evidence_id)
         evidence_at = _parse_time(evidence["observed_at"], f"evidence[{index}].observed_at")
         if evidence_at > observed_at:
             raise ResponsibilityMovementError(

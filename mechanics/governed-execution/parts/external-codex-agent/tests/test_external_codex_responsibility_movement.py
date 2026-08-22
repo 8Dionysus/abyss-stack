@@ -298,6 +298,18 @@ def test_lifecycle_transition_signal_must_match_its_kind() -> None:
         MODULE.observe_once(value)
 
 
+def test_duplicate_evidence_ids_are_rejected_before_classification() -> None:
+    value = observation(
+        [
+            _evidence("duplicate", "process", details={"present": True}),
+            _evidence("duplicate", "session", details={"state": "returning"}),
+        ]
+    )
+
+    with pytest.raises(MODULE.ResponsibilityMovementError, match="duplicate evidence_id"):
+        MODULE.observe_once(value)
+
+
 def test_cli_writes_typed_result_without_polling(tmp_path: Path) -> None:
     observation_path = tmp_path / "observation.json"
     result_path = tmp_path / "result.json"

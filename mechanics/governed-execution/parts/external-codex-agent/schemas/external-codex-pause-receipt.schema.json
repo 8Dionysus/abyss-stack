@@ -74,7 +74,28 @@
     "owner_ref": {"type": "string", "pattern": "^/"},
     "owner_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "pause_receipt_ref": {"type": "string", "pattern": "^/"},
-    "owner": {"type": "object", "minProperties": 7},
+    "owner": {
+      "type": "object",
+      "required": [
+        "owner_id",
+        "owner_repo",
+        "goal_id",
+        "thread_id",
+        "runtime",
+        "transport_posture",
+        "acceptance_posture"
+      ],
+      "properties": {
+        "owner_id": {"type": "string", "minLength": 1},
+        "owner_repo": {"type": "string", "minLength": 1},
+        "goal_id": {"type": "string", "minLength": 1},
+        "thread_id": {"type": "string", "minLength": 1},
+        "runtime": {"type": "string", "minLength": 1},
+        "transport_posture": {"type": "string", "minLength": 1},
+        "acceptance_posture": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
     "transport": {
       "type": "object",
       "required": ["kind", "endpoint"],
