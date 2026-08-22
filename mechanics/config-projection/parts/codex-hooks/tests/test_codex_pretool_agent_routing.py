@@ -137,6 +137,12 @@ def test_typed_not_independent_allows_only_sdk_compatibility_posture(
         "permissionDecisionReason"
     ]
 
+    context_path.write_text(json.dumps(context("not_independent")), encoding="utf-8")
+    assert ADAPTER.handle_event(
+        event(),
+        environ=environment(tmp_path, context_path),
+    ) == {}
+
 
 def test_selected_sdk_root_must_contain_the_imported_package(
     tmp_path: Path,

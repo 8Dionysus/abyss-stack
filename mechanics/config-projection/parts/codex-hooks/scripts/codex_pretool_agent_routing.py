@@ -17,6 +17,7 @@ from pathlib import Path
 import signal
 import sys
 from typing import Any, Mapping
+import uuid
 
 
 CONTEXT_SCHEMA_VERSION = "aoa_codex_pretool_agent_routing_context_v1"
@@ -186,9 +187,7 @@ def _load_context(environ: Mapping[str, str]) -> tuple[Path, dict[str, Any]]:
 def _consume_context(path: Path) -> None:
     """Atomically make a valid context single-use before routing it."""
 
-    consumed_path = path.with_name(path.name + ".consumed")
-    if consumed_path.exists():
-        raise AdapterError("typed route context was already consumed")
+    consumed_path = path.with_name(f"{path.name}.consumed.{uuid.uuid4().hex}")
     try:
         path.rename(consumed_path)
     except OSError as exc:
