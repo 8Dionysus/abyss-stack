@@ -65,6 +65,8 @@ class FakeRpc:
         self.fallback_active_turn = fallback_active_turn
         self.goal_set_status = goal_set_status
         self.calls: list[tuple[str, dict[str, object] | None]] = []
+        self.request_issued_callback = None
+        self._counter = 0
 
     def __enter__(self) -> "FakeRpc":
         return self
@@ -76,6 +78,7 @@ class FakeRpc:
         self.calls.append((method, params))
 
     def call(self, method: str, params: dict[str, object] | None = None) -> dict[str, object]:
+        self._counter += 1
         self.calls.append((method, params))
         if method == "initialize":
             return {"protocolVersion": "1"}
@@ -87,6 +90,18 @@ class FakeRpc:
                 }
             }
         if method == "thread/goal/set":
+            if self.request_issued_callback is not None:
+                self.request_issued_callback(
+                    method,
+                    params,
+                    self._counter,
+                    {
+                        "jsonrpc": "2.0",
+                        "id": self._counter,
+                        "method": method,
+                        "params": params,
+                    },
+                )
             return {
                 "goal": {
                     "threadId": self.thread_id,
@@ -428,6 +443,7 @@ def test_run_pause_reconciles_reserved_mutation_after_receipt_publication_failur
     reserved = json.loads(pause_path.read_text(encoding="utf-8"))
     assert reserved["state"] == "reserved"
     assert reserved["precondition"]["goal_status"] == "active"
+    assert reserved["mutation_dispatched"]["method"] == "thread/goal/set"
     assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
 
     fake.goal_status = "paused"
@@ -436,6 +452,92 @@ def test_run_pause_reconciles_reserved_mutation_after_receipt_publication_failur
     assert second["recovery"]["mode"] == "ambiguous_post_mutation"
     assert second["lifecycle"]["response_available"] is False
     assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
+
+
+def test_run_pause_refuses_paused_goal_without_mutation_dispatch_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner_path = tmp_path / "pause-owner.json"
+    owner_value = pause_owner(
+        goal="goal-pause-unproven",
+        thread="thread-pause-unproven",
+        endpoint="unix:/run/user/1000/example.sock",
+    )
+    owner_path.write_text(
+        json.dumps(owner_value, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    pause_path = tmp_path / "pause-receipt.json"
+    endpoint = tmp_path / "app-server.sock"
+    fake = FakeRpc(
+        endpoint,
+        active_turn=None,
+        goal_status="active",
+        thread_id="thread-pause-unproven",
+    )
+    owner_digest = MODULE._sha256_bytes(owner_path.read_bytes())
+    binding = {
+        "owner_ref": str(owner_path.resolve()),
+        "owner_sha256": owner_digest,
+        "pause_receipt_ref": str(pause_path.resolve()),
+    }
+    reservation = MODULE._pause_reservation(pause_path, binding=binding)
+    precondition = MODULE._pause_precondition(
+        {"goal": {"threadId": "thread-pause-unproven", "status": "active"}}
+    )
+    MODULE._replace_json(
+        pause_path,
+        {
+            **reservation,
+            "prepared_at": "2026-08-22T00:00:00Z",
+            "precondition": precondition,
+            "transport": {
+                "kind": "codex_app_server_websocket_unix",
+                "endpoint": str(endpoint),
+            },
+        },
+        "canonical Goal pause precondition reservation",
+    )
+    fake.goal_status = "paused"
+    monkeypatch.setattr(
+        MODULE,
+        "discover_app_server_socket",
+        lambda _owner: (endpoint, "explicit-endpoint"),
+    )
+    pause_impl = MODULE.pause_goal
+
+    def pause_once(
+        owner_value: dict[str, object],
+        owner_file: Path,
+        target: Path,
+        *,
+        owner_bytes: bytes,
+        reservation_path: Path | None = None,
+        reservation: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        return pause_impl(
+            owner_value,
+            owner_file,
+            target,
+            owner_bytes=owner_bytes,
+            reservation_path=reservation_path,
+            reservation=reservation,
+            rpc_factory=lambda _path: fake,
+        )
+
+    monkeypatch.setattr(MODULE, "pause_goal", pause_once)
+
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="mutation-dispatch evidence",
+    ):
+        MODULE.run_pause(
+            SimpleNamespace(
+                pause_owner=str(owner_path),
+                pause_receipt=str(pause_path),
+            )
+        )
+    assert not any(method == "thread/goal/set" for method, _params in fake.calls)
 
 
 def test_delivery_steers_active_turn_from_bounded_turn_page(

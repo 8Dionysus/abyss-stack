@@ -3,6 +3,51 @@
   "$id": "https://abyss.local/schemas/external-codex-pause-receipt.schema.json",
   "title": "Abyss external Codex Goal pause receipt",
   "type": "object",
+  "$defs": {
+    "mutation_dispatched": {
+      "type": "object",
+      "required": [
+        "attempt_id",
+        "issued_at",
+        "method",
+        "request_id",
+        "params",
+        "params_sha256",
+        "request_sha256"
+      ],
+      "properties": {
+        "attempt_id": {"type": "string", "minLength": 1},
+        "issued_at": {"type": "string", "minLength": 1},
+        "method": {"const": "thread/goal/set"},
+        "request_id": {"type": "integer", "minimum": 1},
+        "params": {
+          "type": "object",
+          "required": ["threadId", "status"],
+          "properties": {
+            "threadId": {"type": "string", "minLength": 1},
+            "status": {"const": "paused"}
+          }
+        },
+        "params_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "request_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "required": [
+        "mode",
+        "mutation_response_available",
+        "reconciled_by",
+        "mutation_dispatched"
+      ],
+      "properties": {
+        "mode": {"const": "ambiguous_post_mutation"},
+        "mutation_response_available": {"const": false},
+        "reconciled_by": {"const": "thread/goal/get"},
+        "mutation_dispatched": {"$ref": "#/$defs/mutation_dispatched"}
+      }
+    }
+  },
   "required": [
     "schema_version",
     "generated_at",
@@ -60,15 +105,35 @@
     "lifecycle_method": {"const": "thread/goal/set"},
     "lifecycle": {
       "type": "object",
-      "required": ["accepted", "initialize", "goal_get", "goal", "goal_response_sha256"],
+      "required": [
+        "accepted",
+        "initialize",
+        "goal_get",
+        "goal",
+        "goal_response_sha256",
+        "precondition",
+        "response_available"
+      ],
       "properties": {
         "accepted": {"const": true},
         "initialize": {"type": "object"},
         "goal_get": {"type": "object"},
         "goal": {"type": "object"},
-        "goal_response_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        "goal_response_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "precondition": {
+          "type": "object",
+          "required": ["goal_status", "goal_get", "goal_response_sha256"],
+          "properties": {
+            "goal_status": {"const": "active"},
+            "goal_get": {"type": "object"},
+            "goal_response_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+          }
+        },
+        "response_available": {"type": "boolean"},
+        "mutation_dispatched": {"$ref": "#/$defs/mutation_dispatched"}
       }
     },
+    "recovery": {"$ref": "#/$defs/recovery"},
     "actions": {
       "type": "object",
       "required": ["goal_lifecycle_set"],
@@ -85,5 +150,29 @@
     "paused": {"const": true},
     "owner_acceptance": {"const": "separate"},
     "semantic_acceptance": {"const": "separate"}
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "lifecycle": {
+            "required": ["response_available"],
+            "properties": {"response_available": {"const": false}}
+          }
+        }
+      },
+      "then": {"required": ["recovery"]}
+    },
+    {
+      "if": {
+        "properties": {
+          "lifecycle": {
+            "required": ["response_available"],
+            "properties": {"response_available": {"const": true}}
+          }
+        }
+      },
+      "then": {"not": {"required": ["recovery"]}}
+    }
+  ]
 }

@@ -57,13 +57,17 @@ Goal first, refuses anything other than `active`, calls the supported
 `abyss_stack_external_codex_pause_receipt_v1`. It does not inject terminal
 input, inspect or signal PIDs, use GDB, start or steer a turn, deliver a wake,
 or close any holder. A receipt proves only the runtime lifecycle transition;
-wake delivery, holder closure, semantic re-entry, and owner acceptance require
-their own later evidence. If the pause receipt is absent or the Goal state is
-not exactly bound, stop and route the state to the runtime owner. A reserved
-pause keeps the active precondition before mutation. If a retry observes the
-exact Goal already paused, it may publish an `ambiguous_post_mutation`
-recovery receipt from a read-only `thread/goal/get` without issuing a second
-lifecycle set; a reserved pause without that precondition fails closed.
+ wake delivery, holder closure, semantic re-entry, and owner acceptance require
+ their own later evidence. If the pause receipt is absent or the Goal state is
+ not exactly bound, stop and route the state to the runtime owner. A reserved
+ pause keeps the active precondition before mutation and records a dispatch
+ marker only after this attempt has issued the exact WebSocket
+ `thread/goal/set` request. If a retry observes the exact Goal already paused,
+ it may publish an `ambiguous_post_mutation` recovery receipt from a read-only
+ `thread/goal/get` without issuing a second lifecycle set only when that marker
+ matches the attempt and request. A reserved pause without the precondition or
+ dispatch evidence fails closed, including when another controller may have
+ paused the Goal after this attempt stopped before issuing its request.
 
 For a parent continuation, inspect only its exact state root and re-entry ID:
 

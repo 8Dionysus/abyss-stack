@@ -8,7 +8,7 @@
   "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
   "default_limit_bytes": 1048576,
   "head_family_digest": "823bca8de848acd8d5bc3b00197132a3225b53144bf00ef655fbfd4f5c6a20b9",
-  "reason": "Refresh the exact owner portable family after adding the owner-bound external Goal pause adapter, recovery evidence, and source contract notes on current main.",
+  "reason": "Refresh the exact owner portable family after hardening Goal pause recovery dispatch evidence and the public receipt schema on current main.",
   "repo": "abyss-stack",
   "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
   "scope": "generated_delta_and_tracked_size",

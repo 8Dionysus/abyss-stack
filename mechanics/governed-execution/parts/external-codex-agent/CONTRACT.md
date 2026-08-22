@@ -126,11 +126,13 @@ Operations are:
   `active_to_paused` transition, transport response digest, and separate
 owner/semantic-acceptance markers. It does not read or start a turn, deliver
 a handoff, authorize or close a holder, or claim semantic acceptance. The
-reservation also stores the exact active precondition before the mutation. If
-the mutation response or receipt publication is lost, a retry observes the
-same bound Goal with read-only `thread/goal/get` and emits an
-`ambiguous_post_mutation` recovery receipt without repeating
-`thread/goal/set`; a reservation without the active precondition fails closed.
+reservation also stores the exact active precondition before the mutation and
+a durable dispatch marker only after the WebSocket request frame has been
+issued by that attempt. If the mutation response or receipt publication is
+lost, a retry observes the same bound Goal with read-only `thread/goal/get`
+and emits an `ambiguous_post_mutation` recovery receipt without repeating
+`thread/goal/set`, but only when the matching dispatch marker is present. A
+reservation without the active precondition or dispatch evidence fails closed.
 - `aoa-external-codex-return return --return-owner ... --handoff ...
   --holder-receipt ... --return-receipt ... --authorization ...
   --closure-receipt ...` is the canonical Codex return leaf. It validates the

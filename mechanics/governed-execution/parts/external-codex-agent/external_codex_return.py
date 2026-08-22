@@ -366,6 +366,9 @@ class UnixWebSocketRpc:
         self.socket: socket.socket | None = None
         self._buffer = b""
         self._counter = 0
+        self.request_issued_callback: Callable[
+            [str, dict[str, object] | None, int, dict[str, object]], None
+        ] | None = None
 
     def set_timeout(self, timeout: float) -> None:
         """Extend a connected read timeout for one bounded history lookup."""
@@ -574,6 +577,8 @@ class UnixWebSocketRpc:
         if params is not None:
             payload["params"] = params
         self._send_json(payload)
+        if self.request_issued_callback is not None:
+            self.request_issued_callback(method, params, request_id, payload)
         response = self._receive_json(request_id)
         if "error" in response:
             raise ExternalCodexReturnError(
@@ -870,6 +875,43 @@ def _validated_pause_precondition(reservation: dict[str, Any]) -> dict[str, Any]
     return precondition
 
 
+def _validated_pause_mutation(
+    mutation: object,
+    *,
+    owner: dict[str, Any],
+    attempt_id: object,
+) -> dict[str, Any]:
+    if not isinstance(mutation, dict):
+        raise ExternalCodexReturnError(
+            "reserved Goal pause lacks durable mutation-dispatch evidence"
+        )
+    expected_params = {"threadId": owner["thread_id"], "status": "paused"}
+    if (
+        not isinstance(attempt_id, str)
+        or not attempt_id
+        or mutation.get("attempt_id") != attempt_id
+        or mutation.get("method") != "thread/goal/set"
+        or not isinstance(mutation.get("issued_at"), str)
+        or not isinstance(mutation.get("request_id"), int)
+        or isinstance(mutation.get("request_id"), bool)
+        or mutation.get("request_id", 0) < 1
+        or mutation.get("params") != expected_params
+        or mutation.get("params_sha256")
+        != _sha256_bytes(_canonical_bytes(expected_params))
+        or not isinstance(mutation.get("request_sha256"), str)
+        or len(mutation["request_sha256"]) != 71
+        or not mutation["request_sha256"].startswith("sha256:")
+        or any(
+            character not in "0123456789abcdef"
+            for character in mutation["request_sha256"][7:]
+        )
+    ):
+        raise ExternalCodexReturnError(
+            "reserved Goal pause mutation-dispatch evidence is invalid"
+        )
+    return mutation
+
+
 def _pause_receipt(
     *,
     owner: dict[str, Any],
@@ -883,6 +925,7 @@ def _pause_receipt(
     goal_status: str,
     identity_source: str,
     precondition: dict[str, Any],
+    mutation_dispatched: dict[str, Any] | None = None,
     recovery: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     lifecycle: dict[str, Any] = {
@@ -896,6 +939,8 @@ def _pause_receipt(
         "precondition": precondition,
         "response_available": recovery is None,
     }
+    if mutation_dispatched is not None:
+        lifecycle["mutation_dispatched"] = mutation_dispatched
     receipt: dict[str, Any] = {
         "schema_version": PAUSE_RECEIPT_SCHEMA_VERSION,
         "generated_at": _utc_now(),
@@ -941,8 +986,9 @@ def pause_goal(
 
     This is deliberately separate from ``deliver_handoff``: it changes only
     Goal lifecycle state and emits no wake message, turn, holder close, or
-    acceptance claim.  When a prior process reached ``thread/goal/set`` but
-    lost its response, a durable active precondition permits a read-only
+    acceptance claim. When a prior process issued the exact
+    ``thread/goal/set`` frame but lost its response, a durable active
+    precondition plus post-send dispatch marker permits a read-only
     reconciliation of the already-paused Goal without issuing a second set.
     """
 
@@ -974,6 +1020,11 @@ def pause_goal(
                     "Codex app-server Goal is not pausable from active state; it is already paused without a resumable pause reservation"
                 )
             precondition = _validated_pause_precondition(reservation)
+            mutation_dispatched = _validated_pause_mutation(
+                reservation.get("mutation_dispatched"),
+                owner=owner,
+                attempt_id=reservation.get("attempt_id"),
+            )
             return _pause_receipt(
                 owner=owner,
                 owner_path=owner_path,
@@ -986,10 +1037,12 @@ def pause_goal(
                 goal_status="paused",
                 identity_source=goal_identity_source,
                 precondition=precondition,
+                mutation_dispatched=mutation_dispatched,
                 recovery={
                     "mode": "ambiguous_post_mutation",
                     "mutation_response_available": False,
                     "reconciled_by": "thread/goal/get",
+                    "mutation_dispatched": mutation_dispatched,
                 },
             )
         if goal_before_status != "active":
@@ -1003,23 +1056,79 @@ def pause_goal(
                 raise ExternalCodexReturnError(
                     "Goal pause reservation is required when a reservation path is supplied"
                 )
+            attempt_id = secrets.token_hex(16)
+            reservation_without_attempt = {
+                key: value
+                for key, value in reservation.items()
+                if key
+                not in {
+                    "attempt_id",
+                    "prepared_at",
+                    "precondition",
+                    "transport",
+                    "mutation_dispatched",
+                }
+            }
+            reservation.clear()
+            reservation.update(reservation_without_attempt)
+            reservation["attempt_id"] = attempt_id
+            prepared_reservation = {
+                **reservation,
+                "prepared_at": _utc_now(),
+                "precondition": precondition,
+                "transport": {
+                    "kind": "codex_app_server_websocket_unix",
+                    "endpoint": str(endpoint),
+                },
+            }
+            reservation.clear()
+            reservation.update(prepared_reservation)
             _replace_json(
                 reservation_path,
-                {
-                    **reservation,
-                    "prepared_at": _utc_now(),
-                    "precondition": precondition,
-                    "transport": {
-                        "kind": "codex_app_server_websocket_unix",
-                        "endpoint": str(endpoint),
-                    },
-                },
+                prepared_reservation,
                 "canonical Goal pause precondition reservation",
             )
-        goal_response = rpc.call(
-            "thread/goal/set",
-            {"threadId": owner["thread_id"], "status": "paused"},
-        )
+        pause_params = {"threadId": owner["thread_id"], "status": "paused"}
+
+        def record_request_issued(
+            method: str,
+            params: dict[str, object] | None,
+            request_id: int,
+            payload: dict[str, object],
+        ) -> None:
+            if reservation_path is None or reservation is None:
+                return
+            if method != "thread/goal/set" or params != pause_params:
+                raise ExternalCodexReturnError(
+                    "Codex app-server pause mutation dispatch identity mismatched"
+                )
+            attempt_id = reservation.get("attempt_id")
+            if not isinstance(attempt_id, str) or not attempt_id:
+                raise ExternalCodexReturnError(
+                    "Goal pause mutation dispatch lacks an attempt identity"
+                )
+            mutation = {
+                "attempt_id": attempt_id,
+                "issued_at": _utc_now(),
+                "method": method,
+                "request_id": request_id,
+                "params": pause_params,
+                "params_sha256": _sha256_bytes(_canonical_bytes(pause_params)),
+                "request_sha256": _sha256_bytes(_canonical_bytes(payload)),
+            }
+            _replace_json(
+                reservation_path,
+                {**reservation, "mutation_dispatched": mutation},
+                "canonical Goal pause mutation dispatch",
+            )
+            reservation["mutation_dispatched"] = mutation
+
+        previous_callback = getattr(rpc, "request_issued_callback", None)
+        setattr(rpc, "request_issued_callback", record_request_issued)
+        try:
+            goal_response = rpc.call("thread/goal/set", pause_params)
+        finally:
+            setattr(rpc, "request_issued_callback", previous_callback)
         goal = _goal_object(goal_response, "thread/goal/set")
         goal_identity_source = _validate_goal_binding(goal, owner)
         goal_status = _string_at(goal, ("status",))
@@ -1040,6 +1149,11 @@ def pause_goal(
         goal_status=goal_status,
         identity_source=goal_identity_source,
         precondition=precondition,
+        mutation_dispatched=(
+            reservation.get("mutation_dispatched")
+            if reservation is not None
+            else None
+        ),
     )
 
 
@@ -1692,6 +1806,7 @@ def _pause_reservation(
         "schema_version": PAUSE_RECEIPT_SCHEMA_VERSION,
         "state": "reserved",
         "reserved_at": _utc_now(),
+        "attempt_id": secrets.token_hex(16),
         **binding,
     }
     _write_new_json(path, reservation, "canonical Goal pause receipt reservation")
@@ -1737,6 +1852,11 @@ def _validate_pause_receipt(
     actions = receipt.get("actions")
     observed = receipt.get("observed")
     precondition = lifecycle.get("precondition") if isinstance(lifecycle, dict) else None
+    mutation_dispatched = (
+        lifecycle.get("mutation_dispatched")
+        if isinstance(lifecycle, dict)
+        else None
+    )
     recovery = receipt.get("recovery")
     if (
         receipt.get("lifecycle_method") != "thread/goal/set"
@@ -1747,6 +1867,10 @@ def _validate_pause_receipt(
         or precondition.get("goal_status") != "active"
         or not isinstance(precondition.get("goal_get"), dict)
         or not isinstance(precondition.get("goal_response_sha256"), str)
+        or (
+            mutation_dispatched is not None
+            and not isinstance(mutation_dispatched, dict)
+        )
         or not isinstance(actions, dict)
         or actions.get("goal_lifecycle_set") is not True
         or not isinstance(observed, dict)
@@ -1765,10 +1889,27 @@ def _validate_pause_receipt(
             or recovery.get("mutation_response_available") is not False
             or recovery.get("reconciled_by") != "thread/goal/get"
             or lifecycle.get("response_available") is not False
+            or not isinstance(recovery.get("mutation_dispatched"), dict)
+            or recovery.get("mutation_dispatched") != mutation_dispatched
         ):
             raise ExternalCodexReturnError(
                 "canonical Goal pause recovery evidence is incomplete"
             )
+        _validated_pause_mutation(
+            mutation_dispatched,
+            owner=owner,
+            attempt_id=mutation_dispatched.get("attempt_id")
+            if isinstance(mutation_dispatched, dict)
+            else None,
+        )
+    elif mutation_dispatched is not None:
+        _validated_pause_mutation(
+            mutation_dispatched,
+            owner=owner,
+            attempt_id=mutation_dispatched.get("attempt_id")
+            if isinstance(mutation_dispatched, dict)
+            else None,
+        )
     return receipt
 
 
