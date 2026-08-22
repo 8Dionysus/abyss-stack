@@ -43,6 +43,14 @@ owner of responsibility classification and role-first meaning; this adapter
 does not choose a role, model, runtime, workspace, or actor and never copies
 opaque `tool_input` into its output.
 
+Each valid context file is consumed by an atomic rename before the SDK route,
+making the classification single-use for one collaboration attempt. When
+`AOA_SDK_SOURCE_ROOT` is supplied, the adapter checks both the package presence
+and the source location of the imported SDK modules. The fragment gives the
+adapter a ten-second native Codex timeout, while the adapter emits a deny after
+its five-second inner route bound so a stalled SDK path cannot fall through as
+an unblocked hook timeout.
+
 Missing or malformed typed context fails closed for a recognized collaboration
 tool without inventing Goal or holder identity. A classified
 `not_independent` result is the only posture that permits the Codex-local

@@ -212,7 +212,7 @@ def test_stack_agent_fragment_preserves_existing_native_handlers(
                 {
                     "type": "command",
                     "command": f'/usr/bin/python3 "{AGENT_ADAPTER_PATH}"',
-                    "timeout": 5,
+                    "timeout": 10,
                     "statusMessage": "Routing Codex collaboration tool through AoA",
                 }
             ],

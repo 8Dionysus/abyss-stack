@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import signal
 import sys
 from typing import Any, Mapping
 
@@ -23,6 +24,7 @@ CODEX_PRE_TOOL_EVENT = "PreToolUse"
 CODEX_AGENT_TOOL_NAMESPACE = "collaboration"
 MAX_EVENT_BYTES = 1024 * 1024
 MAX_CONTEXT_BYTES = 256 * 1024
+INTERNAL_TIMEOUT_SECONDS = 5.0
 
 # These are Codex 0.148.0's collaboration tool names as observed in the
 # PreToolUse wire contract.  The namespace check below fails closed for a new
@@ -57,6 +59,14 @@ CONTEXT_FIELDS = frozenset(
 
 class AdapterError(ValueError):
     """A malformed or unavailable adapter input."""
+
+
+class AdapterTimeout(AdapterError):
+    """The bounded inner route expired before it could return a decision."""
+
+
+def _raise_timeout(_signum: int, _frame: Any) -> None:
+    raise AdapterTimeout("inner route timeout; denied before Codex hook timeout")
 
 
 def _deny(reason: str) -> dict[str, Any]:
@@ -108,6 +118,7 @@ def _tool_class(tool_name: Any) -> str:
 
 def _load_sdk(environ: Mapping[str, str]) -> tuple[Any, Any, Any, Any, Any]:
     source_root = environ.get("AOA_SDK_SOURCE_ROOT")
+    source_path: Path | None = None
     if source_root:
         source_path = Path(source_root).expanduser()
         if not source_path.is_absolute() or not source_path.is_dir():
@@ -115,14 +126,37 @@ def _load_sdk(environ: Mapping[str, str]) -> tuple[Any, Any, Any, Any, Any]:
         src_path = source_path / "src"
         if not src_path.is_dir():
             raise AdapterError("AOA_SDK_SOURCE_ROOT has no src directory")
+        if not (src_path / "aoa_sdk").is_dir():
+            raise AdapterError("AOA_SDK_SOURCE_ROOT has no aoa_sdk package")
         if str(src_path) not in sys.path:
             sys.path.insert(0, str(src_path))
     try:
+        import aoa_sdk
+        import aoa_sdk.control_plane as control_plane_module
+        import aoa_sdk.contracts.agent_tool_routing as agent_tool_routing_module
+        import aoa_sdk.workspace.discovery as workspace_discovery_module
         from aoa_sdk.control_plane import ControlPlaneAPI, default_agent_tool_routing_provenance
         from aoa_sdk.contracts.agent_tool_routing import AgentToolRoutingIntent
         from aoa_sdk.workspace.discovery import Workspace
     except (ImportError, ModuleNotFoundError) as exc:
         raise AdapterError("aoa-sdk is unavailable") from exc
+    if source_path is not None:
+        source_package = (source_path / "src" / "aoa_sdk").resolve()
+        module_files = (
+            getattr(aoa_sdk, "__file__", None),
+            getattr(control_plane_module, "__file__", None),
+            getattr(agent_tool_routing_module, "__file__", None),
+            getattr(workspace_discovery_module, "__file__", None),
+        )
+        try:
+            resolved_files = tuple(Path(value).resolve() for value in module_files)
+        except (TypeError, ValueError, OSError) as exc:
+            raise AdapterError("selected aoa-sdk modules have no valid source files") from exc
+        if any(
+            not file_path.is_relative_to(source_package)
+            for file_path in resolved_files
+        ):
+            raise AdapterError("imported aoa-sdk modules escaped AOA_SDK_SOURCE_ROOT")
     return (
         ControlPlaneAPI,
         default_agent_tool_routing_provenance,
@@ -132,10 +166,11 @@ def _load_sdk(environ: Mapping[str, str]) -> tuple[Any, Any, Any, Any, Any]:
     )
 
 
-def _load_context(environ: Mapping[str, str]) -> dict[str, Any]:
+def _load_context(environ: Mapping[str, str]) -> tuple[Path, dict[str, Any]]:
     path_value = environ.get("AOA_AGENT_TOOL_ROUTING_CONTEXT_FILE")
     if not path_value:
         raise AdapterError("typed Goal/current-holder route context is unavailable")
+    path = Path(path_value)
     context = _read_json_file(
         path_value,
         label="typed route context",
@@ -145,7 +180,19 @@ def _load_context(environ: Mapping[str, str]) -> dict[str, Any]:
         raise AdapterError("typed route context fields are not exact")
     if context.get("schema_version") != CONTEXT_SCHEMA_VERSION:
         raise AdapterError("typed route context schema is unsupported")
-    return context
+    return path, context
+
+
+def _consume_context(path: Path) -> None:
+    """Atomically make a valid context single-use before routing it."""
+
+    consumed_path = path.with_name(path.name + ".consumed")
+    if consumed_path.exists():
+        raise AdapterError("typed route context was already consumed")
+    try:
+        path.rename(consumed_path)
+    except OSError as exc:
+        raise AdapterError("typed route context could not be consumed safely") from exc
 
 
 def _build_intent(
@@ -222,7 +269,8 @@ def route_agent_tool_event(
         )
 
     try:
-        context = _load_context(environment)
+        context_path, context = _load_context(environment)
+        _consume_context(context_path)
         (
             control_plane_api,
             provenance_factory,
@@ -290,6 +338,14 @@ def handle_event(
 
 
 def main() -> int:
+    timer_available = hasattr(signal, "SIGALRM") and hasattr(signal, "setitimer")
+    previous_handler: Any = None
+    if timer_available:
+        previous_handler = signal.signal(
+            signal.SIGALRM,
+            _raise_timeout,
+        )
+        signal.setitimer(signal.ITIMER_REAL, INTERNAL_TIMEOUT_SECONDS)
     try:
         raw = sys.stdin.buffer.read(MAX_EVENT_BYTES + 1)
         if len(raw) > MAX_EVENT_BYTES:
@@ -306,6 +362,10 @@ def main() -> int:
             "Codex PreToolUse adapter failed closed before execution "
             f"({type(exc).__name__})."
         )
+    finally:
+        if timer_available:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            signal.signal(signal.SIGALRM, previous_handler)
     sys.stdout.write(json.dumps(output, sort_keys=True, separators=(",", ":")))
     sys.stdout.write("\n")
     return 0

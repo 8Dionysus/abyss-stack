@@ -128,6 +128,36 @@ def test_typed_not_independent_allows_only_sdk_compatibility_posture(
         environ=environment(tmp_path, context_path),
     ) == {}
 
+    reused = ADAPTER.handle_event(
+        event(),
+        environ=environment(tmp_path, context_path),
+    )
+    assert reused["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "regular absolute file" in reused["hookSpecificOutput"][
+        "permissionDecisionReason"
+    ]
+
+
+def test_selected_sdk_root_must_contain_the_imported_package(
+    tmp_path: Path,
+) -> None:
+    context_path = write_context(tmp_path, context())
+    invalid_sdk_root = tmp_path / "sdk-without-package"
+    (invalid_sdk_root / "src").mkdir(parents=True)
+
+    output = ADAPTER.handle_event(
+        event(),
+        environ={
+            **environment(tmp_path, context_path),
+            "AOA_SDK_SOURCE_ROOT": str(invalid_sdk_root),
+        },
+    )
+
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "no aoa_sdk package" in output["hookSpecificOutput"][
+        "permissionDecisionReason"
+    ]
+
 
 def test_non_agent_tool_passes_without_route_context() -> None:
     assert ADAPTER.handle_event(

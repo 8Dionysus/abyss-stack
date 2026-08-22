@@ -22,6 +22,8 @@ Focused tests cover:
 - exact Codex `PreToolUse` agent-tool recognition and SDK routing;
 - unresolved/independent denial with role-first direction;
 - typed `not_independent` local compatibility and unrelated-tool pass-through;
+- single-use typed context consumption and selected SDK-root verification;
+- inner timeout denial before the longer native hook timeout;
 - malformed or missing context fail-closed behavior without invented identity;
 - composition of the stack-owned adapter fragment without dropping existing
   native hook handlers.

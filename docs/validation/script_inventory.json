@@ -245,9 +245,36 @@
       "disposition": "keep"
     },
     {
+      "family": "config-projection-codex-hooks-agent-routing-adapter",
+      "paths": [
+        "mechanics/config-projection/parts/codex-hooks/scripts/codex_pretool_agent_routing.py"
+      ],
+      "organ_lane": "mechanic/package-local Codex wire adapter",
+      "owner_surface": "mechanics/config-projection/parts/codex-hooks/README.md",
+      "source_truth": [
+        "mechanics/config-projection/parts/codex-hooks/CONTRACT.md",
+        "mechanics/config-projection/parts/codex-hooks/config/abyss-stack-agent-tool-routing.fragment.json",
+        "mechanics/config-projection/parts/codex-hooks/schemas/codex-pretool-agent-routing-context.schema.json",
+        "aoa-sdk typed pre-tool routing contract"
+      ],
+      "reads": [
+        "bounded Codex PreToolUse JSON event on stdin",
+        "explicit typed Goal/current-holder route context file",
+        "selected aoa-sdk source root and workspace"
+      ],
+      "writes": [
+        "native Codex allow or deny JSON on stdout",
+        "single-use context consumed marker beside the supplied context file"
+      ],
+      "side_effects": "read-only route decision for unrelated tools; recognized collaboration tools atomically consume the exact supplied typed context before the SDK call",
+      "validation_lane": "mechanics-part-local/tests/release",
+      "ci_inclusion": "focused mechanic test plus source-fast test-inventory and release pytest lanes",
+      "test_target": "mechanics/config-projection/parts/codex-hooks/tests/test_codex_pretool_agent_routing.py",
+      "disposition": "add"
+    },
+    {
       "family": "config-projection-codex-hooks-compositor",
       "paths": [
-        "mechanics/config-projection/parts/codex-hooks/scripts/codex_pretool_agent_routing.py",
         "mechanics/config-projection/parts/codex-hooks/scripts/render_codex_hooks.py"
       ],
       "organ_lane": "mechanic/package-local config projection",

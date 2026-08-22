@@ -15,7 +15,7 @@
           {
             "type": "command",
             "command": "/usr/bin/python3 \"{{AOA_CODEX_AGENT_ROUTING_HOOK}}\"",
-            "timeout": 5,
+            "timeout": 10,
             "statusMessage": "Routing Codex collaboration tool through AoA"
           }
         ]

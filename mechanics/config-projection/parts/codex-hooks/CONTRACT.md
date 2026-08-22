@@ -36,9 +36,15 @@ responsibility owner. Its `PreToolUse` matcher covers the known
 The adapter must receive an exact typed context file through
 `AOA_AGENT_TOOL_ROUTING_CONTEXT_FILE`; it does not invent Goal or current-holder
 identity from a missing payload and does not copy opaque Codex `tool_input` into
-the hook response. It presents the typed intent to `aoa-sdk`, reflects only the
+the hook response. A valid context file is atomically consumed before the SDK
+call, so a stale classification cannot be reused for a later collaboration
+attempt. If `AOA_SDK_SOURCE_ROOT` is supplied, the adapter requires its
+`src/aoa_sdk` package and verifies that the imported SDK modules remain beneath
+that source root. It presents the typed intent to `aoa-sdk`, reflects only the
 SDK decision, and leaves responsibility classification and role-first dispatch
-to `aoa-agents`.
+to `aoa-agents`. The native hook timeout is longer than the adapter's bounded
+inner route timeout; an inner timeout emits a deny response before Codex can
+time out the hook itself.
 
 ## Output
 
