@@ -42,6 +42,7 @@
 - [ABYSS-STACK-D-0072 AoA 4PDA Connector MCP Access Plane](../ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0074 Telegram and Discord Connector MCP Access Planes](../ABYSS-STACK-D-0074-telegram-discord-connector-mcp-access-planes.md) (`docs/decisions/ABYSS-STACK-D-0074-telegram-discord-connector-mcp-access-planes.md`)
 - [ABYSS-STACK-D-0083 Tree of Sophia Foundation Laboratory Boundary](../ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md) (`docs/decisions/ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md`)
+- [ABYSS-STACK-D-0133 Owner-Owned Pytest Temporary Namespaces](../ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md`)
 
 ## runtime topology
 
@@ -1043,6 +1044,10 @@
 
 - [ABYSS-STACK-D-0110 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md`)
 
+## temporary namespace isolation
+
+- [ABYSS-STACK-D-0133 Owner-Owned Pytest Temporary Namespaces](../ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md`)
+
 ## terminal closeout
 
 - [ABYSS-STACK-D-0124 Visible Holder Terminal Lifecycle Identity](../ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md) (`docs/decisions/ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md`)
@@ -1066,3 +1071,7 @@
 ## unmodeled surface detection
 
 - [ABYSS-STACK-D-0067 Decision Surface Coverage Registry](../ABYSS-STACK-D-0067-decision-surface-coverage-registry.md) (`docs/decisions/ABYSS-STACK-D-0067-decision-surface-coverage-registry.md`)
+
+## upstream pytest lifecycle
+
+- [ABYSS-STACK-D-0133 Owner-Owned Pytest Temporary Namespaces](../ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md`)

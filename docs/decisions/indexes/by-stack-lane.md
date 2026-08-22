@@ -345,6 +345,7 @@
 
 - [ABYSS-STACK-D-0120 Schedule Full Pytest With Bounded Work Stealing](../ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md) (`docs/decisions/ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md`)
 - [ABYSS-STACK-D-0130 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0130-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0130-frontload-release-artifact-guard.md`)
+- [ABYSS-STACK-D-0133 Owner-Owned Pytest Temporary Namespaces](../ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md`)
 
 ## release/tooling
 
@@ -441,6 +442,7 @@
 
 - [ABYSS-STACK-D-0120 Schedule Full Pytest With Bounded Work Stealing](../ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md) (`docs/decisions/ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md`)
 - [ABYSS-STACK-D-0130 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0130-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0130-frontload-release-artifact-guard.md`)
+- [ABYSS-STACK-D-0133 Owner-Owned Pytest Temporary Namespaces](../ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md`)
 
 ## tos-graph
 
@@ -462,6 +464,7 @@
 - [ABYSS-STACK-D-0127 Bind Resume Private-Git Observation to the Accepted Actor Final](../ABYSS-STACK-D-0127-bind-resume-private-git-to-accepted-actor-final.md) (`docs/decisions/ABYSS-STACK-D-0127-bind-resume-private-git-to-accepted-actor-final.md`)
 - [ABYSS-STACK-D-0129 Canonical External Actor Return Leaf](../ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md) (`docs/decisions/ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md`)
 - [ABYSS-STACK-D-0130 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0130-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0130-frontload-release-artifact-guard.md`)
+- [ABYSS-STACK-D-0133 Owner-Owned Pytest Temporary Namespaces](../ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md`)
 
 ## validation lane
 

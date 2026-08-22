@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import getpass
 import json
 from pathlib import Path
+import re
+from types import SimpleNamespace
 
 import pytest
 
@@ -229,10 +232,12 @@ def test_pytest_process_partitions_queue_measured_slow_units_first() -> None:
     assert all(nodeid.startswith(f"{slow_path}::") for nodeid in partitions[0])
 
 
-def test_pytest_scheduler_keeps_an_exact_serial_rollback() -> None:
+def test_pytest_scheduler_keeps_an_exact_serial_rollback(tmp_path: Path) -> None:
     rollback = run_pytest_lane.scheduler_plan("serial")
+    basetemp = tmp_path / "serial"
     command = run_pytest_lane.build_pytest_command(
         extra_args=["tests/test_validation_command_authority.py"],
+        basetemp=basetemp,
     )
 
     assert rollback["reason"] == "explicit_serial_rollback"
@@ -241,8 +246,267 @@ def test_pytest_scheduler_keeps_an_exact_serial_rollback() -> None:
         "-m",
         "pytest",
         "-q",
+        "--basetemp",
+        str(basetemp),
         "tests/test_validation_command_authority.py",
     ]
+
+
+def test_pytest_temp_parent_follows_upstream_runtime_environment(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    debug_root = tmp_path / "debug-root"
+    runtime_root = tmp_path / "runtime-root"
+    debug_root.mkdir()
+    runtime_root.mkdir()
+
+    monkeypatch.setenv("PYTEST_DEBUG_TEMPROOT", str(debug_root))
+    monkeypatch.setenv("TMPDIR", str(runtime_root))
+    assert run_pytest_lane.select_pytest_temp_parent() == debug_root
+
+    monkeypatch.setenv(
+        "PYTEST_DEBUG_TEMPROOT",
+        str(tmp_path / "missing-debug-root"),
+    )
+    assert run_pytest_lane.select_pytest_temp_parent() == runtime_root
+
+
+def test_pytest_invocation_namespaces_are_unique_and_cleaned(tmp_path: Path) -> None:
+    with run_pytest_lane.owned_pytest_temp_namespace(tmp_path) as first:
+        with run_pytest_lane.owned_pytest_temp_namespace(tmp_path) as second:
+            assert first != second
+            assert first.parent == second.parent == tmp_path
+            first_command = run_pytest_lane.build_pytest_command(
+                extra_args=["tests/test_validation_command_authority.py"],
+                basetemp=first,
+            )
+            second_command = run_pytest_lane.build_pytest_command(
+                extra_args=["tests/test_validation_command_authority.py"],
+                basetemp=second,
+            )
+            assert first_command[first_command.index("--basetemp") + 1] == str(first)
+            assert second_command[second_command.index("--basetemp") + 1] == str(second)
+    assert not first.exists()
+    assert not second.exists()
+
+
+def test_pytest_temp_cleanup_failure_leaves_owner_diagnostic(
+    monkeypatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def fail_cleanup(_namespace: Path) -> None:
+        raise OSError("simulated owner cleanup failure")
+
+    monkeypatch.setattr(run_pytest_lane, "_remove_owned_namespace", fail_cleanup)
+    monkeypatch.setattr(
+        run_pytest_lane,
+        "PYTEST_TEMP_CLEANUP_RETRY_DELAY_SECONDS",
+        0,
+    )
+
+    with pytest.raises(run_pytest_lane.PytestTempCleanupError) as raised:
+        with run_pytest_lane.owned_pytest_temp_namespace(tmp_path) as namespace:
+            (namespace / "owned-state").write_text("owned\n", encoding="utf-8")
+
+    result = raised.value.result
+    assert not result.ok
+    assert result.attempts == run_pytest_lane.PYTEST_TEMP_CLEANUP_ATTEMPTS
+    assert result.diagnostic == (
+        tmp_path / f".{namespace.name}.cleanup-failed.json"
+    )
+    payload = json.loads(result.diagnostic.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == (
+        run_pytest_lane.PYTEST_TEMP_CLEANUP_DIAGNOSTIC_SCHEMA
+    )
+    assert payload["status"] == "cleanup_failed"
+    assert payload["namespace"] == str(namespace)
+    assert len(payload["failures"]) == run_pytest_lane.PYTEST_TEMP_CLEANUP_ATTEMPTS
+    assert "[pytest-temp-cleanup-failed]" in capsys.readouterr().err
+
+
+def test_pytest_temp_cleanup_handles_readonly_owned_paths(tmp_path: Path) -> None:
+    namespace = tmp_path / "owned-namespace"
+    readonly_directory = namespace / "runtime" / "release"
+    readonly_directory.mkdir(parents=True)
+    (readonly_directory / "manifest.json").write_text("{}\n", encoding="utf-8")
+    (readonly_directory / "manifest.json").chmod(0o400)
+    readonly_directory.chmod(0o500)
+
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(namespace)
+
+    assert result.ok is True
+    assert not namespace.exists()
+
+
+def test_pytest_lane_returns_visible_failure_when_cleanup_is_unrecoverable(
+    monkeypatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv(run_pytest_lane.PYTEST_TEMP_ROOT_ENV, str(tmp_path))
+    monkeypatch.delenv(run_pytest_lane.PYTEST_TEMP_PARENT_ENV, raising=False)
+    monkeypatch.setattr(
+        run_pytest_lane,
+        "PYTEST_TEMP_CLEANUP_RETRY_DELAY_SECONDS",
+        0,
+    )
+
+    def fail_lane_cleanup(_namespace: Path) -> None:
+        raise OSError("simulated lane cleanup failure")
+
+    monkeypatch.setattr(
+        run_pytest_lane,
+        "_remove_owned_namespace",
+        fail_lane_cleanup,
+    )
+    monkeypatch.setattr(
+        run_pytest_lane.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=0),
+    )
+
+    assert (
+        run_pytest_lane.main(["--scheduler", "serial"])
+        == run_pytest_lane.PYTEST_TEMP_CLEANUP_FAILURE_EXIT_CODE
+    )
+    namespaces = list(tmp_path.glob(f"{run_pytest_lane.PYTEST_TEMP_PREFIX}*"))
+    assert len(namespaces) == 1
+    diagnostic = tmp_path / f".{namespaces[0].name}.cleanup-failed.json"
+    assert diagnostic.is_file()
+    assert "[error] pytest temporary namespace cleanup failed" in capsys.readouterr().err
+
+
+def test_pytest_collect_and_parallel_shards_get_distinct_basetemps(tmp_path: Path) -> None:
+    with run_pytest_lane.owned_pytest_temp_namespace(tmp_path) as collect:
+        with run_pytest_lane.owned_pytest_temp_namespace(tmp_path) as shard_a:
+            with run_pytest_lane.owned_pytest_temp_namespace(tmp_path) as shard_b:
+                commands = [
+                    run_pytest_lane._plugin_command(
+                        selection_args=["tests/test_validation_command_authority.py"],
+                        basetemp=collect,
+                        collect_only=True,
+                    ),
+                    run_pytest_lane._plugin_command(
+                        selection_args=[
+                            "tests/test_validation_command_authority.py::"
+                            "test_manifest_loads_and_names_expected_lanes"
+                        ],
+                        basetemp=shard_a,
+                    ),
+                    run_pytest_lane._plugin_command(
+                        selection_args=[
+                            "tests/test_validation_command_authority.py::"
+                            "test_ci_gate_dispatches_manifest_lane"
+                        ],
+                        basetemp=shard_b,
+                    ),
+                ]
+
+                basetemps = {
+                    Path(command[command.index("--basetemp") + 1])
+                    for command in commands
+                }
+                assert basetemps == {collect, shard_a, shard_b}
+                assert all("-p" in command for command in commands)
+
+
+def test_process_lane_allocates_and_cleans_collect_and_shard_basetemps(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    nodeids = [f"tests/test_lane.py::test_{index}" for index in range(4)]
+    commands: list[list[str]] = []
+
+    monkeypatch.setenv("PYTEST_DEBUG_TEMPROOT", str(tmp_path))
+    monkeypatch.delenv("TMPDIR", raising=False)
+    monkeypatch.setattr(run_pytest_lane, "PROCESS_SHARD_COUNT", 2)
+    monkeypatch.setattr(run_pytest_lane, "PROCESS_WORKER_LIMIT", 2)
+
+    def fake_run(command, *, env, **_kwargs):
+        commands.append(list(command))
+        run_pytest_lane.write_manifest(
+            Path(env[run_pytest_lane.PARTITION_BASELINE_ENV]),
+            nodeids,
+        )
+        return SimpleNamespace(returncode=0)
+
+    class FakeProcess:
+        def __init__(self, command, *, env, **_kwargs):
+            commands.append(list(command))
+            assignment = run_pytest_lane.read_manifest(
+                Path(env[run_pytest_lane.PARTITION_ASSIGNMENT_ENV])
+            )
+            run_pytest_lane.write_manifest(
+                Path(env[run_pytest_lane.PARTITION_OBSERVED_ENV]),
+                assignment,
+            )
+            Path(env[run_pytest_lane.PARTITION_RESULT_ENV]).write_text(
+                json.dumps(
+                    {
+                        "schema_version": run_pytest_lane.PARTITION_RESULT_SCHEMA,
+                        "exitstatus": 0,
+                        "stats": {"passed": len(assignment)},
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+        def poll(self):
+            return 0
+
+        def terminate(self):
+            raise AssertionError("the fake process should finish normally")
+
+        def wait(self):
+            return 0
+
+    monkeypatch.setattr(run_pytest_lane.subprocess, "run", fake_run)
+    monkeypatch.setattr(run_pytest_lane.subprocess, "Popen", FakeProcess)
+
+    assert run_pytest_lane.run_process_worksteal(extra_args=[]) == 0
+
+    basetemps = [
+        Path(command[command.index("--basetemp") + 1])
+        for command in commands
+    ]
+    assert len(basetemps) == 3
+    assert len(set(basetemps)) == len(basetemps)
+    assert all(path.parent == tmp_path for path in basetemps)
+    assert all(not path.exists() for path in basetemps)
+
+
+def test_pytest_lane_rejects_reusable_user_basetemp() -> None:
+    with pytest.raises(ValueError, match="fresh --basetemp"):
+        run_pytest_lane.build_pytest_command(
+            extra_args=["--basetemp", "reused"],
+            basetemp=Path("owned"),
+        )
+    with pytest.raises(ValueError, match="fresh --basetemp"):
+        run_pytest_lane._plugin_command(
+            selection_args=["--basetemp=reused"],
+            basetemp=Path("owned"),
+        )
+
+
+def test_pytest_lane_keeps_tombstone_semantics_upstream_and_paths_generic() -> None:
+    source = (REPO_ROOT / "scripts" / "run_pytest_lane.py").read_text(encoding="utf-8")
+
+    assert f"pytest-of-{getpass.getuser()}" not in source
+    assert "pytest-of-" not in source
+    assert "garbage-" not in source
+    assert "/srv/" not in source
+    assert "/home/" not in source
+    assert "ignore_cleanup_errors" not in source
+    assert re.search(
+        r"[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
+        source,
+        flags=re.IGNORECASE,
+    ) is None
+    assert "PYTEST_DEBUG_TEMPROOT" in source
+    assert "cleanup_pytest_temp_namespace" in source
 
 
 def test_pytest_scheduler_replays_failed_shard_log_at_closeout(

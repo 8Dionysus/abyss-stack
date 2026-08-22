@@ -3,10 +3,15 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter, deque
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass
 import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -45,6 +50,15 @@ PARTITION_OBSERVED_ENV = "ABYSS_STACK_PYTEST_PARTITION_OBSERVED"
 PARTITION_RESULT_ENV = "ABYSS_STACK_PYTEST_PARTITION_RESULT"
 PARTITION_MANIFEST_SCHEMA = "abyss-stack-pytest-partition-manifest-v1"
 PARTITION_RESULT_SCHEMA = "abyss-stack-pytest-partition-result-v1"
+PYTEST_TEMP_ROOT_ENV = "PYTEST_DEBUG_TEMPROOT"
+PYTEST_TEMP_PARENT_ENV = "TMPDIR"
+PYTEST_TEMP_PREFIX = "abyss-stack-pytest-invocation-"
+PYTEST_TEMP_CLEANUP_ATTEMPTS = 3
+PYTEST_TEMP_CLEANUP_RETRY_DELAY_SECONDS = 0.05
+PYTEST_TEMP_CLEANUP_DIAGNOSTIC_SCHEMA = (
+    "abyss-stack-pytest-temp-cleanup-diagnostic-v1"
+)
+PYTEST_TEMP_CLEANUP_FAILURE_EXIT_CODE = 3
 
 
 def nodeid_digest(nodeids: list[str]) -> str:
@@ -178,8 +192,207 @@ def scheduler_plan(requested: str) -> dict[str, Any]:
     }
 
 
-def build_pytest_command(*, extra_args: list[str]) -> list[str]:
-    return [sys.executable, "-m", "pytest", "-q", *extra_args]
+def select_pytest_temp_parent() -> Path | None:
+    """Return the owner-approved runtime parent for pytest temp namespaces."""
+    for environment_name in (PYTEST_TEMP_ROOT_ENV, PYTEST_TEMP_PARENT_ENV):
+        raw = os.environ.get(environment_name)
+        if not raw:
+            continue
+        candidate = Path(raw).expanduser()
+        try:
+            if candidate.is_dir():
+                return candidate
+        except OSError:
+            continue
+    return None
+
+
+@dataclass(frozen=True)
+class PytestTempCleanupResult:
+    namespace: Path
+    ok: bool
+    attempts: int
+    diagnostic: Path | None = None
+
+
+class PytestTempCleanupError(RuntimeError):
+    """A runner-owned pytest namespace could not be removed."""
+
+    def __init__(self, result: PytestTempCleanupResult) -> None:
+        self.result = result
+        diagnostic = (
+            f" diagnostic={result.diagnostic}" if result.diagnostic else ""
+        )
+        super().__init__(
+            "pytest temporary namespace cleanup failed: "
+            f"namespace={result.namespace} attempts={result.attempts}{diagnostic}"
+        )
+
+
+def _pytest_temp_directory(parent: Path | None = None) -> Path:
+    resolved_parent = select_pytest_temp_parent() if parent is None else parent
+    return Path(
+        tempfile.mkdtemp(
+            prefix=PYTEST_TEMP_PREFIX,
+            dir=str(resolved_parent) if resolved_parent is not None else None,
+        )
+    )
+
+
+def _namespace_exists(namespace: Path) -> bool:
+    try:
+        namespace.lstat()
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return True
+    return True
+
+
+def _remove_owned_namespace(namespace: Path) -> None:
+    root = namespace.absolute()
+
+    def onerror(function: Any, path: str, _exc_info: object) -> None:
+        candidate = Path(path).absolute()
+        try:
+            candidate.relative_to(root)
+        except ValueError as exc:
+            raise OSError(
+                f"pytest cleanup path escaped owned namespace: {candidate}"
+            ) from exc
+
+        for writable_candidate in (candidate, candidate.parent):
+            try:
+                writable_candidate.relative_to(root)
+            except ValueError:
+                continue
+            try:
+                mode = os.lstat(writable_candidate).st_mode
+            except OSError:
+                continue
+            if stat.S_ISLNK(mode):
+                continue
+            writable_bits = stat.S_IWUSR
+            if stat.S_ISDIR(mode):
+                writable_bits |= stat.S_IXUSR
+            os.chmod(writable_candidate, mode | writable_bits)
+        function(path)
+
+    shutil.rmtree(namespace, onerror=onerror)
+
+
+def _cleanup_diagnostic_path(namespace: Path) -> Path:
+    return namespace.with_name(f".{namespace.name}.cleanup-failed.json")
+
+
+def _write_cleanup_diagnostic(
+    namespace: Path,
+    failures: list[dict[str, str]],
+) -> Path | None:
+    diagnostic = _cleanup_diagnostic_path(namespace)
+    payload = {
+        "schema_version": PYTEST_TEMP_CLEANUP_DIAGNOSTIC_SCHEMA,
+        "status": "cleanup_failed",
+        "namespace": str(namespace),
+        "parent": str(namespace.parent),
+        "attempts": len(failures),
+        "failures": failures,
+    }
+    try:
+        diagnostic.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        print(
+            "[pytest-temp-cleanup-diagnostic-failed] "
+            f"namespace={namespace} error={exc!r}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return None
+    return diagnostic
+
+
+def cleanup_pytest_temp_namespace(namespace: Path) -> PytestTempCleanupResult:
+    """Remove one runner-owned namespace with bounded visible retry semantics."""
+    failures: list[dict[str, str]] = []
+    for attempt in range(1, PYTEST_TEMP_CLEANUP_ATTEMPTS + 1):
+        try:
+            _remove_owned_namespace(namespace)
+        except FileNotFoundError as exc:
+            if not _namespace_exists(namespace):
+                return PytestTempCleanupResult(namespace, True, attempt)
+            failures.append(
+                {
+                    "attempt": str(attempt),
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                }
+            )
+        except OSError as exc:
+            failures.append(
+                {
+                    "attempt": str(attempt),
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                }
+            )
+        if not _namespace_exists(namespace):
+            return PytestTempCleanupResult(namespace, True, attempt)
+        if attempt < PYTEST_TEMP_CLEANUP_ATTEMPTS:
+            time.sleep(PYTEST_TEMP_CLEANUP_RETRY_DELAY_SECONDS)
+
+    diagnostic = _write_cleanup_diagnostic(namespace, failures)
+    diagnostic_suffix = f" diagnostic={diagnostic}" if diagnostic else ""
+    print(
+        "[pytest-temp-cleanup-failed] "
+        f"namespace={namespace} attempts={len(failures)}{diagnostic_suffix}",
+        file=sys.stderr,
+        flush=True,
+    )
+    return PytestTempCleanupResult(
+        namespace,
+        False,
+        len(failures),
+        diagnostic,
+    )
+
+
+@contextmanager
+def owned_pytest_temp_namespace(parent: Path | None = None) -> Iterator[Path]:
+    """Allocate and clean one unique owner-owned namespace for one invocation."""
+    namespace = _pytest_temp_directory(parent)
+    body_failed = False
+    try:
+        yield namespace
+    except BaseException:
+        body_failed = True
+        raise
+    finally:
+        cleanup = cleanup_pytest_temp_namespace(namespace)
+        if not cleanup.ok and not body_failed:
+            raise PytestTempCleanupError(cleanup)
+
+
+def _assert_no_static_basetemp(args: list[str]) -> None:
+    if any(arg == "--basetemp" or arg.startswith("--basetemp=") for arg in args):
+        raise ValueError(
+            "run_pytest_lane allocates a fresh --basetemp for each invocation"
+        )
+
+
+def build_pytest_command(*, extra_args: list[str], basetemp: Path) -> list[str]:
+    _assert_no_static_basetemp(extra_args)
+    return [
+        sys.executable,
+        "-m",
+        "pytest",
+        "-q",
+        "--basetemp",
+        str(basetemp),
+        *extra_args,
+    ]
 
 
 def partition_nodeids(nodeids: list[str], *, shard_count: int) -> list[list[str]]:
@@ -270,13 +483,17 @@ def _partition_environment(
 def _plugin_command(
     *,
     selection_args: list[str],
+    basetemp: Path,
     collect_only: bool = False,
 ) -> list[str]:
+    _assert_no_static_basetemp(selection_args)
     command = [
         sys.executable,
         "-m",
         "pytest",
         "-q",
+        "--basetemp",
+        str(basetemp),
         "-p",
         "scripts.run_pytest_lane",
     ]
@@ -325,28 +542,36 @@ def _replay_failed_shards(
 
 
 def run_process_worksteal(*, extra_args: list[str]) -> int:
-    parent = os.environ.get("TMPDIR")
-    temporary_parent = parent if parent and Path(parent).is_dir() else None
+    temporary_parent = select_pytest_temp_parent()
     with tempfile.TemporaryDirectory(
         prefix="abyss-stack-pytest-partitions-",
-        dir=temporary_parent,
+        dir=str(temporary_parent) if temporary_parent is not None else None,
     ) as temporary_raw:
         temporary = Path(temporary_raw)
         baseline_path = temporary / "baseline.json"
         collect_log = temporary / "collect.log"
-        collect_command = _plugin_command(selection_args=extra_args, collect_only=True)
-        collect_started = time.monotonic()
-        with collect_log.open("w", encoding="utf-8") as output:
-            collected = subprocess.run(
-                collect_command,
-                cwd=REPO_ROOT,
-                env=_partition_environment(baseline_path=baseline_path),
-                stdout=output,
-                stderr=subprocess.STDOUT,
-                text=True,
-                check=False,
-            )
-        collect_elapsed = time.monotonic() - collect_started
+        try:
+            with owned_pytest_temp_namespace(temporary_parent) as collect_basetemp:
+                collect_command = _plugin_command(
+                    selection_args=extra_args,
+                    basetemp=collect_basetemp,
+                    collect_only=True,
+                )
+                collect_started = time.monotonic()
+                with collect_log.open("w", encoding="utf-8") as output:
+                    collected = subprocess.run(
+                        collect_command,
+                        cwd=REPO_ROOT,
+                        env=_partition_environment(baseline_path=baseline_path),
+                        stdout=output,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False,
+                    )
+                collect_elapsed = time.monotonic() - collect_started
+        except PytestTempCleanupError as exc:
+            print(f"[error] {exc}", file=sys.stderr, flush=True)
+            return PYTEST_TEMP_CLEANUP_FAILURE_EXIT_CODE
         if collected.returncode != 0 or not baseline_path.is_file():
             print(collect_log.read_text(encoding="utf-8"), file=sys.stderr, end="")
             print(
@@ -378,8 +603,9 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
         )
 
         pending: deque[int] = deque(range(len(assignments)))
-        active: dict[int, tuple[subprocess.Popen[str], Any, float]] = {}
+        active: dict[int, tuple[subprocess.Popen[str], Any, float, Path]] = {}
         records: dict[int, dict[str, Any]] = {}
+        cleanup_failed = False
         try:
             while pending or active:
                 while pending and len(active) < PROCESS_WORKER_LIMIT:
@@ -389,53 +615,88 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                     result_path = temporary / f"result-{shard_index}.json"
                     log_path = temporary / f"shard-{shard_index}.log"
                     write_manifest(assignment_path, assignments[shard_index])
-                    output = log_path.open("w", encoding="utf-8")
-                    command = _plugin_command(
-                        selection_args=assignments[shard_index],
+                    temporary_namespace = _pytest_temp_directory(temporary_parent)
+                    basetemp = temporary_namespace
+                    output: Any = None
+                    try:
+                        output = log_path.open("w", encoding="utf-8")
+                        command = _plugin_command(
+                            selection_args=assignments[shard_index],
+                            basetemp=basetemp,
+                        )
+                        process = subprocess.Popen(
+                            command,
+                            cwd=REPO_ROOT,
+                            env=_partition_environment(
+                                baseline_path=baseline_path,
+                                assignment_path=assignment_path,
+                                observed_path=observed_path,
+                                result_path=result_path,
+                            ),
+                            stdout=output,
+                            stderr=subprocess.STDOUT,
+                            text=True,
+                        )
+                    except BaseException:
+                        if output is not None:
+                            output.close()
+                        cleanup_pytest_temp_namespace(temporary_namespace)
+                        raise
+                    active[shard_index] = (
+                        process,
+                        output,
+                        time.monotonic(),
+                        temporary_namespace,
                     )
-                    process = subprocess.Popen(
-                        command,
-                        cwd=REPO_ROOT,
-                        env=_partition_environment(
-                            baseline_path=baseline_path,
-                            assignment_path=assignment_path,
-                            observed_path=observed_path,
-                            result_path=result_path,
-                        ),
-                        stdout=output,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                    )
-                    active[shard_index] = (process, output, time.monotonic())
                     records[shard_index] = {
                         "assignment": assignment_path,
                         "observed": observed_path,
                         "result": result_path,
                         "log": log_path,
                         "command": command,
+                        "basetemp": basetemp,
                     }
 
                 completed_any = False
-                for shard_index, (process, output, started) in list(active.items()):
+                for shard_index, (
+                    process,
+                    output,
+                    started,
+                    temporary_namespace,
+                ) in list(active.items()):
                     returncode = process.poll()
                     if returncode is None:
                         continue
                     output.close()
+                    cleanup = cleanup_pytest_temp_namespace(temporary_namespace)
+                    cleanup_failed = cleanup_failed or not cleanup.ok
                     records[shard_index]["returncode"] = returncode
                     records[shard_index]["elapsed"] = time.monotonic() - started
+                    records[shard_index]["cleanup"] = "passed" if cleanup.ok else "failed"
+                    if cleanup.diagnostic is not None:
+                        records[shard_index]["cleanup_diagnostic"] = str(
+                            cleanup.diagnostic
+                        )
                     del active[shard_index]
                     completed_any = True
                 if not completed_any and active:
                     time.sleep(0.1)
         except BaseException:
-            for process, output, _started in active.values():
+            for process, output, _started, _temporary_namespace in active.values():
                 process.terminate()
                 output.close()
-            for process, _output, _started in active.values():
+            for process, _output, _started, _temporary_namespace in active.values():
                 process.wait()
+            for (
+                _process,
+                _output,
+                _started,
+                temporary_namespace,
+            ) in active.values():
+                cleanup_pytest_temp_namespace(temporary_namespace)
             raise
 
-        failed = False
+        failed = cleanup_failed
         failed_shards: list[int] = []
         totals: Counter[str] = Counter()
         for shard_index in range(len(assignments)):
@@ -467,7 +728,7 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                 "[pytest-shard-result] "
                 f"index={shard_index + 1} selected={len(assignments[shard_index])} "
                 f"returncode={record['returncode']} seconds={record['elapsed']:.2f} "
-                f"selection_proof={proof}",
+                f"selection_proof={proof} cleanup={record['cleanup']}",
                 flush=True,
             )
 
@@ -511,6 +772,11 @@ def main(argv: list[str] | None = None) -> int:
     extra_args = list(args.pytest_args)
     if extra_args[:1] == ["--"]:
         extra_args = extra_args[1:]
+    try:
+        _assert_no_static_basetemp(extra_args)
+    except ValueError as exc:
+        print(f"[error] {exc}", file=sys.stderr, flush=True)
+        return 2
 
     scheduler = scheduler_plan(args.scheduler)
     if not scheduler["ok"]:
@@ -541,14 +807,22 @@ def main(argv: list[str] | None = None) -> int:
         flush=True,
     )
     if scheduler["effective"] == "serial":
-        command = build_pytest_command(extra_args=extra_args)
-        print(f"[run] tests: {subprocess.list2cmdline(command)}", flush=True)
-        completed = subprocess.run(
-            command,
-            cwd=REPO_ROOT,
-            env=os.environ.copy(),
-            check=False,
-        )
+        try:
+            with owned_pytest_temp_namespace() as basetemp:
+                command = build_pytest_command(
+                    extra_args=extra_args,
+                    basetemp=basetemp,
+                )
+                print(f"[run] tests: {subprocess.list2cmdline(command)}", flush=True)
+                completed = subprocess.run(
+                    command,
+                    cwd=REPO_ROOT,
+                    env=os.environ.copy(),
+                    check=False,
+                )
+        except PytestTempCleanupError as exc:
+            print(f"[error] {exc}", file=sys.stderr, flush=True)
+            return PYTEST_TEMP_CLEANUP_FAILURE_EXIT_CODE
         return completed.returncode
     return run_process_worksteal(extra_args=extra_args)
 

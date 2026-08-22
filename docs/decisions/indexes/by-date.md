@@ -258,6 +258,7 @@
 - [ABYSS-STACK-D-0129 Canonical External Actor Return Leaf](../ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md) (`docs/decisions/ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md`)
 - [ABYSS-STACK-D-0130 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0130-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0130-frontload-release-artifact-guard.md`)
 - [ABYSS-STACK-D-0131 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md`)
+- [ABYSS-STACK-D-0133 Owner-Owned Pytest Temporary Namespaces](../ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md`)
 
 ## 2026-08-22
 
