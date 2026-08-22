@@ -43,6 +43,12 @@ class ExternalCodexReturnError(RuntimeError):
     """A fail-closed return validation or delivery error."""
 
 
+class _ReturnAttemptLock:
+    def __init__(self, fd: int) -> None:
+        self.fd = fd
+        self.transferred_to_detached_child = False
+
+
 def _visible_module() -> Any:
     """Load the sibling visible lifecycle module in source and installed forms."""
 
@@ -786,6 +792,7 @@ def _return_attempt_lock(anchor_path: Path) -> Any:
             f"detached return retry lock may not be a symlink: {lock_path}"
         )
     lock_fd: int | None = None
+    lock: _ReturnAttemptLock | None = None
     try:
         flags = os.O_CREAT | os.O_RDWR
         if hasattr(os, "O_CLOEXEC"):
@@ -802,11 +809,13 @@ def _return_attempt_lock(anchor_path: Path) -> Any:
             f"cannot acquire detached return retry lock: {lock_path}"
         ) from exc
     try:
-        yield lock_fd
+        lock = _ReturnAttemptLock(lock_fd)
+        yield lock
     finally:
         if lock_fd is not None:
             try:
-                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                if lock is None or not lock.transferred_to_detached_child:
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
             finally:
                 os.close(lock_fd)
 
@@ -1439,11 +1448,13 @@ def command_return(args: argparse.Namespace) -> int:
             return 0
     # The canonical return receipt is invariant across the retry chain.  Use
     # it as the root lock anchor even when a caller supplies a retry receipt.
-    with _return_attempt_lock(Path(args.return_receipt)) as lock_fd:
-        return _command_return_detached(args, lock_fd)
+    with _return_attempt_lock(Path(args.return_receipt)) as lock:
+        return _command_return_detached(args, lock)
 
 
-def _command_return_detached(args: argparse.Namespace, lock_fd: int) -> int:
+def _command_return_detached(
+    args: argparse.Namespace, lock: _ReturnAttemptLock
+) -> int:
     inputs = _load_return_inputs(args)
     detached_path, result_path, log_path = _detached_paths(args)
     _validate_output_path(detached_path, "detached return receipt")
@@ -1606,7 +1617,6 @@ def _command_return_detached(args: argparse.Namespace, lock_fd: int) -> int:
     ready_read, ready_write = os.pipe()
     child_pid = os.fork()
     if child_pid == 0:
-        os.close(lock_fd)
         os.close(ready_write)
         _run_detached_child(
             launch_args,
@@ -1630,6 +1640,7 @@ def _command_return_detached(args: argparse.Namespace, lock_fd: int) -> int:
     try:
         _write_new_json(detached_path, receipt, "detached return receipt")
         os.write(ready_write, b"\x01")
+        lock.transferred_to_detached_child = True
     finally:
         os.close(ready_write)
     print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))

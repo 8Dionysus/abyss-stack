@@ -136,8 +136,9 @@ Operations are:
   whose child receipt was not yet published. A stable return-attempt lock
   resolved from the invariant canonical return-receipt path serializes direct
   delivery and the entire detached receipt chain, including callers that name
-  a retry receipt, through publication of the running child receipt; concurrent
-  recovery cannot launch competing children. A legacy task-local owner binding
+  a retry receipt, and is transferred to the detached worker through its
+  `run_return`; concurrent direct or detached recovery cannot duplicate owner
+  re-entry. A legacy task-local owner binding
   is accepted only
   as an input migration; no Goal, thread, rollout, PR, disposition, or
   task-root coordinate is selected by source.
