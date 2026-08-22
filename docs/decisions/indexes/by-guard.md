@@ -508,13 +508,13 @@
 
 - [ABYSS-STACK-D-0089 Decision Cache Effect Isolation](../ABYSS-STACK-D-0089-decision-cache-effect-isolation.md) (`docs/decisions/ABYSS-STACK-D-0089-decision-cache-effect-isolation.md`)
 
+## fail-closed identity
+
+- [ABYSS-STACK-D-0131 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md`)
+
 ## fail-fast ordering
 
 - [ABYSS-STACK-D-0130 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0130-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0130-frontload-release-artifact-guard.md`)
-
-## fail-closed identity
-
-- [ABYSS-STACK-D-0129 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0129-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0129-codex-pretool-agent-routing-adapter.md`)
 
 ## federation surface
 
@@ -539,7 +539,7 @@
 
 ## fragment preservation
 
-- [ABYSS-STACK-D-0129 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0129-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0129-codex-pretool-agent-routing-adapter.md`)
+- [ABYSS-STACK-D-0131 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md`)
 
 ## full manifest
 
@@ -785,7 +785,7 @@
 
 ## pre-execution routing
 
-- [ABYSS-STACK-D-0129 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0129-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0129-codex-pretool-agent-routing-adapter.md`)
+- [ABYSS-STACK-D-0131 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md`)
 
 ## private-Git drift
 

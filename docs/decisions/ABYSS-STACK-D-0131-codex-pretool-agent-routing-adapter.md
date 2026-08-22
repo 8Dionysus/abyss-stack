@@ -1,6 +1,6 @@
 # Codex PreToolUse Agent-Routing Adapter
 
-- Decision ID: ABYSS-STACK-D-0129
+- Decision ID: ABYSS-STACK-D-0131
 - Status: accepted
 - Date: 2026-08-21
 - Owner surface: `mechanics/config-projection/parts/codex-hooks/`
