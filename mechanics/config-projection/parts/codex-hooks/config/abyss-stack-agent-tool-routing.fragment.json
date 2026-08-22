@@ -1,0 +1,25 @@
+{
+  "schema_version": "abyss_codex_hooks_fragment_v0",
+  "fragment_id": "abyss-stack:agent-tool-routing:v1",
+  "owner": "abyss-stack",
+  "mode": "pretool-agent-routing",
+  "description": "Reflect SDK-owned responsibility routing before Codex collaboration tools execute",
+  "bindings": [
+    "AOA_CODEX_AGENT_ROUTING_HOOK"
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^collaboration.*$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"{{AOA_CODEX_AGENT_ROUTING_HOOK}}\"",
+            "timeout": 5,
+            "statusMessage": "Routing Codex collaboration tool through AoA"
+          }
+        ]
+      }
+    ]
+  }
+}

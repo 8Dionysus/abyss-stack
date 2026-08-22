@@ -211,6 +211,7 @@
 ## Codex hooks
 
 - [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
+- [ABYSS-STACK-D-0129 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0129-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0129-codex-pretool-agent-routing-adapter.md`)
 
 ## Codex plane
 
@@ -324,6 +325,7 @@
 ## config projection
 
 - [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
+- [ABYSS-STACK-D-0129 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0129-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0129-codex-pretool-agent-routing-adapter.md`)
 
 ## connector adapter
 
@@ -544,6 +546,10 @@
 ## organ portfolio
 
 - [ABYSS-STACK-D-0094 Wave 6 Access-Form and Retirement Classification](../ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md) (`docs/decisions/ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md`)
+
+## owner boundary
+
+- [ABYSS-STACK-D-0129 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0129-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0129-codex-pretool-agent-routing-adapter.md`)
 
 ## owner contract
 

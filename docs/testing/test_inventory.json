@@ -100,6 +100,7 @@
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_surface_validator.py",
         "mechanics/diagnostic-spine/parts/doctor-readiness/tests/test_aoa_doctor.py",
         "mechanics/config-projection/parts/codex-hooks/tests/test_render_codex_hooks.py",
+        "mechanics/config-projection/parts/codex-hooks/tests/test_codex_pretool_agent_routing.py",
         "mechanics/config-projection/parts/sync/tests/test_mcp_deployment_manifest.py",
         "mechanics/federation-seams/parts/federation-checks/tests/test_aoa_federated_check.py",
         "mechanics/federation-seams/parts/federation-checks/tests/test_langchain_api_federated.py",

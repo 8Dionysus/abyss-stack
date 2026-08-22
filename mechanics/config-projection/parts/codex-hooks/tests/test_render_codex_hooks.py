@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import os
 from pathlib import Path
 import stat
 import subprocess
@@ -18,6 +17,10 @@ FRAGMENT_SCHEMA_PATH = PART_ROOT / "schemas" / "codex-hooks-fragment.schema.json
 RECEIPT_SCHEMA_PATH = (
     PART_ROOT / "schemas" / "codex-hooks-composition-receipt.schema.json"
 )
+AGENT_FRAGMENT_PATH = (
+    PART_ROOT / "config" / "abyss-stack-agent-tool-routing.fragment.json"
+)
+AGENT_ADAPTER_PATH = PART_ROOT / "scripts" / "codex_pretool_agent_routing.py"
 
 SPEC = importlib.util.spec_from_file_location("render_codex_hooks", SCRIPT_PATH)
 assert SPEC is not None and SPEC.loader is not None
@@ -180,6 +183,52 @@ def test_owner_fragment_schema_and_native_coexistence(tmp_path: Path) -> None:
     assert fragments[1]["owner"] == "aoa-memo"
     assert set(binding_digests) == set(bindings())
     assert all(value.startswith("sha256:") for value in binding_digests.values())
+
+
+def test_stack_agent_fragment_preserves_existing_native_handlers(
+    tmp_path: Path,
+) -> None:
+    fragment = load_json(AGENT_FRAGMENT_PATH)
+    fragment_schema = load_json(FRAGMENT_SCHEMA_PATH)
+    Draft202012Validator.check_schema(fragment_schema)
+    Draft202012Validator(fragment_schema).validate(fragment)
+    native_path = write_json(tmp_path / "native.json", native_session_fragment())
+
+    output, fragments, binding_digests = COMPOSITOR.compose(
+        [AGENT_FRAGMENT_PATH, native_path],
+        {"AOA_CODEX_AGENT_ROUTING_HOOK": str(AGENT_ADAPTER_PATH)},
+    )
+
+    assert list(output["hooks"]) == [
+        "SessionStart",
+        "UserPromptSubmit",
+        "PreToolUse",
+        "Stop",
+    ]
+    assert output["hooks"]["PreToolUse"] == [
+        {
+            "matcher": "^collaboration.*$",
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": f'/usr/bin/python3 "{AGENT_ADAPTER_PATH}"',
+                    "timeout": 5,
+                    "statusMessage": "Routing Codex collaboration tool through AoA",
+                }
+            ],
+        }
+    ]
+    assert output["hooks"]["SessionStart"] == native_session_fragment()[
+        "hooks"
+    ]["SessionStart"]
+    assert output["hooks"]["UserPromptSubmit"] == native_session_fragment()[
+        "hooks"
+    ]["UserPromptSubmit"]
+    assert output["hooks"]["Stop"] == native_session_fragment()["hooks"]["Stop"]
+    assert fragment["owner"] == "abyss-stack"
+    assert fragments[0]["fragment_id"] == "abyss-stack:agent-tool-routing:v1"
+    assert fragments[1]["owner"] == "external-native"
+    assert set(binding_digests) == {"AOA_CODEX_AGENT_ROUTING_HOOK"}
 
 
 def test_exact_duplicate_handler_is_rejected(tmp_path: Path) -> None:

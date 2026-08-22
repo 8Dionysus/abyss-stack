@@ -30,6 +30,16 @@ placeholders found in command strings, each declared name must be supplied,
 and unused supplied bindings fail closed. Native configs must already be fully
 resolved.
 
+The stack-owned agent-routing fragment is a Codex-wire projection, not a
+responsibility owner. Its `PreToolUse` matcher covers the known
+`collaboration*` namespace and invokes the adapter with the bound source path.
+The adapter must receive an exact typed context file through
+`AOA_AGENT_TOOL_ROUTING_CONTEXT_FILE`; it does not invent Goal or current-holder
+identity from a missing payload and does not copy opaque Codex `tool_input` into
+the hook response. It presents the typed intent to `aoa-sdk`, reflects only the
+SDK decision, and leaves responsibility classification and role-first dispatch
+to `aoa-agents`.
+
 ## Output
 
 The read-only output is native Codex JSON with only `description` and `hooks`.
