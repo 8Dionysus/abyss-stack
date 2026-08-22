@@ -44,12 +44,16 @@ class FakeRpc:
         goal_status: str = "active",
         goal_id: str = "goal-dynamic-1",
         thread_id: str = "thread-dynamic-1",
+        bounded_turns: bool = False,
+        fallback_active_turn: str | None = None,
     ) -> None:
         self.endpoint = endpoint
         self.active_turn = active_turn
         self.goal_status = goal_status
         self.goal_id = goal_id
         self.thread_id = thread_id
+        self.bounded_turns = bounded_turns
+        self.fallback_active_turn = fallback_active_turn
         self.calls: list[tuple[str, dict[str, object] | None]] = []
 
     def __enter__(self) -> "FakeRpc":
@@ -80,11 +84,35 @@ class FakeRpc:
                 }
             }
         if method == "thread/read":
-            if self.active_turn is None:
+            if self.bounded_turns and params != {
+                "threadId": self.thread_id,
+                "includeTurns": False,
+            }:
+                raise AssertionError(params)
+            if self.bounded_turns:
+                turns = []
+            elif self.active_turn is None:
                 turns: list[dict[str, object]] = []
             else:
                 turns = [{"id": self.active_turn, "status": "inProgress", "items": []}]
             return {"thread": {"id": self.thread_id, "turns": turns}}
+        if method == "thread/turns/list":
+            if params != {
+                "threadId": self.thread_id,
+                "limit": 1,
+                "itemsView": "notLoaded",
+            }:
+                raise AssertionError(params)
+            turns = []
+            if self.fallback_active_turn is not None:
+                turns.append(
+                    {
+                        "id": self.fallback_active_turn,
+                        "status": "inProgress",
+                        "items": [],
+                    }
+                )
+            return {"data": turns, "nextCursor": "", "backwardsCursor": ""}
         if method == "turn/start":
             return {"turn": {"id": "new-turn", "status": "inProgress", "items": []}}
         if method == "turn/steer":
@@ -132,6 +160,115 @@ def test_delivery_addresses_dynamic_owner_and_active_or_paused_turn(
     assert receipt["observed"] == {"handoff_delivery": True, "goal_status": "active"}
     assert receipt["goal_binding"]["activation"] == "already_active"
     assert any(method == expected_method for method, _params in fake.calls)
+    thread_reads = [params for method, params in fake.calls if method == "thread/read"]
+    assert thread_reads == [
+        {"threadId": "thread-dynamic-1", "includeTurns": False}
+    ]
+
+
+def test_delivery_uses_bounded_thread_read_for_large_idle_history(
+    tmp_path: Path,
+) -> None:
+    owner_path = tmp_path / "owner.json"
+    owner_value = owner(
+        goal="goal-bounded",
+        thread="thread-bounded",
+        endpoint="unix:/run/user/1000/example.sock",
+    )
+    owner_path.write_text(json.dumps(owner_value, sort_keys=True) + "\n", encoding="utf-8")
+    handoff = tmp_path / "handoff.json"
+    handoff.write_text('{"responsibility_state":"returned"}\n', encoding="utf-8")
+    endpoint = tmp_path / "app-server.sock"
+    fake = FakeRpc(
+        endpoint,
+        active_turn=None,
+        thread_id="thread-bounded",
+        bounded_turns=True,
+    )
+
+    receipt = MODULE.deliver_handoff(
+        MODULE.validate_return_owner(owner_value),
+        owner_path,
+        handoff,
+        endpoint,
+        rpc_factory=lambda path: fake,
+    )
+
+    assert receipt["delivery_method"] == "turn/start"
+    assert any(method == "turn/start" for method, _params in fake.calls)
+    assert any(method == "thread/turns/list" for method, _params in fake.calls)
+
+
+def test_delivery_steers_active_turn_from_bounded_turn_page(
+    tmp_path: Path,
+) -> None:
+    owner_path = tmp_path / "owner.json"
+    owner_value = owner(
+        goal="goal-page",
+        thread="thread-page",
+        endpoint="unix:/run/user/1000/example.sock",
+    )
+    owner_path.write_text(json.dumps(owner_value, sort_keys=True) + "\n", encoding="utf-8")
+    handoff = tmp_path / "handoff.json"
+    handoff.write_text('{"responsibility_state":"returned"}\n', encoding="utf-8")
+    endpoint = tmp_path / "app-server.sock"
+    fake = FakeRpc(
+        endpoint,
+        active_turn=None,
+        thread_id="thread-page",
+        bounded_turns=True,
+        fallback_active_turn="turn-from-page",
+    )
+
+    receipt = MODULE.deliver_handoff(
+        MODULE.validate_return_owner(owner_value),
+        owner_path,
+        handoff,
+        endpoint,
+        rpc_factory=lambda path: fake,
+    )
+
+    assert receipt["delivery_method"] == "turn/steer"
+    assert receipt["active_turn_id"] == "turn-from-page"
+    steer_calls = [params for method, params in fake.calls if method == "turn/steer"]
+    assert steer_calls[0]["expectedTurnId"] == "turn-from-page"
+
+
+def test_discovery_skips_stale_socket_candidate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    incarnation_home = tmp_path / "incarnation"
+    stale = incarnation_home / "app-server-control/app-server-control.sock"
+    ambient_home = tmp_path / "ambient"
+    current = ambient_home / ".codex/app-server-control/app-server-control.sock"
+    monkeypatch.setenv("CODEX_HOME", str(incarnation_home))
+    monkeypatch.delenv("AOA_CODEX_HOME", raising=False)
+    monkeypatch.delenv("AOA_CODEX_APP_SERVER_SOCKET", raising=False)
+    monkeypatch.delenv("CODEX_APP_SERVER_SOCKET", raising=False)
+    monkeypatch.setattr(MODULE.Path, "home", classmethod(lambda _cls: ambient_home))
+
+    socket_paths = {stale, current}
+    monkeypatch.setattr(
+        MODULE.Path,
+        "is_socket",
+        lambda path: path in socket_paths,
+    )
+    probed: list[Path] = []
+
+    def probe(path: Path) -> bool:
+        probed.append(path)
+        return path == current
+
+    monkeypatch.setattr(MODULE, "_socket_is_connectable", probe)
+
+    resolved, posture = MODULE.discover_app_server_socket(
+        {"transport_posture": "resolve-current-local-codex-app-server"}
+    )
+
+    assert resolved == current
+    assert posture == "current_local_codex_app_server"
+    assert probed == [stale, current]
 
 
 def test_existing_return_receipt_is_replayable_without_transport(

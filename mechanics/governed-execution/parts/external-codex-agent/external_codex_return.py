@@ -36,6 +36,8 @@ DETACHED_SCHEMA_VERSION = "abyss_stack_external_codex_return_detached_v1"
 RETURN_ATTEMPT_SCHEMA_VERSION = "abyss_stack_external_codex_return_attempt_v1"
 WEBSOCKET_ACCEPT_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 DEFAULT_TIMEOUT_SECONDS = 10.0
+APP_SERVER_DISCOVERY_PROBE_TIMEOUT_SECONDS = 1.0
+APP_SERVER_TURN_LOOKUP_TIMEOUT_SECONDS = 30.0
 MAX_HANDSHAKE_BYTES = 64 * 1024
 MAX_FRAME_BYTES = 16 * 1024 * 1024
 
@@ -234,6 +236,20 @@ def _socket_path(value: str) -> Path:
     return path
 
 
+def _socket_is_connectable(path: Path) -> bool:
+    """Probe a discovered UNIX socket without sending an app-server frame."""
+
+    connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        connection.settimeout(APP_SERVER_DISCOVERY_PROBE_TIMEOUT_SECONDS)
+        connection.connect(str(path))
+    except OSError:
+        return False
+    finally:
+        connection.close()
+    return True
+
+
 def discover_app_server_socket(owner: dict[str, Any]) -> tuple[Path, str]:
     """Resolve the current local Codex endpoint without embedding a task path."""
 
@@ -265,7 +281,8 @@ def discover_app_server_socket(owner: dict[str, Any]) -> tuple[Path, str]:
             continue
         seen.add(path)
         if path.is_absolute() and not path.is_symlink() and path.is_socket():
-            return path, "current_local_codex_app_server"
+            if _socket_is_connectable(path):
+                return path, "current_local_codex_app_server"
     rendered = ", ".join(str(path) for path in candidates)
     raise ExternalCodexReturnError(
         f"current local Codex app-server socket was not found ({rendered})"
@@ -313,6 +330,13 @@ class UnixWebSocketRpc:
         self.socket: socket.socket | None = None
         self._buffer = b""
         self._counter = 0
+
+    def set_timeout(self, timeout: float) -> None:
+        """Extend a connected read timeout for one bounded history lookup."""
+
+        self.timeout = timeout
+        if self.socket is not None:
+            self.socket.settimeout(timeout)
 
     def __enter__(self) -> "UnixWebSocketRpc":
         connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -684,7 +708,10 @@ def deliver_handoff(
             "thread/read",
             {
                 "threadId": owner["thread_id"],
-                "includeTurns": True,
+                # Keep the delivery frame bounded.  Codex may retain a large
+                # history even when the Goal is idle; the abbreviated view
+                # still exposes the active-turn evidence needed for steer.
+                "includeTurns": False,
             },
         )
         thread = _thread_object(thread_read_response, "thread/read")
@@ -694,6 +721,20 @@ def deliver_handoff(
             )
         turns = thread.get("turns")
         active_turn = _active_turn_id(turns)
+        thread_turns_list_response: dict[str, Any] | None = None
+        if active_turn is None:
+            set_timeout = getattr(rpc, "set_timeout", None)
+            if callable(set_timeout):
+                set_timeout(APP_SERVER_TURN_LOOKUP_TIMEOUT_SECONDS)
+            thread_turns_list_response = rpc.call(
+                "thread/turns/list",
+                {
+                    "threadId": owner["thread_id"],
+                    "limit": 1,
+                    "itemsView": "notLoaded",
+                },
+            )
+            active_turn = _active_turn_id(thread_turns_list_response.get("data"))
         input_value = [{"type": "text", "text": message}]
         if active_turn is not None:
             method = "turn/steer"
@@ -747,6 +788,11 @@ def deliver_handoff(
             "goal": _safe_response_summary(goal_response),
             "thread_read": _safe_response_summary(thread_read_response),
             "turns": _safe_response_summary(turns),
+            "thread_turns_list": (
+                _safe_response_summary(thread_turns_list_response)
+                if thread_turns_list_response is not None
+                else {"used": False}
+            ),
             "turn": _safe_response_summary(turn_response),
             "goal_response_sha256": _sha256_bytes(_canonical_bytes(goal_response)),
             "turn_response_sha256": _sha256_bytes(_canonical_bytes(turn_response)),
