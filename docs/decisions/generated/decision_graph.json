@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 128,
-  "edge_count": 2884,
+  "decision_count": 129,
+  "edge_count": 2905,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1061,
-    "DATED": 128,
-    "GUARDED_BY": 396,
-    "HAS_STATUS": 128,
-    "HAS_SURFACE_CLASS": 346,
-    "IN_STACK_LANE": 301,
-    "NEXT_DECISION": 127,
-    "OWNED_BY_SURFACE": 134,
-    "OWNS_DECISION": 128,
+    "CITES_SOURCE_SURFACE": 1067,
+    "DATED": 129,
+    "GUARDED_BY": 399,
+    "HAS_STATUS": 129,
+    "HAS_SURFACE_CLASS": 349,
+    "IN_STACK_LANE": 304,
+    "NEXT_DECISION": 128,
+    "OWNED_BY_SURFACE": 135,
+    "OWNS_DECISION": 129,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 133
+    "UNDER_MECHANIC_PARENT": 134
   },
   "edges": [
     {
@@ -13788,12 +13788,112 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0128",
+      "target": "decision:ABYSS-STACK-D-0129",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0128",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0128",
       "target": "mechanic_parent:%60mechanics/governed-execution%60",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_return.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-return-owner.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-return-receipt.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "date:2026-08-21",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "guard_family:handoff%20delivery",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "guard_family:holder%20closure",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "guard_family:return-owner%20binding",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "surface_class:lifecycle",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "surface_class:public-contract",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "surface_class:source/runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "stack_lane:governed-execution",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -14435,18 +14535,23 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0128",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0129",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1259,
+  "node_count": 1266,
   "node_type_counts": {
-    "date": 41,
-    "decision": 128,
-    "guard_family": 208,
+    "date": 42,
+    "decision": 129,
+    "guard_family": 210,
     "mechanic_parent": 11,
     "owner_surface": 68,
     "repo": 1,
-    "source_surface": 603,
+    "source_surface": 606,
     "stack_lane": 51,
     "status": 4,
     "surface_class": 144
@@ -14655,6 +14760,11 @@
     {
       "id": "date:2026-08-20",
       "label": "2026-08-20",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-08-21",
+      "label": "2026-08-21",
       "type": "date"
     },
     {
@@ -15938,6 +16048,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-21",
+      "id": "decision:ABYSS-STACK-D-0129",
+      "label": "ABYSS-STACK-D-0129",
+      "path": "docs/decisions/ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md",
+      "posture": "accepted runtime rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0129 Canonical External Actor Return Leaf",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -16378,6 +16498,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:holder%20closure",
+      "label": "holder closure",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:holder%20identity",
       "label": "holder identity",
       "type": "guard_family"
@@ -16740,6 +16865,11 @@
     {
       "id": "guard_family:responsibility%20transfer",
       "label": "responsibility transfer",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:return-owner%20binding",
+      "label": "return-owner binding",
       "type": "guard_family"
     },
     {
@@ -19274,6 +19404,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_return.py",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/external_codex_return.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py",
       "label": "mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py",
       "type": "source_surface"
@@ -19331,6 +19466,16 @@
     {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-resume.schema.json",
       "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-resume.schema.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-return-owner.schema.json",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-return-owner.schema.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-return-receipt.schema.json",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-return-receipt.schema.json",
       "type": "source_surface"
     },
     {

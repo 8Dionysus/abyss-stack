@@ -116,6 +116,39 @@ Operations are:
   delivery into typed `wake_delivered` close authority;
 - `close --holder-receipt ... (--closure-authorization ... | --wake-receipt ...)
   --handoff ... --closure-receipt ...` closes only the exact bound holder.
+- `aoa-external-codex-return return --return-owner ... --handoff ...
+  --holder-receipt ... --return-receipt ... --authorization ...
+  --closure-receipt ...` is the canonical Codex return leaf. It validates the
+  supplied complete owner binding and immutable handoff, reads the exact Goal
+  identity first, refuses terminal or blocked Goals, activates only a paused
+  Goal, reads turns through the supported `thread/read` plus `includeTurns`
+  protocol, steers an active turn or starts a new one, validates the
+  method-specific accepted-turn response, and reserves the output receipt
+  before any app-server mutation. The handoff owner must match the
+  complete canonical transport binding, and existing authorization/closure
+  evidence plus all lifecycle output destinations are validated before any
+  app-server mutation. It writes
+  `abyss_stack_external_codex_return_receipt_v1`, then composes the typed
+  `authorize-close` and exact `close` primitives. `--detach` runs the same
+  operation in a new session, binds durable receipts to the owner/handoff/
+  holder/output identities, follows an already-published retry receipt instead
+  of launching a duplicate child, and recovers a fully bound reserved retry
+  whose child receipt was not yet published. Before delivery it also writes a
+  closure-bound `abyss_stack_external_codex_return_attempt_v1` reservation
+  sidecar. That sidecar records the first canonical return-receipt path for
+  the immutable owner/handoff/holder/authorization/closure identity; later
+  invocations that name another return-receipt path replay that bound path,
+  including a crash after delivery but before authorization. A stable
+  return-attempt lock resolved from the exact closure path bound by the
+  immutable handoff serializes direct delivery and the entire detached receipt
+  chain, including callers that name a retry receipt or an alternate
+  return-receipt path, and is transferred to the detached worker through its
+  `run_return`; concurrent recovery cannot duplicate owner re-entry. Detached
+  launch outputs are reserved before `fork()` in a `launch_reserved` receipt;
+  an orphaned log therefore remains a typed recoverable launch rather than an
+  unowned output collision. A legacy task-local owner binding is accepted only
+  as an input migration; no Goal, thread, rollout, PR, disposition, or
+  task-root coordinate is selected by source.
 
 The operator-visible incarnation launcher has a separate lifecycle contour for
 the responsibility holder. `launch --holder-receipt <absolute json>` remains

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/external-codex-return-receipt.schema.json",
+  "title": "Abyss external Codex canonical return receipt",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "owner_ref",
+    "owner_sha256",
+    "owner",
+    "transport",
+    "handoff_ref",
+    "handoff_sha256",
+    "goal_status",
+    "goal_binding",
+    "delivery_method",
+    "delivery",
+    "actions",
+    "observed",
+    "delivered",
+    "owner_acceptance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "abyss_stack_external_codex_return_receipt_v1"
+    },
+    "generated_at": {"type": "string", "minLength": 1},
+    "owner_ref": {"type": "string", "pattern": "^/"},
+    "owner_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "owner": {"type": "object", "minProperties": 7},
+    "transport": {"type": "object", "required": ["kind", "endpoint"]},
+    "handoff_ref": {"type": "string", "pattern": "^/"},
+    "handoff_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "goal_status": {"const": "active"},
+    "goal_binding": {
+      "type": "object",
+      "required": ["goal_id", "thread_id", "before_status", "activation"],
+      "properties": {
+        "goal_id": {"type": "string", "minLength": 1},
+        "thread_id": {"type": "string", "minLength": 1},
+        "before_status": {"enum": ["active", "paused"]},
+        "activation": {"enum": ["already_active", "paused_to_active"]}
+      }
+    },
+    "delivery_method": {"enum": ["turn/start", "turn/steer"]},
+    "client_user_message_id": {"type": "string", "minLength": 1},
+    "active_turn_id": {"type": ["string", "null"]},
+    "delivery": {
+      "type": "object",
+      "required": ["accepted"],
+      "properties": {"accepted": {"const": true}}
+    },
+    "actions": {
+      "type": "object",
+      "required": ["handoff_message_sent"],
+      "properties": {"handoff_message_sent": {"const": true}}
+    },
+    "observed": {
+      "type": "object",
+      "required": ["handoff_delivery", "goal_status"],
+      "properties": {
+        "handoff_delivery": {"const": true},
+        "goal_status": {"const": "active"}
+      }
+    },
+    "delivered": {"const": true},
+    "owner_acceptance": {"const": "separate"}
+  }
+}

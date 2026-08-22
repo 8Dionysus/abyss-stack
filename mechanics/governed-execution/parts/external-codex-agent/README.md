@@ -103,6 +103,12 @@ and replay only through their matching legacy wake reservation. A retry after a 
   This identity is
   distinct from any nested proof actor. This operator surface is not A2A transport and
   does not replace the governed JSONL runtime;
+- exposes the installed `aoa-external-codex-return` leaf for the final external
+  return contour. The leaf receives an explicit return-owner binding and exact
+  handoff/holder paths, uses the local Codex app-server as a replaceable
+  transport, records accepted delivery for either a paused or active Goal, and
+  composes typed authorization with exact holder closure. It does not claim
+  owner acceptance or semantic re-entry;
 - requires every task to preserve the complete runtime-wide forbidden-effect
   set, while terminal classification independently applies that set instead of
   trusting a caller-supplied subset;

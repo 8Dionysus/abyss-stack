@@ -91,6 +91,7 @@
 - [ABYSS-STACK-D-0123 Parent Passive Turns Disable Code Mode](../ABYSS-STACK-D-0123-parent-passive-code-mode-disable.md) (`docs/decisions/ABYSS-STACK-D-0123-parent-passive-code-mode-disable.md`)
 - [ABYSS-STACK-D-0124 Visible Holder Terminal Lifecycle Identity](../ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md) (`docs/decisions/ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md`)
 - [ABYSS-STACK-D-0127 Bind Resume Private-Git Observation to the Accepted Actor Final](../ABYSS-STACK-D-0127-bind-resume-private-git-to-accepted-actor-final.md) (`docs/decisions/ABYSS-STACK-D-0127-bind-resume-private-git-to-accepted-actor-final.md`)
+- [ABYSS-STACK-D-0129 Canonical External Actor Return Leaf](../ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md) (`docs/decisions/ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md`)
 
 ## inference-pilots
 

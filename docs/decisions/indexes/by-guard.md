@@ -549,6 +549,11 @@
 ## handoff delivery
 
 - [ABYSS-STACK-D-0124 Visible Holder Terminal Lifecycle Identity](../ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md) (`docs/decisions/ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md`)
+- [ABYSS-STACK-D-0129 Canonical External Actor Return Leaf](../ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md) (`docs/decisions/ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md`)
+
+## holder closure
+
+- [ABYSS-STACK-D-0129 Canonical External Actor Return Leaf](../ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md) (`docs/decisions/ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md`)
 
 ## holder identity
 
@@ -834,6 +839,10 @@
 ## responsibility transfer
 
 - [ABYSS-STACK-D-0112 Require Evidence-Complete Owner-Contour Incarnations](../ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md) (`docs/decisions/ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md`)
+
+## return-owner binding
+
+- [ABYSS-STACK-D-0129 Canonical External Actor Return Leaf](../ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md) (`docs/decisions/ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md`)
 
 ## return-policy
 

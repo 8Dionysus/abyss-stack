@@ -72,6 +72,7 @@
 - [ABYSS-STACK-D-0083 Tree of Sophia Foundation Laboratory Boundary](../ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md) (`docs/decisions/ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md`)
 - [ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md`)
 - [ABYSS-STACK-D-0124 Visible Holder Terminal Lifecycle Identity](../ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md) (`docs/decisions/ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md`)
+- [ABYSS-STACK-D-0129 Canonical External Actor Return Leaf](../ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md) (`docs/decisions/ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md`)
 
 ## mechanic package
 
@@ -497,6 +498,7 @@
 - [ABYSS-STACK-D-0082 Observability Bind State and Launcher Cgroup Boundary](../ABYSS-STACK-D-0082-observability-bind-state-and-launcher-cgroup-boundary.md) (`docs/decisions/ABYSS-STACK-D-0082-observability-bind-state-and-launcher-cgroup-boundary.md`)
 - [ABYSS-STACK-D-0087 Owner-Bounded MCP Access Fabric](../ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md) (`docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md`)
 - [ABYSS-STACK-D-0126 Typed Visible Holder Closure Authorization](../ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md) (`docs/decisions/ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md`)
+- [ABYSS-STACK-D-0129 Canonical External Actor Return Leaf](../ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md) (`docs/decisions/ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md`)
 
 ## local evidence
 
@@ -593,6 +595,7 @@
 
 - [ABYSS-STACK-D-0126 Typed Visible Holder Closure Authorization](../ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md) (`docs/decisions/ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md`)
 - [ABYSS-STACK-D-0128 Exact Content-Addressed Runtime Subject Admission](../ABYSS-STACK-D-0128-exact-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0128-exact-runtime-subject-admission.md`)
+- [ABYSS-STACK-D-0129 Canonical External Actor Return Leaf](../ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md) (`docs/decisions/ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md`)
 
 ## questbook
 
