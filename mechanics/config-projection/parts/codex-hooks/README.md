@@ -37,7 +37,8 @@ The stack-owned `abyss-stack:agent-tool-routing:v1` fragment adds the current
 Codex `PreToolUse` command adapter for the `collaboration*` tool namespace. The
 adapter recognizes the Codex wire names, reads at most the configured context
 limit plus one byte from an explicitly supplied typed context file
-(`AOA_AGENT_TOOL_ROUTING_CONTEXT_FILE`), and asks
+(`AOA_AGENT_TOOL_ROUTING_CONTEXT_FILE`), verifies its safe attempt identity
+against the current event, and asks
 `aoa-sdk.ControlPlaneAPI.pre_tool_route()` for the typed next-owner posture.
 It reflects that posture as a native allow or deny. `aoa-agents` remains the
 owner of responsibility classification and role-first meaning; this adapter

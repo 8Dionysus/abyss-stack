@@ -36,13 +36,15 @@ responsibility owner. Its `PreToolUse` matcher covers the known
 The adapter must receive an exact typed context file through
 `AOA_AGENT_TOOL_ROUTING_CONTEXT_FILE`; it does not invent Goal or current-holder
 identity from a missing payload and does not copy opaque Codex `tool_input` into
-the hook response. The adapter reads at most the configured context limit plus
-one byte before rejecting an oversized file. The configured directory entry is
-atomically claimed before the adapter reads it, and the claimed path is
-immediately unlinked after validation and before the SDK call. A stale
-classification therefore cannot be reused for a later collaboration attempt,
-while an atomic producer refresh at the configured path remains available for
-that later attempt.
+the hook response. The exact typed context also carries the safe identity of
+the intended attempt (`session_id`, `turn_id`, `tool_use_id`, and `tool_name`);
+the adapter rejects a context whose identity does not equal the current event.
+It reads at most the configured context limit plus one byte before rejecting an
+oversized file. The configured directory entry is atomically claimed before the
+adapter reads it, and the claimed path is immediately unlinked after validation
+and before the SDK call. A stale or cross-call classification therefore cannot
+be reused for a later collaboration attempt, while an atomic producer refresh
+at the configured path remains available for that later attempt.
 If `AOA_SDK_SOURCE_ROOT` is supplied, the adapter requires its
 `src/aoa_sdk` package and verifies that the imported SDK modules remain beneath
 that source root. It presents the typed intent to `aoa-sdk`, reflects only the

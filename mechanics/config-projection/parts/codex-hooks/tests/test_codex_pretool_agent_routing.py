@@ -43,6 +43,12 @@ def context(boundary_state: str = "unresolved") -> dict[str, object]:
         local_next_route = "codex_local"
     return {
         "schema_version": ADAPTER.CONTEXT_SCHEMA_VERSION,
+        "attempt": {
+            "session_id": "session-fixture",
+            "turn_id": "turn-fixture",
+            "tool_use_id": "call-fixture",
+            "tool_name": "collaborationspawn_agent",
+        },
         "goal_ref": _ref("goal:fixture", "codex-goal", "goal-v1"),
         "current_holder_ref": _ref(
             "holder:fixture",
@@ -178,6 +184,26 @@ def test_context_is_claimed_before_reading_when_producer_refreshes_path(
         "independent"
     )
     assert not list(tmp_path.glob("routing-context.json.consumed.*"))
+
+
+def test_context_authorization_must_bind_to_the_winning_tool_call(
+    tmp_path: Path,
+) -> None:
+    payload = context("not_independent")
+    attempt = payload["attempt"]
+    assert isinstance(attempt, dict)
+    attempt["tool_use_id"] = "different-call"
+    context_path = write_context(tmp_path, payload)
+
+    output = ADAPTER.handle_event(
+        event(),
+        environ=environment(tmp_path, context_path),
+    )
+
+    reason = output["hookSpecificOutput"]["permissionDecisionReason"]
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "does not bind to this tool call" in reason
+    assert "different-call" not in json.dumps(output)
 
 
 def test_oversized_context_fails_closed_after_bounded_read(tmp_path: Path) -> None:

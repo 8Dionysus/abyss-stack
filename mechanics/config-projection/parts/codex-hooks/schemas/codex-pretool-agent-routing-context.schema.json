@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": [
     "schema_version",
+    "attempt",
     "goal_ref",
     "current_holder_ref",
     "route_anchor",
@@ -16,7 +17,35 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "aoa_codex_pretool_agent_routing_context_v1"
+      "const": "aoa_codex_pretool_agent_routing_context_v2"
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "session_id",
+        "turn_id",
+        "tool_use_id",
+        "tool_name"
+      ],
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "turn_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool_use_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool_name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     },
     "goal_ref": {
       "$ref": "#/$defs/contentRef"

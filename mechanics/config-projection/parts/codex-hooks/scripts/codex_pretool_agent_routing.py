@@ -20,7 +20,7 @@ from typing import Any, Mapping
 import uuid
 
 
-CONTEXT_SCHEMA_VERSION = "aoa_codex_pretool_agent_routing_context_v1"
+CONTEXT_SCHEMA_VERSION = "aoa_codex_pretool_agent_routing_context_v2"
 CODEX_PRE_TOOL_EVENT = "PreToolUse"
 CODEX_AGENT_TOOL_NAMESPACE = "collaboration"
 MAX_EVENT_BYTES = 1024 * 1024
@@ -47,6 +47,7 @@ CODEX_AGENT_TOOL_NAMES = frozenset(
 CONTEXT_FIELDS = frozenset(
     {
         "schema_version",
+        "attempt",
         "goal_ref",
         "current_holder_ref",
         "route_anchor",
@@ -210,6 +211,27 @@ def _claim_context(environ: Mapping[str, str]) -> dict[str, Any]:
     return context
 
 
+def _verify_attempt_binding(
+    event: Mapping[str, Any],
+    context: Mapping[str, Any],
+) -> None:
+    attempt = context.get("attempt")
+    if not isinstance(attempt, dict) or set(attempt) != {
+        "session_id",
+        "turn_id",
+        "tool_use_id",
+        "tool_name",
+    }:
+        raise AdapterError("typed route context attempt identity is not exact")
+    for label in ("session_id", "turn_id", "tool_use_id", "tool_name"):
+        expected = _required_string(attempt.get(label), f"context {label}")
+        actual = _required_string(event.get(label), label)
+        if expected != actual:
+            raise AdapterError(
+                f"typed route context does not bind to this tool call ({label})"
+            )
+
+
 def _build_intent(
     event: Mapping[str, Any],
     context: Mapping[str, Any],
@@ -285,6 +307,7 @@ def route_agent_tool_event(
 
     try:
         context = _claim_context(environment)
+        _verify_attempt_binding(event, context)
         (
             control_plane_api,
             provenance_factory,

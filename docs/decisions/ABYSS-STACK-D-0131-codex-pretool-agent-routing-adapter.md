@@ -34,9 +34,10 @@ holder references required by the SDK contract.
 
 Add a command-only `PreToolUse` fragment for the known Codex
 `collaboration*` tool namespace. The adapter reads the event identity and
-opaque-tool presence, reads at most the context limit plus one byte, obtains
-the current Goal/holder and route state only from an exact externally supplied
-context file, constructs
+opaque-tool presence, reads at most the context limit plus one byte, verifies
+the context's safe session/turn/tool-use/tool-name identity against the current
+event, obtains the current Goal/holder and route state only from an exact
+externally supplied context file, constructs
 `aoa_agent_tool_routing_intent_v1`, and calls `aoa-sdk.ControlPlaneAPI`.
 
 The adapter denies unresolved and independent routes with actionable
@@ -46,12 +47,12 @@ malformed context, unknown collaboration names, and unsupported SDK postures
 fail closed. The adapter atomically claims the configured context directory
 entry before reading it, reads the claimed inode, and immediately unlinks that
 claimed path after validation and before the SDK call. A classification cannot
-be reused for a later collaboration attempt, while an atomic producer refresh
-at the configured path survives for that later attempt. Successful calls retain
-no context metadata. When an explicit SDK source root is supplied, the adapter
-verifies both package presence and imported module provenance. Its inner route
-timeout emits a deny before the longer native hook timeout. Unrelated tools
-pass through unchanged.
+be reused for a later or different collaboration attempt, while an atomic
+producer refresh at the configured path survives for that later attempt.
+Successful calls retain no context metadata. When an explicit SDK source root
+is supplied, the adapter verifies both package presence and imported module
+provenance. Its inner route timeout emits a deny before the longer native hook
+timeout. Unrelated tools pass through unchanged.
 The adapter does not choose a role, model, runtime, workspace, or actor, and
 the compositor does not own the context producer, classification, trust, or
 live health.
