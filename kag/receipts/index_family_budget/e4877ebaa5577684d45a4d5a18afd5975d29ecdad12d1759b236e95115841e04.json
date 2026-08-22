@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 8355631,
+  "allowed_tracked_bytes": 37535773,
+  "approved_by": "repository-owner",
+  "base_ref": "ab3db922dd9a2d0321c48ef66e41cd0613bc6ad5",
+  "changed_generated_bytes": 8355631,
+  "changed_generated_files": 78,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "e4877ebaa5577684d45a4d5a18afd5975d29ecdad12d1759b236e95115841e04",
+  "reason": "Refresh the portable abyss-stack owner family after recording the concurrent route-context wait; preserve the standing KAG budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 37535773,
+  "tracked_bytes_max": 24117248
+}
