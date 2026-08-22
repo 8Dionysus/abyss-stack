@@ -12,6 +12,7 @@
     "handoff_ref",
     "handoff_sha256",
     "goal_status",
+    "goal_binding",
     "delivery_method",
     "delivery",
     "actions",
@@ -31,6 +32,16 @@
     "handoff_ref": {"type": "string", "pattern": "^/"},
     "handoff_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "goal_status": {"const": "active"},
+    "goal_binding": {
+      "type": "object",
+      "required": ["goal_id", "thread_id", "before_status", "activation"],
+      "properties": {
+        "goal_id": {"type": "string", "minLength": 1},
+        "thread_id": {"type": "string", "minLength": 1},
+        "before_status": {"enum": ["active", "paused"]},
+        "activation": {"enum": ["already_active", "paused_to_active"]}
+      }
+    },
     "delivery_method": {"enum": ["turn/start", "turn/steer"]},
     "client_user_message_id": {"type": "string", "minLength": 1},
     "active_turn_id": {"type": ["string", "null"]},

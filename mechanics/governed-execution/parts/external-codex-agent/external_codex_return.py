@@ -410,9 +410,16 @@ class UnixWebSocketRpc:
                     raise ExternalCodexReturnError("app-server text response is not JSON")
                 if not isinstance(value, dict):
                     raise ExternalCodexReturnError("app-server response is not an object")
-                if value.get("id") == request_id:
+                # A bidirectional app-server may issue a request while this
+                # client is waiting for a response.  Classify that request
+                # before matching ids: JSON-RPC request ids are not reserved
+                # against a server-side collision with our counter.
+                if isinstance(value.get("method"), str):
+                    self._handle_unrelated_message(value)
+                elif value.get("id") == request_id:
                     return value
-                self._handle_unrelated_message(value)
+                else:
+                    self._handle_unrelated_message(value)
                 fragments.clear()
                 opcode_expected = None
 
@@ -469,6 +476,30 @@ def _active_turn_id(turns: object) -> str | None:
     return None
 
 
+def _goal_object(response: dict[str, Any], method: str) -> dict[str, Any]:
+    goal = response.get("goal")
+    if not isinstance(goal, dict):
+        raise ExternalCodexReturnError(f"Codex app-server {method} did not return a Goal")
+    return goal
+
+
+def _validate_goal_binding(goal: dict[str, Any], owner: dict[str, Any]) -> None:
+    if goal.get("threadId") != owner["thread_id"]:
+        raise ExternalCodexReturnError(
+            "Codex app-server Goal is bound to a different thread"
+        )
+    observed_goal_id = _string_at(goal, ("goalId", "goal_id"))
+    if observed_goal_id is not None:
+        if observed_goal_id != owner["goal_id"]:
+            raise ExternalCodexReturnError(
+                "Codex app-server Goal identity does not match owner binding"
+            )
+    elif owner["goal_id"] != owner["thread_id"]:
+        raise ExternalCodexReturnError(
+            "Codex app-server did not expose enough Goal identity to bind owner"
+        )
+
+
 def deliver_handoff(
     owner: dict[str, Any],
     owner_path: Path,
@@ -506,14 +537,31 @@ def deliver_handoff(
             },
         )
         rpc.notify("initialized")
-        goal_response = rpc.call(
-            "thread/goal/set",
-            {"threadId": owner["thread_id"], "status": "active"},
+        goal_get_response = rpc.call(
+            "thread/goal/get",
+            {"threadId": owner["thread_id"]},
         )
-        goal = goal_response.get("goal")
-        goal_status = _string_at(goal, ("status",)) or _string_at(
-            goal_response, ("status",)
-        )
+        goal_before = _goal_object(goal_get_response, "thread/goal/get")
+        _validate_goal_binding(goal_before, owner)
+        goal_before_status = _string_at(goal_before, ("status",))
+        if goal_before_status == "active":
+            goal_response = goal_get_response
+            goal = goal_before
+            goal_activation = "already_active"
+        elif goal_before_status == "paused":
+            goal_response = rpc.call(
+                "thread/goal/set",
+                {"threadId": owner["thread_id"], "status": "active"},
+            )
+            goal = _goal_object(goal_response, "thread/goal/set")
+            _validate_goal_binding(goal, owner)
+            goal_activation = "paused_to_active"
+        else:
+            raise ExternalCodexReturnError(
+                "Codex app-server Goal is not wakeable: "
+                f"{goal_before_status!r}"
+            )
+        goal_status = _string_at(goal, ("status",))
         if goal_status != "active":
             raise ExternalCodexReturnError(
                 f"Codex app-server did not confirm an active Goal: {goal_status!r}"
@@ -563,12 +611,19 @@ def deliver_handoff(
         "handoff_ref": str(handoff_path.resolve()),
         "handoff_sha256": handoff_digest,
         "goal_status": goal_status,
+        "goal_binding": {
+            "goal_id": owner["goal_id"],
+            "thread_id": owner["thread_id"],
+            "before_status": goal_before_status,
+            "activation": goal_activation,
+        },
         "delivery_method": method,
         "client_user_message_id": client_message_id,
         "active_turn_id": active_turn,
         "delivery": {
             "accepted": True,
             "initialize": _safe_response_summary(initialize),
+            "goal_get": _safe_response_summary(goal_get_response),
             "goal": _safe_response_summary(goal_response),
             "turns": _safe_response_summary(turns_response),
             "turn": _safe_response_summary(turn_response),
@@ -587,6 +642,118 @@ def _write_new_json(path: Path, value: dict[str, Any], label: str) -> None:
         VISIBLE._write_new_json(path, value, label)
     except Exception as exc:
         raise ExternalCodexReturnError(str(exc)) from exc
+
+
+def _validate_output_path(path: Path, label: str) -> Path:
+    if not path.is_absolute() or path.is_symlink():
+        raise ExternalCodexReturnError(
+            f"{label} must be an absolute non-symlink output path: {path}"
+        )
+    if path.parent.is_symlink() or not path.parent.is_dir():
+        raise ExternalCodexReturnError(
+            f"{label} parent must be a real directory: {path.parent}"
+        )
+    if path.exists() and not path.is_file():
+        raise ExternalCodexReturnError(
+            f"{label} must be a regular file or an unused path: {path}"
+        )
+    return path
+
+
+def _return_binding(
+    *,
+    owner_path: Path,
+    owner_digest: str,
+    handoff_path: Path,
+    handoff_digest: str,
+    holder_path: Path,
+    holder_digest: str,
+    authorization_path: Path,
+    closure_path: Path,
+    return_path: Path,
+) -> dict[str, str]:
+    return {
+        "owner_ref": str(owner_path.resolve()),
+        "owner_sha256": owner_digest,
+        "handoff_ref": str(handoff_path.resolve()),
+        "handoff_sha256": handoff_digest,
+        "holder_receipt_ref": str(holder_path.resolve()),
+        "holder_receipt_sha256": holder_digest,
+        "authorization_ref": str(authorization_path.resolve()),
+        "closure_receipt_ref": str(closure_path.resolve()),
+        "return_receipt_ref": str(return_path.resolve()),
+    }
+
+
+def _return_reservation(
+    path: Path,
+    *,
+    binding: dict[str, str],
+) -> dict[str, Any]:
+    if path.exists():
+        value, raw = _load_json_file(path, "canonical return receipt reservation")
+        if raw != _canonical_bytes(value) + b"\n":
+            raise ExternalCodexReturnError(
+                "canonical return receipt reservation is not canonically encoded"
+            )
+        if value.get("schema_version") != RETURN_RECEIPT_SCHEMA_VERSION:
+            raise ExternalCodexReturnError("canonical return receipt reservation schema mismatch")
+        if value.get("state") != "reserved":
+            raise ExternalCodexReturnError(
+                "canonical return receipt exists but is not a completed receipt"
+            )
+        for key, expected in binding.items():
+            if value.get(key) != expected:
+                raise ExternalCodexReturnError(
+                    f"canonical return receipt reservation {key} mismatch"
+                )
+        return value
+    reservation = {
+        "schema_version": RETURN_RECEIPT_SCHEMA_VERSION,
+        "state": "reserved",
+        "reserved_at": _utc_now(),
+        **binding,
+    }
+    _write_new_json(path, reservation, "canonical return receipt reservation")
+    return reservation
+
+
+def _load_return_inputs(args: argparse.Namespace) -> dict[str, Any]:
+    owner_path = _regular_file(Path(args.return_owner), "return owner")
+    owner_value, owner_bytes = _load_json_file(owner_path, "return owner")
+    owner_digest = _sha256_bytes(owner_bytes)
+    owner = validate_return_owner(owner_value)
+    handoff_path = _regular_file(Path(args.handoff), "handoff")
+    holder_path = _regular_file(Path(args.holder_receipt), "holder receipt")
+    closure_path = _validate_output_path(Path(args.closure_receipt), "closure receipt")
+    handoff, handoff_bytes, handoff_digest, holder, holder_bytes, holder_digest = (
+        _load_handoff_context(handoff_path, holder_path, closure_path)
+    )
+    _validate_handoff_owner(handoff, owner)
+    authorization_path = _validate_output_path(
+        Path(args.authorization), "terminal closure authorization"
+    )
+    return_path = _validate_output_path(
+        Path(args.return_receipt), "canonical return receipt"
+    )
+    return {
+        "owner_path": owner_path,
+        "owner_value": owner_value,
+        "owner_bytes": owner_bytes,
+        "owner_digest": owner_digest,
+        "owner": owner,
+        "handoff_path": handoff_path,
+        "handoff_bytes": handoff_bytes,
+        "handoff_digest": handoff_digest,
+        "handoff": handoff,
+        "holder_path": holder_path,
+        "holder": holder,
+        "holder_bytes": holder_bytes,
+        "holder_digest": holder_digest,
+        "closure_path": closure_path,
+        "authorization_path": authorization_path,
+        "return_path": return_path,
+    }
 
 
 def _load_handoff_context(
@@ -612,20 +779,19 @@ def _load_handoff_context(
 
 def _validate_handoff_owner(handoff: dict[str, Any], owner: dict[str, Any]) -> None:
     supplied = handoff.get("return_owner")
-    if supplied is None:
-        return
-    if isinstance(supplied, str):
-        if supplied != owner["owner_id"]:
-            raise ExternalCodexReturnError("handoff return owner does not match owner binding")
-        return
-    if isinstance(supplied, dict):
-        for key in ("owner_id", "goal_id", "thread_id"):
-            if key in supplied and supplied[key] != owner[key]:
-                raise ExternalCodexReturnError(
-                    f"handoff return owner {key} does not match owner binding"
-                )
-        return
-    raise ExternalCodexReturnError("handoff return_owner has an unsupported shape")
+    if not isinstance(supplied, dict):
+        raise ExternalCodexReturnError(
+            "handoff must contain a complete return_owner object"
+        )
+    try:
+        supplied_owner = validate_return_owner(supplied)
+    except ExternalCodexReturnError as exc:
+        raise ExternalCodexReturnError(
+            "handoff return_owner is not a complete owner binding"
+        ) from exc
+    expected = _owner_projection(owner)
+    if _owner_projection(supplied_owner) != expected:
+        raise ExternalCodexReturnError("handoff return owner does not match owner binding")
 
 
 def _validate_return_receipt(
@@ -650,6 +816,15 @@ def _validate_return_receipt(
         raise ExternalCodexReturnError("canonical return receipt owner binding mismatch")
     if receipt.get("goal_status") != "active":
         raise ExternalCodexReturnError("canonical return receipt Goal is not active")
+    goal_binding = receipt.get("goal_binding")
+    if (
+        not isinstance(goal_binding, dict)
+        or goal_binding.get("goal_id") != owner["goal_id"]
+        or goal_binding.get("thread_id") != owner["thread_id"]
+        or goal_binding.get("before_status") not in {"active", "paused"}
+        or goal_binding.get("activation") not in {"already_active", "paused_to_active"}
+    ):
+        raise ExternalCodexReturnError("canonical return receipt Goal binding is incomplete")
     actions = receipt.get("actions")
     observed = receipt.get("observed")
     delivery = receipt.get("delivery")
@@ -732,29 +907,54 @@ def _call_visible(handler: Callable[[argparse.Namespace], int], args: argparse.N
 
 
 def run_return(args: argparse.Namespace) -> dict[str, Any]:
-    owner_path = _regular_file(Path(args.return_owner), "return owner")
-    owner_value, owner_bytes = _load_json_file(owner_path, "return owner")
-    owner_digest = _sha256_bytes(owner_bytes)
-    owner = validate_return_owner(owner_value)
-    handoff_path = _regular_file(Path(args.handoff), "handoff")
-    holder_path = _regular_file(Path(args.holder_receipt), "holder receipt")
-    closure_path = Path(args.closure_receipt)
-    handoff, handoff_bytes, handoff_digest, holder, holder_bytes, holder_digest = (
-        _load_handoff_context(handoff_path, holder_path, closure_path)
-    )
-    _validate_handoff_owner(handoff, owner)
+    inputs = _load_return_inputs(args)
+    owner_path = inputs["owner_path"]
+    owner_bytes = inputs["owner_bytes"]
+    owner_digest = inputs["owner_digest"]
+    owner = inputs["owner"]
+    handoff_path = inputs["handoff_path"]
+    handoff_bytes = inputs["handoff_bytes"]
+    handoff_digest = inputs["handoff_digest"]
+    handoff = inputs["handoff"]
+    holder_path = inputs["holder_path"]
+    holder = inputs["holder"]
+    holder_bytes = inputs["holder_bytes"]
+    holder_digest = inputs["holder_digest"]
+    closure_path = inputs["closure_path"]
+    authorization_path = inputs["authorization_path"]
+    return_path = inputs["return_path"]
     handoff_snapshot = (handoff, handoff_bytes, handoff_digest)
-    return_path = Path(args.return_receipt)
+    binding = _return_binding(
+        owner_path=owner_path,
+        owner_digest=owner_digest,
+        handoff_path=handoff_path,
+        handoff_digest=handoff_digest,
+        holder_path=holder_path,
+        holder_digest=holder_digest,
+        authorization_path=authorization_path,
+        closure_path=closure_path,
+        return_path=return_path,
+    )
     if return_path.exists():
-        receipt = _load_existing_return_receipt(
-            return_path,
-            owner=owner,
-            owner_path=owner_path,
-            owner_digest=owner_digest,
-            handoff_path=handoff_path,
-            handoff_digest=handoff_digest,
+        existing, _existing_raw = _load_json_file(
+            return_path, "canonical return receipt"
         )
+        if existing.get("state") == "reserved":
+            _return_reservation(return_path, binding=binding)
+            receipt = None
+        else:
+            receipt = _load_existing_return_receipt(
+                return_path,
+                owner=owner,
+                owner_path=owner_path,
+                owner_digest=owner_digest,
+                handoff_path=handoff_path,
+                handoff_digest=handoff_digest,
+            )
     else:
+        _return_reservation(return_path, binding=binding)
+        receipt = None
+    if receipt is None:
         VISIBLE._assert_file_snapshot(owner_path, owner_bytes, "return owner")
         VISIBLE._assert_file_snapshot(handoff_path, handoff_bytes, "handoff")
         endpoint, resolution = discover_app_server_socket(owner)
@@ -767,7 +967,7 @@ def run_return(args: argparse.Namespace) -> dict[str, Any]:
             handoff_bytes=handoff_bytes,
         )
         receipt["transport"]["resolution"] = resolution
-        _write_new_json(return_path, receipt, "canonical return receipt")
+        _replace_json(return_path, receipt, "canonical return receipt")
         receipt = _load_existing_return_receipt(
             return_path,
             owner=owner,
@@ -778,7 +978,6 @@ def run_return(args: argparse.Namespace) -> dict[str, Any]:
         )
     VISIBLE._assert_file_snapshot(handoff_path, handoff_bytes, "handoff")
     VISIBLE._assert_file_snapshot(owner_path, owner_bytes, "return owner")
-    authorization_path = Path(args.authorization)
     if authorization_path.exists():
         authorization = _load_existing_authorization(
             authorization_path,
@@ -852,11 +1051,81 @@ def _replace_json(path: Path, value: dict[str, Any], label: str) -> None:
         raise ExternalCodexReturnError(str(exc)) from exc
 
 
+def _detached_binding(
+    inputs: dict[str, Any],
+    *,
+    detached_path: Path,
+    result_path: Path,
+    log_path: Path,
+) -> dict[str, str]:
+    return {
+        **_return_binding(
+            owner_path=inputs["owner_path"],
+            owner_digest=inputs["owner_digest"],
+            handoff_path=inputs["handoff_path"],
+            handoff_digest=inputs["handoff_digest"],
+            holder_path=inputs["holder_path"],
+            holder_digest=inputs["holder_digest"],
+            authorization_path=inputs["authorization_path"],
+            closure_path=inputs["closure_path"],
+            return_path=inputs["return_path"],
+        ),
+        "detached_receipt_ref": str(detached_path.resolve()),
+        "result_ref": str(result_path.resolve()),
+        "log_ref": str(log_path.resolve()),
+    }
+
+
+def _validate_detached_receipt(
+    value: dict[str, Any],
+    *,
+    binding: dict[str, str],
+) -> str:
+    if value.get("schema_version") != DETACHED_SCHEMA_VERSION:
+        raise ExternalCodexReturnError("detached return receipt schema mismatch")
+    state = value.get("state")
+    if state not in {"running", "completed", "failed", "stale"}:
+        raise ExternalCodexReturnError("detached return receipt state is invalid")
+    for key, expected in binding.items():
+        if value.get(key) != expected:
+            raise ExternalCodexReturnError(
+                f"detached return receipt {key} does not match current return"
+            )
+    return state
+
+
+def _load_detached_result(path: Path, *, completed: bool) -> dict[str, Any]:
+    value, raw = _load_json_file(path, "detached canonical return result")
+    if raw != _canonical_bytes(value) + b"\n":
+        raise ExternalCodexReturnError(
+            "detached canonical return result is not canonically encoded"
+        )
+    if value.get("schema_version") != RETURN_RESPONSE_SCHEMA_VERSION:
+        raise ExternalCodexReturnError("detached canonical return result schema mismatch")
+    if completed and value.get("returned") is not True:
+        raise ExternalCodexReturnError(
+            "completed detached return does not prove a returned lifecycle"
+        )
+    if not completed and value.get("returned") is not False:
+        raise ExternalCodexReturnError("failed detached return result is inconsistent")
+    return value
+
+
+def _retry_output_path(path: Path, label: str) -> Path:
+    _validate_output_path(path, label)
+    for _ in range(32):
+        candidate = path.with_name(f"{path.name}.retry-{secrets.token_hex(8)}")
+        if not candidate.exists() and not candidate.is_symlink():
+            return candidate
+    raise ExternalCodexReturnError(f"cannot allocate a retry path for {label}")
+
+
 def _run_detached_child(
     args: argparse.Namespace,
     result_path: Path,
     log_path: Path,
     detached_path: Path,
+    binding: dict[str, str],
     ready_fd: int,
 ) -> None:
     os.setsid()
@@ -873,14 +1142,17 @@ def _run_detached_child(
             result = run_return(args)
             _write_new_json(result_path, result, "detached canonical return result")
             if detached_path.exists():
+                current, _current_raw = _load_json_file(
+                    detached_path, "detached return receipt"
+                )
                 _replace_json(
                     detached_path,
                     {
+                        **current,
+                        **binding,
                         "schema_version": DETACHED_SCHEMA_VERSION,
                         "state": "completed",
                         "completed_at": _utc_now(),
-                        "result_ref": str(result_path.resolve()),
-                        "return_receipt_ref": str(Path(args.return_receipt).resolve()),
                     },
                     "detached return receipt",
                 )
@@ -894,14 +1166,17 @@ def _run_detached_child(
             try:
                 _write_new_json(result_path, failure, "detached canonical return result")
                 if detached_path.exists():
+                    current, _current_raw = _load_json_file(
+                        detached_path, "detached return receipt"
+                    )
                     _replace_json(
                         detached_path,
                         {
+                            **current,
+                            **binding,
                             "schema_version": DETACHED_SCHEMA_VERSION,
                             "state": "failed",
                             "completed_at": _utc_now(),
-                            "result_ref": str(result_path.resolve()),
-                            "return_receipt_ref": str(Path(args.return_receipt).resolve()),
                         },
                         "detached return receipt",
                     )
@@ -916,35 +1191,96 @@ def command_return(args: argparse.Namespace) -> int:
         response = run_return(args)
         print(json.dumps(response, ensure_ascii=False, sort_keys=True))
         return 0
+    inputs = _load_return_inputs(args)
     detached_path, result_path, log_path = _detached_paths(args)
+    _validate_output_path(detached_path, "detached return receipt")
+    _validate_output_path(result_path, "detached canonical return result")
+    _validate_output_path(log_path, "detached canonical return log")
+    binding = _detached_binding(
+        inputs,
+        detached_path=detached_path,
+        result_path=result_path,
+        log_path=log_path,
+    )
+    launch_args = args
     if detached_path.exists():
-        value, _raw = _load_json_file(detached_path, "detached return receipt")
-        state = value.get("state")
+        value, raw = _load_json_file(detached_path, "detached return receipt")
+        if raw != _canonical_bytes(value) + b"\n":
+            raise ExternalCodexReturnError(
+                "detached return receipt is not canonically encoded"
+            )
+        state = _validate_detached_receipt(value, binding=binding)
         if state == "completed":
+            _load_detached_result(result_path, completed=True)
             print(json.dumps(value, ensure_ascii=False, sort_keys=True))
             return 0
         if state == "failed":
+            _load_detached_result(result_path, completed=False)
             print(json.dumps(value, ensure_ascii=False, sort_keys=True))
             return 1
         pid = value.get("child_pid")
         start_ticks = value.get("child_start_ticks")
+        state_now = "missing_identity"
         if isinstance(pid, int) and isinstance(start_ticks, int):
             state_now = VISIBLE._proc_identity_state(pid, start_ticks)
-            if state_now == "live":
+            if state == "running" and state_now == "live":
                 print(json.dumps(value, ensure_ascii=False, sort_keys=True))
                 return 0
-    # Validate all non-destructive inputs before creating the detached helper.
-    owner_path = _regular_file(Path(args.return_owner), "return owner")
-    owner_value, _ = _load_json_file(owner_path, "return owner")
-    validate_return_owner(owner_value)
-    _load_handoff_context(
-        Path(args.handoff), Path(args.holder_receipt), Path(args.closure_receipt)
-    )
+        if state_now == "live":
+            raise ExternalCodexReturnError(
+                "stale detached return receipt still has a live child identity"
+            )
+        retry_detached = _retry_output_path(
+            detached_path, "detached return receipt retry"
+        )
+        retry_result = _retry_output_path(
+            result_path, "detached canonical return result retry"
+        )
+        retry_log = _retry_output_path(log_path, "detached canonical return log retry")
+        _replace_json(
+            detached_path,
+            {
+                **value,
+                "state": "stale",
+                "stale_at": _utc_now(),
+                "stale_child_state": state_now,
+                "retry_receipt_ref": str(retry_detached.resolve()),
+                "retry_result_ref": str(retry_result.resolve()),
+                "retry_log_ref": str(retry_log.resolve()),
+            },
+            "stale detached return receipt",
+        )
+        detached_path, result_path, log_path = retry_detached, retry_result, retry_log
+        binding = _detached_binding(
+            inputs,
+            detached_path=detached_path,
+            result_path=result_path,
+            log_path=log_path,
+        )
+        launch_args = SimpleNamespace(**vars(args))
+        launch_args.detached_receipt = str(detached_path)
+        launch_args.detached_result = str(result_path)
+        launch_args.detached_log = str(log_path)
+    if result_path.exists():
+        raise ExternalCodexReturnError(
+            f"detached canonical return result already exists: {result_path}"
+        )
+    if log_path.exists():
+        raise ExternalCodexReturnError(
+            f"detached canonical return log already exists: {log_path}"
+        )
     ready_read, ready_write = os.pipe()
     child_pid = os.fork()
     if child_pid == 0:
         os.close(ready_write)
-        _run_detached_child(args, result_path, log_path, detached_path, ready_read)
+        _run_detached_child(
+            launch_args,
+            result_path,
+            log_path,
+            detached_path,
+            binding,
+            ready_read,
+        )
         raise AssertionError("detached child returned")
     os.close(ready_read)
     start_ticks = VISIBLE._proc_start_ticks(child_pid)
@@ -954,9 +1290,7 @@ def command_return(args: argparse.Namespace) -> int:
         "created_at": _utc_now(),
         "child_pid": child_pid,
         "child_start_ticks": start_ticks,
-        "result_ref": str(result_path.resolve()),
-        "log_ref": str(log_path.resolve()),
-        "return_receipt_ref": str(Path(args.return_receipt).resolve()),
+        **binding,
     }
     try:
         _write_new_json(detached_path, receipt, "detached return receipt")

@@ -33,9 +33,20 @@ def owner(*, goal: str, thread: str, endpoint: str | None = None) -> dict[str, o
 
 
 class FakeRpc:
-    def __init__(self, endpoint: Path, *, active_turn: str | None) -> None:
+    def __init__(
+        self,
+        endpoint: Path,
+        *,
+        active_turn: str | None,
+        goal_status: str = "active",
+        goal_id: str = "goal-dynamic-1",
+        thread_id: str = "thread-dynamic-1",
+    ) -> None:
         self.endpoint = endpoint
         self.active_turn = active_turn
+        self.goal_status = goal_status
+        self.goal_id = goal_id
+        self.thread_id = thread_id
         self.calls: list[tuple[str, dict[str, object] | None]] = []
 
     def __enter__(self) -> "FakeRpc":
@@ -51,8 +62,22 @@ class FakeRpc:
         self.calls.append((method, params))
         if method == "initialize":
             return {"protocolVersion": "1"}
+        if method == "thread/goal/get":
+            return {
+                "goal": {
+                    "goalId": self.goal_id,
+                    "threadId": self.thread_id,
+                    "status": self.goal_status,
+                }
+            }
         if method == "thread/goal/set":
-            return {"goal": {"status": "active"}}
+            return {
+                "goal": {
+                    "goalId": self.goal_id,
+                    "threadId": self.thread_id,
+                    "status": "active",
+                }
+            }
         if method == "thread/turns/list":
             if self.active_turn is None:
                 return {"data": []}
@@ -82,6 +107,8 @@ def test_delivery_addresses_dynamic_owner_and_active_or_paused_turn(
     handoff.write_text('{"responsibility_state":"returned"}\n', encoding="utf-8")
     endpoint = tmp_path / "app-server.sock"
     fake = FakeRpc(endpoint, active_turn=active_turn)
+    fake.goal_id = str(owner_value["goal_id"])
+    fake.thread_id = str(owner_value["thread_id"])
 
     receipt = MODULE.deliver_handoff(
         MODULE.validate_return_owner(owner_value),
@@ -98,6 +125,7 @@ def test_delivery_addresses_dynamic_owner_and_active_or_paused_turn(
     assert receipt["delivered"] is True
     assert receipt["actions"] == {"handoff_message_sent": True}
     assert receipt["observed"] == {"handoff_delivery": True, "goal_status": "active"}
+    assert receipt["goal_binding"]["activation"] == "already_active"
     assert any(method == expected_method for method, _params in fake.calls)
 
 
@@ -114,12 +142,18 @@ def test_existing_return_receipt_is_replayable_without_transport(
     handoff = tmp_path / "handoff.json"
     handoff.write_text('{"responsibility_state":"returned"}\n', encoding="utf-8")
     validated_owner = MODULE.validate_return_owner(owner_value)
+    fake = FakeRpc(
+        tmp_path / "unused.sock",
+        active_turn=None,
+        goal_id=str(owner_value["goal_id"]),
+        thread_id=str(owner_value["thread_id"]),
+    )
     receipt = MODULE.deliver_handoff(
         validated_owner,
         owner_path,
         handoff,
         tmp_path / "unused.sock",
-        rpc_factory=lambda path: FakeRpc(path, active_turn=None),
+        rpc_factory=lambda path: fake,
     )
     path = tmp_path / "return.json"
     path.write_bytes(MODULE._canonical_bytes(receipt) + b"\n")
@@ -146,6 +180,113 @@ def test_existing_return_receipt_is_replayable_without_transport(
             handoff_path=handoff,
             handoff_digest=MODULE._sha256_bytes(handoff.read_bytes()),
         )
+
+
+@pytest.mark.parametrize("goal_status", ["complete", "blocked", "usageLimited", "budgetLimited"])
+def test_delivery_refuses_terminal_or_blocked_goal_without_mutation(
+    tmp_path: Path,
+    goal_status: str,
+) -> None:
+    owner_path = tmp_path / "owner.json"
+    owner_value = owner(
+        goal="goal-terminal",
+        thread="thread-terminal",
+        endpoint="unix:/run/user/1000/example.sock",
+    )
+    owner_path.write_text(json.dumps(owner_value, sort_keys=True) + "\n", encoding="utf-8")
+    handoff = tmp_path / "handoff.json"
+    handoff.write_text('{"responsibility_state":"returned"}\n', encoding="utf-8")
+    fake = FakeRpc(
+        tmp_path / "app-server.sock",
+        active_turn=None,
+        goal_status=goal_status,
+        goal_id=str(owner_value["goal_id"]),
+        thread_id=str(owner_value["thread_id"]),
+    )
+
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="not wakeable"):
+        MODULE.deliver_handoff(
+            MODULE.validate_return_owner(owner_value),
+            owner_path,
+            handoff,
+            fake.endpoint,
+            rpc_factory=lambda path: fake,
+        )
+
+    assert not any(method == "thread/goal/set" for method, _params in fake.calls)
+    assert not any(method in {"turn/start", "turn/steer"} for method, _params in fake.calls)
+
+
+def test_delivery_requires_goal_thread_binding() -> None:
+    owner_value = MODULE.validate_return_owner(
+        owner(
+            goal="goal-bound",
+            thread="thread-bound",
+            endpoint="unix:/run/user/1000/example.sock",
+        )
+    )
+    goal = {"goalId": "goal-bound", "threadId": "thread-other", "status": "active"}
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="different thread"):
+        MODULE._validate_goal_binding(goal, owner_value)
+
+
+def test_handoff_requires_complete_return_owner() -> None:
+    owner_value = MODULE.validate_return_owner(
+        owner(
+            goal="goal-bound",
+            thread="thread-bound",
+            endpoint="unix:/run/user/1000/example.sock",
+        )
+    )
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="complete"):
+        MODULE._validate_handoff_owner(
+            {"responsibility_state": "returned"},
+            owner_value,
+        )
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="complete"):
+        MODULE._validate_handoff_owner(
+            {"return_owner": {"owner_id": owner_value["owner_id"]}},
+            owner_value,
+        )
+
+
+def test_output_reservation_rejects_relative_destination() -> None:
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="absolute"):
+        MODULE._validate_output_path(Path("relative-receipt.json"), "return receipt")
+
+
+def test_server_request_id_collision_is_not_treated_as_delivery_response() -> None:
+    rpc = MODULE.UnixWebSocketRpc(Path("/run/user/1000/example.sock"))
+    frames = iter(
+        [
+            (
+                True,
+                0x1,
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "server/request",
+                        "params": {},
+                    }
+                ).encode("utf-8"),
+            ),
+            (
+                True,
+                0x1,
+                b'{"jsonrpc":"2.0","id":1,"result":{"ok":true}}',
+            ),
+        ]
+    )
+    sent: list[dict[str, object]] = []
+    rpc._recv_frame = lambda: next(frames)  # type: ignore[method-assign]
+    rpc._send_json = lambda value: sent.append(value)  # type: ignore[method-assign]
+
+    response = rpc._receive_json(1)
+
+    assert response["result"] == {"ok": True}
+    assert sent[0]["id"] == 1
+    assert "error" in sent[0]
 
 
 def test_reusable_return_source_has_no_episode_coordinates() -> None:

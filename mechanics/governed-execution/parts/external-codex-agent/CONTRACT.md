@@ -119,14 +119,17 @@ Operations are:
 - `aoa-external-codex-return return --return-owner ... --handoff ...
   --holder-receipt ... --return-receipt ... --authorization ...
   --closure-receipt ...` is the canonical Codex return leaf. It validates the
-  supplied owner binding and immutable handoff, activates a paused Goal,
-  steers an active turn or starts a new one, writes
+  supplied complete owner binding and immutable handoff, reads the exact Goal
+  identity first, refuses terminal or blocked Goals, activates only a paused
+  Goal, steers an active turn or starts a new one, and reserves the output
+  receipt before any app-server mutation. It writes
   `abyss_stack_external_codex_return_receipt_v1`, then composes the typed
   `authorize-close` and exact `close` primitives. `--detach` runs the same
-  operation in a new session and leaves a durable result for a holder that
-  must close itself. A legacy task-local owner binding is accepted only as an
-  input migration; no Goal, thread, rollout, PR, disposition, or task-root
-  coordinate is selected by source.
+  operation in a new session, binds durable receipts to the owner/handoff/
+  holder/output identities, and publishes a new retry receipt when a prior
+  detached child is stale. A legacy task-local owner binding is accepted only
+  as an input migration; no Goal, thread, rollout, PR, disposition, or
+  task-root coordinate is selected by source.
 
 The operator-visible incarnation launcher has a separate lifecycle contour for
 the responsibility holder. `launch --holder-receipt <absolute json>` remains
