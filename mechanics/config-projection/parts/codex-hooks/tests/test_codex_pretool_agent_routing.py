@@ -127,6 +127,7 @@ def test_typed_not_independent_allows_only_sdk_compatibility_posture(
         event(),
         environ=environment(tmp_path, context_path),
     ) == {}
+    assert not list(tmp_path.glob("routing-context.json.consumed.*"))
 
     reused = ADAPTER.handle_event(
         event(),

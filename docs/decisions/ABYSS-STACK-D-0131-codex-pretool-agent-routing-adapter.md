@@ -42,8 +42,9 @@ The adapter denies unresolved and independent routes with actionable
 `aoa-agents-skills` role-first direction. It permits the built-in local
 compatibility path only for a typed `not_independent` SDK posture. Missing or
 malformed context, unknown collaboration names, and unsupported SDK postures
-fail closed. A valid context is atomically consumed before the SDK call, so a
-classification cannot be reused for a later collaboration attempt. When an
+fail closed. A valid context is atomically claimed and immediately unlinked
+before the SDK call, so a classification cannot be reused for a later
+collaboration attempt while successful calls retain no context metadata. When an
 explicit SDK source root is supplied, the adapter verifies both package
 presence and imported module provenance. Its inner route timeout emits a deny
 before the longer native hook timeout. Unrelated tools pass through unchanged.

@@ -36,9 +36,10 @@ responsibility owner. Its `PreToolUse` matcher covers the known
 The adapter must receive an exact typed context file through
 `AOA_AGENT_TOOL_ROUTING_CONTEXT_FILE`; it does not invent Goal or current-holder
 identity from a missing payload and does not copy opaque Codex `tool_input` into
-the hook response. A valid context file is atomically consumed before the SDK
-call, so a stale classification cannot be reused for a later collaboration
-attempt. If `AOA_SDK_SOURCE_ROOT` is supplied, the adapter requires its
+the hook response. A valid context file is atomically claimed and immediately
+unlinked before the SDK call, so a stale classification cannot be reused for a
+later collaboration attempt and successful calls do not retain its metadata.
+If `AOA_SDK_SOURCE_ROOT` is supplied, the adapter requires its
 `src/aoa_sdk` package and verifies that the imported SDK modules remain beneath
 that source root. It presents the typed intent to `aoa-sdk`, reflects only the
 SDK decision, and leaves responsibility classification and role-first dispatch

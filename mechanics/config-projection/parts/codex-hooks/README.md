@@ -43,8 +43,9 @@ owner of responsibility classification and role-first meaning; this adapter
 does not choose a role, model, runtime, workspace, or actor and never copies
 opaque `tool_input` into its output.
 
-Each valid context file is consumed by an atomic rename before the SDK route,
-making the classification single-use for one collaboration attempt. When
+Each valid context file is claimed by an atomic rename and immediately
+unlinked before the SDK route, making the classification single-use for one
+collaboration attempt without retaining its Goal/holder metadata. When
 `AOA_SDK_SOURCE_ROOT` is supplied, the adapter checks both the package presence
 and the source location of the imported SDK modules. The fragment gives the
 adapter a ten-second native Codex timeout, while the adapter emits a deny after

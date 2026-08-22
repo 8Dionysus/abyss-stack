@@ -264,9 +264,9 @@
       ],
       "writes": [
         "native Codex allow or deny JSON on stdout",
-        "single-use context consumed marker beside the supplied context file"
+        "temporary single-use context claim file, unlinked after the atomic claim"
       ],
-      "side_effects": "read-only route decision for unrelated tools; recognized collaboration tools atomically consume the exact supplied typed context before the SDK call",
+      "side_effects": "read-only route decision for unrelated tools; recognized collaboration tools atomically claim and immediately unlink the exact supplied typed context before the SDK call",
       "validation_lane": "mechanics-part-local/tests/release",
       "ci_inclusion": "focused mechanic test plus source-fast test-inventory and release pytest lanes",
       "test_target": "mechanics/config-projection/parts/codex-hooks/tests/test_codex_pretool_agent_routing.py",

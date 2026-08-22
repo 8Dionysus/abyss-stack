@@ -192,6 +192,10 @@ def _consume_context(path: Path) -> None:
         path.rename(consumed_path)
     except OSError as exc:
         raise AdapterError("typed route context could not be consumed safely") from exc
+    try:
+        consumed_path.unlink()
+    except OSError as exc:
+        raise AdapterError("claimed typed route context could not be removed safely") from exc
 
 
 def _build_intent(
