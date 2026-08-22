@@ -51,6 +51,7 @@ python -m py_compile \
   scripts/aoa-external-codex-agent \
   scripts/aoa-external-actor-bind \
   scripts/aoa-external-codex-incarnation \
+  scripts/aoa-external-codex-stasis \
   mechanics/governed-execution/parts/external-codex-agent/bind_external_actor_launch.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_nested_evidence.py \
@@ -59,6 +60,7 @@ python -m py_compile \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py \
   mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_return.py \
+  mechanics/governed-execution/parts/external-codex-agent/external_codex_responsibility_movement.py \
   mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py \
   mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py
 python scripts/validate_nested_agents.py

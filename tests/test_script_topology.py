@@ -93,6 +93,7 @@ def test_external_codex_operator_wrapper_is_inventory_routed() -> None:
 
     assert "scripts/aoa-external-codex-agent" in operator["paths"]
     assert "scripts/aoa-external-actor-bind" in operator["paths"]
+    assert "scripts/aoa-external-codex-stasis" in operator["paths"]
 
 
 def test_focused_validator_modules_are_script_inventory_covered() -> None:

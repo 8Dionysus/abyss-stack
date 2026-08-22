@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/external-codex-responsibility-observation.schema.json",
+  "title": "One-shot external Codex responsibility movement observation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "observation_id",
+    "obligation_ref",
+    "holder_ref",
+    "return_owner_ref",
+    "handoff_ref",
+    "state_root",
+    "observed_at",
+    "lifecycle",
+    "cost",
+    "evidence",
+    "claim_limits",
+    "stop_line"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "abyss_stack_external_codex_responsibility_observation_v1"
+    },
+    "observation_id": {"type": "string", "minLength": 1},
+    "obligation_ref": {"$ref": "#/$defs/ref"},
+    "holder_ref": {"$ref": "#/$defs/ref"},
+    "return_owner_ref": {"$ref": "#/$defs/ref"},
+    "handoff_ref": {"$ref": "#/$defs/fileRef"},
+    "state_root": {"type": "string", "pattern": "^/", "minLength": 2},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "current_state",
+        "expected_to_states",
+        "transition_started_at",
+        "due_at",
+        "next_observation_at"
+      ],
+      "properties": {
+        "current_state": {"$ref": "#/$defs/state"},
+        "expected_to_states": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/state"}
+        },
+        "transition_started_at": {"type": "string", "format": "date-time"},
+        "due_at": {"type": "string", "format": "date-time"},
+        "next_observation_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["one_shot", "polling", "estimated_ms", "budget_ms"],
+      "properties": {
+        "one_shot": {"const": true},
+        "polling": {"const": false},
+        "estimated_ms": {"type": "integer", "minimum": 0},
+        "budget_ms": {"type": "integer", "minimum": 1}
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {"$ref": "#/$defs/evidence"}
+    },
+    "claim_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["external_canary", "goal_acceptance", "host_trust_admission"],
+      "properties": {
+        "external_canary": {"const": "not_claimed"},
+        "goal_acceptance": {"const": "not_claimed"},
+        "host_trust_admission": {"const": "separate_preserved"}
+      }
+    },
+    "protected_residual_refs": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {"$ref": "#/$defs/fileRef"}
+    },
+    "stop_line": {
+      "const": "Return a reviewed implementation and causal proof to the exact master; do not auto-kill, auto-restart, declare domain failure, accept the Goal, or disturb unrelated actors."
+    }
+  },
+  "$defs": {
+    "state": {
+      "type": "string",
+      "enum": [
+        "accepted",
+        "session_started",
+        "turn_started",
+        "progressing",
+        "waiting",
+        "returning",
+        "terminal"
+      ]
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object_id", "owner_repo", "schema_version", "digest"],
+      "properties": {
+        "object_id": {"type": "string", "minLength": 1},
+        "owner_repo": {"type": "string", "minLength": 1},
+        "schema_version": {"type": "string", "minLength": 1},
+        "digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^/", "minLength": 2},
+        "digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_id", "kind", "signal", "observed_at", "source_ref"],
+      "properties": {
+        "evidence_id": {"type": "string", "minLength": 1},
+        "kind": {
+          "enum": [
+            "lifecycle_transition",
+            "session",
+            "turn",
+            "tool",
+            "artifact",
+            "resource",
+            "process",
+            "transport"
+          ]
+        },
+        "signal": {
+          "enum": [
+            "transition",
+            "session",
+            "turn",
+            "tool",
+            "artifact",
+            "resource",
+            "process",
+            "transport"
+          ]
+        },
+        "observed_at": {"type": "string", "format": "date-time"},
+        "source_ref": {"$ref": "#/$defs/ref"},
+        "from_state": {"$ref": "#/$defs/state"},
+        "to_state": {"$ref": "#/$defs/state"},
+        "details": {
+          "type": "object",
+          "maxProperties": 12
+        }
+      }
+    }
+  }
+}

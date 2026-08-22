@@ -23,6 +23,7 @@ python -m py_compile \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py \
   mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_return.py \
+  mechanics/governed-execution/parts/external-codex-agent/external_codex_responsibility_movement.py \
   mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py \
   mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py
 
@@ -56,6 +57,18 @@ an exact active owner-bound Goal is transitioned through `thread/goal/set` to
   pre-send, and post-send reservation states against the separate
   `abyss_stack_external_codex_pause_reservation_v1` schema, while completed
   evidence remains validated by the pause-receipt schema.
+
+The responsibility-movement tests prove the required branch independently:
+the compiled obligation and exact handoff digest are carried through a
+one-shot observation; a live process plus the real
+`cannot_connect_to_codex_app_server` transport failure is classified as
+deadline stasis because no lifecycle transition was observed; the typed event
+and review wake bind the exact return owner and preserve the stop line. Adding
+the matching `returning -> terminal` transition changes the result to
+`progressing` and suppresses the wake, proving the causal dependency. Cost
+over-budget and pre-deadline cases schedule only one bounded observation, and
+hook-screen evidence is rejected by schema. No external canary, Goal
+acceptance, or host trust-admission success is claimed by this observer.
 
 The deterministic suite separates transport sentinels from unrelated semantic
 cases without exposing a runtime bypass. Fixtures selecting

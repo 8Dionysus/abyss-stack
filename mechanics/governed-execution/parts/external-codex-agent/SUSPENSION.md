@@ -80,6 +80,28 @@ or close any holder. A receipt proves only the runtime lifecycle transition;
   `pause_receipt_ref` must match the exact output path; a copied or incomplete
   receipt is not replayable.
 
+## Observe responsibility movement once
+
+When a return owner may be stalled, prepare one evidence snapshot and run the
+generic observer:
+
+```bash
+scripts/aoa-external-codex-stasis \
+  --observation /absolute/path/to/responsibility-observation.json \
+  --result /absolute/path/to/responsibility-movement.json
+```
+
+The snapshot must bind the exact holder and return owner, expected lifecycle
+transition, deadline, and observation cost. The command does not poll. It
+returns `not_due` or `cost_deferred` with one bounded next-observation hint,
+`progressing` only for transition evidence, or a typed stasis event plus
+review wake when the deadline has passed without that transition. A live PID,
+terminal, session, hook screen, or unchanged worktree is not progress. The
+observer never kills or restarts an actor, declares domain failure, accepts a
+Goal, closes a holder, or disturbs an unrelated actor. The typed wake is a
+request for the canonical return owner to review; transport delivery and
+semantic acceptance remain separate receipts.
+
 For a parent continuation, inspect only its exact state root and re-entry ID:
 
 ```bash

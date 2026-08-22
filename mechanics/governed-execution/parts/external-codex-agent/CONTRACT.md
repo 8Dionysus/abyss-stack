@@ -146,6 +146,25 @@ a handoff, authorize or close a holder, or claim semantic acceptance. The
   `response_available=false` must carry the matching recovery evidence, and
   `pause_receipt_ref` must equal the exact output path; copied or incomplete
   receipts are not replayable.
+- `aoa-external-codex-stasis --observation ... --result ...` performs exactly
+  one responsibility-movement observation. The observation binds the compiled
+  obligation, exact holder/return-owner identity, handoff, runtime state root,
+  transition deadline, cost budget, and immutable stop line. Its lifecycle
+  states are model-neutral (`accepted`, `session_started`, `turn_started`,
+  `progressing`, `waiting`, `returning`, and `terminal`). Only a matching
+  `lifecycle_transition` observed after the bound transition start can produce
+  `progressing`; process existence and session/tool/artifact/resource/transport
+  evidence are supporting or failure evidence, never progress by themselves,
+  and hook-screen evidence is not an admitted input. Before the deadline the
+  result is `not_due`; when the one-shot estimate exceeds its declared budget
+  it is `cost_deferred`, each with at most one later observation coordinate.
+  A due missing transition produces
+  `abyss_stack_external_codex_stasis_event_v1` plus
+  `abyss_stack_external_codex_typed_wake_v1` targeted at the exact return owner.
+  The wake requests owner review through the canonical return transport and
+  carries no kill, restart, domain-failure, Goal-acceptance, or unrelated-actor
+  effect. It does not deliver the wake itself, close a holder, or claim the
+  external canary; those remain separate lifecycle evidence.
 - `aoa-external-codex-return return --return-owner ... --handoff ...
   --holder-receipt ... --return-receipt ... --authorization ...
   --closure-receipt ...` is the canonical Codex return leaf. It validates the

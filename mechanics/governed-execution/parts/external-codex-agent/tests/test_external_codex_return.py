@@ -251,6 +251,15 @@ def test_pause_goal_proves_exact_active_to_paused_transition(
         json.dumps(owner_value, sort_keys=True) + "\n", encoding="utf-8"
     )
     endpoint = tmp_path / "app-server.sock"
+    pause_path = tmp_path / "pause-receipt.json"
+    reservation = MODULE._pause_reservation(
+        pause_path,
+        binding={
+            "owner_ref": str(owner_path.resolve()),
+            "owner_sha256": MODULE._sha256_bytes(owner_path.read_bytes()),
+            "pause_receipt_ref": str(pause_path.resolve()),
+        },
+    )
     fake = FakeRpc(
         endpoint,
         active_turn=None,
@@ -263,6 +272,8 @@ def test_pause_goal_proves_exact_active_to_paused_transition(
         MODULE.validate_pause_owner(owner_value),
         owner_path,
         endpoint,
+        reservation_path=pause_path,
+        reservation=reservation,
         rpc_factory=lambda path: fake,
     )
 
@@ -276,12 +287,49 @@ def test_pause_goal_proves_exact_active_to_paused_transition(
     }
     assert receipt["owner_acceptance"] == "separate"
     assert receipt["semantic_acceptance"] == "separate"
+    assert receipt["lifecycle"]["mutation_dispatched"]["method"] == (
+        "thread/goal/set"
+    )
     assert [method for method, _params in fake.calls] == [
         "initialize",
         "initialized",
         "thread/goal/get",
         "thread/goal/set",
     ]
+
+
+def test_pause_goal_requires_durable_reservation_before_transport(
+    tmp_path: Path,
+) -> None:
+    owner_path = tmp_path / "pause-owner.json"
+    owner_value = pause_owner(
+        goal="goal-pause-no-reservation",
+        thread="thread-pause-no-reservation",
+        endpoint="unix:/run/user/1000/example.sock",
+    )
+    owner_path.write_text(
+        json.dumps(owner_value, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    fake = FakeRpc(
+        tmp_path / "app-server.sock",
+        active_turn=None,
+        goal_status="active",
+        goal_set_status="paused",
+        thread_id="thread-pause-no-reservation",
+    )
+
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="requires a durable reservation",
+    ):
+        MODULE.pause_goal(
+            MODULE.validate_pause_owner(owner_value),
+            owner_path,
+            fake.endpoint,
+            rpc_factory=lambda path: fake,
+        )
+
+    assert not any(method == "thread/goal/set" for method, _params in fake.calls)
 
 
 @pytest.mark.parametrize("goal_status", ["paused", "blocked", "complete"])
@@ -826,7 +874,39 @@ def test_discovery_skips_stale_socket_candidate(
 
     assert resolved == current
     assert posture == "current_local_codex_app_server"
-    assert probed == [stale, current]
+    assert probed == [current]
+
+
+def test_discovery_retries_current_socket_across_bounded_restart_gap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ambient_home = tmp_path / "ambient"
+    current = ambient_home / ".codex/app-server-control/app-server-control.sock"
+    monkeypatch.delenv("AOA_CODEX_HOME", raising=False)
+    monkeypatch.delenv("CODEX_HOME", raising=False)
+    monkeypatch.delenv("AOA_CODEX_APP_SERVER_SOCKET", raising=False)
+    monkeypatch.delenv("CODEX_APP_SERVER_SOCKET", raising=False)
+    monkeypatch.setattr(MODULE.Path, "home", classmethod(lambda _cls: ambient_home))
+    monkeypatch.setattr(MODULE.Path, "is_socket", lambda path: path == current)
+    probes: list[Path] = []
+    sleeps: list[float] = []
+
+    def probe(path: Path) -> bool:
+        probes.append(path)
+        return len(probes) == 2
+
+    monkeypatch.setattr(MODULE, "_socket_is_connectable", probe)
+    monkeypatch.setattr(MODULE.time, "sleep", lambda delay: sleeps.append(delay))
+
+    resolved, posture = MODULE.discover_app_server_socket(
+        {"transport_posture": "resolve-current-local-codex-app-server"}
+    )
+
+    assert resolved == current
+    assert posture == "current_local_codex_app_server"
+    assert probes == [current, current]
+    assert sleeps == [MODULE.APP_SERVER_DISCOVERY_RETRY_DELAY_SECONDS]
 
 
 def test_existing_return_receipt_is_replayable_without_transport(

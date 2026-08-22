@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 133,
-  "edge_count": 2990,
+  "decision_count": 134,
+  "edge_count": 3011,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1090,
-    "DATED": 133,
-    "GUARDED_BY": 411,
-    "HAS_STATUS": 133,
-    "HAS_SURFACE_CLASS": 362,
-    "IN_STACK_LANE": 316,
-    "NEXT_DECISION": 132,
-    "OWNED_BY_SURFACE": 139,
-    "OWNS_DECISION": 133,
+    "CITES_SOURCE_SURFACE": 1096,
+    "DATED": 134,
+    "GUARDED_BY": 414,
+    "HAS_STATUS": 134,
+    "HAS_SURFACE_CLASS": 365,
+    "IN_STACK_LANE": 319,
+    "NEXT_DECISION": 133,
+    "OWNED_BY_SURFACE": 140,
+    "OWNS_DECISION": 134,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 139
+    "UNDER_MECHANIC_PARENT": 140
   },
   "edges": [
     {
@@ -14293,11 +14293,111 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0133",
+      "target": "decision:ABYSS-STACK-D-0134",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0133",
+      "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_responsibility_movement.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_return.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-responsibility-movement.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-responsibility-observation.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_responsibility_movement.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "date:2026-08-22",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "guard_family:bounded%20observation",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "guard_family:lifecycle%20transition",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "guard_family:typed%20wake",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "surface_class:lifecycle",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "surface_class:public-contract",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "surface_class:source/runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "stack_lane:governed-execution",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
       "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -14965,18 +15065,23 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0133",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0134",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1296,
+  "node_count": 1303,
   "node_type_counts": {
     "date": 43,
-    "decision": 133,
-    "guard_family": 222,
+    "decision": 134,
+    "guard_family": 224,
     "mechanic_parent": 11,
     "owner_surface": 68,
     "repo": 1,
-    "source_surface": 615,
+    "source_surface": 619,
     "stack_lane": 51,
     "status": 4,
     "surface_class": 148
@@ -16528,6 +16633,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-22",
+      "id": "decision:ABYSS-STACK-D-0134",
+      "label": "ABYSS-STACK-D-0134",
+      "path": "docs/decisions/ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md",
+      "posture": "accepted runtime rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0134 Generic Responsibility-Movement Observation",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -16630,6 +16745,11 @@
     {
       "id": "guard_family:bounded%20context",
       "label": "bounded context",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:bounded%20observation",
+      "label": "bounded observation",
       "type": "guard_family"
     },
     {
@@ -17625,6 +17745,11 @@
     {
       "id": "guard_family:tool-event%20rejection",
       "label": "tool-event rejection",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:typed%20wake",
+      "label": "typed wake",
       "type": "guard_family"
     },
     {
@@ -19964,6 +20089,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_responsibility_movement.py",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/external_codex_responsibility_movement.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_return.py",
       "label": "mechanics/governed-execution/parts/external-codex-agent/external_codex_return.py",
       "type": "source_surface"
@@ -20034,6 +20164,16 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-responsibility-movement.schema.json",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-responsibility-movement.schema.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-responsibility-observation.schema.json",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-responsibility-observation.schema.json",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-resume.schema.json",
       "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-resume.schema.json",
       "type": "source_surface"
@@ -20066,6 +20206,11 @@
     {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_projection.py",
       "label": "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_projection.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_responsibility_movement.py",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_responsibility_movement.py",
       "type": "source_surface"
     },
     {

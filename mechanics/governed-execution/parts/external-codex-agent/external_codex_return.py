@@ -21,6 +21,7 @@ import secrets
 import socket
 import struct
 import sys
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -40,6 +41,8 @@ PAUSE_RECEIPT_SCHEMA_VERSION = "abyss_stack_external_codex_pause_receipt_v1"
 WEBSOCKET_ACCEPT_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 APP_SERVER_DISCOVERY_PROBE_TIMEOUT_SECONDS = 1.0
+APP_SERVER_DISCOVERY_ATTEMPTS = 5
+APP_SERVER_DISCOVERY_RETRY_DELAY_SECONDS = 0.2
 APP_SERVER_TURN_LOOKUP_TIMEOUT_SECONDS = 30.0
 MAX_HANDSHAKE_BYTES = 64 * 1024
 MAX_FRAME_BYTES = 16 * 1024 * 1024
@@ -287,42 +290,74 @@ def _socket_is_connectable(path: Path) -> bool:
     return True
 
 
+def _discovery_candidates() -> list[Path]:
+    candidates: list[Path] = []
+    value = os.environ.get("AOA_CODEX_APP_SERVER_SOCKET")
+    if value:
+        candidates.append(_socket_path(value))
+    for environment_key in ("AOA_CODEX_HOME",):
+        value = os.environ.get(environment_key)
+        if value:
+            candidates.append(Path(value) / "app-server-control/app-server-control.sock")
+            candidates.append(Path(value) / ".codex/app-server-control/app-server-control.sock")
+    # Prefer the ambient operator home over a scoped CODEX_HOME.  The latter
+    # is normally the external holder's incarnation home during re-entry and
+    # must not capture a master return merely because its socket is live.
+    candidates.append(Path.home() / ".codex/app-server-control/app-server-control.sock")
+    value = os.environ.get("CODEX_APP_SERVER_SOCKET")
+    if value:
+        candidates.append(_socket_path(value))
+    value = os.environ.get("CODEX_HOME")
+    if value:
+        candidates.append(Path(value) / "app-server-control/app-server-control.sock")
+        candidates.append(Path(value) / ".codex/app-server-control/app-server-control.sock")
+    # Rebuild this list on every bounded attempt so a restart which replaces
+    # the socket inode can be found on re-entry.
+    return candidates
+
+
 def discover_app_server_socket(owner: dict[str, Any]) -> tuple[Path, str]:
-    """Resolve the current local Codex endpoint without embedding a task path."""
+    """Resolve the current local Codex endpoint across a bounded restart gap.
+
+    This is a reconnect allowance, not a watcher: at most five fresh socket
+    snapshots are probed, with a short delay between them.  The caller still
+    owns the exact Goal/return binding and the later RPC verifies that binding
+    through the app-server response.
+    """
 
     explicit = _endpoint_from_owner(owner)
     if explicit is not None:
         path = _socket_path(explicit)
-        if not path.is_socket():
-            raise ExternalCodexReturnError(f"app-server endpoint is not a socket: {path}")
-        return path, "owner_binding"
+        for attempt in range(APP_SERVER_DISCOVERY_ATTEMPTS):
+            if path.is_socket() and _socket_is_connectable(path):
+                return path, "owner_binding"
+            if attempt + 1 < APP_SERVER_DISCOVERY_ATTEMPTS:
+                time.sleep(APP_SERVER_DISCOVERY_RETRY_DELAY_SECONDS)
+        raise ExternalCodexReturnError(
+            f"owner-bound app-server endpoint is not connectable after bounded discovery: {path}"
+        )
 
     if owner["transport_posture"] != "resolve-current-local-codex-app-server":
         raise ExternalCodexReturnError(
             "return owner lacks an explicit endpoint or supported discovery posture"
         )
     candidates: list[Path] = []
-    for environment_key in ("AOA_CODEX_APP_SERVER_SOCKET", "CODEX_APP_SERVER_SOCKET"):
-        value = os.environ.get(environment_key)
-        if value:
-            candidates.append(_socket_path(value))
-    for environment_key in ("AOA_CODEX_HOME", "CODEX_HOME"):
-        value = os.environ.get(environment_key)
-        if value:
-            candidates.append(Path(value) / "app-server-control/app-server-control.sock")
-            candidates.append(Path(value) / ".codex/app-server-control/app-server-control.sock")
-    candidates.append(Path.home() / ".codex/app-server-control/app-server-control.sock")
-    seen: set[Path] = set()
-    for path in candidates:
-        if path in seen:
-            continue
-        seen.add(path)
-        if path.is_absolute() and not path.is_symlink() and path.is_socket():
-            if _socket_is_connectable(path):
-                return path, "current_local_codex_app_server"
+    for attempt in range(APP_SERVER_DISCOVERY_ATTEMPTS):
+        candidates = _discovery_candidates()
+        seen: set[Path] = set()
+        for path in candidates:
+            if path in seen:
+                continue
+            seen.add(path)
+            if path.is_absolute() and not path.is_symlink() and path.is_socket():
+                if _socket_is_connectable(path):
+                    return path, "current_local_codex_app_server"
+        if attempt + 1 < APP_SERVER_DISCOVERY_ATTEMPTS:
+            time.sleep(APP_SERVER_DISCOVERY_RETRY_DELAY_SECONDS)
     rendered = ", ".join(str(path) for path in candidates)
     raise ExternalCodexReturnError(
-        f"current local Codex app-server socket was not found ({rendered})"
+        "current local Codex app-server socket was not found after bounded "
+        f"discovery ({rendered})"
     )
 
 
@@ -1074,6 +1109,8 @@ def pause_goal(
     ``thread/goal/set`` frame but lost its response, a durable active
     precondition plus post-send dispatch marker permits a read-only
     reconciliation of the already-paused Goal without issuing a second set.
+    Every mutation attempt must carry its durable reservation so the completed
+    pause receipt cannot omit the dispatch evidence required by its schema.
     """
 
     if owner_bytes is None:
@@ -1134,6 +1171,10 @@ def pause_goal(
             raise ExternalCodexReturnError(
                 "Codex app-server Goal is not pausable from active state: "
                 f"{goal_before_status!r}"
+            )
+        if reservation_path is None or reservation is None:
+            raise ExternalCodexReturnError(
+                "Goal pause mutation requires a durable reservation"
             )
         if reservation is not None:
             mutation_dispatched = reservation.get("mutation_dispatched")
