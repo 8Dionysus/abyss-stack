@@ -11,14 +11,14 @@ Decision records own rationale; this directory contains generated graph read mod
 ## Counts
 
 - Decisions: 133
-- Nodes: 1294
-- Edges: 2988
+- Nodes: 1296
+- Edges: 2990
 
 ## Node Types
 
 - `date`: 43
 - `decision`: 133
-- `guard_family`: 221
+- `guard_family`: 223
 - `mechanic_parent`: 11
 - `owner_surface`: 69
 - `repo`: 1
@@ -31,7 +31,7 @@ Decision records own rationale; this directory contains generated graph read mod
 
 - `CITES_SOURCE_SURFACE`: 1089
 - `DATED`: 133
-- `GUARDED_BY`: 411
+- `GUARDED_BY`: 413
 - `HAS_STATUS`: 133
 - `HAS_SURFACE_CLASS`: 362
 - `IN_STACK_LANE`: 316

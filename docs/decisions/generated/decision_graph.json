@@ -1,11 +1,11 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 133,
-  "edge_count": 2988,
+  "edge_count": 2990,
   "edge_type_counts": {
     "CITES_SOURCE_SURFACE": 1089,
     "DATED": 133,
-    "GUARDED_BY": 411,
+    "GUARDED_BY": 413,
     "HAS_STATUS": 133,
     "HAS_SURFACE_CLASS": 362,
     "IN_STACK_LANE": 316,
@@ -14238,6 +14238,16 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0133",
+      "target": "guard_family:fd%20ownership",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "guard_family:no-follow%20cleanup",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
       "target": "guard_family:source/runtime%20boundary",
       "type": "GUARDED_BY"
     },
@@ -14958,11 +14968,11 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1294,
+  "node_count": 1296,
   "node_type_counts": {
     "date": 43,
     "decision": 133,
-    "guard_family": 221,
+    "guard_family": 223,
     "mechanic_parent": 11,
     "owner_surface": 69,
     "repo": 1,
@@ -16928,6 +16938,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:fd%20ownership",
+      "label": "fd ownership",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:federation%20surface",
       "label": "federation surface",
       "type": "guard_family"
@@ -17145,6 +17160,11 @@
     {
       "id": "guard_family:no%20semantic%20proxy",
       "label": "no semantic proxy",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:no-follow%20cleanup",
+      "label": "no-follow cleanup",
       "type": "guard_family"
     },
     {

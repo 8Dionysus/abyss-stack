@@ -262,23 +262,30 @@ def test_pytest_temp_namespace_falls_back_when_actual_candidate_creation_fails(
     runtime_root = tmp_path / "runtime-root"
     debug_root.mkdir()
     runtime_root.mkdir()
-    real_mkdtemp = run_pytest_lane.tempfile.mkdtemp
-    calls: list[str | None] = []
+    debug_identity = (debug_root.stat().st_dev, debug_root.stat().st_ino)
+    calls: list[tuple[int, str]] = []
+    original_mkdir = run_pytest_lane.os.mkdir
 
-    def fake_mkdtemp(*, prefix, dir=None):
-        calls.append(dir)
-        if dir == str(debug_root):
-            raise PermissionError("simulated parent became unusable at creation")
-        return real_mkdtemp(prefix=prefix, dir=dir)
+    def fake_mkdir(name, mode=0o777, *, dir_fd=None):
+        if dir_fd is not None:
+            identity = (os.fstat(dir_fd).st_dev, os.fstat(dir_fd).st_ino)
+            calls.append((identity[1], name))
+            if identity == debug_identity:
+                raise PermissionError("simulated parent became unusable at creation")
+        return original_mkdir(name, mode, dir_fd=dir_fd)
 
     monkeypatch.setenv("PYTEST_DEBUG_TEMPROOT", str(debug_root))
     monkeypatch.setenv("TMPDIR", str(runtime_root))
-    monkeypatch.setattr(run_pytest_lane.tempfile, "mkdtemp", fake_mkdtemp)
+    monkeypatch.setattr(run_pytest_lane.os, "mkdir", fake_mkdir)
 
     with run_pytest_lane.owned_pytest_temp_namespace() as namespace:
-        assert namespace.parent == runtime_root
+        assert namespace.name == run_pytest_lane.PYTEST_TEMP_BASETEMP_NAME
+        assert namespace.parent.parent == runtime_root
 
-    assert calls == [str(debug_root), str(runtime_root)]
+    assert len(calls) == 2
+    assert calls[0][0] == debug_root.stat().st_ino
+    assert calls[1][0] == runtime_root.stat().st_ino
+    assert all(name.startswith(run_pytest_lane.PYTEST_TEMP_PREFIX) for _inode, name in calls)
     assert not list(debug_root.iterdir())
     assert not list(runtime_root.iterdir())
 
@@ -289,20 +296,21 @@ def test_pytest_temp_namespace_has_no_probe_directory(
 ) -> None:
     debug_root = tmp_path / "debug-root"
     debug_root.mkdir()
-    real_mkdtemp = run_pytest_lane.tempfile.mkdtemp
-    created: list[Path] = []
+    created: list[str] = []
+    original_mkdir = run_pytest_lane.os.mkdir
 
-    def recording_mkdtemp(*, prefix, dir=None):
-        path = Path(real_mkdtemp(prefix=prefix, dir=dir))
-        created.append(path)
-        return str(path)
+    def recording_mkdir(name, mode=0o777, *, dir_fd=None):
+        if dir_fd is not None:
+            created.append(name)
+        return original_mkdir(name, mode, dir_fd=dir_fd)
 
     monkeypatch.setenv("PYTEST_DEBUG_TEMPROOT", str(debug_root))
     monkeypatch.delenv("TMPDIR", raising=False)
-    monkeypatch.setattr(run_pytest_lane.tempfile, "mkdtemp", recording_mkdtemp)
+    monkeypatch.setattr(run_pytest_lane.os, "mkdir", recording_mkdir)
 
     with run_pytest_lane.owned_pytest_temp_namespace() as namespace:
-        assert created == [namespace]
+        assert created == [namespace.parent.name]
+        assert namespace.name == run_pytest_lane.PYTEST_TEMP_BASETEMP_NAME
 
     assert not list(debug_root.iterdir())
 
@@ -315,23 +323,31 @@ def test_pytest_temp_namespace_falls_through_to_default_tempfile(
     runtime_root = tmp_path / "runtime-root"
     debug_root.mkdir()
     runtime_root.mkdir()
-    real_mkdtemp = run_pytest_lane.tempfile.mkdtemp
-    calls: list[str | None] = []
+    default_root = tmp_path / "default-root"
+    default_root.mkdir()
+    identities = {
+        root.stat().st_ino: root
+        for root in (debug_root, runtime_root, default_root)
+    }
+    calls: list[Path] = []
+    original_mkdir = run_pytest_lane.os.mkdir
 
-    def fake_mkdtemp(*, prefix, dir=None):
-        calls.append(dir)
-        if dir in {str(debug_root), str(runtime_root)}:
-            raise PermissionError("simulated unusable candidate")
-        return real_mkdtemp(prefix=prefix, dir=dir)
+    def fake_mkdir(name, mode=0o777, *, dir_fd=None):
+        if dir_fd is not None:
+            root = identities[os.fstat(dir_fd).st_ino]
+            calls.append(root)
+            if root in {debug_root, runtime_root}:
+                raise PermissionError("simulated unusable candidate")
+        return original_mkdir(name, mode, dir_fd=dir_fd)
 
     monkeypatch.setenv("PYTEST_DEBUG_TEMPROOT", str(debug_root))
     monkeypatch.setenv("TMPDIR", str(runtime_root))
-    monkeypatch.setattr(run_pytest_lane.tempfile, "mkdtemp", fake_mkdtemp)
+    monkeypatch.setattr(run_pytest_lane.tempfile, "gettempdir", lambda: str(default_root))
+    monkeypatch.setattr(run_pytest_lane.os, "mkdir", fake_mkdir)
 
     with run_pytest_lane.owned_pytest_temp_namespace() as namespace:
-        assert calls == [str(debug_root), str(runtime_root), None]
-        assert namespace.parent != debug_root
-        assert namespace.parent != runtime_root
+        assert calls == [debug_root, runtime_root, default_root]
+        assert namespace.parent.parent == default_root
 
     assert not list(runtime_root.iterdir())
 
@@ -344,30 +360,79 @@ def test_pytest_temp_namespace_reports_bounded_candidate_exhaustion(
     runtime_root = tmp_path / "runtime-root"
     debug_root.mkdir()
     runtime_root.mkdir()
-    calls: list[str | None] = []
+    default_root = tmp_path / "default-root"
+    default_root.mkdir()
+    identities = {
+        root.stat().st_ino: root
+        for root in (debug_root, runtime_root, default_root)
+    }
+    calls: list[Path] = []
 
-    def fail_mkdtemp(*, prefix, dir=None):
-        calls.append(dir)
+    def fail_mkdir(name, mode=0o777, *, dir_fd=None):
+        root = identities[os.fstat(dir_fd).st_ino]
+        calls.append(root)
         raise PermissionError("simulated exhausted candidates")
 
     monkeypatch.setenv("PYTEST_DEBUG_TEMPROOT", str(debug_root))
     monkeypatch.setenv("TMPDIR", str(runtime_root))
-    monkeypatch.setattr(run_pytest_lane.tempfile, "mkdtemp", fail_mkdtemp)
+    monkeypatch.setattr(run_pytest_lane.tempfile, "gettempdir", lambda: str(default_root))
+    monkeypatch.setattr(run_pytest_lane.os, "mkdir", fail_mkdir)
 
-    with pytest.raises(OSError, match="trying all candidates"):
-        with run_pytest_lane.owned_pytest_temp_namespace():
-            raise AssertionError("namespace creation should not reach the body")
+    with pytest.raises(run_pytest_lane.PytestTempNamespaceCreationError, match="trying all candidates"):
+        run_pytest_lane._pytest_temp_directory()
 
-    assert calls == [str(debug_root), str(runtime_root), None]
+    assert calls == [debug_root, runtime_root, default_root]
     assert not list(debug_root.iterdir())
     assert not list(runtime_root.iterdir())
+
+
+def test_pytest_temp_namespace_fails_closed_without_identity_handle(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delattr(run_pytest_lane.os, "O_PATH", raising=False)
+
+    with pytest.raises(
+        run_pytest_lane.PytestTempNamespaceCreationError,
+        match="O_PATH",
+    ):
+        run_pytest_lane._pytest_temp_directory(tmp_path)
+
+    assert not list(tmp_path.iterdir())
+
+
+def test_pytest_lane_normalizes_candidate_exhaustion_at_runner_boundary(
+    monkeypatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    debug_root = tmp_path / "debug-root"
+    runtime_root = tmp_path / "runtime-root"
+    default_root = tmp_path / "default-root"
+    for root in (debug_root, runtime_root, default_root):
+        root.mkdir()
+
+    def fail_mkdir(name, mode=0o777, *, dir_fd=None):
+        raise PermissionError("simulated exhausted candidates")
+
+    monkeypatch.setenv("PYTEST_DEBUG_TEMPROOT", str(debug_root))
+    monkeypatch.setenv("TMPDIR", str(runtime_root))
+    monkeypatch.setattr(run_pytest_lane.tempfile, "gettempdir", lambda: str(default_root))
+    monkeypatch.setattr(run_pytest_lane.os, "mkdir", fail_mkdir)
+
+    assert (
+        run_pytest_lane.main(["--scheduler", "serial"])
+        == run_pytest_lane.PYTEST_TEMP_CREATION_FAILURE_EXIT_CODE
+    )
+    assert "[error] unable to create an owner-owned pytest temporary namespace" in capsys.readouterr().err
 
 
 def test_pytest_invocation_namespaces_are_unique_and_cleaned(tmp_path: Path) -> None:
     with run_pytest_lane.owned_pytest_temp_namespace(tmp_path) as first:
         with run_pytest_lane.owned_pytest_temp_namespace(tmp_path) as second:
             assert first != second
-            assert first.parent == second.parent == tmp_path
+            assert first.parent != second.parent
+            assert first.parent.parent == second.parent.parent == tmp_path
             first_command = run_pytest_lane.build_pytest_command(
                 extra_args=["tests/test_validation_command_authority.py"],
                 basetemp=first,
@@ -399,20 +464,20 @@ def test_pytest_temp_cleanup_failure_leaves_owner_diagnostic(
 
     with pytest.raises(run_pytest_lane.PytestTempCleanupError) as raised:
         with run_pytest_lane.owned_pytest_temp_namespace(tmp_path) as namespace:
-            (namespace / "owned-state").write_text("owned\n", encoding="utf-8")
+            (namespace.parent / "owned-state").write_text("owned\n", encoding="utf-8")
 
     result = raised.value.result
     assert not result.ok
     assert result.attempts == run_pytest_lane.PYTEST_TEMP_CLEANUP_ATTEMPTS
     assert result.diagnostic == (
-        tmp_path / f".{namespace.name}.cleanup-failed.json"
+        tmp_path / f".{namespace.parent.name}.cleanup-failed.json"
     )
     payload = json.loads(result.diagnostic.read_text(encoding="utf-8"))
     assert payload["schema_version"] == (
         run_pytest_lane.PYTEST_TEMP_CLEANUP_DIAGNOSTIC_SCHEMA
     )
     assert payload["status"] == "cleanup_failed"
-    assert payload["namespace"] == str(namespace)
+    assert payload["namespace"] == str(namespace.parent)
     assert len(payload["failures"]) == run_pytest_lane.PYTEST_TEMP_CLEANUP_ATTEMPTS
     assert "[pytest-temp-cleanup-failed]" in capsys.readouterr().err
 
@@ -421,74 +486,76 @@ def test_pytest_temp_cleanup_diagnostic_is_private_and_closes_fd(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
-    namespace = tmp_path / "owned-namespace"
-    namespace.mkdir()
-    opened: list[int] = []
-    closed: list[int] = []
-    observed_flags: list[int] = []
-    observed_modes: list[int] = []
-    original_open = run_pytest_lane.os.open
-    original_write = run_pytest_lane.os.write
-    original_close = run_pytest_lane.os.close
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    try:
+        opened: list[int] = []
+        closed: list[int] = []
+        observed_flags: list[int] = []
+        observed_modes: list[int] = []
+        original_open = run_pytest_lane.os.open
+        original_write = run_pytest_lane.os.write
+        original_close = run_pytest_lane.os.close
 
-    def recording_open(path, flags, mode=0o777, **kwargs):
-        descriptor = original_open(path, flags, mode, **kwargs)
-        opened.append(descriptor)
-        observed_flags.append(flags)
-        observed_modes.append(mode)
-        return descriptor
+        def recording_open(path, flags, mode=0o777, **kwargs):
+            descriptor = original_open(path, flags, mode, **kwargs)
+            opened.append(descriptor)
+            observed_flags.append(flags)
+            observed_modes.append(mode)
+            return descriptor
 
-    def short_write(descriptor: int, content) -> int:
-        return original_write(descriptor, content[:3])
+        def short_write(descriptor: int, content) -> int:
+            return original_write(descriptor, content[:3])
 
-    def recording_close(descriptor: int) -> None:
-        closed.append(descriptor)
-        original_close(descriptor)
+        def recording_close(descriptor: int) -> None:
+            closed.append(descriptor)
+            original_close(descriptor)
 
-    monkeypatch.setattr(run_pytest_lane.os, "open", recording_open)
-    monkeypatch.setattr(run_pytest_lane.os, "write", short_write)
-    monkeypatch.setattr(run_pytest_lane.os, "close", recording_close)
+        with monkeypatch.context() as patch:
+            patch.setattr(run_pytest_lane.os, "open", recording_open)
+            patch.setattr(run_pytest_lane.os, "write", short_write)
+            patch.setattr(run_pytest_lane.os, "close", recording_close)
 
-    diagnostic = run_pytest_lane._write_cleanup_diagnostic(
-        namespace,
-        [{"attempt": "1", "error_type": "OSError", "error": "failure"}],
-    )
+            diagnostic = run_pytest_lane._write_cleanup_diagnostic(
+                handle,
+                [{"attempt": "1", "error_type": "OSError", "error": "failure"}],
+            )
 
-    assert diagnostic == run_pytest_lane._cleanup_diagnostic_path(namespace)
-    assert len(opened) == 1
-    assert closed == opened
-    assert observed_modes == [0o600]
-    flags = observed_flags[0]
-    assert flags & run_pytest_lane.os.O_CREAT
-    assert flags & run_pytest_lane.os.O_EXCL
-    if hasattr(run_pytest_lane.os, "O_NOFOLLOW"):
-        assert flags & run_pytest_lane.os.O_NOFOLLOW
-    assert stat.S_IMODE(diagnostic.lstat().st_mode) == 0o600
-    payload = json.loads(diagnostic.read_text(encoding="utf-8"))
-    assert payload["status"] == "cleanup_failed"
-    assert payload["failures"] == [
-        {"attempt": "1", "error_type": "OSError", "error": "failure"}
-    ]
+        assert diagnostic == run_pytest_lane._cleanup_diagnostic_path(handle.path)
+        assert len(opened) == 1
+        assert closed == opened
+        assert observed_modes == [0o600]
+        flags = observed_flags[0]
+        assert flags & run_pytest_lane.os.O_CREAT
+        assert flags & run_pytest_lane.os.O_EXCL
+        if hasattr(run_pytest_lane.os, "O_NOFOLLOW"):
+            assert flags & run_pytest_lane.os.O_NOFOLLOW
+        assert stat.S_IMODE(diagnostic.lstat().st_mode) == 0o600
+        payload = json.loads(diagnostic.read_text(encoding="utf-8"))
+        assert payload["status"] == "cleanup_failed"
+        assert payload["failures"] == [
+            {"attempt": "1", "error_type": "OSError", "error": "failure"}
+        ]
+    finally:
+        assert run_pytest_lane.cleanup_pytest_temp_namespace(handle).ok
 
 
 def test_pytest_temp_cleanup_diagnostic_rejects_symlink_collision_without_following(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    namespace = tmp_path / "owned-namespace"
-    namespace.mkdir()
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
     outside = tmp_path / "outside"
     outside.mkdir()
     marker = outside / "runner-writable-marker"
     marker.write_bytes(b"outside bytes must survive\n")
     marker.chmod(0o640)
-    diagnostic = run_pytest_lane._cleanup_diagnostic_path(namespace)
+    diagnostic = run_pytest_lane._cleanup_diagnostic_path(handle.path)
     diagnostic.symlink_to(marker)
     before_bytes = marker.read_bytes()
     before_mode = stat.S_IMODE(marker.stat().st_mode)
 
     result = run_pytest_lane._write_cleanup_diagnostic(
-        namespace,
+        handle,
         [{"attempt": "1", "error_type": "OSError", "error": "failure"}],
     )
 
@@ -498,69 +565,207 @@ def test_pytest_temp_cleanup_diagnostic_rejects_symlink_collision_without_follow
     assert marker.read_bytes() == before_bytes
     assert stat.S_IMODE(marker.stat().st_mode) == before_mode
     assert "[pytest-temp-cleanup-diagnostic-failed]" in capsys.readouterr().err
+    assert run_pytest_lane.cleanup_pytest_temp_namespace(handle).ok
+    diagnostic.unlink()
+
+
+def test_pytest_temp_cleanup_removes_partial_diagnostic_only(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    original_write = run_pytest_lane.os.write
+    writes = 0
+
+    def partial_write(descriptor: int, content) -> int:
+        nonlocal writes
+        writes += 1
+        if writes == 1:
+            return original_write(descriptor, content[:5])
+        return 0
+
+    diagnostic = run_pytest_lane._cleanup_diagnostic_path(handle.path)
+    monkeypatch.setattr(run_pytest_lane.os, "write", partial_write)
+    assert (
+        run_pytest_lane._write_cleanup_diagnostic(
+            handle,
+            [{"attempt": "1", "error_type": "OSError", "error": "failure"}],
+        )
+        is None
+    )
+    assert not diagnostic.exists()
+    assert run_pytest_lane.cleanup_pytest_temp_namespace(handle).ok
+
+
+def test_pytest_temp_cleanup_removes_diagnostic_after_close_failure(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    original_open = run_pytest_lane.os.open
+    original_close = run_pytest_lane.os.close
+    diagnostic = run_pytest_lane._cleanup_diagnostic_path(handle.path)
+    diagnostic_fd: int | None = None
+
+    def recording_open(path, flags, mode=0o777, **kwargs):
+        nonlocal diagnostic_fd
+        descriptor = original_open(path, flags, mode, **kwargs)
+        if path == diagnostic.name and kwargs.get("dir_fd") == handle.parent_fd:
+            diagnostic_fd = descriptor
+        return descriptor
+
+    def failing_close(descriptor: int) -> None:
+        original_close(descriptor)
+        if descriptor == diagnostic_fd:
+            raise OSError("simulated diagnostic close failure")
+
+    monkeypatch.setattr(run_pytest_lane.os, "open", recording_open)
+    monkeypatch.setattr(run_pytest_lane.os, "close", failing_close)
+    assert (
+        run_pytest_lane._write_cleanup_diagnostic(
+            handle,
+            [{"attempt": "1", "error_type": "OSError", "error": "failure"}],
+        )
+        is None
+    )
+    assert not diagnostic.exists()
+    monkeypatch.undo()
+    assert run_pytest_lane.cleanup_pytest_temp_namespace(handle).ok
+
+
+def test_pytest_temp_namespace_fd_handles_are_independent_and_closed(
+    tmp_path: Path,
+) -> None:
+    serial_handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    shard_handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    descriptors = {
+        serial_handle.parent_fd,
+        serial_handle.namespace_fd,
+        shard_handle.parent_fd,
+        shard_handle.namespace_fd,
+    }
+    assert len(descriptors) == 4
+    assert run_pytest_lane.cleanup_pytest_temp_namespace(serial_handle).ok
+    assert run_pytest_lane.cleanup_pytest_temp_namespace(shard_handle).ok
+    for descriptor in descriptors:
+        with pytest.raises(OSError):
+            os.fstat(descriptor)
+
+
+def test_pytest_temp_cleanup_stays_with_original_parent_after_ancestor_swap(
+    tmp_path: Path,
+) -> None:
+    base = tmp_path / "topology"
+    parent = base / "parent"
+    outside = base / "outside"
+    base.mkdir()
+    parent.mkdir()
+    outside.mkdir()
+    marker = outside / "marker"
+    marker.write_text("outside\n", encoding="utf-8")
+    handle = run_pytest_lane._pytest_temp_directory(parent)
+    (handle.path / "owned").write_text("owned\n", encoding="utf-8")
+    outside_namespace = outside / handle.name
+    outside_namespace.mkdir()
+    (outside_namespace / "outside-owned").write_text("preserve\n", encoding="utf-8")
+
+    renamed_parent = base / "renamed-parent"
+    parent.rename(renamed_parent)
+    parent.symlink_to(outside, target_is_directory=True)
+
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
+
+    assert result.ok is True
+    assert not (renamed_parent / handle.name).exists()
+    assert marker.read_text(encoding="utf-8") == "outside\n"
+    assert (outside_namespace / "outside-owned").read_text(encoding="utf-8") == "preserve\n"
+
+    (outside_namespace / "outside-owned").unlink()
+    outside_namespace.rmdir()
+    marker.unlink()
+    parent.unlink()
+    renamed_parent.rmdir()
+    outside.rmdir()
+    base.rmdir()
+
+
+def test_pytest_cleanup_diagnostic_is_published_under_original_parent_after_swap(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    base = tmp_path / "diagnostic-topology"
+    parent = base / "parent"
+    outside = base / "outside"
+    base.mkdir()
+    parent.mkdir()
+    outside.mkdir()
+    marker = outside / "marker"
+    marker.write_text("outside\n", encoding="utf-8")
+    handle = run_pytest_lane._pytest_temp_directory(parent)
+    (handle.path / "owned").write_text("owned\n", encoding="utf-8")
+    outside_namespace = outside / handle.name
+    outside_namespace.mkdir()
+
+    renamed_parent = base / "renamed-parent"
+    parent.rename(renamed_parent)
+    parent.symlink_to(outside, target_is_directory=True)
+    monkeypatch.setattr(
+        run_pytest_lane,
+        "_remove_owned_namespace",
+        lambda _handle: (_ for _ in ()).throw(OSError("forced cleanup failure")),
+    )
+    monkeypatch.setattr(run_pytest_lane, "PYTEST_TEMP_CLEANUP_RETRY_DELAY_SECONDS", 0)
+
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
+    diagnostic_name = f".{handle.name}.cleanup-failed.json"
+
+    assert result.ok is False
+    assert (renamed_parent / diagnostic_name).is_file()
+    assert not (outside / diagnostic_name).exists()
+    assert marker.read_text(encoding="utf-8") == "outside\n"
+    assert outside_namespace.is_dir()
+    assert (renamed_parent / handle.name).is_dir()
+
+    (renamed_parent / diagnostic_name).unlink()
+    (renamed_parent / handle.name / "owned").unlink()
+    (renamed_parent / handle.name).rmdir()
+    outside_namespace.rmdir()
+    marker.unlink()
+    parent.unlink()
+    renamed_parent.rmdir()
+    outside.rmdir()
+    base.rmdir()
 
 
 def test_pytest_temp_cleanup_handles_readonly_owned_paths(tmp_path: Path) -> None:
-    namespace = tmp_path / "owned-namespace"
-    readonly_directory = namespace / "runtime" / "release"
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    readonly_directory = handle.path / "runtime" / "release"
     readonly_directory.mkdir(parents=True)
     (readonly_directory / "manifest.json").write_text("{}\n", encoding="utf-8")
     (readonly_directory / "manifest.json").chmod(0o400)
     readonly_directory.chmod(0o500)
 
-    result = run_pytest_lane.cleanup_pytest_temp_namespace(namespace)
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
 
     assert result.ok is True
-    assert not namespace.exists()
+    assert not handle.path.exists()
 
 
-@pytest.mark.parametrize("callback_api", ("onexc", "onerror"))
-def test_pytest_temp_cleanup_handles_os_open_error_callback_without_replaying_it(
-    monkeypatch,
+def test_pytest_temp_cleanup_repairs_mode_zero_nested_directory_as_owner(
     tmp_path: Path,
-    callback_api: str,
 ) -> None:
-    namespace = tmp_path / "owned-namespace"
-    namespace.mkdir()
-    (namespace / "manifest.json").write_text("{}\n", encoding="utf-8")
-    original_rmtree = run_pytest_lane.shutil.rmtree
-    observed_functions: list[object] = []
-    calls = 0
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    nested = handle.path / "mode-zero"
+    nested.mkdir()
+    payload = nested / "payload.txt"
+    payload.write_text("owned\n", encoding="utf-8")
+    payload.chmod(0o400)
+    nested.chmod(0)
 
-    def fake_onexc_rmtree(path, *, onexc):
-        nonlocal calls
-        calls += 1
-        if calls > 1:
-            original_rmtree(path)
-            return
-        error = PermissionError("simulated os.open failure")
-        observed_functions.append(os.open)
-        onexc(os.open, str(path), error)
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
 
-    def fake_onerror_rmtree(path, *, onerror):
-        nonlocal calls
-        calls += 1
-        if calls > 1:
-            original_rmtree(path)
-            return
-        error = PermissionError("simulated os.open failure")
-        observed_functions.append(os.open)
-        onerror(os.open, str(path), (type(error), error, None))
-
-    monkeypatch.setattr(
-        run_pytest_lane.shutil,
-        "rmtree",
-        fake_onexc_rmtree if callback_api == "onexc" else fake_onerror_rmtree,
-    )
-    monkeypatch.setattr(run_pytest_lane, "PYTEST_TEMP_CLEANUP_RETRY_DELAY_SECONDS", 0)
-
-    result = run_pytest_lane.cleanup_pytest_temp_namespace(namespace)
-
-    assert observed_functions == [os.open]
     assert result.ok is True
-    assert result.attempts == 2
-    assert calls == 2
-    assert not namespace.exists()
+    assert not handle.path.exists()
 
 
 def test_pytest_temp_cleanup_fd_chmod_survives_symlink_swap(
@@ -573,8 +778,8 @@ def test_pytest_temp_cleanup_fd_chmod_survives_symlink_swap(
     ):
         pytest.skip("fd no-follow directory permission support is unavailable")
 
-    namespace = tmp_path / "owned-namespace"
-    candidate = namespace / "readonly-directory"
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    candidate = handle.path / "readonly-directory"
     outside = tmp_path / "outside"
     marker = outside / "keep.txt"
     candidate.mkdir(parents=True)
@@ -583,6 +788,9 @@ def test_pytest_temp_cleanup_fd_chmod_survives_symlink_swap(
     candidate.chmod(0o500)
     outside.chmod(0o500)
 
+    expected = run_pytest_lane._ObjectIdentity.from_stat(
+        os.stat("readonly-directory", dir_fd=handle.namespace_fd, follow_symlinks=False)
+    )
     original_fchmod = run_pytest_lane.os.fchmod
     swapped = False
 
@@ -600,26 +808,31 @@ def test_pytest_temp_cleanup_fd_chmod_survives_symlink_swap(
         lambda *_args, **_kwargs: pytest.fail("cleanup must not chmod by path"),
     )
 
-    run_pytest_lane._make_owned_directory_writable(candidate)
+    with pytest.raises(OSError, match="identity changed"):
+        run_pytest_lane._make_owned_directory_writable(
+            handle.namespace_fd,
+            candidate.name,
+            expected,
+        )
 
     assert swapped is True
     assert stat.S_IMODE(outside.stat().st_mode) == 0o500
     assert marker.read_text(encoding="utf-8") == "no-loss\n"
+    assert run_pytest_lane.cleanup_pytest_temp_namespace(handle).ok
 
 
 def test_pytest_temp_cleanup_does_not_follow_owned_symlinks(tmp_path: Path) -> None:
-    namespace = tmp_path / "owned-namespace"
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
     outside = tmp_path / "outside"
-    namespace.mkdir()
     outside.mkdir()
     marker = outside / "keep.txt"
     marker.write_text("no-loss\n", encoding="utf-8")
-    (namespace / "external").symlink_to(outside, target_is_directory=True)
+    (handle.path / "external").symlink_to(outside, target_is_directory=True)
 
-    result = run_pytest_lane.cleanup_pytest_temp_namespace(namespace)
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
 
     assert result.ok is True
-    assert not namespace.exists()
+    assert not handle.path.exists()
     assert marker.read_text(encoding="utf-8") == "no-loss\n"
 
 
@@ -757,7 +970,7 @@ def test_process_lane_allocates_and_cleans_collect_and_shard_basetemps(
     ]
     assert len(basetemps) == 3
     assert len(set(basetemps)) == len(basetemps)
-    assert all(path.parent == tmp_path for path in basetemps)
+    assert all(path.parent.parent == tmp_path for path in basetemps)
     assert all(not path.exists() for path in basetemps)
 
 

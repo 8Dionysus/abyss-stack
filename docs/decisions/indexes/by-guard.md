@@ -525,6 +525,10 @@
 
 - [ABYSS-STACK-D-0130 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0130-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0130-frontload-release-artifact-guard.md`)
 
+## fd ownership
+
+- [ABYSS-STACK-D-0133 Owner-Owned Pytest Temporary Namespaces](../ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md`)
+
 ## federation surface
 
 - [ABYSS-STACK-D-0064 Federation Effective Runtime Inputs](../ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md) (`docs/decisions/ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md`)
@@ -700,6 +704,10 @@
 ## no semantic proxy
 
 - [ABYSS-STACK-D-0095 Cross-Organ Orchestration Host Boundary](../ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md) (`docs/decisions/ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md`)
+
+## no-follow cleanup
+
+- [ABYSS-STACK-D-0133 Owner-Owned Pytest Temporary Namespaces](../ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md`)
 
 ## observe-only usage
 
