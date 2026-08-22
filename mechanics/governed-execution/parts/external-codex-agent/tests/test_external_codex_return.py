@@ -66,7 +66,6 @@ class FakeRpc:
         if method == "thread/goal/get":
             return {
                 "goal": {
-                    "goalId": self.goal_id,
                     "threadId": self.thread_id,
                     "status": self.goal_status,
                 }
@@ -74,17 +73,20 @@ class FakeRpc:
         if method == "thread/goal/set":
             return {
                 "goal": {
-                    "goalId": self.goal_id,
                     "threadId": self.thread_id,
                     "status": "active",
                 }
             }
-        if method == "thread/turns/list":
+        if method == "thread/read":
             if self.active_turn is None:
-                return {"data": []}
-            return {"data": [{"id": self.active_turn, "status": "inProgress"}]}
-        if method in {"turn/start", "turn/steer"}:
-            return {"turn": {"id": "new-turn", "status": "inProgress"}}
+                turns: list[dict[str, object]] = []
+            else:
+                turns = [{"id": self.active_turn, "status": "inProgress", "items": []}]
+            return {"thread": {"id": self.thread_id, "turns": turns}}
+        if method == "turn/start":
+            return {"turn": {"id": "new-turn", "status": "inProgress", "items": []}}
+        if method == "turn/steer":
+            return {"turnId": "new-turn"}
         raise AssertionError(method)
 
 
@@ -437,6 +439,102 @@ def test_server_request_id_collision_is_not_treated_as_delivery_response() -> No
     assert response["result"] == {"ok": True}
     assert sent[0]["id"] == 1
     assert "error" in sent[0]
+
+
+def test_json_rpc_response_requires_result() -> None:
+    rpc = MODULE.UnixWebSocketRpc(Path("/run/user/1000/example.sock"))
+    sent: list[dict[str, object]] = []
+    rpc._send_json = lambda value: sent.append(value)  # type: ignore[method-assign]
+    rpc._receive_json = lambda _request_id: {"id": 1}  # type: ignore[method-assign]
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="missing result"):
+        rpc.call("turn/start")
+    assert sent[0]["method"] == "turn/start"
+
+
+def test_turn_delivery_requires_protocol_response_shape() -> None:
+    assert MODULE._validate_turn_delivery(
+        "turn/start",
+        {"turn": {"id": "turn-1", "status": "inProgress"}},
+    ) == {"turn_id": "turn-1", "status": "inProgress"}
+    assert MODULE._validate_turn_delivery(
+        "turn/steer", {"turnId": "turn-2"}
+    ) == {"turn_id": "turn-2"}
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="did not return a Turn"):
+        MODULE._validate_turn_delivery("turn/start", {})
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="did not return turnId"):
+        MODULE._validate_turn_delivery("turn/steer", {})
+
+
+def test_goal_binding_accepts_protocol_thread_only_identity() -> None:
+    owner_value = MODULE.validate_return_owner(
+        owner(
+            goal="goal-external",
+            thread="thread-transport",
+            endpoint="unix:/run/user/1000/example.sock",
+        )
+    )
+    assert MODULE._validate_goal_binding(
+        {"threadId": "thread-transport", "status": "active"},
+        owner_value,
+    ) == "owner_goal_to_thread_binding"
+
+
+def test_missing_retry_receipt_recovers_reserved_retry_launch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    paths = {
+        "owner_path": tmp_path / "owner.json",
+        "handoff_path": tmp_path / "handoff.json",
+        "holder_path": tmp_path / "holder.json",
+        "authorization_path": tmp_path / "authorization.json",
+        "closure_path": tmp_path / "closure.json",
+        "return_path": tmp_path / "return.json",
+    }
+    inputs: dict[str, object] = {
+        **paths,
+        "owner_digest": "sha256:" + "1" * 64,
+        "handoff_digest": "sha256:" + "2" * 64,
+        "holder_digest": "sha256:" + "3" * 64,
+    }
+    detached_path = tmp_path / "detached.json"
+    result_path = tmp_path / "result.json"
+    log_path = tmp_path / "return.log"
+    retry_detached = tmp_path / "detached.retry.json"
+    retry_result = tmp_path / "result.retry.json"
+    retry_log = tmp_path / "return.retry.log"
+    binding = MODULE._detached_binding(
+        inputs,
+        detached_path=detached_path,
+        result_path=result_path,
+        log_path=log_path,
+    )
+    stale = {
+        "schema_version": MODULE.DETACHED_SCHEMA_VERSION,
+        "state": "stale",
+        **binding,
+        "retry_receipt_ref": str(retry_detached),
+        "retry_result_ref": str(retry_result),
+        "retry_log_ref": str(retry_log),
+    }
+    detached_path.write_bytes(MODULE._canonical_bytes(stale) + b"\n")
+    monkeypatch.setattr(MODULE, "_load_return_inputs", lambda _args: inputs)
+    monkeypatch.setattr(MODULE.VISIBLE, "_proc_identity_state", lambda *_args: "gone")
+    monkeypatch.setattr(MODULE.os, "pipe", lambda: (0, 1))
+    monkeypatch.setattr(
+        MODULE.os,
+        "fork",
+        lambda: (_ for _ in ()).throw(AssertionError("launch-ready")),
+    )
+    args = SimpleNamespace(
+        detach=True,
+        return_receipt=str(paths["return_path"]),
+        detached_receipt=str(detached_path),
+        detached_result=str(result_path),
+        detached_log=str(log_path),
+    )
+    with pytest.raises(AssertionError, match="launch-ready"):
+        MODULE.command_return(args)
 
 
 def test_reusable_return_source_has_no_episode_coordinates() -> None:

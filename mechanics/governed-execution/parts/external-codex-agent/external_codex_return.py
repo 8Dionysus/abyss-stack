@@ -486,7 +486,11 @@ class UnixWebSocketRpc:
             raise ExternalCodexReturnError(
                 f"Codex app-server {method} failed: {json.dumps(response['error'], sort_keys=True)}"
             )
-        result = response.get("result", {})
+        if "result" not in response:
+            raise ExternalCodexReturnError(
+                f"Codex app-server {method} response is missing result"
+            )
+        result = response["result"]
         if not isinstance(result, dict):
             raise ExternalCodexReturnError(f"Codex app-server {method} returned a non-object result")
         return result
@@ -515,7 +519,7 @@ def _goal_object(response: dict[str, Any], method: str) -> dict[str, Any]:
     return goal
 
 
-def _validate_goal_binding(goal: dict[str, Any], owner: dict[str, Any]) -> None:
+def _validate_goal_binding(goal: dict[str, Any], owner: dict[str, Any]) -> str:
     if goal.get("threadId") != owner["thread_id"]:
         raise ExternalCodexReturnError(
             "Codex app-server Goal is bound to a different thread"
@@ -526,10 +530,49 @@ def _validate_goal_binding(goal: dict[str, Any], owner: dict[str, Any]) -> None:
             raise ExternalCodexReturnError(
                 "Codex app-server Goal identity does not match owner binding"
             )
-    elif owner["goal_id"] != owner["thread_id"]:
-        raise ExternalCodexReturnError(
-            "Codex app-server did not expose enough Goal identity to bind owner"
-        )
+        return "app_server_goal_id"
+    # Codex's ThreadGoal protocol identifies a Goal by its bound thread and
+    # does not expose a separate goal id.  The supplied owner artifact is the
+    # authoritative goal_id -> thread_id mapping in that protocol contour.
+    return "owner_goal_to_thread_binding"
+
+
+def _thread_object(response: dict[str, Any], method: str) -> dict[str, Any]:
+    thread = response.get("thread")
+    if not isinstance(thread, dict):
+        raise ExternalCodexReturnError(f"Codex app-server {method} did not return a Thread")
+    return thread
+
+
+def _validate_turn_delivery(method: str, response: dict[str, Any]) -> dict[str, str]:
+    """Require the method-specific protocol evidence for the accepted turn."""
+
+    if method == "turn/start":
+        turn = response.get("turn")
+        if not isinstance(turn, dict):
+            raise ExternalCodexReturnError(
+                "Codex app-server turn/start did not return a Turn"
+            )
+        turn_id = _string_at(turn, ("id",))
+        status = turn.get("status")
+        if turn_id is None or status not in {
+            "completed",
+            "interrupted",
+            "failed",
+            "inProgress",
+        }:
+            raise ExternalCodexReturnError(
+                "Codex app-server turn/start returned an invalid Turn"
+            )
+        return {"turn_id": turn_id, "status": str(status)}
+    if method == "turn/steer":
+        turn_id = _string_at(response, ("turnId",))
+        if turn_id is None:
+            raise ExternalCodexReturnError(
+                "Codex app-server turn/steer did not return turnId"
+            )
+        return {"turn_id": turn_id}
+    raise ExternalCodexReturnError(f"unsupported delivery method: {method}")
 
 
 def deliver_handoff(
@@ -574,7 +617,7 @@ def deliver_handoff(
             {"threadId": owner["thread_id"]},
         )
         goal_before = _goal_object(goal_get_response, "thread/goal/get")
-        _validate_goal_binding(goal_before, owner)
+        goal_identity_source = _validate_goal_binding(goal_before, owner)
         goal_before_status = _string_at(goal_before, ("status",))
         if goal_before_status == "active":
             goal_response = goal_get_response
@@ -586,7 +629,7 @@ def deliver_handoff(
                 {"threadId": owner["thread_id"], "status": "active"},
             )
             goal = _goal_object(goal_response, "thread/goal/set")
-            _validate_goal_binding(goal, owner)
+            goal_identity_source = _validate_goal_binding(goal, owner)
             goal_activation = "paused_to_active"
         else:
             raise ExternalCodexReturnError(
@@ -598,16 +641,20 @@ def deliver_handoff(
             raise ExternalCodexReturnError(
                 f"Codex app-server did not confirm an active Goal: {goal_status!r}"
             )
-        turns_response = rpc.call(
-            "thread/turns/list",
+        thread_read_response = rpc.call(
+            "thread/read",
             {
                 "threadId": owner["thread_id"],
-                "limit": 1,
-                "sortDirection": "desc",
-                "itemsView": "notLoaded",
+                "includeTurns": True,
             },
         )
-        active_turn = _active_turn_id(turns_response.get("data") or turns_response)
+        thread = _thread_object(thread_read_response, "thread/read")
+        if thread.get("id") != owner["thread_id"]:
+            raise ExternalCodexReturnError(
+                "Codex app-server Thread identity does not match owner binding"
+            )
+        turns = thread.get("turns")
+        active_turn = _active_turn_id(turns)
         input_value = [{"type": "text", "text": message}]
         if active_turn is not None:
             method = "turn/steer"
@@ -630,6 +677,7 @@ def deliver_handoff(
                     "input": input_value,
                 },
             )
+        turn_delivery = _validate_turn_delivery(method, turn_response)
     return {
         "schema_version": RETURN_RECEIPT_SCHEMA_VERSION,
         "generated_at": _utc_now(),
@@ -648,6 +696,7 @@ def deliver_handoff(
             "thread_id": owner["thread_id"],
             "before_status": goal_before_status,
             "activation": goal_activation,
+            "identity_source": goal_identity_source,
         },
         "delivery_method": method,
         "client_user_message_id": client_message_id,
@@ -657,10 +706,12 @@ def deliver_handoff(
             "initialize": _safe_response_summary(initialize),
             "goal_get": _safe_response_summary(goal_get_response),
             "goal": _safe_response_summary(goal_response),
-            "turns": _safe_response_summary(turns_response),
+            "thread_read": _safe_response_summary(thread_read_response),
+            "turns": _safe_response_summary(turns),
             "turn": _safe_response_summary(turn_response),
             "goal_response_sha256": _sha256_bytes(_canonical_bytes(goal_response)),
             "turn_response_sha256": _sha256_bytes(_canonical_bytes(turn_response)),
+            "accepted_turn": turn_delivery,
         },
         "actions": {"handoff_message_sent": True},
         "observed": {"handoff_delivery": True, "goal_status": "active"},
@@ -1405,10 +1456,6 @@ def command_return(args: argparse.Namespace) -> int:
                     (retry_log, "detached return retry log"),
                 ]
             )
-            if not retry_detached.exists():
-                raise ExternalCodexReturnError(
-                    "detached return receipt points to a missing retry receipt"
-                )
             detached_path, result_path, log_path = (
                 retry_detached,
                 retry_result,
@@ -1420,7 +1467,17 @@ def command_return(args: argparse.Namespace) -> int:
                 result_path=result_path,
                 log_path=log_path,
             )
-            continue
+            if detached_path.exists():
+                continue
+            if result_path.exists() or log_path.exists():
+                raise ExternalCodexReturnError(
+                    "detached return retry receipt is missing but its output paths are used"
+                )
+            launch_args = SimpleNamespace(**vars(args))
+            launch_args.detached_receipt = str(detached_path)
+            launch_args.detached_result = str(result_path)
+            launch_args.detached_log = str(log_path)
+            break
         retry_detached = _retry_output_path(
             detached_path, "detached return receipt retry"
         )

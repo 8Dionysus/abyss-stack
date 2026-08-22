@@ -121,8 +121,10 @@ Operations are:
   --closure-receipt ...` is the canonical Codex return leaf. It validates the
   supplied complete owner binding and immutable handoff, reads the exact Goal
   identity first, refuses terminal or blocked Goals, activates only a paused
-  Goal, steers an active turn or starts a new one, and reserves the output
-  receipt before any app-server mutation. The handoff owner must match the
+  Goal, reads turns through the supported `thread/read` plus `includeTurns`
+  protocol, steers an active turn or starts a new one, validates the
+  method-specific accepted-turn response, and reserves the output receipt
+  before any app-server mutation. The handoff owner must match the
   complete canonical transport binding, and existing authorization/closure
   evidence plus all lifecycle output destinations are validated before any
   app-server mutation. It writes
@@ -130,9 +132,9 @@ Operations are:
   `authorize-close` and exact `close` primitives. `--detach` runs the same
   operation in a new session, binds durable receipts to the owner/handoff/
   holder/output identities, follows an already-published retry receipt instead
-  of launching a duplicate child, and publishes a new retry receipt only when
-  the current stale attempt has no live retry. A legacy task-local owner
-  binding is accepted only
+  of launching a duplicate child, and recovers a fully bound reserved retry
+  whose child receipt was not yet published. A legacy task-local owner binding
+  is accepted only
   as an input migration; no Goal, thread, rollout, PR, disposition, or
   task-root coordinate is selected by source.
 
