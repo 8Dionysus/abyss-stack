@@ -36,6 +36,7 @@ DETACHED_SCHEMA_VERSION = "abyss_stack_external_codex_return_detached_v1"
 RETURN_ATTEMPT_SCHEMA_VERSION = "abyss_stack_external_codex_return_attempt_v1"
 WEBSOCKET_ACCEPT_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 DEFAULT_TIMEOUT_SECONDS = 10.0
+APP_SERVER_DISCOVERY_PROBE_TIMEOUT_SECONDS = 1.0
 MAX_HANDSHAKE_BYTES = 64 * 1024
 MAX_FRAME_BYTES = 16 * 1024 * 1024
 
@@ -234,6 +235,20 @@ def _socket_path(value: str) -> Path:
     return path
 
 
+def _socket_is_connectable(path: Path) -> bool:
+    """Probe a discovered UNIX socket without sending an app-server frame."""
+
+    connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        connection.settimeout(APP_SERVER_DISCOVERY_PROBE_TIMEOUT_SECONDS)
+        connection.connect(str(path))
+    except OSError:
+        return False
+    finally:
+        connection.close()
+    return True
+
+
 def discover_app_server_socket(owner: dict[str, Any]) -> tuple[Path, str]:
     """Resolve the current local Codex endpoint without embedding a task path."""
 
@@ -265,7 +280,8 @@ def discover_app_server_socket(owner: dict[str, Any]) -> tuple[Path, str]:
             continue
         seen.add(path)
         if path.is_absolute() and not path.is_symlink() and path.is_socket():
-            return path, "current_local_codex_app_server"
+            if _socket_is_connectable(path):
+                return path, "current_local_codex_app_server"
     rendered = ", ".join(str(path) for path in candidates)
     raise ExternalCodexReturnError(
         f"current local Codex app-server socket was not found ({rendered})"
@@ -684,7 +700,10 @@ def deliver_handoff(
             "thread/read",
             {
                 "threadId": owner["thread_id"],
-                "includeTurns": True,
+                # Keep the delivery frame bounded.  Codex may retain a large
+                # history even when the Goal is idle; the abbreviated view
+                # still exposes the active-turn evidence needed for steer.
+                "includeTurns": False,
             },
         )
         thread = _thread_object(thread_read_response, "thread/read")
