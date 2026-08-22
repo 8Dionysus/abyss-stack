@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shlex
 import stat
 import subprocess
 import sys
@@ -70,6 +71,7 @@ PYTEST_TEMP_CLEANUP_DIAGNOSTIC_SCHEMA = (
 PYTEST_TEMP_CLEANUP_FAILURE_EXIT_CODE = 3
 PYTEST_TEMP_CREATION_FAILURE_EXIT_CODE = 2
 PYTEST_TEMP_NAME_ATTEMPTS = max(100, int(getattr(tempfile, "TMP_MAX", 100)))
+PYTEST_ADDOPTS_ENV = "PYTEST_ADDOPTS"
 
 
 def nodeid_digest(nodeids: list[str]) -> str:
@@ -1159,20 +1161,118 @@ def owned_pytest_temp_namespace(parent: Path | None = None) -> Iterator[Path]:
             raise PytestTempCleanupError(cleanup)
 
 
+class PytestArgumentAuthorityError(ValueError):
+    """The runner cannot prove that pytest will use its owned basetemp."""
+
+
+def _is_addopts_override(args: list[str], index: int) -> bool:
+    argument = args[index]
+    value: str | None = None
+    if argument in {"-o", "--override-ini"}:
+        if index + 1 < len(args):
+            value = args[index + 1]
+    elif argument.startswith("--override-ini="):
+        value = argument.partition("=")[2]
+    elif argument.startswith("-o") and len(argument) > 2:
+        value = argument[2:].lstrip("=")
+    if value is None:
+        return False
+    return value.partition("=")[0].strip().lower() == "addopts"
+
+
+def _validate_pytest_argument_tokens(
+    args: list[str],
+    *,
+    source: str,
+    reject_end_of_options: bool,
+) -> None:
+    """Validate one token stream before pytest or argparse can expand it.
+
+    Pytest's supported ``@file`` syntax is recursive and expands before its
+    option parser sees the resulting tokens.  Reimplementing that parser here
+    would create a second, drift-prone authority.  The owner-bound runner
+    therefore rejects the expansion surface explicitly and keeps only the
+    direct token grammar it can prove.
+    """
+    for index, argument in enumerate(args):
+        if argument == "--basetemp" or argument.startswith("--basetemp="):
+            raise PytestArgumentAuthorityError(
+                "run_pytest_lane requires a fresh --basetemp owned by the "
+                f"runner and rejects {source} argument {index} {argument!r}"
+            )
+        if argument.startswith("@"):
+            raise PytestArgumentAuthorityError(
+                "run_pytest_lane cannot prove a fresh --basetemp through "
+                f"pytest @argument-file expansion in {source} argument {index}; "
+                "argument files are unsupported by the owner-bound lane"
+            )
+        if reject_end_of_options and argument == "--":
+            raise PytestArgumentAuthorityError(
+                "run_pytest_lane cannot prove a fresh --basetemp when "
+                f"PYTEST_ADDOPTS places an end-of-options marker before the "
+                f"runner owner option (at {source} argument {index})"
+            )
+        if source == "runner arguments" and _is_addopts_override(args, index):
+            raise PytestArgumentAuthorityError(
+                "run_pytest_lane cannot accept a user addopts override because "
+                "pytest config addopts is an argument expansion surface; "
+                "the runner owns that setting"
+            )
+
+
+def validate_pytest_argument_authority(
+    args: list[str],
+    *,
+    environment: dict[str, str] | None = None,
+) -> None:
+    """Prove all caller-controlled pytest argument streams are owner-safe."""
+    _validate_pytest_argument_tokens(
+        args,
+        source="runner arguments",
+        reject_end_of_options=False,
+    )
+    environment = os.environ if environment is None else environment
+    raw_addopts = environment.get(PYTEST_ADDOPTS_ENV)
+    if not raw_addopts:
+        return
+    try:
+        addopts = shlex.split(raw_addopts)
+    except ValueError as exc:
+        raise PytestArgumentAuthorityError(
+            "run_pytest_lane cannot prove a fresh --basetemp because "
+            f"{PYTEST_ADDOPTS_ENV} is not valid shell-style argument text"
+        ) from exc
+    _validate_pytest_argument_tokens(
+        addopts,
+        source=PYTEST_ADDOPTS_ENV,
+        reject_end_of_options=True,
+    )
+
+
 def _assert_no_static_basetemp(args: list[str]) -> None:
-    if any(arg == "--basetemp" or arg.startswith("--basetemp=") for arg in args):
-        raise ValueError(
-            "run_pytest_lane allocates a fresh --basetemp for each invocation"
-        )
+    """Compatibility wrapper for the shared argument-authority validator."""
+    _validate_pytest_argument_tokens(
+        args,
+        source="runner arguments",
+        reject_end_of_options=False,
+    )
+
+
+def _pytest_subprocess_environment(args: list[str]) -> dict[str, str]:
+    environment = os.environ.copy()
+    validate_pytest_argument_authority(args, environment=environment)
+    return environment
 
 
 def build_pytest_command(*, extra_args: list[str], basetemp: Path) -> list[str]:
-    _assert_no_static_basetemp(extra_args)
+    validate_pytest_argument_authority(extra_args)
     return [
         sys.executable,
         "-m",
         "pytest",
         "-q",
+        "-o",
+        "addopts=",
         "--basetemp",
         str(basetemp),
         *extra_args,
@@ -1245,8 +1345,9 @@ def _partition_environment(
     assignment_path: Path | None = None,
     observed_path: Path | None = None,
     result_path: Path | None = None,
+    pytest_args: list[str],
 ) -> dict[str, str]:
-    environment = os.environ.copy()
+    environment = _pytest_subprocess_environment(pytest_args)
     environment[PARTITION_BASELINE_ENV] = str(baseline_path)
     if assignment_path is None:
         environment[PARTITION_MODE_ENV] = "collect"
@@ -1270,12 +1371,14 @@ def _plugin_command(
     basetemp: Path,
     collect_only: bool = False,
 ) -> list[str]:
-    _assert_no_static_basetemp(selection_args)
+    validate_pytest_argument_authority(selection_args)
     command = [
         sys.executable,
         "-m",
         "pytest",
         "-q",
+        "-o",
+        "addopts=",
         "--basetemp",
         str(basetemp),
         "-p",
@@ -1326,6 +1429,7 @@ def _replay_failed_shards(
 
 
 def run_process_worksteal(*, extra_args: list[str]) -> int:
+    validate_pytest_argument_authority(extra_args)
     with tempfile.TemporaryDirectory(
         prefix="abyss-stack-pytest-partitions-",
     ) as temporary_raw:
@@ -1344,7 +1448,10 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                     collected = subprocess.run(
                         collect_command,
                         cwd=REPO_ROOT,
-                        env=_partition_environment(baseline_path=baseline_path),
+                        env=_partition_environment(
+                            baseline_path=baseline_path,
+                            pytest_args=extra_args,
+                        ),
                         stdout=output,
                         stderr=subprocess.STDOUT,
                         text=True,
@@ -1420,6 +1527,7 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                                 assignment_path=assignment_path,
                                 observed_path=observed_path,
                                 result_path=result_path,
+                                pytest_args=assignments[shard_index],
                             ),
                             stdout=output,
                             stderr=subprocess.STDOUT,
@@ -1562,8 +1670,8 @@ def main(argv: list[str] | None = None) -> int:
     if extra_args[:1] == ["--"]:
         extra_args = extra_args[1:]
     try:
-        _assert_no_static_basetemp(extra_args)
-    except ValueError as exc:
+        validate_pytest_argument_authority(extra_args)
+    except PytestArgumentAuthorityError as exc:
         print(f"[error] {exc}", file=sys.stderr, flush=True)
         return 2
 
@@ -1606,7 +1714,7 @@ def main(argv: list[str] | None = None) -> int:
                 completed = subprocess.run(
                     command,
                     cwd=REPO_ROOT,
-                    env=os.environ.copy(),
+                    env=_pytest_subprocess_environment(extra_args),
                     check=False,
                     close_fds=True,
                 )

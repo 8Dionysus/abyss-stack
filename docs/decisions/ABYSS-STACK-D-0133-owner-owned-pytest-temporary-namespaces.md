@@ -11,8 +11,8 @@
 - Surface classes: validation workflow, test scheduler, temporary lifecycle
 - Stack lanes: validation, tests, release
 - Mechanic parents: none
-- Guard families: temporary namespace isolation, fd ownership, no-follow cleanup, upstream pytest lifecycle, source/runtime boundary
-- Posture: proposed invocation-owned temp invariant pending independent review
+- Guard families: temporary namespace isolation, pytest argument authority, fd ownership, no-follow cleanup, upstream pytest lifecycle, source/runtime boundary
+- Posture: proposed invocation-owned temp and argument-authority invariants pending independent review
 
 ## Context
 
@@ -28,6 +28,14 @@ worktree, or absolute path. It must also leave capacity policy and legacy
 tombstone cleanup with their existing owners. A silent cleanup failure is not
 an acceptable invocation lifecycle: an ignored removal error can make a
 current owner namespace look complete while leaving its state behind.
+
+Pytest's parser has additional caller-controlled argument sources beyond the
+wrapper's direct argv. Its supported `@file` syntax expands recursively before
+option parsing, `PYTEST_ADDOPTS` is prepended using shell-style splitting, and
+configured `addopts` is also prepended. Since the last parsed `--basetemp`
+wins, moving the owner's option earlier or later alone cannot establish the
+invariant. A direct `-o/--override-ini addopts=...` can also reintroduce an
+option stream after the owner's command construction.
 
 ## Options considered
 
@@ -47,6 +55,18 @@ current owner namespace look complete while leaving its state behind.
 - Allocate the namespace with a retained parent descriptor and use a
   path-following recursive remover. This makes creation fd-relative, but still
   permits an ancestor replacement to redirect cleanup and diagnostics.
+- Move the owner `--basetemp` option within the generated command and allow
+  pytest to expand all other sources. This leaves recursive `@file`, environment,
+  config, and last-option behavior outside the runner's proof.
+- Reimplement pytest's complete argument-file and configuration parser in the
+  runner. This could inspect more syntax, but would create a second parser
+  authority that can drift from the installed pytest version.
+- Reject the parser-expansion surface before launch, validate
+  `PYTEST_ADDOPTS` with the same `shlex` tokenization pytest uses, clear
+  configuration `addopts` with an owner option, reject direct addopts authority
+  overrides, and place the owner option before direct caller arguments. This
+  keeps the proof in one semantic authority surface and fails closed for
+  unsupported expansion syntax.
 
 ## Decision
 
@@ -57,9 +77,22 @@ directly with `mkdir(..., dir_fd=parent_fd)`. The retained binding carries the
 parent and owner descriptors plus their object identities. The context yields
 an uncreated `pytest-basetemp` child `Path` beneath the owner namespace, which
 pytest may replace during its normal setup; cleanup never re-opens that display
-path and instead cleans the retained outer owner handle. Every generated
-pytest command receives that typed child path as `--basetemp`, and user-supplied
+path and instead cleans the retained outer owner handle. Every generated pytest
+command receives that typed child path as `--basetemp`, and user-supplied
 reusable `--basetemp` arguments are rejected.
+
+The same runner-owned argument-authority validator is applied at the public
+entrypoint, serial command builder, collection command builder, process shard
+builder, and subprocess environment construction. It rejects both direct
+`--basetemp` spellings, every `@` argument-file token (including relative and
+nested files), direct addopts overrides, unsafe `PYTEST_ADDOPTS` tokens, an
+environment end-of-options marker that would precede the owner option, and
+malformed environment shell text. The runner does not open or partially parse
+argument files. Generated commands clear pytest config `addopts` after pytest's
+prepended environment/config sources and place the fresh owner `--basetemp`
+before direct caller arguments, so a direct `--` cannot make the owner option
+positional. Rejected input returns before any pytest subprocess or owner
+namespace is started.
 
 Cleanup is an explicit bounded retry lifecycle using an iterative post-order
 stack, fd-relative `listdir`, `O_PATH|O_NOFOLLOW` identity handles, no-follow
@@ -96,7 +129,10 @@ directory per process makes collection, serial execution, and shards mutually
 isolated. The immutable parent handle keeps ancestor rename/symlink replacement
 outside the authority boundary, while identity checks prevent a replaced name
 from being deleted. The explicit rejection of a user basetemp preserves the
-invariant even when callers provide extra pytest arguments. The diagnostic is
+invariant even when callers provide extra pytest arguments. Rejecting pytest's
+recursive argument-file expansion is safer than cloning a version-sensitive
+parser, while clearing config `addopts` preserves ordinary target, nodeid, and
+plugin options. The diagnostic is
 written only for a namespace this invocation created, so a failed cleanup is
 classified without scanning or deleting legacy tombstones.
 
@@ -109,13 +145,17 @@ classified without scanning or deleting legacy tombstones.
 - Positive: an ancestor rename or symlink replacement cannot redirect cleanup or
   diagnostic publication, and mode-000 directories are repaired without
   chmod'ing payload files.
+- Positive: direct, environment, config, and parser-expanded argument paths
+  cannot redirect the owner basetemp; rejected expansion syntax fails before
+  pytest can touch a caller-owned path.
 - Tradeoff: the wrapper owns a small amount of process lifecycle bookkeeping,
   and direct pytest commands outside this canonical lane retain their normal
   upstream behavior. The fd-relative contract is strongest on POSIX platforms
   exposing the required no-follow operations; unsupported platforms fail
   visibly instead of weakening ownership. A robust-deletion failure
   intentionally leaves a classified owner diagnostic and fails the lane so the
-  state is visible.
+  state is visible. This canonical lane intentionally does not support pytest
+  `@file` arguments and owns the config `addopts` setting.
 - Follow-up: independent review must validate the source diff and select an
   owner-approved source-to-Configs deployment transaction.
 

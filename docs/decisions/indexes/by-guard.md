@@ -849,6 +849,10 @@
 
 - [ABYSS-STACK-D-0075 AoA KAG MCP Access Plane](../ABYSS-STACK-D-0075-aoa-kag-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0075-aoa-kag-mcp-access-plane.md`)
 
+## pytest argument authority
+
+- [ABYSS-STACK-D-0133 Owner-Owned Pytest Temporary Namespaces](../ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md`)
+
 ## read-only canary
 
 - [ABYSS-STACK-D-0096 Fail-Closed MCP Protocol Migration Lab](../ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md) (`docs/decisions/ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md`)

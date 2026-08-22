@@ -1,11 +1,11 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 133,
-  "edge_count": 2990,
+  "edge_count": 2991,
   "edge_type_counts": {
     "CITES_SOURCE_SURFACE": 1089,
     "DATED": 133,
-    "GUARDED_BY": 413,
+    "GUARDED_BY": 414,
     "HAS_STATUS": 133,
     "HAS_SURFACE_CLASS": 362,
     "IN_STACK_LANE": 316,
@@ -14248,6 +14248,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0133",
+      "target": "guard_family:pytest%20argument%20authority",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
       "target": "guard_family:source/runtime%20boundary",
       "type": "GUARDED_BY"
     },
@@ -14968,11 +14973,11 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1296,
+  "node_count": 1297,
   "node_type_counts": {
     "date": 43,
     "decision": 133,
-    "guard_family": 223,
+    "guard_family": 224,
     "mechanic_parent": 11,
     "owner_surface": 69,
     "repo": 1,
@@ -16522,7 +16527,7 @@
       "id": "decision:ABYSS-STACK-D-0133",
       "label": "ABYSS-STACK-D-0133",
       "path": "docs/decisions/ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md",
-      "posture": "proposed invocation-owned temp invariant pending independent review",
+      "posture": "proposed invocation-owned temp and argument-authority invariants pending independent review",
       "status": "proposed",
       "title": "ABYSS-STACK-D-0133 Owner-Owned Pytest Temporary Namespaces",
       "type": "decision"
@@ -17330,6 +17335,11 @@
     {
       "id": "guard_family:public-safe%20config",
       "label": "public-safe config",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:pytest%20argument%20authority",
+      "label": "pytest argument authority",
       "type": "guard_family"
     },
     {

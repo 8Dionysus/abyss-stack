@@ -248,6 +248,8 @@ def test_pytest_scheduler_keeps_an_exact_serial_rollback(tmp_path: Path) -> None
         "-m",
         "pytest",
         "-q",
+        "-o",
+        "addopts=",
         "--basetemp",
         str(basetemp),
         "tests/test_validation_command_authority.py",
@@ -893,7 +895,11 @@ def test_pytest_collect_and_parallel_shards_get_distinct_basetemps(tmp_path: Pat
             with run_pytest_lane.owned_pytest_temp_namespace(tmp_path) as shard_b:
                 commands = [
                     run_pytest_lane._plugin_command(
-                        selection_args=["tests/test_validation_command_authority.py"],
+                        selection_args=[
+                            "-k",
+                            "manifest",
+                            "tests/test_validation_command_authority.py",
+                        ],
                         basetemp=collect,
                         collect_only=True,
                     ),
@@ -919,6 +925,17 @@ def test_pytest_collect_and_parallel_shards_get_distinct_basetemps(tmp_path: Pat
                 }
                 assert basetemps == {collect, shard_a, shard_b}
                 assert all("-p" in command for command in commands)
+                assert commands[0][-3:] == [
+                    "-k",
+                    "manifest",
+                    "tests/test_validation_command_authority.py",
+                ]
+                assert commands[1][-1].startswith(
+                    "tests/test_validation_command_authority.py::"
+                )
+                assert commands[2][-1].startswith(
+                    "tests/test_validation_command_authority.py::"
+                )
 
 
 def test_process_lane_allocates_and_cleans_collect_and_shard_basetemps(
@@ -988,16 +1005,266 @@ def test_process_lane_allocates_and_cleans_collect_and_shard_basetemps(
 
 
 def test_pytest_lane_rejects_reusable_user_basetemp() -> None:
-    with pytest.raises(ValueError, match="fresh --basetemp"):
+    with pytest.raises(run_pytest_lane.PytestArgumentAuthorityError, match="fresh --basetemp"):
         run_pytest_lane.build_pytest_command(
             extra_args=["--basetemp", "reused"],
             basetemp=Path("owned"),
         )
-    with pytest.raises(ValueError, match="fresh --basetemp"):
+    with pytest.raises(run_pytest_lane.PytestArgumentAuthorityError, match="fresh --basetemp"):
         run_pytest_lane._plugin_command(
             selection_args=["--basetemp=reused"],
             basetemp=Path("owned"),
         )
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["-o", "addopts=--basetemp /caller-owned"],
+        ["-o=addopts=--basetemp /caller-owned"],
+        ["-oaddopts=--basetemp /caller-owned"],
+        ["--override-ini", "addopts=--basetemp /caller-owned"],
+        ["--override-ini=addopts=--basetemp /caller-owned"],
+    ],
+)
+def test_pytest_lane_rejects_direct_addopts_authority_override(
+    arguments: list[str],
+    monkeypatch,
+) -> None:
+    calls: list[tuple[object, ...]] = []
+
+    def forbidden(*args, **_kwargs):
+        calls.append(args)
+        raise AssertionError("unsafe addopts override must be rejected before pytest")
+
+    monkeypatch.setattr(run_pytest_lane.subprocess, "run", forbidden)
+    monkeypatch.setattr(run_pytest_lane.subprocess, "Popen", forbidden)
+
+    assert run_pytest_lane.main(["--scheduler", "serial", "--", *arguments]) == 2
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    "bad_argument",
+    ["--basetemp", "--basetemp=caller-owned", "@relative.args"],
+)
+def test_pytest_lane_rejects_unsafe_arguments_before_any_subprocess(
+    bad_argument: str,
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    caller = tmp_path / "caller-owned"
+    marker = caller / "victim-marker"
+    marker.parent.mkdir()
+    marker.write_text("must survive\n", encoding="utf-8")
+    calls: list[tuple[object, ...]] = []
+
+    def forbidden(*args, **_kwargs):
+        calls.append(args)
+        raise AssertionError("rejected pytest arguments must not start pytest")
+
+    monkeypatch.setattr(run_pytest_lane.subprocess, "run", forbidden)
+    monkeypatch.setattr(run_pytest_lane.subprocess, "Popen", forbidden)
+
+    if bad_argument == "--basetemp":
+        argv = [
+            "--scheduler",
+            "serial",
+            "--",
+            bad_argument,
+            str(tmp_path / "other"),
+        ]
+    else:
+        argv = ["--scheduler", "serial", "--", bad_argument]
+
+    assert run_pytest_lane.main(argv) == 2
+    assert calls == []
+    assert marker.read_text(encoding="utf-8") == "must survive\n"
+
+
+@pytest.mark.parametrize(
+    ("argument", "payload_template"),
+    [
+        ("@pytest-args.txt", "--basetemp\n{caller}\n"),
+        ("@pytest-args.txt", "--basetemp={caller}\n"),
+        ("@pytest-args.txt", "--basetemp {caller}\n"),
+        ("@pytest-args.txt", "'--basetemp'\n'{caller}'\n"),
+        ("@pytest-args.txt", "--\n--basetemp\n{caller}\n"),
+        ("@relative/pytest-args.txt", "--basetemp\n{caller}\n"),
+        ("@pytest-args.txt", "@nested-args.txt\n"),
+        ("@nested-args.txt", "--basetemp\n{caller}\n"),
+    ],
+)
+def test_pytest_argument_files_are_rejected_without_reading_or_deleting_victim(
+    argument: str,
+    payload_template: str,
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    caller = tmp_path / "caller-owned"
+    marker = caller / "victim-marker"
+    marker.parent.mkdir()
+    marker.write_text("must survive\n", encoding="utf-8")
+    (tmp_path / "pytest-args.txt").write_text(
+        payload_template.format(caller=caller),
+        encoding="utf-8",
+    )
+    (tmp_path / "relative").mkdir()
+    (tmp_path / "relative" / "pytest-args.txt").write_text(
+        f"--basetemp\n{caller}\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "nested-args.txt").write_text(
+        f"--basetemp\n{caller}\n",
+        encoding="utf-8",
+    )
+    calls: list[tuple[object, ...]] = []
+
+    def forbidden(*args, **_kwargs):
+        calls.append(args)
+        raise AssertionError("argument-file rejection must happen before pytest")
+
+    monkeypatch.setattr(run_pytest_lane.subprocess, "run", forbidden)
+    monkeypatch.setattr(run_pytest_lane.subprocess, "Popen", forbidden)
+
+    assert run_pytest_lane.main(["--scheduler", "serial", "--", argument]) == 2
+    assert calls == []
+    assert marker.read_text(encoding="utf-8") == "must survive\n"
+
+
+def test_pytest_end_of_options_cannot_positionalize_owner_option(monkeypatch) -> None:
+    commands: list[list[str]] = []
+
+    def fake_run(command, **_kwargs):
+        commands.append(list(command))
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(run_pytest_lane.subprocess, "run", fake_run)
+
+    assert run_pytest_lane.main(
+        [
+            "--scheduler",
+            "serial",
+            "--",
+            "--",
+            "tests/test_validation_command_authority.py",
+        ]
+    ) == 0
+    command = commands[0]
+    assert command.index("--basetemp") < command.index("--")
+    assert command[command.index("--basetemp") + 1].endswith(
+        run_pytest_lane.PYTEST_TEMP_BASETEMP_NAME
+    )
+
+
+def test_pytest_addopts_expansion_is_validated_and_config_addopts_are_neutralized(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    caller = tmp_path / "caller-owned"
+    caller.mkdir()
+    marker = caller / "victim-marker"
+    marker.write_text("must survive\n", encoding="utf-8")
+    config = tmp_path / "caller-pytest.ini"
+    config.write_text(
+        "[pytest]\n"
+        f"addopts = --basetemp {caller} --\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv(
+        run_pytest_lane.PYTEST_ADDOPTS_ENV,
+        f'-o "addopts=--basetemp {caller}"',
+    )
+    assert run_pytest_lane.main(
+        [
+            "--scheduler",
+            "serial",
+            "--",
+            "-c",
+            str(config),
+            "tests/test_validation_command_authority.py::"
+            "test_manifest_loads_and_names_expected_lanes",
+        ]
+    ) == 0
+    assert marker.read_text(encoding="utf-8") == "must survive\n"
+
+
+def test_pytest_config_argument_file_cannot_redirect_owner(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    caller = tmp_path / "caller-owned"
+    caller.mkdir()
+    marker = caller / "victim-marker"
+    marker.write_text("must survive\n", encoding="utf-8")
+    inner = tmp_path / "inner-args.txt"
+    inner.write_text(f"--basetemp\n{caller}\n", encoding="utf-8")
+    outer = tmp_path / "outer-args.txt"
+    outer.write_text(f"@{inner}\n", encoding="utf-8")
+    config = tmp_path / "caller-pytest.ini"
+    config.write_text(f"[pytest]\naddopts = @{outer}\n", encoding="utf-8")
+
+    monkeypatch.delenv(run_pytest_lane.PYTEST_ADDOPTS_ENV, raising=False)
+    assert run_pytest_lane.main(
+        [
+            "--scheduler",
+            "serial",
+            "--",
+            "-c",
+            str(config),
+            "tests/test_validation_command_authority.py::"
+            "test_manifest_loads_and_names_expected_lanes",
+        ]
+    ) == 0
+    assert marker.read_text(encoding="utf-8") == "must survive\n"
+
+
+@pytest.mark.parametrize(
+    "addopts",
+    [
+        "--basetemp caller-owned",
+        "--basetemp=caller-owned",
+        "'--basetemp' 'caller-owned'",
+        '--basetemp="caller-owned"',
+        "@nested-args.txt",
+        "-- --basetemp caller-owned",
+        "'unterminated",
+    ],
+)
+def test_pytest_addopts_cannot_redirect_owner_before_subprocess(
+    addopts: str,
+    monkeypatch,
+) -> None:
+    calls: list[tuple[object, ...]] = []
+
+    def forbidden(*args, **_kwargs):
+        calls.append(args)
+        raise AssertionError("unsafe PYTEST_ADDOPTS must be rejected before pytest")
+
+    monkeypatch.setenv(run_pytest_lane.PYTEST_ADDOPTS_ENV, addopts)
+    monkeypatch.setattr(run_pytest_lane.subprocess, "run", forbidden)
+    monkeypatch.setattr(run_pytest_lane.subprocess, "Popen", forbidden)
+
+    assert run_pytest_lane.main(["--scheduler", "serial"]) == 2
+    assert calls == []
+
+
+def test_pytest_addopts_keeps_ordinary_options_accepted(monkeypatch) -> None:
+    commands: list[list[str]] = []
+    environments: list[dict[str, str]] = []
+
+    def fake_run(command, **kwargs):
+        commands.append(list(command))
+        environments.append(kwargs["env"])
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setenv(run_pytest_lane.PYTEST_ADDOPTS_ENV, "-p no:cacheprovider")
+    monkeypatch.setattr(run_pytest_lane.subprocess, "run", fake_run)
+
+    assert run_pytest_lane.main(["--scheduler", "serial"]) == 0
+    assert len(commands) == 1
+    assert environments[0][run_pytest_lane.PYTEST_ADDOPTS_ENV] == "-p no:cacheprovider"
 
 
 def test_pytest_lane_keeps_tombstone_semantics_upstream_and_paths_generic() -> None:

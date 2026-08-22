@@ -9,6 +9,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Close pytest argument-authority paths that could redirect the runner-owned
+  basetemp: reject direct and recursive `@file` expansion, validate
+  `PYTEST_ADDOPTS`, own config `addopts`, reject direct addopts overrides, and
+  place the fresh owner option before caller arguments on serial, collection,
+  and shard commands. Unsupported expansion syntax now fails before pytest
+  starts, preserving caller-owned paths and markers.
 - Make each pytest invocation create its owner-owned temporary namespace
   directly beneath an fd-anchored parent selected from `PYTEST_DEBUG_TEMPROOT`,
   `TMPDIR`, or the default tempfile location, without a probe directory. Give
