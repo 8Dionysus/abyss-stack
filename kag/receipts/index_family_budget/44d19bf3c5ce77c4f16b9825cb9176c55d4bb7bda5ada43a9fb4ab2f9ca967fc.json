@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 30174602,
+  "allowed_tracked_bytes": 37839287,
+  "approved_by": "repository-owner",
+  "base_ref": "4113863137b2322830d3b5941b802a5db6fb136b",
+  "changed_generated_bytes": 30174602,
+  "changed_generated_files": 354,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "44d19bf3c5ce77c4f16b9825cb9176c55d4bb7bda5ada43a9fb4ab2f9ca967fc",
+  "reason": "owner-approved canonical pause lifecycle repair with atomic Goal transition proof, replay binding, and precondition summary digest",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 37839287,
+  "tracked_bytes_max": 24117248
+}
