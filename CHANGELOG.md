@@ -9,6 +9,8 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Add a durable content-addressed Codex PreToolUse hook install route with a
+  session-owned typed-context relay and explicit native-hook rollback receipt.
 - Run the bounded runtime-config artifact bundle guard before the complete
   release pytest suite, preserving every required check while returning cheap
   artifact failures before an expensive validation restart.

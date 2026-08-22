@@ -18,12 +18,24 @@ The compositor must not:
 - treat a rendered file, composition receipt, or trusted definition as proof
   that a hook ran or helped.
 
+The stack-owned context relay is a transport exception with a narrow ceiling:
+it may copy the current event's four safe attempt coordinates into a
+single-use entry, but it may not author or alter the typed base. The base must
+be supplied by the current session/owner route through
+`AOA_AGENT_TOOL_ROUTING_CONTEXT_BASE`.
+
 ## Inputs
 
 - one or more JSON files supplied explicitly in command-line order;
 - zero or more `NAME=/safe/absolute/path` bindings;
 - optionally, one existing native output for exact comparison;
 - for explicit write only, one target path and one receipt path.
+
+The durable installer additionally requires one clean exact source checkout,
+one native fragment path, one `aoa-sdk` source root, an install root, a context
+directory, and explicit renderer receipt/backup paths. It copies only the
+allowlisted hook source files into a content-addressed release and refuses a
+dirty or symlinked source/release input.
 
 Owner-envelope bindings are complete and exact: declared names must equal
 placeholders found in command strings, each declared name must be supplied,
@@ -82,4 +94,8 @@ atomically replaced and mode-`0600`. If the receipt cannot be written, the
 previous target is restored atomically, or a newly created target is removed.
 
 This source contract does not itself authorize writing `~/.codex/hooks.json`.
-Exact Codex trust remains a separate operator-visible gate.
+Exact Codex trust remains a separate operator-visible gate. The installer does
+not authorize Codex trust, live health, owner classification, external actor
+launch, or Goal acceptance. If the install receipt cannot be written, it
+restores the previous target bytes and mode after the renderer's own rollback
+boundary.

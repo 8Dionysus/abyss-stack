@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 131,
-  "edge_count": 2949,
+  "decision_count": 132,
+  "edge_count": 2970,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1080,
-    "DATED": 131,
-    "GUARDED_BY": 405,
-    "HAS_STATUS": 131,
-    "HAS_SURFACE_CLASS": 355,
-    "IN_STACK_LANE": 310,
-    "NEXT_DECISION": 130,
-    "OWNED_BY_SURFACE": 137,
-    "OWNS_DECISION": 131,
+    "CITES_SOURCE_SURFACE": 1085,
+    "DATED": 132,
+    "GUARDED_BY": 408,
+    "HAS_STATUS": 132,
+    "HAS_SURFACE_CLASS": 359,
+    "IN_STACK_LANE": 313,
+    "NEXT_DECISION": 131,
+    "OWNED_BY_SURFACE": 138,
+    "OWNS_DECISION": 132,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 137
+    "UNDER_MECHANIC_PARENT": 138
   },
   "edges": [
     {
@@ -14093,6 +14093,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0131",
+      "target": "decision:ABYSS-STACK-D-0132",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
       "target": "owner_surface:mechanics/config-projection/parts/codex-hooks/",
       "type": "OWNED_BY_SURFACE"
     },
@@ -14104,6 +14109,101 @@
     {
       "source": "decision:ABYSS-STACK-D-0131",
       "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "source_surface:docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "source_surface:docs/install/DEPLOYMENT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "source_surface:docs/runtime/PATHS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "source_surface:docs/runtime/STORAGE_LAYOUT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "source_surface:mechanics/config-projection/parts/codex-hooks/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "date:2026-08-22",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "guard_family:atomic%20hook%20composition",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "guard_family:content-addressed%20release",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "guard_family:source%20identity",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "surface_class:Codex%20hooks",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "surface_class:config%20projection",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "surface_class:rollback",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "surface_class:runtime%20install",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "stack_lane:operator",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "stack_lane:source",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "owner_surface:mechanics/config-projection/parts/codex-hooks/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
+      "target": "mechanic_parent:config-projection",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -14760,21 +14860,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0131",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0132",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1281,
+  "node_count": 1289,
   "node_type_counts": {
-    "date": 42,
-    "decision": 131,
-    "guard_family": 216,
+    "date": 43,
+    "decision": 132,
+    "guard_family": 219,
     "mechanic_parent": 11,
     "owner_surface": 68,
     "repo": 1,
-    "source_surface": 611,
+    "source_surface": 612,
     "stack_lane": 51,
     "status": 4,
-    "surface_class": 146
+    "surface_class": 148
   },
   "nodes": [
     {
@@ -14985,6 +15090,11 @@
     {
       "id": "date:2026-08-21",
       "label": "2026-08-21",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-08-22",
+      "label": "2026-08-22",
       "type": "date"
     },
     {
@@ -16298,6 +16408,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-22",
+      "id": "decision:ABYSS-STACK-D-0132",
+      "label": "ABYSS-STACK-D-0132",
+      "path": "docs/decisions/ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md",
+      "posture": "accepted durable install route; trust and live proof remain separate",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0132 Durable Codex Hook Install Profile",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -16355,6 +16475,11 @@
     {
       "id": "guard_family:atomic%20cutover",
       "label": "atomic cutover",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:atomic%20hook%20composition",
+      "label": "atomic hook composition",
       "type": "guard_family"
     },
     {
@@ -16475,6 +16600,11 @@
     {
       "id": "guard_family:content%20minimization",
       "label": "content minimization",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:content-addressed%20release",
+      "label": "content-addressed release",
       "type": "guard_family"
     },
     {
@@ -17280,6 +17410,11 @@
     {
       "id": "guard_family:source%20freshness",
       "label": "source freshness",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:source%20identity",
+      "label": "source identity",
       "type": "guard_family"
     },
     {
@@ -18421,6 +18556,11 @@
     {
       "id": "source_surface:docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md",
       "label": "docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md",
+      "label": "docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md",
       "type": "source_surface"
     },
     {
@@ -21634,6 +21774,11 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:rollback",
+      "label": "rollback",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:root%20orchestrator",
       "label": "root orchestrator",
       "type": "surface_class"
@@ -21686,6 +21831,11 @@
     {
       "id": "surface_class:runtime%20graph%20projection",
       "label": "runtime graph projection",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:runtime%20install",
+      "label": "runtime install",
       "type": "surface_class"
     },
     {

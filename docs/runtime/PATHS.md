@@ -47,6 +47,7 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 | stack-side machine bridge logs | `/srv/AbyssOS/abyss-stack/Logs/machine-bridge` |
 | stack MCP policy audit journals | `/srv/AbyssOS/abyss-stack/Logs/mcp/audit` |
 | codex home | `/srv/AbyssOS/abyss-stack/.codex-home` |
+| Codex agent-routing install root | `/srv/AbyssOS/abyss-stack/.codex-home/agent-tool-routing` |
 | optional vault | `/abyss` |
 | shared AbyssOS workspace root | `/srv/AbyssOS` |
 | optional `Agents-of-Abyss` source root | `/srv/AbyssOS/Agents-of-Abyss` |

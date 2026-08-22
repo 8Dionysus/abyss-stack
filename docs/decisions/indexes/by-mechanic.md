@@ -24,6 +24,7 @@
 - [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
 - [ABYSS-STACK-D-0130 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0130-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0130-frontload-release-artifact-guard.md`)
 - [ABYSS-STACK-D-0131 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md`)
+- [ABYSS-STACK-D-0132 Durable Codex Hook Install Profile](../ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md) (`docs/decisions/ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md`)
 
 ## diagnostic-spine
 
