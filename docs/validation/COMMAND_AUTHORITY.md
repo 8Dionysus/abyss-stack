@@ -35,7 +35,10 @@ stabilizer, but it reads the release command sequence from the lane manifest.
 - Keep `.github` platform rehearsal public-safe and source-checkout-only.
 - Keep live parity opt-in through `scripts/release_check.py --parity-mode live`.
 - Keep OS Abyss artifact bundle checks in the release lane when they validate
-  generated deployable outputs rather than source topology alone.
+  generated deployable outputs rather than source topology alone. The release
+  sequence runs this bounded artifact guard before the complete pytest suite,
+  so a cheap late-discovered release blocker does not force an expensive suite
+  restart; no release step is skipped and Configs parity remains afterward.
 - Keep full-suite scheduling bounded and reversible. Automatic mode may use
   four process-isolated workers over an exact file-aware partition. Baseline,
   disjoint union, observed selection, and child exit receipts must all verify;

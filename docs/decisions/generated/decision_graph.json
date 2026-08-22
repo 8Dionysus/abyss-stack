@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 128,
-  "edge_count": 2884,
+  "decision_count": 129,
+  "edge_count": 2904,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1061,
-    "DATED": 128,
-    "GUARDED_BY": 396,
-    "HAS_STATUS": 128,
-    "HAS_SURFACE_CLASS": 346,
-    "IN_STACK_LANE": 301,
-    "NEXT_DECISION": 127,
-    "OWNED_BY_SURFACE": 134,
-    "OWNS_DECISION": 128,
+    "CITES_SOURCE_SURFACE": 1066,
+    "DATED": 129,
+    "GUARDED_BY": 399,
+    "HAS_STATUS": 129,
+    "HAS_SURFACE_CLASS": 349,
+    "IN_STACK_LANE": 304,
+    "NEXT_DECISION": 128,
+    "OWNED_BY_SURFACE": 135,
+    "OWNS_DECISION": 129,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 133
+    "UNDER_MECHANIC_PARENT": 134
   },
   "edges": [
     {
@@ -13788,12 +13788,107 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0128",
+      "target": "decision:ABYSS-STACK-D-0129",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0128",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0128",
       "target": "mechanic_parent:%60mechanics/governed-execution%60",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "source_surface:docs/validation/COMMAND_AUTHORITY.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "source_surface:docs/validation/validation_lanes.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "source_surface:mechanics/config-projection/parts/rendering/scripts/validate_abyss_machine_runtime_config_bundle.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "source_surface:scripts/release_check.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "source_surface:tests/test_validation_command_authority.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "date:2026-08-21",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "guard_family:complete%20evidence",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "guard_family:fail-fast%20ordering",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "guard_family:release%20artifact%20trust",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "status:proposed",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "surface_class:landing%20latency",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "surface_class:release%20gate",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "surface_class:validation%20workflow",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "stack_lane:release",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "stack_lane:tests",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "owner_surface:docs/validation/validation_lanes.json",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0129",
+      "target": "mechanic_parent:config-projection",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -14435,21 +14530,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0128",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0129",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1259,
+  "node_count": 1266,
   "node_type_counts": {
-    "date": 41,
-    "decision": 128,
-    "guard_family": 208,
+    "date": 42,
+    "decision": 129,
+    "guard_family": 211,
     "mechanic_parent": 11,
     "owner_surface": 68,
     "repo": 1,
-    "source_surface": 603,
+    "source_surface": 604,
     "stack_lane": 51,
     "status": 4,
-    "surface_class": 144
+    "surface_class": 145
   },
   "nodes": [
     {
@@ -14655,6 +14755,11 @@
     {
       "id": "date:2026-08-20",
       "label": "2026-08-20",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-08-21",
+      "label": "2026-08-21",
       "type": "date"
     },
     {
@@ -15938,6 +16043,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-21",
+      "id": "decision:ABYSS-STACK-D-0129",
+      "label": "ABYSS-STACK-D-0129",
+      "path": "docs/decisions/ABYSS-STACK-D-0129-frontload-release-artifact-guard.md",
+      "posture": "proposed ordering invariant pending independent review",
+      "status": "proposed",
+      "title": "ABYSS-STACK-D-0129 Frontload Release Artifact Guard Before the Complete Suite",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -16085,6 +16200,11 @@
     {
       "id": "guard_family:compatibility%20gate%20language",
       "label": "compatibility gate language",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:complete%20evidence",
+      "label": "complete evidence",
       "type": "guard_family"
     },
     {
@@ -16320,6 +16440,11 @@
     {
       "id": "guard_family:fail-closed%20freshness",
       "label": "fail-closed freshness",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:fail-fast%20ordering",
+      "label": "fail-fast ordering",
       "type": "guard_family"
     },
     {
@@ -16715,6 +16840,11 @@
     {
       "id": "guard_family:receipt%20binding",
       "label": "receipt binding",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:release%20artifact%20trust",
+      "label": "release artifact trust",
       "type": "guard_family"
     },
     {
@@ -18931,6 +19061,11 @@
     {
       "id": "source_surface:mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md",
       "label": "mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/config-projection/parts/rendering/scripts/validate_abyss_machine_runtime_config_bundle.py",
+      "label": "mechanics/config-projection/parts/rendering/scripts/validate_abyss_machine_runtime_config_bundle.py",
       "type": "source_surface"
     },
     {
@@ -21166,6 +21301,11 @@
     {
       "id": "surface_class:questbook",
       "label": "questbook",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:release%20gate",
+      "label": "release gate",
       "type": "surface_class"
     },
     {

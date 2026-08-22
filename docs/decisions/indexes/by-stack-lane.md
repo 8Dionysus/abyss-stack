@@ -341,6 +341,7 @@
 ## release
 
 - [ABYSS-STACK-D-0120 Schedule Full Pytest With Bounded Work Stealing](../ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md) (`docs/decisions/ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md`)
+- [ABYSS-STACK-D-0129 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0129-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0129-frontload-release-artifact-guard.md`)
 
 ## release/tooling
 
@@ -431,6 +432,7 @@
 ## tests
 
 - [ABYSS-STACK-D-0120 Schedule Full Pytest With Bounded Work Stealing](../ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md) (`docs/decisions/ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md`)
+- [ABYSS-STACK-D-0129 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0129-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0129-frontload-release-artifact-guard.md`)
 
 ## tos-graph
 
@@ -450,6 +452,7 @@
 - [ABYSS-STACK-D-0123 Parent Passive Turns Disable Code Mode](../ABYSS-STACK-D-0123-parent-passive-code-mode-disable.md) (`docs/decisions/ABYSS-STACK-D-0123-parent-passive-code-mode-disable.md`)
 - [ABYSS-STACK-D-0124 Visible Holder Terminal Lifecycle Identity](../ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md) (`docs/decisions/ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md`)
 - [ABYSS-STACK-D-0127 Bind Resume Private-Git Observation to the Accepted Actor Final](../ABYSS-STACK-D-0127-bind-resume-private-git-to-accepted-actor-final.md) (`docs/decisions/ABYSS-STACK-D-0127-bind-resume-private-git-to-accepted-actor-final.md`)
+- [ABYSS-STACK-D-0129 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0129-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0129-frontload-release-artifact-guard.md`)
 
 ## validation lane
 

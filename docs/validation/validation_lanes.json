@@ -385,12 +385,12 @@
         "command": ["python", "mcp/services/_shared/build_http_auth_vendors.py", "--check"]
       },
       {
-        "label": "run tests",
-        "command": ["python", "scripts/run_pytest_lane.py"]
-      },
-      {
         "label": "validate OS Abyss runtime config artifact bundle",
         "command": ["python", "mechanics/config-projection/parts/rendering/scripts/validate_abyss_machine_runtime_config_bundle.py"]
+      },
+      {
+        "label": "run tests",
+        "command": ["python", "scripts/run_pytest_lane.py"]
       }
     ]
   }

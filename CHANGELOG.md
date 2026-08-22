@@ -9,6 +9,9 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Run the bounded runtime-config artifact bundle guard before the complete
+  release pytest suite, preserving every required check while returning cheap
+  artifact failures before an expensive validation restart.
 - Give every canonical detached visible Codex holder a unique owner-private
   Kitty socket and a persisted Goal/actor/incarnation/session, process,
   window, TTY, runtime-root, and closeout binding. Add read-only owner status
