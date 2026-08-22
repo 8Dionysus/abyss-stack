@@ -494,7 +494,7 @@ def test_detached_retry_lock_is_stable_and_exclusive(tmp_path: Path) -> None:
     return_path = tmp_path / "return.json"
     retry_path = tmp_path / "return.json.detached.retry-1234"
     lock_path = return_path.with_name(return_path.name + ".lock")
-    with MODULE._detached_retry_lock(return_path):
+    with MODULE._return_attempt_lock(return_path):
         assert lock_path.is_file()
         assert not retry_path.with_name(retry_path.name + ".lock").exists()
         flags = os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
@@ -504,6 +504,12 @@ def test_detached_retry_lock_is_stable_and_exclusive(tmp_path: Path) -> None:
                 fcntl.flock(competing_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         finally:
             os.close(competing_fd)
+
+
+@pytest.mark.parametrize("turns", [None, {}, {"unexpected": []}, "not-a-list"])
+def test_active_turn_lookup_rejects_malformed_turn_list(turns: object) -> None:
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="invalid turns list"):
+        MODULE._active_turn_id(turns)
 
 
 def test_goal_binding_accepts_protocol_thread_only_identity() -> None:

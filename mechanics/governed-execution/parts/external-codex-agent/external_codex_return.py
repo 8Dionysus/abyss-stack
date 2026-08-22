@@ -524,12 +524,23 @@ class UnixWebSocketRpc:
 
 def _active_turn_id(turns: object) -> str | None:
     if isinstance(turns, dict):
-        turns = turns.get("data") or turns.get("turns")
+        if "data" in turns:
+            turns = turns["data"]
+        elif "turns" in turns:
+            turns = turns["turns"]
+        else:
+            raise ExternalCodexReturnError(
+                "Codex app-server thread/read returned an invalid turns list"
+            )
     if not isinstance(turns, list):
-        return None
+        raise ExternalCodexReturnError(
+            "Codex app-server thread/read returned an invalid turns list"
+        )
     for turn in reversed(turns):
         if not isinstance(turn, dict):
-            continue
+            raise ExternalCodexReturnError(
+                "Codex app-server thread/read returned an invalid turn"
+            )
         status = turn.get("status")
         if status in {"inProgress", "in_progress", "running"}:
             candidate = turn.get("id")
@@ -765,8 +776,8 @@ def _validate_output_path(path: Path, label: str) -> Path:
 
 
 @contextlib.contextmanager
-def _detached_retry_lock(anchor_path: Path) -> Any:
-    """Serialize stale-retry reservation and child launch for one receipt chain."""
+def _return_attempt_lock(anchor_path: Path) -> Any:
+    """Serialize one canonical return attempt and its detached receipt chain."""
 
     _validate_output_path(anchor_path, "canonical return receipt")
     lock_path = anchor_path.with_name(anchor_path.name + ".lock")
@@ -1422,12 +1433,13 @@ def _run_detached_child(
 
 def command_return(args: argparse.Namespace) -> int:
     if not args.detach:
-        response = run_return(args)
-        print(json.dumps(response, ensure_ascii=False, sort_keys=True))
-        return 0
+        with _return_attempt_lock(Path(args.return_receipt)):
+            response = run_return(args)
+            print(json.dumps(response, ensure_ascii=False, sort_keys=True))
+            return 0
     # The canonical return receipt is invariant across the retry chain.  Use
     # it as the root lock anchor even when a caller supplies a retry receipt.
-    with _detached_retry_lock(Path(args.return_receipt)) as lock_fd:
+    with _return_attempt_lock(Path(args.return_receipt)) as lock_fd:
         return _command_return_detached(args, lock_fd)
 
 
