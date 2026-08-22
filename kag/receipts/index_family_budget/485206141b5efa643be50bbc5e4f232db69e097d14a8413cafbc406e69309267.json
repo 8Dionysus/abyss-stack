@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 10407693,
+  "allowed_tracked_bytes": 37228104,
+  "approved_by": "repository-owner",
+  "base_ref": "169f83784994997aa7d86085dea7453408408959",
+  "changed_generated_bytes": 10407693,
+  "changed_generated_files": 105,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "485206141b5efa643be50bbc5e4f232db69e097d14a8413cafbc406e69309267",
+  "reason": "Refresh the exact owner family for bounded active-turn preservation in canonical external return.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 37228104,
+  "tracked_bytes_max": 24117248
+}
