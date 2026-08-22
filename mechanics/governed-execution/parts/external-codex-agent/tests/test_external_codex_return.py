@@ -277,6 +277,20 @@ def test_handoff_requires_complete_transport_binding() -> None:
         )
 
 
+def test_return_owner_rejects_undeclared_binding_fields() -> None:
+    owner_value = owner(
+        goal="goal-strict",
+        thread="thread-strict",
+        endpoint="unix:/run/user/1000/owner.sock",
+    )
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="undeclared fields"):
+        MODULE.validate_return_owner({**owner_value, "unexpected": "value"})
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="undeclared fields"):
+        MODULE.validate_return_owner(
+            {**owner_value, "transport": {"endpoint": "sock", "unexpected": "value"}}
+        )
+
+
 def test_existing_authorization_is_validated_before_return_delivery(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -477,10 +491,12 @@ def test_turn_delivery_rejects_terminal_failure_status(status: str) -> None:
 
 
 def test_detached_retry_lock_is_stable_and_exclusive(tmp_path: Path) -> None:
-    detached_path = tmp_path / "detached.json"
-    lock_path = detached_path.with_name(detached_path.name + ".lock")
-    with MODULE._detached_retry_lock(detached_path):
+    return_path = tmp_path / "return.json"
+    retry_path = tmp_path / "return.json.detached.retry-1234"
+    lock_path = return_path.with_name(return_path.name + ".lock")
+    with MODULE._detached_retry_lock(return_path):
         assert lock_path.is_file()
+        assert not retry_path.with_name(retry_path.name + ".lock").exists()
         flags = os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
         competing_fd = os.open(lock_path, flags)
         try:

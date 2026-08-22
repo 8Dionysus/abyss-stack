@@ -166,6 +166,25 @@ def _owner_binding_projection(owner: dict[str, Any]) -> dict[str, object]:
 def validate_return_owner(owner: dict[str, Any]) -> dict[str, Any]:
     """Validate owner binding data without selecting any owner identity."""
 
+    allowed_keys = {
+        "schema_version",
+        "owner_id",
+        "owner_repo",
+        "goal_id",
+        "thread_id",
+        "runtime",
+        "transport_posture",
+        "acceptance_posture",
+        "transport_endpoint",
+        "app_server_socket",
+        "transport",
+    }
+    unknown_keys = set(owner) - allowed_keys
+    if unknown_keys:
+        raise ExternalCodexReturnError(
+            "return owner contains undeclared fields: "
+            + ", ".join(sorted(str(key) for key in unknown_keys))
+        )
     schema = owner.get("schema_version")
     if schema not in {RETURN_OWNER_SCHEMA_VERSION, LEGACY_RETURN_OWNER_SCHEMA_VERSION}:
         raise ExternalCodexReturnError("unsupported return-owner schema")
@@ -180,6 +199,12 @@ def validate_return_owner(owner: dict[str, Any]) -> dict[str, Any]:
     if transport is not None:
         if not isinstance(transport, dict):
             raise ExternalCodexReturnError("return owner transport must be an object")
+        unknown_transport_keys = set(transport) - {"endpoint", "socket", "address"}
+        if unknown_transport_keys:
+            raise ExternalCodexReturnError(
+                "return owner transport contains undeclared fields: "
+                + ", ".join(sorted(str(key) for key in unknown_transport_keys))
+            )
         for key in ("endpoint", "socket", "address"):
             if key in transport:
                 _nonempty_string(transport[key], f"return owner transport.{key}")
@@ -740,11 +765,11 @@ def _validate_output_path(path: Path, label: str) -> Path:
 
 
 @contextlib.contextmanager
-def _detached_retry_lock(path: Path) -> Any:
+def _detached_retry_lock(anchor_path: Path) -> Any:
     """Serialize stale-retry reservation and child launch for one receipt chain."""
 
-    _validate_output_path(path, "detached return receipt")
-    lock_path = path.with_name(path.name + ".lock")
+    _validate_output_path(anchor_path, "canonical return receipt")
+    lock_path = anchor_path.with_name(anchor_path.name + ".lock")
     if lock_path.is_symlink():
         raise ExternalCodexReturnError(
             f"detached return retry lock may not be a symlink: {lock_path}"
@@ -1400,10 +1425,9 @@ def command_return(args: argparse.Namespace) -> int:
         response = run_return(args)
         print(json.dumps(response, ensure_ascii=False, sort_keys=True))
         return 0
-    detached_path = Path(
-        args.detached_receipt or (str(args.return_receipt) + ".detached.json")
-    )
-    with _detached_retry_lock(detached_path) as lock_fd:
+    # The canonical return receipt is invariant across the retry chain.  Use
+    # it as the root lock anchor even when a caller supplies a retry receipt.
+    with _detached_retry_lock(Path(args.return_receipt)) as lock_fd:
         return _command_return_detached(args, lock_fd)
 
 
