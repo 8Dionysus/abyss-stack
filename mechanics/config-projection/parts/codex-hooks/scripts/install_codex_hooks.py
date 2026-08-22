@@ -134,13 +134,45 @@ def _fsync_directory(path: Path) -> None:
     try:
         descriptor = os.open(path, os.O_RDONLY | directory_flag)
     except OSError as exc:
-        raise InstallError(f"cannot open receipt directory for durability: {path}") from exc
+        raise InstallError(f"cannot open directory for durability: {path}") from exc
     try:
         os.fsync(descriptor)
     except OSError as exc:
-        raise InstallError(f"cannot persist receipt directory entry: {path}") from exc
+        raise InstallError(f"cannot persist directory entry: {path}") from exc
     finally:
         os.close(descriptor)
+
+
+def _fsync_file(path: Path) -> None:
+    try:
+        descriptor = os.open(path, os.O_RDONLY)
+    except OSError as exc:
+        raise InstallError(f"cannot open release file for durability: {path}") from exc
+    try:
+        os.fsync(descriptor)
+    except OSError as exc:
+        raise InstallError(f"cannot persist release file: {path}") from exc
+    finally:
+        os.close(descriptor)
+
+
+def _fsync_release_tree(release_root: Path) -> None:
+    for path in sorted(
+        release_root.rglob("*"),
+        key=lambda item: len(item.parts),
+        reverse=True,
+    ):
+        if path.is_symlink():
+            raise InstallError(f"release contains a symbolic link: {path.relative_to(release_root)}")
+        if path.is_file():
+            _fsync_file(path)
+        elif path.is_dir():
+            _fsync_directory(path)
+        else:
+            raise InstallError(
+                f"release contains an unsupported entry: {path.relative_to(release_root)}"
+            )
+    _fsync_directory(release_root)
 
 
 def _source_commit(source_root: Path) -> str:
@@ -372,7 +404,9 @@ def materialize_release(
         os.chmod(manifest_path, 0o444)
         _finalize_release_permissions(staging)
         verify_release(staging.resolve())
+        _fsync_release_tree(staging)
         os.replace(staging, release_root)
+        _fsync_directory(releases_root)
     finally:
         if staging.exists():
             for path in sorted(

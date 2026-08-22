@@ -90,10 +90,11 @@ fragment with relay then adapter through the renderer. It records source,
 release, composition, target, and rollback digests without embedding the
 session base or any Goal/task identity in the active command. The release is
 reused only after its manifest closure, immutable file/directory modes, and
-file digests verify. Target, active receipt, composition receipt, and the
-native input, and per-install receipt must be distinct paths; each receipt
-receives a unique operation coordinate. Receipt directory entries are fsynced
-after atomic replacement.
+file digests verify. Target, native input, active receipt, composition receipt,
+and per-install receipt must be distinct paths; each receipt receives a unique
+operation coordinate. Release files and directories are fsynced before the
+release rename, and receipt directory entries are fsynced after atomic
+replacement.
 
 Read-only rendering is the default. `--check-output` compares an existing
 projection without changing it. `--write` is an explicit atomic install route:

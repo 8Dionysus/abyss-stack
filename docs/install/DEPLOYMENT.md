@@ -349,8 +349,9 @@ owner must publish the current typed base through
 holder, task root, role, or proof directory. The install receipt proves source
 identity, read-only release closure, composition, and rollback data only. The
 installer rejects aliases among the native input, active target, and audit
-paths and gives each install receipt an exclusive operation coordinate whose
-directory entry is persisted. Codex trust,
+paths, persists a new release tree before activation, and gives each install
+receipt an exclusive operation coordinate whose directory entry is persisted.
+Codex trust,
 fresh-session hook execution, SDK routing, `aoa-agents` classification, actor
 launch, and Goal acceptance remain separate checks.
 

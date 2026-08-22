@@ -178,6 +178,36 @@ def test_install_receipts_are_unique_and_release_is_read_only(tmp_path: Path) ->
     assert Path(second["install_receipt"]).is_file()
 
 
+def test_install_persists_new_release_before_activation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    directory_calls: list[Path] = []
+    file_calls: list[Path] = []
+    original_fsync_directory = INSTALLER._fsync_directory
+    original_fsync_file = INSTALLER._fsync_file
+
+    def record_directory_sync(path: Path) -> None:
+        directory_calls.append(path)
+        original_fsync_directory(path)
+
+    def record_file_sync(path: Path) -> None:
+        file_calls.append(path)
+        original_fsync_file(path)
+
+    monkeypatch.setattr(INSTALLER, "_fsync_directory", record_directory_sync)
+    monkeypatch.setattr(INSTALLER, "_fsync_file", record_file_sync)
+    result, _paths, _source_root = _install(tmp_path)
+    release_root = Path(result["release_root"])
+    release_parent = release_root.parent
+    staged_roots = [
+        path
+        for path in directory_calls
+        if path.parent == release_parent and path.name.startswith(".staging-")
+    ]
+    assert staged_roots
+    staged_root = staged_roots[-1]
+    assert staged_root / "release-manifest.json" in file_calls
+    assert directory_calls.index(staged_root) < directory_calls.index(release_parent)
+
+
 def test_install_reads_allowlisted_files_from_committed_blobs(tmp_path: Path) -> None:
     source_root = _git_source(tmp_path)
     relative = Path("mechanics/config-projection/parts/codex-hooks/scripts/codex_pretool_agent_routing.py")

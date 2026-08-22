@@ -37,8 +37,9 @@ directory, and explicit renderer receipt/backup paths. It copies only the
 allowlisted hook source files into a content-addressed release and refuses a
 dirty or symlinked source/release input. The release is finalized read-only;
 native input, target, active receipt, composition receipt, and each per-install
-receipt are distinct path identities, and receipt creation uses exclusive
-reservation with a durable parent-directory sync.
+receipt are distinct path identities. Release files and directories are fsynced
+before activation, and receipt creation uses exclusive reservation with a
+durable parent-directory sync.
 
 Owner-envelope bindings are complete and exact: declared names must equal
 placeholders found in command strings, each declared name must be supplied,
