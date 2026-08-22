@@ -73,6 +73,10 @@ Goal acceptance, and the external canary as separate claims.
 ## Follow-up route
 
 The canonical master return owner supplies current app-server evidence and
-performs the exact final pause-and-return canary. Preserve the separate host
+performs the exact final pause-and-return canary when the app-server exposes an
+`atomic_goal_transition` method with a server-supported atomic Goal transition
+proof. The current public
+`ThreadGoalSetParams` method does not, so a live fresh pause is fail-closed and
+must not be represented as a canary result. Preserve the separate host
 trust-admission blocker and keep external-canary and Goal acceptance claims
 outside this runtime result.

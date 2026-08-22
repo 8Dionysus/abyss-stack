@@ -56,6 +56,7 @@ class FakeRpc:
         bounded_turns: bool = False,
         fallback_active_turn: str | None = None,
         goal_set_status: str = "active",
+        atomic_goal_transition: bool = True,
     ) -> None:
         self.endpoint = endpoint
         self.active_turn = active_turn
@@ -65,10 +66,75 @@ class FakeRpc:
         self.bounded_turns = bounded_turns
         self.fallback_active_turn = fallback_active_turn
         self.goal_set_status = goal_set_status
+        self.supports_atomic_goal_transition = atomic_goal_transition
         self.calls: list[tuple[str, dict[str, object] | None]] = []
         self.request_prepare_callback = None
         self.request_issued_callback = None
         self._counter = 0
+
+    def pause_transition_proof(
+        self,
+        *,
+        owner: dict[str, object],
+        precondition: dict[str, object],
+        mutation: dict[str, object],
+        goal_response: dict[str, object],
+    ) -> dict[str, object]:
+        return {
+            "schema_version": MODULE.PAUSE_TRANSITION_PROOF_SCHEMA_VERSION,
+            "kind": "server_compare_and_set",
+            "method": "thread/goal/set",
+            "thread_id": owner["thread_id"],
+            "from_status": "active",
+            "to_status": "paused",
+            "precondition_sha256": precondition["goal_response_sha256"],
+            "request_id": mutation["request_id"],
+            "request_sha256": mutation["request_sha256"],
+            "goal_response_sha256": MODULE._sha256_bytes(
+                MODULE._canonical_bytes(goal_response)
+            ),
+        }
+
+    def atomic_goal_transition(
+        self,
+        *,
+        owner: dict[str, object],
+        precondition: dict[str, object],
+        status: str,
+    ) -> dict[str, object]:
+        goal_response = self.call(
+            "thread/goal/set",
+            {"threadId": owner["thread_id"], "status": status},
+        )
+        mutation_params = next(
+            payload
+            for method, payload in self.calls
+            if method == "thread/goal/set"
+        )
+        assert isinstance(mutation_params, dict)
+        request_id = self._counter
+        request_sha256 = MODULE._sha256_bytes(
+            MODULE._canonical_bytes(
+                {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "method": "thread/goal/set",
+                    "params": mutation_params,
+                }
+            )
+        )
+        return {
+            "goal_response": goal_response,
+            "transition_proof": self.pause_transition_proof(
+                owner=owner,
+                precondition=precondition,
+                mutation={
+                    "request_id": request_id,
+                    "request_sha256": request_sha256,
+                },
+                goal_response=goal_response,
+            ),
+        }
 
     def __enter__(self) -> "FakeRpc":
         return self
@@ -317,6 +383,51 @@ def test_pause_goal_proves_exact_active_to_paused_transition(
     ]
 
 
+def test_pause_goal_refuses_non_atomic_app_server_before_mutation(
+    tmp_path: Path,
+) -> None:
+    owner_path = tmp_path / "pause-owner.json"
+    owner_value = pause_owner(
+        goal="goal-pause-non-atomic",
+        thread="thread-pause-non-atomic",
+        endpoint="unix:/run/user/1000/example.sock",
+    )
+    owner_path.write_bytes(MODULE._canonical_bytes(owner_value) + b"\n")
+    endpoint = tmp_path / "app-server.sock"
+    pause_path = tmp_path / "pause-receipt.json"
+    reservation = MODULE._pause_reservation(
+        pause_path,
+        binding={
+            "owner_ref": str(owner_path.resolve()),
+            "owner_sha256": MODULE._sha256_bytes(owner_path.read_bytes()),
+            "pause_receipt_ref": str(pause_path.resolve()),
+        },
+    )
+    fake = FakeRpc(
+        endpoint,
+        active_turn=None,
+        goal_status="active",
+        goal_set_status="paused",
+        thread_id="thread-pause-non-atomic",
+        atomic_goal_transition=False,
+    )
+
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="no server-supported compare-and-set/version proof",
+    ):
+        MODULE.pause_goal(
+            MODULE.validate_pause_owner(owner_value),
+            owner_path,
+            endpoint,
+            reservation_path=pause_path,
+            reservation=reservation,
+            rpc_factory=lambda _path: fake,
+        )
+
+    assert not any(method == "thread/goal/set" for method, _params in fake.calls)
+
+
 def test_pause_goal_requires_durable_reservation_before_transport(
     tmp_path: Path,
 ) -> None:
@@ -450,16 +561,16 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     owner_path = tmp_path / "pause-owner.json"
+    endpoint = tmp_path / "app-server.sock"
     owner_value = pause_owner(
         goal="goal-pause-replay",
         thread="thread-pause-replay",
-        endpoint="unix:/run/user/1000/example.sock",
+        endpoint=f"unix:{endpoint}",
     )
     owner_path.write_text(
         json.dumps(owner_value, sort_keys=True) + "\n", encoding="utf-8"
     )
     pause_path = tmp_path / "pause-receipt.json"
-    endpoint = tmp_path / "app-server.sock"
     fake = FakeRpc(
         endpoint,
         active_turn=None,
@@ -548,6 +659,18 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     ):
         MODULE.run_pause(args)
 
+    pause_path.write_bytes(MODULE._canonical_bytes(first) + b"\n")
+    mismatched_endpoint = json.loads(json.dumps(first))
+    mismatched_endpoint["transport"]["endpoint"] = str(
+        tmp_path / "contradictory-app-server.sock"
+    )
+    pause_path.write_bytes(MODULE._canonical_bytes(mismatched_endpoint) + b"\n")
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="does not match the explicit pause owner binding",
+    ):
+        MODULE.run_pause(args)
+
     corrupted_digest = json.loads(json.dumps(first))
     corrupted_digest["lifecycle"]["mutation_dispatched"]["request_sha256"] = (
         "sha256:" + "0" * 64
@@ -574,16 +697,16 @@ def test_run_pause_reconciles_reserved_mutation_after_receipt_publication_failur
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     owner_path = tmp_path / "pause-owner.json"
+    endpoint = tmp_path / "app-server.sock"
     owner_value = pause_owner(
         goal="goal-pause-reconcile",
         thread="thread-pause-reconcile",
-        endpoint="unix:/run/user/1000/example.sock",
+        endpoint=f"unix:{endpoint}",
     )
     owner_path.write_text(
         json.dumps(owner_value, sort_keys=True) + "\n", encoding="utf-8"
     )
     pause_path = tmp_path / "pause-receipt.json"
-    endpoint = tmp_path / "app-server.sock"
     fake = FakeRpc(
         endpoint,
         active_turn=None,
@@ -681,16 +804,16 @@ def test_run_pause_reserves_ambiguous_dispatch_before_send(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     owner_path = tmp_path / "pause-owner.json"
+    endpoint = tmp_path / "app-server.sock"
     owner_value = pause_owner(
         goal="goal-pause-dispatch-reservation",
         thread="thread-pause-dispatch-reservation",
-        endpoint="unix:/run/user/1000/example.sock",
+        endpoint=f"unix:{endpoint}",
     )
     owner_path.write_text(
         json.dumps(owner_value, sort_keys=True) + "\n", encoding="utf-8"
     )
     pause_path = tmp_path / "pause-receipt.json"
-    endpoint = tmp_path / "app-server.sock"
     fake = FakeRpc(
         endpoint,
         active_turn=None,
@@ -767,16 +890,16 @@ def test_run_pause_refuses_paused_goal_without_mutation_dispatch_evidence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     owner_path = tmp_path / "pause-owner.json"
+    endpoint = tmp_path / "app-server.sock"
     owner_value = pause_owner(
         goal="goal-pause-unproven",
         thread="thread-pause-unproven",
-        endpoint="unix:/run/user/1000/example.sock",
+        endpoint=f"unix:{endpoint}",
     )
     owner_path.write_text(
         json.dumps(owner_value, sort_keys=True) + "\n", encoding="utf-8"
     )
     pause_path = tmp_path / "pause-receipt.json"
-    endpoint = tmp_path / "app-server.sock"
     fake = FakeRpc(
         endpoint,
         active_turn=None,

@@ -38,6 +38,9 @@ RETURN_ATTEMPT_SCHEMA_VERSION = "abyss_stack_external_codex_return_attempt_v1"
 PAUSE_OWNER_SCHEMA_VERSION = "abyss_stack_external_codex_pause_owner_v1"
 PAUSE_RESERVATION_SCHEMA_VERSION = "abyss_stack_external_codex_pause_reservation_v1"
 PAUSE_RECEIPT_SCHEMA_VERSION = "abyss_stack_external_codex_pause_receipt_v1"
+PAUSE_TRANSITION_PROOF_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_atomic_goal_transition_v1"
+)
 WEBSOCKET_ACCEPT_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 APP_SERVER_DISCOVERY_PROBE_TIMEOUT_SECONDS = 1.0
@@ -89,6 +92,15 @@ def _canonical_bytes(value: object) -> bytes:
 
 def _sha256_bytes(value: bytes) -> str:
     return "sha256:" + hashlib.sha256(value).hexdigest()
+
+
+def _is_sha256_digest(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == len("sha256:") + 64
+        and value.startswith("sha256:")
+        and all(character in "0123456789abcdef" for character in value[7:])
+    )
 
 
 def _utc_now() -> str:
@@ -395,6 +407,19 @@ def _safe_response_summary(value: object) -> dict[str, object]:
 
 class UnixWebSocketRpc:
     """Small stdlib-only JSON-RPC WebSocket client for the local app-server."""
+
+    # The public ThreadGoalSetParams contract in the current Codex app-server
+    # has no compare-and-set/version precondition.  A plain successful
+    # thread/goal/set response therefore cannot prove that this caller caused
+    # active -> paused when another controller may have won the race.  Keep
+    # this explicit so a future protocol adapter must opt in with a real
+    # server-side proof instead of inheriting a false default. Such an adapter
+    # must expose ``atomic_goal_transition(owner, precondition, status)`` and
+    # return the exact Goal response plus server-issued transition proof. The
+    # method owns the conditional request (including any version token) and
+    # must invoke the request callbacks while issuing its WebSocket request so
+    # the caller can bind the exact request to the durable reservation.
+    supports_atomic_goal_transition = False
 
     def __init__(self, path: Path, *, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> None:
         self.path = path
@@ -899,6 +924,20 @@ def _pause_precondition(goal_get_response: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _require_atomic_goal_transition(rpc: Any) -> None:
+    """Refuse a pause adapter that cannot prove its mutation was conditional."""
+
+    if getattr(rpc, "supports_atomic_goal_transition", False) is not True:
+        raise ExternalCodexReturnError(
+            "Codex app-server thread/goal/set has no server-supported "
+            "compare-and-set/version proof; refusing to certify active_to_paused"
+        )
+    if not callable(getattr(rpc, "atomic_goal_transition", None)):
+        raise ExternalCodexReturnError(
+            "Codex app-server pause adapter lacks an atomic Goal transition method"
+        )
+
+
 def _validated_pause_precondition(reservation: dict[str, Any]) -> dict[str, Any]:
     precondition = reservation.get("precondition")
     if not isinstance(precondition, dict):
@@ -929,6 +968,12 @@ def _validated_pause_marker(
             f"reserved Goal pause lacks durable {label} evidence"
         )
     expected_params = {"threadId": owner["thread_id"], "status": "paused"}
+    params = mutation.get("params")
+    params_match = (
+        isinstance(params, dict)
+        and params.get("threadId") == expected_params["threadId"]
+        and params.get("status") == expected_params["status"]
+    )
     expected_keys = {
         "attempt_id",
         "method",
@@ -942,7 +987,7 @@ def _validated_pause_marker(
         "jsonrpc": "2.0",
         "id": mutation.get("request_id"),
         "method": "thread/goal/set",
-        "params": expected_params,
+        "params": params,
     }
     if (
         set(mutation) != expected_keys
@@ -954,9 +999,9 @@ def _validated_pause_marker(
         or not isinstance(mutation.get("request_id"), int)
         or isinstance(mutation.get("request_id"), bool)
         or mutation.get("request_id", 0) < 1
-        or mutation.get("params") != expected_params
+        or not params_match
         or mutation.get("params_sha256")
-        != _sha256_bytes(_canonical_bytes(expected_params))
+        != _sha256_bytes(_canonical_bytes(params))
         or not isinstance(mutation.get("request_sha256"), str)
         or mutation.get("request_sha256")
         != _sha256_bytes(_canonical_bytes(expected_payload))
@@ -1043,6 +1088,89 @@ def _pause_mutation_marker(
     return marker
 
 
+def _validated_pause_transition_proof(
+    proof: object,
+    *,
+    owner: dict[str, Any],
+    precondition: dict[str, Any],
+    mutation: dict[str, Any],
+    goal_response: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Validate server evidence that the pause was an atomic transition."""
+
+    expected_keys = {
+        "schema_version",
+        "kind",
+        "method",
+        "thread_id",
+        "from_status",
+        "to_status",
+        "precondition_sha256",
+        "request_id",
+        "request_sha256",
+        "goal_response_sha256",
+    }
+    if not isinstance(proof, dict) or set(proof) != expected_keys:
+        raise ExternalCodexReturnError(
+            "Codex app-server pause response lacks an exact atomic transition proof"
+        )
+    expected_response_digest = (
+        _sha256_bytes(_canonical_bytes(goal_response))
+        if goal_response is not None
+        else proof.get("goal_response_sha256")
+    )
+    if (
+        proof.get("schema_version") != PAUSE_TRANSITION_PROOF_SCHEMA_VERSION
+        or proof.get("kind") != "server_compare_and_set"
+        or proof.get("method") != "thread/goal/set"
+        or proof.get("thread_id") != owner["thread_id"]
+        or proof.get("from_status") != "active"
+        or proof.get("to_status") != "paused"
+        or proof.get("precondition_sha256")
+        != precondition.get("goal_response_sha256")
+        or proof.get("request_id") != mutation.get("request_id")
+        or proof.get("request_sha256") != mutation.get("request_sha256")
+        or not _is_sha256_digest(proof.get("precondition_sha256"))
+        or not _is_sha256_digest(proof.get("request_sha256"))
+        or not _is_sha256_digest(proof.get("goal_response_sha256"))
+        or proof.get("goal_response_sha256") != expected_response_digest
+    ):
+        raise ExternalCodexReturnError(
+            "Codex app-server pause atomic transition proof is not bound to "
+            "the active precondition and exact mutation"
+        )
+    return proof
+
+
+def _validated_atomic_pause_result(
+    result: object,
+    *,
+    owner: dict[str, Any],
+    precondition: dict[str, Any],
+    mutation: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    if not isinstance(result, dict) or set(result) != {
+        "goal_response",
+        "transition_proof",
+    }:
+        raise ExternalCodexReturnError(
+            "Codex app-server atomic Goal transition result is incomplete"
+        )
+    goal_response = result.get("goal_response")
+    if not isinstance(goal_response, dict):
+        raise ExternalCodexReturnError(
+            "Codex app-server atomic Goal transition lacks a Goal response"
+        )
+    proof = _validated_pause_transition_proof(
+        result.get("transition_proof"),
+        owner=owner,
+        precondition=precondition,
+        mutation=mutation,
+        goal_response=goal_response,
+    )
+    return goal_response, proof
+
+
 def _pause_receipt(
     *,
     owner: dict[str, Any],
@@ -1057,6 +1185,7 @@ def _pause_receipt(
     goal_status: str,
     identity_source: str,
     precondition: dict[str, Any],
+    transition_proof: dict[str, Any],
     mutation_dispatched: dict[str, Any] | None = None,
     recovery: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -1070,6 +1199,7 @@ def _pause_receipt(
         ),
         "precondition": precondition,
         "response_available": recovery is None,
+        "transition_proof": transition_proof,
     }
     if mutation_dispatched is not None:
         lifecycle["mutation_dispatched"] = mutation_dispatched
@@ -1125,6 +1255,9 @@ def pause_goal(
     reconciliation of the already-paused Goal without issuing a second set.
     Every mutation attempt must carry its durable reservation so the completed
     pause receipt cannot omit the dispatch evidence required by its schema.
+    The actual mutation is delegated to an adapter-specific atomic transition
+    method; a plain ``thread/goal/set`` response is never certified as an
+    active-to-paused transition.
     """
 
     if owner_bytes is None:
@@ -1161,6 +1294,12 @@ def pause_goal(
                 owner=owner,
                 attempt_id=reservation.get("attempt_id"),
             )
+            transition_proof = _validated_pause_transition_proof(
+                reservation.get("transition_proof"),
+                owner=owner,
+                precondition=precondition,
+                mutation=mutation_dispatched,
+            )
             return _pause_receipt(
                 owner=owner,
                 owner_path=owner_path,
@@ -1174,6 +1313,7 @@ def pause_goal(
                 goal_status="paused",
                 identity_source=goal_identity_source,
                 precondition=precondition,
+                transition_proof=transition_proof,
                 mutation_dispatched=mutation_dispatched,
                 recovery={
                     "mode": "ambiguous_post_mutation",
@@ -1213,6 +1353,7 @@ def pause_goal(
                 raise ExternalCodexReturnError(
                     "Goal pause mutation was reserved before transport dispatch; refusing to issue a second lifecycle set"
                 )
+        _require_atomic_goal_transition(rpc)
         precondition = _pause_precondition(goal_get_response)
         if reservation_path is not None:
             if reservation is None:
@@ -1252,8 +1393,6 @@ def pause_goal(
                 prepared_reservation,
                 "canonical Goal pause precondition reservation",
             )
-        pause_params = {"threadId": owner["thread_id"], "status": "paused"}
-
         def build_request_marker(
             method: str,
             params: dict[str, object] | None,
@@ -1265,7 +1404,12 @@ def pause_goal(
                 raise ExternalCodexReturnError(
                     "Goal pause mutation dispatch lacks a reservation"
                 )
-            if method != "thread/goal/set" or params != pause_params:
+            if (
+                method != "thread/goal/set"
+                or not isinstance(params, dict)
+                or params.get("threadId") != owner["thread_id"]
+                or params.get("status") != "paused"
+            ):
                 raise ExternalCodexReturnError(
                     "Codex app-server pause mutation dispatch identity mismatched"
                 )
@@ -1326,10 +1470,26 @@ def pause_goal(
         setattr(rpc, "request_prepare_callback", record_request_prepared)
         setattr(rpc, "request_issued_callback", record_request_issued)
         try:
-            goal_response = rpc.call("thread/goal/set", pause_params)
+            _require_atomic_goal_transition(rpc)
+            atomic_result = rpc.atomic_goal_transition(
+                owner=owner,
+                precondition=precondition,
+                status="paused",
+            )
         finally:
             setattr(rpc, "request_prepare_callback", previous_prepare_callback)
             setattr(rpc, "request_issued_callback", previous_callback)
+        mutation_dispatched = _validated_pause_mutation(
+            reservation.get("mutation_dispatched"),
+            owner=owner,
+            attempt_id=reservation.get("attempt_id"),
+        )
+        goal_response, transition_proof = _validated_atomic_pause_result(
+            atomic_result,
+            owner=owner,
+            precondition=precondition,
+            mutation=mutation_dispatched,
+        )
         goal = _goal_object(goal_response, "thread/goal/set")
         goal_identity_source = _validate_goal_binding(goal, owner)
         goal_status = _string_at(goal, ("status",))
@@ -1338,6 +1498,14 @@ def pause_goal(
                 "Codex app-server did not confirm a paused Goal: "
                 f"{goal_status!r}"
             )
+        proof_reservation = {**reservation, "transition_proof": transition_proof}
+        _replace_json(
+            reservation_path,
+            proof_reservation,
+            "canonical Goal pause transition proof",
+        )
+        reservation.clear()
+        reservation.update(proof_reservation)
     return _pause_receipt(
         owner=owner,
         owner_path=owner_path,
@@ -1351,6 +1519,7 @@ def pause_goal(
         goal_status=goal_status,
         identity_source=goal_identity_source,
         precondition=precondition,
+        transition_proof=transition_proof,
         mutation_dispatched=(
             reservation.get("mutation_dispatched")
             if reservation is not None
@@ -2058,6 +2227,20 @@ def _validate_pause_receipt(
         raise ExternalCodexReturnError(
             "canonical Goal pause receipt transport binding is incomplete"
         )
+    owner_endpoint = _endpoint_from_owner(owner)
+    if owner_endpoint is not None:
+        try:
+            expected_endpoint = str(_socket_path(owner_endpoint))
+            observed_endpoint = str(_socket_path(transport["endpoint"]))
+        except ExternalCodexReturnError as exc:
+            raise ExternalCodexReturnError(
+                "canonical Goal pause receipt transport endpoint is invalid"
+            ) from exc
+        if observed_endpoint != expected_endpoint:
+            raise ExternalCodexReturnError(
+                "canonical Goal pause receipt transport endpoint does not match "
+                "the explicit pause owner binding"
+            )
     goal_binding = receipt.get("goal_binding")
     if (
         not isinstance(goal_binding, dict)
@@ -2078,6 +2261,9 @@ def _validate_pause_receipt(
         if isinstance(lifecycle, dict)
         else None
     )
+    transition_proof = (
+        lifecycle.get("transition_proof") if isinstance(lifecycle, dict) else None
+    )
     recovery = receipt.get("recovery")
     if (
         receipt.get("lifecycle_method") != "thread/goal/set"
@@ -2093,6 +2279,7 @@ def _validate_pause_receipt(
         or not isinstance(precondition.get("goal_get"), dict)
         or not isinstance(precondition.get("goal_response_sha256"), str)
         or not isinstance(mutation_dispatched, dict)
+        or not isinstance(transition_proof, dict)
         or not isinstance(actions, dict)
         or actions.get("goal_lifecycle_set") is not True
         or not isinstance(observed, dict)
@@ -2131,6 +2318,18 @@ def _validate_pause_receipt(
             attempt_id=mutation_dispatched.get("attempt_id")
             if isinstance(mutation_dispatched, dict)
             else None,
+        )
+    validated_proof = _validated_pause_transition_proof(
+        transition_proof,
+        owner=owner,
+        precondition=precondition,
+        mutation=mutation_dispatched,
+    )
+    if recovery is None and validated_proof.get(
+        "goal_response_sha256"
+    ) != lifecycle.get("goal_response_sha256"):
+        raise ExternalCodexReturnError(
+            "canonical Goal pause transition proof does not match its response"
         )
     return receipt
 

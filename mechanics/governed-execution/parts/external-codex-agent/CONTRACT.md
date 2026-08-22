@@ -119,33 +119,37 @@ Operations are:
 - `aoa-external-codex-return pause --pause-owner ... --pause-receipt ...` is the
   canonical Goal lifecycle pause leaf. It validates a separate pause-owner
   binding, reads the exact Goal identity first, requires the observed status to
-  be `active`, calls only `thread/goal/set` with `status=paused`, and validates
-  the returned `paused` Goal before publishing
-  `abyss_stack_external_codex_pause_receipt_v1`. The receipt is reserved before
-  the app-server mutation and binds the owner bytes, Goal/thread identities,
-  `active_to_paused` transition, transport response digest, and separate
-owner/semantic-acceptance markers. It does not read or start a turn, deliver
-a handoff, authorize or close a holder, or claim semantic acceptance. The
-  reservation also stores the exact active precondition and an exact mutation
-  reservation before the WebSocket request is sent, then records a separate
-  durable dispatch marker only after the request frame has been issued by that
-  attempt. These in-flight files use the separate
+  be `active`, and requires an `atomic_goal_transition` adapter method that
+  performs a server-supported compare-and-set/version proof before calling
+  `thread/goal/set(status=paused)`. The installed public
+  `ThreadGoalSetParams` app-server method has no such precondition, so the
+  canonical adapter fails closed before mutation and cannot certify an
+  `active_to_paused` transition on that server. A future protocol adapter must
+  explicitly provide the typed
+  `abyss_stack_external_codex_atomic_goal_transition_v1` proof. That adapter
+  owns any version-token request fields; the runtime binds the resulting
+  request marker to the proof. The completed
+  `abyss_stack_external_codex_pause_receipt_v1` schema requires that proof and
+  binds the active precondition, exact request ID and digest, thread, method,
+  and returned Goal response digest.
+
+  The receipt is reserved before the app-server mutation and binds the owner
+  bytes, Goal/thread identities, transition proof, transport response digest,
+  and separate owner/semantic-acceptance markers. It does not read or start a
+  turn, deliver a handoff, authorize or close a holder, or claim semantic
+  acceptance. The reservation also stores the exact active precondition and
+  mutation reservation before the WebSocket request is sent, then records a
+  separate durable dispatch marker only after the request frame has been issued
+  by that attempt. These in-flight files use the separate
   `abyss_stack_external_codex_pause_reservation_v1` contract; the completed
-  `abyss_stack_external_codex_pause_receipt_v1` schema is published only after
-  the paused Goal evidence is complete. If the mutation response, dispatch-marker publication, or receipt
-  publication is lost, a retry observes the same bound Goal with read-only `thread/goal/get`
-  and emits an `ambiguous_post_mutation` recovery receipt without repeating
-  `thread/goal/set`, but only when the matching dispatch marker is present. A
-  retry that still observes `active` after a dispatch marker is present fails
-  closed rather than replacing the in-flight attempt. Recovery also requires
-  the resolved app-server endpoint to equal the endpoint recorded before the
-  mutation; endpoint drift fails closed. A reservation without the active
-  precondition or dispatch evidence fails closed; a pre-send mutation
-  reservation is itself an ambiguous in-flight attempt and is never replaced.
-  A persisted receipt with
-  `response_available=false` must carry the matching recovery evidence, and
-  `pause_receipt_ref` must equal the exact output path; copied or incomplete
-  receipts are not replayable.
+  receipt is published only after the proof and paused Goal evidence are
+  complete. If a matching transition proof was durably persisted but response
+  or receipt publication was lost, a retry may observe the same bound Goal with
+  read-only `thread/goal/get` and emit an `ambiguous_post_mutation` recovery
+  receipt without repeating `thread/goal/set`. A lost mutation response without
+  that proof is not recoverable as an exact receipt. Endpoint drift, missing
+  proof, a pre-send reservation, or incomplete dispatch evidence fails closed;
+  copied or incomplete receipts are not replayable.
 - `aoa-external-codex-stasis --observation ... --result ...` performs exactly
   one responsibility-movement observation. The observation binds the compiled
   obligation, exact holder/return-owner identity, handoff, runtime state root,

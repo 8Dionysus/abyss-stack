@@ -31,12 +31,19 @@ prove the lifecycle transition through the owning control surface.
 
 ## Decision
 
-Use the third route. `aoa-external-codex-return pause` accepts a separate
-pause-owner binding and receipt path, reads the exact Goal through the current
-local Codex app-server, requires `active`, calls only
-`thread/goal/set(status=paused)`, and validates the returned `paused` Goal. Its
-receipt is distinct from return/wake delivery and holder closure, and keeps
-owner acceptance and semantic acceptance separate.
+Use the third route, with a fail-closed protocol capability gate.
+`aoa-external-codex-return pause` accepts a separate pause-owner binding and
+receipt path, reads the exact Goal through the current local Codex app-server,
+requires `active`, and can call only `thread/goal/set(status=paused)` through an
+`atomic_goal_transition` adapter method that supplies a server-supported
+compare-and-set/version proof. The
+installed public `ThreadGoalSetParams` method has no such precondition, so the
+canonical adapter currently refuses to mutate or certify a fresh
+`active_to_paused` transition. A future protocol adapter must return the typed
+`abyss_stack_external_codex_atomic_goal_transition_v1` proof, which the receipt
+binds to the active precondition, exact request, and Goal response. The receipt
+is distinct from return/wake delivery and holder closure, and keeps owner
+acceptance and semantic acceptance separate.
 
 ## Rationale
 
@@ -50,16 +57,18 @@ human acceptance.
 
 ## Consequences
 
-- Positive: any master session can request an exact active-to-paused Goal
-  transition through a stable installed route.
+- Positive: any master session with a protocol-capable adapter can request an
+  exact active-to-paused Goal transition through a stable installed route.
 - Positive: pause, wake delivery, holder closure, semantic re-entry, and owner
   acceptance remain separately reviewable claims.
 - Tradeoff: Codex app-server is the only transport in this slice; another
   runtime needs its own owner-specific adapter.
 - Recovery: the receipt reservation records the active precondition before the
-  lifecycle mutation. If the mutation response or receipt publication is lost,
-  a retry can reconcile the exact paused Goal through a read-only
-  `thread/goal/get` and never repeats `thread/goal/set`.
+  lifecycle mutation. If a typed atomic transition proof was durably persisted
+  but the response or receipt publication was lost, a retry can reconcile the
+  exact paused Goal through a read-only `thread/goal/get` and never repeats
+  `thread/goal/set`. A lost response without that proof is not recoverable as
+  an exact pause receipt.
 - Unchanged: no actor is stopped or restarted by pause, and no model, role,
   eval, sibling-owner, host exposure, secret, or service authority is added.
 
@@ -73,7 +82,9 @@ human acceptance.
 
 ## Follow-up route
 
-The current master owner supplies the exact pause-owner artifact and proves
-the live Goal transition. The existing external return leaf remains the later
-wake and holder-close route; a future non-Codex transport owner may add a
-parallel adapter without changing the holder contract.
+The current master owner supplies the exact pause-owner artifact and, once a
+protocol-capable app-server exists, proves the live Goal transition. The
+current public app-server capability gap is a runtime blocker, not a source
+acceptance or live-canary result. The existing external return leaf remains
+the later wake and holder-close route; a future non-Codex transport owner may
+add a parallel adapter without changing the holder contract.

@@ -52,33 +52,35 @@ aoa-external-codex-return pause \
 ```
 
 The pause owner must bind the exact Goal and thread. The leaf reads the current
-Goal first, refuses anything other than `active`, calls the supported
-`thread/goal/set` API with `paused`, and records
-`abyss_stack_external_codex_pause_receipt_v1`. Its pre-mutation durable file
-uses the separate `abyss_stack_external_codex_pause_reservation_v1` schema;
-it does not claim to be a completed receipt. It does not inject terminal
-input, inspect or signal PIDs, use GDB, start or steer a turn, deliver a wake,
-or close any holder. A receipt proves only the runtime lifecycle transition;
- wake delivery, holder closure, semantic re-entry, and owner acceptance require
- their own later evidence. If the pause receipt is absent or the Goal state is
- not exactly bound, stop and route the state to the runtime owner. A reserved
-  pause keeps the active precondition and an exact mutation reservation before
-  sending the request, then records a dispatch marker only after this attempt
-  has issued the exact WebSocket `thread/goal/set` request. If a retry observes
-  the exact Goal already paused,
-  it may publish an `ambiguous_post_mutation` recovery receipt from a read-only
-  `thread/goal/get` without issuing a second lifecycle set only when that marker
-  matches the attempt and request and the resolved app-server endpoint matches
-  the endpoint recorded before mutation. If the Goal is still `active` after a
-  dispatch marker exists, the retry fails closed rather than replacing that
-  attempt. If the pre-send reservation remains while the Goal is still active,
-  the retry fails closed because the request may already be in flight. A
-  reserved pause without the precondition or dispatch evidence fails closed,
-  including when another controller may have paused the Goal after this attempt
-  stopped before issuing its request. A persisted receipt with
-  `response_available=false` must retain its recovery evidence and its
-  `pause_receipt_ref` must match the exact output path; a copied or incomplete
-  receipt is not replayable.
+Goal first, refuses anything other than `active`, and requires the app-server
+adapter to provide an `atomic_goal_transition` method that performs a
+server-supported compare-and-set/version proof for the
+`thread/goal/set(status=paused)` mutation. The installed public
+`ThreadGoalSetParams` transport has no such precondition, so the canonical
+adapter fails closed before mutation and cannot certify `active_to_paused` on
+that server. A future protocol adapter may opt in only by returning the typed
+`abyss_stack_external_codex_atomic_goal_transition_v1` proof. The adapter owns
+any version-token request fields and the proof is checked against the exact
+request marker. A completed
+`abyss_stack_external_codex_pause_receipt_v1` must carry that proof, binding the
+active precondition, exact request ID and digest, thread, method, and returned
+Goal response digest.
+
+Its pre-mutation durable file uses the separate
+`abyss_stack_external_codex_pause_reservation_v1` schema; it does not claim to
+be a completed receipt. It does not inject terminal input, inspect or signal
+PIDs, use GDB, start or steer a turn, deliver a wake, or close any holder. A
+receipt proves only the runtime lifecycle transition; wake delivery, holder
+closure, semantic re-entry, and owner acceptance require their own later
+evidence. If a previously persisted atomic transition proof exists but receipt
+publication was lost, a retry may publish an `ambiguous_post_mutation`
+recovery receipt from a read-only `thread/goal/get` without issuing a second
+lifecycle set. A lost mutation response without that persisted proof is not
+recoverable as an exact pause receipt. Endpoint drift, missing proof,
+pre-send reservations, and incomplete dispatch evidence fail closed. A
+persisted receipt with `response_available=false` must retain its recovery
+evidence and its `pause_receipt_ref` must match the exact output path; a
+copied or incomplete receipt is not replayable.
 
 ## Observe responsibility movement once
 

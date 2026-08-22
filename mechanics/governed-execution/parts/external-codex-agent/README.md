@@ -111,10 +111,15 @@ and replay only through their matching legacy wake reservation. A retry after a 
   idle, and composes typed authorization with exact holder closure. It does not
   claim owner acceptance or semantic re-entry;
 - exposes the separate `aoa-external-codex-return pause` lifecycle action. It
-  receives a pause-owner binding, performs only the supported Codex app-server
-  Goal transition from `active` to `paused`, and records a distinct pause
-  receipt. Pause, wake delivery, holder closure, semantic re-entry, and owner
-  acceptance remain separate events and claims;
+  receives a pause-owner binding and requires an `atomic_goal_transition`
+  adapter method that performs a server-supported compare-and-set/version proof
+  before performing the Codex app-server Goal transition from `active` to
+  `paused`. The installed public
+  `ThreadGoalSetParams` method lacks that proof, so the canonical adapter fails
+  closed before mutation until a protocol-capable adapter is supplied. A
+  distinct pause receipt binds the typed transition proof; pause, wake delivery,
+  holder closure, semantic re-entry, and owner acceptance remain separate
+  events and claims;
 - exposes `aoa-external-codex-stasis` as a generic, model-neutral responsibility
   movement observer. It consumes one exact lifecycle/session evidence snapshot,
   requires a matching lifecycle transition before classifying movement, and

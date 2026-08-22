@@ -46,6 +46,45 @@
         "reconciled_by": {"const": "thread/goal/get"},
         "mutation_dispatched": {"$ref": "#/$defs/mutation_dispatched"}
       }
+    },
+    "transition_proof": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "kind",
+        "method",
+        "thread_id",
+        "from_status",
+        "to_status",
+        "precondition_sha256",
+        "request_id",
+        "request_sha256",
+        "goal_response_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "abyss_stack_external_codex_atomic_goal_transition_v1"
+        },
+        "kind": {"const": "server_compare_and_set"},
+        "method": {"const": "thread/goal/set"},
+        "thread_id": {"type": "string", "minLength": 1},
+        "from_status": {"const": "active"},
+        "to_status": {"const": "paused"},
+        "precondition_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "request_id": {"type": "integer", "minimum": 1},
+        "request_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "goal_response_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [
@@ -134,6 +173,7 @@
         "goal_response_sha256",
         "precondition",
         "response_available",
+        "transition_proof",
         "mutation_dispatched"
       ],
       "properties": {
@@ -152,6 +192,7 @@
           }
         },
         "response_available": {"type": "boolean"},
+        "transition_proof": {"$ref": "#/$defs/transition_proof"},
         "mutation_dispatched": {"$ref": "#/$defs/mutation_dispatched"}
       }
     },
