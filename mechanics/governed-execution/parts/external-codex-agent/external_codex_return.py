@@ -1,0 +1,1006 @@
+#!/usr/bin/env python3
+"""Deliver one external-actor handoff and close its exact visible holder.
+
+The return owner and transport endpoint are inputs to this module.  Codex's
+local app-server is the only transport implemented here; owner meaning,
+acceptance, and semantic continuation remain outside the runtime.
+"""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import contextlib
+import hashlib
+import importlib.util
+import io
+import json
+import os
+import secrets
+import socket
+import struct
+import sys
+from datetime import UTC, datetime
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, Callable, Sequence
+
+
+SCHEMA_VERSION = "abyss_stack_external_codex_return_v1"
+RETURN_OWNER_SCHEMA_VERSION = "abyss_stack_external_codex_return_owner_v1"
+LEGACY_RETURN_OWNER_SCHEMA_VERSION = "task_local_external_actor_return_owner_v1"
+RETURN_RECEIPT_SCHEMA_VERSION = "abyss_stack_external_codex_return_receipt_v1"
+RETURN_RESPONSE_SCHEMA_VERSION = "abyss_stack_external_codex_return_response_v1"
+DETACHED_SCHEMA_VERSION = "abyss_stack_external_codex_return_detached_v1"
+WEBSOCKET_ACCEPT_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+DEFAULT_TIMEOUT_SECONDS = 10.0
+MAX_HANDSHAKE_BYTES = 64 * 1024
+MAX_FRAME_BYTES = 16 * 1024 * 1024
+
+
+class ExternalCodexReturnError(RuntimeError):
+    """A fail-closed return validation or delivery error."""
+
+
+def _visible_module() -> Any:
+    """Load the sibling visible lifecycle module in source and installed forms."""
+
+    try:
+        return sys.modules["visible_incarnation_home"]
+    except KeyError:
+        pass
+    path = Path(__file__).with_name("visible_incarnation_home.py")
+    spec = importlib.util.spec_from_file_location("visible_incarnation_home", path)
+    if spec is None or spec.loader is None:
+        raise ExternalCodexReturnError("cannot load visible lifecycle module")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+VISIBLE = _visible_module()
+
+
+def _canonical_bytes(value: object) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def _sha256_bytes(value: bytes) -> str:
+    return "sha256:" + hashlib.sha256(value).hexdigest()
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _regular_file(path: Path, label: str) -> Path:
+    if not path.is_absolute() or path.is_symlink() or not path.is_file():
+        raise ExternalCodexReturnError(
+            f"{label} must be an absolute regular non-symlink file: {path}"
+        )
+    return path
+
+
+def _load_json_file(path: Path, label: str) -> tuple[dict[str, Any], bytes]:
+    path = _regular_file(path, label)
+    try:
+        raw = path.read_bytes()
+        value = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ExternalCodexReturnError(f"{label} is not valid JSON: {path}") from exc
+    if not isinstance(value, dict):
+        raise ExternalCodexReturnError(f"{label} must be a JSON object: {path}")
+    return value, raw
+
+
+def _nonempty_string(value: object, label: str) -> str:
+    if not isinstance(value, str) or not value.strip() or any(
+        character in value for character in "\x00\r\n"
+    ):
+        raise ExternalCodexReturnError(f"{label} must be a non-empty safe string")
+    return value
+
+
+def _owner_projection(owner: dict[str, Any]) -> dict[str, str]:
+    return {
+        key: _nonempty_string(owner.get(key), f"return owner {key}")
+        for key in (
+            "owner_id",
+            "owner_repo",
+            "goal_id",
+            "thread_id",
+            "runtime",
+            "transport_posture",
+            "acceptance_posture",
+        )
+    }
+
+
+def validate_return_owner(owner: dict[str, Any]) -> dict[str, Any]:
+    """Validate owner binding data without selecting any owner identity."""
+
+    schema = owner.get("schema_version")
+    if schema not in {RETURN_OWNER_SCHEMA_VERSION, LEGACY_RETURN_OWNER_SCHEMA_VERSION}:
+        raise ExternalCodexReturnError("unsupported return-owner schema")
+    projected = _owner_projection(owner)
+    if projected["runtime"] != "codex":
+        raise ExternalCodexReturnError("this return transport requires runtime=codex")
+    if "transport_endpoint" in owner:
+        _nonempty_string(owner["transport_endpoint"], "return owner transport_endpoint")
+    if "app_server_socket" in owner:
+        _nonempty_string(owner["app_server_socket"], "return owner app_server_socket")
+    transport = owner.get("transport")
+    if transport is not None:
+        if not isinstance(transport, dict):
+            raise ExternalCodexReturnError("return owner transport must be an object")
+        for key in ("endpoint", "socket", "address"):
+            if key in transport:
+                _nonempty_string(transport[key], f"return owner transport.{key}")
+    return {**owner, **projected}
+
+
+def _endpoint_from_owner(owner: dict[str, Any]) -> str | None:
+    for key in ("transport_endpoint", "app_server_socket"):
+        value = owner.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    transport = owner.get("transport")
+    if isinstance(transport, dict):
+        for key in ("endpoint", "socket", "address"):
+            value = transport.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
+    return None
+
+
+def _socket_path(value: str) -> Path:
+    candidate = value.removeprefix("unix:")
+    path = Path(candidate)
+    if not path.is_absolute() or path.is_symlink():
+        raise ExternalCodexReturnError(
+            "Codex app-server endpoint must be an absolute non-symlink UNIX socket"
+        )
+    return path
+
+
+def discover_app_server_socket(owner: dict[str, Any]) -> tuple[Path, str]:
+    """Resolve the current local Codex endpoint without embedding a task path."""
+
+    explicit = _endpoint_from_owner(owner)
+    if explicit is not None:
+        path = _socket_path(explicit)
+        if not path.is_socket():
+            raise ExternalCodexReturnError(f"app-server endpoint is not a socket: {path}")
+        return path, "owner_binding"
+
+    if owner["transport_posture"] != "resolve-current-local-codex-app-server":
+        raise ExternalCodexReturnError(
+            "return owner lacks an explicit endpoint or supported discovery posture"
+        )
+    candidates: list[Path] = []
+    for environment_key in ("AOA_CODEX_APP_SERVER_SOCKET", "CODEX_APP_SERVER_SOCKET"):
+        value = os.environ.get(environment_key)
+        if value:
+            candidates.append(_socket_path(value))
+    for environment_key in ("AOA_CODEX_HOME", "CODEX_HOME"):
+        value = os.environ.get(environment_key)
+        if value:
+            candidates.append(Path(value) / "app-server-control/app-server-control.sock")
+            candidates.append(Path(value) / ".codex/app-server-control/app-server-control.sock")
+    candidates.append(Path.home() / ".codex/app-server-control/app-server-control.sock")
+    seen: set[Path] = set()
+    for path in candidates:
+        if path in seen:
+            continue
+        seen.add(path)
+        if path.is_absolute() and not path.is_symlink() and path.is_socket():
+            return path, "current_local_codex_app_server"
+    rendered = ", ".join(str(path) for path in candidates)
+    raise ExternalCodexReturnError(
+        f"current local Codex app-server socket was not found ({rendered})"
+    )
+
+
+def _string_at(value: object, keys: tuple[str, ...]) -> str | None:
+    if not isinstance(value, dict):
+        return None
+    for key in keys:
+        candidate = value.get(key)
+        if isinstance(candidate, str) and candidate:
+            return candidate
+    return None
+
+
+def _safe_response_summary(value: object) -> dict[str, object]:
+    """Keep delivery proof useful without copying arbitrary server text."""
+
+    if not isinstance(value, dict):
+        return {"kind": type(value).__name__}
+    summary: dict[str, object] = {"keys": sorted(str(key) for key in value)}
+    for output_key, source_keys in {
+        "id": ("id", "turnId", "threadId"),
+        "status": ("status",),
+        "turn_id": ("turnId", "id"),
+    }.items():
+        candidate = _string_at(value, source_keys)
+        if candidate is not None:
+            summary[output_key] = candidate
+    for nested_key in ("goal", "turn"):
+        nested = value.get(nested_key)
+        if isinstance(nested, dict):
+            nested_summary = _safe_response_summary(nested)
+            summary[nested_key] = nested_summary
+    return summary
+
+
+class UnixWebSocketRpc:
+    """Small stdlib-only JSON-RPC WebSocket client for the local app-server."""
+
+    def __init__(self, path: Path, *, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> None:
+        self.path = path
+        self.timeout = timeout
+        self.socket: socket.socket | None = None
+        self._buffer = b""
+        self._counter = 0
+
+    def __enter__(self) -> "UnixWebSocketRpc":
+        connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        connection.settimeout(self.timeout)
+        try:
+            connection.connect(str(self.path))
+            self.socket = connection
+            self._handshake()
+        except (OSError, TimeoutError) as exc:
+            connection.close()
+            raise ExternalCodexReturnError("cannot connect to Codex app-server") from exc
+        return self
+
+    def __exit__(self, _type: object, _value: object, _traceback: object) -> None:
+        try:
+            if self.socket is not None:
+                try:
+                    self._send_frame(0x8, b"")
+                except (OSError, ExternalCodexReturnError):
+                    pass
+                self.socket.close()
+        finally:
+            self.socket = None
+
+    def _require_socket(self) -> socket.socket:
+        if self.socket is None:
+            raise ExternalCodexReturnError("app-server socket is not connected")
+        return self.socket
+
+    def _read_exact(self, size: int) -> bytes:
+        if size < 0 or size > MAX_FRAME_BYTES:
+            raise ExternalCodexReturnError("app-server frame length is invalid")
+        chunks: list[bytes] = []
+        remaining = size
+        if self._buffer:
+            buffered = self._buffer[:remaining]
+            self._buffer = self._buffer[len(buffered) :]
+            chunks.append(buffered)
+            remaining -= len(buffered)
+        connection = self._require_socket()
+        while remaining:
+            chunk = connection.recv(remaining)
+            if not chunk:
+                raise ExternalCodexReturnError("Codex app-server closed the socket")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        return b"".join(chunks)
+
+    def _read_until(self, marker: bytes) -> bytes:
+        connection = self._require_socket()
+        while marker not in self._buffer:
+            chunk = connection.recv(4096)
+            if not chunk:
+                raise ExternalCodexReturnError("Codex app-server closed during handshake")
+            self._buffer += chunk
+            if len(self._buffer) > MAX_HANDSHAKE_BYTES:
+                raise ExternalCodexReturnError("Codex app-server handshake is too large")
+        position = self._buffer.index(marker) + len(marker)
+        result, self._buffer = self._buffer[:position], self._buffer[position:]
+        return result
+
+    def _handshake(self) -> None:
+        key = base64.b64encode(secrets.token_bytes(16)).decode("ascii")
+        request = (
+            "GET /rpc HTTP/1.1\r\n"
+            "Host: localhost\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            f"Sec-WebSocket-Key: {key}\r\n"
+            "Sec-WebSocket-Version: 13\r\n\r\n"
+        ).encode("ascii")
+        connection = self._require_socket()
+        connection.sendall(request)
+        raw = self._read_until(b"\r\n\r\n")
+        lines = raw.decode("latin1").split("\r\n")
+        if not lines or not lines[0].startswith("HTTP/1.1 101"):
+            raise ExternalCodexReturnError("Codex app-server did not accept WebSocket upgrade")
+        headers: dict[str, str] = {}
+        for line in lines[1:]:
+            if ":" in line:
+                name, value = line.split(":", 1)
+                headers[name.strip().lower()] = value.strip()
+        expected = base64.b64encode(
+            hashlib.sha1((key + WEBSOCKET_ACCEPT_GUID).encode("ascii")).digest()
+        ).decode("ascii")
+        if headers.get("sec-websocket-accept") != expected:
+            raise ExternalCodexReturnError("Codex app-server WebSocket accept digest mismatched")
+
+    def _send_frame(self, opcode: int, payload: bytes) -> None:
+        connection = self._require_socket()
+        if len(payload) > MAX_FRAME_BYTES:
+            raise ExternalCodexReturnError("app-server payload is too large")
+        mask = secrets.token_bytes(4)
+        masked = bytes(byte ^ mask[index % 4] for index, byte in enumerate(payload))
+        length = len(masked)
+        if length < 126:
+            header = bytes((0x80 | opcode, 0x80 | length))
+        elif length <= 0xFFFF:
+            header = bytes((0x80 | opcode, 0x80 | 126)) + struct.pack(">H", length)
+        else:
+            header = bytes((0x80 | opcode, 0x80 | 127)) + struct.pack(">Q", length)
+        connection.sendall(header + mask + masked)
+
+    def _send_json(self, value: dict[str, object]) -> None:
+        self._send_frame(0x1, json.dumps(value, separators=(",", ":")).encode("utf-8"))
+
+    def _recv_frame(self) -> tuple[bool, int, bytes]:
+        first, second = self._read_exact(2)
+        final = bool(first & 0x80)
+        opcode = first & 0x0F
+        length = second & 0x7F
+        if length == 126:
+            length = struct.unpack(">H", self._read_exact(2))[0]
+        elif length == 127:
+            length = struct.unpack(">Q", self._read_exact(8))[0]
+        if length > MAX_FRAME_BYTES:
+            raise ExternalCodexReturnError("app-server frame is too large")
+        payload = self._read_exact(length)
+        if second & 0x80:
+            mask = self._read_exact(4)
+            payload = bytes(byte ^ mask[index % 4] for index, byte in enumerate(payload))
+        return final, opcode, payload
+
+    def _receive_json(self, request_id: int) -> dict[str, Any]:
+        fragments: list[bytes] = []
+        opcode_expected: int | None = None
+        while True:
+            final, opcode, payload = self._recv_frame()
+            if opcode == 0x9:
+                self._send_frame(0xA, payload)
+                continue
+            if opcode == 0x8:
+                raise ExternalCodexReturnError("Codex app-server closed during delivery")
+            if opcode in {0x1, 0x2}:
+                if fragments:
+                    raise ExternalCodexReturnError("interleaved app-server WebSocket message")
+                opcode_expected = opcode
+                fragments.append(payload)
+            elif opcode == 0x0:
+                if not fragments:
+                    raise ExternalCodexReturnError("orphaned app-server WebSocket continuation")
+                fragments.append(payload)
+            else:
+                continue
+            # The server normally sends one unfragmented text frame.  A
+            # continuation is only complete when FIN is known, so inspect the
+            # frame header through the helper below for the common path.
+            if not final:
+                continue
+            if opcode_expected != 0x1:
+                raise ExternalCodexReturnError(
+                    "Codex app-server returned a non-text response"
+                )
+            if opcode_expected == 0x1:
+                try:
+                    value = json.loads(b"".join(fragments).decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    # A fragmented frame is handled by the explicit helper
+                    # path; malformed JSON remains fail closed.
+                    raise ExternalCodexReturnError("app-server text response is not JSON")
+                if not isinstance(value, dict):
+                    raise ExternalCodexReturnError("app-server response is not an object")
+                if value.get("id") == request_id:
+                    return value
+                self._handle_unrelated_message(value)
+                fragments.clear()
+                opcode_expected = None
+
+    def _handle_unrelated_message(self, value: dict[str, Any]) -> None:
+        if "id" in value and isinstance(value.get("method"), str):
+            self._send_json(
+                {
+                    "jsonrpc": "2.0",
+                    "id": value["id"],
+                    "error": {
+                        "code": -32601,
+                        "message": "return client does not handle server requests",
+                    },
+                }
+            )
+
+    def notify(self, method: str, params: dict[str, object] | None = None) -> None:
+        payload: dict[str, object] = {"jsonrpc": "2.0", "method": method}
+        if params is not None:
+            payload["params"] = params
+        self._send_json(payload)
+
+    def call(self, method: str, params: dict[str, object] | None = None) -> dict[str, Any]:
+        self._counter += 1
+        request_id = self._counter
+        payload: dict[str, object] = {"jsonrpc": "2.0", "id": request_id, "method": method}
+        if params is not None:
+            payload["params"] = params
+        self._send_json(payload)
+        response = self._receive_json(request_id)
+        if "error" in response:
+            raise ExternalCodexReturnError(
+                f"Codex app-server {method} failed: {json.dumps(response['error'], sort_keys=True)}"
+            )
+        result = response.get("result", {})
+        if not isinstance(result, dict):
+            raise ExternalCodexReturnError(f"Codex app-server {method} returned a non-object result")
+        return result
+
+
+def _active_turn_id(turns: object) -> str | None:
+    if isinstance(turns, dict):
+        turns = turns.get("data") or turns.get("turns")
+    if not isinstance(turns, list):
+        return None
+    for turn in reversed(turns):
+        if not isinstance(turn, dict):
+            continue
+        status = turn.get("status")
+        if status in {"inProgress", "in_progress", "running"}:
+            candidate = turn.get("id")
+            if isinstance(candidate, str) and candidate:
+                return candidate
+    return None
+
+
+def deliver_handoff(
+    owner: dict[str, Any],
+    owner_path: Path,
+    handoff_path: Path,
+    endpoint: Path,
+    *,
+    owner_bytes: bytes | None = None,
+    handoff_bytes: bytes | None = None,
+    rpc_factory: Callable[[Path], Any] = UnixWebSocketRpc,
+) -> dict[str, Any]:
+    """Deliver one immutable handoff to an active or paused Goal/session."""
+
+    handoff_path = _regular_file(handoff_path, "handoff")
+    if owner_bytes is None:
+        owner_bytes = owner_path.read_bytes()
+    if handoff_bytes is None:
+        handoff_bytes = handoff_path.read_bytes()
+    handoff_digest = _sha256_bytes(handoff_bytes)
+    message = (
+        f"External actor return ready: {handoff_path} "
+        f"(handoff_sha256={handoff_digest}). Review this exact handoff, filter its claims, "
+        "and continue the current Goal."
+    )
+    client_message_id = f"external-actor-return-{handoff_digest.removeprefix('sha256:')[:16]}"
+    with rpc_factory(endpoint) as rpc:
+        initialize = rpc.call(
+            "initialize",
+            {
+                "clientInfo": {
+                    "name": "abyss_stack_external_codex_return",
+                    "title": "Abyss external Codex return",
+                    "version": "1",
+                },
+                "capabilities": {"experimentalApi": True},
+            },
+        )
+        rpc.notify("initialized")
+        goal_response = rpc.call(
+            "thread/goal/set",
+            {"threadId": owner["thread_id"], "status": "active"},
+        )
+        goal = goal_response.get("goal")
+        goal_status = _string_at(goal, ("status",)) or _string_at(
+            goal_response, ("status",)
+        )
+        if goal_status != "active":
+            raise ExternalCodexReturnError(
+                f"Codex app-server did not confirm an active Goal: {goal_status!r}"
+            )
+        turns_response = rpc.call(
+            "thread/turns/list",
+            {
+                "threadId": owner["thread_id"],
+                "limit": 1,
+                "sortDirection": "desc",
+                "itemsView": "notLoaded",
+            },
+        )
+        active_turn = _active_turn_id(turns_response.get("data") or turns_response)
+        input_value = [{"type": "text", "text": message}]
+        if active_turn is not None:
+            method = "turn/steer"
+            turn_response = rpc.call(
+                method,
+                {
+                    "threadId": owner["thread_id"],
+                    "expectedTurnId": active_turn,
+                    "clientUserMessageId": client_message_id,
+                    "input": input_value,
+                },
+            )
+        else:
+            method = "turn/start"
+            turn_response = rpc.call(
+                method,
+                {
+                    "threadId": owner["thread_id"],
+                    "clientUserMessageId": client_message_id,
+                    "input": input_value,
+                },
+            )
+    return {
+        "schema_version": RETURN_RECEIPT_SCHEMA_VERSION,
+        "generated_at": _utc_now(),
+        "owner_ref": str(owner_path.resolve()),
+        "owner_sha256": _sha256_bytes(owner_bytes),
+        "owner": _owner_projection(owner),
+        "transport": {
+            "kind": "codex_app_server_websocket_unix",
+            "endpoint": str(endpoint),
+        },
+        "handoff_ref": str(handoff_path.resolve()),
+        "handoff_sha256": handoff_digest,
+        "goal_status": goal_status,
+        "delivery_method": method,
+        "client_user_message_id": client_message_id,
+        "active_turn_id": active_turn,
+        "delivery": {
+            "accepted": True,
+            "initialize": _safe_response_summary(initialize),
+            "goal": _safe_response_summary(goal_response),
+            "turns": _safe_response_summary(turns_response),
+            "turn": _safe_response_summary(turn_response),
+            "goal_response_sha256": _sha256_bytes(_canonical_bytes(goal_response)),
+            "turn_response_sha256": _sha256_bytes(_canonical_bytes(turn_response)),
+        },
+        "actions": {"handoff_message_sent": True},
+        "observed": {"handoff_delivery": True, "goal_status": "active"},
+        "delivered": True,
+        "owner_acceptance": "separate",
+    }
+
+
+def _write_new_json(path: Path, value: dict[str, Any], label: str) -> None:
+    try:
+        VISIBLE._write_new_json(path, value, label)
+    except Exception as exc:
+        raise ExternalCodexReturnError(str(exc)) from exc
+
+
+def _load_handoff_context(
+    handoff_path: Path,
+    holder_receipt_path: Path,
+    closure_receipt_path: Path,
+) -> tuple[dict[str, Any], bytes, str, dict[str, Any], bytes, str]:
+    holder, holder_bytes, holder_digest = VISIBLE._load_holder_receipt_snapshot(
+        _regular_file(holder_receipt_path, "holder receipt")
+    )
+    handoff, handoff_bytes, handoff_digest, _ = VISIBLE._load_handoff_holder_binding(
+        handoff_path=_regular_file(handoff_path, "handoff"),
+        holder_receipt_path=holder_receipt_path,
+        closure_receipt_path=closure_receipt_path,
+        holder_receipt=holder,
+        holder_receipt_bytes=holder_bytes,
+        holder_receipt_digest=holder_digest,
+        require_return=True,
+        require_terminal_action=True,
+    )
+    return handoff, handoff_bytes, handoff_digest, holder, holder_bytes, holder_digest
+
+
+def _validate_handoff_owner(handoff: dict[str, Any], owner: dict[str, Any]) -> None:
+    supplied = handoff.get("return_owner")
+    if supplied is None:
+        return
+    if isinstance(supplied, str):
+        if supplied != owner["owner_id"]:
+            raise ExternalCodexReturnError("handoff return owner does not match owner binding")
+        return
+    if isinstance(supplied, dict):
+        for key in ("owner_id", "goal_id", "thread_id"):
+            if key in supplied and supplied[key] != owner[key]:
+                raise ExternalCodexReturnError(
+                    f"handoff return owner {key} does not match owner binding"
+                )
+        return
+    raise ExternalCodexReturnError("handoff return_owner has an unsupported shape")
+
+
+def _validate_return_receipt(
+    receipt: dict[str, Any],
+    *,
+    owner: dict[str, Any],
+    owner_path: Path,
+    handoff_path: Path,
+    handoff_digest: str,
+) -> dict[str, Any]:
+    if receipt.get("schema_version") != RETURN_RECEIPT_SCHEMA_VERSION:
+        raise ExternalCodexReturnError("canonical return receipt schema mismatch")
+    if receipt.get("delivered") is not True:
+        raise ExternalCodexReturnError("canonical return receipt does not prove delivery")
+    if receipt.get("handoff_ref") != str(handoff_path.resolve()):
+        raise ExternalCodexReturnError("canonical return receipt handoff identity mismatch")
+    if receipt.get("handoff_sha256") != handoff_digest:
+        raise ExternalCodexReturnError("canonical return receipt handoff digest mismatch")
+    if receipt.get("owner_ref") != str(owner_path.resolve()):
+        raise ExternalCodexReturnError("canonical return receipt owner identity mismatch")
+    if receipt.get("owner") != _owner_projection(owner):
+        raise ExternalCodexReturnError("canonical return receipt owner binding mismatch")
+    if receipt.get("goal_status") != "active":
+        raise ExternalCodexReturnError("canonical return receipt Goal is not active")
+    actions = receipt.get("actions")
+    observed = receipt.get("observed")
+    delivery = receipt.get("delivery")
+    if (
+        not isinstance(actions, dict)
+        or actions.get("handoff_message_sent") is not True
+        or not isinstance(observed, dict)
+        or observed.get("handoff_delivery") is not True
+        or not isinstance(delivery, dict)
+        or delivery.get("accepted") is not True
+    ):
+        raise ExternalCodexReturnError("canonical return receipt lacks delivery evidence")
+    return receipt
+
+
+def _load_existing_return_receipt(
+    path: Path,
+    *,
+    owner: dict[str, Any],
+    owner_path: Path,
+    owner_digest: str,
+    handoff_path: Path,
+    handoff_digest: str,
+) -> dict[str, Any]:
+    value, raw = _load_json_file(path, "canonical return receipt")
+    if raw != _canonical_bytes(value) + b"\n":
+        raise ExternalCodexReturnError("canonical return receipt is not canonically encoded")
+    if value.get("owner_sha256") != owner_digest:
+        raise ExternalCodexReturnError("canonical return receipt owner digest mismatch")
+    return _validate_return_receipt(
+        value,
+        owner=owner,
+        owner_path=owner_path,
+        handoff_path=handoff_path,
+        handoff_digest=handoff_digest,
+    )
+
+
+def _load_existing_authorization(
+    path: Path,
+    *,
+    handoff_path: Path,
+    holder_path: Path,
+    closure_path: Path,
+    holder: dict[str, Any],
+    holder_bytes: bytes,
+    holder_digest: str,
+    handoff_snapshot: tuple[dict[str, Any], bytes, str],
+) -> dict[str, Any]:
+    value, raw = _load_json_file(path, "terminal closure authorization")
+    if raw != _canonical_bytes(value) + b"\n":
+        raise ExternalCodexReturnError(
+            "terminal closure authorization is not canonically encoded"
+        )
+    try:
+        return VISIBLE._validate_closure_authorization(
+            authorization_path=path,
+            handoff_path=handoff_path,
+            holder_receipt_path=holder_path,
+            closure_receipt_path=closure_path,
+            holder_receipt=holder,
+            holder_receipt_bytes=holder_bytes,
+            holder_receipt_digest=holder_digest,
+            authorization_snapshot=(value, raw),
+            handoff_snapshot=handoff_snapshot,
+        )
+    except Exception as exc:
+        raise ExternalCodexReturnError(str(exc)) from exc
+
+
+def _call_visible(handler: Callable[[argparse.Namespace], int], args: argparse.Namespace) -> None:
+    output = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(output):
+            result = handler(args)
+    except Exception as exc:
+        raise ExternalCodexReturnError(str(exc)) from exc
+    if result != 0:
+        raise ExternalCodexReturnError(f"visible lifecycle command failed: {handler.__name__}")
+
+
+def run_return(args: argparse.Namespace) -> dict[str, Any]:
+    owner_path = _regular_file(Path(args.return_owner), "return owner")
+    owner_value, owner_bytes = _load_json_file(owner_path, "return owner")
+    owner_digest = _sha256_bytes(owner_bytes)
+    owner = validate_return_owner(owner_value)
+    handoff_path = _regular_file(Path(args.handoff), "handoff")
+    holder_path = _regular_file(Path(args.holder_receipt), "holder receipt")
+    closure_path = Path(args.closure_receipt)
+    handoff, handoff_bytes, handoff_digest, holder, holder_bytes, holder_digest = (
+        _load_handoff_context(handoff_path, holder_path, closure_path)
+    )
+    _validate_handoff_owner(handoff, owner)
+    handoff_snapshot = (handoff, handoff_bytes, handoff_digest)
+    return_path = Path(args.return_receipt)
+    if return_path.exists():
+        receipt = _load_existing_return_receipt(
+            return_path,
+            owner=owner,
+            owner_path=owner_path,
+            owner_digest=owner_digest,
+            handoff_path=handoff_path,
+            handoff_digest=handoff_digest,
+        )
+    else:
+        VISIBLE._assert_file_snapshot(owner_path, owner_bytes, "return owner")
+        VISIBLE._assert_file_snapshot(handoff_path, handoff_bytes, "handoff")
+        endpoint, resolution = discover_app_server_socket(owner)
+        receipt = deliver_handoff(
+            owner,
+            owner_path,
+            handoff_path,
+            endpoint,
+            owner_bytes=owner_bytes,
+            handoff_bytes=handoff_bytes,
+        )
+        receipt["transport"]["resolution"] = resolution
+        _write_new_json(return_path, receipt, "canonical return receipt")
+        receipt = _load_existing_return_receipt(
+            return_path,
+            owner=owner,
+            owner_path=owner_path,
+            owner_digest=owner_digest,
+            handoff_path=handoff_path,
+            handoff_digest=handoff_digest,
+        )
+    VISIBLE._assert_file_snapshot(handoff_path, handoff_bytes, "handoff")
+    VISIBLE._assert_file_snapshot(owner_path, owner_bytes, "return owner")
+    authorization_path = Path(args.authorization)
+    if authorization_path.exists():
+        authorization = _load_existing_authorization(
+            authorization_path,
+            handoff_path=handoff_path,
+            holder_path=holder_path,
+            closure_path=closure_path,
+            holder=holder,
+            holder_bytes=holder_bytes,
+            holder_digest=holder_digest,
+            handoff_snapshot=handoff_snapshot,
+        )
+    else:
+        _call_visible(
+            VISIBLE.command_authorize_close,
+            SimpleNamespace(
+                holder_receipt=str(holder_path),
+                wake_receipt=str(return_path),
+                handoff=str(handoff_path),
+                authorization=str(authorization_path),
+                closure_receipt=str(closure_path),
+            ),
+        )
+        authorization = _load_existing_authorization(
+            authorization_path,
+            handoff_path=handoff_path,
+            holder_path=holder_path,
+            closure_path=closure_path,
+            holder=holder,
+            holder_bytes=holder_bytes,
+            holder_digest=holder_digest,
+            handoff_snapshot=handoff_snapshot,
+        )
+    VISIBLE._assert_file_snapshot(handoff_path, handoff_bytes, "handoff")
+    VISIBLE._assert_file_snapshot(owner_path, owner_bytes, "return owner")
+    # This is deliberately the last lifecycle primitive: once it starts, the
+    # exact holder may receive TERM.  The detached route calls the same path.
+    _call_visible(
+        VISIBLE.command_close,
+        SimpleNamespace(
+            holder_receipt=str(holder_path),
+            closure_authorization=str(authorization_path),
+            wake_receipt=None,
+            handoff=str(handoff_path),
+            closure_receipt=str(closure_path),
+        ),
+    )
+    closure, _closure_bytes = _load_json_file(closure_path, "terminal closure receipt")
+    if closure.get("closed") is not True:
+        raise ExternalCodexReturnError("canonical return did not prove holder closure")
+    return {
+        "schema_version": RETURN_RESPONSE_SCHEMA_VERSION,
+        "returned": True,
+        "delivery": receipt,
+        "authorization": authorization,
+        "closure": closure,
+    }
+
+
+def _detached_paths(args: argparse.Namespace) -> tuple[Path, Path, Path]:
+    return_path = Path(args.return_receipt)
+    detached = Path(args.detached_receipt or (str(return_path) + ".detached.json"))
+    result = Path(args.detached_result or (str(return_path) + ".result.json"))
+    log = Path(args.detached_log or (str(return_path) + ".detached.log"))
+    return detached, result, log
+
+
+def _replace_json(path: Path, value: dict[str, Any], label: str) -> None:
+    try:
+        VISIBLE._write_reservation_json(path, value, label)
+    except Exception as exc:
+        raise ExternalCodexReturnError(str(exc)) from exc
+
+
+def _run_detached_child(
+    args: argparse.Namespace,
+    result_path: Path,
+    log_path: Path,
+    detached_path: Path,
+    ready_fd: int,
+) -> None:
+    os.setsid()
+    descriptor = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    try:
+        os.dup2(descriptor, 1)
+        os.dup2(descriptor, 2)
+        os.dup2(os.open(os.devnull, os.O_RDONLY), 0)
+        ready = os.read(ready_fd, 1)
+        os.close(ready_fd)
+        if ready != b"\x01":
+            raise ExternalCodexReturnError("detached return launch was not committed")
+        try:
+            result = run_return(args)
+            _write_new_json(result_path, result, "detached canonical return result")
+            if detached_path.exists():
+                _replace_json(
+                    detached_path,
+                    {
+                        "schema_version": DETACHED_SCHEMA_VERSION,
+                        "state": "completed",
+                        "completed_at": _utc_now(),
+                        "result_ref": str(result_path.resolve()),
+                        "return_receipt_ref": str(Path(args.return_receipt).resolve()),
+                    },
+                    "detached return receipt",
+                )
+            os._exit(0)
+        except Exception as exc:
+            failure = {
+                "schema_version": RETURN_RESPONSE_SCHEMA_VERSION,
+                "returned": False,
+                "error": str(exc),
+            }
+            try:
+                _write_new_json(result_path, failure, "detached canonical return result")
+                if detached_path.exists():
+                    _replace_json(
+                        detached_path,
+                        {
+                            "schema_version": DETACHED_SCHEMA_VERSION,
+                            "state": "failed",
+                            "completed_at": _utc_now(),
+                            "result_ref": str(result_path.resolve()),
+                            "return_receipt_ref": str(Path(args.return_receipt).resolve()),
+                        },
+                        "detached return receipt",
+                    )
+            finally:
+                os._exit(1)
+    finally:
+        os.close(descriptor)
+
+
+def command_return(args: argparse.Namespace) -> int:
+    if not args.detach:
+        response = run_return(args)
+        print(json.dumps(response, ensure_ascii=False, sort_keys=True))
+        return 0
+    detached_path, result_path, log_path = _detached_paths(args)
+    if detached_path.exists():
+        value, _raw = _load_json_file(detached_path, "detached return receipt")
+        state = value.get("state")
+        if state == "completed":
+            print(json.dumps(value, ensure_ascii=False, sort_keys=True))
+            return 0
+        if state == "failed":
+            print(json.dumps(value, ensure_ascii=False, sort_keys=True))
+            return 1
+        pid = value.get("child_pid")
+        start_ticks = value.get("child_start_ticks")
+        if isinstance(pid, int) and isinstance(start_ticks, int):
+            state_now = VISIBLE._proc_identity_state(pid, start_ticks)
+            if state_now == "live":
+                print(json.dumps(value, ensure_ascii=False, sort_keys=True))
+                return 0
+    # Validate all non-destructive inputs before creating the detached helper.
+    owner_path = _regular_file(Path(args.return_owner), "return owner")
+    owner_value, _ = _load_json_file(owner_path, "return owner")
+    validate_return_owner(owner_value)
+    _load_handoff_context(
+        Path(args.handoff), Path(args.holder_receipt), Path(args.closure_receipt)
+    )
+    ready_read, ready_write = os.pipe()
+    child_pid = os.fork()
+    if child_pid == 0:
+        os.close(ready_write)
+        _run_detached_child(args, result_path, log_path, detached_path, ready_read)
+        raise AssertionError("detached child returned")
+    os.close(ready_read)
+    start_ticks = VISIBLE._proc_start_ticks(child_pid)
+    receipt = {
+        "schema_version": DETACHED_SCHEMA_VERSION,
+        "state": "running",
+        "created_at": _utc_now(),
+        "child_pid": child_pid,
+        "child_start_ticks": start_ticks,
+        "result_ref": str(result_path.resolve()),
+        "log_ref": str(log_path.resolve()),
+        "return_receipt_ref": str(Path(args.return_receipt).resolve()),
+    }
+    try:
+        _write_new_json(detached_path, receipt, "detached return receipt")
+        os.write(ready_write, b"\x01")
+    finally:
+        os.close(ready_write)
+    print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
+def parser() -> argparse.ArgumentParser:
+    root = argparse.ArgumentParser(
+        description=(
+            "Deliver an explicit external Codex handoff to its supplied Goal/session "
+            "and close only its supplied visible holder."
+        )
+    )
+    subcommands = root.add_subparsers(dest="command", required=True)
+    return_parser = subcommands.add_parser(
+        "return",
+        help="deliver the handoff, authorize typed close, and close the exact holder",
+    )
+    return_parser.add_argument("--return-owner", required=True)
+    return_parser.add_argument("--handoff", required=True)
+    return_parser.add_argument("--holder-receipt", required=True)
+    return_parser.add_argument("--return-receipt", required=True)
+    return_parser.add_argument("--authorization", required=True)
+    return_parser.add_argument("--closure-receipt", required=True)
+    return_parser.add_argument("--detach", action="store_true")
+    return_parser.add_argument("--detached-receipt")
+    return_parser.add_argument("--detached-result")
+    return_parser.add_argument("--detached-log")
+    return_parser.set_defaults(handler=command_return)
+    return root
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = parser().parse_args(argv)
+    return int(args.handler(args))
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (ExternalCodexReturnError, VISIBLE.IncarnationHomeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(2)

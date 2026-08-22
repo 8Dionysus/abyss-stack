@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/external-codex-return-owner.schema.json",
+  "title": "Abyss external Codex return owner",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "owner_id",
+    "owner_repo",
+    "goal_id",
+    "thread_id",
+    "runtime",
+    "transport_posture",
+    "acceptance_posture"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "abyss_stack_external_codex_return_owner_v1"
+    },
+    "owner_id": {"type": "string", "minLength": 1},
+    "owner_repo": {"type": "string", "minLength": 1},
+    "goal_id": {"type": "string", "minLength": 1},
+    "thread_id": {"type": "string", "minLength": 1},
+    "runtime": {"const": "codex"},
+    "transport_posture": {"type": "string", "minLength": 1},
+    "acceptance_posture": {"type": "string", "minLength": 1},
+    "transport_endpoint": {"type": "string", "minLength": 1},
+    "app_server_socket": {"type": "string", "minLength": 1},
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {"type": "string", "minLength": 1},
+        "socket": {"type": "string", "minLength": 1},
+        "address": {"type": "string", "minLength": 1}
+      },
+      "minProperties": 1
+    }
+  }
+}
