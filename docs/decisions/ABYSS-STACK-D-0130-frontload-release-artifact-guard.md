@@ -1,6 +1,6 @@
 # Frontload Release Artifact Guard Before the Complete Suite
 
-- Decision ID: ABYSS-STACK-D-0129
+- Decision ID: ABYSS-STACK-D-0130
 - Status: proposed
 - Date: 2026-08-21
 - Owner surface: `docs/validation/validation_lanes.json`

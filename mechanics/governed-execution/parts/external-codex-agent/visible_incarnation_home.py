@@ -2107,7 +2107,10 @@ def _validate_wake_delivery(
         if wake_snapshot is None
         else wake_snapshot[0]
     )
-    if wake.get("schema_version") != "task_local_actor_wake_receipt_v1":
+    if wake.get("schema_version") not in {
+        "task_local_actor_wake_receipt_v1",
+        "abyss_stack_external_codex_return_receipt_v1",
+    }:
         raise IncarnationHomeError("unsupported wake receipt schema")
     if wake.get("handoff_ref") != str(handoff_path.resolve()):
         raise IncarnationHomeError("wake receipt handoff identity mismatch")
@@ -2120,6 +2123,12 @@ def _validate_wake_delivery(
         or observed.get("handoff_delivery") is not True
     ):
         raise IncarnationHomeError("wake receipt does not prove handoff delivery")
+    if wake.get("schema_version") == "abyss_stack_external_codex_return_receipt_v1":
+        delivery = wake.get("delivery")
+        if not isinstance(delivery, dict) or delivery.get("accepted") is not True:
+            raise IncarnationHomeError(
+                "canonical return receipt does not prove accepted delivery"
+            )
     if handoff_snapshot is None:
         try:
             handoff_file = _regular_file(handoff_path, "handoff")

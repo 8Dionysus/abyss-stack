@@ -58,6 +58,7 @@ python -m py_compile \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_mount_launcher.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py \
   mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py \
+  mechanics/governed-execution/parts/external-codex-agent/external_codex_return.py \
   mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py \
   mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py
 python scripts/validate_nested_agents.py

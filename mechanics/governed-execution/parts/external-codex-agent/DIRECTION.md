@@ -41,6 +41,13 @@ re-entry, owner acceptance, master wake, or a model/role verdict; those remain
 separate evidence. A future live canary must prove both the exact holder and
 Kitty disappearance while preserving an unrelated live holder.
 
+The canonical external return leaf now owns the transport bridge around that
+typed lifecycle. It accepts an explicit owner binding, uses the current local
+Codex app-server to activate a paused Goal and steer or start its session,
+persists delivery evidence, and then composes the existing authorization and
+exact close primitives. This remains runtime transport evidence: acceptance,
+semantic re-entry, and owner meaning stay with their owners.
+
 ## Proof sequence
 
 1. Maintain source-local schema, owner-admission, binder, process, drift,

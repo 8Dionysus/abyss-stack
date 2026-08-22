@@ -80,6 +80,10 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         "import aoa_sdk\nprint('incarnation:' + aoa_sdk.MARKER)\n",
         encoding="utf-8",
     )
+    (part / "external_codex_return.py").write_text(
+        "import aoa_sdk\nprint('return:' + aoa_sdk.MARKER)\n",
+        encoding="utf-8",
+    )
     (part / "external_codex_supervisor.py").write_text(
         "PASS = True\n", encoding="utf-8"
     )
@@ -839,6 +843,13 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
         text=True,
     )
     assert incarnation.stdout == "incarnation:exact-sdk\n"
+    actor_return = subprocess.run(
+        [str(bin_dir / "aoa-external-codex-return")],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert actor_return.stdout == "return:exact-sdk\n"
     study = subprocess.run(
         [str(bin_dir / "aoa-external-codex-study")],
         check=True,

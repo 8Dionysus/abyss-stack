@@ -296,7 +296,7 @@
 
 ## complete evidence
 
-- [ABYSS-STACK-D-0129 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0129-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0129-frontload-release-artifact-guard.md`)
+- [ABYSS-STACK-D-0130 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0130-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0130-frontload-release-artifact-guard.md`)
 
 ## complete selection
 
@@ -510,7 +510,7 @@
 
 ## fail-fast ordering
 
-- [ABYSS-STACK-D-0129 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0129-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0129-frontload-release-artifact-guard.md`)
+- [ABYSS-STACK-D-0130 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0130-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0130-frontload-release-artifact-guard.md`)
 
 ## federation surface
 
@@ -557,6 +557,11 @@
 ## handoff delivery
 
 - [ABYSS-STACK-D-0124 Visible Holder Terminal Lifecycle Identity](../ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md) (`docs/decisions/ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md`)
+- [ABYSS-STACK-D-0129 Canonical External Actor Return Leaf](../ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md) (`docs/decisions/ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md`)
+
+## holder closure
+
+- [ABYSS-STACK-D-0129 Canonical External Actor Return Leaf](../ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md) (`docs/decisions/ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md`)
 
 ## holder identity
 
@@ -829,7 +834,7 @@
 
 ## release artifact trust
 
-- [ABYSS-STACK-D-0129 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0129-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0129-frontload-release-artifact-guard.md`)
+- [ABYSS-STACK-D-0130 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0130-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0130-frontload-release-artifact-guard.md`)
 
 ## release governance
 
@@ -846,6 +851,10 @@
 ## responsibility transfer
 
 - [ABYSS-STACK-D-0112 Require Evidence-Complete Owner-Contour Incarnations](../ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md) (`docs/decisions/ABYSS-STACK-D-0112-require-evidence-complete-owner-contour-incarnations.md`)
+
+## return-owner binding
+
+- [ABYSS-STACK-D-0129 Canonical External Actor Return Leaf](../ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md) (`docs/decisions/ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md`)
 
 ## return-policy
 
