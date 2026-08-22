@@ -1,17 +1,17 @@
 {
-  "allowed_bytes": 29664375,
-  "allowed_tracked_bytes": 37630436,
+  "allowed_bytes": 29680346,
+  "allowed_tracked_bytes": 37648290,
   "approved_by": "repository-owner",
   "base_ref": "4113863137b2322830d3b5941b802a5db6fb136b",
-  "changed_generated_bytes": 29664375,
+  "changed_generated_bytes": 29680346,
   "changed_generated_files": 332,
   "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
   "default_limit_bytes": 1048576,
-  "head_family_digest": "823bca8de848acd8d5bc3b00197132a3225b53144bf00ef655fbfd4f5c6a20b9",
-  "reason": "Refresh the exact owner portable family after hardening Goal pause recovery dispatch evidence and the public receipt schema on current main.",
+  "head_family_digest": "45ef1cfbfc069cfea481e2b37bcdf62f17f17ea50dd3c603f4df3fec3a5c9d39",
+  "reason": "Refresh the exact owner portable family after hardening Goal pause recovery dispatch evidence and the public receipt schema on current main, including the landed repair commit.",
   "repo": "abyss-stack",
   "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
   "scope": "generated_delta_and_tracked_size",
-  "tracked_bytes": 37630436,
+  "tracked_bytes": 37648290,
   "tracked_bytes_max": 24117248
 }
