@@ -1313,6 +1313,7 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                             stdout=output,
                             stderr=subprocess.STDOUT,
                             text=True,
+                            close_fds=True,
                         )
                     except BaseException:
                         if output is not None:
@@ -1496,6 +1497,7 @@ def main(argv: list[str] | None = None) -> int:
                     cwd=REPO_ROOT,
                     env=os.environ.copy(),
                     check=False,
+                    close_fds=True,
                 )
         except PytestTempNamespaceCreationError as exc:
             print(f"[error] {exc}", file=sys.stderr, flush=True)
