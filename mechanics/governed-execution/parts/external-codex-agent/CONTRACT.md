@@ -122,12 +122,17 @@ Operations are:
   supplied complete owner binding and immutable handoff, reads the exact Goal
   identity first, refuses terminal or blocked Goals, activates only a paused
   Goal, steers an active turn or starts a new one, and reserves the output
-  receipt before any app-server mutation. It writes
+  receipt before any app-server mutation. The handoff owner must match the
+  complete canonical transport binding, and existing authorization/closure
+  evidence plus all lifecycle output destinations are validated before any
+  app-server mutation. It writes
   `abyss_stack_external_codex_return_receipt_v1`, then composes the typed
   `authorize-close` and exact `close` primitives. `--detach` runs the same
   operation in a new session, binds durable receipts to the owner/handoff/
-  holder/output identities, and publishes a new retry receipt when a prior
-  detached child is stale. A legacy task-local owner binding is accepted only
+  holder/output identities, follows an already-published retry receipt instead
+  of launching a duplicate child, and publishes a new retry receipt only when
+  the current stale attempt has no live retry. A legacy task-local owner
+  binding is accepted only
   as an input migration; no Goal, thread, rollout, PR, disposition, or
   task-root coordinate is selected by source.
 

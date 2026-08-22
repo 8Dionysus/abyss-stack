@@ -122,6 +122,46 @@ def _owner_projection(owner: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def _transport_endpoint_candidates(owner: dict[str, Any]) -> list[str]:
+    candidates: list[str] = []
+    for key in ("transport_endpoint", "app_server_socket"):
+        value = owner.get(key)
+        if isinstance(value, str) and value.strip():
+            candidates.append(value)
+    transport = owner.get("transport")
+    if isinstance(transport, dict):
+        for key in ("endpoint", "socket", "address"):
+            value = transport.get(key)
+            if isinstance(value, str) and value.strip():
+                candidates.append(value)
+    return candidates
+
+
+def _canonical_transport_binding(owner: dict[str, Any]) -> dict[str, object]:
+    """Collapse every accepted endpoint spelling to the effective binding."""
+
+    candidates = _transport_endpoint_candidates(owner)
+    if len(set(candidates)) > 1:
+        raise ExternalCodexReturnError(
+            "return owner transport endpoint aliases do not agree"
+        )
+    return {
+        "posture": _nonempty_string(
+            owner.get("transport_posture"), "return owner transport_posture"
+        ),
+        "endpoint": candidates[0] if candidates else None,
+    }
+
+
+def _owner_binding_projection(owner: dict[str, Any]) -> dict[str, object]:
+    """Project identity plus the complete canonical transport binding."""
+
+    return {
+        "identity": _owner_projection(owner),
+        "transport": _canonical_transport_binding(owner),
+    }
+
+
 def validate_return_owner(owner: dict[str, Any]) -> dict[str, Any]:
     """Validate owner binding data without selecting any owner identity."""
 
@@ -142,21 +182,13 @@ def validate_return_owner(owner: dict[str, Any]) -> dict[str, Any]:
         for key in ("endpoint", "socket", "address"):
             if key in transport:
                 _nonempty_string(transport[key], f"return owner transport.{key}")
+    _canonical_transport_binding({**owner, **projected})
     return {**owner, **projected}
 
 
 def _endpoint_from_owner(owner: dict[str, Any]) -> str | None:
-    for key in ("transport_endpoint", "app_server_socket"):
-        value = owner.get(key)
-        if isinstance(value, str) and value.strip():
-            return value
-    transport = owner.get("transport")
-    if isinstance(transport, dict):
-        for key in ("endpoint", "socket", "address"):
-            value = transport.get(key)
-            if isinstance(value, str) and value.strip():
-                return value
-    return None
+    candidates = _transport_endpoint_candidates(owner)
+    return candidates[0] if candidates else None
 
 
 def _socket_path(value: str) -> Path:
@@ -660,6 +692,18 @@ def _validate_output_path(path: Path, label: str) -> Path:
     return path
 
 
+def _validate_distinct_output_paths(paths: Sequence[tuple[Path, str]]) -> None:
+    seen: dict[Path, str] = {}
+    for path, label in paths:
+        identity = path.resolve()
+        previous = seen.get(identity)
+        if previous is not None:
+            raise ExternalCodexReturnError(
+                f"{label} aliases {previous}; lifecycle output paths must be distinct"
+            )
+        seen[identity] = label
+
+
 def _return_binding(
     *,
     owner_path: Path,
@@ -736,6 +780,37 @@ def _load_return_inputs(args: argparse.Namespace) -> dict[str, Any]:
     return_path = _validate_output_path(
         Path(args.return_receipt), "canonical return receipt"
     )
+    _validate_distinct_output_paths(
+        [
+            (authorization_path, "terminal closure authorization"),
+            (closure_path, "closure receipt"),
+            (return_path, "canonical return receipt"),
+        ]
+    )
+    authorization: dict[str, Any] | None = None
+    if authorization_path.exists():
+        authorization = _load_existing_authorization(
+            authorization_path,
+            handoff_path=handoff_path,
+            holder_path=holder_path,
+            closure_path=closure_path,
+            holder=holder,
+            holder_bytes=holder_bytes,
+            holder_digest=holder_digest,
+            handoff_snapshot=(handoff, handoff_bytes, handoff_digest),
+        )
+    elif closure_path.exists():
+        raise ExternalCodexReturnError(
+            "closure receipt exists without its terminal closure authorization"
+        )
+    if authorization is not None and closure_path.exists():
+        _validate_existing_closure(
+            closure_path,
+            authorization_path=authorization_path,
+            handoff_path=handoff_path,
+            holder_path=holder_path,
+            authorization=authorization,
+        )
     return {
         "owner_path": owner_path,
         "owner_value": owner_value,
@@ -752,6 +827,7 @@ def _load_return_inputs(args: argparse.Namespace) -> dict[str, Any]:
         "holder_digest": holder_digest,
         "closure_path": closure_path,
         "authorization_path": authorization_path,
+        "authorization": authorization,
         "return_path": return_path,
     }
 
@@ -789,8 +865,7 @@ def _validate_handoff_owner(handoff: dict[str, Any], owner: dict[str, Any]) -> N
         raise ExternalCodexReturnError(
             "handoff return_owner is not a complete owner binding"
         ) from exc
-    expected = _owner_projection(owner)
-    if _owner_projection(supplied_owner) != expected:
+    if _owner_binding_projection(supplied_owner) != _owner_binding_projection(owner):
         raise ExternalCodexReturnError("handoff return owner does not match owner binding")
 
 
@@ -893,6 +968,57 @@ def _load_existing_authorization(
         )
     except Exception as exc:
         raise ExternalCodexReturnError(str(exc)) from exc
+
+
+def _validate_existing_closure(
+    path: Path,
+    *,
+    authorization_path: Path,
+    handoff_path: Path,
+    holder_path: Path,
+    authorization: dict[str, Any],
+) -> dict[str, Any]:
+    """Validate a pre-existing closure before any new Goal delivery."""
+
+    value, raw = _load_json_file(path, "terminal closure receipt")
+    if raw != _canonical_bytes(value) + b"\n":
+        raise ExternalCodexReturnError(
+            "terminal closure receipt is not canonically encoded"
+        )
+    if value.get("schema_version") != VISIBLE.TERMINAL_CLOSURE_SCHEMA_VERSION:
+        raise ExternalCodexReturnError(
+            "existing closure receipt is not a typed canonical closure"
+        )
+    expected = {
+        "handoff_ref": str(handoff_path.resolve()),
+        "holder_receipt_ref": str(holder_path.resolve()),
+        "authorization_ref": str(authorization_path.resolve()),
+        "authorization_kind": authorization.get("authorization_kind"),
+        "authorization_evidence_ref": authorization.get("evidence_ref"),
+        "reservation_ref": str(VISIBLE._closure_reservation_path(path).resolve()),
+        "route": "abyss_stack_visible_incarnation_runtime",
+        "trigger": (
+            "wake_bridge_after_confirmed_handoff_delivery"
+            if authorization.get("authorization_kind") == "wake_delivered"
+            else "join_after_validated_terminal_return"
+        ),
+        "closed": True,
+    }
+    for key, expected_value in expected.items():
+        if value.get(key) != expected_value:
+            raise ExternalCodexReturnError(
+                f"existing closure receipt {key} does not match this return"
+            )
+    evidence_key = (
+        "wake_receipt_ref"
+        if authorization.get("authorization_kind") == "wake_delivered"
+        else "join_receipt_ref"
+    )
+    if value.get(evidence_key) != authorization.get("evidence_ref"):
+        raise ExternalCodexReturnError(
+            "existing closure receipt evidence identity does not match authorization"
+        )
+    return value
 
 
 def _call_visible(handler: Callable[[argparse.Namespace], int], args: argparse.Namespace) -> None:
@@ -1196,6 +1322,16 @@ def command_return(args: argparse.Namespace) -> int:
     _validate_output_path(detached_path, "detached return receipt")
     _validate_output_path(result_path, "detached canonical return result")
     _validate_output_path(log_path, "detached canonical return log")
+    _validate_distinct_output_paths(
+        [
+            (inputs["authorization_path"], "terminal closure authorization"),
+            (inputs["closure_path"], "closure receipt"),
+            (inputs["return_path"], "canonical return receipt"),
+            (detached_path, "detached return receipt"),
+            (result_path, "detached canonical return result"),
+            (log_path, "detached canonical return log"),
+        ]
+    )
     binding = _detached_binding(
         inputs,
         detached_path=detached_path,
@@ -1203,7 +1339,14 @@ def command_return(args: argparse.Namespace) -> int:
         log_path=log_path,
     )
     launch_args = args
-    if detached_path.exists():
+    visited_receipts: set[Path] = set()
+    while detached_path.exists():
+        receipt_identity = detached_path.resolve()
+        if receipt_identity in visited_receipts:
+            raise ExternalCodexReturnError(
+                "detached return retry chain contains a cycle"
+            )
+        visited_receipts.add(receipt_identity)
         value, raw = _load_json_file(detached_path, "detached return receipt")
         if raw != _canonical_bytes(value) + b"\n":
             raise ExternalCodexReturnError(
@@ -1230,6 +1373,54 @@ def command_return(args: argparse.Namespace) -> int:
             raise ExternalCodexReturnError(
                 "stale detached return receipt still has a live child identity"
             )
+        retry_refs = {
+            "detached": value.get("retry_receipt_ref"),
+            "result": value.get("retry_result_ref"),
+            "log": value.get("retry_log_ref"),
+        }
+        if any(retry_refs.values()):
+            if not all(isinstance(ref, str) and ref for ref in retry_refs.values()):
+                raise ExternalCodexReturnError(
+                    "detached return receipt has an incomplete retry binding"
+                )
+            retry_detached = _validate_output_path(
+                Path(str(retry_refs["detached"])),
+                "detached return retry receipt",
+            )
+            retry_result = _validate_output_path(
+                Path(str(retry_refs["result"])),
+                "detached return retry result",
+            )
+            retry_log = _validate_output_path(
+                Path(str(retry_refs["log"])),
+                "detached return retry log",
+            )
+            _validate_distinct_output_paths(
+                [
+                    (inputs["authorization_path"], "terminal closure authorization"),
+                    (inputs["closure_path"], "closure receipt"),
+                    (inputs["return_path"], "canonical return receipt"),
+                    (retry_detached, "detached return retry receipt"),
+                    (retry_result, "detached return retry result"),
+                    (retry_log, "detached return retry log"),
+                ]
+            )
+            if not retry_detached.exists():
+                raise ExternalCodexReturnError(
+                    "detached return receipt points to a missing retry receipt"
+                )
+            detached_path, result_path, log_path = (
+                retry_detached,
+                retry_result,
+                retry_log,
+            )
+            binding = _detached_binding(
+                inputs,
+                detached_path=detached_path,
+                result_path=result_path,
+                log_path=log_path,
+            )
+            continue
         retry_detached = _retry_output_path(
             detached_path, "detached return receipt retry"
         )
@@ -1237,6 +1428,16 @@ def command_return(args: argparse.Namespace) -> int:
             result_path, "detached canonical return result retry"
         )
         retry_log = _retry_output_path(log_path, "detached canonical return log retry")
+        _validate_distinct_output_paths(
+            [
+                (inputs["authorization_path"], "terminal closure authorization"),
+                (inputs["closure_path"], "closure receipt"),
+                (inputs["return_path"], "canonical return receipt"),
+                (retry_detached, "detached return receipt retry"),
+                (retry_result, "detached return result retry"),
+                (retry_log, "detached return log retry"),
+            ]
+        )
         _replace_json(
             detached_path,
             {

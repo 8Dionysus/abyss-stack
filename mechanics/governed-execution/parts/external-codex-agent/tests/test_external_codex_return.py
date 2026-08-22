@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -248,6 +249,155 @@ def test_handoff_requires_complete_return_owner() -> None:
             {"return_owner": {"owner_id": owner_value["owner_id"]}},
             owner_value,
         )
+
+
+def test_handoff_requires_complete_transport_binding() -> None:
+    owner_value = MODULE.validate_return_owner(
+        owner(
+            goal="goal-bound",
+            thread="thread-bound",
+            endpoint="unix:/run/user/1000/owner.sock",
+        )
+    )
+    supplied = MODULE.validate_return_owner(
+        owner(
+            goal="goal-bound",
+            thread="thread-bound",
+            endpoint="unix:/run/user/1000/other.sock",
+        )
+    )
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="does not match"):
+        MODULE._validate_handoff_owner(
+            {"return_owner": supplied},
+            owner_value,
+        )
+
+
+def test_existing_authorization_is_validated_before_return_delivery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner_value = owner(
+        goal="goal-preflight",
+        thread="thread-preflight",
+        endpoint="unix:/run/user/1000/owner.sock",
+    )
+    owner_path = tmp_path / "owner.json"
+    owner_path.write_bytes(MODULE._canonical_bytes(owner_value) + b"\n")
+    handoff_path = tmp_path / "handoff.json"
+    handoff_path.write_text("{}\n", encoding="utf-8")
+    holder_path = tmp_path / "holder.json"
+    holder_path.write_text("{}\n", encoding="utf-8")
+    authorization_path = tmp_path / "authorization.json"
+    authorization_path.write_text('{"foreign":true}\n', encoding="utf-8")
+    closure_path = tmp_path / "closure.json"
+    return_path = tmp_path / "return.json"
+    handoff_value = {"return_owner": owner_value}
+    holder_value = {}
+    monkeypatch.setattr(
+        MODULE,
+        "_load_handoff_context",
+        lambda *_args, **_kwargs: (
+            handoff_value,
+            MODULE._canonical_bytes(handoff_value) + b"\n",
+            "sha256:" + "1" * 64,
+            holder_value,
+            b"{}\n",
+            "sha256:" + "2" * 64,
+        ),
+    )
+    called = False
+
+    def reject_downstream(*_args: object, **_kwargs: object) -> dict[str, object]:
+        nonlocal called
+        called = True
+        raise MODULE.ExternalCodexReturnError("foreign authorization binding")
+
+    monkeypatch.setattr(MODULE, "_load_existing_authorization", reject_downstream)
+    args = SimpleNamespace(
+        return_owner=str(owner_path),
+        handoff=str(handoff_path),
+        holder_receipt=str(holder_path),
+        authorization=str(authorization_path),
+        closure_receipt=str(closure_path),
+        return_receipt=str(return_path),
+    )
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="foreign authorization"):
+        MODULE._load_return_inputs(args)
+    assert called is True
+
+
+def test_lifecycle_outputs_may_not_alias() -> None:
+    path = Path("/tmp/canonical-return.json")
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="aliases"):
+        MODULE._validate_distinct_output_paths(
+            [(path, "return receipt"), (path, "authorization")]
+        )
+
+
+def test_detached_return_follows_an_existing_live_retry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    paths = {
+        "owner_path": tmp_path / "owner.json",
+        "handoff_path": tmp_path / "handoff.json",
+        "holder_path": tmp_path / "holder.json",
+        "authorization_path": tmp_path / "authorization.json",
+        "closure_path": tmp_path / "closure.json",
+        "return_path": tmp_path / "return.json",
+    }
+    inputs: dict[str, object] = {
+        **paths,
+        "owner_digest": "sha256:" + "1" * 64,
+        "handoff_digest": "sha256:" + "2" * 64,
+        "holder_digest": "sha256:" + "3" * 64,
+    }
+    detached_path = tmp_path / "detached.json"
+    result_path = tmp_path / "result.json"
+    log_path = tmp_path / "return.log"
+    retry_detached = tmp_path / "detached.retry.json"
+    retry_result = tmp_path / "result.retry.json"
+    retry_log = tmp_path / "return.retry.log"
+    original_binding = MODULE._detached_binding(
+        inputs,
+        detached_path=detached_path,
+        result_path=result_path,
+        log_path=log_path,
+    )
+    retry_binding = MODULE._detached_binding(
+        inputs,
+        detached_path=retry_detached,
+        result_path=retry_result,
+        log_path=retry_log,
+    )
+    original = {
+        "schema_version": MODULE.DETACHED_SCHEMA_VERSION,
+        "state": "stale",
+        **original_binding,
+        "retry_receipt_ref": str(retry_detached),
+        "retry_result_ref": str(retry_result),
+        "retry_log_ref": str(retry_log),
+    }
+    retry = {
+        "schema_version": MODULE.DETACHED_SCHEMA_VERSION,
+        "state": "running",
+        "child_pid": 12345,
+        "child_start_ticks": 67890,
+        **retry_binding,
+    }
+    detached_path.write_bytes(MODULE._canonical_bytes(original) + b"\n")
+    retry_detached.write_bytes(MODULE._canonical_bytes(retry) + b"\n")
+    monkeypatch.setattr(MODULE.VISIBLE, "_proc_identity_state", lambda *_args: "live")
+    monkeypatch.setattr(MODULE, "_load_return_inputs", lambda _args: inputs)
+    args = SimpleNamespace(
+        detach=True,
+        return_receipt=str(paths["return_path"]),
+        detached_receipt=str(detached_path),
+        detached_result=str(result_path),
+        detached_log=str(log_path),
+    )
+    assert MODULE.command_return(args) == 0
 
 
 def test_output_reservation_rejects_relative_destination() -> None:

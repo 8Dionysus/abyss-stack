@@ -8,7 +8,7 @@
   "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
   "default_limit_bytes": 1048576,
   "head_family_digest": "497443b3f804cfa24924ee5e205e52b5265aec376c2a9a9207cbfebd626d8961",
-  "reason": "Refresh exact owner portable family after hardening canonical external actor return output, Goal, and detached receipt bindings.",
+  "reason": "Refresh exact owner portable family after canonical external actor return transport, downstream preflight, and stale retry hardening.",
   "repo": "abyss-stack",
   "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
   "scope": "generated_delta_and_tracked_size",
