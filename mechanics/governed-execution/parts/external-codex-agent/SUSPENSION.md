@@ -94,13 +94,15 @@ scripts/aoa-external-codex-stasis \
 The snapshot must bind the exact holder and return owner, expected lifecycle
 transition, deadline, and observation cost. The command does not poll. It
 returns `not_due` or `cost_deferred` with one bounded next-observation hint,
-`progressing` only for transition evidence, or a typed stasis event plus
-review wake when the deadline has passed without that transition. A live PID,
-terminal, session, hook screen, or unchanged worktree is not progress. The
-observer never kills or restarts an actor, declares domain failure, accepts a
-Goal, closes a holder, or disturbs an unrelated actor. The typed wake is a
-request for the canonical return owner to review; transport delivery and
-semantic acceptance remain separate receipts.
+`progressing` only for an exact-holder, non-no-op transition, or a typed stasis
+event plus review wake when the deadline has passed without that transition. A
+live PID, terminal, session, hook screen, or unchanged worktree is not
+progress. The observer never kills or restarts an actor, declares domain
+failure, accepts a Goal, closes a holder, or disturbs an unrelated actor. The
+typed wake is a request for the canonical return owner to review; transport
+delivery and semantic acceptance remain separate receipts. Movement results
+are published non-replacing, so an observation cannot erase earlier causal
+evidence.
 
 For a parent continuation, inspect only its exact state root and re-entry ID:
 

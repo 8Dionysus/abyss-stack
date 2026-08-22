@@ -140,6 +140,90 @@
       "const": "Return a reviewed implementation and causal proof to the exact master; do not auto-kill, auto-restart, declare domain failure, accept the Goal, or disturb unrelated actors."
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"classification": {"const": "progressing"}}
+      },
+      "then": {
+        "properties": {
+          "transition_evidence": {
+            "properties": {
+              "matching_evidence_ids": {"minItems": 1}
+            }
+          },
+          "event": {"type": "null"},
+          "wake": {"type": "null"},
+          "next_observation": {"type": "null"},
+          "causal_basis": {"const": "matching_lifecycle_transition"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"classification": {"const": "not_due"}}
+      },
+      "then": {
+        "properties": {
+          "transition_evidence": {
+            "properties": {
+              "matching_evidence_ids": {"maxItems": 0}
+            }
+          },
+          "event": {"type": "null"},
+          "wake": {"type": "null"},
+          "next_observation": {
+            "type": "object",
+            "required": ["reason"],
+            "properties": {"reason": {"const": "transition_deadline"}}
+          },
+          "causal_basis": {"const": "deadline_not_reached"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"classification": {"const": "cost_deferred"}}
+      },
+      "then": {
+        "properties": {
+          "transition_evidence": {
+            "properties": {
+              "matching_evidence_ids": {"maxItems": 0}
+            }
+          },
+          "event": {"type": "null"},
+          "wake": {"type": "null"},
+          "next_observation": {
+            "type": "object",
+            "required": ["reason"],
+            "properties": {"reason": {"const": "cost_budget"}}
+          },
+          "causal_basis": {"const": "observation_cost_exceeds_budget"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"classification": {"const": "stasis"}}
+      },
+      "then": {
+        "properties": {
+          "transition_evidence": {
+            "properties": {
+              "matching_evidence_ids": {"maxItems": 0}
+            }
+          },
+          "event": {"$ref": "#/$defs/stasisEvent"},
+          "wake": {"$ref": "#/$defs/typedWake"},
+          "next_observation": {"type": "null"},
+          "causal_basis": {
+            "const": "deadline_elapsed_without_matching_lifecycle_transition"
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "digest": {
       "type": "string",

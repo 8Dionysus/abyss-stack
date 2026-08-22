@@ -159,6 +159,11 @@ def validate_observation(value: Mapping[str, Any]) -> dict[str, Any]:
         )
     if due_at < transition_started_at:
         raise ResponsibilityMovementError("due_at precedes transition_started_at")
+    current_state = lifecycle["current_state"]
+    if current_state in lifecycle["expected_to_states"]:
+        raise ResponsibilityMovementError(
+            "expected_to_states must contain a state different from current_state"
+        )
     for index, evidence in enumerate(candidate["evidence"]):
         evidence_at = _parse_time(evidence["observed_at"], f"evidence[{index}].observed_at")
         if evidence_at > observed_at:
@@ -173,6 +178,16 @@ def validate_observation(value: Mapping[str, Any]) -> dict[str, Any]:
             if evidence.get("to_state") not in LIFECYCLE_STATES:
                 raise ResponsibilityMovementError(
                     f"evidence[{index}] lacks a valid to_state"
+                )
+            if evidence["from_state"] == evidence["to_state"]:
+                raise ResponsibilityMovementError(
+                    f"evidence[{index}] is a no-op lifecycle transition"
+                )
+            if _ref_identity(evidence.get("subject_ref", {})) != _ref_identity(
+                candidate["holder_ref"]
+            ):
+                raise ResponsibilityMovementError(
+                    f"evidence[{index}] lifecycle subject is not the bound holder"
                 )
     return candidate
 
@@ -195,6 +210,7 @@ def _matching_transition_ids(observation: Mapping[str, Any]) -> list[str]:
             and evidence_at <= observed_at
             and evidence["from_state"] == current_state
             and evidence["to_state"] in expected_states
+            and evidence["to_state"] != current_state
         ):
             matches.append(evidence["evidence_id"])
     return matches
@@ -365,20 +381,10 @@ def observe_once(value: Mapping[str, Any]) -> dict[str, Any]:
             observation,
             classification="cost_deferred",
             causal_basis="observation_cost_exceeds_budget",
-            matching_ids=matching_ids,
+            matching_ids=[],
             event=None,
             wake=None,
             next_observation=_next_observation(observation, "cost_budget"),
-        )
-    if now < due_at:
-        return _result(
-            observation,
-            classification="not_due",
-            causal_basis="deadline_not_reached",
-            matching_ids=matching_ids,
-            event=None,
-            wake=None,
-            next_observation=_next_observation(observation, "transition_deadline"),
         )
     if matching_ids:
         return _result(
@@ -389,6 +395,16 @@ def observe_once(value: Mapping[str, Any]) -> dict[str, Any]:
             event=None,
             wake=None,
             next_observation=None,
+        )
+    if now < due_at:
+        return _result(
+            observation,
+            classification="not_due",
+            causal_basis="deadline_not_reached",
+            matching_ids=[],
+            event=None,
+            wake=None,
+            next_observation=_next_observation(observation, "transition_deadline"),
         )
 
     observation_digest = _digest(observation)
@@ -409,7 +425,11 @@ def observe_once(value: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _read_observation(path: Path) -> dict[str, Any]:
-    if not path.is_absolute() or path.is_symlink() or not path.is_file():
+    if (
+        not path.is_absolute()
+        or _has_symlink_component(path)
+        or not path.is_file()
+    ):
         raise ResponsibilityMovementError(
             f"observation must be an absolute regular non-symlink file: {path}"
         )
@@ -423,11 +443,19 @@ def _read_observation(path: Path) -> dict[str, Any]:
 
 
 def _write_result(path: Path, value: Mapping[str, Any]) -> None:
-    if not path.is_absolute() or path.is_symlink():
+    if not path.is_absolute() or _has_symlink_component(path):
         raise ResponsibilityMovementError(
             f"result must be an absolute non-symlink path: {path}"
         )
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.parent.is_symlink() or not path.parent.is_dir():
+        raise ResponsibilityMovementError(
+            f"result parent must be a real directory: {path.parent}"
+        )
+    if path.exists() or path.is_symlink():
+        raise ResponsibilityMovementError(
+            f"result already exists; refusing to overwrite movement evidence: {path}"
+        )
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
     )
@@ -438,7 +466,19 @@ def _write_result(path: Path, value: Mapping[str, Any]) -> None:
             stream.write("\n")
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        try:
+            os.link(temporary, path, follow_symlinks=False)
+        except FileExistsError as exc:
+            raise ResponsibilityMovementError(
+                f"result already exists; refusing to overwrite movement evidence: {path}"
+            ) from exc
+        except OSError as exc:
+            raise ResponsibilityMovementError(
+                f"cannot publish movement result without replacement: {path}"
+            ) from exc
+        finally:
+            if temporary.exists():
+                temporary.unlink()
         directory_fd = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
         try:
             os.fsync(directory_fd)
@@ -458,12 +498,39 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _has_symlink_component(path: Path) -> bool:
+    """Reject leaf and parent aliases before any path canonicalization."""
+
+    if not path.is_absolute():
+        return False
+    current = Path(path.anchor)
+    for component in path.parts[1:]:
+        current /= component
+        if current.is_symlink():
+            return True
+    return False
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        observation_path = args.observation.resolve()
-        result_path = args.result.resolve()
-        if observation_path == result_path:
+        observation_path = args.observation
+        result_path = args.result
+        if (
+            not observation_path.is_absolute()
+            or _has_symlink_component(observation_path)
+        ):
+            raise ResponsibilityMovementError(
+                f"observation must be an absolute non-symlink path: {observation_path}"
+            )
+        if (
+            not result_path.is_absolute()
+            or _has_symlink_component(result_path)
+        ):
+            raise ResponsibilityMovementError(
+                f"result must be an absolute non-symlink path: {result_path}"
+            )
+        if observation_path.absolute() == result_path.absolute():
             raise ResponsibilityMovementError("observation and result paths must differ")
         result = observe_once(_read_observation(observation_path))
         _write_result(result_path, result)

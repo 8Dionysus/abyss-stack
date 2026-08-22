@@ -58,6 +58,8 @@ def _evidence(
         value["to_state"] = to_state
     if details is not None:
         value["details"] = details
+    if kind == "lifecycle_transition":
+        value["subject_ref"] = _ref(HOLDER_ID)
     return value
 
 
@@ -195,6 +197,41 @@ def test_matching_transition_changes_only_classification_and_suppresses_wake() -
     assert result["unrelated_actors"]["preserved"] is True
 
 
+def test_noop_transition_is_not_movement() -> None:
+    value = observation(
+        [
+            _evidence(
+                "return-still-returning",
+                "lifecycle_transition",
+                signal="transition",
+                from_state="returning",
+                to_state="returning",
+            )
+        ]
+    )
+
+    with pytest.raises(MODULE.ResponsibilityMovementError, match="no-op"):
+        MODULE.observe_once(value)
+
+
+def test_transition_subject_must_bind_to_exact_holder() -> None:
+    value = observation(
+        [
+            _evidence(
+                "other-holder-completed",
+                "lifecycle_transition",
+                signal="transition",
+                from_state="returning",
+                to_state="terminal",
+            )
+        ]
+    )
+    value["evidence"][0]["subject_ref"] = _ref("holder:other")
+
+    with pytest.raises(MODULE.ResponsibilityMovementError, match="bound holder"):
+        MODULE.observe_once(value)
+
+
 def test_observation_is_one_shot_and_cost_aware() -> None:
     value = observation(
         [_evidence("process-still-live", "process", details={"present": True})],
@@ -280,3 +317,47 @@ def test_cli_writes_typed_result_without_polling(tmp_path: Path) -> None:
     ).validate(result)
     assert result["one_shot"] is True
     assert result["wake"]["effects"]["auto_kill"] is False
+
+
+def test_cli_refuses_symlink_inputs_and_result_overwrite(tmp_path: Path) -> None:
+    observation_path = tmp_path / "observation.json"
+    result_path = tmp_path / "result.json"
+    observation_path.write_text(
+        json.dumps(observation([]), sort_keys=True), encoding="utf-8"
+    )
+    result_path.write_text("existing\n", encoding="utf-8")
+    completed = subprocess.run(
+        [
+            str(Path(__file__).resolve().parents[5] / "scripts/aoa-external-codex-stasis"),
+            "--observation",
+            str(observation_path),
+            "--result",
+            str(result_path),
+        ],
+        cwd=Path(__file__).resolve().parents[5],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 2
+    assert "refusing to overwrite" in completed.stdout
+    assert result_path.read_text(encoding="utf-8") == "existing\n"
+
+    symlink_observation = tmp_path / "observation-link.json"
+    symlink_observation.symlink_to(observation_path)
+    fresh_result = tmp_path / "fresh-result.json"
+    completed = subprocess.run(
+        [
+            str(Path(__file__).resolve().parents[5] / "scripts/aoa-external-codex-stasis"),
+            "--observation",
+            str(symlink_observation),
+            "--result",
+            str(fresh_result),
+        ],
+        cwd=Path(__file__).resolve().parents[5],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 2
+    assert "non-symlink" in completed.stdout

@@ -157,13 +157,26 @@
         },
         "observed_at": {"type": "string", "format": "date-time"},
         "source_ref": {"$ref": "#/$defs/ref"},
+        "subject_ref": {"$ref": "#/$defs/ref"},
         "from_state": {"$ref": "#/$defs/state"},
         "to_state": {"$ref": "#/$defs/state"},
         "details": {
           "type": "object",
           "maxProperties": 12
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {"const": "lifecycle_transition"}
+            }
+          },
+          "then": {
+            "required": ["subject_ref", "from_state", "to_state"]
+          }
+        }
+      ]
     }
   }
 }

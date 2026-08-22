@@ -1035,6 +1035,7 @@ def _pause_receipt(
     *,
     owner: dict[str, Any],
     owner_path: Path,
+    pause_receipt_path: Path,
     owner_bytes: bytes,
     endpoint: Path,
     initialize: dict[str, Any],
@@ -1065,6 +1066,7 @@ def _pause_receipt(
         "generated_at": _utc_now(),
         "owner_ref": str(owner_path.resolve()),
         "owner_sha256": _sha256_bytes(owner_bytes),
+        "pause_receipt_ref": str(pause_receipt_path.resolve()),
         "owner": _owner_projection(owner),
         "transport": {
             "kind": "codex_app_server_websocket_unix",
@@ -1136,7 +1138,7 @@ def pause_goal(
         goal_identity_source = _validate_goal_binding(goal_before, owner)
         goal_before_status = _string_at(goal_before, ("status",))
         if goal_before_status == "paused":
-            if reservation is None:
+            if reservation_path is None or reservation is None:
                 raise ExternalCodexReturnError(
                     "Codex app-server Goal is not pausable from active state; it is already paused without a resumable pause reservation"
                 )
@@ -1150,6 +1152,7 @@ def pause_goal(
             return _pause_receipt(
                 owner=owner,
                 owner_path=owner_path,
+                pause_receipt_path=reservation_path,
                 owner_bytes=owner_bytes,
                 endpoint=endpoint,
                 initialize=initialize,
@@ -1326,6 +1329,7 @@ def pause_goal(
     return _pause_receipt(
         owner=owner,
         owner_path=owner_path,
+        pause_receipt_path=reservation_path,
         owner_bytes=owner_bytes,
         endpoint=endpoint,
         initialize=initialize,
@@ -2022,6 +2026,25 @@ def _validate_pause_receipt(
     if receipt.get("goal_status") != "paused":
         raise ExternalCodexReturnError(
             "canonical Goal pause receipt Goal is not paused"
+        )
+    transport = receipt.get("transport")
+    if (
+        not isinstance(transport, dict)
+        or set(transport) - {"kind", "endpoint", "resolution"}
+        or transport.get("kind") != "codex_app_server_websocket_unix"
+        or not isinstance(transport.get("endpoint"), str)
+        or not transport["endpoint"].startswith("/")
+        or not transport["endpoint"].strip()
+        or (
+            "resolution" in transport
+            and (
+                not isinstance(transport["resolution"], str)
+                or not transport["resolution"].strip()
+            )
+        )
+    ):
+        raise ExternalCodexReturnError(
+            "canonical Goal pause receipt transport binding is incomplete"
         )
     goal_binding = receipt.get("goal_binding")
     if (

@@ -290,6 +290,14 @@ def test_pause_goal_proves_exact_active_to_paused_transition(
     assert receipt["lifecycle"]["mutation_dispatched"]["method"] == (
         "thread/goal/set"
     )
+    validate(
+        instance=receipt,
+        schema=json.loads(
+            (
+                PART / "schemas/external-codex-pause-receipt.schema.json"
+            ).read_text(encoding="utf-8")
+        ),
+    )
     assert [method for method, _params in fake.calls] == [
         "initialize",
         "initialized",
@@ -515,6 +523,19 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
             owner_path=owner_path,
             owner_digest=MODULE._sha256_bytes(owner_path.read_bytes()),
         )
+
+    pause_path.write_bytes(MODULE._canonical_bytes(first) + b"\n")
+    corrupted_transport = json.loads(json.dumps(first))
+    corrupted_transport["transport"] = {
+        "kind": "wrong_transport",
+        "endpoint": first["transport"]["endpoint"],
+    }
+    pause_path.write_bytes(MODULE._canonical_bytes(corrupted_transport) + b"\n")
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="transport binding",
+    ):
+        MODULE.run_pause(args)
 
     pause_path.write_bytes(MODULE._canonical_bytes(first) + b"\n")
     monkeypatch.setattr(
