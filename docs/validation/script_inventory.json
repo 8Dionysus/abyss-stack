@@ -247,6 +247,7 @@
     {
       "family": "config-projection-codex-hooks-compositor",
       "paths": [
+        "mechanics/config-projection/parts/codex-hooks/scripts/codex_pretool_agent_routing.py",
         "mechanics/config-projection/parts/codex-hooks/scripts/render_codex_hooks.py"
       ],
       "organ_lane": "mechanic/package-local config projection",
