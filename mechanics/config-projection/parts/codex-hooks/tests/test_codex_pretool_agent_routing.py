@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
@@ -348,13 +349,14 @@ def test_context_schema_and_fragment_are_source_valid() -> None:
     Draft202012Validator(context_schema).validate(context())
 
     fragment = json.loads(FRAGMENT_PATH.read_text(encoding="utf-8"))
-    assert fragment["hooks"]["PreToolUse"][0]["matcher"] == (
-        "^(?:Agent|spawn_agent|multi_agent_v1(?:send_input|resume_agent|wait_agent|"
-        "close_agent)|send_message|followup_task|wait_agent|list_agents|"
-        "interrupt_agent|collaboration(?:spawn_agent|send_message|wait_agent|"
-        "close_agent|resume_agent|list_agents|followup_task|interrupt_agent|"
-        "send_input))$"
+    matcher = fragment["hooks"]["PreToolUse"][0]["matcher"]
+    assert matcher == (
+        "^(?:Agent|spawn_agent|(?:multi_agent_|collaboration)[A-Za-z0-9_]+|"
+        "send_message|followup_task|wait_agent|list_agents|interrupt_agent)$"
     )
+    assert re.fullmatch(matcher, "multi_agent_v2future_tool")
+    assert re.fullmatch(matcher, "collaborationfuture_tool")
+    assert not re.fullmatch(matcher, "Bash")
     assert fragment["bindings"] == [
         "AOA_CODEX_AGENT_ROUTING_HOOK",
         "AOA_CODEX_AGENT_ROUTING_CONTEXT_DIR",

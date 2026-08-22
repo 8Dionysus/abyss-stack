@@ -32,8 +32,9 @@ resolved.
 
 The stack-owned agent-routing fragment is a Codex-wire projection, not a
 responsibility owner. Its `PreToolUse` matcher covers the canonical
-`spawn_agent`, v1 namespace-flattened names, v2 unnamespaced names, and the
-observed installed-binary compatibility aliases. It invokes the adapter with
+`spawn_agent`, known v2 unnamespaced names, and any identity in the
+`multi_agent_` or `collaboration` namespaces so future namespace members reach
+the adapter's unknown-agent fail-closed branch. It invokes the adapter with
 explicit safe bindings for the context directory and selected `aoa-sdk` source
 root. The workspace remains the current hook event's `cwd`; the adapter does
 not select a workspace. The adapter must receive an exact typed context

@@ -33,8 +33,10 @@ holder references required by the SDK contract.
 ## Decision
 
 Add a command-only `PreToolUse` fragment for Codex's canonical `spawn_agent`,
-v1 namespace-flattened names, v2 unnamespaced names, and observed installed
-binary compatibility aliases. The composed command binds the selected
+known v2 unnamespaced names, and every identity in the `multi_agent_` and
+`collaboration` namespaces, including observed installed-binary compatibility
+aliases. Future members of those namespaces reach the adapter's explicit
+unknown-agent fail-closed branch. The composed command binds the selected
 context directory and `aoa-sdk` source root explicitly; the adapter uses the
 hook event's `cwd` as its workspace coordinate. It reads the event identity and
 opaque-tool presence, reads at most the context limit plus one byte, verifies

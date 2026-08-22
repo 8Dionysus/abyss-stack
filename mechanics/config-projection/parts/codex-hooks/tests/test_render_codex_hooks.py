@@ -212,11 +212,8 @@ def test_stack_agent_fragment_preserves_existing_native_handlers(
     assert output["hooks"]["PreToolUse"] == [
         {
             "matcher": (
-                "^(?:Agent|spawn_agent|multi_agent_v1(?:send_input|resume_agent|wait_agent|"
-                "close_agent)|send_message|followup_task|wait_agent|list_agents|"
-                "interrupt_agent|collaboration(?:spawn_agent|send_message|wait_agent|"
-                "close_agent|resume_agent|list_agents|followup_task|interrupt_agent|"
-                "send_input))$"
+                "^(?:Agent|spawn_agent|(?:multi_agent_|collaboration)[A-Za-z0-9_]+|"
+                "send_message|followup_task|wait_agent|list_agents|interrupt_agent)$"
             ),
             "hooks": [
                 {

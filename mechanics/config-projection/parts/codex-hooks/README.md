@@ -34,11 +34,13 @@ duplicate handlers, and merges matching event groups in fragment order.
 Metadata is removed from the native output.
 
 The stack-owned `abyss-stack:agent-tool-routing:v1` fragment adds the current
-Codex `PreToolUse` command adapter for the canonical `spawn_agent`, flattened
-v1/v2 names, and observed compatibility aliases. The composed command binds an
-explicit typed context directory and `aoa-sdk` source root; the adapter uses the
-hook event's `cwd` as the workspace coordinate. It reads at most the configured
-context limit plus one byte from that directory
+Codex `PreToolUse` command adapter for the canonical `spawn_agent`, known
+unnamespaced v2 names, and the `multi_agent_`/`collaboration` namespaces. The
+namespace matcher deliberately sends future names to the adapter's unknown
+agent-tool denial branch. The composed command binds an explicit typed context
+directory and `aoa-sdk` source root; the adapter uses the hook event's `cwd` as
+the workspace coordinate. It reads at most the configured context limit plus
+one byte from that directory
 (`AOA_AGENT_TOOL_ROUTING_CONTEXT_DIR`), selects the file keyed by the current
 event's safe session/turn/tool-use/tool-name identity, verifies the context's
 identity against that event, and asks
