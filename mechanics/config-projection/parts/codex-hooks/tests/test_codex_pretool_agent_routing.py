@@ -180,6 +180,21 @@ def test_context_is_claimed_before_reading_when_producer_refreshes_path(
     assert not list(tmp_path.glob("routing-context.json.consumed.*"))
 
 
+def test_oversized_context_fails_closed_after_bounded_read(tmp_path: Path) -> None:
+    context_path = tmp_path / "routing-context.json"
+    context_path.write_bytes(b"{" + b"x" * ADAPTER.MAX_CONTEXT_BYTES)
+
+    output = ADAPTER.handle_event(
+        event(),
+        environ=environment(tmp_path, context_path),
+    )
+
+    reason = output["hookSpecificOutput"]["permissionDecisionReason"]
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "typed route context is too large" in reason
+    assert not list(tmp_path.glob("routing-context.json.consumed.*"))
+
+
 def test_selected_sdk_root_must_contain_the_imported_package(
     tmp_path: Path,
 ) -> None:

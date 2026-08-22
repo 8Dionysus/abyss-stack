@@ -93,7 +93,8 @@ def _read_json_file(path_value: str, *, label: str, maximum: int) -> dict[str, A
     if not path.is_absolute() or path.is_symlink() or not path.is_file():
         raise AdapterError(f"{label} is not a regular absolute file")
     try:
-        raw = path.read_bytes()
+        with path.open("rb") as stream:
+            raw = stream.read(maximum + 1)
     except OSError as exc:
         raise AdapterError(f"{label} is unreadable") from exc
     if len(raw) > maximum:

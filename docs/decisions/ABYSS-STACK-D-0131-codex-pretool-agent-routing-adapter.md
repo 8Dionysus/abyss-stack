@@ -34,8 +34,9 @@ holder references required by the SDK contract.
 
 Add a command-only `PreToolUse` fragment for the known Codex
 `collaboration*` tool namespace. The adapter reads the event identity and
-opaque-tool presence, obtains the current Goal/holder and route state only from
-an exact externally supplied context file, constructs
+opaque-tool presence, reads at most the context limit plus one byte, obtains
+the current Goal/holder and route state only from an exact externally supplied
+context file, constructs
 `aoa_agent_tool_routing_intent_v1`, and calls `aoa-sdk.ControlPlaneAPI`.
 
 The adapter denies unresolved and independent routes with actionable
