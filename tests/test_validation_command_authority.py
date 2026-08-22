@@ -51,6 +51,28 @@ def test_release_check_reads_manifest_backed_release_lane(monkeypatch) -> None:
     assert calls == [("first", ("python", "one.py")), ("second", ("python", "two.py"))]
 
 
+def test_release_check_returns_artifact_blocker_before_full_suite(monkeypatch) -> None:
+    artifact_label = "validate OS Abyss runtime config artifact bundle"
+    calls: list[str] = []
+    parity_calls: list[str] = []
+
+    def run_step(label: str, command: tuple[str, ...]) -> int:
+        calls.append(label)
+        return 19 if label == artifact_label else 0
+
+    monkeypatch.setattr(release_check, "run_step", run_step)
+    monkeypatch.setattr(
+        release_check,
+        "run_parity_step",
+        lambda parity_mode: parity_calls.append(parity_mode) or 0,
+    )
+
+    assert release_check.main(["--parity-mode", "synthetic"]) == 19
+    assert calls[-1] == artifact_label
+    assert "run tests" not in calls
+    assert parity_calls == []
+
+
 def test_release_check_has_no_inline_command_authority() -> None:
     text = (REPO_ROOT / "scripts" / "release_check.py").read_text(encoding="utf-8")
 
@@ -130,6 +152,16 @@ def test_full_test_sequences_share_the_bounded_scheduler_entrypoint() -> None:
         ]
         assert len(test_steps) == 1
         assert test_steps[0].command[1:] == ("scripts/run_pytest_lane.py",)
+
+
+def test_release_gate_frontloads_artifact_guard_before_full_suite() -> None:
+    labels = [step.label for step in validation_lanes.command_sequence("release_check")]
+
+    assert labels.count("validate OS Abyss runtime config artifact bundle") == 1
+    assert labels.count("run tests") == 1
+    assert labels.index("validate OS Abyss runtime config artifact bundle") < labels.index(
+        "run tests"
+    )
 
 
 def test_pytest_scheduler_uses_process_isolated_workstealing() -> None:
