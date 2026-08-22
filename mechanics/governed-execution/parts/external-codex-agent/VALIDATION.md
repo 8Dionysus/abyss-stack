@@ -43,10 +43,11 @@ an exact active owner-bound Goal is transitioned through `thread/goal/set` to
 `paused`, the returned identity and status are required before the receipt is
  published, non-active Goals are refused without a lifecycle mutation, and a
  completed pause receipt replays without a second app-server call. It also
- forces receipt publication failure after the lifecycle mutation and verifies
-  that a reserved active precondition plus matching post-send dispatch marker is
-  reconciled through a read-only Goal read without a second `thread/goal/set`.
-  Companion cases prove that an active observation after dispatch fails closed,
+  forces dispatch-marker and receipt publication failure at their respective
+  boundaries and verifies that a pre-send reservation fails closed while a
+  matching post-send dispatch marker is reconciled through a read-only Goal
+  read without a second `thread/goal/set`. Companion cases prove that an active
+  observation after dispatch fails closed,
   a paused observation through a replacement app-server endpoint fails closed,
   a paused observation without the marker fails closed, and incomplete or
   copied completed receipts fail closed. The fixture asserts that pause does

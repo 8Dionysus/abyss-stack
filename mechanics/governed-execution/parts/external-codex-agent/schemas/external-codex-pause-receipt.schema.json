@@ -112,7 +112,8 @@
         "goal",
         "goal_response_sha256",
         "precondition",
-        "response_available"
+        "response_available",
+        "mutation_dispatched"
       ],
       "properties": {
         "accepted": {"const": true},

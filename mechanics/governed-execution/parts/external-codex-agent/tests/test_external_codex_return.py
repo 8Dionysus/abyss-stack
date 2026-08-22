@@ -65,6 +65,7 @@ class FakeRpc:
         self.fallback_active_turn = fallback_active_turn
         self.goal_set_status = goal_set_status
         self.calls: list[tuple[str, dict[str, object] | None]] = []
+        self.request_prepare_callback = None
         self.request_issued_callback = None
         self._counter = 0
 
@@ -90,6 +91,18 @@ class FakeRpc:
                 }
             }
         if method == "thread/goal/set":
+            if self.request_prepare_callback is not None:
+                self.request_prepare_callback(
+                    method,
+                    params,
+                    self._counter,
+                    {
+                        "jsonrpc": "2.0",
+                        "id": self._counter,
+                        "method": method,
+                        "params": params,
+                    },
+                )
             if self.request_issued_callback is not None:
                 self.request_issued_callback(
                     method,
@@ -373,6 +386,15 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     ):
         MODULE.run_pause(args)
 
+    missing_dispatch = json.loads(json.dumps(first))
+    missing_dispatch["lifecycle"].pop("mutation_dispatched")
+    pause_path.write_bytes(MODULE._canonical_bytes(missing_dispatch) + b"\n")
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="lifecycle evidence",
+    ):
+        MODULE.run_pause(args)
+
     copied_path = tmp_path / "copied-pause-receipt.json"
     copied_path.write_bytes(MODULE._canonical_bytes(first) + b"\n")
     with pytest.raises(
@@ -467,6 +489,7 @@ def test_run_pause_reconciles_reserved_mutation_after_receipt_publication_failur
     assert reserved["state"] == "reserved"
     assert reserved["precondition"]["goal_status"] == "active"
     assert reserved["mutation_dispatched"]["method"] == "thread/goal/set"
+    assert "mutation_reserved" not in reserved
     assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
 
     monkeypatch.setattr(MODULE, "_replace_json", replace_impl)
@@ -499,6 +522,92 @@ def test_run_pause_reconciles_reserved_mutation_after_receipt_publication_failur
     second = MODULE.run_pause(args)
     assert second["recovery"]["mode"] == "ambiguous_post_mutation"
     assert second["lifecycle"]["response_available"] is False
+    assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
+
+
+def test_run_pause_reserves_ambiguous_dispatch_before_send(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner_path = tmp_path / "pause-owner.json"
+    owner_value = pause_owner(
+        goal="goal-pause-dispatch-reservation",
+        thread="thread-pause-dispatch-reservation",
+        endpoint="unix:/run/user/1000/example.sock",
+    )
+    owner_path.write_text(
+        json.dumps(owner_value, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    pause_path = tmp_path / "pause-receipt.json"
+    endpoint = tmp_path / "app-server.sock"
+    fake = FakeRpc(
+        endpoint,
+        active_turn=None,
+        goal_status="active",
+        goal_set_status="paused",
+        thread_id="thread-pause-dispatch-reservation",
+    )
+
+    monkeypatch.setattr(
+        MODULE,
+        "discover_app_server_socket",
+        lambda _owner: (endpoint, "explicit-endpoint"),
+    )
+    pause_impl = MODULE.pause_goal
+
+    def pause_once(
+        owner_value: dict[str, object],
+        owner_file: Path,
+        target: Path,
+        *,
+        owner_bytes: bytes,
+        reservation_path: Path | None = None,
+        reservation: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        return pause_impl(
+            owner_value,
+            owner_file,
+            target,
+            owner_bytes=owner_bytes,
+            reservation_path=reservation_path,
+            reservation=reservation,
+            rpc_factory=lambda _path: fake,
+        )
+
+    monkeypatch.setattr(MODULE, "pause_goal", pause_once)
+    replace_impl = MODULE._replace_json
+
+    def fail_dispatch_marker(
+        path: Path, value: dict[str, object], label: str
+    ) -> None:
+        if label == "canonical Goal pause mutation dispatch":
+            raise MODULE.ExternalCodexReturnError(
+                "injected dispatch publication failure"
+            )
+        replace_impl(path, value, label)
+
+    monkeypatch.setattr(MODULE, "_replace_json", fail_dispatch_marker)
+    args = SimpleNamespace(
+        pause_owner=str(owner_path),
+        pause_receipt=str(pause_path),
+    )
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="injected dispatch publication failure",
+    ):
+        MODULE.run_pause(args)
+    reserved = json.loads(pause_path.read_text(encoding="utf-8"))
+    assert reserved["state"] == "reserved"
+    assert reserved["mutation_reserved"]["method"] == "thread/goal/set"
+    assert "mutation_dispatched" not in reserved
+    assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
+
+    monkeypatch.setattr(MODULE, "_replace_json", replace_impl)
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="reserved before transport dispatch",
+    ):
+        MODULE.run_pause(args)
     assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
 
 
