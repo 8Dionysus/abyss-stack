@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 4969122,
+  "allowed_tracked_bytes": 37535494,
+  "approved_by": "repository-owner",
+  "base_ref": "ab3db922dd9a2d0321c48ef66e41cd0613bc6ad5",
+  "changed_generated_bytes": 4969122,
+  "changed_generated_files": 50,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "682eb21a8701c860130dc91dca1555600cf9419e734d5f9f17848da186f71b5a",
+  "reason": "Refresh the portable abyss-stack owner family after adding bounded relay/adapter concurrency waiting; preserve the standing KAG budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 37535494,
+  "tracked_bytes_max": 24117248
+}
