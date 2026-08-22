@@ -37,9 +37,10 @@ Focused tests cover:
   bindings.
 - clean-source content-addressed release materialization, manifest closure,
   immutable committed-blob source identity, stale-release rejection, active
-  state preflight, distinct-path alias rejection, unique receipt reservation,
-  read-only release finalization, prior composition-receipt restoration, and
-  installer rollback when its active receipt cannot be written.
+  state preflight, native/output distinct-path alias rejection, unique receipt
+  reservation, read-only release finalization, durable receipt-directory sync,
+  prior composition-receipt restoration, and installer rollback when its
+  active receipt cannot be written.
 
 These checks establish composition mechanics only. They do not establish Codex
 trust, live hook invocation, owner-hook health, skill selection, memory use,

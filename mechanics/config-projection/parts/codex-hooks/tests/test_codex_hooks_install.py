@@ -139,6 +139,20 @@ def test_install_rejects_aliases_before_composition(tmp_path: Path) -> None:
             backup_directory=install_root / "backups",
         )
 
+    native_target = tmp_path / "native-target.json"
+    _native_fragment(native_target)
+    with pytest.raises(INSTALLER.InstallError, match="installation paths must be distinct"):
+        INSTALLER.install(
+            source_root=source_root,
+            install_root=install_root,
+            native_fragment=native_target,
+            target=native_target,
+            context_directory=install_root / "contexts-2",
+            sdk_source_root=sdk_root,
+            composition_receipt=install_root / "composition-2.json",
+            backup_directory=install_root / "backups-2",
+        )
+
 
 def test_install_receipts_are_unique_and_release_is_read_only(tmp_path: Path) -> None:
     result, paths, source_root = _install(tmp_path)

@@ -121,9 +121,26 @@ def _atomic_write(path: Path, payload: bytes, *, mode: int) -> None:
         os.chmod(temporary, mode)
         os.replace(temporary, path)
         os.chmod(path, mode)
+        _fsync_directory(path.parent)
     finally:
         if temporary is not None and temporary.exists():
             temporary.unlink()
+
+
+def _fsync_directory(path: Path) -> None:
+    directory_flag = getattr(os, "O_DIRECTORY", 0)
+    if not directory_flag and os.name == "nt":
+        return
+    try:
+        descriptor = os.open(path, os.O_RDONLY | directory_flag)
+    except OSError as exc:
+        raise InstallError(f"cannot open receipt directory for durability: {path}") from exc
+    try:
+        os.fsync(descriptor)
+    except OSError as exc:
+        raise InstallError(f"cannot persist receipt directory entry: {path}") from exc
+    finally:
+        os.close(descriptor)
 
 
 def _source_commit(source_root: Path) -> str:
@@ -571,6 +588,7 @@ def install(
         _assert_distinct_paths(
             {
                 "Codex hooks target": target,
+                "native hook fragment": native_fragment,
                 "active install receipt": active_path,
                 "composition receipt": composition_receipt,
                 "install receipt": receipt_path,
