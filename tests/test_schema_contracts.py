@@ -87,6 +87,9 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-pause-owner.schema.json"
     ),
     Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-pause-reservation.schema.json"
+    ),
+    Path(
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-pause-receipt.schema.json"
     ),
     Path(
