@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 30131899,
+  "allowed_tracked_bytes": 37793525,
+  "approved_by": "repository-owner",
+  "base_ref": "4113863137b2322830d3b5941b802a5db6fb136b",
+  "changed_generated_bytes": 30131899,
+  "changed_generated_files": 354,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "e26dc64d72c56c27e446075b57b6aebbc149ca9816e6e8fa032ad130a66d21c0",
+  "reason": "sha256:99d398ec8b9346c32acef06ce3f354a369e4bdb32f3acc06f3f5954e4c9b69d6 actor-stasis-detection: regenerate the complete owner portable family with the pinned hosted aoa-kag consumer generator after generic responsibility-movement lifecycle repair; generated output remains derived and source-authority-neutral.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 37793525,
+  "tracked_bytes_max": 24117248
+}
