@@ -134,11 +134,11 @@ Operations are:
   holder/output identities, follows an already-published retry receipt instead
   of launching a duplicate child, and recovers a fully bound reserved retry
   whose child receipt was not yet published. A stable return-attempt lock
-  resolved from the invariant canonical return-receipt path serializes direct
-  delivery and the entire detached receipt chain, including callers that name
-  a retry receipt, and is transferred to the detached worker through its
-  `run_return`; concurrent direct or detached recovery cannot duplicate owner
-  re-entry. A legacy task-local owner binding
+  resolved from the exact closure path bound by the immutable handoff
+  serializes direct delivery and the entire detached receipt chain, including
+  callers that name a retry receipt or an alternate return-receipt path, and is
+  transferred to the detached worker through its `run_return`; concurrent
+  recovery cannot duplicate owner re-entry. A legacy task-local owner binding
   is accepted only
   as an input migration; no Goal, thread, rollout, PR, disposition, or
   task-root coordinate is selected by source.

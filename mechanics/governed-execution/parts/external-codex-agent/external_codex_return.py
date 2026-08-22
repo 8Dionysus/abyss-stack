@@ -785,11 +785,11 @@ def _validate_output_path(path: Path, label: str) -> Path:
 def _return_attempt_lock(anchor_path: Path) -> Any:
     """Serialize one canonical return attempt and its detached receipt chain."""
 
-    _validate_output_path(anchor_path, "canonical return receipt")
-    lock_path = anchor_path.with_name(anchor_path.name + ".lock")
+    _validate_output_path(anchor_path, "closure receipt")
+    lock_path = anchor_path.with_name(anchor_path.name + ".return-attempt.lock")
     if lock_path.is_symlink():
         raise ExternalCodexReturnError(
-            f"detached return retry lock may not be a symlink: {lock_path}"
+            f"return attempt lock may not be a symlink: {lock_path}"
         )
     lock_fd: int | None = None
     lock: _ReturnAttemptLock | None = None
@@ -806,7 +806,7 @@ def _return_attempt_lock(anchor_path: Path) -> Any:
         if lock_fd is not None:
             os.close(lock_fd)
         raise ExternalCodexReturnError(
-            f"cannot acquire detached return retry lock: {lock_path}"
+            f"cannot acquire return attempt lock: {lock_path}"
         ) from exc
     try:
         lock = _ReturnAttemptLock(lock_fd)
@@ -1149,6 +1149,35 @@ def _validate_existing_closure(
     return value
 
 
+def _load_authorized_return_receipt(
+    inputs: dict[str, Any],
+) -> tuple[Path, dict[str, Any]] | None:
+    """Replay the immutable wake evidence when a caller changes output paths."""
+
+    authorization = inputs.get("authorization")
+    if authorization is None:
+        return None
+    if authorization.get("authorization_kind") != "wake_delivered":
+        raise ExternalCodexReturnError(
+            "existing closure authorization is not a canonical wake delivery"
+        )
+    evidence_ref = authorization.get("evidence_ref")
+    if not isinstance(evidence_ref, str) or not evidence_ref.startswith("/"):
+        raise ExternalCodexReturnError(
+            "existing wake authorization lacks a canonical return receipt"
+        )
+    evidence_path = _regular_file(Path(evidence_ref), "canonical return evidence")
+    receipt = _load_existing_return_receipt(
+        evidence_path,
+        owner=inputs["owner"],
+        owner_path=inputs["owner_path"],
+        owner_digest=inputs["owner_digest"],
+        handoff_path=inputs["handoff_path"],
+        handoff_digest=inputs["handoff_digest"],
+    )
+    return evidence_path, receipt
+
+
 def _call_visible(handler: Callable[[argparse.Namespace], int], args: argparse.Namespace) -> None:
     output = io.StringIO()
     try:
@@ -1189,7 +1218,15 @@ def run_return(args: argparse.Namespace) -> dict[str, Any]:
         closure_path=closure_path,
         return_path=return_path,
     )
-    if return_path.exists():
+    authorized_return = _load_authorized_return_receipt(inputs)
+    receipt: dict[str, Any] | None = None
+    if authorized_return is not None:
+        evidence_path, receipt = authorized_return
+        if return_path.resolve() != evidence_path.resolve() and return_path.exists():
+            raise ExternalCodexReturnError(
+                "canonical return receipt path differs from existing wake evidence"
+            )
+    if receipt is None and return_path.exists():
         existing, _existing_raw = _load_json_file(
             return_path, "canonical return receipt"
         )
@@ -1205,7 +1242,7 @@ def run_return(args: argparse.Namespace) -> dict[str, Any]:
                 handoff_path=handoff_path,
                 handoff_digest=handoff_digest,
             )
-    else:
+    elif receipt is None:
         _return_reservation(return_path, binding=binding)
         receipt = None
     if receipt is None:
@@ -1442,13 +1479,13 @@ def _run_detached_child(
 
 def command_return(args: argparse.Namespace) -> int:
     if not args.detach:
-        with _return_attempt_lock(Path(args.return_receipt)):
+        with _return_attempt_lock(Path(args.closure_receipt)):
             response = run_return(args)
             print(json.dumps(response, ensure_ascii=False, sort_keys=True))
             return 0
-    # The canonical return receipt is invariant across the retry chain.  Use
-    # it as the root lock anchor even when a caller supplies a retry receipt.
-    with _return_attempt_lock(Path(args.return_receipt)) as lock:
+    # The exact closure path is bound by the immutable handoff and is
+    # invariant across alternate return-receipt paths and retry receipts.
+    with _return_attempt_lock(Path(args.closure_receipt)) as lock:
         return _command_return_detached(args, lock)
 
 

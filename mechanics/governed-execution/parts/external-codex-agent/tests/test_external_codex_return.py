@@ -174,6 +174,21 @@ def test_existing_return_receipt_is_replayable_without_transport(
 
     assert replayed == receipt
 
+    authorized_replay = MODULE._load_authorized_return_receipt(
+        {
+            "authorization": {
+                "authorization_kind": "wake_delivered",
+                "evidence_ref": str(path),
+            },
+            "owner": validated_owner,
+            "owner_path": owner_path,
+            "owner_digest": MODULE._sha256_bytes(owner_path.read_bytes()),
+            "handoff_path": handoff,
+            "handoff_digest": MODULE._sha256_bytes(handoff.read_bytes()),
+        }
+    )
+    assert authorized_replay == (path, receipt)
+
     receipt["handoff_sha256"] = "sha256:" + "0" * 64
     path.write_bytes(MODULE._canonical_bytes(receipt) + b"\n")
     with pytest.raises(MODULE.ExternalCodexReturnError, match="handoff digest"):
@@ -411,6 +426,7 @@ def test_detached_return_follows_an_existing_live_retry(
     args = SimpleNamespace(
         detach=True,
         return_receipt=str(paths["return_path"]),
+        closure_receipt=str(paths["closure_path"]),
         detached_receipt=str(detached_path),
         detached_result=str(result_path),
         detached_log=str(log_path),
@@ -491,10 +507,10 @@ def test_turn_delivery_rejects_terminal_failure_status(status: str) -> None:
 
 
 def test_detached_retry_lock_is_stable_and_exclusive(tmp_path: Path) -> None:
-    return_path = tmp_path / "return.json"
+    closure_path = tmp_path / "closure.json"
     retry_path = tmp_path / "return.json.detached.retry-1234"
-    lock_path = return_path.with_name(return_path.name + ".lock")
-    with MODULE._return_attempt_lock(return_path):
+    lock_path = closure_path.with_name(closure_path.name + ".return-attempt.lock")
+    with MODULE._return_attempt_lock(closure_path):
         assert lock_path.is_file()
         assert not retry_path.with_name(retry_path.name + ".lock").exists()
         flags = os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
@@ -576,6 +592,7 @@ def test_missing_retry_receipt_recovers_reserved_retry_launch(
     args = SimpleNamespace(
         detach=True,
         return_receipt=str(paths["return_path"]),
+        closure_receipt=str(paths["closure_path"]),
         detached_receipt=str(detached_path),
         detached_result=str(result_path),
         detached_log=str(log_path),
