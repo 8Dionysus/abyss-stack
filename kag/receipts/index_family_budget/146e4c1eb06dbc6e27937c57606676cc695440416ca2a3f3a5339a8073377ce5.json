@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 29146695,
+  "allowed_tracked_bytes": 37129462,
+  "approved_by": "repository-owner",
+  "base_ref": "e112426ff1befb2ebcdbf92110f56ff8ea7ec421",
+  "changed_generated_bytes": 29146695,
+  "changed_generated_files": 322,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "146e4c1eb06dbc6e27937c57606676cc695440416ca2a3f3a5339a8073377ce5",
+  "reason": "Refresh exact owner portable family after canonical external actor return transport, downstream preflight, and stale retry hardening with CI-pinned aoa-kag.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 37129462,
+  "tracked_bytes_max": 24117248
+}
