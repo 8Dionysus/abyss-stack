@@ -48,9 +48,10 @@ an exact active owner-bound Goal is transitioned through `thread/goal/set` to
   reconciled through a read-only Goal read without a second `thread/goal/set`.
   Companion cases prove that an active observation after dispatch fails closed,
   a paused observation through a replacement app-server endpoint fails closed,
-  and a paused observation without the marker fails closed. The fixture asserts
-  that pause does not use turn delivery, terminal input, process identity,
-  holder closure, or wake evidence.
+  a paused observation without the marker fails closed, and incomplete or
+  copied completed receipts fail closed. The fixture asserts that pause does
+  not use turn delivery, terminal input, process identity, holder closure, or
+  wake evidence.
 
 The deterministic suite separates transport sentinels from unrelated semantic
 cases without exposing a runtime bypass. Fixtures selecting

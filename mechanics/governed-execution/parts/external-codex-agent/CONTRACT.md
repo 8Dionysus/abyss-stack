@@ -136,7 +136,10 @@ a handoff, authorize or close a holder, or claim semantic acceptance. The
   closed rather than replacing the in-flight attempt. Recovery also requires
   the resolved app-server endpoint to equal the endpoint recorded before the
   mutation; endpoint drift fails closed. A reservation without the active
-  precondition or dispatch evidence fails closed.
+  precondition or dispatch evidence fails closed. A persisted receipt with
+  `response_available=false` must carry the matching recovery evidence, and
+  `pause_receipt_ref` must equal the exact output path; copied or incomplete
+  receipts are not replayable.
 - `aoa-external-codex-return return --return-owner ... --handoff ...
   --holder-receipt ... --return-receipt ... --authorization ...
   --closure-receipt ...` is the canonical Codex return leaf. It validates the

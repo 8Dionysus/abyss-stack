@@ -1890,6 +1890,10 @@ def _validate_pause_receipt(
         or not isinstance(lifecycle, dict)
         or lifecycle.get("accepted") is not True
         or lifecycle.get("response_available") not in {True, False}
+        or (
+            lifecycle.get("response_available") is False
+            and recovery is None
+        )
         or not isinstance(precondition, dict)
         or precondition.get("goal_status") != "active"
         or not isinstance(precondition.get("goal_get"), dict)
@@ -1951,6 +1955,10 @@ def _load_existing_pause_receipt(
     if raw != _canonical_bytes(value) + b"\n":
         raise ExternalCodexReturnError(
             "canonical Goal pause receipt is not canonically encoded"
+        )
+    if value.get("pause_receipt_ref") != str(path.resolve()):
+        raise ExternalCodexReturnError(
+            "canonical Goal pause receipt path identity mismatch"
         )
     if value.get("owner_sha256") != owner_digest:
         raise ExternalCodexReturnError(

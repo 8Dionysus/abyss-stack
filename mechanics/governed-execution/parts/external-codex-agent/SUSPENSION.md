@@ -70,7 +70,10 @@ or close any holder. A receipt proves only the runtime lifecycle transition;
   dispatch marker exists, the retry fails closed rather than replacing that
   attempt. A reserved pause without the precondition or dispatch evidence fails
   closed, including when another controller may have paused the Goal after this
-  attempt stopped before issuing its request.
+  attempt stopped before issuing its request. A persisted receipt with
+  `response_available=false` must retain its recovery evidence and its
+  `pause_receipt_ref` must match the exact output path; a copied or incomplete
+  receipt is not replayable.
 
 For a parent continuation, inspect only its exact state root and re-entry ID:
 

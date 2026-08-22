@@ -364,6 +364,29 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     assert first["pause_receipt_ref"] == str(pause_path.resolve())
     assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
 
+    incomplete = json.loads(json.dumps(first))
+    incomplete["lifecycle"]["response_available"] = False
+    pause_path.write_bytes(MODULE._canonical_bytes(incomplete) + b"\n")
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="lifecycle evidence",
+    ):
+        MODULE.run_pause(args)
+
+    copied_path = tmp_path / "copied-pause-receipt.json"
+    copied_path.write_bytes(MODULE._canonical_bytes(first) + b"\n")
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="path identity",
+    ):
+        MODULE._load_existing_pause_receipt(
+            copied_path,
+            owner=MODULE.validate_pause_owner(owner_value),
+            owner_path=owner_path,
+            owner_digest=MODULE._sha256_bytes(owner_path.read_bytes()),
+        )
+
+    pause_path.write_bytes(MODULE._canonical_bytes(first) + b"\n")
     monkeypatch.setattr(
         MODULE,
         "pause_goal",
