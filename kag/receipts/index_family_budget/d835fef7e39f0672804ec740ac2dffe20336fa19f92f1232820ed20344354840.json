@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 29034085,
+  "allowed_tracked_bytes": 37347856,
+  "approved_by": "repository-owner",
+  "base_ref": "509928bb01ca5e609ca7e53e7fa9bb79943d48b5",
+  "changed_generated_bytes": 29034085,
+  "changed_generated_files": 310,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "d835fef7e39f0672804ec740ac2dffe20336fa19f92f1232820ed20344354840",
+  "reason": "Current-main owner refresh after rebase: rebuild the portable KAG family for the Codex 0.148.0 canonical and flattened agent-tool matcher, explicit context/SDK bindings, and current abyss-stack main ancestry.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 37347856,
+  "tracked_bytes_max": 24117248
+}

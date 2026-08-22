@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agents-of-abyss.dev/schemas/abyss-stack/codex-pretool-agent-routing-context.schema.json",
+  "title": "Typed context for the Codex PreToolUse agent-routing adapter",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "attempt",
+    "goal_ref",
+    "current_holder_ref",
+    "route_anchor",
+    "phase",
+    "boundary_state",
+    "responsibility_result_ref",
+    "local_next_route"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "aoa_codex_pretool_agent_routing_context_v2"
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "session_id",
+        "turn_id",
+        "tool_use_id",
+        "tool_name"
+      ],
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "turn_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool_use_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool_name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "goal_ref": {
+      "$ref": "#/$defs/contentRef"
+    },
+    "current_holder_ref": {
+      "$ref": "#/$defs/contentRef"
+    },
+    "route_anchor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "phase": {
+      "enum": [
+        "initial",
+        "compaction_resume",
+        "reentry",
+        "plan_change"
+      ]
+    },
+    "boundary_state": {
+      "enum": [
+        "not_present",
+        "unresolved",
+        "independent",
+        "not_independent"
+      ]
+    },
+    "responsibility_result_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/contentRef"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "local_next_route": {
+      "anyOf": [
+        {
+          "const": "codex_local"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "contentRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "object_id",
+        "owner_repo",
+        "schema_version",
+        "digest"
+      ],
+      "properties": {
+        "object_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner_repo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

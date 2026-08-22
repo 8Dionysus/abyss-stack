@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 130,
-  "edge_count": 2925,
+  "decision_count": 131,
+  "edge_count": 2949,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1072,
-    "DATED": 130,
-    "GUARDED_BY": 402,
-    "HAS_STATUS": 130,
-    "HAS_SURFACE_CLASS": 352,
-    "IN_STACK_LANE": 307,
-    "NEXT_DECISION": 129,
-    "OWNED_BY_SURFACE": 136,
-    "OWNS_DECISION": 130,
+    "CITES_SOURCE_SURFACE": 1080,
+    "DATED": 131,
+    "GUARDED_BY": 405,
+    "HAS_STATUS": 131,
+    "HAS_SURFACE_CLASS": 355,
+    "IN_STACK_LANE": 310,
+    "NEXT_DECISION": 130,
+    "OWNED_BY_SURFACE": 137,
+    "OWNS_DECISION": 131,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 135
+    "UNDER_MECHANIC_PARENT": 137
   },
   "edges": [
     {
@@ -13983,12 +13983,127 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0130",
+      "target": "decision:ABYSS-STACK-D-0131",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0130",
       "target": "owner_surface:docs/validation/validation_lanes.json",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0130",
       "target": "mechanic_parent:config-projection",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "source_surface:AOA-AG-D-0069-pre-tool-agent-delegation-intercept",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "source_surface:AOA-SDK-D-0100-pre-tool-agent-routing-owner",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "source_surface:aoa-agents",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "source_surface:aoa-sdk",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "source_surface:docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "source_surface:mechanics/config-projection/PARTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "source_surface:mechanics/config-projection/PROVENANCE.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "source_surface:mechanics/config-projection/parts/codex-hooks/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "date:2026-08-21",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "guard_family:fail-closed%20identity",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "guard_family:fragment%20preservation",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "guard_family:pre-execution%20routing",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "surface_class:Codex%20hooks",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "surface_class:config%20projection",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "surface_class:owner%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "stack_lane:operator",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "stack_lane:source",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "owner_surface:mechanics/config-projection/parts/codex-hooks/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "mechanic_parent:config-projection",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0131",
+      "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -14640,21 +14755,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0130",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0131",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1272,
+  "node_count": 1281,
   "node_type_counts": {
     "date": 42,
-    "decision": 130,
-    "guard_family": 213,
+    "decision": 131,
+    "guard_family": 216,
     "mechanic_parent": 11,
     "owner_surface": 68,
     "repo": 1,
-    "source_surface": 607,
+    "source_surface": 611,
     "stack_lane": 51,
     "status": 4,
-    "surface_class": 145
+    "surface_class": 146
   },
   "nodes": [
     {
@@ -16168,6 +16288,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-21",
+      "id": "decision:ABYSS-STACK-D-0131",
+      "label": "ABYSS-STACK-D-0131",
+      "path": "docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md",
+      "posture": "accepted typed wire adapter; live activation remains separately verified",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0131 Codex PreToolUse Agent-Routing Adapter",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -16558,6 +16688,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:fail-closed%20identity",
+      "label": "fail-closed identity",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:fail-fast%20ordering",
       "label": "fail-fast ordering",
       "type": "guard_family"
@@ -16585,6 +16720,11 @@
     {
       "id": "guard_family:fixed%20validation",
       "label": "fixed validation",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:fragment%20preservation",
+      "label": "fragment preservation",
       "type": "guard_family"
     },
     {
@@ -16870,6 +17010,11 @@
     {
       "id": "guard_family:post-reveal%20evidence%20join",
       "label": "post-reveal evidence join",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:pre-execution%20routing",
+      "label": "pre-execution routing",
       "type": "guard_family"
     },
     {
@@ -17714,8 +17859,18 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:AOA-AG-D-0069-pre-tool-agent-delegation-intercept",
+      "label": "AOA-AG-D-0069-pre-tool-agent-delegation-intercept",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:AOA-SDK-D-0080",
       "label": "AOA-SDK-D-0080",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:AOA-SDK-D-0100-pre-tool-agent-routing-owner",
+      "label": "AOA-SDK-D-0100-pre-tool-agent-routing-owner",
       "type": "source_surface"
     },
     {
@@ -17791,6 +17946,11 @@
     {
       "id": "source_surface:aoa-4pda-connector%3Adocs/RUNTIME_CONTRACT.md",
       "label": "aoa-4pda-connector:docs/RUNTIME_CONTRACT.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:aoa-agents",
+      "label": "aoa-agents",
       "type": "source_surface"
     },
     {
@@ -18256,6 +18416,11 @@
     {
       "id": "source_surface:docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md",
       "label": "docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md",
+      "label": "docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md",
       "type": "source_surface"
     },
     {
@@ -21371,6 +21536,11 @@
     {
       "id": "surface_class:organ%20portfolio",
       "label": "organ portfolio",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:owner%20boundary",
+      "label": "owner boundary",
       "type": "surface_class"
     },
     {

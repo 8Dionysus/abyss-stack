@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 29034595,
+  "allowed_tracked_bytes": 37348366,
+  "approved_by": "repository-owner",
+  "base_ref": "509928bb01ca5e609ca7e53e7fa9bb79943d48b5",
+  "changed_generated_bytes": 29034595,
+  "changed_generated_files": 310,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "c57623e7c9b0a5d064d79612711986b554fe060e68e334b3b6546a7f73d1cd97",
+  "reason": "PR 413 review repair broadens the Codex PreToolUse matcher for future multi_agent_ and collaboration namespace members while keeping the adapter allowlist and unknown-agent denial generic. The exact owner generator rewrites the portable family from this source and test change; this is bounded generated KAG amplification, not authored duplicate meaning. Preserve the standing KAG owner-family budget and require current-source candidate parity before landing.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 37348366,
+  "tracked_bytes_max": 24117248
+}

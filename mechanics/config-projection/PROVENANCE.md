@@ -31,7 +31,9 @@ reinterpret them.
   describes render authority.
 - [parts/codex-hooks/README.md](parts/codex-hooks/README.md) composes native
   and owner-envelope hook definitions while preserving independent
-  `aoa-memo` and `aoa-session-memory` ownership.
+  `aoa-memo` and `aoa-session-memory` ownership. Its stack-owned Codex-wire
+  agent-routing adapter reflects the `aoa-sdk` route while leaving
+  responsibility classification with `aoa-agents`.
 - [docs/README.md](docs/README.md) keeps package docs as route surfaces rather
   than a second source tree.
 - [../federation-seams/README.md](../federation-seams/README.md) owns sibling

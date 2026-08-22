@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 29035623,
+  "allowed_tracked_bytes": 37350590,
+  "approved_by": "repository-owner",
+  "base_ref": "509928bb01ca5e609ca7e53e7fa9bb79943d48b5",
+  "changed_generated_bytes": 29035623,
+  "changed_generated_files": 310,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "86ce51b33b291880fd9fce1d14706d5762a1fb5cb54294ccb43cbe8a338d6dab",
+  "reason": "PR 413 review repair binds SDK workspace discovery exclusively to each Codex PreToolUse event cwd and ignores ambient routing or federation checkout overrides. The exact owner generator rewrites the portable family from this source and regression test; this is bounded generated KAG amplification, not authored duplicate meaning. Preserve the standing KAG owner-family budget and require current-source candidate parity before landing.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 37350590,
+  "tracked_bytes_max": 24117248
+}

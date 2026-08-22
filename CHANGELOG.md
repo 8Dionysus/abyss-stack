@@ -12,6 +12,11 @@ Tracking starts with the community-docs baseline for this repository.
 - Run the bounded runtime-config artifact bundle guard before the complete
   release pytest suite, preserving every required check while returning cheap
   artifact failures before an expensive validation restart.
+- Add a stack-owned Codex `PreToolUse` adapter and composable fragment that
+  routes built-in collaboration-tool attempts through the typed `aoa-sdk`
+  decision before execution, fails closed without current-holder context, and
+  preserves existing native hook fragments. Installation and Codex trust remain
+  separate operator-visible gates.
 - Give every canonical detached visible Codex holder a unique owner-private
   Kitty socket and a persisted Goal/actor/incarnation/session, process,
   window, TTY, runtime-root, and closeout binding. Add read-only owner status

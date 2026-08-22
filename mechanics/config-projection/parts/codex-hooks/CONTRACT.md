@@ -30,6 +30,34 @@ placeholders found in command strings, each declared name must be supplied,
 and unused supplied bindings fail closed. Native configs must already be fully
 resolved.
 
+The stack-owned agent-routing fragment is a Codex-wire projection, not a
+responsibility owner. Its `PreToolUse` matcher covers the canonical
+`spawn_agent`, known v2 unnamespaced names, and any identity in the
+`multi_agent_` or `collaboration` namespaces so future namespace members reach
+the adapter's unknown-agent fail-closed branch. It invokes the adapter with
+explicit safe bindings for the context directory and selected `aoa-sdk` source
+root. The workspace remains the current hook event's `cwd`; the adapter does
+not select a workspace. The adapter must receive an exact typed context
+directory through `AOA_AGENT_TOOL_ROUTING_CONTEXT_DIR`; it does not invent Goal
+or current-holder identity from a missing payload and does not copy opaque Codex
+`tool_input` into the hook response. The producer stores each context as
+`attempt-<sha256(canonical safe attempt identity)>.json`, where the identity is
+the current `session_id`, `turn_id`, `tool_use_id`, and `tool_name`. The adapter
+selects only that event-keyed file and rejects a context whose identity does not
+equal the current event. It reads at most the configured context limit plus one
+byte before rejecting an oversized file. The selected directory entry is
+atomically claimed before the adapter reads it, and the claimed path is
+immediately unlinked after validation and before the SDK call. A stale or
+cross-call classification therefore cannot be reused for a later agent-tool
+attempt, and a different concurrent attempt cannot consume the selected file.
+If `AOA_SDK_SOURCE_ROOT` is supplied, the adapter requires its
+`src/aoa_sdk` package and verifies that the imported SDK modules remain beneath
+that source root. It presents the typed intent to `aoa-sdk`, reflects only the
+SDK decision, and leaves responsibility classification and role-first dispatch
+to `aoa-agents`. The native hook timeout is longer than the adapter's bounded
+inner route timeout; an inner timeout emits a deny response before Codex can
+time out the hook itself.
+
 ## Output
 
 The read-only output is native Codex JSON with only `description` and `hooks`.

@@ -66,6 +66,9 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
         "mechanics/config-projection/parts/codex-hooks/schemas/codex-hooks-fragment.schema.json"
     ),
     Path(
+        "mechanics/config-projection/parts/codex-hooks/schemas/codex-pretool-agent-routing-context.schema.json"
+    ),
+    Path(
         "mechanics/config-projection/parts/sync/schemas/mcp-deployment-manifest.schema.json"
     ),
     Path(
