@@ -312,12 +312,11 @@ def _build_intent(
         raise AdapterError("typed route context failed SDK validation") from exc
 
 
-def _workspace_root(event: Mapping[str, Any], environ: Mapping[str, str]) -> Path:
-    value = (
-        environ.get("AOA_AGENT_TOOL_ROUTING_WORKSPACE_ROOT")
-        or environ.get("AOA_SDK_FEDERATION_ROOT")
-        or event.get("cwd")
-    )
+def _workspace_root(event: Mapping[str, Any]) -> Path:
+    # The attempted Codex event is the only workspace authority.  Ambient
+    # routing/federation variables can belong to another checkout and must not
+    # redirect this attempt's SDK discovery.
+    value = event.get("cwd")
     if not isinstance(value, str) or not value:
         raise AdapterError("SDK workspace root is unavailable")
     root = Path(value).expanduser()
@@ -367,7 +366,7 @@ def route_agent_tool_event(
             intent_class=intent_class,
             provenance_factory=provenance_factory,
         )
-        workspace = workspace_class.discover(_workspace_root(event, environment))
+        workspace = workspace_class.discover(_workspace_root(event))
         decision = control_plane_api(workspace).pre_tool_route(intent)
     except AdapterError as exc:
         return _deny(

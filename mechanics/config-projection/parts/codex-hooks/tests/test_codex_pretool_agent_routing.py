@@ -290,6 +290,27 @@ def test_non_agent_tool_passes_without_route_context() -> None:
     ) == {}
 
 
+def test_workspace_root_uses_event_cwd_over_ambient_overrides(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    event_workspace = tmp_path / "event-workspace"
+    ambient_workspace = tmp_path / "ambient-workspace"
+    ambient_federation = tmp_path / "ambient-federation"
+    event_workspace.mkdir()
+    ambient_workspace.mkdir()
+    ambient_federation.mkdir()
+    monkeypatch.setenv(
+        "AOA_AGENT_TOOL_ROUTING_WORKSPACE_ROOT",
+        str(ambient_workspace),
+    )
+    monkeypatch.setenv("AOA_SDK_FEDERATION_ROOT", str(ambient_federation))
+    attempted_event = event()
+    attempted_event["cwd"] = str(event_workspace)
+
+    assert ADAPTER._workspace_root(attempted_event) == event_workspace
+
+
 def test_missing_context_fails_closed_without_inventing_identity(
     tmp_path: Path,
 ) -> None:
