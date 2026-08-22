@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 29624709,
+  "allowed_tracked_bytes": 37529933,
+  "approved_by": "repository-owner",
+  "base_ref": "1ccbb55d947041a8e44b0dd8220cb319a7075320",
+  "changed_generated_bytes": 29624709,
+  "changed_generated_files": 325,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "618c6aa80ce675b99d6866016375c36208f10dd178df6cb9d66215ff1d7f73fa",
+  "reason": "Refresh the portable abyss-stack owner family after persisting release trees before hook activation; preserve the standing KAG budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 37529933,
+  "tracked_bytes_max": 24117248
+}
