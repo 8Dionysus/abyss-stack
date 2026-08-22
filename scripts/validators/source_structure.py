@@ -403,6 +403,8 @@ REQUIRED_FILE_PATHS = tuple(
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-event.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-closure.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-receipt.schema.json",
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-pause-owner.schema.json",
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-pause-receipt.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-launch.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-legacy-owner-migration-catalog.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-owner-admission-generation.schema.json",

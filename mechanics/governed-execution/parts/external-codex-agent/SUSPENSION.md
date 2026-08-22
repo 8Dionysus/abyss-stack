@@ -40,6 +40,27 @@ an interruption result, and preserves the event cursor and partial-usage gap.
 If an exact identity cannot be validated, stop and route the state to the
 runtime owner; do not broaden the target or retry with a stronger primitive.
 
+## Pause an exact Goal after responsibility transfer
+
+When responsibility has moved to an external holder and the master must pause
+its own Goal, use the owner-selected app-server lifecycle leaf:
+
+```bash
+aoa-external-codex-return pause \
+  --pause-owner /absolute/path/to/pause-owner.json \
+  --pause-receipt /absolute/path/to/pause-receipt.json
+```
+
+The pause owner must bind the exact Goal and thread. The leaf reads the current
+Goal first, refuses anything other than `active`, calls the supported
+`thread/goal/set` API with `paused`, and records
+`abyss_stack_external_codex_pause_receipt_v1`. It does not inject terminal
+input, inspect or signal PIDs, use GDB, start or steer a turn, deliver a wake,
+or close any holder. A receipt proves only the runtime lifecycle transition;
+wake delivery, holder closure, semantic re-entry, and owner acceptance require
+their own later evidence. If the pause receipt is absent or the Goal state is
+not exactly bound, stop and route the state to the runtime owner.
+
 For a parent continuation, inspect only its exact state root and re-entry ID:
 
 ```bash

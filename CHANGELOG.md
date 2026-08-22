@@ -14,6 +14,10 @@ Tracking starts with the community-docs baseline for this repository.
   fail-closed behavior when the context remains unavailable.
 - Add a durable content-addressed Codex PreToolUse hook install route with a
   session-owned typed-context relay and explicit native-hook rollback receipt.
+- Add the installed, owner-bound `aoa-external-codex-return pause` leaf for a
+  supported Codex Goal `active` to `paused` lifecycle transition. It records a
+  separate receipt and keeps pause, wake delivery, holder closure, semantic
+  re-entry, and owner acceptance as distinct evidence.
 - Run the bounded runtime-config artifact bundle guard before the complete
   release pytest suite, preserving every required check while returning cheap
   artifact failures before an expensive validation restart.

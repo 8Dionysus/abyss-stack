@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/external-codex-pause-receipt.schema.json",
+  "title": "Abyss external Codex Goal pause receipt",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "generated_at",
+    "owner_ref",
+    "owner_sha256",
+    "pause_receipt_ref",
+    "owner",
+    "transport",
+    "goal_status",
+    "goal_binding",
+    "lifecycle_method",
+    "lifecycle",
+    "actions",
+    "observed",
+    "paused",
+    "owner_acceptance",
+    "semantic_acceptance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "abyss_stack_external_codex_pause_receipt_v1"
+    },
+    "generated_at": {"type": "string", "minLength": 1},
+    "owner_ref": {"type": "string", "pattern": "^/"},
+    "owner_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "pause_receipt_ref": {"type": "string", "pattern": "^/"},
+    "owner": {"type": "object", "minProperties": 7},
+    "transport": {
+      "type": "object",
+      "required": ["kind", "endpoint"],
+      "properties": {
+        "kind": {"const": "codex_app_server_websocket_unix"},
+        "endpoint": {"type": "string", "minLength": 1},
+        "resolution": {"type": "string", "minLength": 1}
+      }
+    },
+    "goal_status": {"const": "paused"},
+    "goal_binding": {
+      "type": "object",
+      "required": [
+        "goal_id",
+        "thread_id",
+        "before_status",
+        "transition",
+        "identity_source"
+      ],
+      "properties": {
+        "goal_id": {"type": "string", "minLength": 1},
+        "thread_id": {"type": "string", "minLength": 1},
+        "before_status": {"const": "active"},
+        "transition": {"const": "active_to_paused"},
+        "identity_source": {"type": "string", "minLength": 1}
+      }
+    },
+    "lifecycle_method": {"const": "thread/goal/set"},
+    "lifecycle": {
+      "type": "object",
+      "required": ["accepted", "initialize", "goal_get", "goal", "goal_response_sha256"],
+      "properties": {
+        "accepted": {"const": true},
+        "initialize": {"type": "object"},
+        "goal_get": {"type": "object"},
+        "goal": {"type": "object"},
+        "goal_response_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "actions": {
+      "type": "object",
+      "required": ["goal_lifecycle_set"],
+      "properties": {"goal_lifecycle_set": {"const": true}}
+    },
+    "observed": {
+      "type": "object",
+      "required": ["goal_lifecycle", "goal_status"],
+      "properties": {
+        "goal_lifecycle": {"const": "paused"},
+        "goal_status": {"const": "paused"}
+      }
+    },
+    "paused": {"const": true},
+    "owner_acceptance": {"const": "separate"},
+    "semantic_acceptance": {"const": "separate"}
+  }
+}

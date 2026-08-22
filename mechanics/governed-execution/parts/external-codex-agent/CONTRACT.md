@@ -116,6 +116,16 @@ Operations are:
   delivery into typed `wake_delivered` close authority;
 - `close --holder-receipt ... (--closure-authorization ... | --wake-receipt ...)
   --handoff ... --closure-receipt ...` closes only the exact bound holder.
+- `aoa-external-codex-return pause --pause-owner ... --pause-receipt ...` is the
+  canonical Goal lifecycle pause leaf. It validates a separate pause-owner
+  binding, reads the exact Goal identity first, requires the observed status to
+  be `active`, calls only `thread/goal/set` with `status=paused`, and validates
+  the returned `paused` Goal before publishing
+  `abyss_stack_external_codex_pause_receipt_v1`. The receipt is reserved before
+  the app-server mutation and binds the owner bytes, Goal/thread identities,
+  `active_to_paused` transition, transport response digest, and separate
+  owner/semantic-acceptance markers. It does not read or start a turn, deliver
+  a handoff, authorize or close a holder, or claim semantic acceptance.
 - `aoa-external-codex-return return --return-owner ... --handoff ...
   --holder-receipt ... --return-receipt ... --authorization ...
   --closure-receipt ...` is the canonical Codex return leaf. It validates the

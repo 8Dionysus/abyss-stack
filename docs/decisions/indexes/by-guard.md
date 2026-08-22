@@ -178,6 +178,10 @@
 
 - [ABYSS-STACK-D-0083 Tree of Sophia Foundation Laboratory Boundary](../ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md) (`docs/decisions/ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md`)
 
+## Goal identity binding
+
+- [ABYSS-STACK-D-0133 Owner-Bound External Goal Pause](../ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md`)
+
 ## RPG runtime projection
 
 - [ABYSS-STACK-D-0061 Active Topology Language Validator Module](../ABYSS-STACK-D-0061-active-topology-language-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0061-active-topology-language-validator-module.md`)
@@ -422,6 +426,10 @@
 - [ABYSS-STACK-D-0119 Preserve Actor Continuity Across Provider Capacity Loss](../ABYSS-STACK-D-0119-preserve-actor-continuity-across-provider-capacity-loss.md) (`docs/decisions/ABYSS-STACK-D-0119-preserve-actor-continuity-across-provider-capacity-loss.md`)
 - [ABYSS-STACK-D-0121 Close Nested Review Evidence Before Inference](../ABYSS-STACK-D-0121-close-nested-review-evidence-before-inference.md) (`docs/decisions/ABYSS-STACK-D-0121-close-nested-review-evidence-before-inference.md`)
 
+## evidence separation
+
+- [ABYSS-STACK-D-0133 Owner-Bound External Goal Pause](../ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md`)
+
 ## exact admission
 
 - [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
@@ -629,6 +637,10 @@
 ## legacy metadata containment
 
 - [ABYSS-STACK-D-0060 Inference Pilot Compatibility Validator Module](../ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md`)
+
+## lifecycle transition
+
+- [ABYSS-STACK-D-0133 Owner-Bound External Goal Pause](../ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md`)
 
 ## loopback exposure
 
