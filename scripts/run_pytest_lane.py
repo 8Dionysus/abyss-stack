@@ -360,15 +360,36 @@ def _write_cleanup_diagnostic(
         "attempts": len(failures),
         "failures": failures,
     }
+    encoded = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode(
+        "utf-8"
+    )
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags |= getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    flags |= getattr(os, "O_BINARY", 0)
+    descriptor: int | None = None
+    error: Exception | None = None
     try:
-        diagnostic.write_text(
-            json.dumps(payload, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-    except OSError as exc:
+        descriptor = os.open(diagnostic, flags, 0o600)
+        remaining = memoryview(encoded)
+        while remaining:
+            written = os.write(descriptor, remaining)
+            if written <= 0:
+                raise OSError("cleanup diagnostic write was incomplete")
+            remaining = remaining[written:]
+    except (OSError, AttributeError, NotImplementedError, TypeError, ValueError) as exc:
+        error = exc
+    finally:
+        if descriptor is not None:
+            try:
+                os.close(descriptor)
+            except (OSError, AttributeError, NotImplementedError, TypeError, ValueError) as exc:
+                if error is None:
+                    error = exc
+    if error is not None:
         print(
             "[pytest-temp-cleanup-diagnostic-failed] "
-            f"namespace={namespace} error={exc!r}",
+            f"namespace={namespace} error={error!r}",
             file=sys.stderr,
             flush=True,
         )

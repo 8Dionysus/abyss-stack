@@ -417,6 +417,89 @@ def test_pytest_temp_cleanup_failure_leaves_owner_diagnostic(
     assert "[pytest-temp-cleanup-failed]" in capsys.readouterr().err
 
 
+def test_pytest_temp_cleanup_diagnostic_is_private_and_closes_fd(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    namespace = tmp_path / "owned-namespace"
+    namespace.mkdir()
+    opened: list[int] = []
+    closed: list[int] = []
+    observed_flags: list[int] = []
+    observed_modes: list[int] = []
+    original_open = run_pytest_lane.os.open
+    original_write = run_pytest_lane.os.write
+    original_close = run_pytest_lane.os.close
+
+    def recording_open(path, flags, mode=0o777, **kwargs):
+        descriptor = original_open(path, flags, mode, **kwargs)
+        opened.append(descriptor)
+        observed_flags.append(flags)
+        observed_modes.append(mode)
+        return descriptor
+
+    def short_write(descriptor: int, content) -> int:
+        return original_write(descriptor, content[:3])
+
+    def recording_close(descriptor: int) -> None:
+        closed.append(descriptor)
+        original_close(descriptor)
+
+    monkeypatch.setattr(run_pytest_lane.os, "open", recording_open)
+    monkeypatch.setattr(run_pytest_lane.os, "write", short_write)
+    monkeypatch.setattr(run_pytest_lane.os, "close", recording_close)
+
+    diagnostic = run_pytest_lane._write_cleanup_diagnostic(
+        namespace,
+        [{"attempt": "1", "error_type": "OSError", "error": "failure"}],
+    )
+
+    assert diagnostic == run_pytest_lane._cleanup_diagnostic_path(namespace)
+    assert len(opened) == 1
+    assert closed == opened
+    assert observed_modes == [0o600]
+    flags = observed_flags[0]
+    assert flags & run_pytest_lane.os.O_CREAT
+    assert flags & run_pytest_lane.os.O_EXCL
+    if hasattr(run_pytest_lane.os, "O_NOFOLLOW"):
+        assert flags & run_pytest_lane.os.O_NOFOLLOW
+    assert stat.S_IMODE(diagnostic.lstat().st_mode) == 0o600
+    payload = json.loads(diagnostic.read_text(encoding="utf-8"))
+    assert payload["status"] == "cleanup_failed"
+    assert payload["failures"] == [
+        {"attempt": "1", "error_type": "OSError", "error": "failure"}
+    ]
+
+
+def test_pytest_temp_cleanup_diagnostic_rejects_symlink_collision_without_following(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    namespace = tmp_path / "owned-namespace"
+    namespace.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    marker = outside / "runner-writable-marker"
+    marker.write_bytes(b"outside bytes must survive\n")
+    marker.chmod(0o640)
+    diagnostic = run_pytest_lane._cleanup_diagnostic_path(namespace)
+    diagnostic.symlink_to(marker)
+    before_bytes = marker.read_bytes()
+    before_mode = stat.S_IMODE(marker.stat().st_mode)
+
+    result = run_pytest_lane._write_cleanup_diagnostic(
+        namespace,
+        [{"attempt": "1", "error_type": "OSError", "error": "failure"}],
+    )
+
+    assert result is None
+    assert diagnostic.is_symlink()
+    assert diagnostic.readlink() == marker
+    assert marker.read_bytes() == before_bytes
+    assert stat.S_IMODE(marker.stat().st_mode) == before_mode
+    assert "[pytest-temp-cleanup-diagnostic-failed]" in capsys.readouterr().err
+
+
 def test_pytest_temp_cleanup_handles_readonly_owned_paths(tmp_path: Path) -> None:
     namespace = tmp_path / "owned-namespace"
     readonly_directory = namespace / "runtime" / "release"
