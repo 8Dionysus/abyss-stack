@@ -33,6 +33,7 @@ LEGACY_RETURN_OWNER_SCHEMA_VERSION = "task_local_external_actor_return_owner_v1"
 RETURN_RECEIPT_SCHEMA_VERSION = "abyss_stack_external_codex_return_receipt_v1"
 RETURN_RESPONSE_SCHEMA_VERSION = "abyss_stack_external_codex_return_response_v1"
 DETACHED_SCHEMA_VERSION = "abyss_stack_external_codex_return_detached_v1"
+RETURN_ATTEMPT_SCHEMA_VERSION = "abyss_stack_external_codex_return_attempt_v1"
 WEBSOCKET_ACCEPT_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 MAX_HANDSHAKE_BYTES = 64 * 1024
@@ -857,6 +858,161 @@ def _return_binding(
     }
 
 
+def _return_attempt_path(closure_path: Path) -> Path:
+    return closure_path.with_name(closure_path.name + ".return-attempt.json")
+
+
+def _return_attempt_binding(inputs: dict[str, Any]) -> dict[str, str]:
+    """Bind idempotency to immutable lifecycle inputs, never caller output names."""
+
+    return {
+        "owner_ref": str(inputs["owner_path"].resolve()),
+        "owner_sha256": str(inputs["owner_digest"]),
+        "handoff_ref": str(inputs["handoff_path"].resolve()),
+        "handoff_sha256": str(inputs["handoff_digest"]),
+        "holder_receipt_ref": str(inputs["holder_path"].resolve()),
+        "holder_receipt_sha256": str(inputs["holder_digest"]),
+        "authorization_ref": str(inputs["authorization_path"].resolve()),
+        "closure_receipt_ref": str(inputs["closure_path"].resolve()),
+    }
+
+
+def _reserve_return_attempt(
+    inputs: dict[str, Any],
+) -> tuple[Path, dict[str, Any]]:
+    """Reserve one closure-bound return identity before any transport mutation."""
+
+    attempt_path = inputs.get("attempt_path")
+    if not isinstance(attempt_path, Path):
+        attempt_path = _return_attempt_path(inputs["closure_path"])
+    attempt_path = _validate_output_path(
+        attempt_path, "canonical return attempt reservation"
+    )
+    binding = _return_attempt_binding(inputs)
+    if attempt_path.exists():
+        value, raw = _load_json_file(
+            attempt_path, "canonical return attempt reservation"
+        )
+        if raw != _canonical_bytes(value) + b"\n":
+            raise ExternalCodexReturnError(
+                "canonical return attempt reservation is not canonically encoded"
+            )
+        if value.get("schema_version") != RETURN_ATTEMPT_SCHEMA_VERSION:
+            raise ExternalCodexReturnError(
+                "canonical return attempt reservation schema mismatch"
+            )
+        if value.get("state") != "reserved":
+            raise ExternalCodexReturnError(
+                "canonical return attempt reservation state is invalid"
+            )
+        for key, expected in binding.items():
+            if value.get(key) != expected:
+                raise ExternalCodexReturnError(
+                    f"canonical return attempt reservation {key} mismatch"
+                )
+        recorded_ref = value.get("return_receipt_ref")
+        if not isinstance(recorded_ref, str) or not recorded_ref.startswith("/"):
+            raise ExternalCodexReturnError(
+                "canonical return attempt reservation lacks a return receipt path"
+            )
+        recorded_path = _validate_output_path(
+            Path(recorded_ref), "canonical return receipt"
+        )
+        if str(recorded_path.resolve()) != recorded_ref:
+            raise ExternalCodexReturnError(
+                "canonical return attempt reservation return path is not canonical"
+            )
+        _validate_distinct_output_paths(
+            [
+                (inputs["authorization_path"], "terminal closure authorization"),
+                (inputs["closure_path"], "closure receipt"),
+                (attempt_path, "canonical return attempt reservation"),
+                (recorded_path, "canonical return receipt"),
+            ]
+        )
+        authorization = inputs.get("authorization")
+        if isinstance(authorization, dict) and authorization.get(
+            "authorization_kind"
+        ) == "wake_delivered":
+            evidence_ref = authorization.get("evidence_ref")
+            if not isinstance(evidence_ref, str) or not evidence_ref.startswith("/"):
+                raise ExternalCodexReturnError(
+                    "existing wake authorization lacks a canonical return receipt"
+                )
+            evidence_path = _validate_output_path(
+                Path(evidence_ref), "canonical return evidence"
+            )
+            if evidence_path.resolve() != recorded_path.resolve():
+                raise ExternalCodexReturnError(
+                    "canonical return attempt reservation disagrees with wake evidence"
+                )
+        return attempt_path, value
+    authorization = inputs.get("authorization")
+    if isinstance(authorization, dict) and authorization.get(
+        "authorization_kind"
+    ) == "wake_delivered":
+        evidence_ref = authorization.get("evidence_ref")
+        if not isinstance(evidence_ref, str) or not evidence_ref.startswith("/"):
+            raise ExternalCodexReturnError(
+                "existing wake authorization lacks a canonical return receipt"
+            )
+        recorded_path = _validate_output_path(
+            Path(evidence_ref), "canonical return evidence"
+        )
+    else:
+        recorded_path = _validate_output_path(
+            inputs["return_path"], "canonical return receipt"
+        )
+    _validate_distinct_output_paths(
+        [
+            (inputs["authorization_path"], "terminal closure authorization"),
+            (inputs["closure_path"], "closure receipt"),
+            (attempt_path, "canonical return attempt reservation"),
+            (recorded_path, "canonical return receipt"),
+        ]
+    )
+    reservation = {
+        "schema_version": RETURN_ATTEMPT_SCHEMA_VERSION,
+        "state": "reserved",
+        "reserved_at": _utc_now(),
+        **binding,
+        "return_receipt_ref": str(recorded_path.resolve()),
+    }
+    _write_new_json(
+        attempt_path, reservation, "canonical return attempt reservation"
+    )
+    return attempt_path, reservation
+
+
+def _bind_return_attempt(inputs: dict[str, Any]) -> dict[str, Any]:
+    """Use the durable closure-bound return path for this and every retry."""
+
+    authorization = inputs.get("authorization")
+    if isinstance(authorization, dict) and authorization.get(
+        "authorization_kind"
+    ) not in {None, "wake_delivered"}:
+        raise ExternalCodexReturnError(
+            "existing closure authorization is not a canonical wake delivery"
+        )
+    _attempt_path, attempt = _reserve_return_attempt(inputs)
+    recorded_ref = attempt.get("return_receipt_ref")
+    if not isinstance(recorded_ref, str):
+        raise ExternalCodexReturnError(
+            "canonical return attempt reservation lacks a return receipt path"
+        )
+    recorded_path = _validate_output_path(
+        Path(recorded_ref), "canonical return receipt"
+    )
+    requested_path = inputs["return_path"]
+    if requested_path.resolve() != recorded_path.resolve() and requested_path.exists():
+        raise ExternalCodexReturnError(
+            "canonical return receipt path differs from the bound return attempt"
+        )
+    bound = dict(inputs)
+    bound["return_path"] = recorded_path
+    return bound
+
+
 def _return_reservation(
     path: Path,
     *,
@@ -908,11 +1064,16 @@ def _load_return_inputs(args: argparse.Namespace) -> dict[str, Any]:
     return_path = _validate_output_path(
         Path(args.return_receipt), "canonical return receipt"
     )
+    attempt_path = _validate_output_path(
+        _return_attempt_path(closure_path),
+        "canonical return attempt reservation",
+    )
     _validate_distinct_output_paths(
         [
             (authorization_path, "terminal closure authorization"),
             (closure_path, "closure receipt"),
             (return_path, "canonical return receipt"),
+            (attempt_path, "canonical return attempt reservation"),
         ]
     )
     authorization: dict[str, Any] | None = None
@@ -957,6 +1118,7 @@ def _load_return_inputs(args: argparse.Namespace) -> dict[str, Any]:
         "authorization_path": authorization_path,
         "authorization": authorization,
         "return_path": return_path,
+        "attempt_path": attempt_path,
     }
 
 
@@ -1190,7 +1352,7 @@ def _call_visible(handler: Callable[[argparse.Namespace], int], args: argparse.N
 
 
 def run_return(args: argparse.Namespace) -> dict[str, Any]:
-    inputs = _load_return_inputs(args)
+    inputs = _bind_return_attempt(_load_return_inputs(args))
     owner_path = inputs["owner_path"]
     owner_bytes = inputs["owner_bytes"]
     owner_digest = inputs["owner_digest"]
@@ -1327,8 +1489,10 @@ def run_return(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
-def _detached_paths(args: argparse.Namespace) -> tuple[Path, Path, Path]:
-    return_path = Path(args.return_receipt)
+def _detached_paths(
+    args: argparse.Namespace, *, return_path: Path | None = None
+) -> tuple[Path, Path, Path]:
+    return_path = return_path or Path(args.return_receipt)
     detached = Path(args.detached_receipt or (str(return_path) + ".detached.json"))
     result = Path(args.detached_result or (str(return_path) + ".result.json"))
     log = Path(args.detached_log or (str(return_path) + ".detached.log"))
@@ -1375,7 +1539,7 @@ def _validate_detached_receipt(
     if value.get("schema_version") != DETACHED_SCHEMA_VERSION:
         raise ExternalCodexReturnError("detached return receipt schema mismatch")
     state = value.get("state")
-    if state not in {"running", "completed", "failed", "stale"}:
+    if state not in {"launch_reserved", "running", "completed", "failed", "stale"}:
         raise ExternalCodexReturnError("detached return receipt state is invalid")
     for key, expected in binding.items():
         if value.get(key) != expected:
@@ -1411,6 +1575,32 @@ def _retry_output_path(path: Path, label: str) -> Path:
     raise ExternalCodexReturnError(f"cannot allocate a retry path for {label}")
 
 
+def _reserve_detached_log(path: Path) -> None:
+    """Create the detached log before fork so orphan launches remain recoverable."""
+
+    _validate_output_path(path, "detached canonical return log")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags, 0o600)
+        try:
+            os.fchmod(descriptor, 0o600)
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    except FileExistsError as exc:
+        raise ExternalCodexReturnError(
+            f"detached canonical return log already exists: {path}"
+        ) from exc
+    except OSError as exc:
+        raise ExternalCodexReturnError(
+            f"cannot reserve detached canonical return log: {path}"
+        ) from exc
+
+
 def _run_detached_child(
     args: argparse.Namespace,
     result_path: Path,
@@ -1420,7 +1610,12 @@ def _run_detached_child(
     ready_fd: int,
 ) -> None:
     os.setsid()
-    descriptor = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    log_flags = os.O_WRONLY | os.O_APPEND
+    if hasattr(os, "O_CLOEXEC"):
+        log_flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        log_flags |= os.O_NOFOLLOW
+    descriptor = os.open(log_path, log_flags)
     try:
         os.dup2(descriptor, 1)
         os.dup2(descriptor, 2)
@@ -1492,8 +1687,10 @@ def command_return(args: argparse.Namespace) -> int:
 def _command_return_detached(
     args: argparse.Namespace, lock: _ReturnAttemptLock
 ) -> int:
-    inputs = _load_return_inputs(args)
-    detached_path, result_path, log_path = _detached_paths(args)
+    inputs = _bind_return_attempt(_load_return_inputs(args))
+    detached_path, result_path, log_path = _detached_paths(
+        args, return_path=inputs["return_path"]
+    )
     _validate_output_path(detached_path, "detached return receipt")
     _validate_output_path(result_path, "detached canonical return result")
     _validate_output_path(log_path, "detached canonical return log")
@@ -1593,7 +1790,9 @@ def _command_return_detached(
             )
             if detached_path.exists():
                 continue
-            if result_path.exists() or log_path.exists():
+            if result_path.exists() or (
+                log_path.exists() and state != "launch_reserved"
+            ):
                 raise ExternalCodexReturnError(
                     "detached return retry receipt is missing but its output paths are used"
                 )
@@ -1651,6 +1850,18 @@ def _command_return_detached(
         raise ExternalCodexReturnError(
             f"detached canonical return log already exists: {log_path}"
         )
+    launch_reservation = {
+        "schema_version": DETACHED_SCHEMA_VERSION,
+        "state": "launch_reserved",
+        "created_at": _utc_now(),
+        **binding,
+    }
+    _write_new_json(
+        detached_path,
+        launch_reservation,
+        "detached return launch reservation",
+    )
+    _reserve_detached_log(log_path)
     ready_read, ready_write = os.pipe()
     child_pid = os.fork()
     if child_pid == 0:
@@ -1675,9 +1886,9 @@ def _command_return_detached(
         **binding,
     }
     try:
-        _write_new_json(detached_path, receipt, "detached return receipt")
-        os.write(ready_write, b"\x01")
+        _replace_json(detached_path, receipt, "detached return receipt")
         lock.transferred_to_detached_child = True
+        os.write(ready_write, b"\x01")
     finally:
         os.close(ready_write)
     print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))

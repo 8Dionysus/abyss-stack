@@ -434,6 +434,36 @@ def test_detached_return_follows_an_existing_live_retry(
     assert MODULE.command_return(args) == 0
 
 
+def test_return_attempt_reuses_bound_receipt_path_after_alternate_retry(
+    tmp_path: Path,
+) -> None:
+    paths = {
+        "owner_path": tmp_path / "owner.json",
+        "handoff_path": tmp_path / "handoff.json",
+        "holder_path": tmp_path / "holder.json",
+        "authorization_path": tmp_path / "authorization.json",
+        "closure_path": tmp_path / "closure.json",
+        "return_path": tmp_path / "return.json",
+    }
+    inputs: dict[str, object] = {
+        **paths,
+        "owner_digest": "sha256:" + "1" * 64,
+        "handoff_digest": "sha256:" + "2" * 64,
+        "holder_digest": "sha256:" + "3" * 64,
+    }
+
+    attempt_path, reservation = MODULE._reserve_return_attempt(inputs)
+    assert reservation["return_receipt_ref"] == str(paths["return_path"].resolve())
+
+    alternate = dict(inputs)
+    alternate["return_path"] = tmp_path / "alternate-return.json"
+    rebound = MODULE._bind_return_attempt(alternate)
+
+    assert rebound["return_path"] == paths["return_path"]
+    assert attempt_path == MODULE._return_attempt_path(paths["closure_path"])
+    assert json.loads(attempt_path.read_text(encoding="utf-8"))["state"] == "reserved"
+
+
 def test_output_reservation_rejects_relative_destination() -> None:
     with pytest.raises(MODULE.ExternalCodexReturnError, match="absolute"):
         MODULE._validate_output_path(Path("relative-receipt.json"), "return receipt")
@@ -599,6 +629,70 @@ def test_missing_retry_receipt_recovers_reserved_retry_launch(
     )
     with pytest.raises(AssertionError, match="launch-ready"):
         MODULE.command_return(args)
+
+
+def test_launch_reserved_orphan_log_transitions_to_recoverable_retry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    paths = {
+        "owner_path": tmp_path / "owner.json",
+        "handoff_path": tmp_path / "handoff.json",
+        "holder_path": tmp_path / "holder.json",
+        "authorization_path": tmp_path / "authorization.json",
+        "closure_path": tmp_path / "closure.json",
+        "return_path": tmp_path / "return.json",
+    }
+    inputs: dict[str, object] = {
+        **paths,
+        "owner_digest": "sha256:" + "1" * 64,
+        "handoff_digest": "sha256:" + "2" * 64,
+        "holder_digest": "sha256:" + "3" * 64,
+    }
+    detached_path = tmp_path / "detached.json"
+    result_path = tmp_path / "result.json"
+    log_path = tmp_path / "return.log"
+    binding = MODULE._detached_binding(
+        inputs,
+        detached_path=detached_path,
+        result_path=result_path,
+        log_path=log_path,
+    )
+    detached_path.write_bytes(
+        MODULE._canonical_bytes(
+            {
+                "schema_version": MODULE.DETACHED_SCHEMA_VERSION,
+                "state": "launch_reserved",
+                "created_at": "2026-08-21T00:00:00Z",
+                **binding,
+            }
+        )
+        + b"\n"
+    )
+    log_path.write_text("orphaned launch\n", encoding="utf-8")
+    monkeypatch.setattr(MODULE, "_load_return_inputs", lambda _args: inputs)
+    monkeypatch.setattr(MODULE.VISIBLE, "_proc_identity_state", lambda *_args: "gone")
+    monkeypatch.setattr(MODULE.os, "pipe", lambda: (0, 1))
+    monkeypatch.setattr(
+        MODULE.os,
+        "fork",
+        lambda: (_ for _ in ()).throw(AssertionError("launch-ready")),
+    )
+    args = SimpleNamespace(
+        detach=True,
+        return_receipt=str(paths["return_path"]),
+        closure_receipt=str(paths["closure_path"]),
+        detached_receipt=str(detached_path),
+        detached_result=str(result_path),
+        detached_log=str(log_path),
+    )
+
+    with pytest.raises(AssertionError, match="launch-ready"):
+        MODULE.command_return(args)
+
+    stale = json.loads(detached_path.read_text(encoding="utf-8"))
+    assert stale["state"] == "stale"
+    assert log_path.read_text(encoding="utf-8") == "orphaned launch\n"
 
 
 def test_reusable_return_source_has_no_episode_coordinates() -> None:

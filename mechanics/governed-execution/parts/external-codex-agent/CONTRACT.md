@@ -133,13 +133,20 @@ Operations are:
   operation in a new session, binds durable receipts to the owner/handoff/
   holder/output identities, follows an already-published retry receipt instead
   of launching a duplicate child, and recovers a fully bound reserved retry
-  whose child receipt was not yet published. A stable return-attempt lock
-  resolved from the exact closure path bound by the immutable handoff
-  serializes direct delivery and the entire detached receipt chain, including
-  callers that name a retry receipt or an alternate return-receipt path, and is
-  transferred to the detached worker through its `run_return`; concurrent
-  recovery cannot duplicate owner re-entry. A legacy task-local owner binding
-  is accepted only
+  whose child receipt was not yet published. Before delivery it also writes a
+  closure-bound `abyss_stack_external_codex_return_attempt_v1` reservation
+  sidecar. That sidecar records the first canonical return-receipt path for
+  the immutable owner/handoff/holder/authorization/closure identity; later
+  invocations that name another return-receipt path replay that bound path,
+  including a crash after delivery but before authorization. A stable
+  return-attempt lock resolved from the exact closure path bound by the
+  immutable handoff serializes direct delivery and the entire detached receipt
+  chain, including callers that name a retry receipt or an alternate
+  return-receipt path, and is transferred to the detached worker through its
+  `run_return`; concurrent recovery cannot duplicate owner re-entry. Detached
+  launch outputs are reserved before `fork()` in a `launch_reserved` receipt;
+  an orphaned log therefore remains a typed recoverable launch rather than an
+  unowned output collision. A legacy task-local owner binding is accepted only
   as an input migration; no Goal, thread, rollout, PR, disposition, or
   task-root coordinate is selected by source.
 
