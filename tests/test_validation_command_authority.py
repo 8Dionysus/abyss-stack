@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 from types import SimpleNamespace
 
 import pytest
@@ -253,7 +254,7 @@ def test_pytest_scheduler_keeps_an_exact_serial_rollback(tmp_path: Path) -> None
     ]
 
 
-def test_pytest_temp_parent_follows_upstream_runtime_environment(
+def test_pytest_temp_namespace_falls_back_when_actual_candidate_creation_fails(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -261,44 +262,105 @@ def test_pytest_temp_parent_follows_upstream_runtime_environment(
     runtime_root = tmp_path / "runtime-root"
     debug_root.mkdir()
     runtime_root.mkdir()
+    real_mkdtemp = run_pytest_lane.tempfile.mkdtemp
+    calls: list[str | None] = []
+
+    def fake_mkdtemp(*, prefix, dir=None):
+        calls.append(dir)
+        if dir == str(debug_root):
+            raise PermissionError("simulated parent became unusable at creation")
+        return real_mkdtemp(prefix=prefix, dir=dir)
 
     monkeypatch.setenv("PYTEST_DEBUG_TEMPROOT", str(debug_root))
     monkeypatch.setenv("TMPDIR", str(runtime_root))
-    assert run_pytest_lane.select_pytest_temp_parent() == debug_root
-    assert not list(debug_root.iterdir())
+    monkeypatch.setattr(run_pytest_lane.tempfile, "mkdtemp", fake_mkdtemp)
 
-    monkeypatch.setenv(
-        "PYTEST_DEBUG_TEMPROOT",
-        str(tmp_path / "missing-debug-root"),
-    )
-    assert run_pytest_lane.select_pytest_temp_parent() == runtime_root
+    with run_pytest_lane.owned_pytest_temp_namespace() as namespace:
+        assert namespace.parent == runtime_root
+
+    assert calls == [str(debug_root), str(runtime_root)]
+    assert not list(debug_root.iterdir())
     assert not list(runtime_root.iterdir())
 
 
-def test_pytest_temp_parent_skips_existing_unusable_candidate(
+def test_pytest_temp_namespace_has_no_probe_directory(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
-    unusable = tmp_path / "unusable"
-    fallback = tmp_path / "fallback"
-    unusable.mkdir()
-    fallback.mkdir()
+    debug_root = tmp_path / "debug-root"
+    debug_root.mkdir()
     real_mkdtemp = run_pytest_lane.tempfile.mkdtemp
+    created: list[Path] = []
+
+    def recording_mkdtemp(*, prefix, dir=None):
+        path = Path(real_mkdtemp(prefix=prefix, dir=dir))
+        created.append(path)
+        return str(path)
+
+    monkeypatch.setenv("PYTEST_DEBUG_TEMPROOT", str(debug_root))
+    monkeypatch.delenv("TMPDIR", raising=False)
+    monkeypatch.setattr(run_pytest_lane.tempfile, "mkdtemp", recording_mkdtemp)
+
+    with run_pytest_lane.owned_pytest_temp_namespace() as namespace:
+        assert created == [namespace]
+
+    assert not list(debug_root.iterdir())
+
+
+def test_pytest_temp_namespace_falls_through_to_default_tempfile(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    debug_root = tmp_path / "debug-root"
+    runtime_root = tmp_path / "runtime-root"
+    debug_root.mkdir()
+    runtime_root.mkdir()
+    real_mkdtemp = run_pytest_lane.tempfile.mkdtemp
+    calls: list[str | None] = []
 
     def fake_mkdtemp(*, prefix, dir=None):
-        if dir == str(unusable):
-            raise PermissionError("simulated unusable configured parent")
+        calls.append(dir)
+        if dir in {str(debug_root), str(runtime_root)}:
+            raise PermissionError("simulated unusable candidate")
         return real_mkdtemp(prefix=prefix, dir=dir)
 
+    monkeypatch.setenv("PYTEST_DEBUG_TEMPROOT", str(debug_root))
+    monkeypatch.setenv("TMPDIR", str(runtime_root))
     monkeypatch.setattr(run_pytest_lane.tempfile, "mkdtemp", fake_mkdtemp)
-    monkeypatch.setenv(run_pytest_lane.PYTEST_TEMP_ROOT_ENV, str(unusable))
-    monkeypatch.setenv(run_pytest_lane.PYTEST_TEMP_PARENT_ENV, str(fallback))
 
-    assert run_pytest_lane.select_pytest_temp_parent() == fallback
     with run_pytest_lane.owned_pytest_temp_namespace() as namespace:
-        assert namespace.parent == fallback
-    assert not list(unusable.iterdir())
-    assert not list(fallback.iterdir())
+        assert calls == [str(debug_root), str(runtime_root), None]
+        assert namespace.parent != debug_root
+        assert namespace.parent != runtime_root
+
+    assert not list(runtime_root.iterdir())
+
+
+def test_pytest_temp_namespace_reports_bounded_candidate_exhaustion(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    debug_root = tmp_path / "debug-root"
+    runtime_root = tmp_path / "runtime-root"
+    debug_root.mkdir()
+    runtime_root.mkdir()
+    calls: list[str | None] = []
+
+    def fail_mkdtemp(*, prefix, dir=None):
+        calls.append(dir)
+        raise PermissionError("simulated exhausted candidates")
+
+    monkeypatch.setenv("PYTEST_DEBUG_TEMPROOT", str(debug_root))
+    monkeypatch.setenv("TMPDIR", str(runtime_root))
+    monkeypatch.setattr(run_pytest_lane.tempfile, "mkdtemp", fail_mkdtemp)
+
+    with pytest.raises(OSError, match="trying all candidates"):
+        with run_pytest_lane.owned_pytest_temp_namespace():
+            raise AssertionError("namespace creation should not reach the body")
+
+    assert calls == [str(debug_root), str(runtime_root), None]
+    assert not list(debug_root.iterdir())
+    assert not list(runtime_root.iterdir())
 
 
 def test_pytest_invocation_namespaces_are_unique_and_cleaned(tmp_path: Path) -> None:
@@ -416,6 +478,50 @@ def test_pytest_temp_cleanup_handles_os_open_error_callback_without_replaying_it
     assert result.attempts == 2
     assert calls == 2
     assert not namespace.exists()
+
+
+def test_pytest_temp_cleanup_fd_chmod_survives_symlink_swap(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    if not all(
+        hasattr(run_pytest_lane.os, attribute)
+        for attribute in ("O_NOFOLLOW", "O_DIRECTORY", "fchmod")
+    ):
+        pytest.skip("fd no-follow directory permission support is unavailable")
+
+    namespace = tmp_path / "owned-namespace"
+    candidate = namespace / "readonly-directory"
+    outside = tmp_path / "outside"
+    marker = outside / "keep.txt"
+    candidate.mkdir(parents=True)
+    outside.mkdir()
+    marker.write_text("no-loss\n", encoding="utf-8")
+    candidate.chmod(0o500)
+    outside.chmod(0o500)
+
+    original_fchmod = run_pytest_lane.os.fchmod
+    swapped = False
+
+    def swap_before_fchmod(fd: int, mode: int) -> None:
+        nonlocal swapped
+        candidate.rmdir()
+        candidate.symlink_to(outside, target_is_directory=True)
+        swapped = True
+        original_fchmod(fd, mode)
+
+    monkeypatch.setattr(run_pytest_lane.os, "fchmod", swap_before_fchmod)
+    monkeypatch.setattr(
+        run_pytest_lane.os,
+        "chmod",
+        lambda *_args, **_kwargs: pytest.fail("cleanup must not chmod by path"),
+    )
+
+    run_pytest_lane._make_owned_directory_writable(candidate)
+
+    assert swapped is True
+    assert stat.S_IMODE(outside.stat().st_mode) == 0o500
+    assert marker.read_text(encoding="utf-8") == "no-loss\n"
 
 
 def test_pytest_temp_cleanup_does_not_follow_owned_symlinks(tmp_path: Path) -> None:

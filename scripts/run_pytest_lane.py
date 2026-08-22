@@ -193,39 +193,23 @@ def scheduler_plan(requested: str) -> dict[str, Any]:
     }
 
 
-def select_pytest_temp_parent() -> Path | None:
-    """Return the owner-approved runtime parent for pytest temp namespaces."""
+def _pytest_temp_candidates(parent: Path | None) -> Iterator[Path | None]:
+    if parent is not None:
+        yield parent
+        return
+
+    seen: set[str] = set()
     for environment_name in (PYTEST_TEMP_ROOT_ENV, PYTEST_TEMP_PARENT_ENV):
         raw = os.environ.get(environment_name)
         if not raw:
             continue
         candidate = Path(raw).expanduser()
-        try:
-            if not candidate.is_dir():
-                continue
-        except OSError:
+        key = os.fspath(candidate)
+        if key in seen:
             continue
-        try:
-            probe = Path(
-                tempfile.mkdtemp(
-                    prefix=PYTEST_TEMP_PREFIX,
-                    dir=str(candidate),
-                )
-            )
-        except OSError:
-            continue
-        try:
-            probe_mode = os.lstat(probe).st_mode
-            if stat.S_ISLNK(probe_mode):
-                probe.unlink()
-                return candidate
-            if not stat.S_ISDIR(probe_mode):
-                continue
-            probe.rmdir()
-        except OSError:
-            continue
-        return candidate
-    return None
+        seen.add(key)
+        yield candidate
+    yield None
 
 
 @dataclass(frozen=True)
@@ -251,13 +235,30 @@ class PytestTempCleanupError(RuntimeError):
 
 
 def _pytest_temp_directory(parent: Path | None = None) -> Path:
-    resolved_parent = select_pytest_temp_parent() if parent is None else parent
-    return Path(
-        tempfile.mkdtemp(
-            prefix=PYTEST_TEMP_PREFIX,
-            dir=str(resolved_parent) if resolved_parent is not None else None,
-        )
+    failures: list[str] = []
+    last_error: OSError | ValueError | None = None
+    for candidate in _pytest_temp_candidates(parent):
+        directory = None if candidate is None else str(candidate)
+        try:
+            return Path(
+                tempfile.mkdtemp(
+                    prefix=PYTEST_TEMP_PREFIX,
+                    dir=directory,
+                )
+            )
+        except (OSError, ValueError) as exc:
+            last_error = exc
+            label = "<default tempfile>" if candidate is None else str(candidate)
+            failures.append(f"{label}: {type(exc).__name__}: {exc}")
+
+    attempted = "; ".join(failures)
+    error = OSError(
+        "unable to create an owner-owned pytest temporary namespace after "
+        f"trying all candidates: {attempted}"
     )
+    if last_error is None:
+        raise error
+    raise error from last_error
 
 
 def _namespace_exists(namespace: Path) -> bool:
@@ -268,6 +269,34 @@ def _namespace_exists(namespace: Path) -> bool:
     except OSError:
         return True
     return True
+
+
+def _make_owned_directory_writable(path: Path) -> None:
+    """Add owner write/search bits through a checked, no-follow directory fd."""
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    directory_flag = getattr(os, "O_DIRECTORY", None)
+    fchmod = getattr(os, "fchmod", None)
+    if not nofollow or not directory_flag or fchmod is None:
+        return
+
+    flags = os.O_RDONLY | nofollow | directory_flag
+    cloexec = getattr(os, "O_CLOEXEC", 0)
+    flags |= cloexec
+    fd: int | None = None
+    try:
+        fd = os.open(os.fspath(path), flags)
+        mode = os.fstat(fd).st_mode
+        if not stat.S_ISDIR(mode):
+            return
+        fchmod(fd, mode | stat.S_IWUSR | stat.S_IXUSR)
+    except OSError:
+        return
+    finally:
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
 
 
 def _remove_owned_namespace(namespace: Path) -> None:
@@ -288,16 +317,7 @@ def _remove_owned_namespace(namespace: Path) -> None:
                 writable_candidate.relative_to(root)
             except ValueError:
                 continue
-            try:
-                mode = os.lstat(writable_candidate).st_mode
-            except OSError:
-                continue
-            if stat.S_ISLNK(mode):
-                continue
-            writable_bits = stat.S_IWUSR
-            if stat.S_ISDIR(mode):
-                writable_bits |= stat.S_IXUSR
-            os.chmod(writable_candidate, mode | writable_bits)
+            _make_owned_directory_writable(writable_candidate)
         cleanup_errors.append(error)
 
     try:
@@ -584,16 +604,14 @@ def _replay_failed_shards(
 
 
 def run_process_worksteal(*, extra_args: list[str]) -> int:
-    temporary_parent = select_pytest_temp_parent()
     with tempfile.TemporaryDirectory(
         prefix="abyss-stack-pytest-partitions-",
-        dir=str(temporary_parent) if temporary_parent is not None else None,
     ) as temporary_raw:
         temporary = Path(temporary_raw)
         baseline_path = temporary / "baseline.json"
         collect_log = temporary / "collect.log"
         try:
-            with owned_pytest_temp_namespace(temporary_parent) as collect_basetemp:
+            with owned_pytest_temp_namespace() as collect_basetemp:
                 collect_command = _plugin_command(
                     selection_args=extra_args,
                     basetemp=collect_basetemp,
@@ -657,7 +675,7 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                     result_path = temporary / f"result-{shard_index}.json"
                     log_path = temporary / f"shard-{shard_index}.log"
                     write_manifest(assignment_path, assignments[shard_index])
-                    temporary_namespace = _pytest_temp_directory(temporary_parent)
+                    temporary_namespace = _pytest_temp_directory()
                     basetemp = temporary_namespace
                     output: Any = None
                     try:

@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Make each pytest invocation create its owner-owned temporary namespace
+  atomically from `PYTEST_DEBUG_TEMPROOT`, `TMPDIR`, or the default tempfile
+  location, without a probe directory; keep fallback creation bounded and
+  cleanup permission repair directory-only, descriptor-based, and no-follow.
 - Bound the Codex agent-routing adapter's wait for an event-keyed relay
   context when matching `PreToolUse` groups run concurrently, while retaining
   fail-closed behavior when the context remains unavailable.
