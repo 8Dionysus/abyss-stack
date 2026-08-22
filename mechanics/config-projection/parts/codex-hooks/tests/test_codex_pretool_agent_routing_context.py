@@ -99,6 +99,24 @@ def test_relay_fails_closed_without_mutating_context_for_bad_base(tmp_path: Path
     assert list(directory.iterdir()) == []
 
 
+def test_relay_does_not_materialize_unknown_agent_context(tmp_path: Path) -> None:
+    directory = tmp_path / "contexts"
+    directory.mkdir()
+    base_path = tmp_path / "base.json"
+    base_path.write_text(json.dumps(base()), encoding="utf-8")
+    unknown = event()
+    unknown["tool_name"] = "collaboration_future_tool"
+
+    assert RELAY.handle_event(
+        unknown,
+        {
+            RELAY.CONTEXT_DIRECTORY_ENV: str(directory),
+            RELAY.CONTEXT_BASE_ENV: str(base_path),
+        },
+    ) == {}
+    assert list(directory.iterdir()) == []
+
+
 def test_relay_fragment_and_schema_are_source_valid() -> None:
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)

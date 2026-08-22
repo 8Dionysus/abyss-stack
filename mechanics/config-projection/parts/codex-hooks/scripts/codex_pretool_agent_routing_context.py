@@ -34,6 +34,33 @@ CONTEXT_FIELDS = frozenset(
     }
 )
 ATTEMPT_FIELDS = ("session_id", "turn_id", "tool_use_id", "tool_name")
+# Keep the relay narrower than the adapter's fail-closed namespace matcher: an
+# unknown future tool must still reach the adapter, but must not create an
+# unclaimable context entry that the adapter intentionally does not consume.
+RELAY_TOOL_NAMES = frozenset(
+    {
+        "spawn_agent",
+        "Agent",
+        "multi_agent_v1send_input",
+        "multi_agent_v1resume_agent",
+        "multi_agent_v1wait_agent",
+        "multi_agent_v1close_agent",
+        "send_message",
+        "followup_task",
+        "wait_agent",
+        "list_agents",
+        "interrupt_agent",
+        "collaborationspawn_agent",
+        "collaborationsend_message",
+        "collaborationwait_agent",
+        "collaborationclose_agent",
+        "collaborationresume_agent",
+        "collaborationlist_agents",
+        "collaborationfollowup_task",
+        "collaborationinterrupt_agent",
+        "collaborationsend_input",
+    }
+)
 MAX_EVENT_BYTES = 1024 * 1024
 MAX_BASE_BYTES = 256 * 1024
 
@@ -128,6 +155,8 @@ def _write_once(directory: Path, target: Path, payload: bytes) -> bool:
 
 def handle_event(event: object, environ: dict[str, str] | None = None) -> dict[str, object]:
     if not isinstance(event, dict) or event.get("hook_event_name") != "PreToolUse":
+        return {}
+    if event.get("tool_name") not in RELAY_TOOL_NAMES:
         return {}
     attempt = _attempt(event)
     environment = os.environ if environ is None else environ

@@ -40,7 +40,10 @@ Metadata is removed from the native output.
 The stack-owned `abyss-stack:agent-tool-routing-context-relay:v1` fragment runs
 immediately before the adapter for the canonical `spawn_agent`, known
 unnamespaced v2 names, and the `multi_agent_`/`collaboration` namespaces. The
-relay reads a session-owned typed base from the inherited
+fragment matcher remains broad so future namespace members reach the adapter's
+unknown-agent denial, but the relay writes context only for the current
+recognized names; an unknown member therefore leaves no unclaimable entry.
+The relay reads a session-owned typed base from the inherited
 `AOA_AGENT_TOOL_ROUTING_CONTEXT_BASE` path and copies only the current safe
 attempt coordinates into the event-keyed context directory. It never chooses
 or interprets Goal, holder, role, model, runtime, or classification meaning.

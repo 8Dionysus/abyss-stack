@@ -157,20 +157,61 @@ def _source_commit(source_root: Path) -> str:
     return commit
 
 
-def _source_files(source_root: Path) -> dict[str, Path]:
-    paths: dict[str, Path] = {}
+def _committed_source_files(source_root: Path, source_commit: str) -> dict[str, bytes]:
+    files: dict[str, bytes] = {}
     for relative_text in RELEASE_FILES:
-        relative = Path(relative_text)
-        path = _require_regular_file(source_root / "mechanics/config-projection/parts/codex-hooks" / relative, f"source file {relative_text}")
-        paths[relative_text] = path
-    return paths
+        repository_path = (
+            Path("mechanics/config-projection/parts/codex-hooks")
+            / relative_text
+        ).as_posix()
+        try:
+            tree_entry = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(source_root),
+                    "ls-tree",
+                    source_commit,
+                    "--",
+                    repository_path,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            entry = tree_entry.split(maxsplit=3)
+            if (
+                len(entry) != 4
+                or entry[0] not in {"100644", "100755"}
+                or entry[1] != "blob"
+                or entry[3] != repository_path
+            ):
+                raise InstallError(
+                    f"committed source file is not a regular blob: {relative_text}"
+                )
+            content = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(source_root),
+                    "show",
+                    f"{source_commit}:{repository_path}",
+                ],
+                check=True,
+                capture_output=True,
+            ).stdout
+        except (OSError, subprocess.CalledProcessError) as exc:
+            raise InstallError(
+                f"cannot read committed source file {relative_text}"
+            ) from exc
+        files[relative_text] = content
+    return files
 
 
 def build_manifest(source_root: Path, source_commit: str) -> dict[str, Any]:
-    files = _source_files(source_root)
+    files = _committed_source_files(source_root, source_commit)
     rows = []
-    for relative_text, path in files.items():
-        raw = path.read_bytes()
+    for relative_text, raw in files.items():
         rows.append(
             {
                 "path": relative_text,
@@ -278,15 +319,20 @@ def materialize_release(
     releases_root = _ensure_directory(install_root / "releases", "release root")
     release_root = releases_root / str(manifest["release_id"])
     if release_root.exists():
-        return release_root, verify_release(release_root), False
+        existing_manifest = verify_release(release_root)
+        if existing_manifest != manifest:
+            raise InstallError(
+                "existing release does not match the current committed manifest"
+            )
+        return release_root, existing_manifest, False
 
     staging = Path(tempfile.mkdtemp(prefix=".staging-", dir=releases_root))
     try:
-        source_paths = _source_files(source_root)
-        for relative_text, source_path in source_paths.items():
+        source_files = _committed_source_files(source_root, source_commit)
+        for relative_text, source_bytes in source_files.items():
             target = staging / relative_text
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source_path, target, follow_symlinks=False)
+            target.write_bytes(source_bytes)
             os.chmod(target, 0o755 if relative_text in PYTHON_RELEASE_FILES else 0o644)
         manifest_path = staging / "release-manifest.json"
         manifest_path.write_bytes(rendered_bytes(manifest))
@@ -302,13 +348,16 @@ def materialize_release(
     return release_root, manifest, True
 
 
-def _load_renderer(source_root: Path) -> Any:
-    path = source_root / "mechanics/config-projection/parts/codex-hooks/scripts/render_codex_hooks.py"
+def _load_renderer(path: Path) -> Any:
     spec = importlib.util.spec_from_file_location("abyss_stack_codex_hook_renderer", path)
-    if spec is None or spec.loader is None:
+    if spec is None:
         raise InstallError("Codex hook renderer could not be loaded")
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    try:
+        source = path.read_bytes()
+    except OSError as exc:
+        raise InstallError("Codex hook renderer could not be read") from exc
+    exec(compile(source, str(path), "exec"), module.__dict__)
     return module
 
 
@@ -365,6 +414,8 @@ def install(
         raise InstallError("Codex hooks target must have an existing non-symlink parent")
     if composition_receipt.is_symlink():
         raise InstallError("composition receipt must not be a symlink")
+    if composition_receipt.exists() and not composition_receipt.is_file():
+        raise InstallError("composition receipt must be a regular file")
     _ensure_directory(composition_receipt.parent, "composition receipt directory")
     context_directory = _ensure_directory(
         _absolute_without_dereference(context_directory, "agent-tool routing context directory"),
@@ -377,7 +428,7 @@ def install(
         install_root,
         source_commit,
     )
-    renderer = _load_renderer(source_root)
+    renderer = _load_renderer(release_root / "scripts/render_codex_hooks.py")
     native_bytes = native_fragment.read_bytes()
     previous_bytes: bytes | None = None
     previous_mode: int | None = None
@@ -386,6 +437,24 @@ def install(
             raise InstallError("Codex hooks target must be a regular file")
         previous_bytes = target.read_bytes()
         previous_mode = stat.S_IMODE(target.stat().st_mode)
+
+    active_path = install_root / "active.json"
+    if active_path.is_symlink():
+        raise InstallError("active install receipt must not be a symlink")
+    if active_path.exists() and not active_path.is_file():
+        raise InstallError("active install receipt must be a regular file")
+    previous_active_bytes = active_path.read_bytes() if active_path.is_file() else None
+    previous_active_mode = (
+        stat.S_IMODE(active_path.stat().st_mode) if active_path.is_file() else None
+    )
+    previous_composition_bytes = (
+        composition_receipt.read_bytes() if composition_receipt.is_file() else None
+    )
+    previous_composition_mode = (
+        stat.S_IMODE(composition_receipt.stat().st_mode)
+        if composition_receipt.is_file()
+        else None
+    )
 
     context_fragment = release_root / "config/abyss-stack-agent-tool-routing-context.fragment.json"
     agent_fragment = release_root / "config/abyss-stack-agent-tool-routing.fragment.json"
@@ -414,13 +483,6 @@ def install(
     except Exception:
         raise
 
-    active_path = install_root / "active.json"
-    if active_path.is_symlink():
-        raise InstallError("active install receipt must not be a symlink")
-    if active_path.exists() and not active_path.is_file():
-        raise InstallError("active install receipt must be a regular file")
-    previous_active_bytes = active_path.read_bytes() if active_path.is_file() else None
-    previous_active_mode = stat.S_IMODE(active_path.stat().st_mode) if active_path.is_file() else None
     receipt_dir = _ensure_directory(install_root / "receipts", "install receipt directory")
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     receipt_path = receipt_dir / f"{timestamp}-{manifest['release_id']}.json"
@@ -478,10 +540,11 @@ def install(
     except BaseException:
         _restore_target(renderer, target, previous_bytes, previous_mode)
         _restore_file(active_path, previous_active_bytes, previous_active_mode)
-        try:
-            composition_receipt.unlink()
-        except OSError:
-            pass
+        _restore_file(
+            composition_receipt,
+            previous_composition_bytes,
+            previous_composition_mode,
+        )
         raise
     return {
         "active": active,

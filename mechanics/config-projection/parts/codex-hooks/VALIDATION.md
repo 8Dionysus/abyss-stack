@@ -21,7 +21,8 @@ Focused tests cover:
 - read-only exact-output comparison.
 - exact Codex `PreToolUse` agent-tool recognition and SDK routing;
 - session-owned base relay copies only safe attempt coordinates and writes
-  one event-keyed context atomically;
+  one event-keyed context atomically; unknown namespace members leave no
+  unclaimable context;
 - canonical `spawn_agent`, flattened v1/v2 identities, observed compatibility
   aliases, and unknown-name fail-closed matcher coverage;
 - unresolved/independent denial with role-first direction;
@@ -35,8 +36,9 @@ Focused tests cover:
   native hook handlers, with explicit context-directory and SDK-source
   bindings.
 - clean-source content-addressed release materialization, manifest closure,
-  immutable source identity, and installer rollback when its active receipt
-  cannot be written.
+  immutable committed-blob source identity, stale-release rejection, active
+  state preflight, prior composition-receipt restoration, and installer
+  rollback when its active receipt cannot be written.
 
 These checks establish composition mechanics only. They do not establish Codex
 trust, live hook invocation, owner-hook health, skill selection, memory use,

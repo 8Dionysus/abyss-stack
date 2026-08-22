@@ -117,6 +117,109 @@ def test_install_materializes_verified_release_and_stable_commands(tmp_path: Pat
     assert Path(result["install_receipt"]).is_file()
 
 
+def test_install_reads_allowlisted_files_from_committed_blobs(tmp_path: Path) -> None:
+    source_root = _git_source(tmp_path)
+    relative = Path("mechanics/config-projection/parts/codex-hooks/scripts/codex_pretool_agent_routing.py")
+    source_path = source_root / relative
+    committed_bytes = source_path.read_bytes()
+    source_path.write_bytes(b"tampered working-tree bytes\n")
+    subprocess.run(
+        ["git", "-C", str(source_root), "update-index", "--assume-unchanged", str(relative)],
+        check=True,
+    )
+    assert subprocess.run(
+        ["git", "-C", str(source_root), "status", "--porcelain=v1"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout == ""
+
+    sdk_root = tmp_path / "sdk"
+    (sdk_root / "src/aoa_sdk").mkdir(parents=True)
+    native = tmp_path / "native.json"
+    _native_fragment(native)
+    target = tmp_path / "codex" / "hooks.json"
+    target.parent.mkdir()
+    target.write_text('{"old":true}\n', encoding="utf-8")
+    install_root = tmp_path / "runtime"
+    result = INSTALLER.install(
+        source_root=source_root,
+        install_root=install_root,
+        native_fragment=native,
+        target=target,
+        context_directory=install_root / "contexts",
+        sdk_source_root=sdk_root,
+        composition_receipt=install_root / "composition.json",
+        backup_directory=install_root / "backups",
+    )
+
+    release_file = Path(result["release_root"]) / relative.relative_to(
+        "mechanics/config-projection/parts/codex-hooks"
+    )
+    assert release_file.read_bytes() == committed_bytes
+
+
+def test_install_rejects_invalid_active_state_before_composition(tmp_path: Path) -> None:
+    source_root = _git_source(tmp_path)
+    sdk_root = tmp_path / "sdk"
+    (sdk_root / "src/aoa_sdk").mkdir(parents=True)
+    native = tmp_path / "native.json"
+    _native_fragment(native)
+    target = tmp_path / "codex" / "hooks.json"
+    target.parent.mkdir()
+    old = b'{"old":true}\n'
+    target.write_bytes(old)
+    install_root = tmp_path / "runtime"
+    install_root.mkdir()
+    active_target = tmp_path / "active-target.json"
+    active_target.write_text('{"old_active":true}\n', encoding="utf-8")
+    (install_root / "active.json").symlink_to(active_target)
+    composition = install_root / "composition.json"
+
+    with pytest.raises(INSTALLER.InstallError, match="active install receipt must not be a symlink"):
+        INSTALLER.install(
+            source_root=source_root,
+            install_root=install_root,
+            native_fragment=native,
+            target=target,
+            context_directory=install_root / "contexts",
+            sdk_source_root=sdk_root,
+            composition_receipt=composition,
+            backup_directory=install_root / "backups",
+        )
+    assert target.read_bytes() == old
+    assert not composition.exists()
+
+
+def test_install_rejects_mismatched_existing_release_manifest(tmp_path: Path) -> None:
+    result, paths, _source_root = _install(tmp_path)
+    release_root = Path(result["release_root"])
+    manifest_path = release_root / "release-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["source"]["commit"] = "f" * 40
+    identity = {
+        "schema_version": manifest["schema_version"],
+        "source": manifest["source"],
+        "files": manifest["files"],
+    }
+    digest = INSTALLER.sha256_bytes(INSTALLER.canonical_bytes(identity))
+    manifest["release_digest"] = digest
+    manifest["release_id"] = digest.replace("sha256:", "sha256-")
+    manifest_path.write_bytes(INSTALLER.rendered_bytes(manifest))
+
+    with pytest.raises(INSTALLER.InstallError, match="does not match the current committed manifest"):
+        INSTALLER.install(
+            source_root=_source_root,
+            install_root=paths["install_root"],
+            native_fragment=paths["native"],
+            target=paths["target"],
+            context_directory=paths["install_root"] / "contexts-2",
+            sdk_source_root=tmp_path / "sdk",
+            composition_receipt=paths["install_root"] / "composition-2.json",
+            backup_directory=paths["install_root"] / "backups-2",
+        )
+
+
 def test_install_rejects_dirty_source_before_touching_target(tmp_path: Path) -> None:
     result, paths, source_root = _install(tmp_path)
     previous = paths["target"].read_bytes()
@@ -190,6 +293,10 @@ def test_install_restores_target_when_active_receipt_write_fails(tmp_path: Path,
     target.write_bytes(old)
     target.chmod(0o640)
     install_root = tmp_path / "runtime"
+    install_root.mkdir()
+    composition = install_root / "composition.json"
+    old_composition = b'{"old_composition":true}\n'
+    composition.write_bytes(old_composition)
     original_atomic_write = INSTALLER._atomic_write
 
     def fail_active(path: Path, payload: bytes, *, mode: int) -> None:
@@ -206,9 +313,9 @@ def test_install_restores_target_when_active_receipt_write_fails(tmp_path: Path,
             target=target,
             context_directory=install_root / "contexts",
             sdk_source_root=sdk_root,
-            composition_receipt=install_root / "composition.json",
+            composition_receipt=composition,
             backup_directory=install_root / "backups",
         )
     assert target.read_bytes() == old
     assert stat.S_IMODE(target.stat().st_mode) == 0o640
-    assert not (install_root / "composition.json").exists()
+    assert composition.read_bytes() == old_composition

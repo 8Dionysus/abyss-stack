@@ -46,10 +46,13 @@ The stack-owned agent-routing fragment is a Codex-wire projection, not a
 responsibility owner. Its `PreToolUse` matcher covers the canonical
 `spawn_agent`, known v2 unnamespaced names, and any identity in the
 `multi_agent_` or `collaboration` namespaces so future namespace members reach
-the adapter's unknown-agent fail-closed branch. It invokes the adapter with
-explicit safe bindings for the context directory and selected `aoa-sdk` source
-root. The workspace remains the current hook event's `cwd`; the adapter does
-not select a workspace. The adapter must receive an exact typed context
+the adapter's unknown-agent fail-closed branch. The relay fragment uses the
+same broad matcher but materializes a context only for the explicit recognized
+name set; an unknown namespace member reaches the adapter without leaving a
+stale context file. It invokes the adapter with explicit safe bindings for the
+context directory and selected `aoa-sdk` source root. The workspace remains the
+current hook event's `cwd`; the adapter does not select a workspace. The
+adapter must receive an exact typed context
 directory through `AOA_AGENT_TOOL_ROUTING_CONTEXT_DIR`; it does not invent Goal
 or current-holder identity from a missing payload and does not copy opaque Codex
 `tool_input` into the hook response. The producer stores each context as
