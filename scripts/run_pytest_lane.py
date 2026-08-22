@@ -753,41 +753,152 @@ def _open_entry_identity(
         raise
 
 
-def _remove_directory_contents(directory_fd: int) -> None:
-    for name in os.listdir(directory_fd):
-        observed = _stat_entry(directory_fd, name)
-        expected = _ObjectIdentity.from_stat(observed)
-        if stat.S_ISDIR(observed.st_mode):
-            child_fd = _open_checked_directory(directory_fd, name, expected)
-            try:
-                _remove_directory_contents(child_fd)
-                child_stat = os.fstat(child_fd)
-                _require_identity(
-                    _ObjectIdentity.from_stat(child_stat),
-                    expected,
-                    subject=f"directory {name!r}",
-                )
-                _require_entry(directory_fd, name, expected)
-                os.rmdir(name, dir_fd=directory_fd)
-                _assert_entry_absent(directory_fd, name)
-            finally:
-                try:
-                    os.close(child_fd)
-                except OSError:
-                    pass
-            continue
+@dataclass
+class _DirectoryWalkFrame:
+    descriptor: int | None
+    identity: _ObjectIdentity
+    name: str | None
+    entries: list[str]
+    index: int = 0
 
-        entry_fd = _open_entry_identity(directory_fd, name, expected)
-        try:
-            _require_entry(directory_fd, name, expected)
-            os.unlink(name, dir_fd=directory_fd)
-            _assert_entry_absent(directory_fd, name)
-        finally:
-            if entry_fd is not None:
+
+def _assert_walk_directory(
+    frame: _DirectoryWalkFrame,
+    *,
+    subject: str,
+) -> os.stat_result:
+    if frame.descriptor is None:
+        raise OSError(f"pytest cleanup lost descriptor for {subject}")
+    observed = os.fstat(frame.descriptor)
+    _require_identity(
+        _ObjectIdentity.from_stat(observed),
+        frame.identity,
+        subject=subject,
+    )
+    if not stat.S_ISDIR(observed.st_mode):
+        raise NotADirectoryError(subject)
+    return observed
+
+
+def _remove_directory_contents(directory_fd: int) -> None:
+    root_stat = os.fstat(directory_fd)
+    root_identity = _ObjectIdentity.from_stat(root_stat)
+    if not stat.S_ISDIR(root_stat.st_mode):
+        raise NotADirectoryError("pytest cleanup root")
+    frames = [
+        _DirectoryWalkFrame(
+            descriptor=directory_fd,
+            identity=root_identity,
+            name=None,
+            entries=os.listdir(directory_fd),
+        )
+    ]
+    try:
+        while frames:
+            frame = frames[-1]
+            if frame.index == len(frame.entries):
+                finished = frames.pop()
+                if finished.name is None:
+                    continue
+                if finished.descriptor is None:
+                    raise OSError(
+                        f"pytest cleanup lost directory fd for {finished.name!r}"
+                    )
+                parent_frame = frames[-1]
+                recovered_parent_fd: int | None = None
                 try:
+                    _assert_walk_directory(
+                        finished,
+                        subject=f"directory {finished.name!r}",
+                    )
+                    recovered_parent_fd = os.open(
+                        "..",
+                        _directory_open_flags(),
+                        dir_fd=finished.descriptor,
+                    )
+                    parent_stat = os.fstat(recovered_parent_fd)
+                    _require_identity(
+                        _ObjectIdentity.from_stat(parent_stat),
+                        parent_frame.identity,
+                        subject=f"parent of directory {finished.name!r}",
+                    )
+                    if parent_frame.descriptor is None:
+                        parent_frame.descriptor = recovered_parent_fd
+                        recovered_parent_fd = None
+                    parent_fd = parent_frame.descriptor
+                    if parent_fd is None:
+                        raise OSError(
+                            f"pytest cleanup lost parent fd for {finished.name!r}"
+                        )
+                    _assert_walk_directory(
+                        parent_frame,
+                        subject=f"parent of directory {finished.name!r}",
+                    )
+                    _require_entry(
+                        parent_fd,
+                        finished.name,
+                        finished.identity,
+                    )
+                    os.rmdir(finished.name, dir_fd=parent_fd)
+                    _assert_entry_absent(parent_fd, finished.name)
+                finally:
+                    try:
+                        if recovered_parent_fd is not None:
+                            os.close(recovered_parent_fd)
+                    finally:
+                        os.close(finished.descriptor)
+                continue
+
+            if frame.descriptor is None:
+                raise OSError("pytest cleanup lost current directory fd")
+            _assert_walk_directory(
+                frame,
+                subject=f"directory {frame.name!r}",
+            )
+            name = frame.entries[frame.index]
+            frame.index += 1
+            observed = _stat_entry(frame.descriptor, name)
+            expected = _ObjectIdentity.from_stat(observed)
+            if stat.S_ISDIR(observed.st_mode):
+                child_fd = _open_checked_directory(frame.descriptor, name, expected)
+                try:
+                    child_entries = os.listdir(child_fd)
+                    if frame.name is not None:
+                        os.close(frame.descriptor)
+                        frame.descriptor = None
+                except BaseException:
+                    try:
+                        os.close(child_fd)
+                    except OSError:
+                        pass
+                    raise
+                frames.append(
+                    _DirectoryWalkFrame(
+                        descriptor=child_fd,
+                        identity=expected,
+                        name=name,
+                        entries=child_entries,
+                    )
+                )
+                continue
+
+            entry_fd = _open_entry_identity(frame.descriptor, name, expected)
+            try:
+                _require_entry(frame.descriptor, name, expected)
+                os.unlink(name, dir_fd=frame.descriptor)
+                _assert_entry_absent(frame.descriptor, name)
+            finally:
+                if entry_fd is not None:
                     os.close(entry_fd)
-                except OSError:
-                    pass
+    except BaseException:
+        for frame in frames:
+            if frame.name is None or frame.descriptor is None:
+                continue
+            try:
+                os.close(frame.descriptor)
+            except OSError:
+                pass
+        raise
 
 
 def _remove_owned_namespace(handle: _PytestTempNamespaceHandle) -> None:

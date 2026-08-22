@@ -836,6 +836,19 @@ def test_pytest_temp_cleanup_does_not_follow_owned_symlinks(tmp_path: Path) -> N
     assert marker.read_text(encoding="utf-8") == "no-loss\n"
 
 
+def test_pytest_temp_cleanup_handles_deeply_nested_directories(tmp_path: Path) -> None:
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    current = handle.path
+    for _ in range(1100):
+        current = current / "d"
+        current.mkdir()
+
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
+
+    assert result.ok is True
+    assert not handle.path.exists()
+
+
 def test_pytest_lane_returns_visible_failure_when_cleanup_is_unrecoverable(
     monkeypatch,
     tmp_path: Path,

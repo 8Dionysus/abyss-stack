@@ -61,11 +61,14 @@ path and instead cleans the retained outer owner handle. Every generated
 pytest command receives that typed child path as `--basetemp`, and user-supplied
 reusable `--basetemp` arguments are rejected.
 
-Cleanup is an explicit bounded retry lifecycle using fd-relative `listdir`,
-`O_PATH|O_NOFOLLOW` identity handles, no-follow identity checks, `unlink`, and
-`rmdir`. Symlink entries are removed as names and never traversed; a platform
-without the identity-handle primitive fails visibly rather than weakening the
-stat/delete boundary. Directory permission repair adds only owner
+Cleanup is an explicit bounded retry lifecycle using an iterative post-order
+stack, fd-relative `listdir`, `O_PATH|O_NOFOLLOW` identity handles, no-follow
+identity checks, `unlink`, and `rmdir`. Child completion reopens its anchored
+`..` parent, verifies that parent identity, and removes the exact original
+child name without retaining one descriptor per ancestor. Symlink entries are
+removed as names and never traversed; a platform without the identity-handle
+primitive fails visibly rather than weakening the stat/delete boundary.
+Directory permission repair adds only owner
 read/write/search bits to a checked directory: it uses `fchmod` when an
 ordinary no-follow directory fd is available, a platform-provided
 `dir_fd`/`follow_symlinks=False` chmod when supported, or Linux `O_PATH` plus
