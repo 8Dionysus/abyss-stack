@@ -167,35 +167,46 @@ def _load_sdk(environ: Mapping[str, str]) -> tuple[Any, Any, Any, Any, Any]:
     )
 
 
-def _load_context(environ: Mapping[str, str]) -> tuple[Path, dict[str, Any]]:
+def _claim_context(environ: Mapping[str, str]) -> dict[str, Any]:
     path_value = environ.get("AOA_AGENT_TOOL_ROUTING_CONTEXT_FILE")
     if not path_value:
         raise AdapterError("typed Goal/current-holder route context is unavailable")
     path = Path(path_value)
-    context = _read_json_file(
-        path_value,
-        label="typed route context",
-        maximum=MAX_CONTEXT_BYTES,
-    )
-    if set(context) != CONTEXT_FIELDS:
-        raise AdapterError("typed route context fields are not exact")
-    if context.get("schema_version") != CONTEXT_SCHEMA_VERSION:
-        raise AdapterError("typed route context schema is unsupported")
-    return path, context
+    if not path.is_absolute() or path.is_symlink() or not path.is_file():
+        raise AdapterError("typed route context is not a regular absolute file")
 
-
-def _consume_context(path: Path) -> None:
-    """Atomically make a valid context single-use before routing it."""
-
-    consumed_path = path.with_name(f"{path.name}.consumed.{uuid.uuid4().hex}")
+    # Claim the directory entry before reading it.  A producer may atomically
+    # replace the configured path while this hook is starting; rename then
+    # reads exactly the inode that was claimed, leaving a fresh replacement at
+    # the configured path for a later attempt.
+    claimed_path = path.with_name(f"{path.name}.consumed.{uuid.uuid4().hex}")
     try:
-        path.rename(consumed_path)
+        path.rename(claimed_path)
     except OSError as exc:
         raise AdapterError("typed route context could not be consumed safely") from exc
     try:
-        consumed_path.unlink()
+        context = _read_json_file(
+            str(claimed_path),
+            label="typed route context",
+            maximum=MAX_CONTEXT_BYTES,
+        )
+        if set(context) != CONTEXT_FIELDS:
+            raise AdapterError("typed route context fields are not exact")
+        if context.get("schema_version") != CONTEXT_SCHEMA_VERSION:
+            raise AdapterError("typed route context schema is unsupported")
+    except Exception:
+        try:
+            claimed_path.unlink()
+        except OSError as cleanup_exc:
+            raise AdapterError(
+                "claimed typed route context could not be removed safely"
+            ) from cleanup_exc
+        raise
+    try:
+        claimed_path.unlink()
     except OSError as exc:
         raise AdapterError("claimed typed route context could not be removed safely") from exc
+    return context
 
 
 def _build_intent(
@@ -272,8 +283,7 @@ def route_agent_tool_event(
         )
 
     try:
-        context_path, context = _load_context(environment)
-        _consume_context(context_path)
+        context = _claim_context(environment)
         (
             control_plane_api,
             provenance_factory,

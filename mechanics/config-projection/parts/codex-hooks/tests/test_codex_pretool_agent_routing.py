@@ -127,6 +127,7 @@ def test_typed_not_independent_allows_only_sdk_compatibility_posture(
         event(),
         environ=environment(tmp_path, context_path),
     ) == {}
+
     assert not list(tmp_path.glob("routing-context.json.consumed.*"))
 
     reused = ADAPTER.handle_event(
@@ -143,6 +144,40 @@ def test_typed_not_independent_allows_only_sdk_compatibility_posture(
         event(),
         environ=environment(tmp_path, context_path),
     ) == {}
+
+
+def test_context_is_claimed_before_reading_when_producer_refreshes_path(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    context_path = write_context(tmp_path, context())
+    original_read_json_file = ADAPTER._read_json_file
+
+    def read_claimed_path(path_value: str, *, label: str, maximum: int):
+        claimed_path = Path(path_value)
+        assert ".consumed." in claimed_path.name
+        context_path.write_text(
+            json.dumps(context("independent")),
+            encoding="utf-8",
+        )
+        return original_read_json_file(
+            path_value,
+            label=label,
+            maximum=maximum,
+        )
+
+    monkeypatch.setattr(ADAPTER, "_read_json_file", read_claimed_path)
+    output = ADAPTER.handle_event(
+        event(),
+        environ=environment(tmp_path, context_path),
+    )
+
+    reason = output["hookSpecificOutput"]["permissionDecisionReason"]
+    assert "status=awaiting_classification" in reason
+    assert json.loads(context_path.read_text(encoding="utf-8"))["boundary_state"] == (
+        "independent"
+    )
+    assert not list(tmp_path.glob("routing-context.json.consumed.*"))
 
 
 def test_selected_sdk_root_must_contain_the_imported_package(
