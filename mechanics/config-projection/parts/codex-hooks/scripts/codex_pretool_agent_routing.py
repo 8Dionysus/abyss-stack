@@ -230,8 +230,19 @@ def _claim_context(
         f"{CONTEXT_FILE_PREFIX}{_attempt_identity_digest(event)}.json"
     )
     deadline = time.monotonic() + CONTEXT_WAIT_SECONDS
-    while not path.is_file():
-        if path.is_symlink() or time.monotonic() >= deadline:
+    while True:
+        if path.is_symlink():
+            raise AdapterError("typed route context for this tool call is unavailable")
+        if path.is_file():
+            # Check again after observing the file.  The relay and adapter
+            # groups can be descheduled independently, so a file may appear
+            # while this process is asleep after the bounded wait expired.
+            if time.monotonic() >= deadline:
+                raise AdapterError(
+                    "typed route context for this tool call is unavailable"
+                )
+            break
+        if time.monotonic() >= deadline:
             raise AdapterError("typed route context for this tool call is unavailable")
         time.sleep(CONTEXT_POLL_SECONDS)
 

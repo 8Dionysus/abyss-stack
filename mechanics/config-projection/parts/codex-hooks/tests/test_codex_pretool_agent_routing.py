@@ -154,6 +154,30 @@ def test_context_claim_waits_for_concurrent_relay(tmp_path: Path) -> None:
     assert "status=awaiting_classification" in reason
 
 
+def test_context_observed_after_deadline_is_rejected(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    clock = iter((100.0, 100.1, 102.1))
+
+    monkeypatch.setattr(ADAPTER.time, "monotonic", lambda: next(clock))
+
+    def delayed_producer(_seconds: float) -> None:
+        write_context(tmp_path, context())
+
+    monkeypatch.setattr(ADAPTER.time, "sleep", delayed_producer)
+
+    output = ADAPTER.handle_event(
+        event(),
+        environ=environment(tmp_path),
+    )
+
+    reason = output["hookSpecificOutput"]["permissionDecisionReason"]
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "for this tool call is unavailable" in reason
+    assert context_file_path(tmp_path).is_file()
+
+
 def test_independent_result_blocks_with_role_first_direction(tmp_path: Path) -> None:
     context_path = write_context(tmp_path, context("independent"))
 
