@@ -62,12 +62,15 @@ or close any holder. A receipt proves only the runtime lifecycle transition;
  not exactly bound, stop and route the state to the runtime owner. A reserved
  pause keeps the active precondition before mutation and records a dispatch
  marker only after this attempt has issued the exact WebSocket
- `thread/goal/set` request. If a retry observes the exact Goal already paused,
- it may publish an `ambiguous_post_mutation` recovery receipt from a read-only
- `thread/goal/get` without issuing a second lifecycle set only when that marker
- matches the attempt and request. A reserved pause without the precondition or
- dispatch evidence fails closed, including when another controller may have
- paused the Goal after this attempt stopped before issuing its request.
+  `thread/goal/set` request. If a retry observes the exact Goal already paused,
+  it may publish an `ambiguous_post_mutation` recovery receipt from a read-only
+  `thread/goal/get` without issuing a second lifecycle set only when that marker
+  matches the attempt and request and the resolved app-server endpoint matches
+  the endpoint recorded before mutation. If the Goal is still `active` after a
+  dispatch marker exists, the retry fails closed rather than replacing that
+  attempt. A reserved pause without the precondition or dispatch evidence fails
+  closed, including when another controller may have paused the Goal after this
+  attempt stopped before issuing its request.
 
 For a parent continuation, inspect only its exact state root and re-entry ID:
 

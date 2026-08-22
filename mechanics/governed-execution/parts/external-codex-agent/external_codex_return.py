@@ -912,6 +912,22 @@ def _validated_pause_mutation(
     return mutation
 
 
+def _validated_pause_transport(
+    reservation: dict[str, Any], *, endpoint: Path
+) -> dict[str, Any]:
+    transport = reservation.get("transport")
+    expected_endpoint = str(endpoint)
+    if (
+        not isinstance(transport, dict)
+        or transport.get("kind") != "codex_app_server_websocket_unix"
+        or transport.get("endpoint") != expected_endpoint
+    ):
+        raise ExternalCodexReturnError(
+            "reserved Goal pause transport endpoint does not match the resolved app-server"
+        )
+    return transport
+
+
 def _pause_receipt(
     *,
     owner: dict[str, Any],
@@ -1019,6 +1035,7 @@ def pause_goal(
                 raise ExternalCodexReturnError(
                     "Codex app-server Goal is not pausable from active state; it is already paused without a resumable pause reservation"
                 )
+            _validated_pause_transport(reservation, endpoint=endpoint)
             precondition = _validated_pause_precondition(reservation)
             mutation_dispatched = _validated_pause_mutation(
                 reservation.get("mutation_dispatched"),
@@ -1049,6 +1066,16 @@ def pause_goal(
             raise ExternalCodexReturnError(
                 "Codex app-server Goal is not pausable from active state: "
                 f"{goal_before_status!r}"
+            )
+        if reservation is not None and reservation.get("mutation_dispatched") is not None:
+            _validated_pause_transport(reservation, endpoint=endpoint)
+            _validated_pause_mutation(
+                reservation.get("mutation_dispatched"),
+                owner=owner,
+                attempt_id=reservation.get("attempt_id"),
+            )
+            raise ExternalCodexReturnError(
+                "Goal pause mutation was already dispatched while the Goal remains active; refusing to issue a second lifecycle set"
             )
         precondition = _pause_precondition(goal_get_response)
         if reservation_path is not None:

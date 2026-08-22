@@ -446,8 +446,33 @@ def test_run_pause_reconciles_reserved_mutation_after_receipt_publication_failur
     assert reserved["mutation_dispatched"]["method"] == "thread/goal/set"
     assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
 
-    fake.goal_status = "paused"
     monkeypatch.setattr(MODULE, "_replace_json", replace_impl)
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="already dispatched.*second lifecycle set",
+    ):
+        MODULE.run_pause(args)
+    assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
+
+    fake.goal_status = "paused"
+    replacement_endpoint = tmp_path / "replacement-app-server.sock"
+    monkeypatch.setattr(
+        MODULE,
+        "discover_app_server_socket",
+        lambda _owner: (replacement_endpoint, "replacement-endpoint"),
+    )
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="transport endpoint",
+    ):
+        MODULE.run_pause(args)
+    assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
+
+    monkeypatch.setattr(
+        MODULE,
+        "discover_app_server_socket",
+        lambda _owner: (endpoint, "explicit-endpoint"),
+    )
     second = MODULE.run_pause(args)
     assert second["recovery"]["mode"] == "ambiguous_post_mutation"
     assert second["lifecycle"]["response_available"] is False
