@@ -537,6 +537,17 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     ):
         MODULE.run_pause(args)
 
+    corrupted_digest = json.loads(json.dumps(first))
+    corrupted_digest["lifecycle"]["mutation_dispatched"]["request_sha256"] = (
+        "sha256:" + "0" * 64
+    )
+    pause_path.write_bytes(MODULE._canonical_bytes(corrupted_digest) + b"\n")
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="dispatch evidence is invalid",
+    ):
+        MODULE.run_pause(args)
+
     pause_path.write_bytes(MODULE._canonical_bytes(first) + b"\n")
     monkeypatch.setattr(
         MODULE,

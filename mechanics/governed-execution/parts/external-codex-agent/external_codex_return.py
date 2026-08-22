@@ -929,8 +929,24 @@ def _validated_pause_marker(
             f"reserved Goal pause lacks durable {label} evidence"
         )
     expected_params = {"threadId": owner["thread_id"], "status": "paused"}
+    expected_keys = {
+        "attempt_id",
+        "method",
+        "request_id",
+        "params",
+        "params_sha256",
+        "request_sha256",
+        timestamp_key,
+    }
+    expected_payload = {
+        "jsonrpc": "2.0",
+        "id": mutation.get("request_id"),
+        "method": "thread/goal/set",
+        "params": expected_params,
+    }
     if (
-        not isinstance(attempt_id, str)
+        set(mutation) != expected_keys
+        or not isinstance(attempt_id, str)
         or not attempt_id
         or mutation.get("attempt_id") != attempt_id
         or mutation.get("method") != "thread/goal/set"
@@ -942,12 +958,8 @@ def _validated_pause_marker(
         or mutation.get("params_sha256")
         != _sha256_bytes(_canonical_bytes(expected_params))
         or not isinstance(mutation.get("request_sha256"), str)
-        or len(mutation["request_sha256"]) != 71
-        or not mutation["request_sha256"].startswith("sha256:")
-        or any(
-            character not in "0123456789abcdef"
-            for character in mutation["request_sha256"][7:]
-        )
+        or mutation.get("request_sha256")
+        != _sha256_bytes(_canonical_bytes(expected_payload))
     ):
         raise ExternalCodexReturnError(
             f"reserved Goal pause {label} evidence is invalid"

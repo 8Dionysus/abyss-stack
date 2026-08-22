@@ -173,8 +173,37 @@
             }
           },
           "then": {
-            "required": ["subject_ref", "from_state", "to_state"]
+            "required": ["subject_ref", "from_state", "to_state"],
+            "properties": {"signal": {"const": "transition"}}
           }
+        },
+        {
+          "if": {"properties": {"kind": {"const": "session"}}},
+          "then": {"properties": {"signal": {"const": "session"}}}
+        },
+        {
+          "if": {"properties": {"kind": {"const": "turn"}}},
+          "then": {"properties": {"signal": {"const": "turn"}}}
+        },
+        {
+          "if": {"properties": {"kind": {"const": "tool"}}},
+          "then": {"properties": {"signal": {"const": "tool"}}}
+        },
+        {
+          "if": {"properties": {"kind": {"const": "artifact"}}},
+          "then": {"properties": {"signal": {"const": "artifact"}}}
+        },
+        {
+          "if": {"properties": {"kind": {"const": "resource"}}},
+          "then": {"properties": {"signal": {"const": "resource"}}}
+        },
+        {
+          "if": {"properties": {"kind": {"const": "process"}}},
+          "then": {"properties": {"signal": {"const": "process"}}}
+        },
+        {
+          "if": {"properties": {"kind": {"const": "transport"}}},
+          "then": {"properties": {"signal": {"const": "transport"}}}
         }
       ]
     }

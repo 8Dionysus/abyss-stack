@@ -281,6 +281,23 @@ def test_hook_screen_is_not_an_admitted_observation_kind() -> None:
         MODULE.observe_once(value)
 
 
+def test_lifecycle_transition_signal_must_match_its_kind() -> None:
+    value = observation(
+        [
+            _evidence(
+                "contradictory-transition",
+                "lifecycle_transition",
+                signal="process",
+                from_state="returning",
+                to_state="terminal",
+            )
+        ]
+    )
+
+    with pytest.raises(MODULE.ResponsibilityMovementError, match="schema mismatch"):
+        MODULE.observe_once(value)
+
+
 def test_cli_writes_typed_result_without_polling(tmp_path: Path) -> None:
     observation_path = tmp_path / "observation.json"
     result_path = tmp_path / "result.json"
