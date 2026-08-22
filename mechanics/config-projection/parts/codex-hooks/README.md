@@ -60,7 +60,9 @@ identity against that event, and asks
 It reflects that posture as a native allow or deny. `aoa-agents` remains the
 owner of responsibility classification and role-first meaning; this adapter
 does not choose a role, model, runtime, workspace, or actor and never copies
-opaque `tool_input` into its output.
+opaque `tool_input` into its output. Because Codex may dispatch matching hook
+groups concurrently, the adapter waits for the relay's event-keyed file for a
+bounded interval before failing closed.
 
 The producer writes one exact file per attempt under the directory, named
 `attempt-<sha256(canonical safe attempt identity)>.json`. The adapter claims

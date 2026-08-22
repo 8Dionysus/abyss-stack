@@ -4,6 +4,8 @@ import importlib.util
 import json
 import re
 from pathlib import Path
+import threading
+import time
 
 from jsonschema import Draft202012Validator
 
@@ -130,6 +132,26 @@ def test_exact_codex_agent_tool_routes_to_sdk_before_execution(tmp_path: Path) -
     assert "status=awaiting_classification" in hook_output["permissionDecisionReason"]
     assert "next_owner=aoa-agents-skills" in hook_output["permissionDecisionReason"]
     assert "opaque tool arguments" not in json.dumps(output)
+
+
+def test_context_claim_waits_for_concurrent_relay(tmp_path: Path) -> None:
+    def produce_context() -> None:
+        time.sleep(0.05)
+        write_context(tmp_path, context())
+
+    producer = threading.Thread(target=produce_context)
+    producer.start()
+    try:
+        output = ADAPTER.handle_event(
+            event(),
+            environ=environment(tmp_path),
+        )
+    finally:
+        producer.join()
+
+    reason = output["hookSpecificOutput"]["permissionDecisionReason"]
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "status=awaiting_classification" in reason
 
 
 def test_independent_result_blocks_with_role_first_direction(tmp_path: Path) -> None:

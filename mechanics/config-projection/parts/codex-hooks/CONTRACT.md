@@ -62,10 +62,11 @@ or current-holder identity from a missing payload and does not copy opaque Codex
 `tool_input` into the hook response. The producer stores each context as
 `attempt-<sha256(canonical safe attempt identity)>.json`, where the identity is
 the current `session_id`, `turn_id`, `tool_use_id`, and `tool_name`. The adapter
-selects only that event-keyed file and rejects a context whose identity does not
-equal the current event. It reads at most the configured context limit plus one
-byte before rejecting an oversized file. The selected directory entry is
-atomically claimed before the adapter reads it, and the claimed path is
+waits briefly for that event-keyed file when matching hook groups are dispatched
+concurrently, then selects only that file and rejects a context whose identity
+does not equal the current event. It reads at most the configured context limit
+plus one byte before rejecting an oversized file. The selected directory entry
+is atomically claimed before the adapter reads it, and the claimed path is
 immediately unlinked after validation and before the SDK call. A stale or
 cross-call classification therefore cannot be reused for a later agent-tool
 attempt, and a different concurrent attempt cannot consume the selected file.
