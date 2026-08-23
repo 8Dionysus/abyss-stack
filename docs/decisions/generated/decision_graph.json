@@ -1,17 +1,17 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 132,
-  "edge_count": 2970,
+  "decision_count": 133,
+  "edge_count": 2991,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1085,
-    "DATED": 132,
-    "GUARDED_BY": 408,
-    "HAS_STATUS": 132,
-    "HAS_SURFACE_CLASS": 359,
-    "IN_STACK_LANE": 313,
-    "NEXT_DECISION": 131,
-    "OWNED_BY_SURFACE": 138,
-    "OWNS_DECISION": 132,
+    "CITES_SOURCE_SURFACE": 1089,
+    "DATED": 133,
+    "GUARDED_BY": 414,
+    "HAS_STATUS": 133,
+    "HAS_SURFACE_CLASS": 362,
+    "IN_STACK_LANE": 316,
+    "NEXT_DECISION": 132,
+    "OWNED_BY_SURFACE": 139,
+    "OWNS_DECISION": 133,
     "SUPERSEDED_BY": 2,
     "UNDER_MECHANIC_PARENT": 138
   },
@@ -14198,6 +14198,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0132",
+      "target": "decision:ABYSS-STACK-D-0133",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0132",
       "target": "owner_surface:mechanics/config-projection/parts/codex-hooks/",
       "type": "OWNED_BY_SURFACE"
     },
@@ -14205,6 +14210,101 @@
       "source": "decision:ABYSS-STACK-D-0132",
       "target": "mechanic_parent:config-projection",
       "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "source_surface:docs/validation/COMMAND_AUTHORITY.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "source_surface:docs/validation/VALIDATOR_TOPOLOGY.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "source_surface:scripts/run_pytest_lane.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "source_surface:tests/test_validation_command_authority.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "date:2026-08-21",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "guard_family:fd%20ownership",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "guard_family:no-follow%20cleanup",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "guard_family:pytest%20argument%20authority",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "guard_family:source/runtime%20boundary",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "guard_family:temporary%20namespace%20isolation",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "guard_family:upstream%20pytest%20lifecycle",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "status:proposed",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "surface_class:temporary%20lifecycle",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "surface_class:test%20scheduler",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "surface_class:validation%20workflow",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "stack_lane:release",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "stack_lane:tests",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "owner_surface:scripts/run_pytest_lane.py",
+      "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "repo:abyss-stack",
@@ -14865,21 +14965,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0132",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0133",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1289,
+  "node_count": 1297,
   "node_type_counts": {
     "date": 43,
-    "decision": 132,
-    "guard_family": 219,
+    "decision": 133,
+    "guard_family": 224,
     "mechanic_parent": 11,
-    "owner_surface": 68,
+    "owner_surface": 69,
     "repo": 1,
     "source_surface": 612,
     "stack_lane": 51,
     "status": 4,
-    "surface_class": 148
+    "surface_class": 149
   },
   "nodes": [
     {
@@ -16418,6 +16523,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-21",
+      "id": "decision:ABYSS-STACK-D-0133",
+      "label": "ABYSS-STACK-D-0133",
+      "path": "docs/decisions/ABYSS-STACK-D-0133-owner-owned-pytest-temporary-namespaces.md",
+      "posture": "proposed invocation-owned temp and argument-authority invariants pending independent review",
+      "status": "proposed",
+      "title": "ABYSS-STACK-D-0133 Owner-Owned Pytest Temporary Namespaces",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -16828,6 +16943,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:fd%20ownership",
+      "label": "fd ownership",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:federation%20surface",
       "label": "federation surface",
       "type": "guard_family"
@@ -17048,6 +17168,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:no-follow%20cleanup",
+      "label": "no-follow cleanup",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:observe-only%20usage",
       "label": "observe-only usage",
       "type": "guard_family"
@@ -17210,6 +17335,11 @@
     {
       "id": "guard_family:public-safe%20config",
       "label": "public-safe config",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:pytest%20argument%20authority",
+      "label": "pytest argument authority",
       "type": "guard_family"
     },
     {
@@ -17478,6 +17608,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:temporary%20namespace%20isolation",
+      "label": "temporary namespace isolation",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:terminal%20closeout",
       "label": "terminal closeout",
       "type": "guard_family"
@@ -17505,6 +17640,11 @@
     {
       "id": "guard_family:unmodeled%20surface%20detection",
       "label": "unmodeled surface detection",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:upstream%20pytest%20lifecycle",
+      "label": "upstream pytest lifecycle",
       "type": "guard_family"
     },
     {
@@ -17780,6 +17920,11 @@
     {
       "id": "owner_surface:scripts/build_workspace_decision_graph.py",
       "label": "scripts/build_workspace_decision_graph.py",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:scripts/run_pytest_lane.py",
+      "label": "scripts/run_pytest_lane.py",
       "type": "owner_surface"
     },
     {
@@ -21946,6 +22091,11 @@
     {
       "id": "surface_class:status%20readout",
       "label": "status readout",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:temporary%20lifecycle",
+      "label": "temporary lifecycle",
       "type": "surface_class"
     },
     {

@@ -3,10 +3,16 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter, deque
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+import errno
 import hashlib
 import json
 import os
 from pathlib import Path
+import shlex
+import stat
 import subprocess
 import sys
 import tempfile
@@ -16,6 +22,14 @@ from typing import Any
 import pytest
 
 
+_FD_RELATIVE_SUPPORT_FUNCTIONS = (
+    os.open,
+    os.mkdir,
+    os.stat,
+    os.unlink,
+    os.rmdir,
+)
+_FD_SUPPORT_FUNCTIONS = (os.listdir,)
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEDULER_ENV = "ABYSS_STACK_TEST_SCHEDULER"
 PROCESS_WORKER_LIMIT = 4
@@ -45,6 +59,19 @@ PARTITION_OBSERVED_ENV = "ABYSS_STACK_PYTEST_PARTITION_OBSERVED"
 PARTITION_RESULT_ENV = "ABYSS_STACK_PYTEST_PARTITION_RESULT"
 PARTITION_MANIFEST_SCHEMA = "abyss-stack-pytest-partition-manifest-v1"
 PARTITION_RESULT_SCHEMA = "abyss-stack-pytest-partition-result-v1"
+PYTEST_TEMP_ROOT_ENV = "PYTEST_DEBUG_TEMPROOT"
+PYTEST_TEMP_PARENT_ENV = "TMPDIR"
+PYTEST_TEMP_PREFIX = "abyss-stack-pytest-invocation-"
+PYTEST_TEMP_BASETEMP_NAME = "pytest-basetemp"
+PYTEST_TEMP_CLEANUP_ATTEMPTS = 3
+PYTEST_TEMP_CLEANUP_RETRY_DELAY_SECONDS = 0.05
+PYTEST_TEMP_CLEANUP_DIAGNOSTIC_SCHEMA = (
+    "abyss-stack-pytest-temp-cleanup-diagnostic-v1"
+)
+PYTEST_TEMP_CLEANUP_FAILURE_EXIT_CODE = 3
+PYTEST_TEMP_CREATION_FAILURE_EXIT_CODE = 2
+PYTEST_TEMP_NAME_ATTEMPTS = max(100, int(getattr(tempfile, "TMP_MAX", 100)))
+PYTEST_ADDOPTS_ENV = "PYTEST_ADDOPTS"
 
 
 def nodeid_digest(nodeids: list[str]) -> str:
@@ -178,8 +205,1235 @@ def scheduler_plan(requested: str) -> dict[str, Any]:
     }
 
 
-def build_pytest_command(*, extra_args: list[str]) -> list[str]:
-    return [sys.executable, "-m", "pytest", "-q", *extra_args]
+def _pytest_temp_candidates(parent: Path | None) -> Iterator[Path | None]:
+    if parent is not None:
+        yield parent
+        return
+
+    seen: set[str] = set()
+    for environment_name in (PYTEST_TEMP_ROOT_ENV, PYTEST_TEMP_PARENT_ENV):
+        raw = os.environ.get(environment_name)
+        if not raw:
+            continue
+        candidate = Path(raw).expanduser()
+        key = os.fspath(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        yield candidate
+    yield None
+
+
+@dataclass(frozen=True)
+class _ObjectIdentity:
+    device: int
+    inode: int
+    file_type: int
+
+    @classmethod
+    def from_stat(cls, result: os.stat_result) -> _ObjectIdentity:
+        return cls(result.st_dev, result.st_ino, stat.S_IFMT(result.st_mode))
+
+    def describe(self) -> str:
+        return f"dev={self.device} ino={self.inode} type={self.file_type:o}"
+
+
+@dataclass(frozen=True)
+class _PytestTempNamespaceBinding:
+    display_path: Path
+    name: str
+    parent_fd: int
+    parent_identity: _ObjectIdentity
+    namespace_fd: int
+    namespace_identity: _ObjectIdentity
+
+
+@dataclass(frozen=True)
+class _NamespaceLinkState:
+    link_count: int
+    original_identity_matches: bool
+    alternate_name: str | None = None
+
+    @property
+    def is_unlinked(self) -> bool:
+        return self.link_count == 0
+
+    def describe(self, handle: _PytestTempNamespaceHandle) -> str:
+        if self.is_unlinked:
+            return (
+                "retained pytest namespace inode is unlinked: "
+                f"st_nlink={self.link_count}"
+            )
+        if self.original_identity_matches:
+            return (
+                "retained pytest namespace inode remains linked under its "
+                f"original name {handle.name!r}: st_nlink={self.link_count}"
+            )
+        if self.alternate_name is not None:
+            location = (
+                "the exact dev/inode/type was observed under alternate name "
+                f"{self.alternate_name!r} in the retained parent"
+            )
+        else:
+            location = (
+                "no exact entry was observed in the retained parent; the inode "
+                "may have moved elsewhere or changed during lookup"
+            )
+        return (
+            "retained pytest namespace inode remains linked after its original "
+            f"name {handle.name!r} changed or disappeared: st_nlink={self.link_count}; "
+            f"{location}; no race-safe fd-only directory unlink is available"
+        )
+
+
+@dataclass
+class _PytestTempNamespaceHandle:
+    binding: _PytestTempNamespaceBinding
+    removed: bool = False
+    _closed_fds: set[int] = field(default_factory=set)
+
+    @property
+    def path(self) -> Path:
+        return self.binding.display_path
+
+    @property
+    def basetemp_path(self) -> Path:
+        """Path handed to pytest; pytest may replace this child directory."""
+        return self.path / PYTEST_TEMP_BASETEMP_NAME
+
+    @property
+    def name(self) -> str:
+        return self.binding.name
+
+    @property
+    def parent_fd(self) -> int:
+        return self.binding.parent_fd
+
+    @property
+    def namespace_fd(self) -> int:
+        return self.binding.namespace_fd
+
+    @property
+    def parent_identity(self) -> _ObjectIdentity:
+        return self.binding.parent_identity
+
+    @property
+    def namespace_identity(self) -> _ObjectIdentity:
+        return self.binding.namespace_identity
+
+    def close(self) -> tuple[str, ...]:
+        errors: list[str] = []
+        for descriptor in (self.namespace_fd, self.parent_fd):
+            if descriptor in self._closed_fds:
+                continue
+            try:
+                os.close(descriptor)
+            except OSError as exc:
+                errors.append(f"fd={descriptor}: {type(exc).__name__}: {exc}")
+            finally:
+                self._closed_fds.add(descriptor)
+        return tuple(errors)
+
+
+class PytestTempNamespaceCreationError(OSError):
+    """All bounded temporary-parent candidates were unusable."""
+
+    def __init__(self, failures: list[str]) -> None:
+        self.failures = tuple(failures)
+        super().__init__(
+            "unable to create an owner-owned pytest temporary namespace after "
+            "trying all candidates: "
+            + "; ".join(failures)
+        )
+
+
+class PytestTempNamespaceSupportError(OSError):
+    """The platform cannot provide the required fd-relative no-follow ABI."""
+
+
+def _supports_dir_fd(function: Any) -> bool:
+    return function in getattr(os, "supports_dir_fd", ())
+
+
+def _supports_fd(function: Any) -> bool:
+    return function in getattr(os, "supports_fd", ())
+
+
+def _require_fd_relative_support() -> None:
+    missing = [
+        function.__name__
+        for function in _FD_RELATIVE_SUPPORT_FUNCTIONS
+        if not _supports_dir_fd(function)
+    ]
+    missing_flags = [
+        name
+        for name in ("O_NOFOLLOW", "O_DIRECTORY", "O_PATH")
+        if not hasattr(os, name)
+    ]
+    missing_fd = [
+        function.__name__
+        for function in _FD_SUPPORT_FUNCTIONS
+        if not _supports_fd(function)
+    ]
+    if missing or missing_fd or missing_flags:
+        details = []
+        if missing:
+            details.append("dir_fd=" + ",".join(missing))
+        if missing_fd:
+            details.append("fd=" + ",".join(missing_fd))
+        if missing_flags:
+            details.append("flags=" + ",".join(missing_flags))
+        raise PytestTempNamespaceSupportError(
+            "fd-anchored pytest namespace lifecycle is unsupported: "
+            + "; ".join(details)
+        )
+
+
+def _cloexec_flag() -> int:
+    return getattr(os, "O_CLOEXEC", 0)
+
+
+def _directory_open_flags() -> int:
+    _require_fd_relative_support()
+    return os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | _cloexec_flag()
+
+
+def _identity_matches(
+    observed: _ObjectIdentity,
+    expected: _ObjectIdentity,
+) -> bool:
+    return observed == expected
+
+
+def _require_identity(
+    observed: _ObjectIdentity,
+    expected: _ObjectIdentity,
+    *,
+    subject: str,
+) -> None:
+    if not _identity_matches(observed, expected):
+        raise OSError(
+            f"pytest cleanup {subject} identity changed: "
+            f"expected={expected.describe()} observed={observed.describe()}"
+        )
+
+
+def _stat_entry(parent_fd: int, name: str) -> os.stat_result:
+    return os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+
+
+def _require_entry(
+    parent_fd: int,
+    name: str,
+    expected: _ObjectIdentity,
+) -> os.stat_result:
+    observed = _stat_entry(parent_fd, name)
+    _require_identity(
+        _ObjectIdentity.from_stat(observed),
+        expected,
+        subject=f"entry {name!r}",
+    )
+    if expected.file_type != stat.S_IFMT(observed.st_mode):
+        raise OSError(f"pytest cleanup entry type changed: {name!r}")
+    return observed
+
+
+def _assert_entry_absent(parent_fd: int, name: str) -> None:
+    try:
+        _stat_entry(parent_fd, name)
+    except FileNotFoundError:
+        return
+    raise OSError(f"pytest cleanup entry remained after removal: {name!r}")
+
+
+def _candidate_path(candidate: Path | None) -> Path:
+    raw = tempfile.gettempdir() if candidate is None else candidate
+    return Path(raw).expanduser().absolute()
+
+
+def _open_candidate_parent(candidate: Path | None) -> tuple[int, Path, _ObjectIdentity]:
+    display_path = _candidate_path(candidate)
+    descriptor = os.open(
+        os.fspath(display_path),
+        _directory_open_flags(),
+    )
+    try:
+        observed = os.fstat(descriptor)
+        identity = _ObjectIdentity.from_stat(observed)
+        if not stat.S_ISDIR(observed.st_mode):
+            raise NotADirectoryError(os.fspath(display_path))
+        return descriptor, display_path, identity
+    except BaseException:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+        raise
+
+
+def _new_namespace_name(parent_fd: int) -> str:
+    names = tempfile._get_candidate_names()
+    for _ in range(PYTEST_TEMP_NAME_ATTEMPTS):
+        name = f"{PYTEST_TEMP_PREFIX}{next(names)}"
+        try:
+            os.mkdir(name, 0o700, dir_fd=parent_fd)
+        except FileExistsError:
+            continue
+        return name
+    raise FileExistsError(
+        f"unable to allocate a unique {PYTEST_TEMP_PREFIX!r} name"
+    )
+
+
+def _create_namespace_in_candidate(
+    candidate: Path | None,
+) -> _PytestTempNamespaceHandle:
+    parent_fd, parent_path, parent_identity = _open_candidate_parent(candidate)
+    namespace_fd: int | None = None
+    name: str | None = None
+    created_identity: _ObjectIdentity | None = None
+    handle: _PytestTempNamespaceHandle | None = None
+    try:
+        name = _new_namespace_name(parent_fd)
+        created_stat = _require_entry(
+            parent_fd,
+            name,
+            _ObjectIdentity.from_stat(_stat_entry(parent_fd, name)),
+        )
+        created_identity = _ObjectIdentity.from_stat(created_stat)
+        if not stat.S_ISDIR(created_stat.st_mode):
+            raise NotADirectoryError(name)
+        namespace_fd = os.open(
+            name,
+            _directory_open_flags(),
+            dir_fd=parent_fd,
+        )
+        namespace_stat = os.fstat(namespace_fd)
+        namespace_identity = _ObjectIdentity.from_stat(namespace_stat)
+        _require_identity(
+            namespace_identity,
+            created_identity,
+            subject=f"created namespace {name!r}",
+        )
+        if not stat.S_ISDIR(namespace_stat.st_mode):
+            raise NotADirectoryError(name)
+        handle = _PytestTempNamespaceHandle(
+            _PytestTempNamespaceBinding(
+                display_path=parent_path / name,
+                name=name,
+                parent_fd=parent_fd,
+                parent_identity=parent_identity,
+                namespace_fd=namespace_fd,
+                namespace_identity=namespace_identity,
+            )
+        )
+        return handle
+    except BaseException:
+        if namespace_fd is not None:
+            try:
+                os.close(namespace_fd)
+            except OSError:
+                pass
+        if name is not None and created_identity is not None:
+            try:
+                _require_entry(parent_fd, name, created_identity)
+                os.rmdir(name, dir_fd=parent_fd)
+            except OSError:
+                pass
+        raise
+    finally:
+        if handle is None:
+            try:
+                os.close(parent_fd)
+            except OSError:
+                pass
+
+
+def _pytest_temp_directory(
+    parent: Path | None = None,
+) -> _PytestTempNamespaceHandle:
+    try:
+        _require_fd_relative_support()
+    except OSError as exc:
+        raise PytestTempNamespaceCreationError([str(exc)]) from exc
+
+    failures: list[str] = []
+    last_error: OSError | ValueError | None = None
+    for candidate in _pytest_temp_candidates(parent):
+        label = "<default tempfile>" if candidate is None else str(candidate)
+        try:
+            return _create_namespace_in_candidate(candidate)
+        except (OSError, ValueError) as exc:
+            last_error = exc
+            failures.append(f"{label}: {type(exc).__name__}: {exc}")
+
+    error = PytestTempNamespaceCreationError(failures)
+    if last_error is None:
+        raise error
+    raise error from last_error
+
+
+def _assert_parent_anchor(handle: _PytestTempNamespaceHandle) -> None:
+    observed = os.fstat(handle.parent_fd)
+    identity = _ObjectIdentity.from_stat(observed)
+    if not stat.S_ISDIR(observed.st_mode):
+        raise NotADirectoryError("retained pytest temporary parent fd")
+    _require_identity(identity, handle.parent_identity, subject="parent fd")
+
+
+def _assert_namespace_fd(handle: _PytestTempNamespaceHandle) -> os.stat_result:
+    observed = os.fstat(handle.namespace_fd)
+    identity = _ObjectIdentity.from_stat(observed)
+    _require_identity(identity, handle.namespace_identity, subject="namespace fd")
+    if not stat.S_ISDIR(observed.st_mode):
+        raise NotADirectoryError("retained pytest namespace fd")
+    return observed
+
+
+def _safe_named_chmod_supported() -> bool:
+    return os.chmod in getattr(os, "supports_dir_fd", ()) and os.chmod in getattr(
+        os,
+        "supports_follow_symlinks",
+        (),
+    )
+
+
+def _safe_proc_fd_chmod_supported() -> bool:
+    return (
+        sys.platform.startswith("linux")
+        and hasattr(os, "O_PATH")
+        and hasattr(os, "O_NOFOLLOW")
+        and hasattr(os, "O_DIRECTORY")
+        and Path("/proc/self/fd").is_dir()
+    )
+
+
+def _chmod_open_directory_fd(
+    descriptor: int,
+    mode: int,
+    *,
+    force_proc: bool = False,
+    parent_fd: int | None = None,
+    name: str | None = None,
+    expected: _ObjectIdentity | None = None,
+) -> None:
+    target_mode = mode | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR
+    fchmod = getattr(os, "fchmod", None)
+    if fchmod is not None and not force_proc:
+        fchmod(descriptor, target_mode)
+    elif (
+        parent_fd is not None
+        and name is not None
+        and expected is not None
+        and _safe_named_chmod_supported()
+    ):
+        os.chmod(
+            name,
+            target_mode,
+            dir_fd=parent_fd,
+            follow_symlinks=False,
+        )
+    elif _safe_proc_fd_chmod_supported():
+        os.chmod(f"/proc/self/fd/{descriptor}", target_mode)
+    else:
+        raise PytestTempNamespaceSupportError(
+            "no safe no-follow directory permission repair is available"
+        )
+
+    after = _ObjectIdentity.from_stat(os.fstat(descriptor))
+    if expected is not None:
+        _require_identity(after, expected, subject=f"directory {name!r}")
+
+
+def _make_owned_directory_writable(
+    parent_fd: int,
+    name: str,
+    expected: _ObjectIdentity,
+) -> None:
+    """Repair only a checked directory entry without following its name."""
+    before = _require_entry(parent_fd, name, expected)
+    if not stat.S_ISDIR(before.st_mode):
+        raise NotADirectoryError(name)
+
+    flags = _directory_open_flags()
+    descriptor: int | None = None
+    try:
+        try:
+            descriptor = os.open(name, flags, dir_fd=parent_fd)
+        except OSError as exc:
+            if exc.errno not in (errno.EACCES, errno.EPERM):
+                raise
+            if _safe_named_chmod_supported():
+                os.chmod(
+                    name,
+                    before.st_mode | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR,
+                    dir_fd=parent_fd,
+                    follow_symlinks=False,
+                )
+                _require_entry(parent_fd, name, expected)
+                return
+            if not _safe_proc_fd_chmod_supported():
+                raise PytestTempNamespaceSupportError(
+                    "mode-000 directory cannot be repaired with a safe "
+                    "no-follow operation on this platform"
+                ) from exc
+            path_flags = (
+                os.O_PATH
+                | os.O_DIRECTORY
+                | os.O_NOFOLLOW
+                | _cloexec_flag()
+            )
+            path_descriptor = os.open(
+                name,
+                path_flags,
+                dir_fd=parent_fd,
+            )
+            try:
+                path_stat = os.fstat(path_descriptor)
+                path_identity = _ObjectIdentity.from_stat(path_stat)
+                _require_identity(path_identity, expected, subject=f"directory {name!r}")
+                if not stat.S_ISDIR(path_stat.st_mode):
+                    raise NotADirectoryError(name)
+                _chmod_open_directory_fd(
+                    path_descriptor,
+                    path_stat.st_mode,
+                    force_proc=True,
+                )
+                _require_entry(parent_fd, name, expected)
+            finally:
+                try:
+                    os.close(path_descriptor)
+                except OSError:
+                    pass
+            return
+
+        observed = os.fstat(descriptor)
+        identity = _ObjectIdentity.from_stat(observed)
+        _require_identity(identity, expected, subject=f"directory {name!r}")
+        if not stat.S_ISDIR(observed.st_mode):
+            raise NotADirectoryError(name)
+        if not all(
+            observed.st_mode & bit
+            for bit in (stat.S_IRUSR, stat.S_IWUSR, stat.S_IXUSR)
+        ):
+            _chmod_open_directory_fd(
+                descriptor,
+                observed.st_mode,
+                parent_fd=parent_fd,
+                name=name,
+                expected=expected,
+            )
+            _require_entry(parent_fd, name, expected)
+    finally:
+        if descriptor is not None:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+
+
+def _open_checked_directory(
+    parent_fd: int,
+    name: str,
+    expected: _ObjectIdentity,
+) -> int:
+    flags = _directory_open_flags()
+    try:
+        descriptor = os.open(name, flags, dir_fd=parent_fd)
+    except OSError as exc:
+        if exc.errno not in (errno.EACCES, errno.EPERM):
+            raise
+        _make_owned_directory_writable(parent_fd, name, expected)
+        descriptor = os.open(name, flags, dir_fd=parent_fd)
+
+    try:
+        observed = os.fstat(descriptor)
+        identity = _ObjectIdentity.from_stat(observed)
+        _require_identity(identity, expected, subject=f"directory {name!r}")
+        if not stat.S_ISDIR(observed.st_mode):
+            raise NotADirectoryError(name)
+        if not all(
+            observed.st_mode & bit
+            for bit in (stat.S_IRUSR, stat.S_IWUSR, stat.S_IXUSR)
+        ):
+            os.close(descriptor)
+            descriptor = -1
+            _make_owned_directory_writable(parent_fd, name, expected)
+            return _open_checked_directory(parent_fd, name, expected)
+        return descriptor
+    except BaseException:
+        if descriptor >= 0:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        raise
+
+
+def _open_entry_identity(
+    parent_fd: int,
+    name: str,
+    expected: _ObjectIdentity,
+) -> int | None:
+    flags = os.O_PATH | os.O_NOFOLLOW | _cloexec_flag()
+    descriptor = os.open(name, flags, dir_fd=parent_fd)
+    try:
+        observed = os.fstat(descriptor)
+        _require_identity(
+            _ObjectIdentity.from_stat(observed),
+            expected,
+            subject=f"entry {name!r}",
+        )
+        return descriptor
+    except BaseException:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+        raise
+
+
+@dataclass
+class _DirectoryWalkFrame:
+    descriptor: int | None
+    identity: _ObjectIdentity
+    name: str | None
+    entries: list[str]
+    index: int = 0
+
+
+def _assert_walk_directory(
+    frame: _DirectoryWalkFrame,
+    *,
+    subject: str,
+) -> os.stat_result:
+    if frame.descriptor is None:
+        raise OSError(f"pytest cleanup lost descriptor for {subject}")
+    observed = os.fstat(frame.descriptor)
+    _require_identity(
+        _ObjectIdentity.from_stat(observed),
+        frame.identity,
+        subject=subject,
+    )
+    if not stat.S_ISDIR(observed.st_mode):
+        raise NotADirectoryError(subject)
+    return observed
+
+
+def _remove_directory_contents(directory_fd: int) -> None:
+    root_stat = os.fstat(directory_fd)
+    root_identity = _ObjectIdentity.from_stat(root_stat)
+    if not stat.S_ISDIR(root_stat.st_mode):
+        raise NotADirectoryError("pytest cleanup root")
+    frames = [
+        _DirectoryWalkFrame(
+            descriptor=directory_fd,
+            identity=root_identity,
+            name=None,
+            entries=os.listdir(directory_fd),
+        )
+    ]
+    try:
+        while frames:
+            frame = frames[-1]
+            if frame.index == len(frame.entries):
+                finished = frames.pop()
+                if finished.name is None:
+                    continue
+                if finished.descriptor is None:
+                    raise OSError(
+                        f"pytest cleanup lost directory fd for {finished.name!r}"
+                    )
+                parent_frame = frames[-1]
+                recovered_parent_fd: int | None = None
+                try:
+                    _assert_walk_directory(
+                        finished,
+                        subject=f"directory {finished.name!r}",
+                    )
+                    recovered_parent_fd = os.open(
+                        "..",
+                        _directory_open_flags(),
+                        dir_fd=finished.descriptor,
+                    )
+                    parent_stat = os.fstat(recovered_parent_fd)
+                    _require_identity(
+                        _ObjectIdentity.from_stat(parent_stat),
+                        parent_frame.identity,
+                        subject=f"parent of directory {finished.name!r}",
+                    )
+                    if parent_frame.descriptor is None:
+                        parent_frame.descriptor = recovered_parent_fd
+                        recovered_parent_fd = None
+                    parent_fd = parent_frame.descriptor
+                    if parent_fd is None:
+                        raise OSError(
+                            f"pytest cleanup lost parent fd for {finished.name!r}"
+                        )
+                    _assert_walk_directory(
+                        parent_frame,
+                        subject=f"parent of directory {finished.name!r}",
+                    )
+                    _require_entry(
+                        parent_fd,
+                        finished.name,
+                        finished.identity,
+                    )
+                    os.rmdir(finished.name, dir_fd=parent_fd)
+                    _assert_entry_absent(parent_fd, finished.name)
+                finally:
+                    try:
+                        if recovered_parent_fd is not None:
+                            os.close(recovered_parent_fd)
+                    finally:
+                        os.close(finished.descriptor)
+                continue
+
+            if frame.descriptor is None:
+                raise OSError("pytest cleanup lost current directory fd")
+            _assert_walk_directory(
+                frame,
+                subject=f"directory {frame.name!r}",
+            )
+            name = frame.entries[frame.index]
+            frame.index += 1
+            observed = _stat_entry(frame.descriptor, name)
+            expected = _ObjectIdentity.from_stat(observed)
+            if stat.S_ISDIR(observed.st_mode):
+                child_fd = _open_checked_directory(frame.descriptor, name, expected)
+                try:
+                    child_entries = os.listdir(child_fd)
+                    if frame.name is not None:
+                        os.close(frame.descriptor)
+                        frame.descriptor = None
+                except BaseException:
+                    try:
+                        os.close(child_fd)
+                    except OSError:
+                        pass
+                    raise
+                frames.append(
+                    _DirectoryWalkFrame(
+                        descriptor=child_fd,
+                        identity=expected,
+                        name=name,
+                        entries=child_entries,
+                    )
+                )
+                continue
+
+            entry_fd = _open_entry_identity(frame.descriptor, name, expected)
+            try:
+                _require_entry(frame.descriptor, name, expected)
+                os.unlink(name, dir_fd=frame.descriptor)
+                _assert_entry_absent(frame.descriptor, name)
+            finally:
+                if entry_fd is not None:
+                    os.close(entry_fd)
+    except BaseException:
+        for frame in frames:
+            if frame.name is None or frame.descriptor is None:
+                continue
+            try:
+                os.close(frame.descriptor)
+            except OSError:
+                pass
+        raise
+
+
+def _find_exact_namespace_name(
+    handle: _PytestTempNamespaceHandle,
+) -> str | None:
+    """Classify one retained inode in its original parent without deleting."""
+    for name in os.listdir(handle.parent_fd):
+        if name == handle.name:
+            continue
+        try:
+            observed = _stat_entry(handle.parent_fd, name)
+        except FileNotFoundError:
+            continue
+        expected = _ObjectIdentity.from_stat(observed)
+        if expected != handle.namespace_identity or not stat.S_ISDIR(observed.st_mode):
+            continue
+
+        # The name is only a lookup hint.  Open and fstat the exact object, then
+        # revalidate the directory entry immediately.  No destructive operation
+        # is allowed to use this name after this classification.
+        descriptor = _open_entry_identity(
+            handle.parent_fd,
+            name,
+            handle.namespace_identity,
+        )
+        try:
+            _require_entry(handle.parent_fd, name, handle.namespace_identity)
+        except (OSError, ValueError) as exc:
+            raise OSError(
+                "retained pytest namespace identity lookup raced at "
+                f"alternate name {name!r}"
+            ) from exc
+        finally:
+            os.close(descriptor)
+        return name
+    return None
+
+
+def _namespace_link_state(
+    handle: _PytestTempNamespaceHandle,
+) -> _NamespaceLinkState:
+    _assert_parent_anchor(handle)
+    namespace_stat = _assert_namespace_fd(handle)
+    link_count = int(namespace_stat.st_nlink)
+    if link_count == 0:
+        return _NamespaceLinkState(link_count, False)
+
+    original_identity_matches = False
+    try:
+        _require_entry(handle.parent_fd, handle.name, handle.namespace_identity)
+    except FileNotFoundError:
+        pass
+    except OSError:
+        # A replacement at the original name is not owned.  The exact lookup
+        # below may still find the retained inode under a different name.
+        pass
+    else:
+        original_identity_matches = True
+
+    alternate_name = None
+    if not original_identity_matches:
+        alternate_name = _find_exact_namespace_name(handle)
+    return _NamespaceLinkState(
+        link_count,
+        original_identity_matches,
+        alternate_name,
+    )
+
+
+def _repair_namespace_permissions(
+    handle: _PytestTempNamespaceHandle,
+    root_stat: os.stat_result,
+) -> None:
+    if all(
+        root_stat.st_mode & bit
+        for bit in (stat.S_IRUSR, stat.S_IWUSR, stat.S_IXUSR)
+    ):
+        return
+    if getattr(os, "fchmod", None) is None:
+        _chmod_open_directory_fd(handle.namespace_fd, root_stat.st_mode)
+    else:
+        os.fchmod(
+            handle.namespace_fd,
+            root_stat.st_mode
+            | stat.S_IRUSR
+            | stat.S_IWUSR
+            | stat.S_IXUSR,
+        )
+
+
+def _clear_owned_namespace_contents(
+    handle: _PytestTempNamespaceHandle,
+) -> None:
+    """Clear only the retained inode; never resolve its changed directory name."""
+    _assert_parent_anchor(handle)
+    root_stat = _assert_namespace_fd(handle)
+    _repair_namespace_permissions(handle, root_stat)
+    _remove_directory_contents(handle.namespace_fd)
+
+
+def _remove_owned_namespace(handle: _PytestTempNamespaceHandle) -> None:
+    _assert_parent_anchor(handle)
+    root_stat = _assert_namespace_fd(handle)
+    _require_entry(handle.parent_fd, handle.name, handle.namespace_identity)
+    if not stat.S_ISDIR(root_stat.st_mode):
+        raise NotADirectoryError(handle.name)
+    _repair_namespace_permissions(handle, root_stat)
+    _remove_directory_contents(handle.namespace_fd)
+    _assert_namespace_fd(handle)
+    _require_entry(handle.parent_fd, handle.name, handle.namespace_identity)
+    os.rmdir(handle.name, dir_fd=handle.parent_fd)
+    _assert_entry_absent(handle.parent_fd, handle.name)
+    namespace_stat = _assert_namespace_fd(handle)
+    if namespace_stat.st_nlink != 0:
+        raise OSError(
+            "pytest cleanup removed the original namespace name but the "
+            f"retained inode remains linked: st_nlink={namespace_stat.st_nlink}"
+        )
+    handle.removed = True
+
+
+def _namespace_still_owned(handle: _PytestTempNamespaceHandle) -> bool:
+    state = _namespace_link_state(handle)
+    if state.is_unlinked:
+        handle.removed = True
+        return False
+    if not state.original_identity_matches:
+        raise OSError(state.describe(handle))
+    return True
+
+
+def _cleanup_diagnostic_path(namespace: Path) -> Path:
+    return namespace.with_name(f".{namespace.name}.cleanup-failed.json")
+
+
+def _unlink_created_diagnostic(
+    handle: _PytestTempNamespaceHandle,
+    name: str,
+    expected: _ObjectIdentity,
+) -> bool:
+    try:
+        observed = _stat_entry(handle.parent_fd, name)
+    except FileNotFoundError:
+        return True
+    actual = _ObjectIdentity.from_stat(observed)
+    if actual != expected or not stat.S_ISREG(observed.st_mode):
+        print(
+            "[pytest-temp-cleanup-diagnostic-failed] "
+            f"refusing to remove changed diagnostic name={name!r}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return False
+    try:
+        os.unlink(name, dir_fd=handle.parent_fd)
+        _assert_entry_absent(handle.parent_fd, name)
+    except OSError as exc:
+        print(
+            "[pytest-temp-cleanup-diagnostic-failed] "
+            f"unable to remove partial diagnostic name={name!r} error={exc!r}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return False
+    return True
+
+
+def _write_cleanup_diagnostic(
+    handle: _PytestTempNamespaceHandle,
+    failures: list[dict[str, str]],
+    *,
+    attempts: int | None = None,
+) -> Path | None:
+    diagnostic = _cleanup_diagnostic_path(handle.path)
+    name = diagnostic.name
+    payload = {
+        "schema_version": PYTEST_TEMP_CLEANUP_DIAGNOSTIC_SCHEMA,
+        "status": "cleanup_failed",
+        "namespace": str(handle.path),
+        "parent": str(handle.path.parent),
+        "attempts": len(failures) if attempts is None else attempts,
+        "failures": failures,
+    }
+    encoded = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode(
+        "utf-8"
+    )
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | _cloexec_flag()
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    flags |= getattr(os, "O_BINARY", 0)
+    descriptor: int | None = None
+    diagnostic_identity: _ObjectIdentity | None = None
+    error: BaseException | None = None
+    try:
+        descriptor = os.open(name, flags, 0o600, dir_fd=handle.parent_fd)
+        diagnostic_identity = _ObjectIdentity.from_stat(os.fstat(descriptor))
+        if not stat.S_ISREG(diagnostic_identity.file_type):
+            raise OSError(f"cleanup diagnostic is not a regular file: {name!r}")
+        remaining = memoryview(encoded)
+        while remaining:
+            written = os.write(descriptor, remaining)
+            if written <= 0:
+                raise OSError("cleanup diagnostic write was incomplete")
+            remaining = remaining[written:]
+    except (OSError, AttributeError, NotImplementedError, TypeError, ValueError) as exc:
+        error = exc
+    finally:
+        if descriptor is not None:
+            try:
+                os.close(descriptor)
+            except (OSError, AttributeError, NotImplementedError, TypeError, ValueError) as exc:
+                if error is None:
+                    error = exc
+    if error is not None:
+        if diagnostic_identity is not None:
+            _unlink_created_diagnostic(handle, name, diagnostic_identity)
+        print(
+            "[pytest-temp-cleanup-diagnostic-failed] "
+            f"namespace={handle.path} error={error!r}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return None
+    return diagnostic
+
+
+@dataclass(frozen=True)
+class PytestTempCleanupResult:
+    namespace: Path
+    ok: bool
+    attempts: int
+    diagnostic: Path | None = None
+    errors: tuple[str, ...] = ()
+
+
+class PytestTempCleanupError(RuntimeError):
+    """A runner-owned pytest namespace could not be removed."""
+
+    def __init__(self, result: PytestTempCleanupResult) -> None:
+        self.result = result
+        diagnostic = (
+            f" diagnostic={result.diagnostic}" if result.diagnostic else ""
+        )
+        errors = f" errors={'; '.join(result.errors)}" if result.errors else ""
+        super().__init__(
+            "pytest temporary namespace cleanup failed: "
+            f"namespace={result.namespace} attempts={result.attempts}"
+            f"{diagnostic}{errors}"
+        )
+
+
+def cleanup_pytest_temp_namespace(
+    handle: _PytestTempNamespaceHandle,
+) -> PytestTempCleanupResult:
+    """Remove one namespace through its retained owner handle."""
+    failures: list[dict[str, str]] = []
+    removed = handle.removed
+    attempts = 0
+    for attempt in range(1, PYTEST_TEMP_CLEANUP_ATTEMPTS + 1):
+        attempts = attempt
+        if removed:
+            break
+        try:
+            _remove_owned_namespace(handle)
+            removed = True
+        except (OSError, ValueError) as exc:
+            failures.append(
+                {
+                    "attempt": str(attempt),
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                }
+            )
+            try:
+                removed = not _namespace_still_owned(handle)
+            except (OSError, ValueError) as state_error:
+                failures.append(
+                    {
+                        "attempt": str(attempt),
+                        "error_type": type(state_error).__name__,
+                        "error": str(state_error),
+                    }
+                )
+                try:
+                    _clear_owned_namespace_contents(handle)
+                    after_clear = _assert_namespace_fd(handle)
+                except (OSError, ValueError) as clear_error:
+                    failures.append(
+                        {
+                            "attempt": str(attempt),
+                            "error_type": type(clear_error).__name__,
+                            "error": str(clear_error),
+                        }
+                    )
+                else:
+                    if after_clear.st_nlink == 0:
+                        removed = True
+                    else:
+                        failures.append(
+                            {
+                                "attempt": str(attempt),
+                                "error_type": "RetainedNamespaceLinked",
+                                "error": (
+                                    "retained pytest namespace contents were cleared "
+                                    "through the retained fd, but its directory link "
+                                    "remains; cleanup cannot safely unlink the "
+                                    f"remaining inode link (st_nlink={after_clear.st_nlink})"
+                                ),
+                            }
+                        )
+        if removed:
+            handle.removed = True
+            break
+        if attempt < PYTEST_TEMP_CLEANUP_ATTEMPTS:
+            time.sleep(PYTEST_TEMP_CLEANUP_RETRY_DELAY_SECONDS)
+
+    if removed:
+        close_errors = handle.close()
+        if close_errors:
+            print(
+                "[pytest-temp-cleanup-fd-close-failed] "
+                f"namespace={handle.path} errors={'; '.join(close_errors)}",
+                file=sys.stderr,
+                flush=True,
+            )
+            return PytestTempCleanupResult(
+                handle.path,
+                False,
+                attempts,
+                errors=close_errors,
+            )
+        return PytestTempCleanupResult(handle.path, True, attempts)
+
+    diagnostic = _write_cleanup_diagnostic(handle, failures, attempts=attempts)
+    diagnostic_suffix = f" diagnostic={diagnostic}" if diagnostic else ""
+    close_errors = handle.close()
+    if close_errors:
+        failures.extend(
+            {
+                "attempt": str(attempts),
+                "error_type": "OSError",
+                "error": error,
+            }
+            for error in close_errors
+        )
+    print(
+        "[pytest-temp-cleanup-failed] "
+        f"namespace={handle.path} attempts={attempts}{diagnostic_suffix}",
+        file=sys.stderr,
+        flush=True,
+    )
+    errors = tuple(
+        f"attempt={failure['attempt']} {failure['error_type']}: {failure['error']}"
+        for failure in failures
+    ) + close_errors
+    return PytestTempCleanupResult(
+        handle.path,
+        False,
+        attempts,
+        diagnostic,
+        errors,
+    )
+
+
+@contextmanager
+def owned_pytest_temp_namespace(parent: Path | None = None) -> Iterator[Path]:
+    """Yield pytest's child basetemp while retaining the owner directory handle."""
+    handle = _pytest_temp_directory(parent)
+    body_failed = False
+    try:
+        yield handle.basetemp_path
+    except BaseException:
+        body_failed = True
+        raise
+    finally:
+        cleanup = cleanup_pytest_temp_namespace(handle)
+        if not cleanup.ok and not body_failed:
+            raise PytestTempCleanupError(cleanup)
+
+
+class PytestArgumentAuthorityError(ValueError):
+    """The runner cannot prove that pytest will use its owned basetemp."""
+
+
+def _is_addopts_override(args: list[str], index: int) -> bool:
+    argument = args[index]
+    value: str | None = None
+    if argument in {"-o", "--override-ini"}:
+        if index + 1 < len(args):
+            value = args[index + 1]
+    elif argument.startswith("--override-ini="):
+        value = argument.partition("=")[2]
+    elif argument.startswith("-o") and len(argument) > 2:
+        value = argument[2:].lstrip("=")
+    if value is None:
+        return False
+    return value.partition("=")[0].strip().lower() == "addopts"
+
+
+def _validate_pytest_argument_tokens(
+    args: list[str],
+    *,
+    source: str,
+    reject_end_of_options: bool,
+) -> None:
+    """Validate one token stream before pytest or argparse can expand it.
+
+    Pytest's supported ``@file`` syntax is recursive and expands before its
+    option parser sees the resulting tokens.  Reimplementing that parser here
+    would create a second, drift-prone authority.  The owner-bound runner
+    therefore rejects the expansion surface explicitly and keeps only the
+    direct token grammar it can prove.
+    """
+    for index, argument in enumerate(args):
+        if argument == "--basetemp" or argument.startswith("--basetemp="):
+            raise PytestArgumentAuthorityError(
+                "run_pytest_lane requires a fresh --basetemp owned by the "
+                f"runner and rejects {source} argument {index} {argument!r}"
+            )
+        if argument.startswith("@"):
+            raise PytestArgumentAuthorityError(
+                "run_pytest_lane cannot prove a fresh --basetemp through "
+                f"pytest @argument-file expansion in {source} argument {index}; "
+                "argument files are unsupported by the owner-bound lane"
+            )
+        if reject_end_of_options and argument == "--":
+            raise PytestArgumentAuthorityError(
+                "run_pytest_lane cannot prove a fresh --basetemp when "
+                f"PYTEST_ADDOPTS places an end-of-options marker before the "
+                f"runner owner option (at {source} argument {index})"
+            )
+        if source == "runner arguments" and _is_addopts_override(args, index):
+            raise PytestArgumentAuthorityError(
+                "run_pytest_lane cannot accept a user addopts override because "
+                "pytest config addopts is an argument expansion surface; "
+                "the runner owns that setting"
+            )
+
+
+def validate_pytest_argument_authority(
+    args: list[str],
+    *,
+    environment: dict[str, str] | None = None,
+) -> None:
+    """Prove all caller-controlled pytest argument streams are owner-safe."""
+    _validate_pytest_argument_tokens(
+        args,
+        source="runner arguments",
+        reject_end_of_options=False,
+    )
+    environment = os.environ if environment is None else environment
+    raw_addopts = environment.get(PYTEST_ADDOPTS_ENV)
+    if not raw_addopts:
+        return
+    try:
+        addopts = shlex.split(raw_addopts)
+    except ValueError as exc:
+        raise PytestArgumentAuthorityError(
+            "run_pytest_lane cannot prove a fresh --basetemp because "
+            f"{PYTEST_ADDOPTS_ENV} is not valid shell-style argument text"
+        ) from exc
+    _validate_pytest_argument_tokens(
+        addopts,
+        source=PYTEST_ADDOPTS_ENV,
+        reject_end_of_options=True,
+    )
+
+
+def _assert_no_static_basetemp(args: list[str]) -> None:
+    """Compatibility wrapper for the shared argument-authority validator."""
+    _validate_pytest_argument_tokens(
+        args,
+        source="runner arguments",
+        reject_end_of_options=False,
+    )
+
+
+def _pytest_subprocess_environment(args: list[str]) -> dict[str, str]:
+    environment = os.environ.copy()
+    validate_pytest_argument_authority(args, environment=environment)
+    return environment
+
+
+def build_pytest_command(*, extra_args: list[str], basetemp: Path) -> list[str]:
+    validate_pytest_argument_authority(extra_args)
+    return [
+        sys.executable,
+        "-m",
+        "pytest",
+        "-q",
+        "-o",
+        "addopts=",
+        "--basetemp",
+        str(basetemp),
+        *extra_args,
+    ]
 
 
 def partition_nodeids(nodeids: list[str], *, shard_count: int) -> list[list[str]]:
@@ -248,8 +1502,9 @@ def _partition_environment(
     assignment_path: Path | None = None,
     observed_path: Path | None = None,
     result_path: Path | None = None,
+    pytest_args: list[str],
 ) -> dict[str, str]:
-    environment = os.environ.copy()
+    environment = _pytest_subprocess_environment(pytest_args)
     environment[PARTITION_BASELINE_ENV] = str(baseline_path)
     if assignment_path is None:
         environment[PARTITION_MODE_ENV] = "collect"
@@ -270,13 +1525,19 @@ def _partition_environment(
 def _plugin_command(
     *,
     selection_args: list[str],
+    basetemp: Path,
     collect_only: bool = False,
 ) -> list[str]:
+    validate_pytest_argument_authority(selection_args)
     command = [
         sys.executable,
         "-m",
         "pytest",
         "-q",
+        "-o",
+        "addopts=",
+        "--basetemp",
+        str(basetemp),
         "-p",
         "scripts.run_pytest_lane",
     ]
@@ -325,28 +1586,41 @@ def _replay_failed_shards(
 
 
 def run_process_worksteal(*, extra_args: list[str]) -> int:
-    parent = os.environ.get("TMPDIR")
-    temporary_parent = parent if parent and Path(parent).is_dir() else None
+    validate_pytest_argument_authority(extra_args)
     with tempfile.TemporaryDirectory(
         prefix="abyss-stack-pytest-partitions-",
-        dir=temporary_parent,
     ) as temporary_raw:
         temporary = Path(temporary_raw)
         baseline_path = temporary / "baseline.json"
         collect_log = temporary / "collect.log"
-        collect_command = _plugin_command(selection_args=extra_args, collect_only=True)
-        collect_started = time.monotonic()
-        with collect_log.open("w", encoding="utf-8") as output:
-            collected = subprocess.run(
-                collect_command,
-                cwd=REPO_ROOT,
-                env=_partition_environment(baseline_path=baseline_path),
-                stdout=output,
-                stderr=subprocess.STDOUT,
-                text=True,
-                check=False,
-            )
-        collect_elapsed = time.monotonic() - collect_started
+        try:
+            with owned_pytest_temp_namespace() as collect_basetemp:
+                collect_command = _plugin_command(
+                    selection_args=extra_args,
+                    basetemp=collect_basetemp,
+                    collect_only=True,
+                )
+                collect_started = time.monotonic()
+                with collect_log.open("w", encoding="utf-8") as output:
+                    collected = subprocess.run(
+                        collect_command,
+                        cwd=REPO_ROOT,
+                        env=_partition_environment(
+                            baseline_path=baseline_path,
+                            pytest_args=extra_args,
+                        ),
+                        stdout=output,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False,
+                    )
+                collect_elapsed = time.monotonic() - collect_started
+        except PytestTempNamespaceCreationError as exc:
+            print(f"[error] {exc}", file=sys.stderr, flush=True)
+            return PYTEST_TEMP_CREATION_FAILURE_EXIT_CODE
+        except PytestTempCleanupError as exc:
+            print(f"[error] {exc}", file=sys.stderr, flush=True)
+            return PYTEST_TEMP_CLEANUP_FAILURE_EXIT_CODE
         if collected.returncode != 0 or not baseline_path.is_file():
             print(collect_log.read_text(encoding="utf-8"), file=sys.stderr, end="")
             print(
@@ -378,8 +1652,12 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
         )
 
         pending: deque[int] = deque(range(len(assignments)))
-        active: dict[int, tuple[subprocess.Popen[str], Any, float]] = {}
+        active: dict[
+            int,
+            tuple[subprocess.Popen[str], Any, float, _PytestTempNamespaceHandle],
+        ] = {}
         records: dict[int, dict[str, Any]] = {}
+        cleanup_failed = False
         try:
             while pending or active:
                 while pending and len(active) < PROCESS_WORKER_LIMIT:
@@ -389,53 +1667,90 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                     result_path = temporary / f"result-{shard_index}.json"
                     log_path = temporary / f"shard-{shard_index}.log"
                     write_manifest(assignment_path, assignments[shard_index])
-                    output = log_path.open("w", encoding="utf-8")
-                    command = _plugin_command(
-                        selection_args=assignments[shard_index],
+                    temporary_namespace = _pytest_temp_directory()
+                    basetemp = temporary_namespace.basetemp_path
+                    output: Any = None
+                    try:
+                        output = log_path.open("w", encoding="utf-8")
+                        command = _plugin_command(
+                            selection_args=assignments[shard_index],
+                            basetemp=basetemp,
+                        )
+                        process = subprocess.Popen(
+                            command,
+                            cwd=REPO_ROOT,
+                            env=_partition_environment(
+                                baseline_path=baseline_path,
+                                assignment_path=assignment_path,
+                                observed_path=observed_path,
+                                result_path=result_path,
+                                pytest_args=assignments[shard_index],
+                            ),
+                            stdout=output,
+                            stderr=subprocess.STDOUT,
+                            text=True,
+                            close_fds=True,
+                        )
+                    except BaseException:
+                        if output is not None:
+                            output.close()
+                        cleanup_pytest_temp_namespace(temporary_namespace)
+                        raise
+                    active[shard_index] = (
+                        process,
+                        output,
+                        time.monotonic(),
+                        temporary_namespace,
                     )
-                    process = subprocess.Popen(
-                        command,
-                        cwd=REPO_ROOT,
-                        env=_partition_environment(
-                            baseline_path=baseline_path,
-                            assignment_path=assignment_path,
-                            observed_path=observed_path,
-                            result_path=result_path,
-                        ),
-                        stdout=output,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                    )
-                    active[shard_index] = (process, output, time.monotonic())
                     records[shard_index] = {
                         "assignment": assignment_path,
                         "observed": observed_path,
                         "result": result_path,
                         "log": log_path,
                         "command": command,
+                        "basetemp": basetemp,
                     }
 
                 completed_any = False
-                for shard_index, (process, output, started) in list(active.items()):
+                for shard_index, (
+                    process,
+                    output,
+                    started,
+                    temporary_namespace,
+                ) in list(active.items()):
                     returncode = process.poll()
                     if returncode is None:
                         continue
                     output.close()
+                    cleanup = cleanup_pytest_temp_namespace(temporary_namespace)
+                    cleanup_failed = cleanup_failed or not cleanup.ok
                     records[shard_index]["returncode"] = returncode
                     records[shard_index]["elapsed"] = time.monotonic() - started
+                    records[shard_index]["cleanup"] = "passed" if cleanup.ok else "failed"
+                    if cleanup.diagnostic is not None:
+                        records[shard_index]["cleanup_diagnostic"] = str(
+                            cleanup.diagnostic
+                        )
                     del active[shard_index]
                     completed_any = True
                 if not completed_any and active:
                     time.sleep(0.1)
         except BaseException:
-            for process, output, _started in active.values():
+            for process, output, _started, _temporary_namespace in active.values():
                 process.terminate()
                 output.close()
-            for process, _output, _started in active.values():
+            for process, _output, _started, _temporary_namespace in active.values():
                 process.wait()
+            for (
+                _process,
+                _output,
+                _started,
+                temporary_namespace,
+            ) in active.values():
+                cleanup_pytest_temp_namespace(temporary_namespace)
             raise
 
-        failed = False
+        failed = cleanup_failed
         failed_shards: list[int] = []
         totals: Counter[str] = Counter()
         for shard_index in range(len(assignments)):
@@ -467,7 +1782,7 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                 "[pytest-shard-result] "
                 f"index={shard_index + 1} selected={len(assignments[shard_index])} "
                 f"returncode={record['returncode']} seconds={record['elapsed']:.2f} "
-                f"selection_proof={proof}",
+                f"selection_proof={proof} cleanup={record['cleanup']}",
                 flush=True,
             )
 
@@ -511,6 +1826,11 @@ def main(argv: list[str] | None = None) -> int:
     extra_args = list(args.pytest_args)
     if extra_args[:1] == ["--"]:
         extra_args = extra_args[1:]
+    try:
+        validate_pytest_argument_authority(extra_args)
+    except PytestArgumentAuthorityError as exc:
+        print(f"[error] {exc}", file=sys.stderr, flush=True)
+        return 2
 
     scheduler = scheduler_plan(args.scheduler)
     if not scheduler["ok"]:
@@ -541,16 +1861,32 @@ def main(argv: list[str] | None = None) -> int:
         flush=True,
     )
     if scheduler["effective"] == "serial":
-        command = build_pytest_command(extra_args=extra_args)
-        print(f"[run] tests: {subprocess.list2cmdline(command)}", flush=True)
-        completed = subprocess.run(
-            command,
-            cwd=REPO_ROOT,
-            env=os.environ.copy(),
-            check=False,
-        )
+        try:
+            with owned_pytest_temp_namespace() as basetemp:
+                command = build_pytest_command(
+                    extra_args=extra_args,
+                    basetemp=basetemp,
+                )
+                print(f"[run] tests: {subprocess.list2cmdline(command)}", flush=True)
+                completed = subprocess.run(
+                    command,
+                    cwd=REPO_ROOT,
+                    env=_pytest_subprocess_environment(extra_args),
+                    check=False,
+                    close_fds=True,
+                )
+        except PytestTempNamespaceCreationError as exc:
+            print(f"[error] {exc}", file=sys.stderr, flush=True)
+            return PYTEST_TEMP_CREATION_FAILURE_EXIT_CODE
+        except PytestTempCleanupError as exc:
+            print(f"[error] {exc}", file=sys.stderr, flush=True)
+            return PYTEST_TEMP_CLEANUP_FAILURE_EXIT_CODE
         return completed.returncode
-    return run_process_worksteal(extra_args=extra_args)
+    try:
+        return run_process_worksteal(extra_args=extra_args)
+    except PytestTempNamespaceCreationError as exc:
+        print(f"[error] {exc}", file=sys.stderr, flush=True)
+        return PYTEST_TEMP_CREATION_FAILURE_EXIT_CODE
 
 
 if __name__ == "__main__":

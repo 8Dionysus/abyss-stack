@@ -9,6 +9,25 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Close pytest argument-authority paths that could redirect the runner-owned
+  basetemp: reject direct and recursive `@file` expansion, validate
+  `PYTEST_ADDOPTS`, own config `addopts`, reject direct addopts overrides, and
+  place the fresh owner option before caller arguments on serial, collection,
+  and shard commands. Unsupported expansion syntax now fails before pytest
+  starts, preserving caller-owned paths and markers.
+- Make each pytest invocation create its owner-owned temporary namespace
+  directly beneath an fd-anchored parent selected from `PYTEST_DEBUG_TEMPROOT`,
+  `TMPDIR`, or the default tempfile location, without a probe directory. Give
+  pytest an uncreated child basetemp beneath that outer owner namespace so its
+  normal setup can replace the child without changing the retained ownership
+  binding. Keep the immutable parent/owner handle through no-follow fd-relative
+  iterative fd-relative recursive cleanup, repair mode-000 directories through
+  a safe opened-object path, publish diagnostics relative to the retained
+  parent, require the retained namespace inode to be unlinked before claiming
+  success, classify same-parent renames and moved/replaced names by exact
+  identity without deleting a raced candidate, clear only the retained inode
+  contents when safe, report any remaining link visibly, and normalize
+  candidate exhaustion at the runner boundary.
 - Bound the Codex agent-routing adapter's wait for an event-keyed relay
   context when matching `PreToolUse` groups run concurrently, while retaining
   fail-closed behavior when the context remains unavailable.
