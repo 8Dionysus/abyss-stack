@@ -1,8 +1,13 @@
-# Process containment part
+# AGENTS.md
+
+## process-containment part
 
 This part owns the generic runtime boundary for one bounded invocation whose
 process tree and temporary storage must have one owner.  It is deliberately
 pytest-neutral.
+
+The private namespace is the only process and temporary-storage authority;
+host pathname cleanup is outside this owner.
 
 Read the governed-execution package card and the root repository cards before
 editing.  The part may expose a backend-neutral API and a Linux bubblewrap

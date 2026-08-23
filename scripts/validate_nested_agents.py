@@ -423,6 +423,12 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'mechanics/governed-execution/parts/governed-runner/tests',
         'Do not turn advisory execution into autonomous authority',
     ),
+    'mechanics/governed-execution/parts/process-containment/AGENTS.md': (
+        'process-containment',
+        'private namespace',
+        'namespace-init',
+        'no host pathname',
+    ),
     'mechanics/governed-execution/parts/external-codex-agent/AGENTS.md': (
         'external Codex incarnation',
         'built-in Codex multi-agent transport',
