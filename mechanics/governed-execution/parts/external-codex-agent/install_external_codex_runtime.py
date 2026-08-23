@@ -48,6 +48,7 @@ RUNTIME_FILES = (
     "external_codex_projection.py",
     "external_codex_return.py",
     "external_codex_responsibility_movement.py",
+    "schema_validation.py",
     "external_codex_static_bootstrap.S",
     "external_codex_supervisor.py",
     "legacy-owner-admission-migrations.v1.json",

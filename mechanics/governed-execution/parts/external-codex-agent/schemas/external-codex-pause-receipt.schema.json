@@ -224,7 +224,8 @@
       "properties": {
         "goal_lifecycle": {"const": "paused"},
         "goal_status": {"const": "paused"}
-      }
+      },
+      "additionalProperties": false
     },
     "paused": {"const": true},
     "owner_acceptance": {"const": "separate"},
