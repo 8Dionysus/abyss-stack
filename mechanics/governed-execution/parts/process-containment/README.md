@@ -28,9 +28,11 @@ Namespace init is PID 1.  It launches the requested command, forwards
 termination using a namespace-wide broadcast, reaps ordinary and reparented
 descendants, and performs an explicit drain before it emits its receipt.  The
 host controller releases it through an owner-controlled pipe only after the
-same-UID procfs/namespace/fd probe passes.  The outer controller waits on a
-pidfd with `waitid(P_PIDFD, ...)` and verifies the immutable start-time identity
-of the backend process.
+same-UID procfs/namespace/fd probe passes.  The probe targets the host identity
+of the private PID-1 child, not bubblewrap's host-facing wrapper; that target
+is bound to the wrapper's child relation, start time, and pidfd probe.  The
+outer controller waits on a pidfd with `waitid(P_PIDFD, ...)` and verifies the
+immutable start-time identity of the backend process.
 
 Successful reclaim is namespace teardown.  The part never calls `unlink` or
 `rmdir` for invocation temporary storage.  Logs and receipts are exported only

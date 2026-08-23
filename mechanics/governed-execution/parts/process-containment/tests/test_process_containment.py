@@ -220,6 +220,12 @@ def test_same_uid_procfs_admission_is_explicit_and_fail_closed(tmp_path: Path) -
         assert admission.get("supported") is False
         checks = admission.get("checks", {})
         assert {"proc_root", "proc_fd", "setns_user", "setns_pid", "setns_mnt"} <= set(checks)
+        target = admission.get("target")
+        host = result.receipt.get("host_identity", {})
+        assert isinstance(target, dict)
+        assert isinstance(host, dict)
+        assert target.get("pid") != host.get("pid")
+        assert target.get("authority") == "parent-child+starttime"
         assert result.command_started is False
         assert result.receipt["receipt"]["command_started"] is False
         return

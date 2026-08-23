@@ -740,6 +740,68 @@ def _read_starttime(pid: int) -> int | None:
     return _process_starttime(pid)
 
 
+def _host_namespace_init_identity(parent_pid: int) -> dict[str, object] | None:
+    """Find the host identity of bwrap's private PID-1 child.
+
+    ``Popen.pid`` is bubblewrap's host-side controller.  With ``--unshare-pid``
+    the process that is PID 1 in the private namespace is a child of that
+    controller and has a different host PID.  Admission must probe that child;
+    probing the controller would inspect the host-facing wrapper and would
+    either miss the namespace boundary or reject every supported host.
+
+    The numeric child PID is only a procfs lookup coordinate.  The returned
+    identity is bound to the controller's child relation, a start-time value,
+    and a pidfd capability probe; it is never used as lifecycle authority.
+    """
+
+    try:
+        children_path = Path(f"/proc/{parent_pid}/task/{parent_pid}/children")
+        child_pids = [
+            int(value)
+            for value in children_path.read_text(encoding="ascii").split()
+            if value.isdigit()
+        ]
+    except (OSError, ValueError):
+        return None
+
+    candidates: list[dict[str, object]] = []
+    for child_pid in child_pids:
+        try:
+            status = Path(f"/proc/{child_pid}/status").read_text(encoding="ascii")
+        except OSError:
+            continue
+        nspid_line = next(
+            (line for line in status.splitlines() if line.startswith("NSpid:")),
+            None,
+        )
+        if nspid_line is None:
+            continue
+        nspids = nspid_line.split()[1:]
+        if not nspids or nspids[-1] != "1":
+            continue
+        starttime = _read_starttime(child_pid)
+        if starttime is None:
+            continue
+        try:
+            pidfd = os.pidfd_open(child_pid)
+        except OSError:
+            continue
+        else:
+            os.close(pidfd)
+        candidates.append(
+            {
+                "pid": child_pid,
+                "starttime": starttime,
+                "pidfd": True,
+                "authority": "parent-child+starttime",
+                "numeric_pid_authority": False,
+            }
+        )
+    if len(candidates) != 1:
+        return None
+    return candidates[0]
+
+
 def _read_receipt(stderr: bytes) -> tuple[dict[str, object] | None, bytes]:
     lines = stderr.splitlines(keepends=True)
     receipt: dict[str, object] | None = None
@@ -989,24 +1051,35 @@ def run_contained(spec: Any, *, result_factory: Any | None = None):
                 "numeric_pid_authority": False,
             }
             first_stderr = _read_line_fd(process.stderr.fileno()) if process.stderr is not None else b""
+            namespace_init_host_identity = _host_namespace_init_identity(process.pid)
+            host_identity["namespace_init_host_identity"] = namespace_init_host_identity
             same_uid: dict[str, object] = {
                 "checks": {},
                 "supported": False,
                 "violations": [
                     "host_starttime_missing"
                     if host_identity["starttime"] is None
-                    else "namespace_ready_marker_missing"
+                    else "namespace_init_host_identity_missing"
                 ],
+                "target": namespace_init_host_identity,
             }
             admission_byte = b""
-            if first_stderr.startswith(READY_PREFIX.encode()) and host_identity["starttime"] is not None:
+            if (
+                first_stderr.startswith(READY_PREFIX.encode())
+                and host_identity["starttime"] is not None
+                and namespace_init_host_identity is not None
+            ):
                 try:
-                    same_uid = _same_uid_admission_probe(process.pid)
+                    same_uid = _same_uid_admission_probe(
+                        int(namespace_init_host_identity["pid"])
+                    )
+                    same_uid["target"] = namespace_init_host_identity
                 except (OSError, RuntimeError) as exc:
                     same_uid = {
                         "checks": {},
                         "supported": False,
                         "violations": [f"probe_error:{type(exc).__name__}:{exc}"],
+                        "target": namespace_init_host_identity,
                     }
                 if same_uid.get("supported") is True:
                     admission_byte = b"R"

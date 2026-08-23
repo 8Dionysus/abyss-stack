@@ -34,9 +34,12 @@ legacy cleanup path.
 ## Identity
 
 The receipt binds a random invocation identity, profile/command/environment
-digests, backend digest, backend pidfd start-time identity, and user/mount/PID
-namespace inode identities.  Numeric PID and PGID values may appear as
-diagnostic facts, but never as ownership authority.
+digests, backend digest, backend pidfd start-time identity, the separate
+host-side identity of namespace PID 1 used for admission, and user/mount/PID
+namespace inode identities.  The namespace-init host identity is bound to the
+backend controller's child relation, its start-time, and a pidfd probe. Numeric
+PID and PGID values may appear as diagnostic facts, but never as ownership
+authority.
 
 ## Lifecycle
 
