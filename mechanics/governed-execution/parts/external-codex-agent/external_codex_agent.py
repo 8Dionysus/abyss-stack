@@ -58,8 +58,12 @@ from external_codex_projection import (  # noqa: E402
     build_actor_manifest,
     build_actor_manifest_from_descriptor,
     build_private_git_admission_manifest,
+    create_review_state_seal,
     materialize_actor_projection,
     materialize_actor_projection_from_seed,
+    verify_review_state_seal,
+    read_source_shallow_boundary,
+    _read_regular_path,
     remove_actor_projection,
 )
 from external_codex_nested_evidence import (  # noqa: E402
@@ -112,6 +116,9 @@ ACTOR_MANIFEST_SCHEMA_PATH = (
 ACTOR_DELTA_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-actor-delta.schema.json"
 REVIEW_SEED_ENVELOPE_SCHEMA_PATH = (
     SCHEMA_ROOT / "external-codex-review-seed-envelope.schema.json"
+)
+REVIEW_STATE_SEAL_SCHEMA_PATH = (
+    SCHEMA_ROOT / "external-codex-review-state-seal.schema.json"
 )
 ACTOR_INPUT_ENVELOPE_SCHEMA_PATH = (
     SCHEMA_ROOT / "external-codex-actor-input-envelope.schema.json"
@@ -6332,6 +6339,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
         "git_head": _git_head(location, git_env=git_env),
         "git_status_porcelain_sha256": sha256_bytes(status_raw),
         "git_diff_binary_sha256": sha256_bytes(diff_raw),
+        "git_shallow": read_source_shallow_boundary(location),
         "status_entries": [
             {"path": path, "status": status[path]} for path in sorted(status)
         ],
@@ -6373,6 +6381,16 @@ def _workspace_manifests_match(
         return False
     baseline_without_diff = dict(baseline)
     current_without_diff = dict(current)
+    # Older admitted manifests did not carry the shallow-boundary snapshot.
+    # Preserve that compatibility only for a currently non-shallow source; a
+    # shallow source must be re-admitted with its exact boundary bytes.
+    current_shallow = current_without_diff.get("git_shallow")
+    if (
+        "git_shallow" not in baseline_without_diff
+        and isinstance(current_shallow, Mapping)
+        and current_shallow.get("present") is False
+    ):
+        baseline_without_diff["git_shallow"] = current_shallow
     baseline_diff = baseline_without_diff.pop("git_diff_binary_sha256", None)
     current_diff = current_without_diff.pop("git_diff_binary_sha256", None)
     if (
@@ -7303,6 +7321,10 @@ class ExternalCodexRuntime:
                     )
                 else:
                     seed_path = Path(str(review_seed["writer_projection_path"]))
+                    if isinstance(review_seed.get("writer_review_seal_ref"), dict):
+                        seed_path = Path(
+                            str(review_seed["writer_review_seal_ref"]["artifact_ref"])
+                        ).parent
                     seed_manifest = _load_verified_json_ref(
                         review_seed["writer_final_manifest_ref"],
                         label="actor projection recovery seed manifest",
@@ -7337,6 +7359,15 @@ class ExternalCodexRuntime:
                     expected_source_git_head=str(
                         prior_baseline["source_git_head"]
                     ),
+                    expected_shallow_bytes=(
+                        _read_regular_path(
+                            witness_path / ".git" / "shallow",
+                            label="recovery witness .git/shallow",
+                        )[0]
+                        if (witness_path / ".git" / "shallow").is_file()
+                        else None
+                    ),
+                    require_strict_fsck=True,
                     semantic_workspace_root=witness_path,
                 )
                 observed_baseline_after = _checked_actor_manifest(
@@ -7445,6 +7476,10 @@ class ExternalCodexRuntime:
                 )
             else:
                 seed_path = Path(str(review_seed["writer_projection_path"]))
+                if isinstance(review_seed.get("writer_review_seal_ref"), dict):
+                    seed_path = Path(
+                        str(review_seed["writer_review_seal_ref"]["artifact_ref"])
+                    ).parent
                 seed_manifest_ref = review_seed["writer_final_manifest_ref"]
                 seed_manifest = _load_verified_json_ref(
                     seed_manifest_ref,
@@ -9285,7 +9320,12 @@ class ExternalCodexRuntime:
             effort,
             tool_entry,
             repository_workspace=(
-                Path(str(review_seed["writer_projection_path"]))
+                Path(
+                    str(review_seed["writer_review_seal_ref"]["artifact_ref"])
+                ).parent
+                if review_seed is not None
+                and isinstance(review_seed.get("writer_review_seal_ref"), dict)
+                else Path(str(review_seed["writer_projection_path"]))
                 if review_seed is not None
                 else workspace
             ),
@@ -9620,6 +9660,19 @@ class ExternalCodexRuntime:
                 "review_seed_writer_result_unbound",
                 "terminal writer result bytes differ from locked runtime state",
             )
+        if (
+            result.get("failure_code") is not None
+            or result.get("status") not in {"completed", "review_required"}
+            or self._failure_authority_effects(
+                state.get("executed_commands", [])
+                if isinstance(state.get("executed_commands"), list)
+                else []
+            )
+        ):
+            raise ExternalCodexRuntimeError(
+                "review_seed_writer_not_clean",
+                "only clean completed or review-required writers can seed review",
+            )
         self._validate_owner_admission_result_binding_locked(
             state,
             result,
@@ -9665,6 +9718,97 @@ class ExternalCodexRuntime:
             label="terminal writer source manifest",
             schema_path=WORKSPACE_MANIFEST_SCHEMA_PATH,
         )
+        seal_ref = state.get("review_seal_ref")
+        result_seal_ref = result.get("review_seal_ref")
+        if seal_ref is not None and not isinstance(seal_ref, dict):
+            raise ExternalCodexRuntimeError(
+                "review_seed_seal_unbound",
+                "terminal writer review-state seal reference is malformed",
+            )
+        if result_seal_ref is not None and not isinstance(result_seal_ref, dict):
+            raise ExternalCodexRuntimeError(
+                "review_seed_seal_unbound",
+                "terminal writer result review-state seal reference is malformed",
+            )
+        if seal_ref is None and result_seal_ref is not None:
+            raise ExternalCodexRuntimeError(
+                "review_seed_writer_result_unbound",
+                "terminal writer result names a review-state seal absent from runtime state",
+            )
+        if isinstance(seal_ref, dict):
+            if result_seal_ref != seal_ref:
+                raise ExternalCodexRuntimeError(
+                    "review_seed_writer_result_unbound",
+                    "terminal writer result does not bind its review-state seal",
+                )
+            seal_path = Path(str(seal_ref.get("artifact_ref", "")))
+            seal_root = seal_path.parent
+            seal_base = self._session_dir(session_id) / "review-state-seal"
+            seal_is_first_attempt = seal_root == seal_base
+            seal_is_retry = (
+                seal_root.parent == seal_base
+                and re.fullmatch(r"attempt-[0-9]{3}", seal_root.name) is not None
+            )
+            if (
+                seal_path.name != "review-state-seal.json"
+                or not (seal_is_first_attempt or seal_is_retry)
+            ):
+                raise ExternalCodexRuntimeError(
+                    "review_seed_seal_unowned",
+                    "terminal writer review-state seal is outside its exact session",
+                )
+            seal_metadata = _load_verified_json_ref(
+                seal_ref,
+                label="terminal writer review-state seal",
+                schema_path=REVIEW_STATE_SEAL_SCHEMA_PATH,
+            )
+            final_manifest = _load_verified_json_ref(
+                final_ref,
+                label="sealed terminal writer actor final manifest",
+                schema_path=ACTOR_MANIFEST_SCHEMA_PATH,
+            )
+            delta = _load_verified_json_ref(
+                delta_ref,
+                label="sealed terminal writer actor delta",
+                schema_path=ACTOR_DELTA_SCHEMA_PATH,
+            )
+            if (
+                Path(str(final_ref["artifact_ref"]))
+                != seal_path.parent / str(seal_metadata["manifest_path"])
+                or Path(str(delta_ref["artifact_ref"]))
+                != seal_path.parent / str(seal_metadata["delta_path"])
+            ):
+                raise ExternalCodexRuntimeError(
+                    "review_seed_seal_evidence_unbound",
+                    "terminal writer evidence does not point into its sealed state",
+                )
+            try:
+                verify_review_state_seal(
+                    seal_path.parent,
+                    expected_manifest=final_manifest,
+                    expected_delta=delta,
+                    expected_session_id=session_id,
+                    expected_incarnation_id=str(state["incarnation_id"]),
+                    expected_status=str(state["status"]),
+                )
+            except ProjectionError as exc:
+                raise ExternalCodexRuntimeError(
+                    "review_seed_seal_invalid",
+                    str(exc),
+                ) from exc
+            return {
+                "schema_version": "abyss_stack_external_codex_review_seed_envelope_v1",
+                "writer_session_id": session_id,
+                "writer_incarnation_id": str(state["incarnation_id"]),
+                "writer_thread_id": str(state["thread_id"]),
+                "writer_status": str(state["status"]),
+                "writer_result_ref": _artifact_ref(result_path),
+                "writer_projection_path": str(state["actor_projection_path"]),
+                "writer_final_manifest_ref": dict(final_ref),
+                "writer_delta_ref": dict(delta_ref),
+                "writer_source_manifest_ref": dict(source_ref),
+                "writer_review_seal_ref": dict(seal_ref),
+            }
         projection_path = self._projection_path_from_state(state)
         projection_flags = os.O_PATH | os.O_CLOEXEC | os.O_DIRECTORY
         if hasattr(os, "O_NOFOLLOW"):
@@ -9718,7 +9862,28 @@ class ExternalCodexRuntime:
             envelope_path = (
                 self._session_dir(writer_session_id) / "review-seed-envelope.json"
             )
-            _atomic_write_json(envelope_path, envelope, mode=0o400)
+            if envelope_path.exists() or envelope_path.is_symlink():
+                if envelope_path.is_symlink():
+                    raise ExternalCodexRuntimeError(
+                        "review_seed_envelope_substituted",
+                        "existing review seed envelope is symbolic",
+                    )
+                existing = _load_verified_json_ref(
+                    {
+                        "owner_repo": "abyss-stack",
+                        "artifact_ref": str(envelope_path),
+                        "artifact_digest": sha256_file(envelope_path),
+                    },
+                    label="existing external Codex review seed envelope",
+                    schema_path=REVIEW_SEED_ENVELOPE_SCHEMA_PATH,
+                )
+                if existing != envelope:
+                    raise ExternalCodexRuntimeError(
+                        "review_seed_envelope_drift",
+                        "existing review seed envelope differs from the locked terminal writer",
+                    )
+            else:
+                _atomic_write_json(envelope_path, envelope, mode=0o400)
             return _artifact_ref(envelope_path)
 
     def _validate_review_seed(
@@ -9807,6 +9972,10 @@ class ExternalCodexRuntime:
                     "artifact_digest"
                 ],
             }
+            if isinstance(envelope.get("writer_review_seal_ref"), dict):
+                required_digests["writer-review-state-seal"] = envelope[
+                    "writer_review_seal_ref"
+                ]["artifact_digest"]
             if any(
                 not isinstance(immutable_by_id.get(input_id), dict)
                 or immutable_by_id[input_id].get("artifact_digest") != digest
@@ -10109,6 +10278,7 @@ class ExternalCodexRuntime:
                 ],
                 "actor_final_manifest_ref": None,
                 "actor_delta_ref": None,
+                "review_seal_ref": None,
                 "review_seed_envelope_ref": (
                     {
                         "owner_repo": "abyss-stack",
@@ -10430,9 +10600,15 @@ class ExternalCodexRuntime:
             error_code="isolated_git_hooks_unavailable",
             purpose="Git hooks directory",
         )
-        repository_git_environment = _controller_git_environment(
-            repository_workspace or Path(str(launch["workspace_path"]))
+        repository_coordinate = repository_workspace or Path(
+            str(launch["workspace_path"])
         )
+        if (repository_coordinate / "review-state-seal.json").is_file():
+            repository_git_environment = _base_controller_git_environment()
+        else:
+            repository_git_environment = _controller_git_environment(
+                repository_coordinate
+            )
         environment["HOME"] = str(shell_home)
         environment["PATH"] = CODEX_EXECUTABLE_PATH
         environment["BASH_ENV"] = "/dev/null"
@@ -13282,6 +13458,8 @@ Runtime session identity: {state["session_id"]}
         source_manifest_match: bool | None = None
         source_manifest_final_ref: dict[str, Any] | None = None
         actor_delta_changes: list[dict[str, Any]] = []
+        current_manifest: dict[str, Any] | None = None
+        delta: dict[str, Any] | None = None
         manifest_observation_gap = False
         manifest_observation_failure_code: str | None = None
         head_drift = False
@@ -13471,6 +13649,55 @@ Runtime session identity: {state["session_id"]}
             status = "failed"
         else:
             status = str(report["status"])
+        review_seal_ref: dict[str, Any] | None = None
+        if (
+            status in {"completed", "review_required"}
+            and failure_code is None
+            and report is not None
+            and current_manifest is not None
+            and delta is not None
+            and actor_delta_ref is not None
+        ):
+            try:
+                seal_root = self._session_dir(str(state["session_id"])) / "review-state-seal"
+                if attempt_number > 1:
+                    seal_root = seal_root / f"attempt-{attempt_number:03d}"
+                seal = create_review_state_seal(
+                    actor_workspace,
+                    seal_root,
+                    session_id=str(state["session_id"]),
+                    incarnation_id=str(state["incarnation_id"]),
+                    writer_status=status,
+                    final_manifest=current_manifest,
+                    actor_delta=delta,
+                )
+                seal_metadata_path = seal_root / "review-state-seal.json"
+                seal_metadata = load_json(
+                    seal_metadata_path,
+                    label="review state seal",
+                )
+                validate_json(
+                    seal_metadata,
+                    REVIEW_STATE_SEAL_SCHEMA_PATH,
+                    label="review state seal",
+                )
+                review_seal_ref = _artifact_ref(seal_metadata_path)
+                actor_final_manifest_ref = _artifact_ref(
+                    seal_root / str(seal["manifest_path"])
+                )
+                actor_delta_ref = _artifact_ref(
+                    seal_root / str(seal["delta_path"])
+                )
+                state["review_seal_ref"] = review_seal_ref
+                state["actor_final_manifest_ref"] = actor_final_manifest_ref
+                state["actor_delta_ref"] = actor_delta_ref
+            except (ExternalCodexRuntimeError, ProjectionError) as exc:
+                status = "authority_blocked"
+                failure_code = "review_state_seal_failed"
+                failure_message = str(exc)
+                state["review_seal_ref"] = None
+        else:
+            state["review_seal_ref"] = None
         attempt["status"] = status
         attempt_duration = max(0.0, (finished - started).total_seconds())
         attempt["active_wall_seconds"] = attempt_duration
@@ -13555,7 +13782,9 @@ Runtime session identity: {state["session_id"]}
         ]
         for ref in (
             workspace_manifest_ref,
+            actor_final_manifest_ref,
             actor_delta_ref,
+            review_seal_ref,
             state.get("source_manifest_before_ref"),
             state.get("source_manifest_after_ref"),
             source_manifest_final_ref,
@@ -13603,6 +13832,7 @@ Runtime session identity: {state["session_id"]}
             "actor_baseline_manifest_ref": actor_manifest_baseline_ref,
             "actor_final_manifest_ref": actor_final_manifest_ref,
             "actor_delta_ref": actor_delta_ref,
+            "review_seal_ref": review_seal_ref,
             "source_manifest_before_ref": state.get("source_manifest_before_ref"),
             "source_manifest_after_ref": state.get("source_manifest_after_ref"),
             "source_manifest_final_ref": source_manifest_final_ref,
@@ -13903,6 +14133,7 @@ Runtime session identity: {state["session_id"]}
             },
         )
         state["changed_paths"] = changed_paths
+        state["review_seal_ref"] = None
         state["wake_evaluation"] = dict(wake)
         evidence_refs = [
             _artifact_ref(failure_path),
@@ -13966,6 +14197,7 @@ Runtime session identity: {state["session_id"]}
             "actor_baseline_manifest_ref": actor_baseline_ref,
             "actor_final_manifest_ref": actor_final_ref,
             "actor_delta_ref": actor_delta_ref,
+            "review_seal_ref": None,
             "source_manifest_before_ref": state.get("source_manifest_before_ref"),
             "source_manifest_after_ref": state.get("source_manifest_after_ref"),
             "source_manifest_final_ref": source_final_ref,
@@ -14170,6 +14402,7 @@ Runtime session identity: {state["session_id"]}
             "actor_baseline_manifest_ref",
             "actor_final_manifest_ref",
             "actor_delta_ref",
+            "review_seal_ref",
         ):
             if key in result:
                 state[key] = result[key]
@@ -14245,6 +14478,7 @@ Runtime session identity: {state["session_id"]}
             "actor_baseline_manifest_ref": state.get("actor_baseline_manifest_ref"),
             "actor_final_manifest_ref": state.get("actor_final_manifest_ref"),
             "actor_delta_ref": state.get("actor_delta_ref"),
+            "review_seal_ref": state.get("review_seal_ref"),
         }
 
     def status(self, session_id: str) -> dict[str, Any]:
@@ -14640,6 +14874,11 @@ Runtime session identity: {state["session_id"]}
             state["finished_at"] = None
             state["result_path"] = None
             state["result_digest"] = None
+            state["review_seal_ref"] = None
+            state["actor_final_manifest_ref"] = previous_result.get(
+                "actor_final_manifest_ref"
+            )
+            state["actor_delta_ref"] = previous_result.get("actor_delta_ref")
             self._spawn_worker(state, mode="resume", resume_payload=resume)
             return self._public_state(state)
 

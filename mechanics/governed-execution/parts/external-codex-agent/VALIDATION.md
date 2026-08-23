@@ -178,7 +178,12 @@ actor containment, and a post-publication target swap cannot become the durable
 actor baseline. Publication is relative to a pinned parent descriptor, its baseline
 comes from the retained staging inode, uses non-replacing rename, and cleans the
 exact committed inode after an injected post-rename failure for both source and
-review-seed projections while refusing a replacement inode. Unicode/JSON-escaped
+review-seed projections while refusing a replacement inode. Admitted
+shallow-source tests preserve only necessary commit boundaries, reject malformed
+or forged boundary metadata, and pass strict full fsck. Terminal
+review-state tests seal the actor tree before lock release, tolerate a benign
+post-closeout index refresh, replay repeated issuance idempotently, and reject
+tampered seal objects or cross-session materialization. Unicode/JSON-escaped
 source coordinates are removed from mapping keys, values, arbitrary text, and
 model-facing control views by schema-validated actor input envelopes. Tests
 cover mixed/case-varied/nested escapes, escaped slashes, surrogate pairs,

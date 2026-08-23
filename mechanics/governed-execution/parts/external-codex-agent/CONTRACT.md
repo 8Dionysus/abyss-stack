@@ -573,8 +573,10 @@ the worker or model starts, the controller materializes a fresh runtime-owned
 actor projection of the admitted exact Git-worktree baseline, rejecting
 unsupported special entries or unsafe symlinks. It copies content through open
 directory/file descriptors and constructs a private `.git` body from the exact
-admitted HEAD and index objects; private Git config, remotes, alternates, logs,
-and source coordinates are excluded. It records a source
+admitted HEAD and index objects; when the source is shallow, it preserves only
+source-authored commit boundaries that are in the admitted object set and are
+necessary to explain missing parents. Private Git config, remotes, alternates,
+logs, and source coordinates are excluded. It records a source
 manifest before and after materialization and fails closed if those source
 bytes or directory identities differ. Projection staging is created and
 renamed relative to one pinned parent descriptor. The authoritative baseline is
@@ -590,8 +592,11 @@ the only model target, cwd, validation root, and mutable repository surface;
 the source checkout remains the owner acceptance surface and is never passed
 as a model coordinate. A reviewer may clone an exact writer projection only
 from a controller-issued envelope binding the terminal writer session, result,
-final manifest, delta, source manifest, and projection. The envelope is
-recomputed under the writer lock, and reviewer immutable evidence must bind the
+final manifest, delta, source manifest, and projection. A clean terminal writer
+also seals the exact actor tree into a content-addressed review-state root before
+releasing the writer lock; the envelope binds that seal and reviewer
+materialization reads the seal rather than the mutable writer path. The envelope
+is recomputed under the writer lock, and reviewer immutable evidence must bind the
 same writer duty. Neither review preparation nor execution needs the historical
 source checkout after the writer has returned.
 
