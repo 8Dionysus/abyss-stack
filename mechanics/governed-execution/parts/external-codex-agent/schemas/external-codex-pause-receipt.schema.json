@@ -160,7 +160,8 @@
         "before_status": {"const": "active"},
         "transition": {"const": "active_to_paused"},
         "identity_source": {"type": "string", "minLength": 1}
-      }
+      },
+      "additionalProperties": false
     },
     "lifecycle_method": {"const": "thread/goal/set"},
     "lifecycle": {
@@ -192,18 +193,21 @@
           "required": [
             "goal_status",
             "goal_get",
+            "goal_get_response",
             "goal_get_summary_sha256",
             "goal_response_sha256"
           ],
           "properties": {
             "goal_status": {"const": "active"},
             "goal_get": {"type": "object"},
+            "goal_get_response": {"type": "object"},
             "goal_get_summary_sha256": {
               "type": "string",
               "pattern": "^sha256:[0-9a-f]{64}$"
             },
             "goal_response_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
-          }
+          },
+          "additionalProperties": false
         },
         "response_available": {"type": "boolean"},
         "transition_proof": {"$ref": "#/$defs/transition_proof"},

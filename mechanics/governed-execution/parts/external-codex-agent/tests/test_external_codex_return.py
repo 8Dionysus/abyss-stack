@@ -573,6 +573,18 @@ def test_pause_precondition_rejects_tampered_stored_goal_summary() -> None:
     ):
         MODULE._validated_pause_precondition(tampered)
 
+    tampered_digest = {
+        "precondition": {
+            **precondition,
+            "goal_response_sha256": "sha256:" + "0" * 64,
+        }
+    }
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="invalid active precondition",
+    ):
+        MODULE._validated_pause_precondition(tampered_digest)
+
 
 def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     tmp_path: Path,

@@ -972,6 +972,7 @@ def _pause_precondition(goal_get_response: dict[str, Any]) -> dict[str, Any]:
     return {
         "goal_status": "active",
         "goal_get": goal_get_summary,
+        "goal_get_response": goal_get_response,
         "goal_get_summary_sha256": _sha256_bytes(
             _canonical_bytes(goal_get_summary)
         ),
@@ -1004,10 +1005,15 @@ def _validated_pause_precondition(reservation: dict[str, Any]) -> dict[str, Any]
     if (
         precondition.get("goal_status") != "active"
         or not isinstance(precondition.get("goal_get"), dict)
+        or not isinstance(precondition.get("goal_get_response"), dict)
         or not _is_sha256_digest(precondition.get("goal_get_summary_sha256"))
-        or not isinstance(precondition.get("goal_response_sha256"), str)
+        or not _is_sha256_digest(precondition.get("goal_response_sha256"))
         or precondition.get("goal_get_summary_sha256")
         != _sha256_bytes(_canonical_bytes(precondition.get("goal_get")))
+        or precondition.get("goal_get")
+        != _safe_response_summary(precondition.get("goal_get_response"))
+        or precondition.get("goal_response_sha256")
+        != _sha256_bytes(_canonical_bytes(precondition.get("goal_get_response")))
     ):
         raise ExternalCodexReturnError(
             "reserved Goal pause has an invalid active precondition"
