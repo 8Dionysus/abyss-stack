@@ -6,6 +6,7 @@ policy contracts, candidate exports, tests, and local worker paths.
 - [governed-runner](governed-runner/README.md)
 - [agent-os-adapter](agent-os-adapter/README.md)
 - [external-codex-agent](external-codex-agent/README.md)
+- [process-containment](process-containment/README.md)
 - [autonomy-status](autonomy-status/README.md)
 - [return-policy](return-policy/README.md)
 - [runtime-contracts](runtime-contracts/README.md)

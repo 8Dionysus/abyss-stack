@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Add the generic process-containment substrate for namespace-owned
+  invocations: private user/PID/mount namespaces, tmpfs teardown reclaim,
+  PID-1 drain, pidfd identity, same-UID admission, and fail-closed diagnostics.
+
 - Bound the Codex agent-routing adapter's wait for an event-keyed relay
   context when matching `PreToolUse` groups run concurrently, while retaining
   fail-closed behavior when the context remains unavailable.

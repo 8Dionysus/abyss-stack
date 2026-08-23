@@ -210,6 +210,7 @@
 - [ABYSS-STACK-D-0123 Parent Passive Turns Disable Code Mode](../ABYSS-STACK-D-0123-parent-passive-code-mode-disable.md) (`docs/decisions/ABYSS-STACK-D-0123-parent-passive-code-mode-disable.md`)
 - [ABYSS-STACK-D-0124 Visible Holder Terminal Lifecycle Identity](../ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md) (`docs/decisions/ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md`)
 - [ABYSS-STACK-D-0127 Bind Resume Private-Git Observation to the Accepted Actor Final](../ABYSS-STACK-D-0127-bind-resume-private-git-to-accepted-actor-final.md) (`docs/decisions/ABYSS-STACK-D-0127-bind-resume-private-git-to-accepted-actor-final.md`)
+- [ABYSS-STACK-D-0135 Private Namespace-Owned Pytest Invocation Lifecycle](../ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md`)
 
 ## diagnostics
 
@@ -445,6 +446,7 @@
 
 - [ABYSS-STACK-D-0120 Schedule Full Pytest With Bounded Work Stealing](../ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md) (`docs/decisions/ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md`)
 - [ABYSS-STACK-D-0130 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0130-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0130-frontload-release-artifact-guard.md`)
+- [ABYSS-STACK-D-0135 Private Namespace-Owned Pytest Invocation Lifecycle](../ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md`)
 
 ## tos-graph
 
@@ -468,6 +470,7 @@
 - [ABYSS-STACK-D-0130 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0130-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0130-frontload-release-artifact-guard.md`)
 - [ABYSS-STACK-D-0133 Owner-Bound External Goal Pause](../ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md`)
 - [ABYSS-STACK-D-0134 Generic Responsibility-Movement Observation](../ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md) (`docs/decisions/ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md`)
+- [ABYSS-STACK-D-0135 Private Namespace-Owned Pytest Invocation Lifecycle](../ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md`)
 
 ## validation lane
 
