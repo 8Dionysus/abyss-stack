@@ -197,6 +197,31 @@ def test_matching_transition_changes_only_classification_and_suppresses_wake() -
     assert result["unrelated_actors"]["preserved"] is True
 
 
+def test_transition_at_observation_window_start_counts_as_movement() -> None:
+    value = observation(
+        [
+            _evidence(
+                "return-start-boundary",
+                "lifecycle_transition",
+                signal="transition",
+                observed_at="2026-08-22T11:55:00Z",
+                from_state="returning",
+                to_state="terminal",
+            )
+        ]
+    )
+
+    result = MODULE.observe_once(value)
+
+    assert result["classification"] == "progressing"
+    assert result["causal_basis"] == "matching_lifecycle_transition"
+    assert result["transition_evidence"]["matching_evidence_ids"] == [
+        "return-start-boundary"
+    ]
+    assert result["event"] is None
+    assert result["wake"] is None
+
+
 def test_noop_transition_is_not_movement() -> None:
     value = observation(
         [

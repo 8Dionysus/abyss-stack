@@ -229,6 +229,7 @@
     "owner_acceptance": {"const": "separate"},
     "semantic_acceptance": {"const": "separate"}
   },
+  "additionalProperties": false,
   "allOf": [
     {
       "if": {

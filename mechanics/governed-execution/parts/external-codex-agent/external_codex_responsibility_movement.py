@@ -223,7 +223,7 @@ def _matching_transition_ids(observation: Mapping[str, Any]) -> list[str]:
             continue
         evidence_at = _parse_time(evidence["observed_at"], "lifecycle transition")
         if (
-            evidence_at > transition_started_at
+            evidence_at >= transition_started_at
             and evidence_at <= observed_at
             and evidence["from_state"] == current_state
             and evidence["to_state"] in expected_states
