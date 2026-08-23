@@ -361,7 +361,7 @@ def _load_capability_class_registry() -> tuple[
         CAPABILITY_CLASS_REGISTRY_PATH, "capability-class registry"
     )
     value, raw = _load_json_snapshot(path, "capability-class registry")
-    required = {"$schema", "schema_version", "classes", "unknown"}
+    required = {"$schema", "schema_version", "classes", "entries", "unknown"}
     if set(value) != required:
         raise IncarnationHomeError("capability-class registry fields are not exact")
     if value.get("$schema") != "schemas/external-codex-capability-classes.schema.json":
@@ -373,19 +373,19 @@ def _load_capability_class_registry() -> tuple[
         raise IncarnationHomeError("capability-class registry classes are invalid")
 
     definitions: dict[str, dict[str, Any]] = {}
+    class_definitions: dict[str, dict[str, Any]] = {}
     class_ids: set[str] = set()
     for capability_class, definition in classes.items():
         if (
             not isinstance(capability_class, str)
             or not isinstance(definition, dict)
-            or set(definition) != {"projection", "grantable", "entries"}
+            or set(definition) != {"projection", "grantable"}
         ):
             raise IncarnationHomeError(
                 "capability-class registry definition is not exact"
             )
         projection = definition.get("projection")
         grantable = definition.get("grantable")
-        entries = definition.get("entries")
         if (
             not isinstance(capability_class, str)
             or CAPABILITY_CLASS_ID_PATTERN.fullmatch(capability_class) is None
@@ -393,9 +393,6 @@ def _load_capability_class_registry() -> tuple[
             or capability_class in class_ids
             or projection not in {"shared_link", "denied"}
             or not isinstance(grantable, bool)
-            or not isinstance(entries, list)
-            or not all(isinstance(name, str) for name in entries)
-            or len(set(entries)) != len(entries)
         ):
             raise IncarnationHomeError(
                 "capability-class registry definition is invalid"
@@ -408,28 +405,39 @@ def _load_capability_class_registry() -> tuple[
                 "capability-class registry policy is not an admitted safe tuple"
             )
         class_ids.add(capability_class)
-        for name in entries:
-            if (
-                not isinstance(name, str)
-                or CAPABILITY_ENTRY_NAME_PATTERN.fullmatch(name) is None
-                or name in {".", ".."}
-                or name in LOCAL_NAMES
-                or Path(name).name != name
-                or name in definitions
-            ):
-                raise IncarnationHomeError(
-                    "capability-class registry entry is invalid"
-                )
-            definitions[name] = {
-                "capability_class": capability_class,
-                "projection": projection,
-                "grantable": grantable,
-            }
+        class_definitions[capability_class] = {
+            "projection": projection,
+            "grantable": grantable,
+        }
 
     if not set(CAPABILITY_CLASS_POLICIES).issubset(class_ids):
         raise IncarnationHomeError(
             "capability-class registry omits an admitted canonical class"
         )
+
+    entries = value.get("entries")
+    if not isinstance(entries, dict):
+        raise IncarnationHomeError("capability-class registry entries are invalid")
+    for name, capability_class in entries.items():
+        if (
+            not isinstance(name, str)
+            or CAPABILITY_ENTRY_NAME_PATTERN.fullmatch(name) is None
+            or name in {".", ".."}
+            or name in LOCAL_NAMES
+            or Path(name).name != name
+            or not isinstance(capability_class, str)
+            or CAPABILITY_CLASS_ID_PATTERN.fullmatch(capability_class) is None
+            or capability_class == "unknown"
+            or capability_class not in class_definitions
+        ):
+            raise IncarnationHomeError(
+                "capability-class registry entry is invalid"
+            )
+        class_definition = class_definitions[capability_class]
+        definitions[name] = {
+            "capability_class": capability_class,
+            **class_definition,
+        }
 
     unknown = value.get("unknown")
     if not isinstance(unknown, dict) or set(unknown) != {

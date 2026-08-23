@@ -136,6 +136,10 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         "external-codex-holder-terminal-closure.schema.json",
     ):
         (schemas / schema_name).write_text("{}\n", encoding="utf-8")
+    shutil.copyfile(
+        PART_ROOT / "schemas" / "external-codex-capability-classes.schema.json",
+        schemas / "external-codex-capability-classes.schema.json",
+    )
     package = sdk / "src/aoa_sdk"
     (package / "contracts").mkdir(parents=True)
     (package / "__init__.py").write_text("MARKER = 'exact-sdk'\n", encoding="utf-8")
@@ -763,6 +767,7 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
         "external-codex-holder-terminal-join.schema.json",
         "external-codex-holder-terminal-closure-authorization.schema.json",
         "external-codex-holder-terminal-closure.schema.json",
+        "external-codex-capability-classes.schema.json",
     ):
         assert (release_root / "runtime/schemas" / schema_name).is_file()
     assert (

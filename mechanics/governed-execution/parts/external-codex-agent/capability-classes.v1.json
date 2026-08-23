@@ -4,37 +4,35 @@
   "classes": {
     "session_continuity": {
       "projection": "shared_link",
-      "grantable": false,
-      "entries": [
-        "archived_sessions",
-        "attachments",
-        "auth.json",
-        "history.jsonl",
-        "memories",
-        "memories_1.sqlite",
-        "memories_1.sqlite-shm",
-        "memories_1.sqlite-wal",
-        "session_index.jsonl",
-        "sessions"
-      ]
+      "grantable": false
     },
     "actor_tooling": {
       "projection": "shared_link",
-      "grantable": false,
-      "entries": ["skills"]
+      "grantable": false
     },
     "operator_control": {
       "projection": "denied",
-      "grantable": true,
-      "entries": [
-        "app-server-control",
-        "app-server-daemon",
-        "browser",
-        "hooks.json",
-        "plugins",
-        "queues"
-      ]
+      "grantable": true
     }
+  },
+  "entries": {
+    "archived_sessions": "session_continuity",
+    "attachments": "session_continuity",
+    "auth.json": "session_continuity",
+    "history.jsonl": "session_continuity",
+    "memories": "session_continuity",
+    "memories_1.sqlite": "session_continuity",
+    "memories_1.sqlite-shm": "session_continuity",
+    "memories_1.sqlite-wal": "session_continuity",
+    "session_index.jsonl": "session_continuity",
+    "sessions": "session_continuity",
+    "skills": "actor_tooling",
+    "app-server-control": "operator_control",
+    "app-server-daemon": "operator_control",
+    "browser": "operator_control",
+    "hooks.json": "operator_control",
+    "plugins": "operator_control",
+    "queues": "operator_control"
   },
   "unknown": {
     "capability_class": "unknown",

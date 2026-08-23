@@ -822,8 +822,10 @@ digest to reproduce the exact nested projection before materialization.
 The capability meaning consumed by the classifier is authored in
 `capability-classes.v1.json`, with an exact schema and digest recorded in the
 projection. Its `classes` value is an object whose keys are the unique authored
-class IDs; class identity is therefore part of the schema representation, not
-only a loader-side uniqueness check. Entries absent from that registry resolve to an explicit
+class IDs, and its `entries` value is an object whose exact ambient-entry keys
+each name one owning class ID. Entry ownership is therefore structural and
+unambiguous for schema-only consumers, not only a loader-side uniqueness
+check. Entries absent from that registry resolve to an explicit
 `unknown`/denied/grantable result; adding a future capability family therefore
 does not require executable endpoint special cases. The registry schema and
 loader require the canonical `session_continuity`, `actor_tooling`, and

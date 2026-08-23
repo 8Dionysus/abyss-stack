@@ -225,9 +225,7 @@ def test_capability_class_registry_is_authored_data_with_explicit_unknown(
     registry = json.loads(
         (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
     )
-    registry["classes"]["session_continuity"]["entries"].append(
-        "custom-continuity"
-    )
+    registry["entries"]["custom-continuity"] = "session_continuity"
     registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
     registry_path.write_text(json.dumps(registry), encoding="utf-8")
     Draft202012Validator(
@@ -281,13 +279,13 @@ def test_capability_class_ids_are_unique_structural_keys(
     registry["classes"]["future_semantic"] = {
         "projection": "denied",
         "grantable": False,
-        "entries": ["future-capability"],
     }
     registry["classes"]["future_semantic_next"] = {
         "projection": "denied",
         "grantable": False,
-        "entries": ["future-capability-next"],
     }
+    registry["entries"]["future-capability"] = "future_semantic"
+    registry["entries"]["future-capability-next"] = "future_semantic_next"
     Draft202012Validator(schema).validate(registry)
     registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
     registry_path.write_text(json.dumps(registry), encoding="utf-8")
@@ -299,6 +297,39 @@ def test_capability_class_ids_are_unique_structural_keys(
         definitions["future-capability-next"]["capability_class"]
         == "future_semantic_next"
     )
+
+
+def test_capability_registry_schema_rejects_cross_class_duplicate_shape() -> None:
+    registry = json.loads(
+        (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
+    )
+    registry["classes"]["session_continuity"]["entries"] = ["shared-entry"]
+    registry["classes"]["actor_tooling"]["entries"] = ["shared-entry"]
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-capability-classes.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert list(Draft202012Validator(schema).iter_errors(registry))
+
+
+def test_capability_registry_loader_rejects_cross_class_duplicate_shape(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = json.loads(
+        (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
+    )
+    registry["classes"]["session_continuity"]["entries"] = ["shared-entry"]
+    registry["classes"]["actor_tooling"]["entries"] = ["shared-entry"]
+    registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    monkeypatch.setattr(MODULE, "CAPABILITY_CLASS_REGISTRY_PATH", registry_path)
+
+    with pytest.raises(
+        MODULE.IncarnationHomeError, match="definition is not exact"
+    ):
+        MODULE._load_capability_class_registry()
 
 
 def test_capability_class_registry_rejects_operator_control_policy_override(
@@ -334,7 +365,6 @@ def test_capability_class_registry_rejects_unsafe_future_authority_tuple(
     registry["classes"]["future_semantic"] = {
         "projection": "shared_link",
         "grantable": False,
-        "entries": ["future-capability"],
     }
     registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
     registry_path.write_text(json.dumps(registry), encoding="utf-8")
@@ -361,8 +391,8 @@ def test_safe_future_registry_class_produces_schema_valid_manifest(
     registry["classes"]["future_semantic"] = {
         "projection": "denied",
         "grantable": False,
-        "entries": ["future-capability"],
     }
+    registry["entries"]["future-capability"] = "future_semantic"
     registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
     registry_path.write_text(json.dumps(registry), encoding="utf-8")
     registry_schema = json.loads(

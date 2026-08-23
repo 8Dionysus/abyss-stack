@@ -4,7 +4,7 @@
   "title": "Owner-authored external Codex capability-class registry",
   "type": "object",
   "additionalProperties": false,
-  "required": ["$schema", "schema_version", "classes", "unknown"],
+  "required": ["$schema", "schema_version", "classes", "entries", "unknown"],
   "properties": {
     "$schema": {
       "const": "schemas/external-codex-capability-classes.schema.json"
@@ -34,9 +34,19 @@
       },
       "additionalProperties": {"$ref": "#/$defs/futureClassDefinition"}
     },
+    "entries": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/entryName"},
+      "additionalProperties": {"$ref": "#/$defs/classId"}
+    },
     "unknown": {"$ref": "#/$defs/unknownDefinition"}
   },
   "$defs": {
+    "classId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "not": {"const": "unknown"}
+    },
     "entryName": {
       "type": "string",
       "pattern": "^(?!\\.\\.?$)[^/]+$",
@@ -45,15 +55,10 @@
     "classDefinition": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["projection", "grantable", "entries"],
+      "required": ["projection", "grantable"],
       "properties": {
         "projection": {"enum": ["shared_link", "denied"]},
-        "grantable": {"type": "boolean"},
-        "entries": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {"$ref": "#/$defs/entryName"}
-        }
+        "grantable": {"type": "boolean"}
       }
     },
     "sessionContinuityDefinition": {

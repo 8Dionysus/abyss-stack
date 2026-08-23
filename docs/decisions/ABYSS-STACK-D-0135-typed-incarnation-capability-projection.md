@@ -50,11 +50,12 @@ validates the projection again when loading the manifest and preserves the
 owner-authored capability-class registry plus grant path/digest as provenance
 and drift evidence.
 
-The representation makes the two relations structural. Registry `classes` is
-an object keyed by the unique authored class ID. Manifest `entries` is an
-object keyed by the exact ambient entry name, and a shared operator-control
-entry carries the complete `explicit_grant` projection nested under that key;
-denied entries carry `explicit_grant: null`. There is no detached
+The representation makes the three relations structural. Registry `classes` is
+an object keyed by the unique authored class ID, while registry `entries` is
+one object keyed by exact ambient entry name whose value is its sole class ID.
+Manifest `entries` is an object keyed by the exact ambient entry name, and a
+shared operator-control entry carries the complete `explicit_grant` projection
+nested under that key; denied entries carry `explicit_grant: null`. There is no detached
 `explicit_grants` list or grant-ID-only field. Loading still re-reads the
 referenced artifact and rejects metadata, subject, ambient-entry, expiry, or
 digest drift, so the schema describes the required relation while runtime
@@ -80,9 +81,9 @@ relation can turn an operator-control entry into a shared link. Deny-by-default
 unknown and future entries avoid implicit authority while exact grants provide
 a typed future extension point.
 
-The map-key representation makes class and ambient-entry identity explicit to
-schema-only consumers and removes the two detached-list/duplicate-ID shapes
-identified by the fresh review.
+The map-key representation makes class and ambient-entry ownership explicit to
+schema-only consumers and removes the authored cross-class duplicate plus the
+two detached-list/duplicate-ID shapes identified by the fresh review.
 The grant is intentionally reusable by its exact subject until expiry; subject,
 path, grant-artifact digest, and expiry binding make copied, stale, or mutated
 grant artifacts fail closed, but mutable bytes inside a dynamic operator
