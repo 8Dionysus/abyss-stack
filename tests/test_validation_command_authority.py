@@ -131,7 +131,7 @@ def test_workflow_routes_reusable_commands_through_ci_gate() -> None:
     assert "AOA_SKILLS_SOURCE_ROOT: ${{ runner.temp }}/aoa-skills-source" in workflow
     assert "AOA_STATS_ROOT: ${{ runner.temp }}/aoa-stats-validator" in workflow
     assert "PYTHONPATH: ${{ runner.temp }}/aoa-sdk-source/src" in workflow
-    assert "TMPDIR: ${{ runner.temp }}" in workflow
+    assert "TMPDIR: ${{ runner.temp }}" not in workflow
     assert ".deps/aoa-sdk" not in workflow
     assert shellcheck_commands[0]["command"][0] == "shellcheck"
 
@@ -243,6 +243,53 @@ def test_pytest_scheduler_keeps_an_exact_serial_rollback() -> None:
         "-q",
         "tests/test_validation_command_authority.py",
     ]
+
+
+def test_canonical_pytest_modes_route_through_one_containment_instance(monkeypatch) -> None:
+    calls: list[tuple[str, list[str]]] = []
+    monkeypatch.setattr(
+        run_pytest_lane,
+        "_run_in_containment",
+        lambda *, mode, extra_args: calls.append((mode, extra_args)) or 0,
+    )
+
+    assert run_pytest_lane.main(["--scheduler", "serial", "tests/test_example.py"]) == 0
+    assert run_pytest_lane.main(["--scheduler", "auto"]) == 0
+
+    assert calls == [
+        ("serial", ["tests/test_example.py"]),
+        ("process-4x32-file-aware", []),
+    ]
+
+
+def test_pytest_adapter_rejects_host_temp_and_output_redirections(monkeypatch) -> None:
+    for name in run_pytest_lane.FORBIDDEN_EXTERNAL_ENVIRONMENT:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("TMPDIR", "/host/temp")
+    with pytest.raises(run_pytest_lane.ContainmentAdapterError, match="external_redirection:TMPDIR"):
+        run_pytest_lane._containment_spec(mode="serial", extra_args=[])
+
+    monkeypatch.delenv("TMPDIR")
+    with pytest.raises(run_pytest_lane.ContainmentAdapterError, match="external_pytest_redirection"):
+        run_pytest_lane._containment_spec(mode="serial", extra_args=["--basetemp", "/host/temp"])
+
+
+def test_pytest_adapter_source_has_no_legacy_process_or_path_authority() -> None:
+    text = (REPO_ROOT / "scripts" / "run_pytest_lane.py").read_text(encoding="utf-8")
+
+    assert "import pytest" not in text
+    assert "TemporaryDirectory" in text  # worker-only private tmpfs manifests
+    assert "killpg" not in text
+    assert "setpgid" not in text
+    assert "quarantine" not in text
+    assert "os.unlink" not in text
+    assert "os.rmdir" not in text
+
+
+def test_process_worker_rejects_execution_outside_containment(monkeypatch, capsys) -> None:
+    monkeypatch.delenv(run_pytest_lane.CONTAINMENT_ACTIVE_ENV, raising=False)
+    assert run_pytest_lane.run_process_worksteal(extra_args=[]) == 125
+    assert "only valid inside process containment" in capsys.readouterr().err
 
 
 def test_pytest_scheduler_replays_failed_shard_log_at_closeout(

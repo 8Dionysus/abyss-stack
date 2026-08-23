@@ -4,20 +4,30 @@ from __future__ import annotations
 import argparse
 from collections import Counter, deque
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
+import site
+import shutil
 import subprocess
 import sys
+import sysconfig
 import tempfile
 import time
 from typing import Any
 
-import pytest
-
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
+CONTAINMENT_API_PATH = (
+    REPO_ROOT
+    / "mechanics"
+    / "governed-execution"
+    / "parts"
+    / "process-containment"
+    / "contained_invocation.py"
+)
 SCHEDULER_ENV = "ABYSS_STACK_TEST_SCHEDULER"
+CONTAINMENT_ACTIVE_ENV = "ABYSS_CONTAINMENT_ACTIVE"
 PROCESS_WORKER_LIMIT = 4
 PROCESS_SHARD_COUNT = 32
 SCHEDULERS = ("auto", "serial", "process-4x32-file-aware")
@@ -45,6 +55,27 @@ PARTITION_OBSERVED_ENV = "ABYSS_STACK_PYTEST_PARTITION_OBSERVED"
 PARTITION_RESULT_ENV = "ABYSS_STACK_PYTEST_PARTITION_RESULT"
 PARTITION_MANIFEST_SCHEMA = "abyss-stack-pytest-partition-manifest-v1"
 PARTITION_RESULT_SCHEMA = "abyss-stack-pytest-partition-result-v1"
+FORBIDDEN_EXTERNAL_ENVIRONMENT = (
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "PYTEST_DEBUG_TEMPROOT",
+    "PYTEST_ADDOPTS",
+    "PYTHONPYCACHEPREFIX",
+)
+FORBIDDEN_PYTEST_REDIRECTIONS = (
+    "--basetemp",
+    "--junitxml",
+    "--html",
+    "--json-report",
+    "--cov-report",
+    "--result-log",
+)
+CONTAINMENT_STATUS_CODES = {
+    "containment_unsupported": 125,
+    "recovery_required": 126,
+    "infrastructure_failure": 127,
+}
 
 
 def nodeid_digest(nodeids: list[str]) -> str:
@@ -87,14 +118,13 @@ def read_manifest(path: Path) -> list[str]:
 def _manifest_path_from_env(name: str) -> Path:
     raw = os.environ.get(name)
     if not raw:
-        raise pytest.UsageError(f"missing ${name} for bounded pytest partition")
+        raise ValueError(f"missing ${name} for bounded pytest partition")
     return Path(raw)
 
 
-@pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(
-    config: pytest.Config,
-    items: list[pytest.Item],
+    config: Any,
+    items: list[Any],
 ) -> None:
     mode = os.environ.get(PARTITION_MODE_ENV)
     if not mode:
@@ -102,20 +132,20 @@ def pytest_collection_modifyitems(
 
     nodeids = [item.nodeid for item in items]
     if len(nodeids) != len(set(nodeids)):
-        raise pytest.UsageError("duplicate pytest nodeids cannot form an exact partition")
+        raise ValueError("duplicate pytest nodeids cannot form an exact partition")
 
     if mode == "collect":
         write_manifest(_manifest_path_from_env(PARTITION_BASELINE_ENV), nodeids)
         return
     if mode != "shard":
-        raise pytest.UsageError(f"unknown bounded pytest partition mode: {mode!r}")
+        raise ValueError(f"unknown bounded pytest partition mode: {mode!r}")
 
     baseline = read_manifest(_manifest_path_from_env(PARTITION_BASELINE_ENV))
     assignment = read_manifest(_manifest_path_from_env(PARTITION_ASSIGNMENT_ENV))
     if not assignment or not set(assignment).issubset(set(baseline)):
-        raise pytest.UsageError("pytest shard assignment is empty or outside the baseline")
+        raise ValueError("pytest shard assignment is empty or outside the baseline")
     if len(nodeids) != len(assignment) or set(nodeids) != set(assignment):
-        raise pytest.UsageError(
+        raise ValueError(
             "pytest shard did not collect its explicit assignment exactly once"
         )
     write_manifest(
@@ -124,8 +154,7 @@ def pytest_collection_modifyitems(
     )
 
 
-@pytest.hookimpl(trylast=True)
-def pytest_sessionfinish(session: pytest.Session, exitstatus: int | pytest.ExitCode) -> None:
+def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
     if os.environ.get(PARTITION_MODE_ENV) != "shard":
         return
     result_path = _manifest_path_from_env(PARTITION_RESULT_ENV)
@@ -180,6 +209,291 @@ def scheduler_plan(requested: str) -> dict[str, Any]:
 
 def build_pytest_command(*, extra_args: list[str]) -> list[str]:
     return [sys.executable, "-m", "pytest", "-q", *extra_args]
+
+
+class ContainmentAdapterError(ValueError):
+    """A canonical pytest request cannot be admitted to the namespace profile."""
+
+
+def _containment_api() -> Any:
+    module_name = "abyss_stack_process_containment_api"
+    spec = importlib.util.spec_from_file_location(module_name, CONTAINMENT_API_PATH)
+    if spec is None or spec.loader is None:
+        raise ContainmentAdapterError(f"process-containment API is unavailable: {CONTAINMENT_API_PATH}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _reject_external_redirections(extra_args: list[str]) -> None:
+    for index, argument in enumerate(extra_args):
+        option = argument.split("=", 1)[0]
+        if option in FORBIDDEN_PYTEST_REDIRECTIONS or any(
+            argument.startswith(prefix + "=") for prefix in FORBIDDEN_PYTEST_REDIRECTIONS
+        ):
+            raise ContainmentAdapterError(f"external_pytest_redirection:{option}")
+        if option in {"-o", "--override-ini"} and index + 1 < len(extra_args):
+            setting = extra_args[index + 1].lower()
+            if any(token in setting for token in ("basetemp", "tmp", "cache_dir", "junitxml")):
+                raise ContainmentAdapterError(f"external_pytest_redirection:{setting}")
+        if any(token in argument.lower() for token in ("basetemp=", "tmpdir=", "temproot=")):
+            raise ContainmentAdapterError(f"external_pytest_redirection:{argument}")
+
+
+def _path_values_for_environment(name: str, value: str) -> list[Path]:
+    if name == "PYTHONPATH" or name.endswith("_PATH"):
+        values = value.split(os.pathsep)
+    else:
+        values = [value]
+    paths: list[Path] = []
+    for raw in values:
+        if not raw or not raw.startswith("/"):
+            raise ContainmentAdapterError(f"runtime_path_must_be_absolute:{name}")
+        path = Path(raw)
+        try:
+            resolved = path.resolve(strict=True)
+        except OSError as exc:
+            raise ContainmentAdapterError(f"runtime_path_unavailable:{name}:{raw}") from exc
+        if not resolved.is_dir():
+            raise ContainmentAdapterError(f"runtime_path_not_directory:{name}:{raw}")
+        paths.append(resolved)
+    return paths
+
+
+def _runtime_roots() -> tuple[Path, ...]:
+    candidates: list[Path] = []
+    candidate_guests: set[str] = set()
+
+    def add(path: Path) -> None:
+        try:
+            resolved = path.resolve(strict=True)
+        except OSError:
+            return
+        if not resolved.is_dir() or resolved == Path("/"):
+            return
+        guest = str(path if path.is_absolute() else resolved)
+        if guest == "/" or resolved == REPO_ROOT:
+            return
+        if guest not in candidate_guests:
+            candidate_guests.add(guest)
+            candidates.append(path if path.is_absolute() else resolved)
+
+    executable = Path(sys.executable).resolve(strict=True)
+    add(executable.parent.parent)
+    for value in (sys.prefix, sys.base_prefix, sys.exec_prefix):
+        add(Path(value))
+    for key in ("stdlib", "platstdlib", "purelib", "platlib", "scripts"):
+        value = sysconfig.get_path(key)
+        if value:
+            add(Path(value))
+    for value in (*site.getsitepackages(), site.getusersitepackages()):
+        if value and value != ".":
+            add(Path(value))
+    for path in _declared_python_package_roots():
+        add(path)
+    for executable_name in ("git", "sh", "bash", "shellcheck"):
+        executable_path = shutil.which(executable_name)
+        if executable_path:
+            add(Path(executable_path).resolve().parent.parent)
+    try:
+        linker_probe = subprocess.run(
+            ["ldd", str(executable)],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        linker_probe = None
+    if linker_probe is not None:
+        for line in linker_probe.stdout.splitlines():
+            for token in line.replace("=>", " ").split():
+                if token.startswith("/") and Path(token).is_file():
+                    add(Path(token).parent)
+    for name, value in os.environ.items():
+        if name == "PYTHONPATH" or (name.startswith("AOA_") and name.endswith(("_ROOT", "_PATH"))):
+            for path in _path_values_for_environment(name, value):
+                add(path)
+    return tuple(sorted(candidates, key=str))
+
+
+def _declared_python_package_roots() -> tuple[Path, ...]:
+    roots: list[Path] = []
+    for module_name in ("pytest",):
+        module_spec = importlib.util.find_spec(module_name)
+        if module_spec is None or not module_spec.origin or module_spec.origin in {"built-in", "frozen"}:
+            continue
+        origin = Path(module_spec.origin)
+        try:
+            package_root = origin.parent if module_spec.submodule_search_locations else origin.parent
+            package_root = package_root.resolve(strict=True)
+        except OSError:
+            continue
+        candidate = package_root.parent if package_root.name == module_name else package_root
+        if candidate.is_dir() and candidate not in roots:
+            roots.append(candidate)
+    return tuple(roots)
+
+
+def _worktree_metadata_roots() -> tuple[Path, ...]:
+    """Expose only the read-only Git admin coordinates needed by a linked worktree."""
+
+    git_entry = REPO_ROOT / ".git"
+    if not git_entry.is_file():
+        return ()
+    line = git_entry.read_text(encoding="utf-8").strip()
+    prefix = "gitdir:"
+    if not line.startswith(prefix):
+        return ()
+    gitdir = Path(line[len(prefix) :].strip())
+    if not gitdir.is_absolute():
+        gitdir = (REPO_ROOT / gitdir).resolve()
+    if not gitdir.is_dir():
+        return ()
+    roots = [gitdir, REPO_ROOT]
+    commondir_file = gitdir / "commondir"
+    if commondir_file.is_file():
+        common = Path(commondir_file.read_text(encoding="utf-8").strip())
+        if not common.is_absolute():
+            common = (gitdir / common).resolve()
+        if common.is_dir():
+            roots.append(common)
+    return tuple(dict.fromkeys(roots))
+
+
+def _containment_environment(runtime_roots: tuple[Path, ...]) -> dict[str, str]:
+    forbidden = sorted(name for name in FORBIDDEN_EXTERNAL_ENVIRONMENT if name in os.environ)
+    if forbidden:
+        raise ContainmentAdapterError("external_redirection:" + ",".join(forbidden))
+
+    environment: dict[str, str] = {}
+    for name in ("LANG", "LC_ALL", "LC_CTYPE", "TZ", "PYTHONHASHSEED", "CI"):
+        value = os.environ.get(name)
+        if value is not None:
+            environment[name] = value
+
+    path_entries: list[str] = []
+    for raw in os.environ.get("PATH", "").split(os.pathsep):
+        if not raw.startswith("/"):
+            continue
+        path = Path(raw)
+        if not path.is_dir():
+            continue
+        try:
+            resolved = path.resolve(strict=True)
+        except OSError:
+            continue
+        if any(resolved == root or root in resolved.parents for root in runtime_roots):
+            path_entries.append(str(resolved))
+    executable_dir = str(Path(sys.executable).resolve(strict=True).parent)
+    if executable_dir not in path_entries:
+        path_entries.insert(0, executable_dir)
+    environment["PATH"] = os.pathsep.join(path_entries)
+
+    pythonpath = os.environ.get("PYTHONPATH")
+    if pythonpath is not None:
+        _path_values_for_environment("PYTHONPATH", pythonpath)
+    pythonpath_entries = [
+        str(path)
+        for path in _path_values_for_environment("PYTHONPATH", pythonpath)
+    ] if pythonpath is not None else []
+    for path in _declared_python_package_roots():
+        if str(path) not in pythonpath_entries:
+            pythonpath_entries.append(str(path))
+    if pythonpath_entries:
+        environment["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
+
+    for name, value in os.environ.items():
+        if name.startswith("AOA_"):
+            if name.endswith(("_ROOT", "_PATH")):
+                if "\x00" in name or "\x00" in value:
+                    raise ContainmentAdapterError(f"environment_contains_nul:{name}")
+                _path_values_for_environment(name, value)
+                environment[name] = value
+            continue
+        if not name.startswith("RUN_"):
+            continue
+        if "\x00" in name or "\x00" in value:
+            raise ContainmentAdapterError(f"environment_contains_nul:{name}")
+        if "/" in value or os.pathsep in value:
+            continue
+        environment[name] = value
+    return environment
+
+
+def _containment_spec(*, mode: str, extra_args: list[str]) -> Any:
+    _reject_external_redirections(extra_args)
+    api = _containment_api()
+    runtime_paths = (*_runtime_roots(), *_worktree_metadata_roots())
+    seen_guests: set[str] = set()
+    runtime_roots_list = []
+    for path in runtime_paths:
+        guest = str(path)
+        if guest in seen_guests:
+            continue
+        seen_guests.add(guest)
+        runtime_roots_list.append(api.ReadOnlyRoot(host=path, guest=guest))
+    runtime_roots = tuple(runtime_roots_list)
+    environment = _containment_environment(runtime_roots)
+    guest_python = str(Path(sys.executable).resolve(strict=True))
+    if mode == "serial":
+        command = (guest_python, "-m", "pytest", "-q", "-p", "no:cacheprovider", *extra_args)
+    elif mode == "process-4x32-file-aware":
+        command = (
+            guest_python,
+            "/workspace/scripts/run_pytest_lane.py",
+            "--contained-process-worksteal",
+            *extra_args,
+        )
+    else:
+        raise ContainmentAdapterError(f"unknown_containment_mode:{mode}")
+    export_raw = os.environ.get("ABYSS_STACK_PYTEST_EXPORT_ROOT")
+    export_root = Path(export_raw).resolve() if export_raw else None
+    return api.ContainmentSpec(
+        profile_id="pytest-canonical-namespace-v1",
+        source_root=api.ReadOnlyRoot(host=REPO_ROOT, guest="/workspace"),
+        runtime_roots=runtime_roots,
+        command=tuple(str(item) for item in command),
+        environment=environment,
+        cwd="/workspace",
+        export_root=export_root,
+        drain_timeout_seconds=10.0,
+        termination_grace_seconds=2.0,
+    )
+
+
+def _run_in_containment(*, mode: str, extra_args: list[str]) -> int:
+    try:
+        spec = _containment_spec(mode=mode, extra_args=extra_args)
+        api = _containment_api()
+    except ContainmentAdapterError as exc:
+        payload = {
+            "status": "containment_unsupported",
+            "command_started": False,
+            "diagnostic": str(exc),
+        }
+        print("[pytest-containment] " + json.dumps(payload, sort_keys=True), file=sys.stderr, flush=True)
+        return CONTAINMENT_STATUS_CODES["containment_unsupported"]
+    result = api.run_contained(spec)
+    receipt = result.receipt if isinstance(result.receipt, dict) else {}
+    print(
+        "[pytest-containment] "
+        + json.dumps(
+            {
+                "status": result.status,
+                "returncode": result.returncode,
+                "command_started": result.command_started,
+                "receipt": receipt,
+            },
+            sort_keys=True,
+        ),
+        file=sys.stderr,
+        flush=True,
+    )
+    if result.status == "completed":
+        return int(result.returncode or 0)
+    return CONTAINMENT_STATUS_CODES.get(result.status, 127)
 
 
 def partition_nodeids(nodeids: list[str], *, shard_count: int) -> list[list[str]]:
@@ -278,6 +592,8 @@ def _plugin_command(
         "pytest",
         "-q",
         "-p",
+        "no:cacheprovider",
+        "-p",
         "scripts.run_pytest_lane",
     ]
     if collect_only:
@@ -325,8 +641,20 @@ def _replay_failed_shards(
 
 
 def run_process_worksteal(*, extra_args: list[str]) -> int:
+    if os.environ.get(CONTAINMENT_ACTIVE_ENV) != "1":
+        print(
+            "[error] process work stealing is only valid inside process containment",
+            file=sys.stderr,
+        )
+        return CONTAINMENT_STATUS_CODES["containment_unsupported"]
     parent = os.environ.get("TMPDIR")
-    temporary_parent = parent if parent and Path(parent).is_dir() else None
+    if parent not in {"/tmp", "/var/tmp", "/dev/shm"}:
+        print(
+            "[error] process work stealing requires a private tmpfs temporary root",
+            file=sys.stderr,
+        )
+        return CONTAINMENT_STATUS_CODES["containment_unsupported"]
+    temporary_parent = parent
     with tempfile.TemporaryDirectory(
         prefix="abyss-stack-pytest-partitions-",
         dir=temporary_parent,
@@ -507,7 +835,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    if raw_argv[:1] == ["--contained-process-worksteal"]:
+        return run_process_worksteal(extra_args=raw_argv[1:])
+    args = build_parser().parse_args(raw_argv)
     extra_args = list(args.pytest_args)
     if extra_args[:1] == ["--"]:
         extra_args = extra_args[1:]
@@ -542,15 +873,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     if scheduler["effective"] == "serial":
         command = build_pytest_command(extra_args=extra_args)
-        print(f"[run] tests: {subprocess.list2cmdline(command)}", flush=True)
-        completed = subprocess.run(
-            command,
-            cwd=REPO_ROOT,
-            env=os.environ.copy(),
-            check=False,
-        )
-        return completed.returncode
-    return run_process_worksteal(extra_args=extra_args)
+        print(f"[run] namespace-owned tests: {subprocess.list2cmdline(command)}", flush=True)
+        return _run_in_containment(mode="serial", extra_args=extra_args)
+    return _run_in_containment(
+        mode="process-4x32-file-aware",
+        extra_args=extra_args,
+    )
 
 
 if __name__ == "__main__":
