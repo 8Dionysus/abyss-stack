@@ -23,7 +23,11 @@ Tracking starts with the community-docs baseline for this repository.
   binding. Keep the immutable parent/owner handle through no-follow fd-relative
   iterative fd-relative recursive cleanup, repair mode-000 directories through
   a safe opened-object path, publish diagnostics relative to the retained
-  parent, and normalize candidate exhaustion at the runner boundary.
+  parent, require the retained namespace inode to be unlinked before claiming
+  success, classify same-parent renames and moved/replaced names by exact
+  identity without deleting a raced candidate, clear only the retained inode
+  contents when safe, report any remaining link visibly, and normalize
+  candidate exhaustion at the runner boundary.
 - Bound the Codex agent-routing adapter's wait for an event-keyed relay
   context when matching `PreToolUse` groups run concurrently, while retaining
   fail-closed behavior when the context remains unavailable.

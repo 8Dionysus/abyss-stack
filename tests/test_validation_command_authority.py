@@ -449,6 +449,122 @@ def test_pytest_invocation_namespaces_are_unique_and_cleaned(tmp_path: Path) -> 
     assert not second.exists()
 
 
+def test_pytest_temp_cleanup_never_claims_success_for_same_parent_rename(
+    tmp_path: Path,
+) -> None:
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    renamed = tmp_path / "renamed-owner"
+    payload = handle.path / "payload"
+    payload.write_text("owned\n", encoding="utf-8")
+    handle.path.rename(renamed)
+
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
+
+    assert result.ok is False
+    assert renamed.is_dir()
+    assert not (renamed / "payload").exists()
+    assert any(
+        "retained pytest namespace inode remains linked" in error
+        for error in result.errors
+    )
+    handle.close()
+
+
+def test_pytest_temp_cleanup_preserves_original_name_replacement_after_rename(
+    tmp_path: Path,
+) -> None:
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    renamed = tmp_path / "renamed-owner"
+    payload = handle.path / "payload"
+    payload.write_text("owned\n", encoding="utf-8")
+    handle.path.rename(renamed)
+    replacement = tmp_path / handle.name
+    replacement.mkdir()
+    marker = replacement / "replacement-marker"
+    marker.write_text("preserve\n", encoding="utf-8")
+
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
+
+    assert result.ok is False
+    assert replacement.is_dir()
+    assert marker.read_text(encoding="utf-8") == "preserve\n"
+    assert renamed.is_dir()
+    assert not (renamed / "payload").exists()
+    handle.close()
+
+
+def test_pytest_temp_cleanup_fails_visibly_when_namespace_moves_outside_parent(
+    tmp_path: Path,
+) -> None:
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    marker = outside / "unrelated-marker"
+    marker.write_text("preserve\n", encoding="utf-8")
+    moved = outside / "moved-owner"
+    (handle.path / "payload").write_text("owned\n", encoding="utf-8")
+    handle.path.rename(moved)
+
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
+
+    assert result.ok is False
+    assert moved.is_dir()
+    assert not (moved / "payload").exists()
+    assert marker.read_text(encoding="utf-8") == "preserve\n"
+    assert not (outside / f".{handle.name}.cleanup-failed.json").exists()
+    assert any("remains linked" in error for error in result.errors)
+    handle.close()
+
+
+def test_pytest_temp_cleanup_fails_closed_on_alternate_identity_lookup_race(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    renamed = tmp_path / "renamed-owner"
+    raced_away = tmp_path / "raced-away-owner"
+    (handle.path / "payload").write_text("owned\n", encoding="utf-8")
+    handle.path.rename(renamed)
+    original_require_entry = run_pytest_lane._require_entry
+    raced = False
+
+    def race_during_revalidation(parent_fd, name, expected):
+        nonlocal raced
+        if parent_fd == handle.parent_fd and name == renamed.name and not raced:
+            renamed.rename(raced_away)
+            renamed.mkdir()
+            (renamed / "victim-marker").write_text("preserve\n", encoding="utf-8")
+            raced = True
+        return original_require_entry(parent_fd, name, expected)
+
+    monkeypatch.setattr(run_pytest_lane, "_require_entry", race_during_revalidation)
+
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
+
+    assert result.ok is False
+    assert raced is True
+    assert (renamed / "victim-marker").read_text(encoding="utf-8") == (
+        "preserve\n"
+    )
+    assert raced_away.is_dir()
+    assert not (raced_away / "payload").exists()
+    handle.close()
+
+
+def test_pytest_temp_cleanup_requires_unlinked_retained_inode_for_success(
+    tmp_path: Path,
+) -> None:
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    namespace_fd = handle.namespace_fd
+    handle.path.rmdir()
+
+    assert os.fstat(namespace_fd).st_nlink == 0
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
+
+    assert result.ok is True
+    handle.close()
+
+
 def test_pytest_temp_cleanup_failure_leaves_owner_diagnostic(
     monkeypatch,
     tmp_path: Path,

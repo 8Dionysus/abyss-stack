@@ -55,6 +55,13 @@ option stream after the owner's command construction.
 - Allocate the namespace with a retained parent descriptor and use a
   path-following recursive remover. This makes creation fd-relative, but still
   permits an ancestor replacement to redirect cleanup and diagnostics.
+- Retain the namespace descriptor, scan the original parent for a renamed
+  entry with the exact device/inode/type identity, and remove that entry by
+  name. This can classify same-parent recovery, but a POSIX/Linux directory
+  has no portable race-safe `rmdir`-by-fd primitive; using the recovered name
+  would reintroduce a deletion race. The safe fallback is to clear only the
+  retained inode through its descriptor and report the remaining link as a
+  cleanup failure.
 - Move the owner `--basetemp` option within the generated command and allow
   pytest to expand all other sources. This leaves recursive `@file`, environment,
   config, and last-option behavior outside the runner's proof.
@@ -101,6 +108,17 @@ identity checks, `unlink`, and `rmdir`. Child completion reopens its anchored
 child name without retaining one descriptor per ancestor. Symlink entries are
 removed as names and never traversed; a platform without the identity-handle
 primitive fails visibly rather than weakening the stat/delete boundary.
+The retained outer namespace descriptor is also the authority for link state:
+cleanup reports success only after `fstat` proves `st_nlink == 0`. If the
+original name is missing or replaced while the retained inode remains linked,
+cleanup performs at most a one-level, exact identity lookup in the retained
+original parent for classification. It never deletes a recovered name: the
+entry is opened no-follow and revalidated immediately, then the retained fd is
+used to clear only the owned contents. A same-parent rename, an inode moved
+outside the retained parent, a lookup/removal race, or an original-name
+replacement therefore leaves a visible failure while preserving the changed
+candidate or unrelated entries. There is no portable race-safe directory
+unlink-by-fd primitive to turn that classified name into a safe removal.
 Directory permission repair adds only owner
 read/write/search bits to a checked directory: it uses `fchmod` when an
 ordinary no-follow directory fd is available, a platform-provided
@@ -145,6 +163,10 @@ classified without scanning or deleting legacy tombstones.
 - Positive: an ancestor rename or symlink replacement cannot redirect cleanup or
   diagnostic publication, and mode-000 directories are repaired without
   chmod'ing payload files.
+- Positive: a retained inode cannot be reported as removed merely because its
+  original name disappeared; exact same-parent renames and moved/replaced
+  namespaces are classified from the retained parent and fail visibly when no
+  race-safe directory unlink primitive exists.
 - Positive: direct, environment, config, and parser-expanded argument paths
   cannot redirect the owner basetemp; rejected expansion syntax fails before
   pytest can touch a caller-owned path.
@@ -168,8 +190,9 @@ classified without scanning or deleting legacy tombstones.
 
 ## Follow-up route
 
-The independent reviewer should confirm the uniqueness, cleanup-success, and
-cleanup-failure-visibility tests, re-run the focused validation lane, and
+The independent reviewer should confirm the uniqueness, link-state,
+same-parent rename, replacement, moved-parent, lookup-race, cleanup-success,
+and cleanup-failure-visibility tests, re-run the focused validation lane, and
 decide whether the broad documented `scripts/` Configs projection is safe for
 a separate deployment transaction. Runtime activation remains unclaimed until
 that route has a precise rollback artifact and an exact landed source ref.

@@ -248,6 +248,44 @@ class _PytestTempNamespaceBinding:
     namespace_identity: _ObjectIdentity
 
 
+@dataclass(frozen=True)
+class _NamespaceLinkState:
+    link_count: int
+    original_identity_matches: bool
+    alternate_name: str | None = None
+
+    @property
+    def is_unlinked(self) -> bool:
+        return self.link_count == 0
+
+    def describe(self, handle: _PytestTempNamespaceHandle) -> str:
+        if self.is_unlinked:
+            return (
+                "retained pytest namespace inode is unlinked: "
+                f"st_nlink={self.link_count}"
+            )
+        if self.original_identity_matches:
+            return (
+                "retained pytest namespace inode remains linked under its "
+                f"original name {handle.name!r}: st_nlink={self.link_count}"
+            )
+        if self.alternate_name is not None:
+            location = (
+                "the exact dev/inode/type was observed under alternate name "
+                f"{self.alternate_name!r} in the retained parent"
+            )
+        else:
+            location = (
+                "no exact entry was observed in the retained parent; the inode "
+                "may have moved elsewhere or changed during lookup"
+            )
+        return (
+            "retained pytest namespace inode remains linked after its original "
+            f"name {handle.name!r} changed or disappeared: st_nlink={self.link_count}; "
+            f"{location}; no race-safe fd-only directory unlink is available"
+        )
+
+
 @dataclass
 class _PytestTempNamespaceHandle:
     binding: _PytestTempNamespaceBinding
@@ -903,46 +941,132 @@ def _remove_directory_contents(directory_fd: int) -> None:
         raise
 
 
+def _find_exact_namespace_name(
+    handle: _PytestTempNamespaceHandle,
+) -> str | None:
+    """Classify one retained inode in its original parent without deleting."""
+    for name in os.listdir(handle.parent_fd):
+        if name == handle.name:
+            continue
+        try:
+            observed = _stat_entry(handle.parent_fd, name)
+        except FileNotFoundError:
+            continue
+        expected = _ObjectIdentity.from_stat(observed)
+        if expected != handle.namespace_identity or not stat.S_ISDIR(observed.st_mode):
+            continue
+
+        # The name is only a lookup hint.  Open and fstat the exact object, then
+        # revalidate the directory entry immediately.  No destructive operation
+        # is allowed to use this name after this classification.
+        descriptor = _open_entry_identity(
+            handle.parent_fd,
+            name,
+            handle.namespace_identity,
+        )
+        try:
+            _require_entry(handle.parent_fd, name, handle.namespace_identity)
+        except (OSError, ValueError) as exc:
+            raise OSError(
+                "retained pytest namespace identity lookup raced at "
+                f"alternate name {name!r}"
+            ) from exc
+        finally:
+            os.close(descriptor)
+        return name
+    return None
+
+
+def _namespace_link_state(
+    handle: _PytestTempNamespaceHandle,
+) -> _NamespaceLinkState:
+    _assert_parent_anchor(handle)
+    namespace_stat = _assert_namespace_fd(handle)
+    link_count = int(namespace_stat.st_nlink)
+    if link_count == 0:
+        return _NamespaceLinkState(link_count, False)
+
+    original_identity_matches = False
+    try:
+        _require_entry(handle.parent_fd, handle.name, handle.namespace_identity)
+    except FileNotFoundError:
+        pass
+    except OSError:
+        # A replacement at the original name is not owned.  The exact lookup
+        # below may still find the retained inode under a different name.
+        pass
+    else:
+        original_identity_matches = True
+
+    alternate_name = None
+    if not original_identity_matches:
+        alternate_name = _find_exact_namespace_name(handle)
+    return _NamespaceLinkState(
+        link_count,
+        original_identity_matches,
+        alternate_name,
+    )
+
+
+def _repair_namespace_permissions(
+    handle: _PytestTempNamespaceHandle,
+    root_stat: os.stat_result,
+) -> None:
+    if all(
+        root_stat.st_mode & bit
+        for bit in (stat.S_IRUSR, stat.S_IWUSR, stat.S_IXUSR)
+    ):
+        return
+    if getattr(os, "fchmod", None) is None:
+        _chmod_open_directory_fd(handle.namespace_fd, root_stat.st_mode)
+    else:
+        os.fchmod(
+            handle.namespace_fd,
+            root_stat.st_mode
+            | stat.S_IRUSR
+            | stat.S_IWUSR
+            | stat.S_IXUSR,
+        )
+
+
+def _clear_owned_namespace_contents(
+    handle: _PytestTempNamespaceHandle,
+) -> None:
+    """Clear only the retained inode; never resolve its changed directory name."""
+    _assert_parent_anchor(handle)
+    root_stat = _assert_namespace_fd(handle)
+    _repair_namespace_permissions(handle, root_stat)
+    _remove_directory_contents(handle.namespace_fd)
+
+
 def _remove_owned_namespace(handle: _PytestTempNamespaceHandle) -> None:
     _assert_parent_anchor(handle)
     root_stat = _assert_namespace_fd(handle)
     _require_entry(handle.parent_fd, handle.name, handle.namespace_identity)
     if not stat.S_ISDIR(root_stat.st_mode):
         raise NotADirectoryError(handle.name)
-    if not all(
-        root_stat.st_mode & bit
-        for bit in (stat.S_IRUSR, stat.S_IWUSR, stat.S_IXUSR)
-    ):
-        if getattr(os, "fchmod", None) is None:
-            _chmod_open_directory_fd(
-                handle.namespace_fd,
-                root_stat.st_mode,
-                parent_fd=handle.parent_fd,
-                name=handle.name,
-                expected=handle.namespace_identity,
-            )
-        else:
-            os.fchmod(
-                handle.namespace_fd,
-                root_stat.st_mode
-                | stat.S_IRUSR
-                | stat.S_IWUSR
-                | stat.S_IXUSR,
-            )
+    _repair_namespace_permissions(handle, root_stat)
     _remove_directory_contents(handle.namespace_fd)
     _assert_namespace_fd(handle)
     _require_entry(handle.parent_fd, handle.name, handle.namespace_identity)
     os.rmdir(handle.name, dir_fd=handle.parent_fd)
     _assert_entry_absent(handle.parent_fd, handle.name)
+    namespace_stat = _assert_namespace_fd(handle)
+    if namespace_stat.st_nlink != 0:
+        raise OSError(
+            "pytest cleanup removed the original namespace name but the "
+            f"retained inode remains linked: st_nlink={namespace_stat.st_nlink}"
+        )
     handle.removed = True
 
 
 def _namespace_still_owned(handle: _PytestTempNamespaceHandle) -> bool:
-    try:
-        _require_entry(handle.parent_fd, handle.name, handle.namespace_identity)
-    except FileNotFoundError:
+    state = _namespace_link_state(handle)
+    if state.is_unlinked:
         handle.removed = True
         return False
+    if not state.original_identity_matches:
+        raise OSError(state.describe(handle))
     return True
 
 
@@ -985,6 +1109,8 @@ def _unlink_created_diagnostic(
 def _write_cleanup_diagnostic(
     handle: _PytestTempNamespaceHandle,
     failures: list[dict[str, str]],
+    *,
+    attempts: int | None = None,
 ) -> Path | None:
     diagnostic = _cleanup_diagnostic_path(handle.path)
     name = diagnostic.name
@@ -993,7 +1119,7 @@ def _write_cleanup_diagnostic(
         "status": "cleanup_failed",
         "namespace": str(handle.path),
         "parent": str(handle.path.parent),
-        "attempts": len(failures),
+        "attempts": len(failures) if attempts is None else attempts,
         "failures": failures,
     }
     encoded = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode(
@@ -1078,6 +1204,13 @@ def cleanup_pytest_temp_namespace(
             _remove_owned_namespace(handle)
             removed = True
         except (OSError, ValueError) as exc:
+            failures.append(
+                {
+                    "attempt": str(attempt),
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                }
+            )
             try:
                 removed = not _namespace_still_owned(handle)
             except (OSError, ValueError) as state_error:
@@ -1088,13 +1221,33 @@ def cleanup_pytest_temp_namespace(
                         "error": str(state_error),
                     }
                 )
-            failures.append(
-                {
-                    "attempt": str(attempt),
-                    "error_type": type(exc).__name__,
-                    "error": str(exc),
-                }
-            )
+                try:
+                    _clear_owned_namespace_contents(handle)
+                    after_clear = _assert_namespace_fd(handle)
+                except (OSError, ValueError) as clear_error:
+                    failures.append(
+                        {
+                            "attempt": str(attempt),
+                            "error_type": type(clear_error).__name__,
+                            "error": str(clear_error),
+                        }
+                    )
+                else:
+                    if after_clear.st_nlink == 0:
+                        removed = True
+                    else:
+                        failures.append(
+                            {
+                                "attempt": str(attempt),
+                                "error_type": "RetainedNamespaceLinked",
+                                "error": (
+                                    "retained pytest namespace contents were cleared "
+                                    "through the retained fd, but its directory link "
+                                    "remains; cleanup cannot safely unlink the "
+                                    f"remaining inode link (st_nlink={after_clear.st_nlink})"
+                                ),
+                            }
+                        )
         if removed:
             handle.removed = True
             break
@@ -1118,7 +1271,7 @@ def cleanup_pytest_temp_namespace(
             )
         return PytestTempCleanupResult(handle.path, True, attempts)
 
-    diagnostic = _write_cleanup_diagnostic(handle, failures)
+    diagnostic = _write_cleanup_diagnostic(handle, failures, attempts=attempts)
     diagnostic_suffix = f" diagnostic={diagnostic}" if diagnostic else ""
     close_errors = handle.close()
     if close_errors:
@@ -1132,16 +1285,20 @@ def cleanup_pytest_temp_namespace(
         )
     print(
         "[pytest-temp-cleanup-failed] "
-        f"namespace={handle.path} attempts={len(failures)}{diagnostic_suffix}",
+        f"namespace={handle.path} attempts={attempts}{diagnostic_suffix}",
         file=sys.stderr,
         flush=True,
     )
+    errors = tuple(
+        f"attempt={failure['attempt']} {failure['error_type']}: {failure['error']}"
+        for failure in failures
+    ) + close_errors
     return PytestTempCleanupResult(
         handle.path,
         False,
-        len(failures),
+        attempts,
         diagnostic,
-        close_errors,
+        errors,
     )
 
 
