@@ -98,6 +98,7 @@
 - [ABYSS-STACK-D-0131 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md`)
 - [ABYSS-STACK-D-0133 Owner-Bound External Goal Pause](../ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md`)
 - [ABYSS-STACK-D-0134 Generic Responsibility-Movement Observation](../ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md) (`docs/decisions/ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md`)
+- [ABYSS-STACK-D-0135 Private Namespace-Owned Pytest Invocation Lifecycle](../ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md`)
 
 ## inference-pilots
 

@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 134,
-  "edge_count": 3011,
+  "decision_count": 135,
+  "edge_count": 3034,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1096,
-    "DATED": 134,
-    "GUARDED_BY": 414,
-    "HAS_STATUS": 134,
-    "HAS_SURFACE_CLASS": 365,
-    "IN_STACK_LANE": 319,
-    "NEXT_DECISION": 133,
-    "OWNED_BY_SURFACE": 140,
-    "OWNS_DECISION": 134,
+    "CITES_SOURCE_SURFACE": 1103,
+    "DATED": 135,
+    "GUARDED_BY": 418,
+    "HAS_STATUS": 135,
+    "HAS_SURFACE_CLASS": 368,
+    "IN_STACK_LANE": 322,
+    "NEXT_DECISION": 134,
+    "OWNED_BY_SURFACE": 141,
+    "OWNS_DECISION": 135,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 140
+    "UNDER_MECHANIC_PARENT": 141
   },
   "edges": [
     {
@@ -14393,11 +14393,121 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0134",
+      "target": "decision:ABYSS-STACK-D-0135",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0134",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0134",
+      "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "source_surface:docs/decisions/ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "source_surface:docs/validation/validation_lanes.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "source_surface:mechanics/governed-execution/parts/process-containment/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "source_surface:mechanics/governed-execution/parts/process-containment/contained_invocation.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "source_surface:mechanics/governed-execution/parts/process-containment/namespace_launcher.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "source_surface:mechanics/governed-execution/parts/process-containment/tests/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "source_surface:scripts/run_pytest_lane.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "date:2026-08-22",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "guard_family:descendant%20drain",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "guard_family:fail-closed%20portability",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "guard_family:namespace%20admission",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "guard_family:tmpfs%20teardown",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "status:proposed",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "surface_class:runtime%20process%20containment",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "surface_class:storage%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "surface_class:validation%20workflow",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "stack_lane:governed%20execution",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "stack_lane:tests",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "owner_surface:mechanics/governed-execution/parts/process-containment/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
       "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -15070,21 +15180,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0134",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0135",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1303,
+  "node_count": 1316,
   "node_type_counts": {
     "date": 43,
-    "decision": 134,
-    "guard_family": 224,
+    "decision": 135,
+    "guard_family": 228,
     "mechanic_parent": 11,
-    "owner_surface": 68,
+    "owner_surface": 69,
     "repo": 1,
-    "source_surface": 619,
+    "source_surface": 624,
     "stack_lane": 51,
     "status": 4,
-    "surface_class": 148
+    "surface_class": 150
   },
   "nodes": [
     {
@@ -16643,6 +16758,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-22",
+      "id": "decision:ABYSS-STACK-D-0135",
+      "label": "ABYSS-STACK-D-0135",
+      "path": "docs/decisions/ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md",
+      "posture": "proposed rationale pending exact-head live proof",
+      "status": "proposed",
+      "title": "ABYSS-STACK-D-0135 Private Namespace-Owned Pytest Invocation Lifecycle",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -16888,6 +17013,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:descendant%20drain",
+      "label": "descendant drain",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:design%20surface",
       "label": "design surface",
       "type": "guard_family"
@@ -17060,6 +17190,11 @@
     {
       "id": "guard_family:fail-closed%20identity",
       "label": "fail-closed identity",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:fail-closed%20portability",
+      "label": "fail-closed portability",
       "type": "guard_family"
     },
     {
@@ -17260,6 +17395,11 @@
     {
       "id": "guard_family:mutable%20control%20projection",
       "label": "mutable control projection",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:namespace%20admission",
+      "label": "namespace admission",
       "type": "guard_family"
     },
     {
@@ -17738,6 +17878,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:tmpfs%20teardown",
+      "label": "tmpfs teardown",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:tool%20allowlist",
       "label": "tool allowlist",
       "type": "guard_family"
@@ -18005,6 +18150,11 @@
     {
       "id": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py",
       "label": "mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:mechanics/governed-execution/parts/process-containment/",
+      "label": "mechanics/governed-execution/parts/process-containment/",
       "type": "owner_surface"
     },
     {
@@ -18806,6 +18956,11 @@
     {
       "id": "source_surface:docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md",
       "label": "docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:docs/decisions/ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md",
+      "label": "docs/decisions/ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md",
       "type": "source_surface"
     },
     {
@@ -20241,6 +20396,26 @@
     {
       "id": "source_surface:mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
       "label": "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/process-containment/CONTRACT.md",
+      "label": "mechanics/governed-execution/parts/process-containment/CONTRACT.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/process-containment/contained_invocation.py",
+      "label": "mechanics/governed-execution/parts/process-containment/contained_invocation.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/process-containment/namespace_launcher.py",
+      "label": "mechanics/governed-execution/parts/process-containment/namespace_launcher.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/process-containment/tests/",
+      "label": "mechanics/governed-execution/parts/process-containment/tests/",
       "type": "source_surface"
     },
     {
@@ -22134,6 +22309,11 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:runtime%20process%20containment",
+      "label": "runtime process containment",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:runtime%20profile",
       "label": "runtime profile",
       "type": "surface_class"
@@ -22231,6 +22411,11 @@
     {
       "id": "surface_class:status%20readout",
       "label": "status readout",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:storage%20boundary",
+      "label": "storage boundary",
       "type": "surface_class"
     },
     {

@@ -705,6 +705,10 @@
 
 - [ABYSS-STACK-D-0089 Decision Cache Effect Isolation](../ABYSS-STACK-D-0089-decision-cache-effect-isolation.md) (`docs/decisions/ABYSS-STACK-D-0089-decision-cache-effect-isolation.md`)
 
+## runtime process containment
+
+- [ABYSS-STACK-D-0135 Private Namespace-Owned Pytest Invocation Lifecycle](../ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md`)
+
 ## runtime protocol
 
 - [ABYSS-STACK-D-0108 Modern-Only MCP Organ Runtime](../ABYSS-STACK-D-0108-modern-only-mcp-organ-runtime.md) (`docs/decisions/ABYSS-STACK-D-0108-modern-only-mcp-organ-runtime.md`)
@@ -778,6 +782,10 @@
 
 - [ABYSS-STACK-D-0051 Runtime Hygiene Validator Module](../ABYSS-STACK-D-0051-runtime-hygiene-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0051-runtime-hygiene-validator-module.md`)
 
+## storage boundary
+
+- [ABYSS-STACK-D-0135 Private Namespace-Owned Pytest Invocation Lifecycle](../ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md`)
+
 ## test scheduler
 
 - [ABYSS-STACK-D-0120 Schedule Full Pytest With Bounded Work Stealing](../ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md) (`docs/decisions/ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md`)
@@ -802,6 +810,7 @@
 
 - [ABYSS-STACK-D-0120 Schedule Full Pytest With Bounded Work Stealing](../ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md) (`docs/decisions/ABYSS-STACK-D-0120-schedule-full-pytest-with-bounded-work-stealing.md`)
 - [ABYSS-STACK-D-0130 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0130-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0130-frontload-release-artifact-guard.md`)
+- [ABYSS-STACK-D-0135 Private Namespace-Owned Pytest Invocation Lifecycle](../ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md`)
 
 ## vector store
 

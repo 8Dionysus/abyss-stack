@@ -369,6 +369,10 @@
 
 - [ABYSS-STACK-D-0097 Codex Consumer Handoff Remains Owner-Composed](../ABYSS-STACK-D-0097-codex-consumer-handoff-remains-owner-composed.md) (`docs/decisions/ABYSS-STACK-D-0097-codex-consumer-handoff-remains-owner-composed.md`)
 
+## descendant drain
+
+- [ABYSS-STACK-D-0135 Private Namespace-Owned Pytest Invocation Lifecycle](../ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md`)
+
 ## design surface
 
 - [ABYSS-STACK-D-0055 Root Routes Validator Module](../ABYSS-STACK-D-0055-root-routes-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0055-root-routes-validator-module.md`)
@@ -532,6 +536,10 @@
 
 - [ABYSS-STACK-D-0131 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md`)
 
+## fail-closed portability
+
+- [ABYSS-STACK-D-0135 Private Namespace-Owned Pytest Invocation Lifecycle](../ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md`)
+
 ## fail-fast ordering
 
 - [ABYSS-STACK-D-0130 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0130-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0130-frontload-release-artifact-guard.md`)
@@ -690,6 +698,10 @@
 ## mutable control projection
 
 - [ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md`)
+
+## namespace admission
+
+- [ABYSS-STACK-D-0135 Private Namespace-Owned Pytest Invocation Lifecycle](../ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md`)
 
 ## narrowest access form
 
@@ -1071,6 +1083,10 @@
 ## test topology
 
 - [ABYSS-STACK-D-0063 Root Validator Wrapper Tail Removal](../ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md) (`docs/decisions/ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md`)
+
+## tmpfs teardown
+
+- [ABYSS-STACK-D-0135 Private Namespace-Owned Pytest Invocation Lifecycle](../ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0135-private-namespace-owned-pytest-invocation-lifecycle.md`)
 
 ## tool allowlist
 
