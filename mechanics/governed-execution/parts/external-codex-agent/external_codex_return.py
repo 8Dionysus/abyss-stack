@@ -1199,8 +1199,15 @@ def _pause_receipt(
     lifecycle: dict[str, Any] = {
         "accepted": True,
         "initialize": _safe_response_summary(initialize),
-        "goal_get": _safe_response_summary(goal_get_response),
+        # Preserve the original active observation here.  During
+        # post-dispatch recovery ``goal_get_response`` is the later paused
+        # reconciliation read; the durable precondition remains the evidence
+        # that this lifecycle attempt started from active.
+        "goal_get": precondition["goal_get"],
         "goal": _safe_response_summary(goal_response),
+        "goal_summary_sha256": _sha256_bytes(
+            _canonical_bytes(_safe_response_summary(goal_response))
+        ),
         "goal_response_sha256": _sha256_bytes(
             _canonical_bytes(goal_response)
         ),
@@ -2277,6 +2284,10 @@ def _validate_pause_receipt(
         or not isinstance(lifecycle, dict)
         or lifecycle.get("accepted") is not True
         or lifecycle.get("response_available") not in {True, False}
+        or not isinstance(lifecycle.get("initialize"), dict)
+        or not isinstance(lifecycle.get("goal_get"), dict)
+        or not isinstance(lifecycle.get("goal"), dict)
+        or not _is_sha256_digest(lifecycle.get("goal_summary_sha256"))
         or (
             lifecycle.get("response_available") is False
             and recovery is None
@@ -2299,6 +2310,28 @@ def _validate_pause_receipt(
             "canonical Goal pause receipt lacks lifecycle evidence"
         )
     _validated_pause_precondition({"precondition": precondition})
+    if lifecycle.get("goal_get") != precondition.get("goal_get"):
+        raise ExternalCodexReturnError(
+            "canonical Goal pause receipt active Goal summary does not match its precondition"
+        )
+    goal_summary = lifecycle.get("goal")
+    goal_summary_status = (
+        goal_summary.get("status")
+        if isinstance(goal_summary, dict)
+        else None
+    )
+    if goal_summary_status is None and isinstance(goal_summary, dict):
+        nested_goal_summary = goal_summary.get("goal")
+        if isinstance(nested_goal_summary, dict):
+            goal_summary_status = nested_goal_summary.get("status")
+    if (
+        goal_summary_status != "paused"
+        or lifecycle.get("goal_summary_sha256")
+        != _sha256_bytes(_canonical_bytes(lifecycle.get("goal")))
+    ):
+        raise ExternalCodexReturnError(
+            "canonical Goal pause receipt paused Goal summary digest is invalid"
+        )
     if recovery is not None:
         if (
             not isinstance(recovery, dict)

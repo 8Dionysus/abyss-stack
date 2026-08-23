@@ -701,6 +701,18 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
         MODULE.run_pause(args)
 
     pause_path.write_bytes(MODULE._canonical_bytes(first) + b"\n")
+    corrupted_goal_summary = json.loads(json.dumps(first))
+    corrupted_goal_summary["lifecycle"]["goal"]["status"] = "active"
+    pause_path.write_bytes(
+        MODULE._canonical_bytes(corrupted_goal_summary) + b"\n"
+    )
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="paused Goal summary digest is invalid",
+    ):
+        MODULE.run_pause(args)
+
+    pause_path.write_bytes(MODULE._canonical_bytes(first) + b"\n")
     monkeypatch.setattr(
         MODULE,
         "pause_goal",
