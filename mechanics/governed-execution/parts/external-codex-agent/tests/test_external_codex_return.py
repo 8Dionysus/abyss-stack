@@ -739,6 +739,15 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     ):
         MODULE.run_pause(args)
 
+    undeclared_action = json.loads(json.dumps(first))
+    undeclared_action["actions"]["handoff_message_sent"] = True
+    pause_path.write_bytes(MODULE._canonical_bytes(undeclared_action) + b"\n")
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="schema mismatch",
+    ):
+        MODULE.run_pause(args)
+
     pause_path.write_bytes(MODULE._canonical_bytes(first) + b"\n")
     monkeypatch.setattr(
         MODULE,

@@ -214,7 +214,8 @@
     "actions": {
       "type": "object",
       "required": ["goal_lifecycle_set"],
-      "properties": {"goal_lifecycle_set": {"const": true}}
+      "properties": {"goal_lifecycle_set": {"const": true}},
+      "additionalProperties": false
     },
     "observed": {
       "type": "object",
