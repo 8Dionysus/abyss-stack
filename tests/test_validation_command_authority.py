@@ -262,6 +262,58 @@ def test_canonical_pytest_modes_route_through_one_containment_instance(monkeypat
     ]
 
 
+def test_mocked_admission_runs_serial_and_process_modes_in_containment(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    for name in run_pytest_lane.FORBIDDEN_EXTERNAL_ENVIRONMENT:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+
+    api = run_pytest_lane._containment_api()
+    launcher = api._launcher_module()
+    monkeypatch.setattr(
+        launcher,
+        "_same_uid_admission_probe",
+        lambda _pid: {"checks": {}, "supported": True, "violations": []},
+    )
+    selection = ["tests/test_test_topology.py"]
+
+    serial_spec = run_pytest_lane._containment_spec(
+        mode="serial",
+        extra_args=selection,
+    )
+    try:
+        launcher._validate_spec(serial_spec)
+    except launcher.AdmissionError as exc:
+        pytest.skip(
+            f"containment backend unavailable for deterministic integration: {exc}"
+        )
+    serial = launcher.run_contained(serial_spec, result_factory=api.ContainmentResult)
+    if serial.status == "containment_unsupported":
+        pytest.skip("containment backend rejected deterministic integration")
+    assert serial.status == "completed"
+    assert serial.returncode == 0
+    assert serial.receipt["receipt"]["drain_complete"] is True
+    assert serial.receipt["receipt"]["live_descendants"] == []
+
+    process_spec = run_pytest_lane._containment_spec(
+        mode="process-4x32-file-aware",
+        extra_args=selection,
+    )
+    process = launcher.run_contained(process_spec, result_factory=api.ContainmentResult)
+    assert process.status == "completed"
+    assert process.returncode == 0
+    assert process.receipt["receipt"]["drain_complete"] is True
+    assert process.receipt["receipt"]["live_descendants"] == []
+
+    output = capsys.readouterr().out
+    assert "[pytest-partition] collected=5" in output
+    assert "exact_union=true overlap=false" in output
+    assert "[pytest-aggregate] verdict=passed selected=5 shards=5" in output
+    assert 'outcomes={"passed": 5}' in output
+
+
 def test_pytest_adapter_rejects_host_temp_and_output_redirections(monkeypatch) -> None:
     for name in run_pytest_lane.FORBIDDEN_EXTERNAL_ENVIRONMENT:
         monkeypatch.delenv(name, raising=False)
