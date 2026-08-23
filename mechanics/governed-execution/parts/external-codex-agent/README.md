@@ -136,9 +136,12 @@ and replay only through their matching legacy wake reservation. A retry after a 
   claim owner acceptance or semantic re-entry;
 - exposes `aoa-external-codex-return return-route --route <absolute json>` as a
   digest-bound bridge entrypoint that selects no Goal or terminal and delegates
-  only to the canonical return leaf. The route's wrapper exit is not delivery
-  or closure evidence; durable return, authorization, and exact-holder closure
-  receipts remain required. After a pre-return CLI loss,
+  only to the canonical return leaf. The canonical leaf reasserts the bound
+  owner, handoff, and holder digests at the locked directed-input boundary, so
+  a valid-input replacement after route preflight fails closed before any
+  delivery or close effect. The route's wrapper exit is not delivery or closure
+  evidence; durable return, authorization, and exact-holder closure receipts
+  remain required. After a pre-return CLI loss,
   `visible_incarnation_home.py rebind` can derive a canonical holder receipt
   only from the exact holder-loss packet and live replacement lineage, and that
   receipt proves holder identity only;

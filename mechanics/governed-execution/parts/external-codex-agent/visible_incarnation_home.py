@@ -3161,6 +3161,14 @@ def _load_holder_receipt_snapshot(
     ):
         raise IncarnationHomeError("holder terminal receipt is incomplete")
     replacement_reentry = receipt.get("replacement_reentry")
+    post_exec_rebound = "exe_digest" in holder and not any(
+        key in holder
+        for key in ("pre_exec_argv", "pre_exec_argv_digest", "pre_exec_exe_digest")
+    )
+    if post_exec_rebound and replacement_reentry is None:
+        raise IncarnationHomeError(
+            "post-exec rebound holder receipt requires replacement_reentry provenance"
+        )
     if replacement_reentry is not None:
         _validate_replacement_reentry_binding(
             replacement_reentry,

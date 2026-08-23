@@ -1516,11 +1516,88 @@ def test_return_route_dispatches_only_its_digest_bound_inputs(
         "return_receipt": str(tmp_path / "return.json"),
         "authorization": str(tmp_path / "authorization.json"),
         "closure_receipt": str(tmp_path / "closure.json"),
+        "expected_owner_sha256": route["owner_sha256"],
+        "expected_handoff_sha256": route["handoff_sha256"],
+        "expected_holder_receipt_sha256": route["holder_receipt_sha256"],
         "detach": False,
         "detached_receipt": None,
         "detached_result": None,
         "detached_log": None,
     }
+
+
+def test_return_route_rechecks_digest_after_preflight_before_delegated_effects(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner_path = tmp_path / "owner.json"
+    owner_value = owner(
+        goal="goal-route-intervening-mutation",
+        thread="thread-route-intervening-mutation",
+        endpoint="unix:/run/user/1000/route.sock",
+    )
+    owner_path.write_bytes(MODULE._canonical_bytes(owner_value) + b"\n")
+    handoff_path = tmp_path / "handoff.json"
+    handoff_path.write_bytes(
+        MODULE._canonical_bytes({"return_owner": owner_value}) + b"\n"
+    )
+    holder_path = tmp_path / "holder.json"
+    holder_path.write_text("{}\n", encoding="utf-8")
+    route_path = tmp_path / "route.json"
+    route = {
+        "schema_version": MODULE.RETURN_ROUTE_SCHEMA_VERSION,
+        "owner_ref": str(owner_path),
+        "owner_sha256": MODULE._sha256_bytes(owner_path.read_bytes()),
+        "handoff_ref": str(handoff_path),
+        "handoff_sha256": MODULE._sha256_bytes(handoff_path.read_bytes()),
+        "holder_receipt_ref": str(holder_path),
+        "holder_receipt_sha256": MODULE._sha256_bytes(holder_path.read_bytes()),
+        "return_receipt_ref": str(tmp_path / "return.json"),
+        "authorization_ref": str(tmp_path / "authorization.json"),
+        "closure_receipt_ref": str(tmp_path / "closure.json"),
+    }
+    route_path.write_bytes(MODULE._canonical_bytes(route) + b"\n")
+
+    def load_context(
+        handoff: Path,
+        holder: Path,
+        _closure: Path,
+    ) -> tuple[dict[str, object], bytes, str, dict[str, object], bytes, str]:
+        handoff_bytes = handoff.read_bytes()
+        holder_bytes = holder.read_bytes()
+        return (
+            json.loads(handoff_bytes),
+            handoff_bytes,
+            MODULE._sha256_bytes(handoff_bytes),
+            json.loads(holder_bytes),
+            holder_bytes,
+            MODULE._sha256_bytes(holder_bytes),
+        )
+
+    monkeypatch.setattr(MODULE, "_load_handoff_context", load_context)
+    monkeypatch.setattr(
+        MODULE,
+        "deliver_handoff",
+        lambda *_args, **_kwargs: pytest.fail("route digest drift reached delivery"),
+    )
+    original_command_return = MODULE.command_return
+
+    def mutate_after_route_preflight(args: SimpleNamespace) -> int:
+        handoff_path.write_bytes(
+            MODULE._canonical_bytes(
+                {"return_owner": owner_value, "intervening_mutation": True}
+            )
+            + b"\n"
+        )
+        return original_command_return(args)
+
+    monkeypatch.setattr(MODULE, "command_return", mutate_after_route_preflight)
+
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="digest drifted at locked directed-input boundary",
+    ):
+        MODULE.command_return_route(SimpleNamespace(route=str(route_path)))
 
 
 def test_return_route_rejects_input_digest_drift(tmp_path: Path) -> None:

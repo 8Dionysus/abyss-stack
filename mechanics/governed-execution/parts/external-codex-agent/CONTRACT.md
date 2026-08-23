@@ -217,9 +217,12 @@ Operations are:
   digest-bound record of the already selected owner, handoff, canonical holder
   receipt, and three output paths. It performs no Goal or terminal discovery;
   it delegates only after every input digest, output identity, and alias check
-  passes. A route or wrapper exit is not delivery or closure evidence; the
-  durable return, typed authorization, and exact-holder closure receipts remain
-  the claims that must be inspected.
+  passes. The route's owner, handoff, and holder digests are carried through
+  the return-attempt lock and reasserted against the exact directed-input bytes
+  loaded under that lock; an intervening mutation therefore fails closed before
+  delivery, authorization, or closure. A route or wrapper exit is not delivery
+  or closure evidence; the durable return, typed authorization, and exact-holder
+  closure receipts remain the claims that must be inspected.
 
 The operator-visible incarnation launcher has a separate lifecycle contour for
 the responsibility holder. `launch --holder-receipt <absolute json>` remains

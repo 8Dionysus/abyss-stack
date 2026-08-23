@@ -1981,16 +1981,56 @@ def _return_reservation(
     return reservation
 
 
+def _assert_expected_route_digest(
+    args: argparse.Namespace,
+    *,
+    input_name: str,
+    actual_digest: str,
+    label: str,
+) -> None:
+    """Reassert a route-bound input digest after the return lock is held."""
+
+    expected = getattr(args, f"expected_{input_name}_sha256", None)
+    if expected is None:
+        return
+    if not isinstance(expected, str) or not _is_sha256_digest(expected):
+        raise ExternalCodexReturnError(
+            f"canonical return route {label} expected digest is invalid"
+        )
+    if actual_digest != expected:
+        raise ExternalCodexReturnError(
+            f"canonical return route {label} digest drifted at locked directed-input boundary"
+        )
+
+
 def _load_return_inputs(args: argparse.Namespace) -> dict[str, Any]:
     owner_path = _regular_file(Path(args.return_owner), "return owner")
     owner_value, owner_bytes = _load_json_file(owner_path, "return owner")
     owner_digest = _sha256_bytes(owner_bytes)
+    _assert_expected_route_digest(
+        args,
+        input_name="owner",
+        actual_digest=owner_digest,
+        label="return owner",
+    )
     owner = validate_return_owner(owner_value)
     handoff_path = _regular_file(Path(args.handoff), "handoff")
     holder_path = _regular_file(Path(args.holder_receipt), "holder receipt")
     closure_path = _validate_output_path(Path(args.closure_receipt), "closure receipt")
     handoff, handoff_bytes, handoff_digest, holder, holder_bytes, holder_digest = (
         _load_handoff_context(handoff_path, holder_path, closure_path)
+    )
+    _assert_expected_route_digest(
+        args,
+        input_name="handoff",
+        actual_digest=handoff_digest,
+        label="handoff",
+    )
+    _assert_expected_route_digest(
+        args,
+        input_name="holder_receipt",
+        actual_digest=holder_digest,
+        label="holder terminal receipt",
     )
     _validate_handoff_owner(handoff, owner)
     authorization_path = _validate_output_path(
@@ -3017,6 +3057,9 @@ def command_return_route(args: argparse.Namespace) -> int:
             return_receipt=route["return_receipt_ref"],
             authorization=route["authorization_ref"],
             closure_receipt=route["closure_receipt_ref"],
+            expected_owner_sha256=route["owner_sha256"],
+            expected_handoff_sha256=route["handoff_sha256"],
+            expected_holder_receipt_sha256=route["holder_receipt_sha256"],
             detach=False,
             detached_receipt=None,
             detached_result=None,

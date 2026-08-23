@@ -130,6 +130,25 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "holder": {
+            "required": ["exe_digest"],
+            "not": {
+              "anyOf": [
+                {"required": ["pre_exec_argv"]},
+                {"required": ["pre_exec_argv_digest"]},
+                {"required": ["pre_exec_exe_digest"]}
+              ]
+            }
+          }
+        }
+      },
+      "then": {"required": ["replacement_reentry"]}
+    }
+  ],
   "$defs": {
     "controlSocket": {
       "type": "object",

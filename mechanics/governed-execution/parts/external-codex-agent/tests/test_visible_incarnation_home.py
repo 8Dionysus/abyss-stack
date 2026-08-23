@@ -14,7 +14,7 @@ from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, ValidationError
 
 
 PART = Path(__file__).resolve().parents[1]
@@ -643,15 +643,18 @@ def test_capability_projection_schemas_are_valid_json(schema_name: str) -> None:
     Draft202012Validator.check_schema(schema)
 
 
-def test_holder_schema_accepts_rebind_post_exec_identity_without_pre_exec_snapshot() -> None:
+def test_holder_schema_and_loader_reject_rebind_post_exec_identity_without_provenance(
+    tmp_path: Path,
+) -> None:
     schema = json.loads(
         (PART / "schemas" / "external-codex-holder-terminal-receipt.schema.json").read_text(
             encoding="utf-8"
         )
     )
+    receipt_path = tmp_path / "rebound-holder.json"
     receipt = {
         "schema_version": MODULE.HOLDER_RECEIPT_SCHEMA_VERSION,
-        "receipt_ref": "/tmp/rebound-holder.json",
+        "receipt_ref": str(receipt_path.resolve()),
         "created_at": "2026-08-23T00:00:00Z",
         "lifecycle_role": "responsibility_holder",
         "boot_id": "183fe056-94d4-4d38-8967-2892c7a924ae",
@@ -685,7 +688,14 @@ def test_holder_schema_accepts_rebind_post_exec_identity_without_pre_exec_snapsh
             "dedicated": True,
         },
     }
-    Draft202012Validator(schema).validate(receipt)
+    with pytest.raises(ValidationError, match="replacement_reentry"):
+        Draft202012Validator(schema).validate(receipt)
+    receipt_path.write_bytes(MODULE.canonical_bytes(receipt) + b"\n")
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="requires replacement_reentry provenance",
+    ):
+        MODULE._load_holder_receipt_snapshot(receipt_path)
 
 
 def test_holder_loss_reentry_is_exactly_bound_to_source_evidence(
@@ -2119,6 +2129,11 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
             "parent_pid": parent_pid,
             "parent_start_ticks": 12,
             "parent_comm": "bwrap",
+            "pre_exec_argv": holder_argv,
+            "pre_exec_argv_digest": MODULE.sha256_bytes(
+                MODULE.canonical_bytes(holder_argv)
+            ),
+            "pre_exec_exe_digest": executable_digest,
             "argv": holder_argv,
             "argv_digest": MODULE.sha256_bytes(MODULE.canonical_bytes(holder_argv)),
             "exe_digest": executable_digest,
@@ -2298,10 +2313,15 @@ def test_live_close_uses_holder_bound_companion_after_host_removal(
             "parent_start_ticks": 12,
             "parent_comm": "bwrap",
             "argv": holder_argv,
-                "argv_digest": MODULE.sha256_bytes(
-                    MODULE.canonical_bytes(holder_argv)
-                ),
-                "exe_digest": MODULE.sha256_bytes(executable_bytes),
+            "pre_exec_argv": holder_argv,
+            "pre_exec_argv_digest": MODULE.sha256_bytes(
+                MODULE.canonical_bytes(holder_argv)
+            ),
+            "pre_exec_exe_digest": MODULE.sha256_bytes(executable_bytes),
+            "argv_digest": MODULE.sha256_bytes(
+                MODULE.canonical_bytes(holder_argv)
+            ),
+            "exe_digest": MODULE.sha256_bytes(executable_bytes),
         },
         "runtime": {
             "codex_executable": str(executable),
@@ -3386,6 +3406,11 @@ def test_identity_bound_close_records_already_gone_without_reopening_manifest(
             "parent_pid": 987654322,
             "parent_start_ticks": 12,
             "parent_comm": "kitty",
+            "pre_exec_argv": ["/usr/bin/codex", "exec"],
+            "pre_exec_argv_digest": MODULE.sha256_bytes(
+                MODULE.canonical_bytes(["/usr/bin/codex", "exec"])
+            ),
+            "pre_exec_exe_digest": "sha256:" + "0" * 64,
             "argv": ["/usr/bin/codex", "exec"],
             "argv_digest": MODULE.sha256_bytes(
                 MODULE.canonical_bytes(["/usr/bin/codex", "exec"])

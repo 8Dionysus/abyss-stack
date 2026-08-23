@@ -69,10 +69,13 @@ boundary, not evidence of trust admission or app-server enforcement.
 The wake/return repair adds deterministic coverage for the explicit
 holder-loss reentry packet: source duty/event digests, same-actor/session
 continuity, replacement holder identity, and provenance drift are rejected
-fail-closed. Return-route tests prove strict input-digest binding, output-path
-non-aliasing, and delegation without Goal or terminal selection. These checks
-still do not claim a live app-server delivery, holder closure, semantic
-acceptance, or installed-release parity.
+fail-closed. Return-route tests prove strict input-digest binding, including an
+intervening valid-input mutation after route preflight and before delegated
+dispatch, output-path non-aliasing, and delegation without Goal or terminal
+selection. The holder tests also reject a rebound-shaped post-exec receipt when
+its replacement provenance is missing. These checks still do not claim a live
+app-server delivery, holder closure, semantic acceptance, or installed-release
+parity.
 
 The focused external-return tests also cover the separate Goal pause contour:
 an exact active owner-bound Goal is refused before `thread/goal/set` when the
