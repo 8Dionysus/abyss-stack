@@ -28,6 +28,16 @@
         },
         {
           "required": ["pid", "start_ticks", "parent_pid", "parent_start_ticks", "parent_comm", "pre_exec_argv", "pre_exec_argv_digest", "pre_exec_exe_digest", "argv", "argv_digest", "exe_digest"]
+        },
+        {
+          "required": ["pid", "start_ticks", "parent_pid", "parent_start_ticks", "parent_comm", "argv", "argv_digest", "exe_digest"],
+          "not": {
+            "anyOf": [
+              {"required": ["pre_exec_argv"]},
+              {"required": ["pre_exec_argv_digest"]},
+              {"required": ["pre_exec_exe_digest"]}
+            ]
+          }
         }
       ],
       "properties": {

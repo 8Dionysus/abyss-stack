@@ -643,6 +643,51 @@ def test_capability_projection_schemas_are_valid_json(schema_name: str) -> None:
     Draft202012Validator.check_schema(schema)
 
 
+def test_holder_schema_accepts_rebind_post_exec_identity_without_pre_exec_snapshot() -> None:
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-holder-terminal-receipt.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    receipt = {
+        "schema_version": MODULE.HOLDER_RECEIPT_SCHEMA_VERSION,
+        "receipt_ref": "/tmp/rebound-holder.json",
+        "created_at": "2026-08-23T00:00:00Z",
+        "lifecycle_role": "responsibility_holder",
+        "boot_id": "183fe056-94d4-4d38-8967-2892c7a924ae",
+        "holder": {
+            "pid": 101,
+            "start_ticks": 1001,
+            "parent_pid": 202,
+            "parent_start_ticks": 2002,
+            "parent_comm": "kitty",
+            "argv": ["/usr/bin/codex", "resume"],
+            "argv_digest": "sha256:" + "1" * 64,
+            "exe_digest": "sha256:" + "2" * 64,
+        },
+        "runtime": {
+            "codex_executable": "/usr/bin/codex",
+            "codex_executable_digest": "sha256:" + "2" * 64,
+            "incarnation_manifest": "/tmp/incarnation-home.json",
+            "incarnation_manifest_digest": "sha256:" + "3" * 64,
+            "model": "gpt-5.6-luna",
+            "reasoning_effort": "max",
+            "ambient_codex_home": "/home/dionysus/.codex",
+            "incarnation_codex_home": "/tmp/codex-home",
+        },
+        "terminal": {
+            "binding": "kitty_ancestor_at_exec",
+            "required_comm": "kitty",
+            "pid": 202,
+            "start_ticks": 2002,
+            "argv": ["/usr/bin/kitty"],
+            "window_id": "1",
+            "dedicated": True,
+        },
+    }
+    Draft202012Validator(schema).validate(receipt)
+
+
 def test_holder_loss_reentry_is_exactly_bound_to_source_evidence(
     tmp_path: Path,
 ) -> None:
