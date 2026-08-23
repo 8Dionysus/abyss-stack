@@ -20,11 +20,13 @@ The controller:
   realization, runtime/tool profile, result schema, workspace HEAD, immutable
   inputs, Codex binary digest/version, ChatGPT login, and live model catalog;
 - prepares an incarnation-scoped Codex home for operator-visible external
-  actors without moving the top-level TUI out of the ambient trusted home. The
-  launcher binds model and effort explicitly and passes the scoped home only
-  through Codex's shell environment policy, so ordinary descendant
-  `codex exec` processes retain the selected incarnation while session and hook
-  trust identities remain stable. A direct visible holder can additionally
+  actors. The canonical visible holder and its descendants use the projected
+  incarnation home; authentication, session continuity, and actor tooling are
+  retained through typed shared links, while ambient operator-control and
+  unknown entries are not inherited. The launcher binds model and effort
+  explicitly and passes the same scoped home through Codex's shell environment
+  policy, so ordinary descendant `codex exec` processes retain the selected
+  incarnation. A direct visible holder can additionally
   emit its own PID/start-ticks/post-exec-argv-bound lifecycle receipt immediately
   before `exec`, including the first detached Kitty ancestor, its window identity,
   and a no-sibling dedication proof across the installed bubblewrap wrapper;
@@ -103,6 +105,15 @@ and replay only through their matching legacy wake reservation. A retry after a 
   This identity is
   distinct from any nested proof actor. This operator surface is not A2A transport and
   does not replace the governed JSONL runtime;
+- records the v2 incarnation-home manifest as a model-neutral capability
+  projection. Session continuity and actor tooling entries remain available by
+  default, while ambient operator-control entries and unknown entries are
+  denied rather than admitted by an endpoint blacklist. An owner-authored
+  `external-codex-capability-grant.schema.json` grant may project exactly one
+  operator-control entry only when its capability ID, ambient-home identity,
+  model realization, incarnation coordinate, digest, and expiry match. This
+  projection controls runtime materialization; it is not itself an
+  app-server mutation gate or owner-acceptance proof;
 - exposes the installed `aoa-external-codex-return` leaf for the final external
   return contour. The leaf receives an explicit return-owner binding and exact
   handoff/holder paths, uses a connectable local Codex app-server as a

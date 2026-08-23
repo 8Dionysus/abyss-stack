@@ -31,7 +31,11 @@ from pathlib import Path
 from typing import Any, Sequence
 
 
-SCHEMA_VERSION = "abyss_stack_codex_incarnation_home_v1"
+SCHEMA_VERSION = "abyss_stack_codex_incarnation_home_v2"
+CAPABILITY_PROJECTION_SCHEMA_VERSION = (
+    "abyss_stack_codex_capability_projection_v1"
+)
+CAPABILITY_GRANT_SCHEMA_VERSION = "abyss_stack_codex_capability_grant_v1"
 HOLDER_RECEIPT_SCHEMA_VERSION = "abyss_stack_visible_incarnation_holder_terminal_v1"
 TERMINAL_JOIN_SCHEMA_VERSION = "abyss_stack_visible_incarnation_terminal_join_v1"
 CLOSURE_AUTHORIZATION_SCHEMA_VERSION = (
@@ -55,6 +59,8 @@ CONTROL_SOCKET_MAX_LENGTH = 103
 VISIBLE_LAUNCH_GATE_SCHEMA_VERSION = "abyss_stack_visible_launch_admission_gate_v1"
 VISIBLE_LAUNCH_GATE_WAIT_SECONDS = 15.0
 VISIBLE_LAUNCH_GATE_POLL_SECONDS = 0.05
+VISIBLE_TERMINAL_BINDING_WAIT_SECONDS = 15.0
+VISIBLE_TERMINAL_BINDING_POLL_SECONDS = 0.05
 SAFE_PROJECTION_FORBIDDEN_KEYS = frozenset(
     {
         "env",
@@ -79,6 +85,21 @@ SAFE_PROJECTION_FORBIDDEN_KEYS = frozenset(
 LOCAL_NAMES = frozenset(
     {"config.toml", "cache", "log", "tmp", DESCENDANT_BIN_NAME}
 )
+SESSION_CONTINUITY_NAMES = frozenset(
+    {
+        "archived_sessions",
+        "attachments",
+        "auth.json",
+        "history.jsonl",
+        "memories",
+        "memories_1.sqlite",
+        "memories_1.sqlite-shm",
+        "memories_1.sqlite-wal",
+        "session_index.jsonl",
+        "sessions",
+    }
+)
+ACTOR_TOOLING_NAMES = frozenset({"skills"})
 ROOT_KEY_LINE = re.compile(
     r"^\s*(?P<key>model|model_reasoning_effort|\"model\"|\"model_reasoning_effort\")\s*="
 )
@@ -329,6 +350,171 @@ def _ambient_home_identity(ambient_home: Path) -> str:
     return sha256_bytes(
         canonical_bytes({"ambient_codex_home": str(ambient_home)})
     )
+
+
+def _ambient_capability_class(name: str) -> str:
+    """Classify one ambient entry by semantic role, not by endpoint name."""
+
+    if name in SESSION_CONTINUITY_NAMES:
+        return "session_continuity"
+    if name in ACTOR_TOOLING_NAMES:
+        return "actor_tooling"
+    return "unknown"
+
+
+def _capability_grant_projection(
+    *,
+    grant_path: Path,
+    ambient_home_identity: str,
+    model_realization_id: str,
+    incarnation_coordinate: str,
+) -> tuple[dict[str, Any], bytes]:
+    """Validate one owner-authored, exact-entry projection grant."""
+
+    path = _regular_file(grant_path, "capability grant")
+    value, raw = _load_json_snapshot(path, "capability grant")
+    if value.get("schema_version") != CAPABILITY_GRANT_SCHEMA_VERSION:
+        raise IncarnationHomeError("unsupported capability grant schema")
+    required = {
+        "$schema",
+        "schema_version",
+        "grant_id",
+        "capability_id",
+        "capability_class",
+        "ambient_entry",
+        "effect",
+        "subject",
+        "expires_at",
+    }
+    if set(value) != required:
+        raise IncarnationHomeError("capability grant fields are not exact")
+    if value.get("$schema") != "schemas/external-codex-capability-grant.schema.json":
+        raise IncarnationHomeError("capability grant schema binding is invalid")
+    grant_id = value.get("grant_id")
+    capability_id = value.get("capability_id")
+    capability_class = value.get("capability_class")
+    ambient_entry = value.get("ambient_entry")
+    effect = value.get("effect")
+    expires_at = value.get("expires_at")
+    if not all(
+        isinstance(item, str) and item.strip()
+        for item in (grant_id, capability_id, ambient_entry, expires_at)
+    ):
+        raise IncarnationHomeError("capability grant identity is invalid")
+    if (
+        capability_class != "operator_control"
+        or effect != "project_shared_link"
+        or ambient_entry in LOCAL_NAMES
+        or Path(ambient_entry).name != ambient_entry
+        or ambient_entry in {"", ".", ".."}
+        or capability_id != f"codex.home.{ambient_entry}"
+    ):
+        raise IncarnationHomeError("capability grant scope is invalid")
+    subject = value.get("subject")
+    if not isinstance(subject, dict) or set(subject) != {
+        "ambient_home_identity",
+        "model_realization_id",
+        "incarnation_coordinate",
+    }:
+        raise IncarnationHomeError("capability grant subject is invalid")
+    if (
+        subject.get("ambient_home_identity") != ambient_home_identity
+        or subject.get("model_realization_id") != model_realization_id
+        or subject.get("incarnation_coordinate") != incarnation_coordinate
+    ):
+        raise IncarnationHomeError("capability grant subject does not match incarnation")
+    try:
+        expiry = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise IncarnationHomeError("capability grant expiry is invalid") from exc
+    if expiry.tzinfo is None or expiry <= datetime.now(UTC):
+        raise IncarnationHomeError("capability grant is stale or expired")
+    projection = {
+        "grant_id": grant_id,
+        "capability_id": capability_id,
+        "capability_class": capability_class,
+        "ambient_entry": ambient_entry,
+        "effect": effect,
+        "subject": dict(subject),
+        "expires_at": expires_at,
+        "path": str(path),
+        "sha256": sha256_bytes(raw),
+    }
+    return projection, raw
+
+
+def _build_capability_projection(
+    *,
+    ambient_home: Path,
+    ambient_home_identity: str,
+    model_realization_id: str,
+    incarnation_coordinate: str,
+    capability_grants: Sequence[Path] = (),
+) -> dict[str, Any]:
+    """Build the typed home projection; ambient operator state is denied by default."""
+
+    grants: list[dict[str, Any]] = []
+    grants_by_entry: dict[str, dict[str, Any]] = {}
+    grant_ids: set[str] = set()
+    for grant_path in capability_grants:
+        grant, _raw = _capability_grant_projection(
+            grant_path=Path(grant_path),
+            ambient_home_identity=ambient_home_identity,
+            model_realization_id=model_realization_id,
+            incarnation_coordinate=incarnation_coordinate,
+        )
+        entry = str(grant["ambient_entry"])
+        if entry in grants_by_entry or grant["grant_id"] in grant_ids:
+            raise IncarnationHomeError("capability grants contain a duplicate identity")
+        grants_by_entry[entry] = grant
+        grant_ids.add(str(grant["grant_id"]))
+        grants.append(grant)
+
+    entries: list[dict[str, Any]] = []
+    for source in sorted(ambient_home.iterdir(), key=lambda item: item.name):
+        if source.name in LOCAL_NAMES:
+            continue
+        if source.is_symlink():
+            raise IncarnationHomeError(
+                f"ambient capability entry may not be a symlink: {source}"
+            )
+        capability_class = _ambient_capability_class(source.name)
+        grant = grants_by_entry.get(source.name)
+        if grant is not None and capability_class in {
+            "session_continuity",
+            "actor_tooling",
+        }:
+            raise IncarnationHomeError(
+                "capability grant targets a non-operator capability entry"
+            )
+        projected = grant is not None or capability_class in {
+            "session_continuity",
+            "actor_tooling",
+        }
+        entries.append(
+            {
+                "name": source.name,
+                "capability_class": (
+                    "operator_control" if grant is not None else capability_class
+                ),
+                "projection": "shared_link" if projected else "denied",
+                "grantable": capability_class == "unknown",
+                "grant_id": None if grant is None else grant["grant_id"],
+            }
+        )
+    entries.sort(key=lambda item: str(item["name"]))
+    entry_names = {str(entry["name"]) for entry in entries}
+    if set(grants_by_entry) - entry_names:
+        raise IncarnationHomeError(
+            "capability grant targets an absent ambient capability entry"
+        )
+    grants.sort(key=lambda item: str(item["ambient_entry"]))
+    return {
+        "schema_version": CAPABILITY_PROJECTION_SCHEMA_VERSION,
+        "default_policy": "deny_ambient_operator_control",
+        "entries": entries,
+        "explicit_grants": grants,
+    }
 
 
 def _incarnation_coordinate(realization_id: str, fingerprint: str) -> str:
@@ -1904,6 +2090,34 @@ def _reserve_closure_receipt(
         raise
 
 
+def _wait_for_visible_terminal_binding(
+    *, holder_pid: int
+) -> tuple[int, int, list[str], str, bool]:
+    """Wait for the causal Kitty ancestry and dedication handshake to settle."""
+
+    deadline = time.monotonic() + VISIBLE_TERMINAL_BINDING_WAIT_SECONDS
+    last_error: IncarnationHomeError | None = None
+    while True:
+        try:
+            terminal_pid, terminal_start_ticks, terminal_argv = _kitty_ancestor(
+                holder_pid
+            )
+            window_id, dedicated = _kitty_dedication(
+                holder_pid=holder_pid,
+                kitty_pid=terminal_pid,
+                terminal_argv=terminal_argv,
+            )
+            return terminal_pid, terminal_start_ticks, terminal_argv, window_id, dedicated
+        except IncarnationHomeError as exc:
+            last_error = exc
+            if time.monotonic() >= deadline:
+                raise IncarnationHomeError(
+                    "visible holder terminal binding did not become ready: "
+                    f"{last_error}"
+                ) from exc
+            time.sleep(VISIBLE_TERMINAL_BINDING_POLL_SECONDS)
+
+
 def _holder_receipt(
     *,
     receipt_path: Path,
@@ -1925,12 +2139,13 @@ def _holder_receipt(
     if holder_parent_pid <= 1:
         raise IncarnationHomeError("visible holder has no usable process parent")
     parent_comm = _proc_comm(holder_parent_pid)
-    terminal_pid, terminal_start_ticks, terminal_argv = _kitty_ancestor(holder_pid)
-    window_id, dedicated = _kitty_dedication(
-        holder_pid=holder_pid,
-        kitty_pid=terminal_pid,
-        terminal_argv=terminal_argv,
-    )
+    (
+        terminal_pid,
+        terminal_start_ticks,
+        terminal_argv,
+        window_id,
+        dedicated,
+    ) = _wait_for_visible_terminal_binding(holder_pid=holder_pid)
     post_exec_argv = _post_exec_argv(
         executable,
         argv,
@@ -4130,7 +4345,11 @@ def command_close(args: argparse.Namespace) -> int:
 
 
 def prepare_home(
-    *, ambient_home: Path, realization_path: Path, runtime_root: Path
+    *,
+    ambient_home: Path,
+    realization_path: Path,
+    runtime_root: Path,
+    capability_grants: Sequence[Path] = (),
 ) -> dict[str, Any]:
     ambient_home = _absolute_directory(ambient_home, "ambient Codex home")
     runtime_root = _absolute_directory(runtime_root, "runtime root")
@@ -4180,15 +4399,19 @@ def prepare_home(
         ambient_home / "config.toml", "ambient Codex config"
     ).read_bytes()
     config = _bound_config(ambient_config, model_slug, effort)
-    shared_sources: list[Path] = []
-    for source in sorted(ambient_home.iterdir(), key=lambda item: item.name):
-        if source.name in LOCAL_NAMES:
-            continue
-        if source.is_symlink():
-            raise IncarnationHomeError(
-                f"ambient shared state entry may not be a symlink: {source}"
-            )
-        shared_sources.append(source)
+    capability_projection = _build_capability_projection(
+        ambient_home=ambient_home,
+        ambient_home_identity=ambient_identity,
+        model_realization_id=str(realization.get("model_realization_id")),
+        incarnation_coordinate=coordinate,
+        capability_grants=capability_grants,
+    )
+    projected_entries = [
+        entry
+        for entry in capability_projection["entries"]
+        if entry["projection"] == "shared_link"
+    ]
+    shared_names = [str(entry["name"]) for entry in projected_entries]
 
     incarnation_root.mkdir(mode=0o700, exist_ok=True)
     codex_home.mkdir(mode=0o700, exist_ok=True)
@@ -4212,30 +4435,52 @@ def prepare_home(
             for name in existing["shared_state_names"]
             if isinstance(name, str) and name not in LOCAL_NAMES and Path(name).name == name
         }
-    shared_names: list[str] = []
-    for source in shared_sources:
+    if incarnation_root.exists() and isinstance(
+        existing.get("capability_projection"), dict
+    ):
+        for entry in existing["capability_projection"].get("entries", []):
+            if (
+                isinstance(entry, dict)
+                and entry.get("projection") == "shared_link"
+                and isinstance(entry.get("name"), str)
+            ):
+                previous_shared_names.add(entry["name"])
+
+    for entry in projected_entries:
+        source = ambient_home / str(entry["name"])
         if source.is_symlink():
             raise IncarnationHomeError(
-                f"ambient shared state entry may not be a symlink: {source}"
+                f"ambient capability entry may not be a symlink: {source}"
             )
         target = codex_home / source.name
         if target.is_symlink():
             if target.readlink() != source:
-                raise IncarnationHomeError(f"shared state link drift: {target}")
+                raise IncarnationHomeError(f"capability projection link drift: {target}")
         elif target.exists():
-            raise IncarnationHomeError(f"shared state target is not a symlink: {target}")
+            raise IncarnationHomeError(
+                f"capability projection target is not a symlink: {target}"
+            )
         else:
             target.symlink_to(source)
-        shared_names.append(source.name)
 
-    for name in sorted(previous_shared_names - set(shared_names)):
+    all_capability_names = {
+        str(entry["name"]) for entry in capability_projection["entries"]
+    }
+    for name in sorted(
+        (previous_shared_names | all_capability_names) - set(shared_names)
+    ):
         target = codex_home / name
         source = ambient_home / name
+        if not target.exists() and not target.is_symlink():
+            continue
         if not target.is_symlink() or target.readlink() != source:
-            raise IncarnationHomeError(f"obsolete shared state link drift: {target}")
+            raise IncarnationHomeError(
+                f"obsolete capability projection link drift: {target}"
+            )
         target.unlink()
 
     manifest = {
+        "$schema": "schemas/external-codex-incarnation-home.schema.json",
         "schema_version": SCHEMA_VERSION,
         "model_realization_id": realization.get("model_realization_id"),
         "model_realization_ref": str(realization_path),
@@ -4249,7 +4494,8 @@ def prepare_home(
         "codex_home": str(codex_home),
         "config_digest": sha256_bytes(config),
         "shared_state_names": shared_names,
-        "top_level_posture": "ambient-home",
+        "capability_projection": capability_projection,
+        "top_level_posture": "incarnation-home",
         "child_posture": "incarnation-home-via-shell-environment-policy",
     }
     _write_exact(
@@ -4273,6 +4519,8 @@ def _load_manifest_snapshot(
         )
     if manifest.get("schema_version") != SCHEMA_VERSION:
         raise IncarnationHomeError("unsupported incarnation-home manifest")
+    if manifest.get("$schema") != "schemas/external-codex-incarnation-home.schema.json":
+        raise IncarnationHomeError("incarnation-home manifest schema binding is invalid")
     codex_home = _absolute_directory(Path(str(manifest.get("codex_home"))), "incarnation Codex home")
     ambient_home = _absolute_directory(
         Path(str(manifest.get("ambient_codex_home"))), "ambient Codex home"
@@ -4333,6 +4581,27 @@ def _load_manifest_snapshot(
         or scoped_config["features"].get("multi_agent") is not False
     ):
         raise IncarnationHomeError("scoped Codex config binding drift")
+    capability_projection = manifest.get("capability_projection")
+    expected_capability_projection = _build_capability_projection(
+        ambient_home=ambient_home,
+        ambient_home_identity=str(manifest.get("ambient_home_identity")),
+        model_realization_id=str(realization.get("model_realization_id")),
+        incarnation_coordinate=_incarnation_coordinate(
+            str(realization.get("model_realization_id")), fingerprint
+        ),
+        capability_grants=[
+            Path(str(grant.get("path")))
+            for grant in (
+                capability_projection.get("explicit_grants", [])
+                if isinstance(capability_projection, dict)
+                else []
+            )
+            if isinstance(grant, dict) and isinstance(grant.get("path"), str)
+        ],
+    )
+    if capability_projection != expected_capability_projection:
+        raise IncarnationHomeError("capability projection drift")
+
     shared_names = manifest.get("shared_state_names")
     if (
         not isinstance(shared_names, list)
@@ -4348,12 +4617,14 @@ def _load_manifest_snapshot(
     ):
         raise IncarnationHomeError("shared-state manifest is invalid")
     expected_shared_names = sorted(
-        entry.name
-        for entry in ambient_home.iterdir()
-        if entry.name not in LOCAL_NAMES
+        str(entry["name"])
+        for entry in expected_capability_projection["entries"]
+        if entry["projection"] == "shared_link"
     )
     if sorted(shared_names) != expected_shared_names:
-        raise IncarnationHomeError("shared-state manifest no longer matches ambient home")
+        raise IncarnationHomeError(
+            "shared-state manifest no longer matches capability projection"
+        )
     expected_names = set(shared_names) | LOCAL_NAMES
     for entry in codex_home.iterdir():
         if entry.name not in expected_names:
@@ -4369,7 +4640,7 @@ def _load_manifest_snapshot(
             or not target.is_symlink()
             or target.readlink() != source
         ):
-            raise IncarnationHomeError(f"shared-state link drift: {target}")
+            raise IncarnationHomeError(f"capability projection link drift: {target}")
     for name in LOCAL_NAMES - {"config.toml"}:
         local = codex_home / name
         if local.is_symlink() or not local.is_dir():
@@ -5566,6 +5837,7 @@ def command_prepare(args: argparse.Namespace) -> int:
         ambient_home=Path(args.ambient_codex_home),
         realization_path=Path(args.model_realization),
         runtime_root=Path(args.runtime_root),
+        capability_grants=[Path(path) for path in (args.capability_grant or [])],
     )
     print(json.dumps(manifest, ensure_ascii=False, sort_keys=True))
     return 0
@@ -5726,7 +5998,7 @@ def command_payload_launch(args: argparse.Namespace) -> int:
             "package_relative": companion_relative_argument,
         }
     environment = dict(os.environ)
-    environment["CODEX_HOME"] = str(manifest["ambient_codex_home"])
+    environment["CODEX_HOME"] = str(manifest["codex_home"])
     if args.holder_receipt:
         _holder_receipt(
             receipt_path=Path(args.holder_receipt),
@@ -5777,7 +6049,7 @@ def command_launch(args: argparse.Namespace) -> int:
     command = Path(args.codex_executable)
     executable = _resolved_executable(command)
     environment = dict(os.environ)
-    environment["CODEX_HOME"] = str(manifest["ambient_codex_home"])
+    environment["CODEX_HOME"] = str(manifest["codex_home"])
     if terminal_title is not None:
         _binding_context_value, binding_context_bytes = _load_json_snapshot(
             Path(binding_context_argument), "terminal binding context"
@@ -6210,6 +6482,12 @@ def parser() -> argparse.ArgumentParser:
     prepare.add_argument("--ambient-codex-home", required=True)
     prepare.add_argument("--model-realization", required=True)
     prepare.add_argument("--runtime-root", required=True)
+    prepare.add_argument(
+        "--capability-grant",
+        action="append",
+        default=[],
+        help="owner-authored exact grant for one operator capability entry",
+    )
     prepare.set_defaults(handler=command_prepare)
     launch = subcommands.add_parser("launch")
     launch.add_argument("--manifest", required=True)

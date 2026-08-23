@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-incarnation-home.schema.json",
+  "title": "Bound Codex incarnation home and semantic capability projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "model_realization_id",
+    "model_realization_ref",
+    "configuration_fingerprint",
+    "model_slug",
+    "reasoning_effort",
+    "runtime_version",
+    "ambient_codex_home",
+    "ambient_home_identity",
+    "runtime_root",
+    "codex_home",
+    "config_digest",
+    "shared_state_names",
+    "capability_projection",
+    "top_level_posture",
+    "child_posture"
+  ],
+  "properties": {
+    "$schema": {"const": "schemas/external-codex-incarnation-home.schema.json"},
+    "schema_version": {"const": "abyss_stack_codex_incarnation_home_v2"},
+    "model_realization_id": {"type": "string", "minLength": 1},
+    "model_realization_ref": {"$ref": "#/$defs/absolutePath"},
+    "configuration_fingerprint": {"$ref": "#/$defs/digest"},
+    "model_slug": {"type": "string", "minLength": 1},
+    "reasoning_effort": {"type": "string", "minLength": 1},
+    "runtime_version": {"type": "string", "minLength": 1},
+    "ambient_codex_home": {"$ref": "#/$defs/absolutePath"},
+    "ambient_home_identity": {"$ref": "#/$defs/digest"},
+    "runtime_root": {"$ref": "#/$defs/absolutePath"},
+    "codex_home": {"$ref": "#/$defs/absolutePath"},
+    "config_digest": {"$ref": "#/$defs/digest"},
+    "shared_state_names": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/name"}
+    },
+    "capability_projection": {"$ref": "#/$defs/capabilityProjection"},
+    "top_level_posture": {"const": "incarnation-home"},
+    "child_posture": {"const": "incarnation-home-via-shell-environment-policy"}
+  },
+  "$defs": {
+    "absolutePath": {"type": "string", "pattern": "^/", "minLength": 2},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "name": {
+      "type": "string",
+      "pattern": "^(?!\\.\\.?$)[^/]+$",
+      "minLength": 1
+    },
+    "capabilityProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "default_policy", "entries", "explicit_grants"],
+      "properties": {
+        "schema_version": {"const": "abyss_stack_codex_capability_projection_v1"},
+        "default_policy": {"const": "deny_ambient_operator_control"},
+        "entries": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/capabilityEntry"}
+        },
+        "explicit_grants": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/grantProjection"}
+        }
+      }
+    },
+    "capabilityEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "capability_class", "projection", "grantable", "grant_id"],
+      "properties": {
+        "name": {"$ref": "#/$defs/name"},
+        "capability_class": {
+          "enum": ["session_continuity", "actor_tooling", "operator_control", "unknown"]
+        },
+        "projection": {"enum": ["shared_link", "denied"]},
+        "grantable": {"type": "boolean"},
+        "grant_id": {"type": ["string", "null"]}
+      }
+    },
+    "grantProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grant_id",
+        "capability_id",
+        "capability_class",
+        "ambient_entry",
+        "effect",
+        "subject",
+        "expires_at",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "grant_id": {"type": "string", "minLength": 1},
+        "capability_id": {"type": "string", "minLength": 1},
+        "capability_class": {"const": "operator_control"},
+        "ambient_entry": {"$ref": "#/$defs/name"},
+        "effect": {"const": "project_shared_link"},
+        "subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ambient_home_identity", "model_realization_id", "incarnation_coordinate"],
+          "properties": {
+            "ambient_home_identity": {"$ref": "#/$defs/digest"},
+            "model_realization_id": {"type": "string", "minLength": 1},
+            "incarnation_coordinate": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "expires_at": {"type": "string", "minLength": 1},
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

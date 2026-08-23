@@ -247,6 +247,14 @@ window ID, TTY, title, socket, runtime state root, and closeout route. The
 `bind` command can materialize that binding from a legacy task-local receipt
 only with an explicit owner context.
 
+The payload holder publishes its lifecycle receipt only after the exact Kitty
+ancestor and dedicated-window handshake is ready. The runtime retries that
+causal identity observation for a bounded interval, preserving the exact
+holder PID/start ticks, Kitty PID/start ticks, window ID, and dedication proof;
+it does not turn a blind parent timeout into a successful launch. If the
+handshake never becomes ready, the launch fails closed and no live terminal
+binding is claimed.
+
 The canonical terminal observability surface is
 `status --binding <absolute json> [--output <absolute json>]`. It validates
 the exact process identities, queries Kitty through the bound socket, and
@@ -769,6 +777,31 @@ This userspace contract does not claim survival of a direct, out-of-contract
 `SIGKILL` delivered to the supervisor itself. A kernel-enforced guarantee for
 that case requires a separately designed and admitted compatible cgroup
 containment route.
+
+## Incarnation-home capability projection
+
+`prepare` writes a v2 `incarnation-home.json` whose `$schema` points to
+`schemas/external-codex-incarnation-home.schema.json`. The manifest carries a
+model-neutral `capability_projection` with one typed entry for every non-local
+ambient-home entry. `session_continuity` and `actor_tooling` entries are
+projected as shared links by default. `operator_control` and `unknown` entries
+are denied by default, so the runtime does not admit ambient app-server,
+hooks, plugin, queue, browser, or other operator-control state merely because
+the visible holder was launched from the operator's top-level home. The
+canonical visible holder itself uses the projected incarnation home; the
+ordinary actor-local `config.toml`, `cache`, `log`, `tmp`, and descendant binary
+remain real incarnation-local paths.
+
+An `--capability-grant` input is an exact
+`schemas/external-codex-capability-grant.schema.json` owner artifact for one
+operator-control entry. Admission requires the typed capability ID and
+effect, an exact ambient-home identity, model realization ID, incarnation
+coordinate, regular-file digest, and future expiry; duplicate, stale,
+replayed, absent-entry, malformed, or mismatched grants fail closed. The
+resulting manifest stores the grant path and digest so refresh or mutation is
+detected. This is a runtime materialization and admission projection, not the
+semantic owner policy and not proof that the Codex app-server mutation itself
+enforces the grant.
 
 ## Lifecycle and usage metering
 

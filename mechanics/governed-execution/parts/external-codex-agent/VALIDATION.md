@@ -39,6 +39,19 @@ python scripts/generate_decision_indexes.py --check
 python scripts/validate_nested_agents.py
 ```
 
+## Incarnation-home projection and visible binding
+
+The focused home suite covers the v2 manifest/schema binding, default
+projection of session continuity and actor tooling, deny-by-default ambient
+operator-control and unknown entries, exact subject-bound operator grants,
+grant expiry and drift, and cleanup of links left by the previous broad
+projection. The same suite verifies that the visible holder retries the causal
+Kitty ancestry/dedication handshake before publishing its holder receipt and
+fails closed when the exact terminal binding is not ready. These tests prove
+source behavior only; they do not prove installed-release parity, host
+trust/admission, a live visible canary, app-server effect enforcement, wake
+delivery, holder closure, owner acceptance, or Goal acceptance.
+
 The focused external-return tests also cover the separate Goal pause contour:
 an exact active owner-bound Goal is refused before `thread/goal/set` when the
 app-server adapter lacks an `atomic_goal_transition` method with a
