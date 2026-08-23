@@ -265,6 +265,120 @@ def test_capability_class_registry_is_authored_data_with_explicit_unknown(
     ] == str(registry_path)
 
 
+def test_capability_class_registry_rejects_operator_control_policy_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = json.loads(
+        (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
+    )
+    operator_control = next(
+        definition
+        for definition in registry["classes"]
+        if definition["capability_class"] == "operator_control"
+    )
+    operator_control["projection"] = "shared_link"
+    registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-capability-classes.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert list(Draft202012Validator(schema).iter_errors(registry))
+    monkeypatch.setattr(MODULE, "CAPABILITY_CLASS_REGISTRY_PATH", registry_path)
+
+    with pytest.raises(
+        MODULE.IncarnationHomeError, match="safe tuple"
+    ):
+        MODULE._load_capability_class_registry()
+
+
+def test_capability_class_registry_rejects_unsafe_future_authority_tuple(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = json.loads(
+        (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
+    )
+    registry["classes"].append(
+        {
+            "capability_class": "future_semantic",
+            "projection": "shared_link",
+            "grantable": False,
+            "entries": ["future-capability"],
+        }
+    )
+    registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-capability-classes.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert list(Draft202012Validator(schema).iter_errors(registry))
+    monkeypatch.setattr(MODULE, "CAPABILITY_CLASS_REGISTRY_PATH", registry_path)
+
+    with pytest.raises(
+        MODULE.IncarnationHomeError, match="safe tuple"
+    ):
+        MODULE._load_capability_class_registry()
+
+
+def test_safe_future_registry_class_produces_schema_valid_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = json.loads(
+        (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
+    )
+    registry["classes"].append(
+        {
+            "capability_class": "future_semantic",
+            "projection": "denied",
+            "grantable": False,
+            "entries": ["future-capability"],
+        }
+    )
+    registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    registry_schema = json.loads(
+        (PART / "schemas" / "external-codex-capability-classes.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    Draft202012Validator(registry_schema).validate(registry)
+    monkeypatch.setattr(MODULE, "CAPABILITY_CLASS_REGISTRY_PATH", registry_path)
+
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    (ambient / "future-capability").write_text("{}", encoding="utf-8")
+
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_schema = json.loads(
+        (PART / "schemas" / "external-codex-incarnation-home.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    Draft202012Validator(manifest_schema).validate(manifest)
+    entry = next(
+        item
+        for item in manifest["capability_projection"]["entries"]
+        if item["name"] == "future-capability"
+    )
+    assert entry == {
+        "name": "future-capability",
+        "capability_class": "future_semantic",
+        "projection": "denied",
+        "grantable": False,
+        "grant_id": None,
+    }
+
+
 def test_capability_projection_reuses_subject_grant_without_binding_endpoint_bytes(
     tmp_path: Path,
 ) -> None:

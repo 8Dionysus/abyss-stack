@@ -812,7 +812,18 @@ The capability meaning consumed by the classifier is authored in
 `capability-classes.v1.json`, with an exact schema and digest recorded in the
 projection. Entries absent from that registry resolve to an explicit
 `unknown`/denied/grantable result; adding a future capability family therefore
-does not require executable endpoint special cases.
+does not require executable endpoint special cases. The registry schema and
+loader require the canonical `session_continuity`, `actor_tooling`, and
+`operator_control` classes with their exact admitted policy tuples: shared-link
+and non-grantable, shared-link and non-grantable, and denied and grantable,
+respectively. A future vocabulary ID may be added only as denied and
+non-grantable; its manifest entry is schema-valid but cannot create a shared
+link or consume the operator-control grant relation. Promoting a future class
+to an authority-bearing policy therefore requires a coordinated source change
+to the loader, registry schema, incarnation-home schema, and this contract.
+`operator_control` becomes a shared link only when the existing exact
+subject-bound explicit grant is present; changing its registry tuple alone
+cannot widen authority.
 
 ## Lifecycle and usage metering
 

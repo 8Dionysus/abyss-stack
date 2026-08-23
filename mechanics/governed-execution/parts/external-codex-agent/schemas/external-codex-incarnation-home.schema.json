@@ -89,12 +89,98 @@
       "properties": {
         "name": {"$ref": "#/$defs/name"},
         "capability_class": {
-          "enum": ["session_continuity", "actor_tooling", "operator_control", "unknown"]
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
         },
         "projection": {"enum": ["shared_link", "denied"]},
         "grantable": {"type": "boolean"},
         "grant_id": {"type": ["string", "null"]}
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "capability_class": {
+                "enum": ["session_continuity", "actor_tooling"]
+              }
+            },
+            "required": ["capability_class"]
+          },
+          "then": {
+            "properties": {
+              "projection": {"const": "shared_link"},
+              "grantable": {"const": false},
+              "grant_id": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability_class": {"const": "operator_control"}
+            },
+            "required": ["capability_class"]
+          },
+          "then": {
+            "properties": {
+              "grantable": {"const": true}
+            },
+            "oneOf": [
+              {
+                "properties": {
+                  "projection": {"const": "denied"},
+                  "grant_id": {"type": "null"}
+                }
+              },
+              {
+                "properties": {
+                  "projection": {"const": "shared_link"},
+                  "grant_id": {"type": "string", "minLength": 1}
+                }
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability_class": {"const": "unknown"}
+            },
+            "required": ["capability_class"]
+          },
+          "then": {
+            "properties": {
+              "projection": {"const": "denied"},
+              "grantable": {"const": true},
+              "grant_id": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability_class": {
+                "not": {
+                  "enum": [
+                    "session_continuity",
+                    "actor_tooling",
+                    "operator_control",
+                    "unknown"
+                  ]
+                }
+              }
+            },
+            "required": ["capability_class"]
+          },
+          "then": {
+            "properties": {
+              "projection": {"const": "denied"},
+              "grantable": {"const": false},
+              "grant_id": {"type": "null"}
+            }
+          }
+        }
+      ]
     },
     "capabilityClassRegistry": {
       "type": "object",

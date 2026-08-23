@@ -107,8 +107,13 @@ and replay only through their matching legacy wake reservation. A retry after a 
   does not replace the governed JSONL runtime;
 - records the v2 incarnation-home manifest as a model-neutral capability
   projection. The owner-authored `capability-classes.v1.json` registry supplies
-  session-continuity, actor-tooling, and known operator-control meanings;
-  entries absent from it resolve explicitly to `unknown` and remain denied.
+  session-continuity, actor-tooling, and known operator-control meanings. Its
+  loader and schema pin those canonical policies; future vocabulary entries
+  are representable only as denied and non-grantable, so registry data alone
+  cannot widen authority or emit a schema-invalid manifest. Entries absent from
+  it resolve explicitly to `unknown` and remain denied.
+  `operator_control` remains denied in the registry and can become a shared
+  link only through the exact explicit grant relation below.
   An owner-authored `external-codex-capability-grant.schema.json` grant may
   project exactly one operator-control entry only when its capability ID,
   ambient-home identity, model realization, incarnation coordinate, grant

@@ -44,6 +44,13 @@ CAPABILITY_CLASS_REGISTRY_NAME = "capability-classes.v1.json"
 CAPABILITY_CLASS_REGISTRY_PATH = Path(__file__).resolve().with_name(
     CAPABILITY_CLASS_REGISTRY_NAME
 )
+CAPABILITY_CLASS_POLICIES = {
+    "session_continuity": ("shared_link", False),
+    "actor_tooling": ("shared_link", False),
+    "operator_control": ("denied", True),
+}
+CAPABILITY_CLASS_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
+CAPABILITY_ENTRY_NAME_PATTERN = re.compile(r"^(?!\.\.?$)[^/]+$")
 HOLDER_RECEIPT_SCHEMA_VERSION = "abyss_stack_visible_incarnation_holder_terminal_v1"
 TERMINAL_JOIN_SCHEMA_VERSION = "abyss_stack_visible_incarnation_terminal_join_v1"
 CLOSURE_AUTHORIZATION_SCHEMA_VERSION = (
@@ -383,7 +390,7 @@ def _load_capability_class_registry() -> tuple[
         entries = definition.get("entries")
         if (
             not isinstance(capability_class, str)
-            or not capability_class
+            or CAPABILITY_CLASS_ID_PATTERN.fullmatch(capability_class) is None
             or capability_class == "unknown"
             or capability_class in class_ids
             or projection not in {"shared_link", "denied"}
@@ -395,11 +402,18 @@ def _load_capability_class_registry() -> tuple[
             raise IncarnationHomeError(
                 "capability-class registry definition is invalid"
             )
+        expected_policy = CAPABILITY_CLASS_POLICIES.get(capability_class)
+        if expected_policy is None:
+            expected_policy = ("denied", False)
+        if (projection, grantable) != expected_policy:
+            raise IncarnationHomeError(
+                "capability-class registry policy is not an admitted safe tuple"
+            )
         class_ids.add(capability_class)
         for name in entries:
             if (
                 not isinstance(name, str)
-                or not name
+                or CAPABILITY_ENTRY_NAME_PATTERN.fullmatch(name) is None
                 or name in {".", ".."}
                 or name in LOCAL_NAMES
                 or Path(name).name != name
@@ -413,6 +427,11 @@ def _load_capability_class_registry() -> tuple[
                 "projection": projection,
                 "grantable": grantable,
             }
+
+    if not set(CAPABILITY_CLASS_POLICIES).issubset(class_ids):
+        raise IncarnationHomeError(
+            "capability-class registry omits an admitted canonical class"
+        )
 
     unknown = value.get("unknown")
     if not isinstance(unknown, dict) or set(unknown) != {

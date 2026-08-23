@@ -114,13 +114,15 @@ Tracking starts with the community-docs baseline for this repository.
   receipt instead of selecting a proof actor from generic runtime fields.
 - Project the external incarnation home through a typed, model-neutral
   capability manifest: the owner-authored class registry supplies session
-  continuity and actor tooling meanings, entries absent from it resolve to
-  deny-by-default `unknown`, and one reusable time-bounded subject-bound grant
-  can opt in one operator-control entry. Grant artifact identity/path/bytes are
-  bound; mutable dynamic endpoint contents are intentionally not. The
-  canonical visible holder now uses that projected home rather than inheriting
-  the ambient home. Repair visible launch admission so the holder waits for
-  the causal Kitty ancestry/dedication handshake before publishing its lifecycle
+  continuity and actor tooling meanings, while canonical policy tuples are
+  enforced by the loader and schemas. Entries absent from it resolve to
+  deny-by-default `unknown`; future vocabulary entries remain denied and
+  non-grantable, and one reusable time-bounded subject-bound grant can opt in
+  one operator-control entry. Grant artifact identity/path/bytes are bound;
+  mutable dynamic endpoint contents are intentionally not. The canonical
+  visible holder now uses that projected home rather than inheriting the
+  ambient home. Repair visible launch admission so the holder waits for the
+  causal Kitty ancestry/dedication handshake before publishing its lifecycle
   receipt; source tests do not claim installed activation, live protection, or
   app-server effect enforcement.
 - Keep operator-visible external Codex actors in the ambient trusted home while

@@ -20,7 +20,12 @@ The incarnation-home classifier consumes the checked-in
 in executable code. That registry is a runtime-owner projection of admitted
 capability meaning: entries absent from it resolve to explicit `unknown`,
 deny-by-default, and grantable status. The registry path and bytes are
-digest-bound in the generated projection, while a reusable grant separately
+digest-bound in the generated projection. The schema and loader require exact
+policies for the three canonical classes; future vocabulary IDs are admitted
+only as denied and non-grantable, so a registry edit cannot widen authority or
+produce a manifest outside its schema. `operator_control` is denied in the
+registry and becomes shared only through the separate explicit grant relation.
+A reusable grant separately
 binds the capability identity, ambient path, subject, grant artifact bytes,
 and expiry window. Mutable contents inside a dynamic target endpoint are not
 promoted into grant authority.

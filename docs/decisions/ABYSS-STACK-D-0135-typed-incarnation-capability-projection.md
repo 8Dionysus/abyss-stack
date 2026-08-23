@@ -37,8 +37,12 @@ holder before its Kitty ancestry and dedication binding had become observable.
 
 Use the third route. The v2 incarnation-home manifest records a model-neutral
 projection for every non-local ambient entry. Only authored session continuity
-and actor tooling classes are shared-link defaults; all other entries are
-`unknown` and denied. An exact typed grant may declare one concrete entry as
+and actor tooling classes are shared-link defaults; the canonical
+`operator_control` class is denied and grantable, and entries absent from the
+registry are `unknown` and denied. The registry schema and loader also permit
+future vocabulary IDs only as denied and non-grantable, keeping future meaning
+explicit without allowing registry data alone to widen authority or emit a
+schema-invalid manifest. An exact typed grant may declare one concrete entry as
 operator control and project it only when its capability ID/effect,
 ambient-home identity, model realization, incarnation coordinate, regular-file
 digest, and future expiry all match the current incarnation. The runtime
@@ -57,8 +61,14 @@ Semantic classes preserve ordinary work while preventing ambient operator
 control from becoming an implicit external-incarnation authority. The
 owner-authored registry supplies the class meaning and leaves entries absent
 from it as explicit `unknown`, so adding a future capability family does not
-grow executable endpoint special cases. Deny-by-default unknown entries avoid
-implicit authority while exact grants provide a typed future extension point.
+grow executable endpoint special cases. The canonical policy tuples are
+repeated in the registry schema and loader: session continuity and actor
+tooling are shared/non-grantable, operator control is denied/grantable, and
+future class IDs are denied/non-grantable. The generated manifest schema
+represents those future denied classes, while only the exact explicit grant
+relation can turn an operator-control entry into a shared link. Deny-by-default
+unknown and future entries avoid implicit authority while exact grants provide
+a typed future extension point.
 The grant is intentionally reusable by its exact subject until expiry; subject,
 path, grant-artifact digest, and expiry binding make copied, stale, or mutated
 grant artifacts fail closed, but mutable bytes inside a dynamic operator
@@ -71,6 +81,9 @@ wrapper.
 
 - Positive: the runtime materializes only the intended home projection and
   exposes a durable typed grant surface for future owner policy.
+- Positive: registry vocabulary can evolve as explicit denied/non-grantable
+  data without allowing an arbitrary policy tuple to widen authority or break
+  manifest-schema validation.
 - Positive: holder receipt publication now depends on the same causal terminal
   identity that visible launch admission later validates.
 - Tradeoff: app-server mutation enforcement remains outside this source slice;

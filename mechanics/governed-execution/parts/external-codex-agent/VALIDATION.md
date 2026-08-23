@@ -45,6 +45,9 @@ The focused home suite covers the v2 manifest/schema binding, the
 owner-authored capability-class registry and its explicit unknown path, default
 projection of session continuity and actor tooling, deny-by-default ambient
 operator-control and unknown entries, exact subject-bound operator grants,
+canonical class policy enforcement, rejection of an operator-control policy
+override and unsafe future shared-link tuple, schema-coherent denied future
+vocabulary entries,
 grant expiry and artifact drift, intentional same-subject grant reuse until
 expiry, acceptance of mutable dynamic endpoint contents without target-content
 binding, and cleanup of links left by the previous broad projection. The same
