@@ -1463,6 +1463,118 @@ def test_lifecycle_outputs_may_not_alias() -> None:
         )
 
 
+def test_return_route_dispatches_only_its_digest_bound_inputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner_path = tmp_path / "owner.json"
+    owner_value = owner(
+        goal="goal-route",
+        thread="thread-route",
+        endpoint="unix:/run/user/1000/route.sock",
+    )
+    owner_path.write_bytes(MODULE._canonical_bytes(owner_value) + b"\n")
+    handoff_path = tmp_path / "handoff.json"
+    handoff_path.write_text('{"responsibility_state":"returned"}\n', encoding="utf-8")
+    holder_path = tmp_path / "holder.json"
+    holder_path.write_text('{"holder":"replacement"}\n', encoding="utf-8")
+    route_path = tmp_path / "route.json"
+    route = {
+        "schema_version": MODULE.RETURN_ROUTE_SCHEMA_VERSION,
+        "owner_ref": str(owner_path),
+        "owner_sha256": MODULE._sha256_bytes(owner_path.read_bytes()),
+        "handoff_ref": str(handoff_path),
+        "handoff_sha256": MODULE._sha256_bytes(handoff_path.read_bytes()),
+        "holder_receipt_ref": str(holder_path),
+        "holder_receipt_sha256": MODULE._sha256_bytes(holder_path.read_bytes()),
+        "return_receipt_ref": str(tmp_path / "return.json"),
+        "authorization_ref": str(tmp_path / "authorization.json"),
+        "closure_receipt_ref": str(tmp_path / "closure.json"),
+    }
+    route_path.write_bytes(MODULE._canonical_bytes(route) + b"\n")
+    validate(
+        instance=route,
+        schema=json.loads(
+            (PART / "schemas/external-codex-return-route.schema.json").read_text(
+                encoding="utf-8"
+            )
+        ),
+    )
+
+    captured: dict[str, object] = {}
+
+    def capture(args: SimpleNamespace) -> int:
+        captured.update(vars(args))
+        return 23
+
+    monkeypatch.setattr(MODULE, "command_return", capture)
+    assert MODULE.command_return_route(SimpleNamespace(route=str(route_path))) == 23
+    assert captured == {
+        "return_owner": str(owner_path),
+        "handoff": str(handoff_path),
+        "holder_receipt": str(holder_path),
+        "return_receipt": str(tmp_path / "return.json"),
+        "authorization": str(tmp_path / "authorization.json"),
+        "closure_receipt": str(tmp_path / "closure.json"),
+        "detach": False,
+        "detached_receipt": None,
+        "detached_result": None,
+        "detached_log": None,
+    }
+
+
+def test_return_route_rejects_input_digest_drift(tmp_path: Path) -> None:
+    owner_path = tmp_path / "owner.json"
+    owner_path.write_text("{}\n", encoding="utf-8")
+    handoff_path = tmp_path / "handoff.json"
+    handoff_path.write_text("{}\n", encoding="utf-8")
+    holder_path = tmp_path / "holder.json"
+    holder_path.write_text("{}\n", encoding="utf-8")
+    route_path = tmp_path / "route.json"
+    route = {
+        "schema_version": MODULE.RETURN_ROUTE_SCHEMA_VERSION,
+        "owner_ref": str(owner_path),
+        "owner_sha256": MODULE._sha256_bytes(owner_path.read_bytes()),
+        "handoff_ref": str(handoff_path),
+        "handoff_sha256": MODULE._sha256_bytes(handoff_path.read_bytes()),
+        "holder_receipt_ref": str(holder_path),
+        "holder_receipt_sha256": MODULE._sha256_bytes(holder_path.read_bytes()),
+        "return_receipt_ref": str(tmp_path / "return.json"),
+        "authorization_ref": str(tmp_path / "authorization.json"),
+        "closure_receipt_ref": str(tmp_path / "closure.json"),
+    }
+    route_path.write_bytes(MODULE._canonical_bytes(route) + b"\n")
+    handoff_path.write_text('{"drift":true}\n', encoding="utf-8")
+
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="handoff digest has drifted"):
+        MODULE._load_return_route(route_path)
+
+
+def test_return_route_rejects_output_alias_with_bound_input(tmp_path: Path) -> None:
+    owner_path = tmp_path / "owner.json"
+    handoff_path = tmp_path / "handoff.json"
+    holder_path = tmp_path / "holder.json"
+    for path in (owner_path, handoff_path, holder_path):
+        path.write_text("{}\n", encoding="utf-8")
+    route_path = tmp_path / "route.json"
+    route = {
+        "schema_version": MODULE.RETURN_ROUTE_SCHEMA_VERSION,
+        "owner_ref": str(owner_path),
+        "owner_sha256": MODULE._sha256_bytes(owner_path.read_bytes()),
+        "handoff_ref": str(handoff_path),
+        "handoff_sha256": MODULE._sha256_bytes(handoff_path.read_bytes()),
+        "holder_receipt_ref": str(holder_path),
+        "holder_receipt_sha256": MODULE._sha256_bytes(holder_path.read_bytes()),
+        "return_receipt_ref": str(owner_path),
+        "authorization_ref": str(tmp_path / "authorization.json"),
+        "closure_receipt_ref": str(tmp_path / "closure.json"),
+    }
+    route_path.write_bytes(MODULE._canonical_bytes(route) + b"\n")
+
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="aliases"):
+        MODULE._load_return_route(route_path)
+
+
 def test_detached_return_follows_an_existing_live_retry(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

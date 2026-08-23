@@ -52,6 +52,9 @@ CAPABILITY_CLASS_POLICIES = {
 CAPABILITY_CLASS_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 CAPABILITY_ENTRY_NAME_PATTERN = re.compile(r"^(?!\.\.?$)[^/]+$")
 HOLDER_RECEIPT_SCHEMA_VERSION = "abyss_stack_visible_incarnation_holder_terminal_v1"
+HOLDER_LOSS_REENTRY_SCHEMA_VERSION = (
+    "task_local_external_actor_holder_loss_reentry_v1"
+)
 TERMINAL_JOIN_SCHEMA_VERSION = "abyss_stack_visible_incarnation_terminal_join_v1"
 CLOSURE_AUTHORIZATION_SCHEMA_VERSION = (
     "abyss_stack_visible_incarnation_terminal_closure_authorization_v1"
@@ -1158,6 +1161,211 @@ def _load_binding_context_snapshot(raw: bytes) -> dict[str, str]:
     return _validate_binding_context(
         _decode_json_snapshot(raw, "terminal binding context snapshot")
     )
+
+
+def _load_holder_loss_reentry(
+    path: Path,
+    *,
+    expected_context: dict[str, str] | None = None,
+    expected_holder: tuple[int, int] | None = None,
+    expected_terminal: tuple[int, int] | None = None,
+) -> tuple[dict[str, Any], bytes, str]:
+    """Load the exact task-local evidence that admitted a replacement holder.
+
+    A holder-loss reentry receipt is not itself a canonical visible-holder
+    receipt.  It is an immutable admission input for the explicit rebind
+    operation below.  Keep that distinction visible and require every
+    identity/path/digest relation before a canonical receipt can be derived.
+    """
+
+    receipt, raw = _load_json_snapshot(path, "holder-loss reentry receipt")
+    if receipt.get("schema_version") != HOLDER_LOSS_REENTRY_SCHEMA_VERSION:
+        raise IncarnationHomeError("unsupported holder-loss reentry receipt schema")
+    expected_keys = {
+        "schema_version",
+        "goal_id",
+        "actor_id",
+        "role",
+        "session_id",
+        "workspace",
+        "duty_ref",
+        "duty_sha256",
+        "failure_event_ref",
+        "failure_event_sha256",
+        "prior_holder",
+        "current_holder",
+        "terminal",
+        "continuity",
+        "claim_limit",
+    }
+    if set(receipt) != expected_keys:
+        raise IncarnationHomeError("holder-loss reentry receipt fields are not exact")
+    for key in ("goal_id", "actor_id", "role", "session_id", "claim_limit"):
+        _binding_ref(receipt.get(key), f"holder-loss reentry {key}")
+    workspace = _binding_ref(receipt.get("workspace"), "holder-loss reentry workspace")
+    if not Path(workspace).is_absolute():
+        raise IncarnationHomeError("holder-loss reentry workspace must be absolute")
+    if expected_context is not None:
+        if receipt["goal_id"] != expected_context["goal_ref"]:
+            raise IncarnationHomeError("holder-loss reentry Goal identity disagrees with context")
+        if receipt["actor_id"] != expected_context["actor_ref"]:
+            raise IncarnationHomeError("holder-loss reentry actor identity disagrees with context")
+        if receipt["session_id"] != expected_context["session_ref"]:
+            raise IncarnationHomeError("holder-loss reentry session identity disagrees with context")
+        context_workspace = expected_context.get("workspace")
+        if context_workspace is not None and workspace != context_workspace:
+            raise IncarnationHomeError("holder-loss reentry workspace disagrees with context")
+    for ref_key, digest_key, label in (
+        ("duty_ref", "duty_sha256", "holder-loss duty"),
+        ("failure_event_ref", "failure_event_sha256", "holder-loss failure event"),
+    ):
+        reference = _regular_file(Path(receipt[ref_key]), label)
+        digest = receipt[digest_key]
+        if not isinstance(digest, str) or SHA256_DIGEST_PATTERN.fullmatch(digest) is None:
+            raise IncarnationHomeError(f"{label} digest is invalid")
+        if sha256_bytes(reference.read_bytes()) != digest:
+            raise IncarnationHomeError(f"{label} digest has drifted")
+    prior_holder = receipt["prior_holder"]
+    current_holder = receipt["current_holder"]
+    terminal = receipt["terminal"]
+    continuity = receipt["continuity"]
+    if (
+        not isinstance(prior_holder, dict)
+        or set(prior_holder) != {"pid", "start_ticks", "state"}
+        or not _positive_int(prior_holder.get("pid"))
+        or not _positive_int(prior_holder.get("start_ticks"))
+        or prior_holder.get("state") != "lost_before_return"
+    ):
+        raise IncarnationHomeError("holder-loss prior-holder evidence is invalid")
+    if (
+        not isinstance(current_holder, dict)
+        or set(current_holder) != {"pid", "start_ticks"}
+        or not _positive_int(current_holder.get("pid"))
+        or not _positive_int(current_holder.get("start_ticks"))
+    ):
+        raise IncarnationHomeError("holder-loss current-holder evidence is invalid")
+    if expected_holder is not None and (
+        current_holder["pid"] != expected_holder[0]
+        or current_holder["start_ticks"] != expected_holder[1]
+    ):
+        raise IncarnationHomeError("holder-loss current-holder identity disagrees")
+    if (
+        not isinstance(terminal, dict)
+        or set(terminal) != {"pid", "start_ticks", "visible", "operator_interactive"}
+        or not _positive_int(terminal.get("pid"))
+        or not _positive_int(terminal.get("start_ticks"))
+        or terminal.get("visible") is not True
+        or terminal.get("operator_interactive") is not True
+    ):
+        raise IncarnationHomeError("holder-loss terminal evidence is invalid")
+    if expected_terminal is not None and (
+        terminal["pid"] != expected_terminal[0]
+        or terminal["start_ticks"] != expected_terminal[1]
+    ):
+        raise IncarnationHomeError("holder-loss terminal identity disagrees")
+    if (
+        not isinstance(continuity, dict)
+        or continuity
+        != {
+            "same_actor": True,
+            "same_session": True,
+            "replacement_physical_incarnation": True,
+        }
+    ):
+        raise IncarnationHomeError("holder-loss continuity evidence is invalid")
+    return receipt, raw, sha256_bytes(raw)
+
+
+def _load_rebind_manifest(
+    path: Path, *, runtime_state_root: Path
+) -> tuple[dict[str, Any], bytes, str]:
+    """Read only the immutable realization fields needed by a rebind."""
+
+    manifest, raw = _load_json_snapshot(path, "replacement incarnation manifest")
+    if not path.resolve().is_relative_to(runtime_state_root.resolve()):
+        raise IncarnationHomeError(
+            "replacement incarnation manifest is outside the bound runtime state root"
+        )
+    required = {
+        "schema_version",
+        "model_slug",
+        "reasoning_effort",
+        "runtime_version",
+        "ambient_codex_home",
+        "codex_home",
+    }
+    if not required <= manifest.keys():
+        raise IncarnationHomeError("replacement incarnation manifest is incomplete")
+    if manifest.get("schema_version") not in {
+        SCHEMA_VERSION,
+        "abyss_stack_codex_incarnation_home_v1",
+    }:
+        raise IncarnationHomeError("unsupported replacement incarnation manifest")
+    for key in (
+        "model_slug",
+        "reasoning_effort",
+        "runtime_version",
+        "ambient_codex_home",
+        "codex_home",
+    ):
+        _binding_ref(manifest.get(key), f"replacement incarnation manifest {key}")
+    for key in ("ambient_codex_home", "codex_home"):
+        if not Path(manifest[key]).is_absolute():
+            raise IncarnationHomeError(
+                f"replacement incarnation manifest {key} must be absolute"
+            )
+    return manifest, raw, sha256_bytes(raw)
+
+
+def _validate_replacement_reentry_binding(
+    value: object,
+    *,
+    holder: dict[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise IncarnationHomeError("replacement reentry binding is not an object")
+    required = {
+        "receipt_ref",
+        "receipt_sha256",
+        "duty_ref",
+        "duty_sha256",
+        "failure_event_ref",
+        "failure_event_sha256",
+        "goal_id",
+        "actor_id",
+        "session_id",
+        "holder_pid",
+        "holder_start_ticks",
+    }
+    if set(value) != required:
+        raise IncarnationHomeError("replacement reentry binding fields are not exact")
+    reference = _regular_file(Path(value["receipt_ref"]), "replacement reentry receipt")
+    digest = value["receipt_sha256"]
+    if not isinstance(digest, str) or SHA256_DIGEST_PATTERN.fullmatch(digest) is None:
+        raise IncarnationHomeError("replacement reentry receipt digest is invalid")
+    if sha256_bytes(reference.read_bytes()) != digest:
+        raise IncarnationHomeError("replacement reentry receipt digest has drifted")
+    reentry, _raw, _digest = _load_holder_loss_reentry(
+        reference,
+        expected_holder=(holder.get("pid"), holder.get("start_ticks"))
+        if _positive_int(holder.get("pid")) and _positive_int(holder.get("start_ticks"))
+        else None,
+    )
+    for key in ("duty_ref", "duty_sha256", "failure_event_ref", "failure_event_sha256"):
+        if value[key] != reentry[key]:
+            raise IncarnationHomeError(
+                f"replacement reentry binding {key} disagrees with source receipt"
+            )
+    for key in ("goal_id", "actor_id", "session_id"):
+        if value[key] != reentry[key]:
+            raise IncarnationHomeError(
+                f"replacement reentry binding {key} disagrees with source receipt"
+            )
+    if value["holder_pid"] != reentry["current_holder"]["pid"] or value[
+        "holder_start_ticks"
+    ] != reentry["current_holder"]["start_ticks"]:
+        raise IncarnationHomeError("replacement reentry holder identity disagrees")
+    return value
 
 
 def _revalidate_bound_holder_identity(holder: dict[str, object]) -> None:
@@ -2370,6 +2578,141 @@ def _holder_receipt(
     return receipt
 
 
+def _rebind_replacement_holder_receipt(
+    *,
+    receipt_path: Path,
+    holder_loss_reentry_path: Path,
+    binding_context_path: Path,
+    manifest_path: Path,
+    codex_executable_path: Path,
+) -> dict[str, Any]:
+    """Bind a live replacement holder after a pre-return CLI loss.
+
+    This is an explicit recovery adapter for the old direct visible bootstrap.
+    It never upgrades the holder-loss receipt by itself: the replacement PID,
+    Kitty ancestry, current argv/executable, scoped manifest, and every source
+    digest are re-observed before a new canonical holder receipt is published.
+    """
+
+    context_document, _context_raw = _load_json_snapshot(
+        binding_context_path, "terminal binding context"
+    )
+    context = _validate_binding_context(context_document)
+    context_workspace = context_document.get("workspace")
+    if not isinstance(context_workspace, str) or not Path(context_workspace).is_absolute():
+        raise IncarnationHomeError("terminal binding context workspace is invalid")
+    context["workspace"] = context_workspace
+    reentry, _reentry_raw, reentry_digest = _load_holder_loss_reentry(
+        holder_loss_reentry_path,
+        expected_context=context,
+    )
+    holder_pid = reentry["current_holder"]["pid"]
+    holder_start_ticks = reentry["current_holder"]["start_ticks"]
+    terminal_pid = reentry["terminal"]["pid"]
+    terminal_start_ticks = reentry["terminal"]["start_ticks"]
+    if not _descends_from(os.getpid(), holder_pid):
+        raise IncarnationHomeError(
+            "replacement holder rebind must run from the bound holder lineage"
+        )
+    if _proc_identity_state(holder_pid, holder_start_ticks) != "live":
+        raise IncarnationHomeError("replacement holder is not live")
+    if _proc_identity_state(terminal_pid, terminal_start_ticks) != "live":
+        raise IncarnationHomeError("replacement Kitty terminal is not live")
+    if _proc_parent_pid(holder_pid) != terminal_pid:
+        raise IncarnationHomeError("replacement holder is not a direct Kitty child")
+    if _proc_start_ticks(terminal_pid) != terminal_start_ticks:
+        raise IncarnationHomeError("replacement Kitty PID was reused")
+    if _proc_comm(terminal_pid) != "kitty":
+        raise IncarnationHomeError("replacement terminal is not Kitty")
+    observed_terminal_pid, observed_terminal_start_ticks, terminal_argv = _kitty_ancestor(
+        holder_pid
+    )
+    if (
+        observed_terminal_pid != terminal_pid
+        or observed_terminal_start_ticks != terminal_start_ticks
+    ):
+        raise IncarnationHomeError("replacement Kitty ancestry disagrees with reentry")
+    window_id, dedicated = _kitty_dedication(
+        holder_pid=holder_pid,
+        kitty_pid=terminal_pid,
+        terminal_argv=terminal_argv,
+    )
+    manifest, _manifest_bytes, manifest_digest = _load_rebind_manifest(
+        manifest_path,
+        runtime_state_root=Path(context["runtime_state_root"]),
+    )
+    executable = _regular_file(codex_executable_path, "replacement Codex executable")
+    observed_executable = Path(f"/proc/{holder_pid}/exe").resolve()
+    if observed_executable != executable.resolve():
+        raise IncarnationHomeError(
+            "replacement Codex executable path disagrees with live holder"
+        )
+    executable_digest = _proc_exe_digest(holder_pid)
+    if sha256_bytes(executable.read_bytes()) != executable_digest:
+        raise IncarnationHomeError("replacement Codex executable digest has drifted")
+    scoped_home = os.environ.get("CODEX_HOME")
+    if scoped_home != manifest["codex_home"]:
+        raise IncarnationHomeError(
+            "replacement holder CODEX_HOME disagrees with its manifest"
+        )
+    holder_argv = _proc_argv(holder_pid)
+    holder_parent_pid = _proc_parent_pid(holder_pid)
+    holder_parent_start_ticks = _proc_start_ticks(holder_parent_pid)
+    holder_parent_comm = _proc_comm(holder_parent_pid)
+    receipt: dict[str, Any] = {
+        "schema_version": HOLDER_RECEIPT_SCHEMA_VERSION,
+        "receipt_ref": str(receipt_path.resolve()),
+        "created_at": _utc_now(),
+        "lifecycle_role": "responsibility_holder",
+        "boot_id": _proc_boot_id(),
+        "holder": {
+            "pid": holder_pid,
+            "start_ticks": holder_start_ticks,
+            "parent_pid": holder_parent_pid,
+            "parent_start_ticks": holder_parent_start_ticks,
+            "parent_comm": holder_parent_comm,
+            "argv": holder_argv,
+            "argv_digest": sha256_bytes(canonical_bytes(holder_argv)),
+            "exe_digest": executable_digest,
+        },
+        "runtime": {
+            "codex_executable": str(executable.resolve()),
+            "codex_executable_digest": executable_digest,
+            "incarnation_manifest": str(manifest_path.resolve()),
+            "incarnation_manifest_digest": manifest_digest,
+            "model": str(manifest["model_slug"]),
+            "reasoning_effort": str(manifest["reasoning_effort"]),
+            "ambient_codex_home": str(manifest["ambient_codex_home"]),
+            "incarnation_codex_home": str(manifest["codex_home"]),
+        },
+        "terminal": {
+            "binding": "kitty_ancestor_at_exec",
+            "required_comm": "kitty",
+            "pid": terminal_pid,
+            "start_ticks": terminal_start_ticks,
+            "argv": terminal_argv,
+            "window_id": window_id,
+            "dedicated": dedicated,
+        },
+        "replacement_reentry": {
+            "receipt_ref": str(holder_loss_reentry_path.resolve()),
+            "receipt_sha256": reentry_digest,
+            "duty_ref": reentry["duty_ref"],
+            "duty_sha256": reentry["duty_sha256"],
+            "failure_event_ref": reentry["failure_event_ref"],
+            "failure_event_sha256": reentry["failure_event_sha256"],
+            "goal_id": reentry["goal_id"],
+            "actor_id": reentry["actor_id"],
+            "session_id": reentry["session_id"],
+            "holder_pid": holder_pid,
+            "holder_start_ticks": holder_start_ticks,
+        },
+    }
+    _assert_safe_projection(receipt)
+    _write_new_json(receipt_path, receipt, "replacement holder terminal receipt")
+    return receipt
+
+
 def _decode_holder_manifest_snapshot(runtime: dict[str, Any]) -> bytes | None:
     """Validate and return the immutable manifest snapshot in a holder receipt.
 
@@ -2817,6 +3160,12 @@ def _load_holder_receipt_snapshot(
         or not all(isinstance(item, str) for item in holder["argv"])
     ):
         raise IncarnationHomeError("holder terminal receipt is incomplete")
+    replacement_reentry = receipt.get("replacement_reentry")
+    if replacement_reentry is not None:
+        _validate_replacement_reentry_binding(
+            replacement_reentry,
+            holder=holder,
+        )
     pre_exec_argv = holder.get("pre_exec_argv")
     pre_exec_argv_digest = holder.get("pre_exec_argv_digest")
     pre_exec_exe_digest = holder.get("pre_exec_exe_digest")
@@ -3740,6 +4089,18 @@ def command_bind(args: argparse.Namespace) -> int:
         source_digest=source_digest,
     )
     print(json.dumps(document, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
+def command_rebind(args: argparse.Namespace) -> int:
+    receipt = _rebind_replacement_holder_receipt(
+        receipt_path=Path(args.output),
+        holder_loss_reentry_path=Path(args.holder_loss_reentry),
+        binding_context_path=Path(args.binding_context),
+        manifest_path=Path(args.manifest),
+        codex_executable_path=Path(args.codex_executable),
+    )
+    print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
     return 0
 
 
@@ -6658,6 +7019,19 @@ def parser() -> argparse.ArgumentParser:
     bind.add_argument("--binding-context", required=True)
     bind.add_argument("--output", required=True)
     bind.set_defaults(handler=command_bind)
+    rebind = subcommands.add_parser(
+        "rebind",
+        help=(
+            "derive one canonical holder receipt from an exact holder-loss "
+            "replacement evidence packet"
+        ),
+    )
+    rebind.add_argument("--holder-loss-reentry", required=True)
+    rebind.add_argument("--binding-context", required=True)
+    rebind.add_argument("--manifest", required=True)
+    rebind.add_argument("--codex-executable", required=True)
+    rebind.add_argument("--output", required=True)
+    rebind.set_defaults(handler=command_rebind)
     status = subcommands.add_parser("status")
     status.add_argument("--binding")
     status.add_argument("--holder-receipt")

@@ -118,6 +118,59 @@ def _terminal_binding_fixture(
     return listener, binding, holder, terminal
 
 
+def _holder_loss_reentry_fixture(
+    tmp_path: Path,
+) -> tuple[Path, dict[str, object], dict[str, str]]:
+    duty = tmp_path / "duty.md"
+    duty.write_text("wake-return duty\n", encoding="utf-8")
+    failure_event = tmp_path / "observer-event.json"
+    failure_event.write_text('{"event":"holder_lost"}\n', encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    runtime_state_root = tmp_path / "runtime-state"
+    runtime_state_root.mkdir()
+    closeout_route = tmp_path / "closeout.sh"
+    closeout_route.write_text("#!/bin/sh\n", encoding="utf-8")
+    receipt = {
+        "schema_version": MODULE.HOLDER_LOSS_REENTRY_SCHEMA_VERSION,
+        "goal_id": "goal:holder-loss",
+        "actor_id": "actor:holder-loss",
+        "role": "coder/executor",
+        "session_id": "session:holder-loss",
+        "workspace": str(workspace),
+        "duty_ref": str(duty),
+        "duty_sha256": MODULE.sha256_bytes(duty.read_bytes()),
+        "failure_event_ref": str(failure_event),
+        "failure_event_sha256": MODULE.sha256_bytes(failure_event.read_bytes()),
+        "prior_holder": {"pid": 11, "start_ticks": 111, "state": "lost_before_return"},
+        "current_holder": {"pid": 101, "start_ticks": 1001},
+        "terminal": {
+            "pid": 202,
+            "start_ticks": 2002,
+            "visible": True,
+            "operator_interactive": True,
+        },
+        "continuity": {
+            "same_actor": True,
+            "same_session": True,
+            "replacement_physical_incarnation": True,
+        },
+        "claim_limit": "replacement visible CLI holder only; return and closure remain separate",
+    }
+    path = tmp_path / "holder-loss-reentry.json"
+    path.write_bytes(MODULE.canonical_bytes(receipt) + b"\n")
+    context = {
+        "goal_ref": receipt["goal_id"],
+        "actor_ref": receipt["actor_id"],
+        "incarnation_ref": "incarnation:holder-loss",
+        "session_ref": receipt["session_id"],
+        "runtime_state_root": str(runtime_state_root),
+        "closeout_route": str(closeout_route),
+        "workspace": receipt["workspace"],
+    }
+    return path, receipt, context
+
+
 def test_prepared_home_binds_nested_default_without_rehoming_parent(tmp_path: Path) -> None:
     ambient = tmp_path / "ambient"
     runtime_root = tmp_path / "runtime"
@@ -588,6 +641,55 @@ def test_capability_projection_schemas_are_valid_json(schema_name: str) -> None:
     assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
     assert schema["additionalProperties"] is False
     Draft202012Validator.check_schema(schema)
+
+
+def test_holder_loss_reentry_is_exactly_bound_to_source_evidence(
+    tmp_path: Path,
+) -> None:
+    path, receipt, context = _holder_loss_reentry_fixture(tmp_path)
+    loaded, raw, digest = MODULE._load_holder_loss_reentry(
+        path,
+        expected_context=context,
+        expected_holder=(101, 1001),
+        expected_terminal=(202, 2002),
+    )
+    assert loaded == receipt
+    assert raw == path.read_bytes()
+    assert digest == MODULE.sha256_bytes(raw)
+
+    receipt["goal_id"] = "goal:wrong"
+    path.write_bytes(MODULE.canonical_bytes(receipt) + b"\n")
+    with pytest.raises(MODULE.IncarnationHomeError, match="Goal identity"):
+        MODULE._load_holder_loss_reentry(path, expected_context=context)
+
+
+def test_replacement_reentry_binding_rejects_provenance_drift(
+    tmp_path: Path,
+) -> None:
+    path, receipt, _context = _holder_loss_reentry_fixture(tmp_path)
+    binding = {
+        "receipt_ref": str(path),
+        "receipt_sha256": MODULE.sha256_bytes(path.read_bytes()),
+        "duty_ref": receipt["duty_ref"],
+        "duty_sha256": receipt["duty_sha256"],
+        "failure_event_ref": receipt["failure_event_ref"],
+        "failure_event_sha256": receipt["failure_event_sha256"],
+        "goal_id": receipt["goal_id"],
+        "actor_id": receipt["actor_id"],
+        "session_id": receipt["session_id"],
+        "holder_pid": 101,
+        "holder_start_ticks": 1001,
+    }
+    assert MODULE._validate_replacement_reentry_binding(
+        binding,
+        holder={"pid": 101, "start_ticks": 1001},
+    ) == binding
+    binding["failure_event_sha256"] = "sha256:" + "0" * 64
+    with pytest.raises(MODULE.IncarnationHomeError, match="failure_event_sha256"):
+        MODULE._validate_replacement_reentry_binding(
+            binding,
+            holder={"pid": 101, "start_ticks": 1001},
+        )
 
 
 def test_preparation_rejects_realization_fingerprint_drift(tmp_path: Path) -> None:

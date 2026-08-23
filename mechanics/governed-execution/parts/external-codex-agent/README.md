@@ -134,6 +134,14 @@ and replay only through their matching legacy wake reservation. A retry after a 
   active Goal through bounded turn views without treating omitted history as
   idle, and composes typed authorization with exact holder closure. It does not
   claim owner acceptance or semantic re-entry;
+- exposes `aoa-external-codex-return return-route --route <absolute json>` as a
+  digest-bound bridge entrypoint that selects no Goal or terminal and delegates
+  only to the canonical return leaf. The route's wrapper exit is not delivery
+  or closure evidence; durable return, authorization, and exact-holder closure
+  receipts remain required. After a pre-return CLI loss,
+  `visible_incarnation_home.py rebind` can derive a canonical holder receipt
+  only from the exact holder-loss packet and live replacement lineage, and that
+  receipt proves holder identity only;
 - exposes the separate `aoa-external-codex-return pause` lifecycle action. It
   receives a pause-owner binding and requires an `atomic_goal_transition`
   adapter method that performs a server-supported compare-and-set/version proof

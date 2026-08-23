@@ -66,6 +66,14 @@ descriptive-schema-valid, but manifest loading recomputes the exact
 subject/entry/artifact relation and rejects it; this is the runtime admission
 boundary, not evidence of trust admission or app-server enforcement.
 
+The wake/return repair adds deterministic coverage for the explicit
+holder-loss reentry packet: source duty/event digests, same-actor/session
+continuity, replacement holder identity, and provenance drift are rejected
+fail-closed. Return-route tests prove strict input-digest binding, output-path
+non-aliasing, and delegation without Goal or terminal selection. These checks
+still do not claim a live app-server delivery, holder closure, semantic
+acceptance, or installed-release parity.
+
 The focused external-return tests also cover the separate Goal pause contour:
 an exact active owner-bound Goal is refused before `thread/goal/set` when the
 app-server adapter lacks an `atomic_goal_transition` method with a

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/external-codex-return-route.schema.json",
+  "title": "Abyss external Codex canonical return route",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "owner_ref",
+    "owner_sha256",
+    "handoff_ref",
+    "handoff_sha256",
+    "holder_receipt_ref",
+    "holder_receipt_sha256",
+    "return_receipt_ref",
+    "authorization_ref",
+    "closure_receipt_ref"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "abyss_stack_external_codex_return_route_v1"
+    },
+    "owner_ref": {"type": "string", "pattern": "^/"},
+    "owner_sha256": {"$ref": "#/$defs/digest"},
+    "handoff_ref": {"type": "string", "pattern": "^/"},
+    "handoff_sha256": {"$ref": "#/$defs/digest"},
+    "holder_receipt_ref": {"type": "string", "pattern": "^/"},
+    "holder_receipt_sha256": {"$ref": "#/$defs/digest"},
+    "return_receipt_ref": {"type": "string", "pattern": "^/"},
+    "authorization_ref": {"type": "string", "pattern": "^/"},
+    "closure_receipt_ref": {"type": "string", "pattern": "^/"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

@@ -212,6 +212,15 @@ Operations are:
   as an input migration; no Goal, thread, rollout, PR, disposition, or
   task-root coordinate is selected by source.
 
+  `aoa-external-codex-return return-route --route <absolute json>` is the
+  bridge-safe form of the same leaf. The route is a non-replacing,
+  digest-bound record of the already selected owner, handoff, canonical holder
+  receipt, and three output paths. It performs no Goal or terminal discovery;
+  it delegates only after every input digest, output identity, and alias check
+  passes. A route or wrapper exit is not delivery or closure evidence; the
+  durable return, typed authorization, and exact-holder closure receipts remain
+  the claims that must be inspected.
+
 The operator-visible incarnation launcher has a separate lifecycle contour for
 the responsibility holder. `launch --holder-receipt <absolute json>` remains
 valid for the direct `exec` route: immediately before the Codex `exec`, it
@@ -246,6 +255,15 @@ the Goal, actor/incarnation/session, holder and Kitty PID/start ticks, Kitty
 window ID, TTY, title, socket, runtime state root, and closeout route. The
 `bind` command can materialize that binding from a legacy task-local receipt
 only with an explicit owner context.
+
+The `rebind` command is a narrow recovery adapter for a replacement physical
+holder after a pre-return CLI loss. It accepts only the exact
+`task_local_external_actor_holder_loss_reentry_v1` packet, validates its duty
+and observer-event digests, current holder/Kitty identities, direct holder
+lineage, scoped incarnation manifest, and executable digest, and publishes a
+new canonical holder receipt carrying the packet provenance. The rebind receipt
+proves only holder identity; it does not prove wake delivery, Goal activation,
+semantic acceptance, or closure.
 
 The payload holder publishes its lifecycle receipt only after the exact Kitty
 ancestor and dedicated-window handshake is ready. The runtime retries that
